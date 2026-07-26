@@ -1,5 +1,36 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
 <mapper namespace="com.cakeshop.domain.product.mapper.ProductMapper">
-    <!-- 사용자 입력은 #{} 만 사용 (${} 금지) -->
+
+    <!--
+        고객 상품 상세 조회.
+
+        판매 중인 상품만 조회한다.
+        상품이 없거나 판매 중지 상태이면 조회 결과가 반환되지 않는다.
+    -->
+    <select id="findPublicDetailById"
+            resultType="com.cakeshop.domain.product.dto.view.ProductDetailView">
+        SELECT
+            p.id,
+            p.category_id,
+            c.name AS category_name,
+            p.name,
+            p.description,
+            p.base_price,
+            p.stock_quantity,
+            p.product_type,
+            p.preparation_days,
+            p.cancellation_limit_days,
+            p.average_rating,
+            p.review_count
+        FROM products p
+                 INNER JOIN categories c
+                            ON c.id = p.category_id
+        WHERE p.id = #{productId}
+          AND p.status = 'ACTIVE'
+    </select>
+
 </mapper>

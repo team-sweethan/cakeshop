@@ -4,7 +4,17 @@ import com.cakeshop.global.error.ErrorCode;
 
 public enum ProductErrorCode implements ErrorCode {
 
-    NOT_ON_SALE("PRODUCT_001", "판매 중인 상품이 아닙니다.", 400);
+    NOT_ON_SALE(
+            "PRODUCT_001",
+            "판매 중인 상품이 아닙니다.",
+            400
+    ),
+
+    NOT_FOUND(
+            "PRODUCT_002",
+            "상품을 찾을 수 없습니다.",
+            404
+    );
 
     private final String code;
     private final String message;

@@ -10,3 +10,4 @@
 ALTER TABLE `products`
     ADD COLUMN `stock_quantity` INT UNSIGNED NULL
     AFTER `base_price`;
+
