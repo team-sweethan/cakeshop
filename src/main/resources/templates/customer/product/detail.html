@@ -25,9 +25,6 @@
 
 <main class="page-container">
 
-  <!-- 목업 화면 안내 -->
-  <div th:replace="~{fragments/customer/mock-notice :: notice}"></div>
-
   <!-- 페이지 제목 -->
   <h1>상품 상세</h1>
 
@@ -54,35 +51,15 @@
   <!-- 상품 상세 정보 -->
   <section class="grid grid--2 section">
 
-    <!--
-      상품 이미지 영역.
-      product_images 구현 전까지 정적 샘플을 노출한다.
-    -->
+    <!-- 상품 이미지 테이블 연결 전까지 명확한 빈 상태를 표시한다. -->
     <div class="product-gallery">
-
-      <!-- 정적 대표 이미지 -->
       <div class="placeholder-image placeholder-image--lg">
-        상품 대표 이미지
+        상품 이미지 준비 중
       </div>
 
-      <!-- 정적 추가 이미지 목록 -->
-      <div class="grid grid--4 product-gallery__thumbnails">
-        <div class="placeholder-image placeholder-image--sm">
-          이미지 1
-        </div>
-
-        <div class="placeholder-image placeholder-image--sm">
-          이미지 2
-        </div>
-
-        <div class="placeholder-image placeholder-image--sm">
-          이미지 3
-        </div>
-
-        <div class="placeholder-image placeholder-image--sm">
-          이미지 4
-        </div>
-      </div>
+      <p class="note" style="margin-top:8px">
+        등록된 상품 이미지가 없습니다.
+      </p>
     </div>
 
     <!-- 실제 상품 기본 정보 -->
@@ -171,20 +148,6 @@
           </span>
       </div>
 
-      <!--
-        알레르기 정보.
-        DB 컬럼 구현 전까지 정적 샘플을 노출한다.
-      -->
-      <div class="data-row">
-          <span class="data-row__label">
-            알레르기 정보
-          </span>
-
-        <span>
-            밀, 유제품, 계란
-          </span>
-      </div>
-
       <!-- 상품 준비 기간 -->
       <div class="data-row">
           <span class="data-row__label">
@@ -223,6 +186,63 @@
         >
             픽업일 2일 전까지 취소 가능
           </span>
+      </div>
+
+      <!-- 실제 상품 옵션 -->
+      <div class="section" style="margin-top:16px">
+        <h3 class="form-label">선택 가능한 옵션</h3>
+
+        <div class="stack"
+             th:if="${!optionGroups.isEmpty()}">
+          <section class="panel"
+                   th:each="optionGroup : ${optionGroups}">
+            <div class="cluster cluster--between">
+              <strong th:text="${optionGroup.name}">
+                옵션 그룹
+              </strong>
+
+              <span class="badge badge--info"
+                    th:if="${optionGroup.required}">
+                필수
+              </span>
+
+              <span class="badge"
+                    th:unless="${optionGroup.required}">
+                선택
+              </span>
+            </div>
+
+            <div style="margin-top:8px">
+              <div class="data-row"
+                   th:each="option : ${optionGroup.options}">
+                <span th:text="${option.name}">
+                  옵션명
+                </span>
+
+                <span th:if="${option.additionalPrice.signum() > 0}">
+                  +
+                  <span th:text="${#numbers.formatInteger(
+                      option.additionalPrice,
+                      1,
+                      'COMMA'
+                  )}">
+                    0
+                  </span>원
+                </span>
+
+                <span class="text-muted"
+                      th:unless="${option.additionalPrice.signum() > 0}">
+                  추가 금액 없음
+                </span>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <div class="panel panel--dashed text-muted"
+             th:if="${optionGroups.isEmpty()}">
+          등록된 선택 옵션이 없습니다.
+        </div>
       </div>
 
       <!-- 재고가 있는 경우에만 수량 선택기를 표시한다. -->
@@ -322,13 +342,10 @@
           </button>
         </div>
 
-        <!--
-          주문 제작 옵션 버튼.
-          옵션 도메인 연결 전까지 정적 버튼으로 노출한다.
-        -->
         <div
                 class="cluster"
-                th:if="${product.available}"
+                th:if="${product.available
+                        and product.productType.name() == 'CUSTOM'}"
         >
           <a
                   class="btn"
@@ -336,10 +353,6 @@
           >
             제작 옵션 선택
           </a>
-
-          <span class="note">
-              주문 제작 상품 버튼
-            </span>
         </div>
       </div>
     </div>
@@ -373,62 +386,9 @@
   </span>
     </div>
 
-    <!--
-      실제 후기 조회 기능 구현 전까지
-      아래 후기 목록은 정적 샘플로 노출한다.
-    -->
-    <div class="stack">
-
-      <!-- 정적 샘플 후기 1 -->
-      <article class="panel">
-        <div class="cluster cluster--between text-muted">
-            <span>
-              김OO | ★★★★★
-            </span>
-
-          <time datetime="2025-01-15">
-            2025.01.15
-          </time>
-        </div>
-
-        <p>
-          맛있고 예뻐요.
-        </p>
-      </article>
-
-      <!-- 정적 샘플 후기 2 -->
-      <article class="panel">
-        <div class="cluster cluster--between text-muted">
-            <span>
-              이OO | ★★★★☆
-            </span>
-
-          <time datetime="2025-01-10">
-            2025.01.10
-          </time>
-        </div>
-
-        <p>
-          달지 않고 좋아요.
-        </p>
-      </article>
-
-      <!-- 정적 샘플 후기 3 -->
-      <article class="panel">
-        <div class="cluster cluster--between text-muted">
-            <span>
-              박OO | ★★★★★
-            </span>
-
-          <time datetime="2025-01-05">
-            2025.01.05
-          </time>
-        </div>
-
-        <p>
-          픽업이 편리했습니다.
-        </p>
-      </article>
+    <!-- 후기 목록 도메인이 연결되기 전까지 허위 샘플은 표시하지 않는다. -->
+    <div class="panel panel--dashed text-muted">
+      후기 목록은 준비 중입니다.
     </div>
 
     <!-- 실제 후기 작성 화면 이동 -->
