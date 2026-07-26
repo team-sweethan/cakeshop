@@ -5,7 +5,7 @@
 -- 컬럼명과 용도에 맞춰 타입, NULL 허용 여부, 기본값을 합리적으로 지정했다.
 -- 애플리케이션의 Java enum이 확정되면 각 status 컬럼에 CHECK 제약을 추가한다.
 --
--- payments.active_paid_order_id는 결제 상태가 PAID인 동안에만 order_id를 갖는
+-- payments.active_paid_order_id는 결제 상태가 DONE인 동안에만 order_id를 갖는
 -- 생성 열이다. UNIQUE 제약과 결합하여 주문 하나에 활성 결제가 1건만 존재하게 한다.
 
 SET NAMES utf8mb4;
@@ -326,7 +326,7 @@ CREATE TABLE `payments` (
     `provider_status`      VARCHAR(50) NULL,
     `active_paid_order_id` BIGINT
         GENERATED ALWAYS AS (
-            CASE WHEN `status` = 'PAID' THEN `order_id` ELSE NULL END
+            CASE WHEN `status` = 'DONE' THEN `order_id` ELSE NULL END
         ) STORED,
     `failure_code`         VARCHAR(100) NULL,
     `failure_message`      VARCHAR(500) NULL,

@@ -2,36 +2,44 @@ package com.cakeshop.domain.order.entity;
 
 import java.util.Set;
 
-// 주문 상태 11개 — 주문제작 승인 단계도 동일 enum에 포함
+// 일반·수제 주문 공통 상태 7개 — 주문 종류별 전이는 Service에서 구분한다.
 public enum OrderStatus {
 
-    WAITING_APPROVAL,  // 주문제작 전용: 관리자 승인 대기
-    APPROVED,          // 주문제작 전용: 승인됨 → 결제 진행 가능
-    REJECTED,          // 주문제작 전용: 거절 (최종)
-    PENDING_PAYMENT,   // 공통: 결제 대기 (일반 주문 시작점)
-    PAID,              // 공통: 토스 결제 승인 완료
-    ACCEPTED,          // 공통: 관리자 접수
-    PREPARING,         // 공통: 제작·준비·포장
-    READY,             // 공통: 픽업 준비 완료
-    PICKED_UP,         // 공통: 인도 완료 (최종)
-    CANCELED,          // 공통: 취소 완료 (최종)
-    EXPIRED;           // 공통: 결제 시간 초과 (최종)
+    /*
+    결제 성공 후
+    일반 상품 -> READY_FOR_PICKUP
+    수제 상품 -> UNDER_REVIEW
+     */
+    PENDING_PAYMENT,   // 결제 대기
+    UNDER_REVIEW,      // 수제 케이크 확인 중
+    READY_FOR_PICKUP,  // 픽업 대기
+    PICKED_UP,         // 픽업 완료
+    CANCELED,          // 주문 취소
+    REJECTED,          // 수제 케이크 반려
+    EXPIRED;           // 결제 시간 만료
 
-    // 정의된 전이 외의 상태 변경은 허용하지 않는다
     public boolean canTransitionTo(OrderStatus next) {
         return switch (this) {
-            case WAITING_APPROVAL -> Set.of(APPROVED, REJECTED, CANCELED).contains(next);
-            case APPROVED -> Set.of(PENDING_PAYMENT, CANCELED).contains(next);
-            case PENDING_PAYMENT -> Set.of(PAID, EXPIRED, CANCELED).contains(next);
-            case PAID -> Set.of(ACCEPTED, CANCELED).contains(next);
-            case ACCEPTED -> Set.of(PREPARING, CANCELED).contains(next);      // 취소는 관리자만 (Service에서 검증)
-            case PREPARING -> Set.of(READY, CANCELED).contains(next);          // 관리자만, 매장 정책 충족 시
-            case READY -> Set.of(PICKED_UP, CANCELED).contains(next);          // 관리자만, 매장 정책 충족 시
-            case REJECTED, PICKED_UP, CANCELED, EXPIRED -> false;              // 최종 상태
+            case PENDING_PAYMENT ->
+                    Set.of(UNDER_REVIEW, READY_FOR_PICKUP, CANCELED, EXPIRED)
+                            .contains(next);
+
+            case UNDER_REVIEW ->
+                    Set.of(READY_FOR_PICKUP, REJECTED, CANCELED)
+                            .contains(next);
+
+            case READY_FOR_PICKUP ->
+                    Set.of(PICKED_UP, CANCELED)
+                            .contains(next);
+
+            case PICKED_UP, CANCELED, REJECTED, EXPIRED -> false;
         };
     }
 
     public boolean isFinal() {
-        return this == REJECTED || this == PICKED_UP || this == CANCELED || this == EXPIRED;
+        return this == PICKED_UP
+                || this == CANCELED
+                || this == REJECTED
+                || this == EXPIRED;
     }
 }

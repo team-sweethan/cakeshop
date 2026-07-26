@@ -63,8 +63,8 @@
 | 공통 회원 | 일반 사용자 기능 확인 | 🟡 `user` (day1) | |
 | 상태별 회원 | 제한·탈퇴 등 예외 확인 | 🟡 `suspended`(정지) — `members.status` 컬럼 반영 완료. 남은 건 로그인 시 정지/탈퇴 차단 로직(`findByEmail`에 `status` 조회 + 거부) 채택 여부 | |
 | 개인 계정 | 개인 기능 개발 | ⬜ | |
-| 주문 계정 | 주문 생성·승인·취소 흐름 | 🟡 `buyer`(PICKED_UP) · `custom`(WAITING_APPROVAL) | |
-| 결제 계정 | 결제·환불 흐름 | 🟡 `paid`(PAID) | |
+| 주문 계정 | 주문 생성·승인·취소 흐름 | 🟡 `buyer`(PICKED_UP) · `custom`(UNDER_REVIEW) | |
+| 결제 계정 | 결제·환불 흐름 | 🟡 `paid`(DONE) | |
 | 리뷰 계정 | 픽업 완료 후 리뷰 작성 | ⬜ | |
 
 ### 원칙

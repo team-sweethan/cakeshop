@@ -143,7 +143,7 @@ DB 모델과 화면 모델을 분리해, 화면 검증 규칙이 영속 모델�
 - **저장값은 영문 enum 이름 하나로 통일.** 한글·숫자·코드값으로 저장하지 않는다.
 - **한글은 화면에서만.** 저장값과 라벨을 섞으면 세 표현이 서로 어긋난다(drift). 라벨 매핑은 enum이나 view가 소유한다.
 - **전이는 service에서.** DB는 값 집합만, 상태 머신은 Java가 소유한다.
-- `OrderStatus`(11개 + 전이)·`PaymentStatus`(6개)가 **이미 이 형태의 모범답안**이다. 나머지 담당자는 이 두 enum을 그대로 복제해서 자기 도메인에 적용한다.
+- `OrderStatus`(7개 + 전이)·`PaymentStatus`(6개)가 **이미 이 형태의 모범답안**이다. 나머지 담당자는 이 두 enum을 그대로 복제해서 자기 도메인에 적용한다.
 
 ### DB 컬럼 작성 규칙 (전원 합의)
 
@@ -159,7 +159,7 @@ DB 모델과 화면 모델을 분리해, 화면 검증 규칙이 영속 모델�
 | `members.status` | 수민 | 정상 / 이용 제한 | `ACTIVE / SUSPENDED / WITHDRAWN` | 거의 확정 |
 | `products.status` | 시은 | 판매 중 / 판매 중지 | `ACTIVE / INACTIVE` | 거의 확정 |
 | `product_options.status` | 시은 | (표기 없음) | `ACTIVE / INACTIVE` ? | ☐ 열림 |
-| `orders.status` | 주환 | 승인대기/승인/거절/결제대기/결제완료/접수/제작중/픽업준비/픽업완료 | **`OrderStatus` 11개 (확정)** | ✅ 코드 확정 |
+| `orders.status` | 주환 | 결제대기/확인중/픽업대기/픽업완료/취소/반려/만료 | **`OrderStatus` 7개 (확정)** | ✅ 코드 확정 |
 | `payments.status` | 주환 | 결제 완료 / 결제 대기 | **`PaymentStatus` 6개 (확정)** | ✅ 코드 확정 |
 | `payment_cancellations.status` | 주환 | 취소 요청 | `REQUESTED / DONE / REJECTED` ? | ☐ 열림 |
 | `coupons.status` | 정후 | 발급 중 | `ACTIVE / INACTIVE / ENDED` ? | ☐ 열림 |
@@ -172,18 +172,21 @@ DB 모델과 화면 모델을 분리해, 화면 검증 규칙이 영속 모델�
 
 ### 이미 확정된 두 enum
 
-**`OrderStatus` (주문·주문제작 공통, 11개 + 전이규칙 — 코드에 확정됨)**
+**`OrderStatus` (주문·주문제작 공통, 7개 + 전이규칙 — 코드에 확정됨)**
 
 ```
 정상 흐름:
-WAITING_APPROVAL → APPROVED → PENDING_PAYMENT → PAID → ACCEPTED → PREPARING → READY → PICKED_UP
+  일반 상품
+  PENDING_PAYMENT -> READY_FOR_PICKUP -> PICKED_UP
+  수제 상품
+  PENDING_PAYMENT -> UNDER_REVIEW -> READY_FOR_PICKUP -> PICKED_UP
 예외 흐름:
-WAITING_APPROVAL → REJECTED           (주문제작 거절, 최종)
-PENDING_PAYMENT  → EXPIRED            (결제 시간 초과, 최종)
-* 대부분 상태     → CANCELED           (취소, 최종)
+PENDING_PAYMENT -> EXPIRED
+UNDER_REVIEW -> REJECTED
+허용된 상태 → CANCELED                 (취소, 최종)
 최종 상태: REJECTED / PICKED_UP / CANCELED / EXPIRED
 ```
-전이 규칙은 `OrderStatus.canTransitionTo()`가 소유한다. SQL의 `CHECK`는 11개 값 집합만 나열한다.
+전이 규칙은 `OrderStatus.canTransitionTo()`가 소유한다. SQL의 `CHECK`는 7개 값 집합만 나열한다.
 
 **`PaymentStatus` (토스 결제 상태, 6개 — 코드에 확정됨. 주문 enum과 절대 섞지 않는다)**
 

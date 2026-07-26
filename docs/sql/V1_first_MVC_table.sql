@@ -253,7 +253,7 @@
 
     -- =========================================================
     -- 결제 (주환)
-    -- 1차에는 Mock 결과 저장. active_paid_order_id 는 status=PAID 일 때만 order_id 를
+    -- 1차에는 Mock 결과 저장. active_paid_order_id 는 status=DONE 일 때만 order_id 를
     -- 갖는 생성 열이며, UNIQUE 와 결합해 주문당 활성 결제 1건을 보장한다.
     -- =========================================================
 
@@ -269,7 +269,7 @@
         `provider_status`      VARCHAR(50) NULL,
         `active_paid_order_id` BIGINT
             GENERATED ALWAYS AS (
-                CASE WHEN `status` = 'PAID' THEN `order_id` ELSE NULL END
+                CASE WHEN `status` = 'DONE' THEN `order_id` ELSE NULL END
             ) STORED,
         `failure_code`         VARCHAR(100) NULL,
         `failure_message`      VARCHAR(500) NULL,
