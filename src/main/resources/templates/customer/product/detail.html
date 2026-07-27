@@ -49,7 +49,13 @@
   </p>
 
   <!-- 상품 상세 정보 -->
-  <section class="grid grid--2 section">
+  <section class="grid grid--2 section"
+           data-product-detail
+           th:attr="data-product-id=${product.id},
+                    data-product-name=${product.name},
+                    data-product-type=${product.productType.displayName},
+                    data-base-price=${product.basePrice},
+                    data-stock=${product.stockQuantity}">
 
     <!-- 상품 이미지 테이블 연결 전까지 명확한 빈 상태를 표시한다. -->
     <div class="product-gallery">
@@ -195,7 +201,12 @@
         <div class="stack"
              th:if="${!optionGroups.isEmpty()}">
           <section class="panel"
-                   th:each="optionGroup : ${optionGroups}">
+                   th:each="optionGroup : ${optionGroups}"
+                   data-option-group
+                   th:attr="data-option-group-id=${optionGroup.id},
+                            data-option-group-name=${optionGroup.name},
+                            data-option-required=${optionGroup.required},
+                            data-selection-type=${optionGroup.selectionType}">
             <div class="cluster cluster--between">
               <strong th:text="${optionGroup.name}">
                 옵션 그룹
@@ -213,10 +224,23 @@
             </div>
 
             <div style="margin-top:8px">
-              <div class="data-row"
-                   th:each="option : ${optionGroup.options}">
-                <span th:text="${option.name}">
-                  옵션명
+              <!-- 단일 선택 그룹은 radio, 복수 선택 그룹은 checkbox로 출력한다. -->
+              <label class="data-row"
+                     th:each="option : ${optionGroup.options}">
+                <span class="cluster">
+                  <input data-product-option
+                         th:type="${optionGroup.selectionType == 'MULTIPLE'
+                                  ? 'checkbox'
+                                  : 'radio'}"
+                         th:name="|option-group-${optionGroup.id}|"
+                         th:value="${option.id}"
+                         th:attr="data-option-id=${option.id},
+                                  data-option-name=${option.name},
+                                  data-option-price=${option.additionalPrice}">
+
+                  <span th:text="${option.name}">
+                    옵션명
+                  </span>
                 </span>
 
                 <span th:if="${option.additionalPrice.signum() > 0}">
@@ -234,8 +258,15 @@
                       th:unless="${option.additionalPrice.signum() > 0}">
                   추가 금액 없음
                 </span>
-              </div>
+              </label>
             </div>
+
+            <!-- 필수 옵션 그룹이 선택되지 않았을 때 JavaScript가 표시한다. -->
+            <p class="form-error"
+               data-option-group-error
+               hidden>
+              필수 옵션을 선택해 주세요.
+            </p>
           </section>
         </div>
 
@@ -294,6 +325,46 @@
           >
             +
           </button>
+        </div>
+      </div>
+
+      <!-- 선택 옵션과 수량이 바뀔 때 JavaScript가 금액을 다시 계산한다. -->
+      <div class="panel stack"
+           th:if="${product.available}"
+           data-product-price-summary
+           style="margin-top:16px">
+        <div class="data-row">
+          <span class="data-row__label">기본 가격</span>
+          <strong th:text="|${#numbers.formatInteger(
+                    product.basePrice,
+                    1,
+                    'COMMA'
+                  )}원|">
+            0원
+          </strong>
+        </div>
+
+        <div class="data-row">
+          <span class="data-row__label">옵션 추가금액</span>
+          <strong data-selected-option-price>0원</strong>
+        </div>
+
+        <div class="data-row">
+          <span class="data-row__label">수량</span>
+          <strong data-selected-quantity>1개</strong>
+        </div>
+
+        <div class="data-row">
+          <span class="data-row__label">총금액</span>
+          <strong data-product-total-price
+                  style="font-size:20px"
+                  th:text="|${#numbers.formatInteger(
+                    product.basePrice,
+                    1,
+                    'COMMA'
+                  )}원|">
+            0원
+          </strong>
         </div>
       </div>
 
