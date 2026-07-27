@@ -65,30 +65,39 @@
         추천 · 인기 상품
       </h2>
 
+      <!-- HomeController가 전달한 추천 상품이 있을 때만 상품 목록을 출력한다. -->
       <div class="grid grid--4 product-grid"
            th:if="${!recommendedProducts.isEmpty()}">
+
+        <!-- 추천 상품을 반복 출력하고 상품 ID를 이용해 상세 화면으로 연결한다. -->
         <a class="product-card"
            th:each="product : ${recommendedProducts}"
-           th:href="@{/products/{productId}(productId=${product.id})}">
+           th:href="@{/products/{productId}(
+                 productId=${product.id}
+             )}">
 
+          <!-- 대표 이미지 URL이 있으면 실제 상품 이미지를 출력한다. -->
           <img class="placeholder-image"
                th:if="${product.thumbnailUrl != null
-                       and !product.thumbnailUrl.isBlank()}"
+                         and !product.thumbnailUrl.isBlank()}"
                th:src="${product.thumbnailUrl}"
                th:alt="${product.name}">
 
+          <!-- 대표 이미지가 없으면 이미지 준비 중 영역을 출력한다. -->
           <div class="placeholder-image"
                th:unless="${product.thumbnailUrl != null
-                           and !product.thumbnailUrl.isBlank()}">
+                             and !product.thumbnailUrl.isBlank()}">
             상품 이미지 준비 중
           </div>
 
           <div class="product-card__body">
+            <!-- DB에서 조회한 상품명을 출력한다. -->
             <h3 class="product-card__name"
                 th:text="${product.name}">
               상품명
             </h3>
 
+            <!-- 상품 가격에 천 단위 쉼표를 적용한다. -->
             <p class="product-card__price">
               <span th:text="${#numbers.formatInteger(
                   product.basePrice,
@@ -100,29 +109,34 @@
             </p>
 
             <div class="cluster">
+              <!-- 일반 케이크 또는 주문 제작 상품 유형을 출력한다. -->
               <span class="badge"
                     th:text="${product.productType.displayName}">
                 상품 유형
               </span>
 
+              <!-- 준비 기간이 0일인 상품에만 당일 픽업 배지를 출력한다. -->
               <span class="badge badge--info"
                     th:if="${product.sameDayPickup}">
                 당일 픽업
               </span>
 
+              <!-- 재고 수량이 0인 상품에만 품절 배지를 출력한다. -->
               <span class="badge badge--danger"
                     th:if="${product.outOfStock}">
                 품절
               </span>
 
+              <!-- 재고 수량 제한이 없는 상품은 주문 가능으로 표시한다. -->
               <span class="badge badge--success"
                     th:if="${product.unlimitedStock}">
                 주문 가능
               </span>
 
+              <!-- 재고 수량이 1개 이상 남은 상품은 재고 있음으로 표시한다. -->
               <span class="badge badge--success"
                     th:if="${product.available
-                           and !product.unlimitedStock}">
+                             and !product.unlimitedStock}">
                 재고 있음
               </span>
             </div>
@@ -130,10 +144,11 @@
         </a>
       </div>
 
+      <!-- 추천 상품 조회 결과가 비어 있으면 안내 문구를 출력한다. -->
       <div class="panel panel--dashed text-muted"
            th:if="${recommendedProducts.isEmpty()}"
            style="text-align:center">
-        현재 추천할 수 있는 상품이 없습니다.
+        현재 추천 상품이 없습니다.
       </div>
     </section>
 
