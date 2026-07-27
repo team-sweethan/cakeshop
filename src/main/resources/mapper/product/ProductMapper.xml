@@ -191,32 +191,90 @@
             po.id ASC
     </select>
 
-    <!-- 관리자 전체 상품 목록 조회 -->
+    <!-- 관리자 상품 목록에서 공통으로 사용하는 검색 및 필터 조건 -->
+    <sql id="adminProductConditions">
+        WHERE 1 = 1
+
+        <!-- 상품명 검색 -->
+        <if test="condition != null
+              and condition.keyword != null
+              and !condition.keyword.trim().isEmpty()">
+            AND p.name LIKE CONCAT(
+            '%',
+            TRIM(#{condition.keyword}),
+            '%'
+            )
+        </if>
+
+        <!-- 상품 유형 필터 -->
+        <if test="condition != null
+              and condition.type != null">
+            AND p.product_type = #{condition.type}
+        </if>
+
+        <!-- 판매 상태 필터 -->
+        <if test="condition != null
+              and condition.status != null">
+            AND p.status = #{condition.status}
+        </if>
+
+        <!-- 재고 상태 필터 -->
+        <if test="condition != null
+              and condition.stock != null">
+            <choose>
+                <!-- 재고 제한이 없거나 재고가 남은 상품 -->
+                <when test=
+                              "condition.stock.name() == 'AVAILABLE'">
+                    AND (
+                    p.stock_quantity IS NULL
+                    OR p.stock_quantity
+                    <![CDATA[ > ]]>
+                    0
+                    )
+                </when>
+
+                <!-- 재고 수량이 0인 품절 상품 -->
+                <when test=
+                              "condition.stock.name() == 'OUT_OF_STOCK'">
+                    AND p.stock_quantity = 0
+                </when>
+            </choose>
+        </if>
+    </sql>
+
+    <!-- 검색 조건에 맞는 관리자 상품 목록 조회 -->
     <select id="findAdminProducts"
-            resultType="com.cakeshop.domain.product.admin.dto.view.ProductAdminListView">
+            resultType=
+                    "com.cakeshop.domain.product.admin.dto.view.ProductAdminListView">
 
         SELECT
-            p.id,
-            p.name,
-            p.product_type AS productType,
-            p.base_price AS basePrice,
-            p.stock_quantity AS stockQuantity,
-            p.status,
-            p.created_at AS createdAt
+        p.id,
+        p.name,
+        p.product_type AS productType,
+        p.base_price AS basePrice,
+        p.stock_quantity AS stockQuantity,
+        p.status,
+        p.created_at AS createdAt
         FROM products p
+
+        <include refid="adminProductConditions"/>
+
         ORDER BY
-            p.created_at DESC,
-            p.id DESC
-            LIMIT #{size}
+        p.created_at DESC,
+        p.id DESC
+
+        LIMIT #{size}
         OFFSET #{offset}
     </select>
 
-    <!-- 관리자 전체 상품 개수 조회 -->
+    <!-- 검색 조건에 맞는 관리자 상품 개수 조회 -->
     <select id="countAdminProducts"
             resultType="long">
 
         SELECT COUNT(*)
-        FROM products
+        FROM products p
+
+        <include refid="adminProductConditions"/>
     </select>
 
 </mapper>

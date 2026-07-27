@@ -2,6 +2,7 @@ package com.cakeshop.domain.product.mapper;
 
 import java.util.List;
 
+import com.cakeshop.domain.product.admin.dto.form.ProductAdminSearchCondition;
 import com.cakeshop.domain.product.admin.dto.view.ProductAdminListView;
 import com.cakeshop.domain.product.customer.dto.form.ProductSearchCondition;
 import com.cakeshop.domain.product.customer.dto.view.ProductDetailView;
@@ -59,21 +60,32 @@ public interface ProductMapper {
     );
 
     /**
-     * 관리자 상품 목록에 표시할 전체 상품을 조회한다.
+     * 검색 조건에 맞는 관리자 상품 목록을 조회한다.
      *
+     * @param condition 상품 검색 및 필터 조건
      * @param size 한 페이지에 표시할 상품 수
      * @param offset 조회를 시작할 행 위치
-     * @return 관리자용 상품 목록
+     * @return 검색 조건에 맞는 관리자용 상품 목록
      */
     List<ProductAdminListView> findAdminProducts(
-            @Param("size") int size,
-            @Param("offset") int offset
+            @Param("condition")
+            ProductAdminSearchCondition condition,
+
+            @Param("size")
+            int size,
+
+            @Param("offset")
+            int offset
     );
 
     /**
-     * 관리자 상품 목록의 전체 상품 개수를 조회한다.
+     * 관리자 상품 검색 조건에 맞는 전체 상품 개수를 조회한다.
      *
-     * @return 전체 상품 개수
+     * @param condition 상품 검색 및 필터 조건
+     * @return 검색 조건에 맞는 전체 상품 개수
      */
-    long countAdminProducts();
+    long countAdminProducts(
+            @Param("condition")
+            ProductAdminSearchCondition condition
+    );
 }

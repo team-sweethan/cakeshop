@@ -55,8 +55,10 @@ class AdminPageControllerTests {
                 );
 
         // 관리자 상품 목록을 조회하면 빈 페이지를 반환하도록 설정한다.
-        when(productAdminService.getProducts(any()))
-                .thenReturn(pageResult);
+        when(productAdminService.getProducts(
+                any(),
+                any()
+        )).thenReturn(pageResult);
 
         // 테스트할 관리자 Controller들을 등록한다.
         mockMvc = MockMvcBuilders

@@ -12,8 +12,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.util.List;
 
+import com.cakeshop.domain.product.admin.dto.form.AdminStockFilter;
+import com.cakeshop.domain.product.admin.dto.form.ProductAdminSearchCondition;
 import com.cakeshop.domain.product.admin.dto.view.ProductAdminListView;
 import com.cakeshop.domain.product.admin.service.ProductAdminService;
+import com.cakeshop.domain.product.entity.ProductStatus;
+import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 
@@ -25,7 +29,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 class ProductAdminControllerTests {
 
     @Test
-    void productsReturnsAdminProductListPage() throws Exception {
+    void productsBindsSearchConditionAndPageRequest()
+            throws Exception {
         ProductAdminService productAdminService =
                 mock(ProductAdminService.class);
 
@@ -36,8 +41,10 @@ class ProductAdminControllerTests {
                         15
                 );
 
-        when(productAdminService.getProducts(any()))
-                .thenReturn(pageResult);
+        when(productAdminService.getProducts(
+                any(),
+                any()
+        )).thenReturn(pageResult);
 
         MockMvc mockMvc = MockMvcBuilders
                 .standaloneSetup(
@@ -47,9 +54,12 @@ class ProductAdminControllerTests {
                 )
                 .build();
 
-        // 관리자 상품 목록의 두 번째 페이지를 요청한다.
         mockMvc.perform(
                         get("/admin/products")
+                                .param("keyword", "딸기")
+                                .param("type", "GENERAL")
+                                .param("status", "ACTIVE")
+                                .param("stock", "AVAILABLE")
                                 .param("page", "2")
                                 .param("size", "10")
                 )
@@ -60,23 +70,45 @@ class ProductAdminControllerTests {
                 .andExpect(model().attribute(
                         "pageResult",
                         pageResult
+                ))
+                .andExpect(model().attributeExists(
+                        "condition",
+                        "productTypes",
+                        "productStatuses",
+                        "stockFilters"
                 ));
+
+        ArgumentCaptor<ProductAdminSearchCondition>
+                conditionCaptor =
+                ArgumentCaptor.forClass(
+                        ProductAdminSearchCondition.class
+                );
 
         ArgumentCaptor<PageRequest> pageCaptor =
                 ArgumentCaptor.forClass(PageRequest.class);
 
-        verify(productAdminService)
-                .getProducts(pageCaptor.capture());
+        verify(productAdminService).getProducts(
+                conditionCaptor.capture(),
+                pageCaptor.capture()
+        );
 
-        // 요청값이 PageRequest로 올바르게 변환됐는지 확인한다.
-        PageRequest capturedPageRequest =
+        ProductAdminSearchCondition condition =
+                conditionCaptor.getValue();
+
+        assertThat(condition.getKeyword())
+                .isEqualTo("딸기");
+        assertThat(condition.getType())
+                .isEqualTo(ProductType.GENERAL);
+        assertThat(condition.getStatus())
+                .isEqualTo(ProductStatus.ACTIVE);
+        assertThat(condition.getStock())
+                .isEqualTo(AdminStockFilter.AVAILABLE);
+
+        PageRequest pageRequest =
                 pageCaptor.getValue();
 
-        assertThat(capturedPageRequest.getPage())
-                .isEqualTo(2);
-        assertThat(capturedPageRequest.getSize())
-                .isEqualTo(10);
-        assertThat(capturedPageRequest.getOffset())
-                .isEqualTo(10);
+        assertThat(pageRequest.getPage()).isEqualTo(2);
+        assertThat(pageRequest.getSize()).isEqualTo(10);
+        assertThat(pageRequest.getOffset()).isEqualTo(10);
     }
 }

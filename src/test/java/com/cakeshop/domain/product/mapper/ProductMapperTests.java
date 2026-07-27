@@ -6,6 +6,8 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.cakeshop.domain.product.admin.dto.form.AdminStockFilter;
+import com.cakeshop.domain.product.admin.dto.form.ProductAdminSearchCondition;
 import com.cakeshop.domain.product.admin.dto.view.ProductAdminListView;
 import com.cakeshop.domain.product.customer.dto.form.ProductSearchCondition;
 import com.cakeshop.domain.product.customer.dto.form.ProductSort;
@@ -350,26 +352,25 @@ class ProductMapperTests {
 
     @Test
     void adminListIncludesActiveAndInactiveProducts() {
-        // DB에 저장된 전체 상품 개수를 확인한다.
+        ProductAdminSearchCondition condition =
+                new ProductAdminSearchCondition();
+
         Long expectedCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM products",
                 Long.class
         );
 
-        // 관리자 목록은 판매 상태와 관계없이 전체 상품을 조회한다.
         List<ProductAdminListView> products =
                 productMapper.findAdminProducts(
+                        condition,
                         expectedCount.intValue(),
                         0
                 );
 
-        assertThat(productMapper.countAdminProducts())
-                .isEqualTo(expectedCount);
+        assertThat(
+                productMapper.countAdminProducts(condition)
+        ).isEqualTo(expectedCount);
 
-        assertThat(products)
-                .hasSize(expectedCount.intValue());
-
-        // 현재 테스트에서 추가한 상품만 선택한다.
         List<ProductAdminListView> testProducts =
                 products.stream()
                         .filter(product ->
@@ -377,7 +378,6 @@ class ProductMapperTests {
                         )
                         .toList();
 
-        // 등록일이 최신인 상품부터 조회되는지 확인한다.
         assertThat(testProducts)
                 .extracting(ProductAdminListView::name)
                 .containsExactly(
@@ -389,12 +389,40 @@ class ProductMapperTests {
                         keyword + " A 당일 재고 상품"
                 );
 
-        // 판매 중지 상품도 관리자 목록에 포함되는지 확인한다.
         assertThat(testProducts)
                 .anyMatch(product ->
-                        product.name().contains("D 판매 중지 상품")
-                                && product.status()
+                        product.status()
                                 == ProductStatus.INACTIVE
+                );
+    }
+
+    @Test
+    void adminSearchConditionsCanBeCombined() {
+        ProductAdminSearchCondition condition =
+                new ProductAdminSearchCondition();
+
+        condition.setKeyword(keyword + " B 품절");
+        condition.setType(ProductType.GENERAL);
+        condition.setStatus(ProductStatus.ACTIVE);
+        condition.setStock(
+                AdminStockFilter.OUT_OF_STOCK
+        );
+
+        assertThat(
+                productMapper.countAdminProducts(condition)
+        ).isEqualTo(1);
+
+        List<ProductAdminListView> products =
+                productMapper.findAdminProducts(
+                        condition,
+                        10,
+                        0
+                );
+
+        assertThat(products)
+                .extracting(ProductAdminListView::name)
+                .containsExactly(
+                        keyword + " B 품절 상품"
                 );
     }
 }
