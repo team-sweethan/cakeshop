@@ -1,4 +1,4 @@
-package com.cakeshop.domain.product.service;
+package com.cakeshop.domain.product.admin.service;
 
 import org.springframework.stereotype.Service;
 

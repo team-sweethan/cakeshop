@@ -17,6 +17,10 @@ public class HomeController {
     @GetMapping("/")
     public String home(Model model) {
         model.addAttribute("store", homeService.getStore());
+        model.addAttribute(
+                "recommendedProducts",
+                homeService.getRecommendedProducts()
+        );
         return "home/main";
     }
 
