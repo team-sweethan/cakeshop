@@ -277,4 +277,13 @@
         <include refid="adminProductConditions"/>
     </select>
 
+    <!-- 상품 판매 상태 변경 -->
+    <update id="updateProductStatus">
+        UPDATE products
+        SET
+            status = #{status},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{productId}
+    </update>
+
 </mapper>

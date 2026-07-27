@@ -4,10 +4,13 @@ import java.util.List;
 
 import com.cakeshop.domain.product.admin.dto.form.ProductAdminSearchCondition;
 import com.cakeshop.domain.product.admin.dto.view.ProductAdminListView;
+import com.cakeshop.domain.product.entity.ProductStatus;
+import com.cakeshop.domain.product.error.ProductErrorCode;
 import com.cakeshop.domain.product.mapper.ProductMapper;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 
+import com.cakeshop.global.error.BusinessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -75,5 +78,32 @@ public class ProductAdminService {
                 normalizedPageRequest,
                 totalElements
         );
+    }
+
+    /**
+     * 상품의 판매 상태를 변경한다.
+     *
+     * @param productId 상태를 변경할 상품 식별자
+     * @param status 변경할 판매 상태
+     * @throws BusinessException 존재하지 않는 상품인 경우
+     */
+    @Transactional
+    public void changeProductStatus(
+            long productId,
+            ProductStatus status
+    ) {
+        // 상품의 판매 상태와 수정 일시를 변경한다.
+        int updatedRows =
+                productMapper.updateProductStatus(
+                        productId,
+                        status
+                );
+
+        // 변경된 행이 없으면 존재하지 않는 상품으로 처리한다.
+        if (updatedRows == 0) {
+            throw new BusinessException(
+                    ProductErrorCode.NOT_FOUND
+            );
+        }
     }
 }

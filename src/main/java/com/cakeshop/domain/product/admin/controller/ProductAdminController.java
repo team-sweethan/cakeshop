@@ -12,10 +12,8 @@ import com.cakeshop.global.common.paging.PageResult;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ModelAttribute;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
 public class ProductAdminController {
@@ -170,5 +168,45 @@ public class ProductAdminController {
             @PathVariable long productId
     ) {
         return "admin/product/form";
+    }
+
+    /**
+     * 상품의 판매 상태를 변경한다.
+     *
+     * @param productId 상태를 변경할 상품 식별자
+     * @param status 변경할 판매 상태
+     * @param redirectAttributes 상태 변경 결과 메시지를 전달할 객체
+     * @return 관리자 상품 목록으로 이동하는 경로
+     */
+    @PostMapping("/admin/products/{productId}/status")
+    public String changeStatus(
+            @PathVariable("productId")
+            long productId,
+
+            @RequestParam("status")
+            ProductStatus status,
+
+            RedirectAttributes redirectAttributes
+    ) {
+        // 상품의 판매 상태를 변경한다.
+        productAdminService.changeProductStatus(
+                productId,
+                status
+        );
+
+        // 변경된 상태에 맞는 완료 메시지를 만든다.
+        String successMessage =
+                status == ProductStatus.ACTIVE
+                        ? "상품 판매를 시작했습니다."
+                        : "상품 판매를 중지했습니다.";
+
+        // 목록 화면으로 이동한 후 완료 메시지를 표시하도록 전달한다.
+        redirectAttributes.addFlashAttribute(
+                "successMessage",
+                successMessage
+        );
+
+        // 새로고침으로 상태 변경 요청이 반복되지 않도록 목록으로 리다이렉트한다.
+        return "redirect:/admin/products";
     }
 }

@@ -16,12 +16,14 @@
 <body>
 <div class="admin-layout">
 
+    <!-- 관리자 사이드바 -->
     <aside th:replace=
                    "~{fragments/admin/sidebar :: sidebar('products')}">
     </aside>
 
     <div class="admin-main">
 
+        <!-- 관리자 헤더 -->
         <header th:replace=
                         "~{fragments/admin/header :: header('상품 관리')}">
         </header>
@@ -31,6 +33,11 @@
             <h1 class="admin-page-title">
                 상품 목록
             </h1>
+
+            <!-- 상태 변경 결과 메시지 -->
+            <div th:replace=
+                         "~{fragments/common/alert :: alert}">
+            </div>
 
             <!-- 상품 검색 및 필터 -->
             <div class="admin-toolbar">
@@ -58,7 +65,8 @@
                             유형 전체
                         </option>
 
-                        <option th:each="productType : ${productTypes}"
+                        <option th:each=
+                                        "productType : ${productTypes}"
                                 th:value="${productType}"
                                 th:text="${productType.displayName}">
                             상품 유형
@@ -112,6 +120,7 @@
                     </a>
                 </form>
 
+                <!-- 상품 등록 화면 이동 -->
                 <a class="btn btn--primary"
                    th:href="@{/admin/products/new}">
                     상품 등록
@@ -148,6 +157,7 @@
                     <!-- 검색 조건에 맞는 상품 -->
                     <tr th:each="product : ${pageResult.content}">
 
+                        <!-- 상품 이미지 -->
                         <td>
                             <div class=
                                          "placeholder-image placeholder-image--sm">
@@ -155,14 +165,17 @@
                             </div>
                         </td>
 
+                        <!-- 상품명 -->
                         <td th:text="${product.name}">
                             상품명
                         </td>
 
+                        <!-- 상품 유형 -->
                         <td th:text="${product.productType.displayName}">
                             상품 유형
                         </td>
 
+                        <!-- 상품 가격 -->
                         <td th:text=
                                     "|${#numbers.formatInteger(
                         product.basePrice,
@@ -172,6 +185,7 @@
                             0원
                         </td>
 
+                        <!-- 상품 재고 -->
                         <td>
                             <!-- 재고 제한 없음 -->
                             <span th:if="${product.unlimitedStock}">
@@ -191,6 +205,7 @@
               </span>
                         </td>
 
+                        <!-- 판매 상태 -->
                         <td>
               <span class="badge badge--success"
                     th:if=
@@ -205,6 +220,7 @@
               </span>
                         </td>
 
+                        <!-- 등록일 -->
                         <td th:text=
                                     "${#temporals.format(
                         product.createdAt,
@@ -213,14 +229,62 @@
                             등록일
                         </td>
 
+                        <!-- 관리 기능 -->
                         <td>
-                            <a class="btn"
-                               th:href=
-                                       "@{/admin/products/{productId}/edit(
-                         productId=${product.id}
-                     )}">
-                                수정
-                            </a>
+                            <div class="cluster">
+
+                                <!-- 상품 수정 -->
+                                <a class="btn"
+                                   th:href=
+                                           "@{/admin/products/{productId}/edit(
+                           productId=${product.id}
+                       )}">
+                                    수정
+                                </a>
+
+                                <!-- 판매 중인 상품 -->
+                                <form th:if=
+                                              "${product.status.name() == 'ACTIVE'}"
+                                      method="post"
+                                      th:action=
+                                              "@{/admin/products/{productId}/status(
+                              productId=${product.id}
+                          )}">
+
+                                    <input type="hidden"
+                                           name="status"
+                                           value="INACTIVE">
+
+                                    <button class="btn btn--danger"
+                                            type="submit"
+                                            data-confirm=
+                                                    "상품 판매를 중지하시겠습니까?">
+                                        판매 중지
+                                    </button>
+                                </form>
+
+                                <!-- 판매 중지된 상품 -->
+                                <form th:if=
+                                              "${product.status.name() == 'INACTIVE'}"
+                                      method="post"
+                                      th:action=
+                                              "@{/admin/products/{productId}/status(
+                              productId=${product.id}
+                          )}">
+
+                                    <input type="hidden"
+                                           name="status"
+                                           value="ACTIVE">
+
+                                    <button class="btn btn--primary"
+                                            type="submit"
+                                            data-confirm=
+                                                    "상품 판매를 시작하시겠습니까?">
+                                        판매 시작
+                                    </button>
+                                </form>
+
+                            </div>
                         </td>
                     </tr>
 

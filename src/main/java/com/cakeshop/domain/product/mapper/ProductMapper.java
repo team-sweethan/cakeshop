@@ -9,6 +9,7 @@ import com.cakeshop.domain.product.customer.dto.view.ProductDetailView;
 import com.cakeshop.domain.product.customer.dto.view.ProductListView;
 import com.cakeshop.domain.product.customer.dto.view.ProductOptionRow;
 
+import com.cakeshop.domain.product.entity.ProductStatus;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -87,5 +88,20 @@ public interface ProductMapper {
     long countAdminProducts(
             @Param("condition")
             ProductAdminSearchCondition condition
+    );
+
+    /**
+     * 상품의 판매 상태를 변경한다.
+     *
+     * @param productId 상태를 변경할 상품 식별자
+     * @param status 변경할 판매 상태
+     * @return 상태가 변경된 상품 행 개수
+     */
+    int updateProductStatus(
+            @Param("productId")
+            long productId,
+
+            @Param("status")
+            ProductStatus status
     );
 }

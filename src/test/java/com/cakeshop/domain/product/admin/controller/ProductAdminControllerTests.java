@@ -1,5 +1,8 @@
 package com.cakeshop.domain.product.admin.controller;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -110,5 +113,74 @@ class ProductAdminControllerTests {
         assertThat(pageRequest.getPage()).isEqualTo(2);
         assertThat(pageRequest.getSize()).isEqualTo(10);
         assertThat(pageRequest.getOffset()).isEqualTo(10);
+    }
+
+    @Test
+    void changeStatusRedirectsToProductList()
+            throws Exception {
+        ProductAdminService productAdminService =
+                mock(ProductAdminService.class);
+
+        MockMvc mockMvc = MockMvcBuilders
+                .standaloneSetup(
+                        new ProductAdminController(
+                                productAdminService
+                        )
+                )
+                .build();
+
+        // 판매 중지 요청을 전송한다.
+        mockMvc.perform(
+                        post("/admin/products/{productId}/status", 1L)
+                                .param("status", "INACTIVE")
+                )
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(
+                        "/admin/products"
+                ))
+                .andExpect(flash().attribute(
+                        "successMessage",
+                        "상품 판매를 중지했습니다."
+                ));
+
+        // 요청값이 Service로 정확하게 전달됐는지 확인한다.
+        verify(productAdminService).changeProductStatus(
+                1L,
+                ProductStatus.INACTIVE
+        );
+    }
+
+    @Test
+    void startSaleUsesActiveStatus()
+            throws Exception {
+        ProductAdminService productAdminService =
+                mock(ProductAdminService.class);
+
+        MockMvc mockMvc = MockMvcBuilders
+                .standaloneSetup(
+                        new ProductAdminController(
+                                productAdminService
+                        )
+                )
+                .build();
+
+        // 판매 시작 요청을 전송한다.
+        mockMvc.perform(
+                        post("/admin/products/{productId}/status", 1L)
+                                .param("status", "ACTIVE")
+                )
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(
+                        "/admin/products"
+                ))
+                .andExpect(flash().attribute(
+                        "successMessage",
+                        "상품 판매를 시작했습니다."
+                ));
+
+        verify(productAdminService).changeProductStatus(
+                1L,
+                ProductStatus.ACTIVE
+        );
     }
 }

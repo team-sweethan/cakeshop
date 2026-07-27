@@ -425,4 +425,51 @@ class ProductMapperTests {
                         keyword + " B 품절 상품"
                 );
     }
+
+    @Test
+    void adminCanChangeProductStatus() {
+        Long productId = jdbcTemplate.queryForObject(
+                """
+                SELECT id
+                FROM products
+                WHERE name = ?
+                """,
+                Long.class,
+                keyword + " D 판매 중지 상품"
+        );
+
+        // 판매 중지 상품의 상태를 판매 중으로 변경한다.
+        int updatedRows =
+                productMapper.updateProductStatus(
+                        productId,
+                        ProductStatus.ACTIVE
+                );
+
+        String updatedStatus =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT status
+                        FROM products
+                        WHERE id = ?
+                        """,
+                        String.class,
+                        productId
+                );
+
+        // 상품 한 건이 수정되고 DB 상태가 ACTIVE로 변경됐는지 확인한다.
+        assertThat(updatedRows).isEqualTo(1);
+        assertThat(updatedStatus).isEqualTo("ACTIVE");
+    }
+
+    @Test
+    void changingStatusOfMissingProductReturnsZero() {
+        int updatedRows =
+                productMapper.updateProductStatus(
+                        Long.MAX_VALUE,
+                        ProductStatus.INACTIVE
+                );
+
+        // 존재하지 않는 상품은 변경된 행이 없어야 한다.
+        assertThat(updatedRows).isZero();
+    }
 }

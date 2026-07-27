@@ -1,6 +1,7 @@
 package com.cakeshop.domain.product.admin.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.never;
@@ -15,10 +16,12 @@ import com.cakeshop.domain.product.admin.dto.form.ProductAdminSearchCondition;
 import com.cakeshop.domain.product.admin.dto.view.ProductAdminListView;
 import com.cakeshop.domain.product.entity.ProductStatus;
 import com.cakeshop.domain.product.entity.ProductType;
+import com.cakeshop.domain.product.error.ProductErrorCode;
 import com.cakeshop.domain.product.mapper.ProductMapper;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 
+import com.cakeshop.global.error.BusinessException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -124,5 +127,49 @@ class ProductAdminServiceTests {
         assertThat(result.getSize()).isEqualTo(10);
         assertThat(result.getTotalElements()).isEqualTo(15);
         assertThat(result.getTotalPages()).isEqualTo(2);
+    }
+
+    @Test
+    void changeProductStatusUpdatesProduct() {
+        when(productMapper.updateProductStatus(
+                1L,
+                ProductStatus.INACTIVE
+        )).thenReturn(1);
+
+        // 판매 중인 상품의 상태를 판매 중지로 변경한다.
+        productAdminService.changeProductStatus(
+                1L,
+                ProductStatus.INACTIVE
+        );
+
+        // Mapper에 상품 ID와 변경 상태가 전달됐는지 확인한다.
+        verify(productMapper).updateProductStatus(
+                1L,
+                ProductStatus.INACTIVE
+        );
+    }
+
+    @Test
+    void changeStatusOfMissingProductThrowsException() {
+        when(productMapper.updateProductStatus(
+                999L,
+                ProductStatus.INACTIVE
+        )).thenReturn(0);
+
+        // 존재하지 않는 상품은 NOT_FOUND 예외로 처리되는지 확인한다.
+        assertThatThrownBy(() ->
+                productAdminService.changeProductStatus(
+                        999L,
+                        ProductStatus.INACTIVE
+                )
+        )
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        exception ->
+                                assertThat(exception.getErrorCode())
+                                        .isEqualTo(
+                                                ProductErrorCode.NOT_FOUND
+                                        )
+                );
     }
 }
