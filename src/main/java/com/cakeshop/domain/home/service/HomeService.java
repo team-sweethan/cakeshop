@@ -2,10 +2,10 @@ package com.cakeshop.domain.home.service;
 
 import java.util.List;
 
-import com.cakeshop.domain.product.dto.form.ProductSearchCondition;
-import com.cakeshop.domain.product.dto.form.ProductSort;
-import com.cakeshop.domain.product.dto.view.ProductListView;
-import com.cakeshop.domain.product.service.ProductService;
+import com.cakeshop.domain.product.customer.dto.form.ProductSearchCondition;
+import com.cakeshop.domain.product.customer.dto.form.ProductSort;
+import com.cakeshop.domain.product.customer.dto.view.ProductListView;
+import com.cakeshop.domain.product.customer.service.ProductService;
 import com.cakeshop.domain.store.dto.view.StorePublicView;
 import com.cakeshop.domain.store.service.StoreService;
 import com.cakeshop.global.common.paging.PageRequest;

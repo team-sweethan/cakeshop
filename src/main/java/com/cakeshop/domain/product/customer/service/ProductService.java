@@ -1,17 +1,17 @@
-package com.cakeshop.domain.product.service;
+package com.cakeshop.domain.product.customer.service;
 
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.cakeshop.domain.product.dto.form.ProductSearchCondition;
-import com.cakeshop.domain.product.dto.form.ProductSort;
-import com.cakeshop.domain.product.dto.view.ProductDetailView;
-import com.cakeshop.domain.product.dto.view.ProductListView;
-import com.cakeshop.domain.product.dto.view.ProductOptionGroupView;
-import com.cakeshop.domain.product.dto.view.ProductOptionItemView;
-import com.cakeshop.domain.product.dto.view.ProductOptionRow;
+import com.cakeshop.domain.product.customer.dto.form.ProductSearchCondition;
+import com.cakeshop.domain.product.customer.dto.form.ProductSort;
+import com.cakeshop.domain.product.customer.dto.view.ProductDetailView;
+import com.cakeshop.domain.product.customer.dto.view.ProductListView;
+import com.cakeshop.domain.product.customer.dto.view.ProductOptionGroupView;
+import com.cakeshop.domain.product.customer.dto.view.ProductOptionItemView;
+import com.cakeshop.domain.product.customer.dto.view.ProductOptionRow;
 import com.cakeshop.domain.product.error.ProductErrorCode;
 import com.cakeshop.domain.product.mapper.ProductMapper;
 import com.cakeshop.global.common.paging.PageRequest;

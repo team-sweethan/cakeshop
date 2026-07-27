@@ -1,4 +1,4 @@
-package com.cakeshop.domain.product.dto.view;
+package com.cakeshop.domain.product.customer.dto.view;
 
 import java.util.List;
 

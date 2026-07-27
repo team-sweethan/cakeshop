@@ -1,4 +1,4 @@
-package com.cakeshop.domain.product.service;
+package com.cakeshop.domain.product.customer.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -10,11 +10,11 @@ import static org.mockito.Mockito.when;
 import java.math.BigDecimal;
 import java.util.List;
 
-import com.cakeshop.domain.product.dto.form.ProductSearchCondition;
-import com.cakeshop.domain.product.dto.form.ProductSort;
-import com.cakeshop.domain.product.dto.view.ProductListView;
-import com.cakeshop.domain.product.dto.view.ProductOptionGroupView;
-import com.cakeshop.domain.product.dto.view.ProductOptionRow;
+import com.cakeshop.domain.product.customer.dto.form.ProductSearchCondition;
+import com.cakeshop.domain.product.customer.dto.form.ProductSort;
+import com.cakeshop.domain.product.customer.dto.view.ProductListView;
+import com.cakeshop.domain.product.customer.dto.view.ProductOptionGroupView;
+import com.cakeshop.domain.product.customer.dto.view.ProductOptionRow;
 import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.mapper.ProductMapper;
 import com.cakeshop.global.common.paging.PageRequest;

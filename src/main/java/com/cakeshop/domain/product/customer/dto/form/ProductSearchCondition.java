@@ -1,4 +1,4 @@
-package com.cakeshop.domain.product.dto.form;
+package com.cakeshop.domain.product.customer.dto.form;
 
 import java.math.BigDecimal;
 

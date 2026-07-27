@@ -2,10 +2,10 @@ package com.cakeshop.domain.product.mapper;
 
 import java.util.List;
 
-import com.cakeshop.domain.product.dto.form.ProductSearchCondition;
-import com.cakeshop.domain.product.dto.view.ProductDetailView;
-import com.cakeshop.domain.product.dto.view.ProductListView;
-import com.cakeshop.domain.product.dto.view.ProductOptionRow;
+import com.cakeshop.domain.product.customer.dto.form.ProductSearchCondition;
+import com.cakeshop.domain.product.customer.dto.view.ProductDetailView;
+import com.cakeshop.domain.product.customer.dto.view.ProductListView;
+import com.cakeshop.domain.product.customer.dto.view.ProductOptionRow;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;

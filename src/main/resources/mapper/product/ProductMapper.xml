@@ -69,7 +69,7 @@
 
     <!-- 고객 상품 목록 조회 -->
     <select id="findPublicProducts"
-            resultType="com.cakeshop.domain.product.dto.view.ProductListView">
+            resultType="com.cakeshop.domain.product.customer.dto.view.ProductListView">
 
         SELECT
         p.id,
@@ -142,7 +142,7 @@
 
     <!-- 고객 상품 상세 조회 -->
     <select id="findPublicDetailById"
-            resultType="com.cakeshop.domain.product.dto.view.ProductDetailView">
+            resultType="com.cakeshop.domain.product.customer.dto.view.ProductDetailView">
 
         SELECT
             p.id,
@@ -166,7 +166,7 @@
 
     <!-- 판매 중인 상품의 활성 옵션 조회 -->
     <select id="findPublicOptionRowsByProductId"
-            resultType="com.cakeshop.domain.product.dto.view.ProductOptionRow">
+            resultType="com.cakeshop.domain.product.customer.dto.view.ProductOptionRow">
 
         SELECT
             pog.id AS group_id,

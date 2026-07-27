@@ -1,4 +1,4 @@
-package com.cakeshop.domain.product.controller;
+package com.cakeshop.domain.product.customer.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -12,12 +12,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.util.List;
 
-import com.cakeshop.domain.product.dto.form.ProductSearchCondition;
-import com.cakeshop.domain.product.dto.form.ProductSort;
-import com.cakeshop.domain.product.dto.form.StockFilter;
-import com.cakeshop.domain.product.dto.view.ProductListView;
+import com.cakeshop.domain.product.customer.dto.form.ProductSearchCondition;
+import com.cakeshop.domain.product.customer.dto.form.ProductSort;
+import com.cakeshop.domain.product.customer.dto.form.StockFilter;
+import com.cakeshop.domain.product.customer.dto.view.ProductListView;
 import com.cakeshop.domain.product.entity.ProductType;
-import com.cakeshop.domain.product.service.ProductService;
+import com.cakeshop.domain.product.customer.service.ProductService;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 
