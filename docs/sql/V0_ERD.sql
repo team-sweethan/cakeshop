@@ -241,18 +241,17 @@ CREATE TABLE `orders` (
     `original_amount`         DECIMAL(12, 0) NOT NULL,
     `discount_amount`         DECIMAL(12, 0) NOT NULL DEFAULT 0,
     `final_amount`            DECIMAL(12, 0) NOT NULL,
-    `status`                  VARCHAR(30) NOT NULL,
+    `status`                  VARCHAR(30) NOT NULL DEFAULT 'PENDING_PAYMENT',
     `pickup_at`               DATETIME(6) NOT NULL,
     `cancellation_blocked_at` DATETIME(6) NULL,
     `payment_expires_at`      DATETIME(6) NULL,
     `request_message`         TEXT NULL,
     `reject_reason`           TEXT NULL,
-    `approved_at`             DATETIME(6) NULL,
+    `under_review_at`         DATETIME(6) NULL,
     `rejected_at`             DATETIME(6) NULL,
-    `accepted_at`             DATETIME(6) NULL,
     `ready_at`                DATETIME(6) NULL,
     `picked_up_at`            DATETIME(6) NULL,
-    `completed_at`            DATETIME(6) NULL,
+    `expired_at`              DATETIME(6) NULL,
     `canceled_at`             DATETIME(6) NULL,
     `cancel_reason`           TEXT NULL,
     `canceled_by`             VARCHAR(30) NULL,
@@ -262,6 +261,16 @@ CREATE TABLE `orders` (
                                              ON UPDATE CURRENT_TIMESTAMP(6),
     PRIMARY KEY (`id`),
     CONSTRAINT `uk_orders_order_number` UNIQUE (`order_number`),
+    CONSTRAINT `chk_orders_status`
+        CHECK (`status` IN (
+            'PENDING_PAYMENT',
+            'UNDER_REVIEW',
+            'READY_FOR_PICKUP',
+            'PICKED_UP',
+            'CANCELED',
+            'REJECTED',
+            'EXPIRED'
+        )),
     CONSTRAINT `fk_orders_member`
         FOREIGN KEY (`member_id`) REFERENCES `members` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
