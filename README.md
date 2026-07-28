@@ -182,6 +182,8 @@ created: src/main/resources/db/migration/V20260729_101542__add_coupon_table.sql
 
 `-Pdesc`는 필수이며 **소문자 snake_case**(`[a-z0-9]+(_[a-z0-9]+)*`)만 받는다. 대문자·하이픈·한글은 태스크가 거부한다. 예: `add_coupon_table`, `drop_legacy_index`.
 
+작성 예시와 포맷은 [`docs/flyway_make_sample.md`](docs/flyway_make_sample.md)를 참고한다.
+
 #### 2. DDL 작성
 
 생성된 파일에 SQL을 채운다.
