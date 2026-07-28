@@ -1,15 +1,383 @@
-<!doctype html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head>
-  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>상품 관리 | 관리자</title><link rel="stylesheet" th:href="@{/css/app.css}"></head><body>
-<div class="admin-layout"><aside th:replace="~{fragments/admin/sidebar :: sidebar('products')}"></aside><div class="admin-main">
-  <header th:replace="~{fragments/admin/header :: header('상품 관리')}"></header><main class="admin-content">
-  <div th:replace="~{fragments/admin/mock-notice :: notice}"></div>
-  <h1 class="admin-page-title">상품 목록</h1>
-  <div class="admin-toolbar"><form class="filter-form" method="get" th:action="@{/admin/products}"><input class="form-control" name="keyword" placeholder="상품명 검색"><select class="form-control" name="type"><option>유형 전체</option><option>일반 케이크</option><option>주문 제작</option></select><select class="form-control" name="status"><option>판매 상태 전체</option><option>판매 중</option><option>판매 중지</option></select><select class="form-control" name="stock"><option>재고 전체</option><option>재고 있음</option><option>품절</option></select><button class="btn" type="submit">검색</button></form><a class="btn btn--primary" th:href="@{/admin/products/new}">상품 등록 화면</a></div>
-  <div class="table-wrap"><table class="data-table"><thead><tr><th>이미지</th><th>상품명</th><th>유형</th><th>가격</th><th>재고</th><th>판매 상태</th><th>등록일</th><th>관리</th></tr></thead><tbody>
-    <tr><td><div class="placeholder-image placeholder-image--sm">이미지</div></td><td>딸기 생크림 케이크</td><td>일반</td><td>35,000원</td><td>12개</td><td><span class="badge badge--success">판매 중</span></td><td>2024.12.01</td><td><div class="cluster"><a class="btn" th:href="@{/admin/products/1/edit}">수정 화면</a><button class="btn btn--danger" type="button" data-confirm="판매를 중지하시겠습니까?">중지</button><button class="btn btn--danger" type="button" data-confirm="상품을 삭제하시겠습니까?">삭제</button></div></td></tr>
-    <tr><td><div class="placeholder-image placeholder-image--sm">이미지</div></td><td>레터링 주문 케이크</td><td>주문 제작</td><td>55,000원</td><td>-</td><td><span class="badge badge--success">판매 중</span></td><td>2024.11.15</td><td><div class="cluster"><a class="btn" th:href="@{/admin/products/2/edit}">수정 화면</a><button class="btn btn--danger" type="button" data-confirm="판매를 중지하시겠습니까?">중지</button><button class="btn btn--danger" type="button" data-confirm="상품을 삭제하시겠습니까?">삭제</button></div></td></tr>
-    <tr><td><div class="placeholder-image placeholder-image--sm">이미지</div></td><td>당일 픽업 세트</td><td>당일 픽업</td><td>28,000원</td><td>2개</td><td><span class="badge badge--warning">재고 부족</span></td><td>2024.10.20</td><td><div class="cluster"><a class="btn" th:href="@{/admin/products/3/edit}">수정 화면</a><button class="btn btn--danger" type="button" data-confirm="판매를 중지하시겠습니까?">중지</button><button class="btn btn--danger" type="button" data-confirm="상품을 삭제하시겠습니까?">삭제</button></div></td></tr>
-    <tr><td><div class="placeholder-image placeholder-image--sm">이미지</div></td><td>마카롱 케이크</td><td>시즌</td><td>38,000원</td><td>0개</td><td><span class="badge badge--danger">품절</span></td><td>2024.09.10</td><td><div class="cluster"><a class="btn" th:href="@{/admin/products/4/edit}">수정 화면</a><button class="btn btn--danger" type="button" data-confirm="판매를 중지하시겠습니까?">중지</button><button class="btn btn--danger" type="button" data-confirm="상품을 삭제하시겠습니까?">삭제</button></div></td></tr>
-  </tbody></table></div>
-</main></div></div></body></html>
+<!doctype html>
+<html lang="ko"
+      xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>상품 관리 | 관리자</title>
+
+    <link rel="stylesheet"
+          th:href="@{/css/app.css}">
+</head>
+
+<body>
+<div class="admin-layout">
+
+    <!-- 관리자 사이드바 -->
+    <aside th:replace=
+                   "~{fragments/admin/sidebar :: sidebar('products')}">
+    </aside>
+
+    <div class="admin-main">
+
+        <!-- 관리자 헤더 -->
+        <header th:replace=
+                        "~{fragments/admin/header :: header('상품 관리')}">
+        </header>
+
+        <main class="admin-content">
+
+            <h1 class="admin-page-title">
+                상품 목록
+            </h1>
+
+            <!-- 상태 변경 결과 메시지 -->
+            <div th:replace=
+                         "~{fragments/common/alert :: alert}">
+            </div>
+
+            <!-- 상품 검색 및 필터 -->
+            <div class="admin-toolbar">
+
+                <form class="filter-form"
+                      method="get"
+                      th:action="@{/admin/products}"
+                      th:object="${condition}">
+
+                    <!-- 검색 후에도 페이지 크기를 유지한다. -->
+                    <input type="hidden"
+                           name="size"
+                           th:value="${pageResult.size}">
+
+                    <!-- 상품명 검색 -->
+                    <input class="form-control"
+                           type="text"
+                           th:field="*{keyword}"
+                           placeholder="상품명 검색">
+
+                    <!-- 상품 유형 필터 -->
+                    <select class="form-control"
+                            th:field="*{type}">
+                        <option value="">
+                            유형 전체
+                        </option>
+
+                        <option th:each=
+                                        "productType : ${productTypes}"
+                                th:value="${productType}"
+                                th:text="${productType.displayName}">
+                            상품 유형
+                        </option>
+                    </select>
+
+                    <!-- 판매 상태 필터 -->
+                    <select class="form-control"
+                            th:field="*{status}">
+                        <option value="">
+                            판매 상태 전체
+                        </option>
+
+                        <option th:each=
+                                        "productStatus : ${productStatuses}"
+                                th:value="${productStatus}"
+                                th:text=
+                                        "${productStatus.name() == 'ACTIVE'
+                            ? '판매 중'
+                            : '판매 중지'}">
+                            판매 상태
+                        </option>
+                    </select>
+
+                    <!-- 재고 상태 필터 -->
+                    <select class="form-control"
+                            th:field="*{stock}">
+                        <option value="">
+                            재고 전체
+                        </option>
+
+                        <option th:each=
+                                        "stockFilter : ${stockFilters}"
+                                th:value="${stockFilter}"
+                                th:text="${stockFilter.displayName}">
+                            재고 상태
+                        </option>
+                    </select>
+
+                    <button class="btn"
+                            type="submit">
+                        검색
+                    </button>
+
+                    <!-- 검색 조건 초기화 -->
+                    <a class="btn"
+                       th:href="@{/admin/products(
+                 size=${pageResult.size}
+             )}">
+                        초기화
+                    </a>
+                </form>
+
+                <!-- 상품 등록 화면 이동 -->
+                <a class="btn btn--primary"
+                   th:href="@{/admin/products/new}">
+                    상품 등록
+                </a>
+            </div>
+
+            <!-- 검색 결과 개수 -->
+            <p class="text-muted">
+                총
+                <strong th:text="${pageResult.totalElements}">
+                    0
+                </strong>개 상품
+            </p>
+
+            <!-- 상품 목록 -->
+            <div class="table-wrap">
+                <table class="data-table">
+
+                    <thead>
+                    <tr>
+                        <th>이미지</th>
+                        <th>상품명</th>
+                        <th>유형</th>
+                        <th>가격</th>
+                        <th>재고</th>
+                        <th>판매 상태</th>
+                        <th>등록일</th>
+                        <th>관리</th>
+                    </tr>
+                    </thead>
+
+                    <tbody>
+
+                    <!-- 검색 조건에 맞는 상품 -->
+                    <tr th:each="product : ${pageResult.content}">
+
+                        <!-- 상품 이미지 -->
+                        <td>
+                            <div class=
+                                         "placeholder-image placeholder-image--sm">
+                                이미지
+                            </div>
+                        </td>
+
+                        <!-- 상품명 -->
+                        <td th:text="${product.name}">
+                            상품명
+                        </td>
+
+                        <!-- 상품 유형 -->
+                        <td th:text="${product.productType.displayName}">
+                            상품 유형
+                        </td>
+
+                        <!-- 상품 가격 -->
+                        <td th:text=
+                                    "|${#numbers.formatInteger(
+                        product.basePrice,
+                        0,
+                        'COMMA'
+                    )}원|">
+                            0원
+                        </td>
+
+                        <!-- 상품 재고 -->
+                        <td>
+                            <!-- 재고 제한 없음 -->
+                            <span th:if="${product.unlimitedStock}">
+                -
+              </span>
+
+                            <!-- 재고 수량 -->
+                            <span th:unless="${product.unlimitedStock}"
+                                  th:text="|${product.stockQuantity}개|">
+                0개
+              </span>
+
+                            <!-- 품절 표시 -->
+                            <span class="badge badge--danger"
+                                  th:if="${product.outOfStock}">
+                품절
+              </span>
+                        </td>
+
+                        <!-- 판매 상태 -->
+                        <td>
+              <span class="badge badge--success"
+                    th:if=
+                            "${product.status.name() == 'ACTIVE'}">
+                판매 중
+              </span>
+
+                            <span class="badge badge--danger"
+                                  th:if=
+                                          "${product.status.name() == 'INACTIVE'}">
+                판매 중지
+              </span>
+                        </td>
+
+                        <!-- 등록일 -->
+                        <td th:text=
+                                    "${#temporals.format(
+                        product.createdAt,
+                        'yyyy.MM.dd'
+                    )}">
+                            등록일
+                        </td>
+
+                        <!-- 관리 기능 -->
+                        <td>
+                            <div class="cluster">
+
+                                <!-- 상품 수정 -->
+                                <a class="btn"
+                                   th:href=
+                                           "@{/admin/products/{productId}/edit(
+                           productId=${product.id}
+                       )}">
+                                    수정
+                                </a>
+
+                                <!-- 판매 중인 상품 -->
+                                <form th:if=
+                                              "${product.status.name() == 'ACTIVE'}"
+                                      method="post"
+                                      th:action=
+                                              "@{/admin/products/{productId}/status(
+                              productId=${product.id}
+                          )}">
+
+                                    <input type="hidden"
+                                           name="status"
+                                           value="INACTIVE">
+
+                                    <button class="btn btn--danger"
+                                            type="submit"
+                                            data-confirm=
+                                                    "상품 판매를 중지하시겠습니까?">
+                                        판매 중지
+                                    </button>
+                                </form>
+
+                                <!-- 판매 중지된 상품 -->
+                                <form th:if=
+                                              "${product.status.name() == 'INACTIVE'}"
+                                      method="post"
+                                      th:action=
+                                              "@{/admin/products/{productId}/status(
+                              productId=${product.id}
+                          )}">
+
+                                    <input type="hidden"
+                                           name="status"
+                                           value="ACTIVE">
+
+                                    <button class="btn btn--primary"
+                                            type="submit"
+                                            data-confirm=
+                                                    "상품 판매를 시작하시겠습니까?">
+                                        판매 시작
+                                    </button>
+                                </form>
+
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- 검색 결과가 없는 경우 -->
+                    <tr th:if="${pageResult.content.isEmpty()}">
+                        <td colspan="8"
+                            class="text-muted"
+                            style="text-align: center;">
+                            검색 조건에 맞는 상품이 없습니다.
+                        </td>
+                    </tr>
+
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 페이지 이동 -->
+            <nav class="cluster"
+                 th:if="${pageResult.totalPages > 1}"
+                 aria-label="페이지 이동"
+                 style=
+                         "justify-content: center; margin-top: 16px;">
+
+                <!-- 이전 페이지 -->
+                <a class="btn"
+                   th:if="${pageResult.page > 1}"
+                   th:href=
+                           "@{/admin/products(
+                    keyword=${condition.keyword},
+                    type=${condition.type},
+                    status=${condition.status},
+                    stock=${condition.stock},
+                    page=${pageResult.page - 1},
+                    size=${pageResult.size}
+                )}">
+                    이전
+                </a>
+
+                <span class="btn btn--disabled"
+                      th:unless="${pageResult.page > 1}">
+          이전
+        </span>
+
+                <!-- 페이지 번호 -->
+                <a class="btn"
+                   th:each="pageNumber :
+                ${#numbers.sequence(
+                    1,
+                    pageResult.totalPages
+                )}"
+                   th:text="${pageNumber}"
+                   th:classappend=
+                           "${pageNumber == pageResult.page}
+                    ? ' is-active'"
+                   th:href=
+                           "@{/admin/products(
+                    keyword=${condition.keyword},
+                    type=${condition.type},
+                    status=${condition.status},
+                    stock=${condition.stock},
+                    page=${pageNumber},
+                    size=${pageResult.size}
+                )}">
+                    1
+                </a>
+
+                <!-- 다음 페이지 -->
+                <a class="btn"
+                   th:if=
+                           "${pageResult.page
+                    < pageResult.totalPages}"
+                   th:href=
+                           "@{/admin/products(
+                    keyword=${condition.keyword},
+                    type=${condition.type},
+                    status=${condition.status},
+                    stock=${condition.stock},
+                    page=${pageResult.page + 1},
+                    size=${pageResult.size}
+                )}">
+                    다음
+                </a>
+
+                <span class="btn btn--disabled"
+                      th:unless=
+                              "${pageResult.page
+                      < pageResult.totalPages}">
+          다음
+        </span>
+            </nav>
+
+        </main>
+    </div>
+</div>
+</body>
+</html>

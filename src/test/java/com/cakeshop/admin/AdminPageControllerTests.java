@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import com.cakeshop.domain.product.admin.service.ProductAdminService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -36,7 +37,7 @@ class AdminPageControllerTests {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.standaloneSetup(
-            new StatisticsAdminController(), new ProductAdminController(), new OrderAdminController(),
+            new StatisticsAdminController(), new ProductAdminController(Mockito.mock(ProductAdminService.class)), new OrderAdminController(),
             new FulfillmentAdminController(), new PaymentAdminController(),
             new MemberAdminController(), new ReviewAdminController(), new NotificationAdminController(),
             new CommunityAdminController(), new CouponAdminController(Mockito.mock(CouponAdminService.class))
