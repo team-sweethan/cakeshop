@@ -343,4 +343,41 @@
                    #{status}
                )
     </insert>
+
+    <!-- 관리자 상품 수정 폼 조회 -->
+    <select id="findAdminProductFormById"
+            resultType=
+                    "com.cakeshop.domain.product.admin.dto.form.ProductForm">
+
+        SELECT
+            p.category_id AS categoryId,
+            p.name,
+            p.description,
+            p.base_price AS basePrice,
+            p.stock_quantity AS stockQuantity,
+            p.product_type AS productType,
+            p.preparation_days AS preparationDays,
+            p.cancellation_limit_days AS cancellationLimitDays
+        FROM products p
+        WHERE p.id = #{productId}
+    </select>
+
+    <!-- 상품 기본 정보 수정 -->
+    <update id="updateProduct"
+            parameterType=
+                    "com.cakeshop.domain.product.entity.Product">
+
+        UPDATE products
+        SET
+            category_id = #{categoryId},
+            name = #{name},
+            description = #{description, jdbcType=LONGVARCHAR},
+            base_price = #{basePrice},
+            stock_quantity = #{stockQuantity, jdbcType=INTEGER},
+            product_type = #{productType},
+            preparation_days = #{preparationDays},
+            cancellation_limit_days = #{cancellationLimitDays},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+    </update>
 </mapper>

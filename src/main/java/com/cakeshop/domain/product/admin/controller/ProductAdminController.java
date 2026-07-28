@@ -193,6 +193,18 @@ public class ProductAdminController {
                 new ProductForm()
         );
 
+        // 등록 화면임을 템플릿에 전달한다.
+        model.addAttribute(
+                "editMode",
+                false
+        );
+
+        // 상품 등록 요청을 처리할 경로를 화면에 전달한다.
+        model.addAttribute(
+                "formAction",
+                "/admin/products"
+        );
+
         // 카테고리와 상품 유형 선택지를 화면에 전달한다.
         addProductFormOptions(model);
 
@@ -222,6 +234,16 @@ public class ProductAdminController {
     ) {
         // 입력값 검증에 실패하면 카테고리와 상품 유형을 다시 전달한다.
         if (bindingResult.hasErrors()) {
+            model.addAttribute(
+                    "editMode",
+                    false
+            );
+
+            model.addAttribute(
+                    "formAction",
+                    "/admin/products"
+            );
+
             addProductFormOptions(model);
 
             return "admin/product/form";
@@ -240,10 +262,115 @@ public class ProductAdminController {
         return "redirect:/admin/products";
     }
 
+    /**
+     * 관리자 상품 수정 화면을 반환한다.
+     *
+     * @param productId 수정할 상품 식별자
+     * @param model 기존 상품 정보와 선택지를 전달할 모델
+     * @return 상품 수정 템플릿 경로
+     */
     @GetMapping("/admin/products/{productId}/edit")
     public String editForm(
-            @PathVariable long productId
+            @PathVariable("productId")
+            long productId,
+
+            Model model
     ) {
+        // 기존 상품 정보를 수정 폼 형태로 조회한다.
+        ProductForm productForm =
+                productAdminService.getProductForm(
+                        productId
+                );
+
+        // 기존 상품 정보를 화면에 전달한다.
+        model.addAttribute(
+                "productForm",
+                productForm
+        );
+
+        // 수정 대상 상품 ID를 화면에 전달한다.
+        model.addAttribute(
+                "productId",
+                productId
+        );
+
+        // 수정 화면임을 템플릿에 전달한다.
+        model.addAttribute(
+                "editMode",
+                true
+        );
+
+        // 현재 상품의 수정 요청을 처리할 경로를 화면에 전달한다.
+        model.addAttribute(
+                "formAction",
+                "/admin/products/" + productId
+        );
+
+        addProductFormOptions(model);
+
+        return "admin/product/form";
+    }
+
+    /**
+     * 관리자 상품 수정 요청을 처리한다.
+     *
+     * @param productId 수정할 상품 식별자
+     * @param form 상품 수정 입력값
+     * @param bindingResult 입력값 검증 결과
+     * @param model 검증 실패 시 화면 데이터를 전달할 모델
+     * @param redirectAttributes 수정 결과 메시지를 전달할 객체
+     * @return 검증 실패 시 수정 화면, 성공 시 상품 목록으로 이동
+     */
+    @PostMapping("/admin/products/{productId}")
+    public String update(
+            @PathVariable("productId")
+            long productId,
+
+            @Valid
+            @ModelAttribute("productForm")
+            ProductForm form,
+
+            BindingResult bindingResult,
+
+            Model model,
+
+            RedirectAttributes redirectAttributes
+    ) {
+        // 입력값 검증에 실패하면 수정 화면에 필요한 값을 다시 전달한다.
+        if (bindingResult.hasErrors()) {
+            model.addAttribute(
+                    "productId",
+                    productId
+            );
+
+            model.addAttribute(
+                    "editMode",
+                    true
+            );
+
+            model.addAttribute(
+                    "formAction",
+                    "/admin/products/" + productId
+            );
+
+            addProductFormOptions(model);
+
+            return "admin/product/form";
+        }
+
+        // 검증된 입력값으로 상품의 기본 정보를 수정한다.
+        productAdminService.updateProduct(
+                productId,
+                form
+        );
+
+        // 목록 화면에 수정 완료 메시지를 전달한다.
+        redirectAttributes.addFlashAttribute(
+                "successMessage",
+                "상품 정보를 수정했습니다."
+        );
+
+        // 새로고침으로 수정 요청이 반복되지 않도록 목록으로 이동한다.
         return "redirect:/admin/products";
     }
 

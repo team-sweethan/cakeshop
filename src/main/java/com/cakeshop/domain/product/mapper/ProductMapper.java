@@ -3,6 +3,7 @@ package com.cakeshop.domain.product.mapper;
 import java.util.List;
 
 import com.cakeshop.domain.product.admin.dto.form.ProductAdminSearchCondition;
+import com.cakeshop.domain.product.admin.dto.form.ProductForm;
 import com.cakeshop.domain.product.admin.dto.view.ProductAdminListView;
 import com.cakeshop.domain.product.admin.dto.view.ProductCategoryOptionView;
 import com.cakeshop.domain.product.customer.dto.form.ProductSearchCondition;
@@ -135,4 +136,25 @@ public interface ProductMapper {
      * @return 등록된 상품 행 개수
      */
     int insertProduct(Product product);
+
+    /**
+     * 관리자 상품 수정 화면에 표시할 기존 상품 정보를 조회한다.
+     *
+     * @param productId 조회할 상품 식별자
+     * @return 상품 수정 폼, 존재하지 않으면 {@code null}
+     */
+    ProductForm findAdminProductFormById(
+            @Param("productId")
+            long productId
+    );
+
+    /**
+     * 상품의 기본 정보를 수정한다.
+     *
+     * <p>판매 상태, 평점, 리뷰 수와 상품 옵션은 변경하지 않는다.</p>
+     *
+     * @param product 수정할 상품 정보
+     * @return 수정된 상품 행 개수
+     */
+    int updateProduct(Product product);
 }

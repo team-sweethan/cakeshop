@@ -172,4 +172,96 @@ public class ProductAdminService {
 
         return product.getId();
     }
+
+    /**
+     * 관리자 상품 수정 화면에 표시할 기존 상품 정보를 조회한다.
+     *
+     * @param productId 조회할 상품 식별자
+     * @return 기존 상품 정보가 담긴 수정 폼
+     * @throws BusinessException 상품이 존재하지 않는 경우
+     */
+    @Transactional(readOnly = true)
+    public ProductForm getProductForm(long productId) {
+        // 상품의 기존 기본 정보를 수정 폼 형태로 조회한다.
+        ProductForm form =
+                productMapper.findAdminProductFormById(
+                        productId
+                );
+
+        // 존재하지 않는 상품이면 수정 화면을 제공하지 않는다.
+        if (form == null) {
+            throw new BusinessException(
+                    ProductErrorCode.NOT_FOUND
+            );
+        }
+
+        return form;
+    }
+
+    /**
+     * 상품의 기본 정보를 수정한다.
+     *
+     * <p>판매 상태와 평점, 리뷰 수, 옵션 정보는 변경하지 않는다.</p>
+     *
+     * @param productId 수정할 상품 식별자
+     * @param form 상품 수정 입력값
+     * @throws BusinessException 상품이 없거나 카테고리가 유효하지 않은 경우
+     */
+    @Transactional
+    public void updateProduct(
+            long productId,
+            ProductForm form
+    ) {
+        // 수정할 상품이 실제로 존재하는지 확인한다.
+        if (productMapper.findAdminProductFormById(
+                productId
+        ) == null) {
+            throw new BusinessException(
+                    ProductErrorCode.NOT_FOUND
+            );
+        }
+
+        // 선택한 카테고리가 존재하고 활성 상태인지 확인한다.
+        if (form == null
+                || form.getCategoryId() == null
+                || !productMapper.existsActiveCategoryById(
+                form.getCategoryId()
+        )) {
+            throw new BusinessException(
+                    ProductErrorCode.INVALID_CATEGORY
+            );
+        }
+
+        // 검증된 수정 폼을 DB 업데이트에 사용할 Product 객체로 변환한다.
+        Product product = new Product();
+
+        product.setId(productId);
+        product.setCategoryId(form.getCategoryId());
+        product.setName(form.normalizedName());
+        product.setDescription(
+                form.normalizedDescription()
+        );
+        product.setBasePrice(form.getBasePrice());
+        product.setStockQuantity(
+                form.getStockQuantity()
+        );
+        product.setProductType(form.getProductType());
+        product.setPreparationDays(
+                form.getPreparationDays()
+        );
+        product.setCancellationLimitDays(
+                form.getCancellationLimitDays()
+        );
+
+        // 상품의 기본 정보만 수정한다.
+        int updatedRows =
+                productMapper.updateProduct(product);
+
+        // 상품이 동시에 삭제되는 등의 이유로 수정되지 않았다면 NOT_FOUND로 처리한다.
+        if (updatedRows == 0) {
+            throw new BusinessException(
+                    ProductErrorCode.NOT_FOUND
+            );
+        }
+    }
 }

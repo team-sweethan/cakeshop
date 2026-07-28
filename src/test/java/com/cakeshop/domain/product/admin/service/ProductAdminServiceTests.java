@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -266,6 +267,180 @@ class ProductAdminServiceTests {
 
         verify(productMapper, never())
                 .insertProduct(any(Product.class));
+    }
+
+    @Test
+    void existingProductFormIsReturned() {
+        ProductForm form = validProductForm();
+
+        when(productMapper.findAdminProductFormById(1L))
+                .thenReturn(form);
+
+        ProductForm result =
+                productAdminService.getProductForm(1L);
+
+        assertThat(result).isSameAs(form);
+        verify(productMapper)
+                .findAdminProductFormById(1L);
+    }
+
+    @Test
+    void missingProductFormThrowsNotFoundException() {
+        when(productMapper.findAdminProductFormById(999L))
+                .thenReturn(null);
+
+        assertThatThrownBy(() ->
+                productAdminService.getProductForm(999L)
+        )
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        exception ->
+                                assertThat(exception.getErrorCode())
+                                        .isEqualTo(
+                                                ProductErrorCode.NOT_FOUND
+                                        )
+                );
+    }
+
+    @Test
+    void updateProductChangesOnlyBasicInformation() {
+        ProductForm existingForm = validProductForm();
+        ProductForm updateForm = validProductForm();
+
+        updateForm.setName("  수정 케이크  ");
+        updateForm.setDescription("  수정된 상품 설명  ");
+        updateForm.setBasePrice(
+                BigDecimal.valueOf(45_000)
+        );
+        updateForm.setStockQuantity(null);
+        updateForm.setProductType(ProductType.CUSTOM);
+        updateForm.setPreparationDays(3);
+        updateForm.setCancellationLimitDays(2);
+
+        when(productMapper.findAdminProductFormById(1L))
+                .thenReturn(existingForm);
+        when(productMapper.existsActiveCategoryById(1L))
+                .thenReturn(true);
+        when(productMapper.updateProduct(any(Product.class)))
+                .thenReturn(1);
+
+        productAdminService.updateProduct(
+                1L,
+                updateForm
+        );
+
+        ArgumentCaptor<Product> productCaptor =
+                ArgumentCaptor.forClass(Product.class);
+
+        verify(productMapper)
+                .updateProduct(productCaptor.capture());
+
+        Product updatedProduct =
+                productCaptor.getValue();
+
+        assertThat(updatedProduct.getId()).isEqualTo(1L);
+        assertThat(updatedProduct.getCategoryId())
+                .isEqualTo(1L);
+        assertThat(updatedProduct.getName())
+                .isEqualTo("수정 케이크");
+        assertThat(updatedProduct.getDescription())
+                .isEqualTo("수정된 상품 설명");
+        assertThat(updatedProduct.getBasePrice())
+                .isEqualByComparingTo("45000");
+        assertThat(updatedProduct.getStockQuantity())
+                .isNull();
+        assertThat(updatedProduct.getProductType())
+                .isEqualTo(ProductType.CUSTOM);
+        assertThat(updatedProduct.getPreparationDays())
+                .isEqualTo(3);
+        assertThat(updatedProduct.getCancellationLimitDays())
+                .isEqualTo(2);
+
+        // 기본 정보 수정에서는 판매 상태를 변경하지 않는다.
+        assertThat(updatedProduct.getStatus()).isNull();
+    }
+
+    @Test
+    void updateMissingProductThrowsNotFoundException() {
+        ProductForm form = validProductForm();
+
+        when(productMapper.findAdminProductFormById(999L))
+                .thenReturn(null);
+
+        assertThatThrownBy(() ->
+                productAdminService.updateProduct(
+                        999L,
+                        form
+                )
+        )
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        exception ->
+                                assertThat(exception.getErrorCode())
+                                        .isEqualTo(
+                                                ProductErrorCode.NOT_FOUND
+                                        )
+                );
+
+        verify(productMapper, never())
+                .existsActiveCategoryById(anyLong());
+        verify(productMapper, never())
+                .updateProduct(any(Product.class));
+    }
+
+    @Test
+    void updateProductWithInactiveCategoryThrowsException() {
+        ProductForm form = validProductForm();
+
+        when(productMapper.findAdminProductFormById(1L))
+                .thenReturn(validProductForm());
+        when(productMapper.existsActiveCategoryById(1L))
+                .thenReturn(false);
+
+        assertThatThrownBy(() ->
+                productAdminService.updateProduct(
+                        1L,
+                        form
+                )
+        )
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        exception ->
+                                assertThat(exception.getErrorCode())
+                                        .isEqualTo(
+                                                ProductErrorCode.INVALID_CATEGORY
+                                        )
+                );
+
+        verify(productMapper, never())
+                .updateProduct(any(Product.class));
+    }
+
+    @Test
+    void updateProductWithNoAffectedRowThrowsNotFoundException() {
+        ProductForm form = validProductForm();
+
+        when(productMapper.findAdminProductFormById(1L))
+                .thenReturn(validProductForm());
+        when(productMapper.existsActiveCategoryById(1L))
+                .thenReturn(true);
+        when(productMapper.updateProduct(any(Product.class)))
+                .thenReturn(0);
+
+        assertThatThrownBy(() ->
+                productAdminService.updateProduct(
+                        1L,
+                        form
+                )
+        )
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        exception ->
+                                assertThat(exception.getErrorCode())
+                                        .isEqualTo(
+                                                ProductErrorCode.NOT_FOUND
+                                        )
+                );
     }
 
     /**

@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import com.cakeshop.domain.product.admin.dto.form.AdminStockFilter;
@@ -216,6 +217,14 @@ class ProductAdminControllerTests {
                         "productForm",
                         "categories",
                         "productTypes"
+                ))
+                .andExpect(model().attribute(
+                        "editMode",
+                        false
+                ))
+                .andExpect(model().attribute(
+                        "formAction",
+                        "/admin/products"
                 ));
     }
 
@@ -321,5 +330,201 @@ class ProductAdminControllerTests {
 
         verify(productAdminService, never())
                 .createProduct(any());
+    }
+
+    @Test
+    void editFormReturnsExistingProductInformation()
+            throws Exception {
+        ProductAdminService productAdminService =
+                mock(ProductAdminService.class);
+
+        ProductForm productForm = validProductForm();
+        ProductCategoryOptionView category =
+                new ProductCategoryOptionView(
+                        1L,
+                        "케이크"
+                );
+
+        when(productAdminService.getProductForm(1L))
+                .thenReturn(productForm);
+        when(productAdminService.getActiveCategories())
+                .thenReturn(List.of(category));
+
+        MockMvc mockMvc = MockMvcBuilders
+                .standaloneSetup(
+                        new ProductAdminController(
+                                productAdminService
+                        )
+                )
+                .build();
+
+        mockMvc.perform(
+                        get("/admin/products/{productId}/edit", 1L)
+                )
+                .andExpect(status().isOk())
+                .andExpect(view().name(
+                        "admin/product/form"
+                ))
+                .andExpect(model().attribute(
+                        "productForm",
+                        productForm
+                ))
+                .andExpect(model().attribute(
+                        "productId",
+                        1L
+                ))
+                .andExpect(model().attribute(
+                        "editMode",
+                        true
+                ))
+                .andExpect(model().attribute(
+                        "formAction",
+                        "/admin/products/1"
+                ))
+                .andExpect(model().attributeExists(
+                        "categories",
+                        "productTypes"
+                ));
+
+        verify(productAdminService)
+                .getProductForm(1L);
+    }
+
+    @Test
+    void updateProductRedirectsToProductList()
+            throws Exception {
+        ProductAdminService productAdminService =
+                mock(ProductAdminService.class);
+
+        MockMvc mockMvc = MockMvcBuilders
+                .standaloneSetup(
+                        new ProductAdminController(
+                                productAdminService
+                        )
+                )
+                .build();
+
+        mockMvc.perform(
+                        post("/admin/products/{productId}", 1L)
+                                .param("categoryId", "1")
+                                .param("name", "수정 케이크")
+                                .param("description", "수정된 상품 설명")
+                                .param("basePrice", "45000")
+                                .param("stockQuantity", "5")
+                                .param("productType", "CUSTOM")
+                                .param("preparationDays", "3")
+                                .param(
+                                        "cancellationLimitDays",
+                                        "2"
+                                )
+                )
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(
+                        "/admin/products"
+                ))
+                .andExpect(flash().attribute(
+                        "successMessage",
+                        "상품 정보를 수정했습니다."
+                ));
+
+        ArgumentCaptor<ProductForm> formCaptor =
+                ArgumentCaptor.forClass(ProductForm.class);
+
+        verify(productAdminService).updateProduct(
+                eq(1L),
+                formCaptor.capture()
+        );
+
+        ProductForm form = formCaptor.getValue();
+
+        assertThat(form.getCategoryId()).isEqualTo(1L);
+        assertThat(form.getName()).isEqualTo("수정 케이크");
+        assertThat(form.getDescription())
+                .isEqualTo("수정된 상품 설명");
+        assertThat(form.getBasePrice())
+                .isEqualByComparingTo("45000");
+        assertThat(form.getStockQuantity()).isEqualTo(5);
+        assertThat(form.getProductType())
+                .isEqualTo(ProductType.CUSTOM);
+        assertThat(form.getPreparationDays()).isEqualTo(3);
+        assertThat(form.getCancellationLimitDays())
+                .isEqualTo(2);
+    }
+
+    @Test
+    void invalidUpdateFormReturnsEditPage()
+            throws Exception {
+        ProductAdminService productAdminService =
+                mock(ProductAdminService.class);
+
+        when(productAdminService.getActiveCategories())
+                .thenReturn(List.of(
+                        new ProductCategoryOptionView(
+                                1L,
+                                "케이크"
+                        )
+                ));
+
+        MockMvc mockMvc = MockMvcBuilders
+                .standaloneSetup(
+                        new ProductAdminController(
+                                productAdminService
+                        )
+                )
+                .build();
+
+        mockMvc.perform(
+                        post("/admin/products/{productId}", 1L)
+                                .param("name", "")
+                                .param("basePrice", "-1")
+                                .param("preparationDays", "-1")
+                                .param(
+                                        "cancellationLimitDays",
+                                        "-1"
+                                )
+                )
+                .andExpect(status().isOk())
+                .andExpect(view().name(
+                        "admin/product/form"
+                ))
+                .andExpect(model().attributeHasErrors(
+                        "productForm"
+                ))
+                .andExpect(model().attribute(
+                        "productId",
+                        1L
+                ))
+                .andExpect(model().attribute(
+                        "editMode",
+                        true
+                ))
+                .andExpect(model().attribute(
+                        "formAction",
+                        "/admin/products/1"
+                ))
+                .andExpect(model().attributeExists(
+                        "categories",
+                        "productTypes"
+                ));
+
+        verify(productAdminService, never())
+                .updateProduct(anyLong(), any());
+    }
+
+    private ProductForm validProductForm() {
+        ProductForm form = new ProductForm();
+
+        form.setCategoryId(1L);
+        form.setName("기존 케이크");
+        form.setDescription("기존 상품 설명");
+        form.setBasePrice(
+                BigDecimal.valueOf(35_000)
+        );
+        form.setStockQuantity(10);
+        form.setProductType(ProductType.GENERAL);
+        form.setPreparationDays(2);
+        form.setCancellationLimitDays(1);
+
+        return form;
     }
 }

@@ -8,6 +8,7 @@ import java.util.List;
 
 import com.cakeshop.domain.product.admin.dto.form.AdminStockFilter;
 import com.cakeshop.domain.product.admin.dto.form.ProductAdminSearchCondition;
+import com.cakeshop.domain.product.admin.dto.form.ProductForm;
 import com.cakeshop.domain.product.admin.dto.view.ProductAdminListView;
 import com.cakeshop.domain.product.admin.dto.view.ProductCategoryOptionView;
 import com.cakeshop.domain.product.customer.dto.form.ProductSearchCondition;
@@ -553,5 +554,113 @@ class ProductMapperTests {
         );
 
         assertThat(status).isEqualTo("INACTIVE");
+    }
+
+    @Test
+    void adminProductFormContainsExistingValues() {
+        ProductForm form =
+                productMapper.findAdminProductFormById(
+                        optionProductId
+                );
+
+        assertThat(form).isNotNull();
+        assertThat(form.getCategoryId())
+                .isEqualTo(categoryId);
+        assertThat(form.getName())
+                .isEqualTo(
+                        keyword + " A 당일 재고 상품"
+                );
+        assertThat(form.getDescription())
+                .isEmpty();
+        assertThat(form.getBasePrice())
+                .isEqualByComparingTo("10000");
+        assertThat(form.getStockQuantity())
+                .isEqualTo(10);
+        assertThat(form.getProductType())
+                .isEqualTo(ProductType.GENERAL);
+        assertThat(form.getPreparationDays())
+                .isZero();
+        assertThat(form.getCancellationLimitDays())
+                .isZero();
+    }
+
+    @Test
+    void adminCanUpdateProductWithoutChangingStatus() {
+        Product product = new Product();
+
+        product.setId(optionProductId);
+        product.setCategoryId(categoryId);
+        product.setName(keyword + " 수정 상품");
+        product.setDescription("수정된 상품 설명");
+        product.setBasePrice(
+                BigDecimal.valueOf(55_000)
+        );
+        product.setStockQuantity(null);
+        product.setProductType(ProductType.CUSTOM);
+        product.setPreparationDays(3);
+        product.setCancellationLimitDays(2);
+
+        int updatedRows =
+                productMapper.updateProduct(product);
+
+        ProductForm updatedForm =
+                productMapper.findAdminProductFormById(
+                        optionProductId
+                );
+
+        String status = jdbcTemplate.queryForObject(
+                """
+                SELECT status
+                FROM products
+                WHERE id = ?
+                """,
+                String.class,
+                optionProductId
+        );
+
+        assertThat(updatedRows).isEqualTo(1);
+        assertThat(updatedForm).isNotNull();
+        assertThat(updatedForm.getName())
+                .isEqualTo(keyword + " 수정 상품");
+        assertThat(updatedForm.getDescription())
+                .isEqualTo("수정된 상품 설명");
+        assertThat(updatedForm.getBasePrice())
+                .isEqualByComparingTo("55000");
+        assertThat(updatedForm.getStockQuantity())
+                .isNull();
+        assertThat(updatedForm.getProductType())
+                .isEqualTo(ProductType.CUSTOM);
+        assertThat(updatedForm.getPreparationDays())
+                .isEqualTo(3);
+        assertThat(updatedForm.getCancellationLimitDays())
+                .isEqualTo(2);
+
+        // 기본 정보 수정 후에도 기존 판매 상태는 유지되어야 한다.
+        assertThat(status).isEqualTo("ACTIVE");
+    }
+
+    @Test
+    void missingProductCannotBeReadOrUpdated() {
+        assertThat(
+                productMapper.findAdminProductFormById(
+                        Long.MAX_VALUE
+                )
+        ).isNull();
+
+        Product product = new Product();
+
+        product.setId(Long.MAX_VALUE);
+        product.setCategoryId(categoryId);
+        product.setName(keyword + " 존재하지 않는 상품");
+        product.setDescription(null);
+        product.setBasePrice(BigDecimal.ZERO);
+        product.setStockQuantity(null);
+        product.setProductType(ProductType.GENERAL);
+        product.setPreparationDays(0);
+        product.setCancellationLimitDays(0);
+
+        assertThat(
+                productMapper.updateProduct(product)
+        ).isZero();
     }
 }

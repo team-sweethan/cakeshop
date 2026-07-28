@@ -7,7 +7,12 @@
   <meta name="viewport"
         content="width=device-width, initial-scale=1.0">
 
-  <title>상품 등록 | 관리자</title>
+  <title th:text=
+                 "${editMode
+                 ? '상품 수정 | 관리자'
+                 : '상품 등록 | 관리자'}">
+    상품 관리 | 관리자
+  </title>
 
   <link rel="stylesheet"
         th:href="@{/css/app.css}">
@@ -25,12 +30,17 @@
 
     <!-- 관리자 헤더 -->
     <header th:replace=
-                    "~{fragments/admin/header :: header('상품 등록')}">
+                    "~{fragments/admin/header :: header('상품 관리')}">
     </header>
 
     <main class="admin-content">
 
-      <h1 class="admin-page-title">
+      <!-- 등록·수정 모드에 따른 제목 -->
+      <h1 class="admin-page-title"
+          th:text=
+                  "${editMode
+                  ? '상품 수정'
+                  : '상품 등록'}">
         상품 등록
       </h1>
 
@@ -39,9 +49,16 @@
                    "~{fragments/common/alert :: alert}">
       </div>
 
+      <!--
+          등록:
+          POST /admin/products
+
+          수정:
+          POST /admin/products/{productId}
+      -->
       <form class="admin-form"
             method="post"
-            th:action="@{/admin/products}"
+            th:action="${formAction}"
             th:object="${productForm}">
 
         <!-- 전체 입력값 오류 안내 -->
@@ -292,19 +309,31 @@
               </p>
             </div>
 
-            <!-- 최초 판매 상태 안내 -->
-            <div class="alert alert--info">
+            <!-- 등록 화면 안내 -->
+            <div class="alert alert--info"
+                 th:unless="${editMode}">
               새 상품은 판매 중지 상태로 등록됩니다.
               상품 정보와 옵션을 확인한 후 목록에서 판매를 시작해 주세요.
+            </div>
+
+            <!-- 수정 화면 안내 -->
+            <div class="alert alert--info"
+                 th:if="${editMode}">
+              상품 정보를 수정해도 현재 판매 상태는 변경되지 않습니다.
+              판매 시작 또는 중지는 상품 목록에서 변경해 주세요.
             </div>
           </div>
         </section>
 
-        <!-- 등록 버튼 -->
+        <!-- 저장 버튼 -->
         <div class="cluster">
           <button class="btn btn--primary"
                   type="submit"
-                  th:disabled="${categories.isEmpty()}">
+                  th:disabled="${categories.isEmpty()}"
+                  th:text=
+                          "${editMode
+                          ? '상품 수정'
+                          : '상품 등록'}">
             상품 등록
           </button>
 
