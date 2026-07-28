@@ -45,6 +45,17 @@ class FlywayMigrationTests {
                 """,
                 Integer.class
         );
+        Integer memberNameColumnCount = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM information_schema.columns
+                WHERE table_schema = DATABASE()
+                  AND table_name = 'members'
+                  AND column_name = 'name'
+                  AND is_nullable = 'NO'
+                """,
+                Integer.class
+        );
         Integer localMemberCount = jdbcTemplate.queryForObject(
                 """
                 SELECT COUNT(*)
@@ -58,8 +69,10 @@ class FlywayMigrationTests {
         );
 
         assertThat(appliedVersions)
-                .containsExactly("0", "1");
+                .containsExactly("0", "1", "3");
         assertThat(stockColumnCount)
+                .isOne();
+        assertThat(memberNameColumnCount)
                 .isOne();
         assertThat(localMemberCount)
                 .isZero();
