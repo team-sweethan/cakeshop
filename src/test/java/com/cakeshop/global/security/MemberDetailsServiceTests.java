@@ -42,7 +42,7 @@ class MemberDetailsServiceTests {
 
         MemberDetails details = (MemberDetails) memberDetailsService.loadUserByUsername(admin.getEmail());
 
-        assertThat(details.getMember().getId()).isEqualTo(1L);
+        assertThat(details.getMemberId()).isEqualTo(1L);
         assertThat(details.getAuthorities()).extracting("authority").containsExactly("ROLE_ADMIN");
     }
 
