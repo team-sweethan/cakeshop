@@ -2,4 +2,66 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.cakeshop.domain.payment.mapper.PaymentMapper">
     <!-- 사용자 입력은 #{} 만 사용 (${} 금지) -->
+
+    <insert id="insertReadyPayment"
+            parameterType="com.cakeshop.domain.payment.entity.Payment"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO payments (
+            order_id,
+            toss_order_id,
+            payment_key,
+            idempotency_key,
+            method,
+            amount,
+            status,
+            provider_status,
+            failure_code,
+            failure_message
+        )
+        VALUES (
+            #{orderId},
+            #{tossOrderId},
+            #{paymentKey},
+            #{idempotencyKey},
+            #{method},
+            #{amount},
+            'READY',
+            #{providerStatus},
+            #{failureCode},
+            #{failureMessage}
+        )
+    </insert>
+
+    <select id="findPaymentsByOrderId"
+            resultType="com.cakeshop.domain.payment.entity.Payment">
+        SELECT
+            id,
+            order_id,
+            toss_order_id,
+            payment_key,
+            idempotency_key,
+            method,
+            amount,
+            status,
+            provider_status,
+            active_paid_order_id,
+            failure_code,
+            failure_message,
+            requested_at,
+            approved_at,
+            canceled_at,
+            created_at,
+            updated_at
+        FROM payments
+        WHERE order_id = #{orderId}
+        ORDER BY id
+    </select>
+
+    <update id="updateStatusIfCurrent">
+        UPDATE payments
+        SET status = #{nextStatus}
+        WHERE id = #{paymentId}
+          AND status = #{expectedStatus}
+    </update>
 </mapper>
