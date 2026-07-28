@@ -42,7 +42,7 @@
 | RDS 적용 이력 기록 위치 | ⬜ | |
 | 적용 실패 시 롤백 방법 | ⬜ | |
 | 테이블·컬럼·제약조건 네이밍 규칙 | ✅ [`conventions.md`](conventions.md) 데이터베이스 규약 준수 | |
-| 로컬 seed와 공용 seed의 구분 기준 | ✅ 로컬 시드는 Flyway 밖의 `src/main/resources/db/seed/seed-local.sql`. 스키마 migration과 완전히 분리해 시드를 고쳐도 DB 재생성이 필요 없다 | |
+| 로컬 seed와 공용 seed의 구분 기준 | ✅ 로컬 샘플은 Flyway 밖의 `src/main/resources/db/seed/seed-local.sql`, 모든 환경의 실행 필수 기준 데이터는 versioned migration으로 관리한다 | |
 
 ### 원칙
 

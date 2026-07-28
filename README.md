@@ -82,6 +82,7 @@ DB를 다시 만든 뒤 프로젝트 루트에서 실행한다.
 1. `V0__initial_schema.sql`: 전체 공통 스키마 생성
 2. `V1__add_product_stock.sql`: 상품 재고 컬럼 추가
 3. `V3__add_member_name.sql`: 회원 이름 컬럼 추가 및 기존 로컬 계정 값 보정
+4. `V20260729_003452__provision_default_store.sql`: 모든 환경에 필요한 대표 매장과 7개 요일 영업시간 보장
 
 스키마가 올라오면 샘플 데이터를 넣는다. MariaDB 클라이언트에서 `src/main/resources/db/seed/seed-local.sql`을 실행한다.
 
@@ -90,7 +91,10 @@ mariadb --host=localhost --port=3307 --user=root --password cakeshop `
   < src\main\resources\db\seed\seed-local.sql
 ```
 
-이 스크립트는 애플리케이션 데이터를 전부 지우고 샘플 데이터를 다시 넣는다. 로컬에서 만든 주문·리뷰·게시글도 함께 사라지므로 로컬 DB에서만 실행한다. 대신 몇 번을 실행해도 결과가 같으므로, 시드 내용이 바뀌었을 때 이 단계만 다시 실행하면 된다. DB를 다시 만들 필요가 없다.
+이 스크립트는 공통 필수 데이터인 대표 매장과 영업시간은 유지하고, 나머지 로컬 샘플 데이터를
+지운 뒤 다시 넣는다. 로컬에서 만든 주문·리뷰·게시글도 함께 사라지므로 로컬 DB에서만 실행한다.
+대신 몇 번을 실행해도 결과가 같으므로, 시드 내용이 바뀌었을 때 이 단계만 다시 실행하면 된다.
+DB를 다시 만들 필요가 없다.
 
 적용 결과는 MariaDB에서 다음 SQL로 확인한다.
 
@@ -208,7 +212,10 @@ created: src/main/resources/db/migration/V20260729_101542__add_coupon_table.sql
 
 ### 샘플 데이터
 
-`db/seed/seed-local.sql`은 Flyway가 스캔하지 않는다. 그래서 checksum 검증에 걸리지 않고, 내용을 고쳐도 팀원들이 DB를 다시 만들 필요가 없다. 스크립트 맨 앞에서 애플리케이션 데이터를 전부 지운 뒤 다시 넣으므로 몇 번을 실행해도 결과가 같다.
+`db/seed/seed-local.sql`은 Flyway가 스캔하지 않는다. 그래서 checksum 검증에 걸리지 않고, 내용을
+고쳐도 팀원들이 DB를 다시 만들 필요가 없다. 스크립트 맨 앞에서 로컬 샘플 데이터를 지운 뒤
+다시 넣으므로 몇 번을 실행해도 결과가 같다. 모든 환경에 필요한 대표 매장과 영업시간은
+versioned migration으로 관리하며 로컬 seed가 삭제하거나 덮어쓰지 않는다.
 
 상태값(`status`) 컬럼은 도메인마다 흩어지지 않도록 `docs/status-design.md`의 상태값 공통 규칙(영문 enum 이름 저장·한글 라벨 미저장·전이는 service)을 따른다.
 
@@ -225,7 +232,9 @@ created: src/main/resources/db/migration/V20260729_101542__add_coupon_table.sql
 
 ### 적용 순서
 
-1. 빈 로컬 DB를 생성하고 애플리케이션을 `local` 프로필로 실행해 Flyway가 테이블을 만들게 한 뒤, `db/seed/seed-local.sql`을 실행해 필수 샘플 데이터(공통 샘플 계정 `admin@cakeshop.local`·`user@cakeshop.local`, 대표 매장 1행 + 7개 요일 영업시간)를 넣는다.
+1. 빈 로컬 DB를 생성하고 애플리케이션을 `local` 프로필로 실행해 Flyway가 테이블과 필수 대표
+   매장·7개 요일 영업시간을 만들게 한 뒤, `db/seed/seed-local.sql`을 실행해 공통 샘플 계정
+   `admin@cakeshop.local`·`user@cakeshop.local` 등 로컬 샘플 데이터를 넣는다.
 2. `admin@cakeshop.local / Admin1234!`로 로그인한다.
 3. `GET /admin/store`에서 매장 정보를 조회한다.
 4. 폼 저장은 `StoreUpdateForm` 검증 → `StoreService` 트랜잭션 → `StoreMapper.xml`의 `#{}` 바인딩 순서로 처리된다.

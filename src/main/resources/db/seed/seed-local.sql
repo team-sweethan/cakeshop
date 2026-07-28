@@ -1,7 +1,8 @@
 -- 로컬 개발 환경 전용 시드 데이터
 --
--- ⚠️ 주의: 이 스크립트는 로컬 애플리케이션 데이터를 전부 지우고 샘플 데이터를 다시 넣는다.
---    로컬에서 만든 주문·리뷰·게시글도 함께 사라진다. 운영/공용 DB에서는 절대 실행하지 않는다.
+-- ⚠️ 주의: 이 스크립트는 대표 매장·영업시간을 제외한 로컬 애플리케이션 데이터를 지우고
+--    샘플 데이터를 다시 넣는다. 로컬에서 만든 주문·리뷰·게시글도 함께 사라진다.
+--    운영/공용 DB에서는 절대 실행하지 않는다.
 --
 -- Flyway 관리 대상이 아니다. flyway_schema_history 에 기록이 남지 않으며,
 -- 스키마 마이그레이션(db/migration)이 모두 적용된 뒤 수동으로 실행한다.
@@ -54,8 +55,6 @@ DELETE FROM `product_option_groups`;
 DELETE FROM `products`;
 DELETE FROM `categories`;
 DELETE FROM `store_holiday`;
-DELETE FROM `store_business_hour`;
-DELETE FROM `store`;
 DELETE FROM `social_accounts`;
 DELETE FROM `members`;
 
@@ -94,13 +93,11 @@ ALTER TABLE `product_option_groups` AUTO_INCREMENT = 1;
 ALTER TABLE `products` AUTO_INCREMENT = 1;
 ALTER TABLE `categories` AUTO_INCREMENT = 1;
 ALTER TABLE `store_holiday` AUTO_INCREMENT = 1;
-ALTER TABLE `store_business_hour` AUTO_INCREMENT = 1;
-ALTER TABLE `store` AUTO_INCREMENT = 1;
 ALTER TABLE `social_accounts` AUTO_INCREMENT = 1;
 ALTER TABLE `members` AUTO_INCREMENT = 1;
 
 -- ---------------------------------------------------------------------------
--- 1. 기본 로컬 계정과 대표 매장
+-- 1. 기본 로컬 계정
 -- ---------------------------------------------------------------------------
 -- 공통 샘플 계정: 비밀번호는 둘 다 'Admin1234!' (BCrypt 해시 저장)
 -- role 은 접두어 없는 값(USER/ADMIN)으로 저장 (MemberDetailsService 가 'ROLE_' 부착)
@@ -113,26 +110,6 @@ INSERT INTO `members` (`email`, `password`, `name`, `nickname`, `phone`, `role`,
     ('user@cakeshop.local',
     '$2a$10$wRIE78x8sm..uLtbp9LHde7l6wUWQD3NjPvThQaXvZ3PpXfW6wwX.',
     '테스트회원', '테스트회원', '010-0000-0002', 'USER', 'ACTIVE');
-
--- 대표 매장 1행 (id = 1 = StoreService.DEFAULT_STORE_ID)
-INSERT INTO `store`
-    (`id`, `name`, `description`, `address`, `phone`,
-    `pickup_place`, `pickup_start_time`, `pickup_end_time`, `pickup_interval_minutes`)
-VALUES
-    (1, '케이크 공방', '수제 케이크 전문 매장입니다.', '서울특별시 강남구 테헤란로 1', '02-000-0000',
-    '매장 1층 픽업 데스크', '10:00:00', '20:00:00', 30);
-
--- 7개 요일 영업시간 (getStoreView 가 요일 행을 필수로 요구)
-INSERT INTO `store_business_hour`
-    (`store_id`, `day_of_week`, `open_time`, `close_time`, `is_closed`)
-VALUES
-    (1, 'MONDAY',    '10:00:00', '20:00:00', 0),
-    (1, 'TUESDAY',   '10:00:00', '20:00:00', 0),
-    (1, 'WEDNESDAY', '10:00:00', '20:00:00', 0),
-    (1, 'THURSDAY',  '10:00:00', '20:00:00', 0),
-    (1, 'FRIDAY',    '10:00:00', '20:00:00', 0),
-    (1, 'SATURDAY',  '11:00:00', '21:00:00', 0),
-    (1, 'SUNDAY',    NULL,       NULL,       1);
 
 -- =========================================================
 -- 상품 도메인 로컬 테스트 데이터

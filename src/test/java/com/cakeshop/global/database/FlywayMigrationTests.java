@@ -72,6 +72,22 @@ class FlywayMigrationTests {
                 """,
                 Integer.class
         );
+        Integer defaultStoreCount = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM store
+                WHERE id = 1
+                """,
+                Integer.class
+        );
+        Integer defaultBusinessHourCount = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM store_business_hour
+                WHERE store_id = 1
+                """,
+                Integer.class
+        );
 
         // 마이그레이션은 계속 늘어나므로 목록 전체를 고정하지 않는다.
         // 초기 세 개의 상대 순서와 "전부 성공했고 checksum이 맞다"만 지킨다.
@@ -87,5 +103,9 @@ class FlywayMigrationTests {
                 .isOne();
         assertThat(localMemberCount)
                 .isZero();
+        assertThat(defaultStoreCount)
+                .isOne();
+        assertThat(defaultBusinessHourCount)
+                .isEqualTo(7);
     }
 }

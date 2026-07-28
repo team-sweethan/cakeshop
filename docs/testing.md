@@ -305,7 +305,9 @@ Testcontainers 테스트를 돌리려면 **로컬에 Docker가 실행 중**이�
 | 첫 실행이 매우 느림 | MariaDB image 최초 다운로드. 이후에는 캐시되어 빨라진다 |
 | container는 뜨는데 연결 실패 | `@MariaDbIntegrationTest`를 붙였는지, `@AutoConfigureTestDatabase(replace = NONE)`가 있는지 확인 |
 
-Flyway와 seed 데이터의 역할 분리는 [`conventions.md`](conventions.md)의 「6-1. Flyway migration 규약」에서 확정했다. 요약하면 `db/migration`은 Flyway가 관리하는 스키마 변경, `db/seed`는 Flyway 밖에서 직접 실행하는 로컬 샘플 데이터다.
+Flyway와 seed 데이터의 역할 분리는 [`conventions.md`](conventions.md)의 「6-1. Flyway migration
+규약」에서 확정했다. 요약하면 `db/migration`은 Flyway가 관리하는 스키마 변경과 모든 환경에
+필요한 기준 데이터, `db/seed`는 Flyway 밖에서 직접 실행하는 로컬 샘플 데이터다.
 개발 환경 준비 절차는 `CONTRIBUTING.md`에 기록한다(**작성 예정**).
 
 ## 10. 파일·네트워크·외부 시스템 **[권장]**
