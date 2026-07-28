@@ -1,17 +1,118 @@
 -- 로컬 개발 환경 전용 시드 데이터
--- application.yml의 local Flyway location에서만 실행한다.
--- RDS에서는 classpath:db/local을 스캔하지 않는다.
+--
+-- ⚠️ 주의: 이 스크립트는 로컬 애플리케이션 데이터를 전부 지우고 샘플 데이터를 다시 넣는다.
+--    로컬에서 만든 주문·리뷰·게시글도 함께 사라진다. 운영/공용 DB에서는 절대 실행하지 않는다.
+--
+-- Flyway 관리 대상이 아니다. flyway_schema_history 에 기록이 남지 않으며,
+-- 스키마 마이그레이션(db/migration)이 모두 적용된 뒤 수동으로 실행한다.
+--   1) gradlew bootRun --args="--spring.profiles.active=local"   → 스키마
+--   2) MariaDB 클라이언트에서 이 파일 실행                          → 샘플 데이터
+-- 내용을 고친 뒤에는 2)만 다시 실행하면 된다. DB 재생성이 필요 없다.
 
--- 기본 로컬 계정과 대표 매장
+-- ---------------------------------------------------------------------------
+-- 0. 초기화 — 몇 번이든 다시 실행할 수 있도록 기존 데이터를 지운다.
+--
+-- FOREIGN_KEY_CHECKS 를 끄지 않는다. 대신 V0__initial_schema.sql 의 FK 정의를
+-- 역순으로 따라 자식 → 부모 순으로 지운다. FK 를 우회하지 않으므로 고아 행이 남지 않는다.
+-- flyway_schema_history 는 건드리지 않는다 (스키마 이력은 그대로 유지).
+-- ---------------------------------------------------------------------------
+
+-- comments 는 parent_comment_id 로 자기 자신을 참조한다.
+-- 중첩 깊이와 무관하게 안전하도록 부모 참조를 먼저 끊고 지운다.
+UPDATE `comments` SET `parent_comment_id` = NULL;
+
+DELETE FROM `notification_deliveries`;
+DELETE FROM `notifications`;
+DELETE FROM `chat_message_reads`;
+DELETE FROM `chat_messages`;
+DELETE FROM `chat_room_orders`;
+DELETE FROM `chat_rooms`;
+DELETE FROM `member_coupons`;
+DELETE FROM `coupons`;
+DELETE FROM `post_reports`;
+DELETE FROM `post_images`;
+DELETE FROM `post_likes`;
+DELETE FROM `comments`;
+DELETE FROM `posts`;
+DELETE FROM `post_categories`;
+DELETE FROM `review_replies`;
+DELETE FROM `review_images`;
+DELETE FROM `reviews`;
+DELETE FROM `payment_cancellations`;
+DELETE FROM `payments`;
+DELETE FROM `order_item_images`;
+DELETE FROM `order_item_options`;
+DELETE FROM `order_items`;
+DELETE FROM `orders`;
+DELETE FROM `cart_item_images`;
+DELETE FROM `cart_item_options`;
+DELETE FROM `cart_items`;
+DELETE FROM `carts`;
+DELETE FROM `product_images`;
+DELETE FROM `product_options`;
+DELETE FROM `product_option_groups`;
+DELETE FROM `products`;
+DELETE FROM `categories`;
+DELETE FROM `store_holiday`;
+DELETE FROM `store_business_hour`;
+DELETE FROM `store`;
+DELETE FROM `social_accounts`;
+DELETE FROM `members`;
+
+-- DELETE 는 AUTO_INCREMENT 카운터를 되돌리지 않는다. 그대로 두면 재실행할 때마다
+-- 상품 id 가 밀려 /products/1 같은 경로가 깨진다. 매번 같은 id 가 나오도록 되돌린다.
+ALTER TABLE `notification_deliveries` AUTO_INCREMENT = 1;
+ALTER TABLE `notifications` AUTO_INCREMENT = 1;
+ALTER TABLE `chat_message_reads` AUTO_INCREMENT = 1;
+ALTER TABLE `chat_messages` AUTO_INCREMENT = 1;
+ALTER TABLE `chat_room_orders` AUTO_INCREMENT = 1;
+ALTER TABLE `chat_rooms` AUTO_INCREMENT = 1;
+ALTER TABLE `member_coupons` AUTO_INCREMENT = 1;
+ALTER TABLE `coupons` AUTO_INCREMENT = 1;
+ALTER TABLE `post_reports` AUTO_INCREMENT = 1;
+ALTER TABLE `post_images` AUTO_INCREMENT = 1;
+ALTER TABLE `post_likes` AUTO_INCREMENT = 1;
+ALTER TABLE `comments` AUTO_INCREMENT = 1;
+ALTER TABLE `posts` AUTO_INCREMENT = 1;
+ALTER TABLE `post_categories` AUTO_INCREMENT = 1;
+ALTER TABLE `review_replies` AUTO_INCREMENT = 1;
+ALTER TABLE `review_images` AUTO_INCREMENT = 1;
+ALTER TABLE `reviews` AUTO_INCREMENT = 1;
+ALTER TABLE `payment_cancellations` AUTO_INCREMENT = 1;
+ALTER TABLE `payments` AUTO_INCREMENT = 1;
+ALTER TABLE `order_item_images` AUTO_INCREMENT = 1;
+ALTER TABLE `order_item_options` AUTO_INCREMENT = 1;
+ALTER TABLE `order_items` AUTO_INCREMENT = 1;
+ALTER TABLE `orders` AUTO_INCREMENT = 1;
+ALTER TABLE `cart_item_images` AUTO_INCREMENT = 1;
+ALTER TABLE `cart_item_options` AUTO_INCREMENT = 1;
+ALTER TABLE `cart_items` AUTO_INCREMENT = 1;
+ALTER TABLE `carts` AUTO_INCREMENT = 1;
+ALTER TABLE `product_images` AUTO_INCREMENT = 1;
+ALTER TABLE `product_options` AUTO_INCREMENT = 1;
+ALTER TABLE `product_option_groups` AUTO_INCREMENT = 1;
+ALTER TABLE `products` AUTO_INCREMENT = 1;
+ALTER TABLE `categories` AUTO_INCREMENT = 1;
+ALTER TABLE `store_holiday` AUTO_INCREMENT = 1;
+ALTER TABLE `store_business_hour` AUTO_INCREMENT = 1;
+ALTER TABLE `store` AUTO_INCREMENT = 1;
+ALTER TABLE `social_accounts` AUTO_INCREMENT = 1;
+ALTER TABLE `members` AUTO_INCREMENT = 1;
+
+-- ---------------------------------------------------------------------------
+-- 1. 기본 로컬 계정과 대표 매장
+-- ---------------------------------------------------------------------------
 -- 공통 샘플 계정: 비밀번호는 둘 다 'Admin1234!' (BCrypt 해시 저장)
 -- role 은 접두어 없는 값(USER/ADMIN)으로 저장 (MemberDetailsService 가 'ROLE_' 부착)
-INSERT INTO `members` (`email`, `password`, `nickname`, `phone`, `role`, `status`) VALUES
+-- name 은 V3__add_member_name.sql 에서 NOT NULL 이 됐다. 시드가 마이그레이션 뒤에 돌므로
+-- 여기서 직접 채워야 한다. 값은 V3 의 보정 UPDATE(name = nickname)와 같게 맞춘다.
+INSERT INTO `members` (`email`, `password`, `name`, `nickname`, `phone`, `role`, `status`) VALUES
     ('admin@cakeshop.local',
     '$2a$10$wRIE78x8sm..uLtbp9LHde7l6wUWQD3NjPvThQaXvZ3PpXfW6wwX.',
-    '관리자', '010-0000-0001', 'ADMIN', 'ACTIVE'),
+    '관리자', '관리자', '010-0000-0001', 'ADMIN', 'ACTIVE'),
     ('user@cakeshop.local',
     '$2a$10$wRIE78x8sm..uLtbp9LHde7l6wUWQD3NjPvThQaXvZ3PpXfW6wwX.',
-    '테스트회원', '010-0000-0002', 'USER', 'ACTIVE');
+    '테스트회원', '테스트회원', '010-0000-0002', 'USER', 'ACTIVE');
 
 -- 대표 매장 1행 (id = 1 = StoreService.DEFAULT_STORE_ID)
 INSERT INTO `store`

@@ -31,22 +31,22 @@
 
 ## 2. DB 공유 및 변경 방식
 
-현재 프로젝트는 Flyway 없이 `docs/sql`의 SQL을 수동 적용한다.
+현재 프로젝트는 Flyway로 스키마를 관리한다. `docs/sql`은 과거 수동 적용 SQL과 설계 참고 자료로만 남는다.
 
 | 결정할 사항 | 최종 결정 | 담당자 |
 |---|---|---|
-| 스키마 공유 방식 | ✅ Flyway 미사용 — `docs/sql` DDL 수동 적용. `docs/sql`도 repo에 포함해 코드와 함께 버전관리 | |
-| SQL 파일명과 실행 순서 규칙 | 🟡 `V0/V1…` 번호 규칙 사용(현재 `V0_ERD`·`V1_first_MVC_table`). 스키마 오너·변경 내용은 PR 설명에 명시 | |
+| 스키마 공유 방식 | ✅ Flyway 사용 — `src/main/resources/db/migration`. 애플리케이션 기동 시 자동 적용 | |
+| SQL 파일명과 실행 순서 규칙 | ✅ `V<yyyyMMdd>_<HHmmss>__<snake_case>.sql`. 파일명은 직접 짓지 않고 `gradlew newMigration -Pdesc=…`로 생성한다. 규약은 [`conventions.md`](conventions.md) 6-1절 | |
 | SQL 검토자 | ⬜ | |
 | 공용 RDS 반영 담당자 | ⬜ | |
 | RDS 적용 이력 기록 위치 | ⬜ | |
 | 적용 실패 시 롤백 방법 | ⬜ | |
 | 테이블·컬럼·제약조건 네이밍 규칙 | ✅ [`conventions.md`](conventions.md) 데이터베이스 규약 준수 | |
-| 로컬 seed와 공용 seed의 구분 기준 | ⬜ `V1_first_MVC_table.sql`이 테이블(rds 필요)과 샘플 계정·매장 시드(local 전용)를 함께 담고 있어 분리 여부 결정 필요 | |
+| 로컬 seed와 공용 seed의 구분 기준 | ✅ 로컬 시드는 Flyway 밖의 `src/main/resources/db/seed/seed-local.sql`. 스키마 migration과 완전히 분리해 시드를 고쳐도 DB 재생성이 필요 없다 | |
 
 ### 원칙
 
-- DB 구조의 정본은 `docs/sql`로 한다.
+- DB 구조의 정본은 `src/main/resources/db/migration`으로 한다.
 - 공용 RDS에 적용한 SQL 파일은 수정하지 않고 새 변경 파일을 추가한다.
 - SQL은 로컬 DB에서 검증하고 PR 검토를 거친 후 RDS에 반영한다.
 - 대량 테스트 데이터는 공용 RDS에 넣지 않는다.

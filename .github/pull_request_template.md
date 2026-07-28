@@ -21,10 +21,11 @@
 - [ ] 없음
 - [ ] 있음
 
-<!-- 변경이 있다면 migration 파일명, 기존 데이터 영향, 적용·복구 방법을 작성해 주세요. -->
+<!-- 변경이 있다면 migration 파일명, 기존 데이터 영향, 적용·복구 방법을 작성해 주세요.
+     migration 파일은 `gradlew newMigration -Pdesc=<snake_case>`로 만듭니다. -->
 
 - migration:
-- seed:
+- seed (`db/seed/seed-local.sql`): <!-- 고쳤다면 팀원이 스크립트를 다시 실행해야 합니다. DB 재생성은 필요 없습니다. -->
 - 기존 데이터 및 운영 환경 영향:
 
 ## 리뷰어가 집중해서 볼 부분

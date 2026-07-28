@@ -278,7 +278,8 @@ class XxxMapperTests { ... }
   2. 명시적 정리 (`@AfterEach` 삭제)
   3. **고유 접미사로 논리적 분리** — 예: `"name-" + System.nanoTime()`.
      `ProductMapperTests`가 쓰는 방식이며 허용된다. **[허용]**
-- schema는 애플리케이션이 사용하는 Flyway migration으로 생성한다. seed(`db/local`)에 의존하지 않는다.
+- schema는 애플리케이션이 사용하는 Flyway migration으로 생성한다. seed(`db/seed/seed-local.sql`)에 의존하지 않는다.
+  - 시드가 꼭 필요한 소수의 테스트는 `@Sql(scripts = "classpath:db/seed/seed-local.sql", executionPhase = BEFORE_TEST_CLASS)`로 직접 넣는다 (`ScreenRenderingTests`). `spring.flyway.locations`를 덮어쓰지 않는다. **[금지]**
 - DB 통합 테스트는 당분간 병렬 실행하지 않는다.
 
 ### 적용 범위
@@ -286,6 +287,7 @@ class XxxMapperTests { ... }
 - Mapper XML의 SQL·매핑·필터·정렬·페이징 검증
 - 여러 쓰기 작업의 트랜잭션 rollback 검증
 - 빈 DB에서 Flyway migration 전체 적용 검증 (`FlywayMigrationTests`)
+- migration 파일명 규약·버전 중복 검증 (`MigrationNamingTests` — 리소스만 훑으므로 Docker 불필요)
 - DB 제약조건, enum·날짜·금액 타입처럼 MariaDB 동작이 중요한 검증
 - DB까지 포함해야 의미가 있는 소수의 핵심 애플리케이션 흐름
 
@@ -303,7 +305,7 @@ Testcontainers 테스트를 돌리려면 **로컬에 Docker가 실행 중**이�
 | 첫 실행이 매우 느림 | MariaDB image 최초 다운로드. 이후에는 캐시되어 빨라진다 |
 | container는 뜨는데 연결 실패 | `@MariaDbIntegrationTest`를 붙였는지, `@AutoConfigureTestDatabase(replace = NONE)`가 있는지 확인 |
 
-Flyway와 seed 데이터의 역할 분리는 `database.md`에서 정한다(**작성 예정**).
+Flyway와 seed 데이터의 역할 분리는 [`conventions.md`](conventions.md)의 「6-1. Flyway migration 규약」에서 확정했다. 요약하면 `db/migration`은 Flyway가 관리하는 스키마 변경, `db/seed`는 Flyway 밖에서 직접 실행하는 로컬 샘플 데이터다.
 개발 환경 준비 절차는 `CONTRIBUTING.md`에 기록한다(**작성 예정**).
 
 ## 10. 파일·네트워크·외부 시스템 **[권장]**

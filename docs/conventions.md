@@ -1,8 +1,8 @@
 # cakeshop 코드 컨벤션
 
 - **상태**: 정본 (2026-07-28 확정, v2 제안안 승격)
-- **범위**: Java · Spring MVC · MyBatis · 패키지 · DB 스키마 · 공통 코드 기준
-- **제외**: 테스트 작성 규칙, CI, PR, Flyway·seed 규칙 — [22. 별도 문서에서 결정할 항목](#22-별도-문서에서-결정할-항목) 참고
+- **범위**: Java · Spring MVC · MyBatis · 패키지 · DB 스키마 · Flyway·seed · 공통 코드 기준
+- **제외**: 테스트 작성 규칙, CI, PR — [22. 별도 문서에서 결정할 항목](#22-별도-문서에서-결정할-항목) 참고
 - **관련 문서**: 화면 규격 [frontend-template-format.md](frontend-template-format.md), 상태 설계 [status-design.md](status-design.md)
 
 ---
@@ -133,6 +133,22 @@ Controller → Service → Mapper → DB
   - 제약 `CONSTRAINT chk_<table>_status CHECK (status IN (...))`
   - 신규 행의 시작 상태를 `DEFAULT`로 지정 (예: `members` → `ACTIVE`)
 - **소프트삭제**: 공통 규약으로 강제하지 않는다. 이력 보존이 필요한 테이블만 담당자가 판단해 도입한다. **[허용]**
+
+### 6-1. Flyway migration 규약
+
+- **파일명을 직접 짓지 않는다. [금지]** 여러 사람이 동시에 브랜치를 나눠 작업하면 같은 버전 번호가 나오고, Git은 파일명이 다르면 조용히 둘 다 머지한다. 충돌은 머지 뒤 앱을 띄울 때야 드러난다.
+- **생성은 항상 아래 명령으로 한다.**
+
+  ```powershell
+  .\gradlew.bat newMigration -Pdesc=add_coupon_table
+  ```
+
+  `src/main/resources/db/migration/V<yyyyMMdd>_<HHmmss>__<snake_case>.sql`이 만들어진다. `-Pdesc`는 소문자 `snake_case`만 받는다. 같은 초에 만들어진 파일이 있으면 자동으로 1초 밀어서 생성한다.
+- **분 단위 버전(`V20260729_1015__x.sql`)은 [금지].** Flyway는 버전 조각을 숫자로 비교하므로 초 단위와 섞이면 `1015 < 101542`가 되어 나중에 만든 파일이 먼저 실행된다. `MigrationNamingTests`가 CI에서 잡는다.
+- **머지된 migration은 수정하지 않는다. [금지]** checksum이 바뀌면 팀원 전원이 로컬 DB를 다시 만들어야 한다. 변경이 필요하면 새 migration을 만든다.
+- **서로 의존하는 DDL은 한 파일·한 PR에 담는다.** 타임스탬프는 "만든 시각"이라 머지 순서와 다를 수 있어 `out-of-order: true`를 켜 두었다. 파일이 나뉘면 머신마다 적용 순서가 달라질 수 있다.
+- **로컬 샘플 데이터는 migration에 넣지 않는다. [금지]** `src/main/resources/db/seed/seed-local.sql`에 둔다. 이 디렉터리는 Flyway가 스캔하지 않으므로 내용을 고쳐도 DB를 다시 만들 필요가 없다. 시드는 맨 앞에서 기존 데이터를 지우고 다시 넣어 몇 번을 실행해도 결과가 같아야 한다.
+- 레거시 `V0`, `V1`, `V3`은 이미 RDS와 팀원 로컬에 적용돼 있어 rename하지 않는다.
 
 ## 7. Entity 규칙
 
@@ -347,6 +363,4 @@ AI 코드 리뷰는 보조 수단이며 테스트, CI, 사람의 승인을 대�
 - 테스트 종류별 작성 규칙과 최소 범위
 - CI 필수 검사와 브랜치 보호
 - PR·커밋·브랜치 규칙
-- Flyway baseline과 migration 파일명
-- local·test·production seed 분리
 - formatter·정적 분석 도구의 구체적 선택 (import 순서 합의와 연동)

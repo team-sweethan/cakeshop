@@ -41,3 +41,57 @@ dependencies {
 }
 
 tasks.named('test') { useJUnitPlatform() }
+
+// 마이그레이션 파일명을 사람이 정하면 여러 브랜치에서 같은 버전이 나온다.
+// 버전은 생성 시각으로 찍고, 개발자는 설명만 넘긴다.
+//   gradlew newMigration -Pdesc=add_coupon_table
+tasks.register('newMigration') {
+    group = 'cakeshop'
+    description = '타임스탬프 규칙에 맞는 빈 Flyway migration 파일을 만든다. 예: -Pdesc=add_coupon_table'
+
+    // configuration cache 대응: 설정 시점 값만 캡처하고 doLast 안에서 project를 참조하지 않는다.
+    def migrationDir = layout.projectDirectory.dir('src/main/resources/db/migration').asFile
+    def projectDir = layout.projectDirectory.asFile
+    def descProvider = providers.gradleProperty('desc')
+
+    doLast {
+        def desc = descProvider.getOrNull()
+        // Windows 콘솔 코드페이지에 따라 한글이 깨질 수 있어 실행에 필요한 정보는 ASCII 로 적는다.
+        if (!desc?.trim()) {
+            throw new GradleException(
+                    'usage: gradlew newMigration -Pdesc=<snake_case_description>\n' +
+                    '  e.g. gradlew newMigration -Pdesc=add_coupon_table'
+            )
+        }
+        if (!(desc ==~ /[a-z0-9]+(_[a-z0-9]+)*/)) {
+            throw new GradleException(
+                    "-Pdesc must be lower snake_case, but was '${desc}'\n" +
+                    '  e.g. add_coupon_table, drop_legacy_index'
+            )
+        }
+
+        def formatter = java.time.format.DateTimeFormatter.ofPattern('yyyyMMdd_HHmmss')
+        def existing = (migrationDir.listFiles() ?: new File[0])*.name
+        def stamp = java.time.LocalDateTime.now()
+        // 같은 초에 만들어진 마이그레이션이 이미 있으면 버전이 겹친다.
+        // 설명이 달라도 Flyway 버전은 같으므로 파일명 전체가 아니라 버전 접두어로 확인한다.
+        while (existing.any { it.startsWith('V' + stamp.format(formatter) + '__') }) {
+            stamp = stamp.plusSeconds(1)
+        }
+
+        def target = new File(migrationDir, "V${stamp.format(formatter)}__${desc}.sql")
+        migrationDir.mkdirs()
+        target.setText("""\
+-- ${desc}
+-- 생성: ${stamp.format(java.time.format.DateTimeFormatter.ofPattern('yyyy-MM-dd HH:mm:ss'))}
+--
+-- 규칙
+-- * 이 파일은 머지된 뒤 절대 수정하지 않는다. 변경이 필요하면 새 migration 을 만든다.
+-- * 로컬 샘플 데이터는 여기 넣지 않는다. db/seed/seed-local.sql 을 쓴다.
+-- * 서로 의존하는 DDL 은 파일을 나누지 말고 이 파일에 함께 담는다.
+
+""", 'UTF-8')
+
+        println "created: ${projectDir.toPath().relativize(target.toPath()).toString().replace('\\', '/')}"
+    }
+}

@@ -56,8 +56,9 @@ ci: PR Gradle 테스트 workflow 추가
 - DB 변경이 없으면 `없음`으로 명시한다.
 - DB 변경이 있으면 새 migration 파일명, 변경 내용, 기존 데이터에 미치는 영향을 작성한다.
 - 이미 공유되거나 적용된 versioned migration은 수정하지 않고 새로운 버전으로 추가한다.
-- 공통 schema migration은 `db/migration`, 로컬 seed는 `db/local`에 둔다.
-- 로컬 seed가 RDS에서 실행되지 않는지 확인한다.
+- migration 파일명은 직접 짓지 않고 `gradlew newMigration -Pdesc=<snake_case>`로 만든다.
+- 공통 schema migration은 `db/migration`, 로컬 seed는 `db/seed`에 둔다. seed는 Flyway 관리 대상이 아니라 RDS에서 실행될 일이 없다.
+- seed를 고쳤다면 팀원이 다시 실행해야 한다는 점을 본문에 적는다(DB 재생성은 필요 없다).
 - 데이터 삭제나 호환성 문제가 생길 수 있는 변경은 적용 순서와 복구 방법을 함께 작성한다.
 
 ### 리뷰어가 집중해서 볼 부분

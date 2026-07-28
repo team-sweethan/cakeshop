@@ -18,6 +18,9 @@ spring:
     locations: classpath:db/migration
     validate-on-migrate: true
     clean-disabled: true
+    # 파일명의 타임스탬프는 '만든 시각'이라 머지 순서와 다를 수 있다.
+    # 늦게 머지된 낮은 버전도 받아들이지 않으면 validate 가 실패한다.
+    out-of-order: true
 
 server:
   tomcat:
@@ -53,10 +56,6 @@ spring:
     url: jdbc:mariadb://${LOCAL_DB_HOST:localhost}:${LOCAL_DB_PORT}/${LOCAL_DB_DATABASE}
     username: ${LOCAL_DB_USERNAME}
     password: ${LOCAL_DB_PASSWORD}
-  flyway:
-    locations:
-      - classpath:db/migration
-      - classpath:db/local
 app:
   mockup:
     # 화면 선이관 기간에만 조회 화면을 로그인 없이 확인한다. rds에서는 false다.

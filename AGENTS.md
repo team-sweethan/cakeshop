@@ -4,7 +4,7 @@
 
 이 프로젝트는 Java 21, Spring Boot 4, Spring MVC, Thymeleaf, Spring Security, MyBatis, Flyway, MariaDB를 사용한다. 애플리케이션 코드는 `src/main/java/com/cakeshop`에 둔다. 기능은 `domain/<도메인>/` 아래에 `controller`, `service`, `mapper`, `entity`, `dto/form`, `dto/view`, `error` 패키지를 두는 수직 슬라이스 구조로 구성한다. 둘 이상의 도메인이 실제로 공유하는 기반 코드만 `global`에 둔다.
 
-MyBatis XML은 `src/main/resources/mapper/<도메인>/`, 화면 템플릿은 `src/main/resources/templates/{admin,customer}`, Flyway migration은 `src/main/resources/db/migration`에 둔다. 테스트는 `src/test/java`에서 운영 코드의 패키지 구조를 따르고, 테스트 설정은 `src/test/resources`에 둔다. `bin`, `build`, `out`은 생성 결과물이므로 직접 수정하지 않는다.
+MyBatis XML은 `src/main/resources/mapper/<도메인>/`, 화면 템플릿은 `src/main/resources/templates/{admin,customer}`, Flyway migration은 `src/main/resources/db/migration`, 로컬 개발용 시드는 `src/main/resources/db/seed`에 둔다(시드는 Flyway 관리 대상이 아니다). 테스트는 `src/test/java`에서 운영 코드의 패키지 구조를 따르고, 테스트 설정은 `src/test/resources`에 둔다. `bin`, `build`, `out`은 생성 결과물이므로 직접 수정하지 않는다.
 
 ## 아키텍처 개요
 
@@ -71,8 +71,31 @@ domain/<도메인>/
 
 최근 이력과 `docs/pull-request.md`에 따라 커밋 제목은 `<type>: 한글 요약` 형식으로 작성한다. 예: `fix: 회원 이름 컬럼 마이그레이션 추가`. type은 `feat`, `fix`, `refactor`, `test`, `docs`, `ci`, `chore`를 사용한다.
 
-PR 하나에는 하나의 목적만 담는다. 본문에 변경 목적, 주요 변경, 테스트 결과, DB/Flyway 영향, 집중 리뷰 사항, 관련 이슈를 작성하고 화면 변경에는 스크린샷을 첨부한다. 공유된 Flyway migration은 수정하지 말고 새 versioned migration을 추가한다. CI 통과, 미해결 리뷰 정리, 최소 1명 승인을 병합 조건으로 한다.
+PR 하나에는 하나의 목적만 담는다. 본문에 변경 목적, 주요 변경, 테스트 결과, DB/Flyway 영향, 집중 리뷰 사항, 관련 이슈를 작성하고 화면 변경에는 스크린샷을 첨부한다. 공유된 Flyway migration은 수정하지 말고 새 versioned migration을 추가한다. 파일명은 직접 짓지 않고 `gradlew newMigration -Pdesc=<snake_case>`로 만든다(자세한 규약은 `docs/conventions.md` 6-1절). CI 통과, 미해결 리뷰 정리, 최소 1명 승인을 병합 조건으로 한다.
 
 ## 보안과 설정
 
 `.env`의 비밀 값을 커밋하지 않는다. 인증 정보, 개인정보, SQL, 내부 경로를 응답이나 로그에 노출하지 않는다. 회원 소유권은 Service에서 인증 사용자 기준으로 검증하고, 관리자 기능은 화면 숨김이 아니라 Spring Security에서 `ADMIN` 권한을 강제한다.
+
+## Code Review Rules
+
+포맷, 컴파일, 테스트처럼 결정적인 검사는 CI에 맡기고 코드 리뷰는 다음 중대한 위험에 집중한다.
+
+### 인증·인가와 정보 노출
+
+- 회원 소유 자원은 요청으로 전달된 회원 ID를 신뢰하지 말고 인증된 사용자와 자원 소유권을 Service에서 검증한다.
+- 관리자 기능은 화면 요소를 숨기는 데 의존하지 말고 Spring Security에서 `ADMIN` 권한을 강제한다.
+- 비밀번호, 인증 정보, 개인정보, SQL, 내부 경로를 응답이나 로그에 노출하지 않는다.
+
+### 트랜잭션과 상태 무결성
+
+- 주문·결제·재고·쿠폰처럼 여러 쓰기와 상태 전이가 연결된 작업은 공개 Service 메서드의 단일 트랜잭션에서 현재 상태와 목표 상태를 검증한다.
+- 실패 시 일부 변경만 남거나 재시도·웹훅으로 중복 반영되지 않아야 한다.
+- rollback, 중복 실행, 금지된 상태 전이를 테스트한다.
+
+### SQL과 스키마 안전성
+
+- MyBatis에서 사용자 제어 값은 `#{}`로 바인딩하고 `${}` 치환을 사용하지 않는다.
+- 정렬처럼 동적 SQL이 필요하면 허용된 enum 값을 `<choose>`로 매핑한다.
+- 공유된 Flyway migration은 수정하지 않고 새 versioned migration을 추가한다.
+- 스키마 변경은 기존 데이터 영향과 복구 방법을 설명하고 MariaDB Testcontainers 테스트로 검증한다.
