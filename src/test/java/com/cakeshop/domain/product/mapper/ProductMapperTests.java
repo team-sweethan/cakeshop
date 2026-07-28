@@ -11,18 +11,16 @@ import com.cakeshop.domain.product.customer.dto.form.ProductSort;
 import com.cakeshop.domain.product.customer.dto.form.StockFilter;
 import com.cakeshop.domain.product.customer.dto.view.ProductListView;
 import com.cakeshop.domain.product.entity.ProductType;
-
 import com.cakeshop.global.config.MariaDbIntegrationTest;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mybatis.spring.boot.test.autoconfigure.MybatisTest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 
 @MybatisTest
-//@ActiveProfiles("local")
 @MariaDbIntegrationTest
 @AutoConfigureTestDatabase(
         replace = AutoConfigureTestDatabase.Replace.NONE

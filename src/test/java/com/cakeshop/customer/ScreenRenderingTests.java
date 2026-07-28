@@ -5,17 +5,21 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.cakeshop.global.config.MariaDbIntegrationTest;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
-@SpringBootTest(properties = "app.mockup.public-preview=true")
-@ActiveProfiles("local")
+@SpringBootTest(properties = {
+        "app.mockup.public-preview=true",
+        "spring.flyway.locations=classpath:db/migration,classpath:db/local"
+})
+@MariaDbIntegrationTest
 class ScreenRenderingTests {
 
     @Autowired
@@ -31,7 +35,7 @@ class ScreenRenderingTests {
     }
 
     @Test
-    void allDatabaseFreePreviewScreensRenderThroughThymeleaf() throws Exception {
+    void allPublicPreviewScreensRenderThroughThymeleaf() throws Exception {
         // 관리자 화면은 public-preview 에서도 열리지 않는다(SecurityConfig: /admin/** = ROLE_ADMIN).
         // 따라서 로그인 없이 렌더되는 고객 프리뷰 화면만 검증한다.
         String[] paths = {
