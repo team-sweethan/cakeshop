@@ -13,6 +13,11 @@ spring:
       # 매장·상품 등의 이미지 업로드 상한. 기본값(1MB)은 사진에 너무 작다.
       max-file-size: 5MB
       max-request-size: 10MB
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    validate-on-migrate: true
+    clean-disabled: true
 
 server:
   tomcat:
@@ -48,6 +53,10 @@ spring:
     url: jdbc:mariadb://${LOCAL_DB_HOST:localhost}:${LOCAL_DB_PORT}/${LOCAL_DB_DATABASE}
     username: ${LOCAL_DB_USERNAME}
     password: ${LOCAL_DB_PASSWORD}
+  flyway:
+    locations:
+      - classpath:db/migration
+      - classpath:db/local
 app:
   mockup:
     # 화면 선이관 기간에만 조회 화면을 로그인 없이 확인한다. rds에서는 false다.
@@ -64,3 +73,6 @@ spring:
     url: "jdbc:mariadb://${RDS_ENDPOINT}:${RDS_PORT:3306}/${RDS_DATABASE}?sslMode=trust"
     username: ${RDS_USERNAME}
     password: ${RDS_PASSWORD}
+  flyway:
+    # RDS에서는 공통 스키마 마이그레이션만 실행하고 로컬 샘플 데이터는 제외한다.
+    locations: classpath:db/migration
