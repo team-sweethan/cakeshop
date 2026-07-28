@@ -8,3 +8,4 @@ application-prod.yml
 .env
 uploads/
 .DS_Store
+.bin
