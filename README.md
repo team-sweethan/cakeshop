@@ -141,7 +141,7 @@ Flyway의 `clean`은 `clean-disabled: true`로 차단되어 있다. 초기화 �
 
 ### 공용 RDS로 실행
 
-공용 RDS가 이미 사용 중이라면 Flyway 전환용 baseline과 스키마 검증이 완료되기 전에는 이 프로필로 애플리케이션을 시작하지 않는다. 로컬 DB 초기화 절차의 `DROP DATABASE`를 RDS에 실행해서는 안 된다.
+`rds` 프로필에서는 Flyway를 비활성화한다. 애플리케이션 기동은 RDS 스키마를 생성하거나 변경하지 않으므로, 필요한 스키마가 별도 검토·승인 절차로 먼저 반영됐는지 확인한다. 로컬 DB 초기화 절차의 `DROP DATABASE`를 RDS에 실행해서는 안 된다.
 
 1. `.env_sample`을 `.env`로 복사한다.
 2. `.env`의 `RDS_ENDPOINT`, `RDS_PORT`, `RDS_DATABASE`, `RDS_USERNAME`, `RDS_PASSWORD`를 실제 접속 정보로 변경한다.
@@ -151,7 +151,7 @@ Flyway의 `clean`은 `clean-disabled: true`로 차단되어 있다. 초기화 �
 .\gradlew.bat bootRun --args="--spring.profiles.active=rds"
 ```
 
-정상 실행 로그에는 `The following 1 profile is active: "rds"`가 표시된다. `.env`는 Git에 커밋하지 않으며 저장소에는 실제 값이 없는 `.env_sample`만 유지한다.
+정상 실행 로그에는 `The following 1 profile is active: "rds"`가 표시되고 Flyway migration은 실행되지 않는다. `.env`는 Git에 커밋하지 않으며 저장소에는 실제 값이 없는 `.env_sample`만 유지한다.
 
 RDS 프로필은 `require_secure_transport=ON` 환경에 맞춰 MariaDB Connector/J의 `sslMode=trust`로 TLS 연결을 사용한다. 이 설정은 통신을 암호화하지만 서버 인증서와 호스트명은 검증하지 않으므로 팀 공용 개발 RDS 용도에만 사용한다. 운영 환경에서는 AWS RDS CA 인증서를 등록하고 `sslMode=verify-full`을 사용해야 한다.
 
@@ -181,13 +181,13 @@ Remove-Item Env:SPRING_PROFILES_ACTIVE -ErrorAction SilentlyContinue
 ## 프로필 요약
 
 - `local` (기본): `.env`의 `LOCAL_DB_HOST`, `LOCAL_DB_PORT`, `LOCAL_DB_DATABASE`, `LOCAL_DB_USERNAME`, `LOCAL_DB_PASSWORD`를 사용하고 공통 Flyway migration을 적용. 샘플 데이터는 `db/seed/seed-local.sql`을 직접 실행해 넣는다
-- `rds`: `.env`의 `RDS_ENDPOINT`, `RDS_PORT`, `RDS_DATABASE`, `RDS_USERNAME`, `RDS_PASSWORD`를 사용하고 공통 Flyway migration만 적용
+- `rds`: `.env`의 `RDS_ENDPOINT`, `RDS_PORT`, `RDS_DATABASE`, `RDS_USERNAME`, `RDS_PASSWORD`를 사용하며 Flyway는 비활성화. 스키마는 별도 승인 절차로 반영한다
 
 ## DB 스키마 관리
 
-DB 스키마는 Flyway가 관리한다. 모든 프로필이 `src/main/resources/db/migration` 하나만 본다. 이미 공유된 versioned migration은 수정하지 않고 새로운 버전 파일을 추가한다.
+로컬과 테스트 DB 스키마는 Flyway가 관리한다. `rds` 프로필의 Flyway는 비활성화하며 애플리케이션 기동으로 공용 DB를 변경하지 않는다. 이미 공유된 versioned migration은 수정하지 않고 새로운 버전 파일을 추가한다.
 
-- `src/main/resources/db/migration`: `local`, `test`, `rds`에 공통 적용되는 스키마 변경
+- `src/main/resources/db/migration`: `local`, `test`에서 자동 적용하고 RDS에는 별도 검토·승인 절차로 반영하는 스키마 변경
 - `src/main/resources/db/seed`: 로컬 개발용 샘플 데이터. **Flyway 관리 대상이 아니다.** 필요할 때 직접 실행한다
 - `docs/sql`: 과거 수동 적용 SQL과 설계 참고 자료. 신규 DB에 직접 실행하지 않는다.
 
@@ -212,7 +212,7 @@ created: src/main/resources/db/migration/V20260729_101542__add_coupon_table.sql
 
 상태값(`status`) 컬럼은 도메인마다 흩어지지 않도록 `docs/status-design.md`의 상태값 공통 규칙(영문 enum 이름 저장·한글 라벨 미저장·전이는 service)을 따른다.
 
-빈 로컬 DB에서는 Flyway가 자동으로 전체 이력을 적용한다. 기존 수동 DB는 스키마 상태가 사람마다 다를 수 있으므로 `baseline-on-migrate`를 임의로 활성화하지 않는다. 공용 RDS 역시 자동 baseline 대상으로 취급하지 않으며, 백업과 스키마 비교를 거친 팀 승인 전환 절차 없이 초기화하거나 migration을 실행하지 않는다.
+빈 로컬 DB에서는 Flyway가 자동으로 전체 이력을 적용한다. 기존 수동 DB는 스키마 상태가 사람마다 다를 수 있으므로 `baseline-on-migrate`를 임의로 활성화하지 않는다. `rds` 프로필은 Flyway를 실행하지 않으며, 백업과 스키마 비교를 거친 팀 승인 절차 없이 RDS를 초기화하거나 migration을 반영하지 않는다.
 
 ## 구조
 

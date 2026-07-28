@@ -31,11 +31,11 @@
 
 ## 2. DB 공유 및 변경 방식
 
-현재 프로젝트는 Flyway로 스키마를 관리한다. `docs/sql`은 과거 수동 적용 SQL과 설계 참고 자료로만 남는다.
+현재 프로젝트는 로컬·테스트 스키마를 Flyway로 관리한다. `rds` 프로필은 Flyway를 실행하지 않으며, `docs/sql`은 과거 수동 적용 SQL과 설계 참고 자료로만 남는다.
 
 | 결정할 사항 | 최종 결정 | 담당자 |
 |---|---|---|
-| 스키마 공유 방식 | ✅ Flyway 사용 — `src/main/resources/db/migration`. 애플리케이션 기동 시 자동 적용 | |
+| 스키마 공유 방식 | ✅ `src/main/resources/db/migration`을 정본으로 사용. `local`·`test`는 기동 시 자동 적용하고 RDS는 별도 검토·승인 절차로 반영 | |
 | SQL 파일명과 실행 순서 규칙 | ✅ `V<yyyyMMdd>_<HHmmss>__<snake_case>.sql`. 파일명은 직접 짓지 않고 `gradlew newMigration -Pdesc=…`로 생성한다. 규약은 [`conventions.md`](conventions.md) 6-1절 | |
 | SQL 검토자 | ⬜ | |
 | 공용 RDS 반영 담당자 | ⬜ | |
@@ -48,7 +48,7 @@
 
 - DB 구조의 정본은 `src/main/resources/db/migration`으로 한다.
 - 공용 RDS에 적용한 SQL 파일은 수정하지 않고 새 변경 파일을 추가한다.
-- SQL은 로컬 DB에서 검증하고 PR 검토를 거친 후 RDS에 반영한다.
+- SQL은 로컬 DB에서 검증하고 PR 검토를 거친 후 지정된 담당자가 RDS에 별도로 반영한다.
 - 대량 테스트 데이터는 공용 RDS에 넣지 않는다.
 
 ---

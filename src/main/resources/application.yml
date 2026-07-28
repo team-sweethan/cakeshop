@@ -73,5 +73,6 @@ spring:
     username: ${RDS_USERNAME}
     password: ${RDS_PASSWORD}
   flyway:
-    # RDS에서는 공통 스키마 마이그레이션만 실행하고 로컬 샘플 데이터는 제외한다.
-    locations: classpath:db/migration
+    # 애플리케이션 기동으로 공용 RDS 스키마가 변경되지 않도록 차단한다.
+    # RDS 스키마 변경은 검토·승인된 별도 반영 절차로만 수행한다.
+    enabled: false
