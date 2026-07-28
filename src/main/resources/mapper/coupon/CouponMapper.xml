@@ -1,5 +1,153 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.cakeshop.domain.coupon.mapper.CouponMapper">
-    <!-- 사용자 입력은 #{} 만 사용 (${} 금지) -->
+    <!-- 사용자 입력은 #{}로만 바인딩한다. ${}는 SQL 구조를 바꿀 수 있어 사용하지 않는다. -->
+
+    <sql id="couponColumns">
+        id,
+        name,
+        discount_type AS discountType,
+        discount_value AS discountValue,
+        minimum_order_amount AS minimumOrderAmount,
+        maximum_discount_amount AS maximumDiscountAmount,
+        total_quantity AS totalQuantity,
+        issued_quantity AS issuedQuantity,
+        starts_at AS startsAt,
+        expires_at AS expiresAt,
+        CASE WHEN expires_at &lt;= NOW(6) THEN 'ENDED' ELSE status END AS status,
+        created_by AS createdBy,
+        created_at AS createdAt,
+        updated_at AS updatedAt
+    </sql>
+
+    <!-- 목록과 COUNT가 반드시 같은 검색 조건을 사용하도록 공통 SQL 조각으로 둔다. -->
+    <sql id="couponSearchConditions">
+        <where>
+            <if test="condition.keyword != null and !condition.keyword.trim().isEmpty()">
+                AND name LIKE CONCAT(
+                '%',
+                TRIM(#{condition.keyword}),
+                '%'
+                )
+            </if>
+
+            <if test="condition.status != null">
+                <choose>
+                    <when test="condition.status.name() == 'ACTIVE'">
+                        AND status = 'ACTIVE' AND expires_at &gt; NOW(6)
+                    </when>
+                    <when test="condition.status.name() == 'INACTIVE'">
+                        AND status = 'INACTIVE' AND expires_at &gt; NOW(6)
+                    </when>
+                    <when test="condition.status.name() == 'ENDED'">
+                        AND (status = 'ENDED' OR (status IN ('ACTIVE', 'INACTIVE') AND expires_at &lt;= NOW(6)))
+                    </when>
+                </choose>
+            </if>
+        </where>
+    </sql>
+
+    <!-- 생성 키를 Coupon.id에 되돌려 후속 흐름에서 사용할 수 있게 한다. -->
+    <insert id="insertCoupon" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO coupons (
+            name,
+            discount_type,
+            discount_value,
+            minimum_order_amount,
+            maximum_discount_amount,
+            total_quantity,
+            starts_at,
+            expires_at,
+            created_by
+        )
+        VALUES (
+                   #{name},
+                   #{discountType},
+                   #{discountValue},
+                   #{minimumOrderAmount},
+                   #{maximumDiscountAmount},
+                   #{totalQuantity},
+                   #{startsAt},
+                   #{expiresAt},
+                   #{createdBy}
+               )
+    </insert>
+
+    <select id="findCouponById" resultType="com.cakeshop.domain.coupon.entity.Coupon">
+        <!-- 수정/상태 전환 전 현재 발급 수량과 상태를 확인하는 단건 조회다. -->
+        SELECT
+        <include refid="couponColumns"/>
+        FROM coupons
+        WHERE id = #{couponId}
+    </select>
+
+    <select id="findCoupons" resultType="com.cakeshop.domain.coupon.dto.view.CouponView">
+        <!-- 목록 화면에 필요한 열만 조회하고, 상태 우선순위 다음 최신 생성순으로 정렬한다. -->
+        SELECT
+            id,
+            name,
+            discount_type AS discountType,
+            discount_value AS discountValue,
+            minimum_order_amount AS minimumOrderAmount,
+            maximum_discount_amount AS maximumDiscountAmount,
+            total_quantity AS totalQuantity,
+            issued_quantity AS issuedQuantity,
+            starts_at AS startsAt,
+            expires_at AS expiresAt,
+            CASE WHEN expires_at &lt;= NOW(6) THEN 'ENDED' ELSE status END AS status
+        FROM coupons
+
+        <include refid="couponSearchConditions"/>
+
+        ORDER BY
+            CASE CASE WHEN expires_at &lt;= NOW(6) THEN 'ENDED' ELSE status END
+            WHEN 'ACTIVE' THEN 1
+            WHEN 'INACTIVE' THEN 2
+            WHEN 'ENDED' THEN 3
+            ELSE 4
+            END,
+            created_at DESC,
+            id DESC
+        LIMIT #{size}
+        OFFSET #{offset}
+    </select>
+
+    <select id="countCoupons" resultType="long">
+        <!-- 페이지 수 계산을 위해 목록 조회와 동일한 조건으로 전체 건수를 센다. -->
+        SELECT COUNT(*)
+        FROM coupons
+
+        <include refid="couponSearchConditions"/>
+    </select>
+
+    <update id="updateCoupon">
+        <!-- issued_quantity, status, created/updated 시각은 화면 수정 대상에서 제외한다. -->
+        UPDATE coupons
+        SET
+            name = #{name},
+            discount_type = #{discountType},
+            discount_value = #{discountValue},
+            minimum_order_amount = #{minimumOrderAmount},
+            maximum_discount_amount = #{maximumDiscountAmount},
+            total_quantity = #{totalQuantity},
+            starts_at = #{startsAt},
+            expires_at = #{expiresAt}
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateStatus">
+        <!-- 상태 전이는 Service에서 검증하고, SQL은 확정된 상태만 반영한다. -->
+        UPDATE coupons
+        SET status = #{status}
+        WHERE id = #{couponId}
+    </update>
+
+    <!-- ACTIVE·INACTIVE(재개할 수 없도록 만료된) 상태를 ENDED로 일괄 전환한다. -->
+    <update id="endExpiredCoupons">
+        UPDATE coupons
+        SET status = 'ENDED'
+        WHERE status IN ('ACTIVE', 'INACTIVE')
+          AND expires_at &lt;= NOW(6)
+    </update>
+
 </mapper>
