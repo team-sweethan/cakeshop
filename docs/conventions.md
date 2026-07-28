@@ -1,52 +1,173 @@
-# 백엔드 공통 규약
+# cakeshop 코드 컨벤션
 
-각 담당자가 도메인을 독립적으로 구현하되 통합 시 충돌이 없도록 코드 스타일과 구조를 통일한다. 이 문서의 기준 구현체는 `com.cakeshop.domain.store` 도메인이며, 판단이 서지 않으면 store 코드를 그대로 따른다.
+- **상태**: 정본 (2026-07-28 확정, v2 제안안 승격)
+- **범위**: Java · Spring MVC · MyBatis · 패키지 · DB 스키마 · Flyway·seed · 공통 코드 기준
+- **제외**: 테스트 작성 규칙, CI, PR — 각각 별도 문서에서 확정했다. [22절](#22-이-문서-밖에서-다루는-항목)에 정본 위치와 미정 항목을 정리했다
+- **관련 문서**: 화면 규격 [frontend-template-format.md](frontend-template-format.md), 상태 설계 [status-design.md](status-design.md)
 
-상태값(`status`) 표준은 이 문서 끝의 [상태값(status) 공통 규칙](#상태값status-공통-규칙)에 정본으로 둔다.
+---
 
-## 스택
+## 1. 문서 목적과 적용 원칙
 
-- Spring Boot + MyBatis + MariaDB
-- 서버 사이드 렌더링(Thymeleaf), 관리자/고객 화면 분리
-- 화면 규격은 [frontend-template-format.md](frontend-template-format.md)를 따른다.
+이 문서는 도메인별 구현 방식이 달라지는 것을 막고 코드 리뷰의 공통 기준을 정하기 위한 **정본**이다. 상태값 설계의 상세 기준은 [status-design.md](status-design.md)를 정본으로 한다.
 
-## 패키지 구조
+- 규칙 문서를 코드보다 우선하는 정본으로 삼는다. 특정 도메인의 현재 구현(store 포함)을 무조건 복사하지 않는다.
+- 문서와 기존 코드가 어긋나면 **문서를 기준으로 코드를 고치는 것이 원칙**이되, 수정 시점은 [20절](#20-기존-코드-적용-방식)을 따른다. 문서 쪽이 틀렸다고 판단되면 코드가 아니라 문서 수정 PR을 먼저 올린다.
+- 새 코드와 수정하는 코드부터 적용한다. 기존 코드를 컨벤션에 맞추기 위한 대규모 이동은 기능 PR과 분리한다.
+- 예외가 필요하면 이유와 적용 범위를 PR에 기록하고 팀의 승인을 받는다.
 
-도메인마다 아래 구조를 동일하게 사용한다. (`store`가 표준 예시다.)
+### 규칙 강도 표기
+
+| 라벨 | 의미 |
+|---|---|
+| **[필수]** | 예외 승인 없이 지켜야 한다. **이 문서에서 별도 표기가 없는 규칙은 전부 [필수]다.** |
+| **[권장]** | 특별한 이유가 없으면 따른다. 어길 경우 PR에 이유를 한 줄 남긴다. |
+| **[허용]** | 상황에 따라 선택할 수 있다. |
+| **[금지]** | 사용하지 않는다. ([18. 금지 패턴](#18-금지-패턴)에 취합) |
+| 🔶 **합의 필요** | 기존 코드와 충돌하거나 팀 결정이 남은 항목. 합의 전까지 강제하지 않는다. |
+
+## 2. 기본 기술 기준
+
+- Java 21 · Spring Boot 4 🔶 *채택 전 build.gradle과 대조해 실제 버전으로 확정한다. 문서의 버전 표기는 항상 build.gradle을 따라간다.*
+- Spring MVC + Thymeleaf (서버 사이드 렌더링, 관리자/고객 화면 분리)
+- Spring Security 세션 인증
+- MyBatis XML Mapper + MariaDB
+- 생성자 주입, Bean Validation
+- JPA와 MyBatis를 혼용하지 않는다. DB 접근 방식의 정본은 MyBatis다.
+
+## 3. 패키지 구조
+
+도메인은 `com.cakeshop.domain.<도메인>` 아래에 수직 슬라이스로 구성한다.
 
 ```
 domain/<도메인>/
-  controller/      @Controller, 화면 요청 처리
-  service/         @Service, 업무 로직·트랜잭션
-  mapper/          @Mapper 인터페이스 (SQL은 XML에 둔다)
-  entity/          DB 한 행을 표현하는 영속 모델(POJO)
+  controller/      화면 요청 처리
+  service/         업무 로직·트랜잭션
+  mapper/          @Mapper 인터페이스 (SQL은 XML)
+  entity/          DB 한 행을 표현하는 POJO
   dto/
-    form/          화면 입력 + 검증 전용 DTO
-    view/          화면 출력 전용 읽기 DTO(record)
+    form/          화면 입력 + 검증 전용
+    view/          화면 출력 전용 (record)
   error/           도메인별 ErrorCode enum
 ```
 
-MyBatis XML은 `resources/mapper/<도메인>/XxxMapper.xml`에 둔다.
+MyBatis XML은 `src/main/resources/mapper/<도메인>/XxxMapper.xml`에 둔다.
 
-계층 호출 방향은 `Controller → Service → Mapper` 단방향이며, 역방향 호출이나 계층 건너뛰기는 하지 않는다.
+### 관리자와 고객 코드
 
-## 데이터베이스 규약
+- 관리자와 고객 화면은 **URL과 클래스명**으로 구분한다.
+  - 고객: `ProductController`, URL `/products`
+  - 관리자: `ProductAdminController`, URL `/admin/products`
+- 같은 업무 규칙을 관리자·고객에 각각 구현하지 않는다. Service·Mapper·Entity는 원칙적으로 공유한다.
+- 패키지를 `admin`/`customer`로 추가 분리하려면 도메인 전체가 같은 구조를 쓰도록 별도 구조 변경 PR에서 처리한다.
+
+### 계층 의존 방향
+
+```
+Controller → Service → Mapper → DB
+```
+
+- Controller에서 Mapper를 직접 호출하지 않는다. 역방향 호출·계층 건너뛰기 금지.
+- Service가 Thymeleaf, Model, RedirectAttributes 등 웹 타입에 의존하지 않는다.
+- 다른 도메인의 Mapper·Entity를 직접 사용하지 않는다. 도메인 간 호출은 [15절](#15-도메인-간-연동)의 공개 Service 인터페이스를 사용한다.
+
+## 4. 클래스와 메서드 네이밍
+
+| 대상 | 규칙 | 예시 |
+|---|---|---|
+| 고객 Controller | `<Domain>Controller` | `ProductController` |
+| 관리자 Controller | `<Domain>AdminController` | `ProductAdminController` |
+| Service | `<Domain>Service` | `MemberService` |
+| 조회 전용 Service | `<Domain>QueryService` | `ProductQueryService` |
+| Mapper | `<Domain>Mapper` | `MemberMapper` |
+| 입력 Form | 🔶 아래 참고 | — |
+| 화면 View | `<Domain><Purpose>View` | `ProductDetailView` |
+| 오류 코드 | `<Domain>ErrorCode` | `MemberErrorCode` |
+
+### 🔶 Form 네이밍
+
+| 안       | 형식 | 예시 | 비고 |
+|---------|---|---|---|
+| **확정안** | `<Domain><Action>Form` | `ProductCreateForm`, `StoreUpdateForm` | **기존 store 코드와 일치.** 리네임 불필요, View 네이밍(`ProductDetailView`)과도 도메인-선행으로 일관됨 |
+
+
+### 메서드 네이밍
+
+- boolean 메서드는 `is`, `has`, `can`으로 시작한다.
+- 조회 메서드 접두어는 의미로 구분한다:
+  - `find`: 값이 없을 수 있다 → `Optional<T>` 반환
+  - `get`: 값이 반드시 있어야 한다 → 없으면 `BusinessException`
+  - `exists` / `count`: 존재 여부 / 개수
+- `Manager`, `Helper`, `Util`, `Common`처럼 범위가 불명확한 이름은 피한다. **[권장]**
+
+## 5. Java 작성 스타일
+
+- 들여쓰기 공백 4칸, 탭 금지. 중괄호는 K&R.
+- 한 줄 120자 상한. **[권장]**
+- 와일드카드 import 금지.
+- 필드는 `private` 기본. 변경 불필요한 의존성·지역 변수는 `final`. **[권장]**
+- 생성자 주입을 사용한다. 필드 주입 `@Autowired`는 [금지]. 주입용 생성자는 `@RequiredArgsConstructor` [허용].
+- `@Data`는 Entity·DTO에 사용하지 않는다. 필요한 `@Getter`, `@Setter`만 사용한다.
+- 주석은 구현을 그대로 읽는 대신 선택 이유·제약·부작용을 설명한다. **[권장]**
+- 소스 파일은 UTF-8로 저장한다. `build.gradle`이 `JavaCompile`의 `options.encoding`을 `UTF-8`로 고정하고 있다. JVM 기본 인코딩에 맡기면 Windows(MS949)에서 한글 주석과 문자열이 컴파일하는 PC마다 다르게 깨진다.
+- 콘솔에 그대로 찍히는 문자열(빌드 스크립트 출력, 기동 실패 안내 등)에서 **실행에 필요한 명령·경로는 ASCII로 적는다.** 콘솔 코드페이지에 따라 한글이 깨져도 조치는 읽을 수 있어야 한다.
+
+### 🔶 합의 필요: import 순서
+
+| 안                 | 순서 | 비고 |
+|-------------------|---|---|
+| 확정안 (기존 store 코드) | 표준 라이브러리 → (빈 줄) → 서드파티(lombok 등) | 현재 코드 전체가 이 순서 |
+> 어느 안이든 **formatter 설정 파일과 함께 확정**한다([22절](#22-이-문서-밖에서-다루는-항목)). formatter 없이 문서로만 정하면 도메인마다 다시 어긋난다. 확정 전까지는 기존 파일의 순서를 건드리지 않는다.
+
+## 6. 데이터베이스 규약
+
+> v1에서 복원한 절이다. DDL을 작성하는 전 담당자에게 적용된다.
 
 - **PK**: `BIGINT AUTO_INCREMENT`, 컬럼명 `id`, 자바 타입 `Long`.
-- **네이밍**: 테이블·컬럼은 `snake_case`, 테이블명은 복수형(`members`, `products`). 자바 필드는 `camelCase`. 매핑은 `application.yml`의 `map-underscore-to-camel-case: true`가 처리한다. 단, 단일 설정 도메인인 `store`·`store_business_hour`·`store_holiday`는 기존 코드 호환을 위해 단수형을 유지한다.
+- **네이밍**: 테이블·컬럼은 `snake_case`, 테이블명은 복수형(`members`, `products`). 자바 필드는 `camelCase`, 매핑은 `map-underscore-to-camel-case: true`가 처리한다.
+  - 예외: 단일 설정 도메인인 `store` · `store_business_hour` · `store_holiday`는 기존 코드 호환을 위해 단수형을 유지한다.
 - **시간 컬럼**: `created_at`, `updated_at`을 `DATETIME(6)`으로 둔다.
-  - 생성 시각은 DDL의 `DEFAULT CURRENT_TIMESTAMP(6)`로 DB가 채운다.
-  - 수정 시각은 DDL의 `ON UPDATE CURRENT_TIMESTAMP(6)`에 위임한다. `UPDATE` 문에서 `updated_at`을 직접 세팅하지 않는다.
-  - 자바 서비스 코드에서 시간 값을 직접 세팅하지 않는다.
-- **enum**: DB 컬럼은 `VARCHAR`로 둔다. MyBatis 기본 핸들러가 enum을 `name()` 문자열로 저장·조회하므로 별도 설정이 필요 없다. `INT`(ordinal) 저장은 금지한다. 상태 컬럼의 상세 규칙은 아래 [상태값(status) 공통 규칙](#상태값status-공통-규칙)을 따른다.
-- **소프트삭제**: 공통 규약으로 강제하지 않는다. 이력 보존이 필요한 테이블만 담당자가 판단해 도입한다.
+  - 생성 시각은 DDL의 `DEFAULT CURRENT_TIMESTAMP(6)`, 수정 시각은 `ON UPDATE CURRENT_TIMESTAMP(6)`에 위임한다.
+  - `UPDATE` 문과 자바 서비스 코드에서 시간 값을 직접 세팅하지 않는다.
+- **enum 컬럼**: `VARCHAR`로 저장한다. MyBatis 기본 핸들러가 enum `name()` 문자열로 저장·조회한다. `INT`(ordinal) 저장은 [금지].
+- **status 컬럼 DDL** (상세 규칙은 [14절](#14-상태값-규칙)):
+  - 타입 `VARCHAR(20) NOT NULL` (더 긴 값이 필요하면 그 컬럼만 늘리고 이유를 주석으로 남긴다)
+  - 제약 `CONSTRAINT chk_<table>_status CHECK (status IN (...))`
+  - 신규 행의 시작 상태를 `DEFAULT`로 지정 (예: `members` → `ACTIVE`)
+- **소프트삭제**: 공통 규약으로 강제하지 않는다. 이력 보존이 필요한 테이블만 담당자가 판단해 도입한다. **[허용]**
 
-## 엔티티
+### 6-1. Flyway migration 규약
 
-- 순수 POJO로 둔다. JPA 애너테이션을 붙이지 않는다.
-- getter/setter는 Lombok `@Getter @Setter`로 생성한다. 손으로 작성하지 않는다.
-- 상속(BaseEntity)은 사용하지 않는다. 필요한 시간 컬럼은 각 엔티티에 직접 선언한다.
-- import 정렬: 표준 라이브러리 → 빈 줄 → 서드파티(lombok 등).
+- **파일명을 직접 짓지 않는다. [금지]** 여러 사람이 동시에 브랜치를 나눠 작업하면 같은 버전 번호가 나오고, Git은 파일명이 다르면 조용히 둘 다 머지한다. 충돌은 머지 뒤 앱을 띄울 때야 드러난다.
+- **생성은 항상 아래 명령으로 한다.**
+
+  ```powershell
+  .\gradlew.bat newMigration -Pdesc=add_coupon_table
+  ```
+
+  `src/main/resources/db/migration/V<yyyyMMdd>_<HHmmss>__<snake_case>.sql`이 만들어진다. `-Pdesc`는 소문자 `snake_case`만 받는다. 같은 초에 만들어진 파일이 있으면 자동으로 1초 밀어서 생성한다.
+- **분 단위 버전(`V20260729_1015__x.sql`)은 [금지].** Flyway는 버전 조각을 숫자로 비교하므로 초 단위와 섞이면 `1015 < 101542`가 되어 나중에 만든 파일이 먼저 실행된다. `MigrationNamingTests`가 CI에서 잡는다.
+- **머지된 migration은 수정하지 않는다. [금지]** checksum이 바뀌면 팀원 전원이 로컬 DB를 다시 만들어야 한다. 변경이 필요하면 새 migration을 만든다.
+- **서로 의존하는 DDL은 한 파일·한 PR에 담는다.** 타임스탬프는 "만든 시각"이라 머지 순서와 다를 수 있어 `out-of-order: true`를 켜 두었다. 파일이 나뉘면 머신마다 적용 순서가 달라질 수 있다.
+- **Flyway 자동 실행 범위는 `local`, `test`로 제한한다.** `rds` 프로필에서는 Flyway를 비활성화하고, 검토·승인된 별도 반영 절차 없이 애플리케이션이 공용 DB 스키마를 변경하지 못하게 한다.
+- **모든 환경의 실행에 필요한 기준 데이터는 versioned migration으로 관리한다.** 애플리케이션이
+  특정 PK나 행의 존재를 전제로 한다면 로컬 seed에만 두지 않는다. `rds`에는 애플리케이션이
+  자동 실행하지 않으며, 검토·승인된 별도 반영 절차에서 해당 migration을 적용한다.
+- **로컬 샘플 데이터는 migration에 넣지 않는다. [금지]** `src/main/resources/db/seed/seed-local.sql`에 둔다. 이 디렉터리는 Flyway가 스캔하지 않으므로 내용을 고쳐도 DB를 다시 만들 필요가 없다. 시드는 맨 앞에서 기존 로컬 샘플 데이터를 지우고 다시 넣어 몇 번을 실행해도 결과가 같아야 한다.
+- 레거시 `V0`, `V1`, `V3`은 Flyway 도입 이전에 손으로 지은 이름이라 생성기 형식과 다르다. 이후 타임스탬프 버전이 항상 더 크므로(`3 < 20260729.003452`) 순서에 문제가 없어 그대로 둔다. `MigrationNamingTests`가 이 셋만 예외로 허용한다.
+- **적용된 migration의 파일명을 바꾸지 않는다. [금지]** checksum은 파일 **내용**으로 계산하므로 이름만 바꿔서는 checksum이 변하지 않는다. 대신 이력에 기록된 버전·설명과 어긋나 실패한다. 버전은 그대로 두고 설명만 바꾸면 `DESCRIPTION_MISMATCH`, 버전까지 바꾸면 이력의 기존 버전이 미해결이 되고 새 버전은 미적용으로 잡힌다.
+- **Flyway 실패 중 조치가 정해진 것은 한국어 안내로 바꿔 던진다.** `global/config/FlywayConfig.java`가 `FlywayMigrationStrategy`로 `migrate()`를 감싸, 이력 테이블 부재·checksum 불일치·버전 중복을 각각의 조치와 함께 출력한다. 원인을 특정할 수 없는 오류는 원본 예외를 그대로 남긴다. 새로운 실패 유형에 조치가 정해지면 이 클래스에 error code를 추가한다.
+
+## 7. Entity 규칙
+
+Entity는 DB 한 행을 표현하는 MyBatis용 POJO다.
+
+- JPA 애너테이션을 붙이지 않는다.
+- DB 컬럼에 대응하는 값만 가진다. 화면 표시용 문자열·UI 상태·Bean Validation을 넣지 않는다.
+- Entity를 Controller의 입력 객체로 쓰거나 Model에 담아 Thymeleaf에 직접 전달하지 않는다.
+- 비밀번호 해시 등 민감한 필드를 가진 Entity는 웹 계층에 노출하지 않는다.
+- 공통 BaseEntity 상속은 사용하지 않는다. 시간 필드는 필요한 Entity에 `LocalDateTime`으로 직접 선언한다.
+- getter/setter는 Lombok `@Getter @Setter`로 생성한다.
 
 ```java
 import java.time.LocalDateTime;
@@ -63,189 +184,202 @@ public class Member {
 }
 ```
 
-## DTO
+## 8. DTO 규칙
 
-DB 모델과 화면 모델을 분리해, 화면 검증 규칙이 영속 모델로 번지지 않게 한다.
+### Form DTO — `dto/form`
 
-- **form**: 화면 입력 전용. Bean Validation(`@NotBlank`, `@Size` 등)을 여기에만 붙인다. 단일 필드로 표현 못 하는 교차 검증은 `@AssertTrue` 메서드로 둔다. (store `StoreUpdateForm` 참고)
-- **view**: 화면 출력 전용. 불변 `record`로 두고, 여러 테이블 조회 결과를 서비스에서 하나로 조합한다. (store `StoreView` 참고)
-- entity를 컨트롤러/화면에 직접 노출하지 않는다.
+- HTTP 요청 입력과 입력 검증을 담당한다. 변경 가능한 일반 class로 작성한다.
+- `@NotBlank`, `@Size`, `@Email` 등 Bean Validation은 **Form에만** 붙인다.
+- Controller에서 `@Valid` + `BindingResult`를 함께 사용한다.
+- 여러 필드에 걸친 검증(비밀번호 확인 등)은 `@AssertTrue` 또는 커스텀 검증으로 처리한다.
+- 업무 상태 확인·DB 조회가 필요한 검증은 Service에서 처리한다.
 
-## MyBatis 매퍼
+### View DTO — `dto/view`
 
-- 매퍼 인터페이스에 `@Mapper`를 붙이고, SQL은 XML에 작성한다.
-- **컬럼을 명시**한다. `SELECT *`를 쓰지 않는다.
-- 모든 사용자 입력은 `#{}`로 바인딩한다. `${}`는 사용하지 않는다(SQL 인젝션 방지).
-- 컬럼과 필드명이 다르거나 타입 변환이 필요하면 `resultMap`을 쓴다.
-- 자동 생성 키는 `useGeneratedKeys="true" keyProperty="id"`로 받는다.
-- 단건 조회 반환은 `Optional<T>`을 사용한다. (store `findStoreById`)
+- 화면에 필요한 출력 데이터만 제공한다. 불변 `record`를 기본으로 한다.
+- Entity 전체를 필드로 포함하지 않는다. 템플릿이 DB 구조를 직접 알지 않게 한다.
+- 한글 라벨·파생값은 View DTO 또는 enum의 메서드가 만든다.
+- 여러 테이블 조회 결과는 Service에서 하나의 View로 조합한다.
 
-## 서비스 · 트랜잭션
+## 9. Controller 규칙
 
-- 조회 메서드는 `@Transactional(readOnly = true)`.
-- 쓰기 메서드는 `@Transactional`. 여러 테이블에 걸친 쓰기는 한 트랜잭션으로 묶어 일부만 반영되는 상태를 막는다. (store `updateStore`)
-- 업무 규칙 위반은 `throw new BusinessException(도메인ErrorCode)`로 알린다.
-- 상태 전이 검증은 service가 소유한다(아래 상태 규칙 참고). DB `CHECK`는 허용 값 집합만 지킨다.
+Controller의 책임은 다음으로 한정한다: 요청 값 바인딩, 입력 형식 검증, 인증 사용자 확인, Service 호출, View/redirect 선택.
 
-## 에러 처리
+- 업무 계산과 상태 전이를 Controller에 작성하지 않는다.
+- 성공한 POST는 PRG(Post-Redirect-Get). 검증 실패 시에는 redirect하지 않고 입력한 form을 그대로 재렌더한다.
+- 성공 메시지는 `successMessage`, 실패 메시지는 `errorMessage` Flash Attribute로 전달한다. 이 두 키는 `fragments/common/alert.html`이 읽는다.
+- 화면에서 바로 수정 가능한 입력 오류만 `bindingResult.rejectValue(...)`로 해당 필드에 연결한다. 나머지 업무 예외는 GlobalExceptionHandler가 처리한다.
+- `catch (Exception)`으로 모든 예외를 잡지 않는다.
+- URL 식별자는 명시적인 `@PathVariable("name")`을 사용한다.
+- 반환하는 View 이름은 실제 템플릿 경로와 일치시킨다.
 
-- 도메인마다 `com.cakeshop.global.error.ErrorCode`를 구현한 enum을 둔다. 각 항목은 `코드·메시지·HTTP 상태`를 가진다. (store `StoreErrorCode`)
-- 코드 접두어는 도메인별로 구분한다(`STORE_001`, `MEMBER_001` …).
-- 화면에서 바로 고칠 수 있는 업무 오류는 컨트롤러에서 `bindingResult.rejectValue(...)`로 해당 입력 필드에 돌려준다. (store `addHoliday`)
+## 10. Service와 트랜잭션 규칙
 
-## 컨트롤러
+Service가 업무 규칙과 트랜잭션 경계를 소유한다.
 
-- 폼 제출은 PRG(Post-Redirect-Get) 패턴을 따른다. 성공 후 `redirect:`로 이동한다.
-- 검증 실패 시에는 리다이렉트하지 않고 사용자가 입력한 form을 그대로 재렌더한다.
-- 성공 알림은 `redirectAttributes.addFlashAttribute("successMessage", ...)`, 오류 알림은 `"errorMessage"` 키로 전달한다. 이 두 키를 `fragments/common/alert.html`이 읽어 화면에 출력한다.
+- 조회 메서드는 `@Transactional(readOnly = true)`, 쓰기 메서드는 `@Transactional`.
+- 여러 Mapper 호출이 하나의 업무 작업이면 반드시 하나의 트랜잭션으로 묶는다. 일부만 반영되는 상태를 만들지 않는다.
+- 트랜잭션은 public Service 메서드에서 시작한다. Controller·Mapper에 `@Transactional`을 붙이지 않는다.
+- 상태 전이는 현재 상태 → 목표 상태를 Service에서 검증한다.
+- 업무 규칙 위반은 `BusinessException` + 도메인별 ErrorCode로 표현한다. `IllegalArgumentException`·일반 `RuntimeException`을 업무 오류 전달 수단으로 쓰지 않는다.
+- Service가 `Model`, `HttpServletRequest`, `HttpSession`에 의존하지 않는다.
 
-## 인증
+## 11. MyBatis Mapper 규칙
 
-- 세션 기반 인증을 사용한다(구현 완료).
-- 현재 로그인 회원은 컨트롤러 파라미터에 `@AuthenticationPrincipal MemberDetails member`로 직접 받는다. 세션 키를 직접 읽거나 별도 커스텀 애너테이션을 만들지 않는다.
-- **역할(role)** 값은 접두어 없이 `USER` / `ADMIN`으로 DB에 저장한다. `MemberDetailsService`가 권한 문자열로 변환할 때 `ROLE_` 접두어를 붙이므로, `hasRole('ADMIN')` / `sec:authorize="hasRole('ADMIN')"`가 그대로 동작한다. role 컬럼에 직접 `ROLE_`를 넣지 않는다.
+- Mapper 인터페이스에 `@Mapper`, SQL은 XML에 작성한다. 메서드명과 XML id를 동일하게 유지한다.
+- `SELECT *`를 사용하지 않는다. 컬럼을 명시한다.
+- 사용자 입력은 반드시 `#{}`로 바인딩한다. `${}`는 정렬 컬럼을 포함해 [금지].
+  - 동적 정렬은 허용된 enum 값을 SQL의 `<choose>`로 매핑한다.
+- 단건 조회는 `Optional<T>`를 반환한다.
+- 생성 키는 `useGeneratedKeys="true" keyProperty="id"`.
+- 컬럼-필드명이 다르거나 enum 변환이 불명확하면 `resultMap`을 작성한다.
+- `created_at`, `updated_at`은 DB 기본값이 관리하므로 SQL에서 세팅하지 않는다. ([6절](#6-데이터베이스-규약))
 
-## 도메인 간 연동
+## 12. 오류 처리 규칙
 
-- 다른 도메인의 테이블을 직접 JOIN·조회하지 않는다. 각 도메인이 공개한 **Service 인터페이스**를 통해 필요한 정보를 받는다.
+- 도메인 오류 코드는 각 도메인의 `error` 패키지가 소유하며 `ErrorCode` 인터페이스를 구현한다. 도메인별 오류 코드를 global에 모으지 않는다.
+- 오류 코드는 `<DOMAIN>_<3자리 번호>` 형식 (`STORE_001`, `MEMBER_001` …). 각 항목은 코드·메시지·HTTP 상태를 가진다.
+- 사용자에게 노출할 메시지와 내부 로그 메시지를 구분한다.
+- 예외 메시지에 비밀번호, 개인정보, SQL, 내부 경로를 포함하지 않는다.
+- `BusinessException`, `ErrorCode`, `GlobalExceptionHandler` 등 공통 기반만 `global.error`에 둔다.
+
+## 13. 인증·인가 규칙
+
+- Spring Security 세션 인증을 사용한다. 현재 사용자는 `@AuthenticationPrincipal MemberDetails`로 받는다.
+- Controller에서 세션 키를 직접 읽거나 커스텀 애너테이션을 만들지 않는다.
+- DB `role` 값은 접두어 없이 `USER` / `ADMIN`으로 저장한다. `ROLE_` 접두어는 `MemberDetailsService`가 권한 객체 생성 시에만 붙인다. role 컬럼에 `ROLE_`을 직접 넣지 않는다.
+- 인증 실패 메시지로 이메일 존재 여부를 구분해 노출하지 않는다.
+- 정지·탈퇴 회원의 로그인 허용 여부는 `MemberStatus` 업무 규칙으로 검사한다.
+- 관리자 인가는 URL 숨김·버튼 비활성화가 아니라 **Security 설정에서 강제**한다.
+
+## 14. 상태값 규칙
+
+한 상태 컬럼은 3가지 표현을 가지며, 정본은 저장값이다.
+
+| 표현 | 소유 | 규칙 |
+|---|---|---|
+| 저장값 = enum 이름 (UPPER_SNAKE) | DB `VARCHAR` + Java enum | **정본.** MyBatis가 이름으로 자동 매핑 |
+| 한글 라벨 | enum `label()` / View DTO | **DB에 저장하지 않는다** |
+| 전이 규칙 | enum `canTransitionTo()` + Service | DB `CHECK`는 값 집합만 검증 |
+
+- ordinal 숫자 저장 [금지]. DDL 규칙은 [6절](#6-데이터베이스-규약) 참고.
+- 재고 수량(파생값), 읽음 여부(boolean), 글 종류(type/category), 다른 도메인의 status는 내 status enum으로 만들지 않는다.
+- `OrderStatus`(11개 + 전이)·`PaymentStatus`(6개)가 확정된 레퍼런스 구현이다.
+
+> 도메인별 상태값 인벤토리, 담당자별 미확정 ☐ 항목(product_options·payment_cancellations·coupons·comments·reviews·chat_rooms·NotificationType), 함정 분류표는 [status-design.md](status-design.md)를 정본으로 한다. 담당자 ☐ 항목의 확정·갱신도 그 문서에서 계속한다.
+
+## 15. 도메인 간 연동
+
+- 다른 도메인의 테이블을 직접 JOIN·조회하지 않고, Mapper·Entity를 직접 사용하지 않는다.
+- 각 도메인이 공개한 **Service 인터페이스** 또는 읽기 전용 **QueryService**를 통해 필요한 정보를 받는다.
 - 구현이 아직 없으면 인터페이스 시그니처만 먼저 합의하고, 사용하는 쪽은 stub으로 개발을 진행한다.
-- 최소 공개 계약(1차 합의 대상):
-  - 회원: `MemberService.findById(id)` → (id, 이름, 권한, 상태)
-  - 상품: `ProductQueryService.getSalesInfo(id)` → (판매가능여부, 가격, 재고)
+- 최소 공개 계약 (1차 합의 대상):
 
-## 추후 확정 (본보기 도메인에서 시연)
-
-아래는 store 도메인이 다루지 않아 별도 예시로 기준을 확정한다. 확정 전까지 임의 구현하지 않는다.
-
-- **목록·페이징**: 무한스크롤 / 페이지 번호 중 택1 (미정). 정해지면 카운트 쿼리와 `LIMIT/OFFSET` 표준을 여기에 추가한다.
-- **도메인 간 FK 연동**: order ↔ member ↔ product 연결 예시로 확정한다.
-- **상태 enum 컬럼**: 표준 방식은 아래 [상태값(status) 공통 규칙](#상태값status-공통-규칙)에서 확정했다. `OrderStatus`·`PaymentStatus`가 모범 구현이며, 도메인별 미확정 값만 담당자가 채운다.
-
----
-
-# 상태값(status) 공통 규칙
-
-> 목적: 13개 도메인에 흩어진 모든 `status`(및 상태처럼 보이는 값)를 **한 방식으로 통일**한다.
-> 상태값 관련 결정은 이 절을 정본으로 삼는다.
-
-## status 하나를 다루는 표준 방식 (전 도메인 공통)
-
-한 상태 컬럼은 **3가지 표현**을 가진다. 어디를 정본으로 두는지가 핵심이다.
-
-| 표현 | 어디에 | 규칙 |
+| 도메인 | 계약 | 반환 |
 |---|---|---|
-| **저장값 = enum 이름** (영문 UPPER_SNAKE) | DB `VARCHAR` + `CHECK IN(...)`, Java `enum` | **이게 정본.** MyBatis가 enum ↔ 문자열을 이름으로 자동 매핑한다. |
-| **한글 라벨** (판매 중, 승인 대기 …) | 화면 | **절대 저장하지 않는다.** enum의 `label()` 또는 view 헬퍼로 매핑한다. 목업에 하드코딩된 한글 배지는 전부 enum-driven으로 교체한다. |
-| **전이 규칙** | Java `enum`의 `canTransitionTo()` | DB `CHECK`는 "허용 값 집합"만 지킨다. **전이는 service에서 검증**한다. SQL에 전이를 넣지 않는다. |
+| 회원 | `MemberService.findById(id)` | id, 이름, 권한, 상태 |
+| 상품 | `ProductQueryService.getSalesInfo(id)` | 판매가능여부, 가격, 재고 |
 
-### 핵심 원칙
+## 16. global 편입 기준
 
-- **저장값은 영문 enum 이름 하나로 통일.** 한글·숫자·코드값으로 저장하지 않는다.
-- **한글은 화면에서만.** 저장값과 라벨을 섞으면 세 표현이 서로 어긋난다(drift). 라벨 매핑은 enum이나 view가 소유한다.
-- **전이는 service에서.** DB는 값 집합만, 상태 머신은 Java가 소유한다.
-- `OrderStatus`(11개 + 전이)·`PaymentStatus`(6개)가 **이미 이 형태의 모범답안**이다. 나머지 담당자는 이 두 enum을 그대로 복제해서 자기 도메인에 적용한다.
+다음 조건을 **모두** 만족할 때만 global에 둔다.
 
-### DB 컬럼 작성 규칙 (전원 합의)
+1. 두 개 이상의 도메인에서 **실제로** 사용한다. (향후 가능성만으로는 불충분)
+2. 특정 도메인의 업무 의미를 포함하지 않는다.
+3. 변경 시 영향 범위와 관리 담당자가 명확하다.
 
-- 타입: **`VARCHAR(20) NOT NULL`** (긴 값이 필요하면 그 컬럼만 예외적으로 늘리고 이유를 주석으로 남긴다)
-- 제약: **`CONSTRAINT chk_<table>_status CHECK (status IN ('A','B', ...))`** — `store` DDL의 `chk_...` 네이밍 관례 준수
-- 기본값: 신규 행이 시작하는 상태를 `DEFAULT`로 지정 (예: `members` → `ACTIVE`, `member_coupons` → `ISSUED`)
-- 컬럼명: 상태는 `status`, 종류는 `type` / `category` (아래 분류에 따름)
-
-## status 자리 전수 인벤토리 (코드 + 목업 통합)
-
-| 도메인.컬럼 | 담당 | 목업 표기 | 저장값(enum) | 상태 |
-|---|---|---|---|---|
-| `members.status` | 수민 | 정상 / 이용 제한 | `ACTIVE / SUSPENDED / WITHDRAWN` | 거의 확정 |
-| `products.status` | 시은 | 판매 중 / 판매 중지 | `ACTIVE / INACTIVE` | 거의 확정 |
-| `product_options.status` | 시은 | (표기 없음) | `ACTIVE / INACTIVE` ? | ☐ 열림 |
-| `orders.status` | 주환 | 승인대기/승인/거절/결제대기/결제완료/접수/제작중/픽업준비/픽업완료 | **`OrderStatus` 11개 (확정)** | ✅ 코드 확정 |
-| `payments.status` | 주환 | 결제 완료 / 결제 대기 | **`PaymentStatus` 6개 (확정)** | ✅ 코드 확정 |
-| `payment_cancellations.status` | 주환 | 취소 요청 | `REQUESTED / DONE / REJECTED` ? | ☐ 열림 |
-| `coupons.status` | 정후 | 발급 중 | `ACTIVE / INACTIVE / ENDED` ? | ☐ 열림 |
-| `member_coupons.status` | 정후 | 사용 가능 / 사용 완료 | `ISSUED / USED / EXPIRED` | 거의 확정 |
-| `posts.status` | 현규 | 정상 / 제재 | `ACTIVE / DELETED / BLOCKED` | 거의 확정 |
-| `comments.status` | 현규 | (표기 없음) | `ACTIVE / DELETED` ? | ☐ 열림 |
-| `post_reports.status` | 현규 | (신고 처리) | `PENDING / ACCEPTED / REJECTED` | 거의 확정 |
-| `reviews.status` | 현규 | 숨김 | `VISIBLE / HIDDEN` ? | ☐ 열림 |
-| `chat_rooms.status` | 민정 | 상담가능 / 상담중 / 미답변 | `OPEN / CLOSED` ? (아래 함정 참고) | ☐ 열림 |
-
-### 이미 확정된 두 enum
-
-**`OrderStatus` (주문·주문제작 공통, 11개 + 전이규칙 — 코드에 확정됨)**
-
-```
-정상 흐름:
-WAITING_APPROVAL → APPROVED → PENDING_PAYMENT → PAID → ACCEPTED → PREPARING → READY → PICKED_UP
-예외 흐름:
-WAITING_APPROVAL → REJECTED           (주문제작 거절, 최종)
-PENDING_PAYMENT  → EXPIRED            (결제 시간 초과, 최종)
-* 대부분 상태     → CANCELED           (취소, 최종)
-최종 상태: REJECTED / PICKED_UP / CANCELED / EXPIRED
-```
-전이 규칙은 `OrderStatus.canTransitionTo()`가 소유한다. SQL의 `CHECK`는 11개 값 집합만 나열한다.
-
-**`PaymentStatus` (토스 결제 상태, 6개 — 코드에 확정됨. 주문 enum과 절대 섞지 않는다)**
-
-```
-READY / DONE / CANCELED / PARTIAL_CANCELED / ABORTED / EXPIRED
-```
-
-## ⚠️ status처럼 보이지만 status가 아닌 것 (분류 필수)
-
-목업 배지를 그대로 컬럼으로 만들지 않는다. 4종류로 갈린다.
-
-### 불리언 → enum 만들지 않는다
-
-| 목업 표기 | 실제 | 담당 |
-|---|---|---|
-| 알림 `읽음 / 미읽음` | `notifications.is_read BOOLEAN` | 민정 |
-| 영업시간 `휴무` | `store_business_hour.is_closed`(이미 존재) | — |
-
-### 파생값 → 저장하지 않고 계산한다
-
-| 목업 표기 | 실제 | 담당 |
-|---|---|---|
-| 상품 `품절 / 재고 부족` | `stock_quantity`에서 계산(0이면 품절). **`products.status`(판매 on/off)와 별개** | 시은 |
-| 채팅 `미답변` | 마지막 메시지가 관리자 답이 아님 → 메시지에서 파생. 방 자체 `status`와 다름 | 민정 |
-
-> 시은 주의: `products.status`(ACTIVE/INACTIVE = 판매 스위치)와 재고(품절/재고부족)는 **다른 축**이다. 하나의 컬럼으로 합치지 않는다.
-
-### 종류(type/category) → status가 아니다 (단, 저장 방식은 동일 패턴)
-
-| 목업 표기 | 실제 | 담당 |
-|---|---|---|
-| 커뮤니티 글 `후기 / 질문 / 레시피 / 자유` | `posts.category` (`REVIEW/QUESTION/RECIPE/FREE`) — status와 별도 컬럼 | 현규 |
-| 알림 `주문 승인 / 결제 완료 …` | `NotificationType` enum (**현재 TODO, 채워야 함**) | 민정 |
-
-`type`/`category`도 저장값·라벨 규칙은 status와 동일하게 적용한다(영문 enum 이름 저장, 한글 라벨 미저장).
-
-### 다른 도메인의 status를 빌려 표시하는 것 → 자기 컬럼이 아니다
-
-| 목업 표기 | 실제 |
+| global에 둘 수 있는 것 | global에 두지 않는 것 |
 |---|---|
-| 채팅 목록의 `승인 대기 / 제작 중` 배지 | 연결된 **주문의 `orders.status`**를 표시한 것. `chat_rooms`에 저장하지 않는다 |
+| Spring·MyBatis·Web 설정 | 도메인 Entity, Form, View |
+| Security 기반 설정과 어댑터 | 도메인 상태 enum·업무 오류 코드 |
+| 공통 예외 처리 기반 | 한 도메인만 쓰는 유틸리티 |
+| 여러 도메인이 공유하는 페이징 값 객체 | 할인·재고·주문 전이 같은 업무 규칙 |
+| 파일 저장소 등 외부 시스템 공통 인터페이스 | 향후 가능성만 보고 만든 추상화 |
 
-## 지금 못 박을 것 vs 담당자가 채울 것
+global에서 도메인 Mapper를 직접 호출하지 않는다. 필요하면 도메인이 공개한 Service/QueryService를 사용한다.
 
-### 지금 전원 합의로 확정 (미루면 서로 깨진다)
+## 17. Thymeleaf와 화면 모델 규칙
 
-1. **표준 방식** — enum 이름 저장 / 한글 라벨 미저장 / 전이는 service. `OrderStatus`·`PaymentStatus`가 레퍼런스.
-2. **DB 컬럼 규칙** — `VARCHAR(20) NOT NULL` + `chk_<table>_status CHECK IN(...)` + 시작 상태 `DEFAULT`.
-3. **함정 분류** — "재고·읽음·글종류·남의 status는 내 status 컬럼이 아니다"를 합의.
+- 공통 header, footer, alert는 fragment를 재사용한다. 화면 규격 상세는 [frontend-template-format.md](frontend-template-format.md)를 따른다.
+- 템플릿에서 Entity를 직접 탐색하거나 복잡한 업무 조건을 계산하지 않는다. Controller가 View DTO와 필요한 enum 목록을 Model에 제공한다.
+- URL은 `th:href`, `th:action`을 사용한다. POST 폼은 Spring Security CSRF 정책을 따른다.
+- 관리자·고객 템플릿은 각각 `templates/admin`, `templates/customer` 아래에 둔다.
+- 템플릿 전용 JavaScript에서 API·URL 문자열을 중복 정의하지 않는다. **[권장]**
 
-### 담당자가 자기 DDL 짤 때 채우는 ☐
+## 18. 금지 패턴
 
-| 담당 | 채울 것 |
+리뷰에서 이 절 번호로 바로 지적한다.
+
+1. Controller → Mapper 직접 호출
+2. 다른 도메인의 Mapper·Entity 직접 사용
+3. Entity를 요청 Form이나 화면 View로 재사용
+4. Service에서 웹 객체(Model, HttpSession 등) 사용
+5. 일반 `Exception`으로 업무 흐름 제어
+6. `SELECT *`
+7. MyBatis `${}` 사용자 입력 치환
+8. 비밀번호·개인정보 로그 출력
+9. 한글 상태값 DB 저장
+10. ordinal enum 저장
+11. 필드 주입 `@Autowired`
+12. `UPDATE` 문·서비스 코드에서 `updated_at` 직접 세팅
+13. 근거 없는 global 이동
+14. 기능 PR 안에서 대규모 패키지 정리
+
+## 19. 기계적 검사와 코드 리뷰의 역할
+
+| formatter·정적 검사·CI가 확인 | 사람·AI 리뷰가 확인 |
 |---|---|
-| 시은 | `product_options.status` 필요 여부 확정 |
-| 주환 | `payment_cancellations.status` 값 확정 |
-| 정후 | `coupons.status`(캠페인 상태) 값 확정 |
-| 현규 | `comments.status` / `reviews.status`(숨김) 값 확정 |
-| 민정 | `chat_rooms.status` 정의 + **`NotificationType` enum 값 채우기**(현재 TODO) |
+| 빌드와 컴파일 | 계층 책임과 의존 방향 |
+| import와 포맷 | 트랜잭션 경계 |
+| 테스트 통과 | 상태 전이 검증 |
+| 와일드카드 import | 인증·인가 누락 |
+| 정적 분석으로 찾는 단순 위반 | Entity·민감정보 노출, 도메인 간 결합, global 편입 타당성 |
 
-> ☐ 항목을 확정하면 인벤토리의 해당 행을 "확정"으로 갱신하고, enum + DDL을 함께 커밋한다.
+AI 코드 리뷰는 보조 수단이며 테스트, CI, 사람의 승인을 대체하지 않는다.
 
-## 한 줄 요약
+## 20. 기존 코드 적용 방식
 
-**저장값은 영문 enum 이름 하나로 통일, 한글은 화면에서만, 전이는 service에서. 그리고 재고·읽음·글종류·남의 도메인 status는 내 status 컬럼이 아니다.**
+1. 이 문서가 정본이다. 변경이 필요하면 문서 수정 PR을 먼저 올려 합의한다.
+2. 신규 코드부터 적용한다. 기존 위반은 해당 도메인 기능을 수정할 때 함께 고친다.
+3. 패키지 이동·리네임처럼 충돌 위험이 큰 정리는 별도 PR + 담당자 승인으로 진행한다.
+4. 이 문서를 채택해도 기존 담당자 코드를 일괄 수정하지 않는다.
+
+## 21. 확정이 필요한 결정
+
+### 합의만 하면 되는 것 (충돌 없음)
+
+- 문서가 특정 구현체보다 우선한다.
+- 도메인 기본 구조는 `controller/service/mapper/entity/dto/error`로 통일한다.
+- 관리자·고객은 Controller 클래스명과 URL로 구분한다.
+- Entity / Form / View를 분리하고, Service가 업무 규칙과 트랜잭션을 소유한다.
+- 도메인 간 연결은 공개 Service/QueryService를 사용한다.
+- global 편입은 16절 기준을 만족할 때만 한다.
+- 기계적으로 검사 가능한 스타일은 향후 CI에서 강제한다.
+
+### 🔶 합의 필요 (기존 코드와 충돌 — 회의 안건)
+
+| # | 항목 | 선택지 | 위치 |
+|---|---|---|---|
+| 1 | Form 네이밍 | A: `<Domain><Action>Form` (기존 코드 일치, 추천) / B: `<Action><Domain>Form` | [4절](#4-클래스와-메서드-네이밍) |
+| 2 | import 순서 | A: 표준 → 서드파티 (기존 코드) / B: java → 내부 → 외부 — **formatter 설정과 함께 확정** | [5절](#5-java-작성-스타일) |
+| 3 | 기술 버전 표기 | build.gradle 실제 버전과 대조 후 확정 | [2절](#2-기본-기술-기준) |
+
+## 22. 이 문서 밖에서 다루는 항목
+
+### 다른 문서에서 확정됨
+
+| 항목 | 정본 |
+|---|---|
+| 상태값 설계 — 도메인별 status 인벤토리, 함정 분류표 | [status-design.md](status-design.md) |
+| 테스트 종류별 작성 규칙과 최소 범위 | [testing.md](testing.md) |
+| PR·커밋 규칙, 리뷰 요청과 병합 기준 | [pull-request.md](pull-request.md) |
+| CI 필수 검사 | [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) |
+| 로컬 DB 준비와 초기화 절차 | [README.md](../README.md) |
+
+### 아직 미정
+
+| 항목 | 내용 |
+|---|---|
+| 페이징 표준 | 무한스크롤/페이지 번호 택1, 카운트 쿼리·`LIMIT/OFFSET` 규약 |
+| formatter·정적 분석 도구 선택 | [5절 「🔶 합의 필요: import 순서」](#-합의-필요-import-순서)와 함께 확정한다. 도구 없이 문서로만 정하면 도메인마다 다시 어긋난다 |
+| branch protection·required check 적용 | 현황은 [testing.md 17절](testing.md#17-결정-현황과-알려진-공백)에서 관리한다 |
