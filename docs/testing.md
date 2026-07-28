@@ -2,7 +2,7 @@
 
 - **상태**: 팀 합의 전 초안 (검토 반영본)
 - **범위**: Java · Spring MVC · Spring Security · MyBatis · MariaDB 테스트와 CI 실행 기준
-- **관련 문서**: [코드 컨벤션 v2](conventions-v2-proposal.md)
+- **관련 문서**: [코드 컨벤션](conventions.md)
 
 ## 초안 대비 변경점
 
@@ -362,7 +362,7 @@ PR을 올리기 전에 저장소 루트에서 전체 테스트를 실행한다.
 
 1. 운영 DB와 맞출 MariaDB image의 정확한 버전
 2. Testcontainers 공통 설정 위치와 Spring datasource 연결 방식
-3. **mybatis-spring-boot-starter-test의 Spring Boot 버전 호환 확인** (코드 컨벤션 v2의 🔶 버전 확정 항목과 연동 — `@MybatisTest` 사용 가능 여부가 여기에 달려 있다)
+3. **mybatis-spring-boot-starter-test의 Spring Boot 버전 호환 확인** (코드 컨벤션의 🔶 버전 확정 항목과 연동 — `@MybatisTest` 사용 가능 여부가 여기에 달려 있다)
 4. Testcontainers용 테스트 profile 이름과 환경 변수 목록
 5. Flyway migration을 테스트 schema 생성에 사용하는 방식 (`database.md`와 연동)
 6. JaCoCo 도입 여부와 초기 기준

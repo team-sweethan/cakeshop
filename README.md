@@ -80,7 +80,7 @@ Flyway를 사용하지 않는다. `docs/sql`의 DDL을 RDS와 각 개발자의 �
 - `V0_ERD.sql`: 전체 ERD 참조 스키마(정본 설계). 실제 적용은 아래 `V1_first_MVC_table.sql`로 올린다.
 - `V1_first_MVC_table.sql`: 도메인별 1차 기능 병렬 착수용 테이블 15개(컬럼 정의는 `V0_ERD.sql`과 동일, 2차는 테이블 추가만으로 확장). 로그인 가능한 공통 샘플 계정과 매장 필수 시드(대표 매장 1행 + 7개 요일 영업시간)를 함께 포함한다.
 
-상태값(`status`) 컬럼은 도메인마다 흩어지지 않도록 `docs/conventions.md`의 상태값 공통 규칙(영문 enum 이름 저장·한글 라벨 미저장·전이는 service)을 따른다.
+상태값(`status`) 컬럼은 도메인마다 흩어지지 않도록 `docs/status-design.md`의 상태값 공통 규칙(영문 enum 이름 저장·한글 라벨 미저장·전이는 service)을 따른다.
 
 ## 구조
 

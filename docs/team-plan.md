@@ -1,7 +1,7 @@
 # cakeshop 팀 개발 합의서
 
 > 프로젝트 공유 전에 팀이 함께 결정해야 하는 항목을 기록한다.
-> 설치·실행 방법은 `README.md`, 코드 규약과 상태값 상세 기준은 [`conventions.md`](conventions.md)를 따른다.
+> 설치·실행 방법은 `README.md`, 코드 규약은 [`conventions.md`](conventions.md), 상태값 상세 기준은 [`status-design.md`](status-design.md)를 따른다.
 > 표기: ✅ 결정됨 · 🟡 제안(검토 필요) · ⬜ 미정
 > 이 문서는 합의 기록용이며, 실제 repo 생성·커밋·push 등 git 작업은 팀이 직접 수행한다.
 
@@ -78,7 +78,7 @@
 
 ## 4. 상태값
 
-상태값, 화면 표시명, 상태 전이의 상세 기준은 [`conventions.md`](conventions.md)의 **상태값(status) 공통 규칙**을 정본으로 한다.
+상태값, 화면 표시명, 상태 전이의 상세 기준은 [`status-design.md`](status-design.md)를 정본으로 한다.
 
 | 결정할 사항 | 최종 결정 | 담당자 |
 |---|---|---|

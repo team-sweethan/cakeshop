@@ -1,7 +1,7 @@
 # cakeshop PR 작성 규칙
 
 - **범위**: GitHub Pull Request 작성, 리뷰 요청, 병합 기준
-- **관련 문서**: [코드 컨벤션 v2](conventions-v2-proposal.md), [테스트 작성 규칙](testing.md)
+- **관련 문서**: [코드 컨벤션](conventions.md), [테스트 작성 규칙](testing.md)
 
 ## 1. 기본 원칙
 
