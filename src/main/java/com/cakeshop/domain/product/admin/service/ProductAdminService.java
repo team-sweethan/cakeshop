@@ -3,7 +3,10 @@ package com.cakeshop.domain.product.admin.service;
 import java.util.List;
 
 import com.cakeshop.domain.product.admin.dto.form.ProductAdminSearchCondition;
+import com.cakeshop.domain.product.admin.dto.form.ProductForm;
 import com.cakeshop.domain.product.admin.dto.view.ProductAdminListView;
+import com.cakeshop.domain.product.admin.dto.view.ProductCategoryOptionView;
+import com.cakeshop.domain.product.entity.Product;
 import com.cakeshop.domain.product.entity.ProductStatus;
 import com.cakeshop.domain.product.error.ProductErrorCode;
 import com.cakeshop.domain.product.mapper.ProductMapper;
@@ -105,5 +108,68 @@ public class ProductAdminService {
                     ProductErrorCode.NOT_FOUND
             );
         }
+    }
+
+    /**
+     * 상품 등록 화면에서 선택할 활성 카테고리를 조회한다.
+     *
+     * @return 활성 카테고리 목록
+     */
+    @Transactional(readOnly = true)
+    public List<ProductCategoryOptionView> getActiveCategories() {
+        // 화면에 표시할 수 있는 활성 카테고리만 조회한다.
+        return productMapper.findActiveCategories();
+    }
+
+    /**
+     * 새로운 상품의 기본 정보를 등록한다.
+     *
+     * <p>등록 직후에는 고객 화면에 노출되지 않도록
+     * 판매 중지 상태로 저장한다.</p>
+     *
+     * @param form 상품 등록 입력값
+     * @return 생성된 상품 식별자
+     * @throws BusinessException 선택할 수 없는 카테고리인 경우
+     */
+    @Transactional
+    public long createProduct(ProductForm form) {
+        // 카테고리 ID가 없거나 활성 카테고리가 아니면 등록을 중단한다.
+        if (form == null
+                || form.getCategoryId() == null
+                || !productMapper.existsActiveCategoryById(
+                form.getCategoryId()
+        )) {
+            throw new BusinessException(
+                    ProductErrorCode.INVALID_CATEGORY
+            );
+        }
+
+        // 검증된 등록 폼을 DB에 저장할 Product 객체로 변환한다.
+        Product product = new Product();
+
+        product.setCategoryId(form.getCategoryId());
+        product.setName(form.normalizedName());
+        product.setDescription(
+                form.normalizedDescription()
+        );
+        product.setBasePrice(form.getBasePrice());
+        product.setStockQuantity(
+                form.getStockQuantity()
+        );
+        product.setProductType(form.getProductType());
+        product.setPreparationDays(
+                form.getPreparationDays()
+        );
+        product.setCancellationLimitDays(
+                form.getCancellationLimitDays()
+        );
+
+        // 옵션과 내용을 확인한 후 판매를 시작할 수 있도록 기본 상태를 판매 중지로 설정한다.
+        product.setStatus(ProductStatus.INACTIVE);
+
+        // 상품을 등록하고 자동 생성된 상품 ID를 Product에 저장한다.
+        productMapper.insertProduct(product);
+
+        return product.getId();
     }
 }

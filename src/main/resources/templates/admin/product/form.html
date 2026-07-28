@@ -1,13 +1,322 @@
-<!doctype html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head>
-  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>상품 등록·수정 | 관리자</title><link rel="stylesheet" th:href="@{/css/app.css}"></head><body>
-<div class="admin-layout"><aside th:replace="~{fragments/admin/sidebar :: sidebar('products')}"></aside><div class="admin-main">
-  <header th:replace="~{fragments/admin/header :: header('상품 등록·수정')}"></header><main class="admin-content">
-  <div th:replace="~{fragments/admin/mock-notice :: notice}"></div>
-  <h1 class="admin-page-title">상품 등록·수정</h1>
-  <div class="admin-form">
-    <section class="section"><h2 class="section-title">기본 정보</h2><div class="panel form-stack"><div class="form-group"><label>상품명</label><input class="form-control" value="딸기 생크림 케이크"></div><div class="grid grid--2"><div class="form-group"><label>상품 유형</label><select class="form-control"><option>일반 케이크</option><option>주문 제작</option><option>당일 픽업</option></select></div><div class="form-group"><label>판매 가격</label><input class="form-control" type="number" value="35000"></div></div><div class="form-group"><label>상품 설명</label><textarea class="form-control form-control--textarea">신선한 딸기와 부드러운 생크림으로 만든 케이크입니다.</textarea></div></div></section>
-    <section class="section"><h2 class="section-title">판매·재고</h2><div class="panel grid grid--2"><div class="form-group"><label>판매 상태</label><select class="form-control"><option>판매 중</option><option>판매 중지</option></select></div><div class="form-group"><label>재고</label><input class="form-control" type="number" value="12"></div></div></section>
-    <div class="cluster"><button class="btn btn--primary" type="button" disabled>백엔드 연결 후 저장</button><a class="btn" th:href="@{/admin/products}">목록으로</a></div>
+<!doctype html>
+<html lang="ko"
+      xmlns:th="http://www.thymeleaf.org">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0">
+
+  <title>상품 등록 | 관리자</title>
+
+  <link rel="stylesheet"
+        th:href="@{/css/app.css}">
+</head>
+
+<body>
+<div class="admin-layout">
+
+  <!-- 관리자 사이드바 -->
+  <aside th:replace=
+                 "~{fragments/admin/sidebar :: sidebar('products')}">
+  </aside>
+
+  <div class="admin-main">
+
+    <!-- 관리자 헤더 -->
+    <header th:replace=
+                    "~{fragments/admin/header :: header('상품 등록')}">
+    </header>
+
+    <main class="admin-content">
+
+      <h1 class="admin-page-title">
+        상품 등록
+      </h1>
+
+      <!-- 공통 성공 및 오류 메시지 -->
+      <div th:replace=
+                   "~{fragments/common/alert :: alert}">
+      </div>
+
+      <form class="admin-form"
+            method="post"
+            th:action="@{/admin/products}"
+            th:object="${productForm}">
+
+        <!-- 전체 입력값 오류 안내 -->
+        <div class="alert alert--error"
+             th:if="${#fields.hasAnyErrors()}">
+
+          <strong>
+            입력 내용을 확인해 주세요.
+          </strong>
+
+          <ul>
+            <li th:each="error : ${#fields.allErrors()}"
+                th:text="${error}">
+              입력값 오류
+            </li>
+          </ul>
+        </div>
+
+        <!-- 기본 정보 -->
+        <section class="section">
+
+          <h2 class="section-title">
+            기본 정보
+          </h2>
+
+          <div class="panel form-stack">
+
+            <!-- 카테고리 -->
+            <div class="form-group">
+              <label for="categoryId">
+                카테고리
+                <span class="required">*</span>
+              </label>
+
+              <select id="categoryId"
+                      class="form-control"
+                      th:field="*{categoryId}"
+                      required>
+
+                <option value="">
+                  카테고리를 선택해 주세요.
+                </option>
+
+                <option th:each="category : ${categories}"
+                        th:value="${category.id}"
+                        th:text="${category.name}">
+                  카테고리
+                </option>
+              </select>
+
+              <p class="field-error"
+                 th:errors="*{categoryId}">
+                카테고리를 선택해 주세요.
+              </p>
+
+              <p class="form-help"
+                 th:if="${categories.isEmpty()}">
+                사용할 수 있는 카테고리가 없습니다.
+              </p>
+            </div>
+
+            <!-- 상품명 -->
+            <div class="form-group">
+              <label for="name">
+                상품명
+                <span class="required">*</span>
+              </label>
+
+              <input id="name"
+                     class="form-control"
+                     type="text"
+                     th:field="*{name}"
+                     maxlength="150"
+                     placeholder="상품명을 입력해 주세요."
+                     required>
+
+              <p class="field-error"
+                 th:errors="*{name}">
+                상품명을 확인해 주세요.
+              </p>
+            </div>
+
+            <!-- 상품 유형과 가격 -->
+            <div class="grid grid--2">
+
+              <!-- 상품 유형 -->
+              <div class="form-group">
+                <label for="productType">
+                  상품 유형
+                  <span class="required">*</span>
+                </label>
+
+                <select id="productType"
+                        class="form-control"
+                        th:field="*{productType}"
+                        required>
+
+                  <option value="">
+                    상품 유형을 선택해 주세요.
+                  </option>
+
+                  <option th:each=
+                                  "productType : ${productTypes}"
+                          th:value="${productType}"
+                          th:text="${productType.displayName}">
+                    상품 유형
+                  </option>
+                </select>
+
+                <p class="field-error"
+                   th:errors="*{productType}">
+                  상품 유형을 선택해 주세요.
+                </p>
+              </div>
+
+              <!-- 기본 판매 가격 -->
+              <div class="form-group">
+                <label for="basePrice">
+                  판매 가격
+                  <span class="required">*</span>
+                </label>
+
+                <input id="basePrice"
+                       class="form-control"
+                       type="number"
+                       th:field="*{basePrice}"
+                       min="0"
+                       max="999999999999"
+                       step="1"
+                       placeholder="0"
+                       required>
+
+                <p class="field-error"
+                   th:errors="*{basePrice}">
+                  판매 가격을 확인해 주세요.
+                </p>
+              </div>
+            </div>
+
+            <!-- 상품 설명 -->
+            <div class="form-group">
+              <label for="description">
+                상품 설명
+              </label>
+
+              <textarea id="description"
+                        class=
+                                "form-control form-control--textarea"
+                        th:field="*{description}"
+                        maxlength="5000"
+                        placeholder=
+                                "상품의 특징과 안내 사항을 입력해 주세요.">
+              </textarea>
+
+              <p class="field-error"
+                 th:errors="*{description}">
+                상품 설명을 확인해 주세요.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- 판매 및 재고 정보 -->
+        <section class="section">
+
+          <h2 class="section-title">
+            판매 및 재고
+          </h2>
+
+          <div class="panel form-stack">
+
+            <div class="grid grid--2">
+
+              <!-- 재고 수량 -->
+              <div class="form-group">
+                <label for="stockQuantity">
+                  재고 수량
+                </label>
+
+                <input id="stockQuantity"
+                       class="form-control"
+                       type="number"
+                       th:field="*{stockQuantity}"
+                       min="0"
+                       step="1"
+                       placeholder="재고 제한 없음">
+
+                <p class="form-help">
+                  비워 두면 재고 수량 제한 없이 판매할 수 있습니다.
+                </p>
+
+                <p class="field-error"
+                   th:errors="*{stockQuantity}">
+                  재고 수량을 확인해 주세요.
+                </p>
+              </div>
+
+              <!-- 준비 일수 -->
+              <div class="form-group">
+                <label for="preparationDays">
+                  준비 일수
+                  <span class="required">*</span>
+                </label>
+
+                <input id="preparationDays"
+                       class="form-control"
+                       type="number"
+                       th:field="*{preparationDays}"
+                       min="0"
+                       max="65535"
+                       step="1"
+                       required>
+
+                <p class="form-help">
+                  0일이면 당일 픽업이 가능한 상품입니다.
+                </p>
+
+                <p class="field-error"
+                   th:errors="*{preparationDays}">
+                  상품 준비 일수를 확인해 주세요.
+                </p>
+              </div>
+            </div>
+
+            <!-- 취소 제한 일수 -->
+            <div class="form-group">
+              <label for="cancellationLimitDays">
+                취소 제한 일수
+                <span class="required">*</span>
+              </label>
+
+              <input id="cancellationLimitDays"
+                     class="form-control"
+                     type="number"
+                     th:field="*{cancellationLimitDays}"
+                     min="0"
+                     max="65535"
+                     step="1"
+                     required>
+
+              <p class="form-help">
+                예를 들어 2일이면 픽업일 2일 전부터 취소가 제한됩니다.
+              </p>
+
+              <p class="field-error"
+                 th:errors="*{cancellationLimitDays}">
+                취소 제한 일수를 확인해 주세요.
+              </p>
+            </div>
+
+            <!-- 최초 판매 상태 안내 -->
+            <div class="alert alert--info">
+              새 상품은 판매 중지 상태로 등록됩니다.
+              상품 정보와 옵션을 확인한 후 목록에서 판매를 시작해 주세요.
+            </div>
+          </div>
+        </section>
+
+        <!-- 등록 버튼 -->
+        <div class="cluster">
+          <button class="btn btn--primary"
+                  type="submit"
+                  th:disabled="${categories.isEmpty()}">
+            상품 등록
+          </button>
+
+          <a class="btn"
+             th:href="@{/admin/products}">
+            목록으로
+          </a>
+        </div>
+      </form>
+
+    </main>
   </div>
-</main></div></div></body></html>
+</div>
+</body>
+</html>

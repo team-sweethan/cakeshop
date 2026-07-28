@@ -9,10 +9,12 @@ import java.util.List;
 import com.cakeshop.domain.product.admin.dto.form.AdminStockFilter;
 import com.cakeshop.domain.product.admin.dto.form.ProductAdminSearchCondition;
 import com.cakeshop.domain.product.admin.dto.view.ProductAdminListView;
+import com.cakeshop.domain.product.admin.dto.view.ProductCategoryOptionView;
 import com.cakeshop.domain.product.customer.dto.form.ProductSearchCondition;
 import com.cakeshop.domain.product.customer.dto.form.ProductSort;
 import com.cakeshop.domain.product.customer.dto.form.StockFilter;
 import com.cakeshop.domain.product.customer.dto.view.ProductListView;
+import com.cakeshop.domain.product.entity.Product;
 import com.cakeshop.domain.product.entity.ProductStatus;
 import com.cakeshop.domain.product.entity.ProductType;
 
@@ -471,5 +473,85 @@ class ProductMapperTests {
 
         // 존재하지 않는 상품은 변경된 행이 없어야 한다.
         assertThat(updatedRows).isZero();
+    }
+
+    @Test
+    void activeCategoriesCanBeQueried() {
+        List<ProductCategoryOptionView> categories =
+                productMapper.findActiveCategories();
+
+        // setUp에서 추가한 활성 카테고리가 목록에 포함되는지 확인한다.
+        assertThat(categories)
+                .anyMatch(category ->
+                        category.id().equals(categoryId)
+                );
+
+        // 활성 카테고리의 존재 여부가 true인지 확인한다.
+        assertThat(
+                productMapper.existsActiveCategoryById(categoryId)
+        ).isTrue();
+    }
+
+    @Test
+    void inactiveCategoryIsNotAvailable() {
+        // 조회하기 전에 카테고리를 비활성화한다.
+        jdbcTemplate.update(
+                """
+                UPDATE categories
+                SET is_active = 0
+                WHERE id = ?
+                """,
+                categoryId
+        );
+
+        // 비활성 카테고리는 선택 가능한 카테고리로 판단하지 않아야 한다.
+        assertThat(
+                productMapper.existsActiveCategoryById(categoryId)
+        ).isFalse();
+
+        List<ProductCategoryOptionView> categories =
+                productMapper.findActiveCategories();
+
+        // 등록 화면의 카테고리 목록에서도 제외되는지 확인한다.
+        assertThat(categories)
+                .noneMatch(category ->
+                        category.id().equals(categoryId)
+                );
+    }
+
+    @Test
+    void adminCanInsertInactiveProduct() {
+        Product product = new Product();
+
+        product.setCategoryId(categoryId);
+        product.setName(keyword + " 신규 상품");
+        product.setDescription("상품 등록 테스트");
+        product.setBasePrice(
+                BigDecimal.valueOf(45_000)
+        );
+        product.setStockQuantity(10);
+        product.setProductType(ProductType.GENERAL);
+        product.setPreparationDays(2);
+        product.setCancellationLimitDays(1);
+        product.setStatus(ProductStatus.INACTIVE);
+
+        int insertedRows =
+                productMapper.insertProduct(product);
+
+        // 상품 한 건이 등록되고 ID가 생성됐는지 확인한다.
+        assertThat(insertedRows).isEqualTo(1);
+        assertThat(product.getId()).isNotNull();
+
+        String status = jdbcTemplate.queryForObject(
+                """
+                SELECT status
+                FROM products
+                WHERE id = ?
+                """,
+                String.class,
+                product.getId()
+        );
+
+        assertThat(status).isEqualTo("INACTIVE");
     }
 }

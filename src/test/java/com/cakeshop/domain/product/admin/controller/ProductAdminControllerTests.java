@@ -1,13 +1,11 @@
 package com.cakeshop.domain.product.admin.controller;
 
+import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -17,7 +15,9 @@ import java.util.List;
 
 import com.cakeshop.domain.product.admin.dto.form.AdminStockFilter;
 import com.cakeshop.domain.product.admin.dto.form.ProductAdminSearchCondition;
+import com.cakeshop.domain.product.admin.dto.form.ProductForm;
 import com.cakeshop.domain.product.admin.dto.view.ProductAdminListView;
+import com.cakeshop.domain.product.admin.dto.view.ProductCategoryOptionView;
 import com.cakeshop.domain.product.admin.service.ProductAdminService;
 import com.cakeshop.domain.product.entity.ProductStatus;
 import com.cakeshop.domain.product.entity.ProductType;
@@ -182,5 +182,144 @@ class ProductAdminControllerTests {
                 1L,
                 ProductStatus.ACTIVE
         );
+    }
+
+    @Test
+    void createFormReturnsProductFormPage()
+            throws Exception {
+        ProductAdminService productAdminService =
+                mock(ProductAdminService.class);
+
+        ProductCategoryOptionView category =
+                new ProductCategoryOptionView(
+                        1L,
+                        "케이크"
+                );
+
+        when(productAdminService.getActiveCategories())
+                .thenReturn(List.of(category));
+
+        MockMvc mockMvc = MockMvcBuilders
+                .standaloneSetup(
+                        new ProductAdminController(
+                                productAdminService
+                        )
+                )
+                .build();
+
+        mockMvc.perform(get("/admin/products/new"))
+                .andExpect(status().isOk())
+                .andExpect(view().name(
+                        "admin/product/form"
+                ))
+                .andExpect(model().attributeExists(
+                        "productForm",
+                        "categories",
+                        "productTypes"
+                ));
+    }
+
+    @Test
+    void createProductRedirectsToProductList()
+            throws Exception {
+        ProductAdminService productAdminService =
+                mock(ProductAdminService.class);
+
+        when(productAdminService.createProduct(any()))
+                .thenReturn(10L);
+
+        MockMvc mockMvc = MockMvcBuilders
+                .standaloneSetup(
+                        new ProductAdminController(
+                                productAdminService
+                        )
+                )
+                .build();
+
+        mockMvc.perform(
+                        post("/admin/products")
+                                .param("categoryId", "1")
+                                .param("name", "신규 케이크")
+                                .param("description", "상품 설명")
+                                .param("basePrice", "35000")
+                                .param("stockQuantity", "10")
+                                .param("productType", "GENERAL")
+                                .param("preparationDays", "2")
+                                .param(
+                                        "cancellationLimitDays",
+                                        "1"
+                                )
+                )
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(
+                        "/admin/products"
+                ))
+                .andExpect(flash().attribute(
+                        "successMessage",
+                        "상품을 등록했습니다."
+                ));
+
+        ArgumentCaptor<ProductForm> formCaptor =
+                ArgumentCaptor.forClass(ProductForm.class);
+
+        verify(productAdminService)
+                .createProduct(formCaptor.capture());
+
+        ProductForm form = formCaptor.getValue();
+
+        assertThat(form.getCategoryId()).isEqualTo(1L);
+        assertThat(form.getName()).isEqualTo("신규 케이크");
+        assertThat(form.getBasePrice())
+                .isEqualByComparingTo("35000");
+        assertThat(form.getProductType())
+                .isEqualTo(ProductType.GENERAL);
+    }
+
+    @Test
+    void invalidProductFormReturnsCreatePage()
+            throws Exception {
+        ProductAdminService productAdminService =
+                mock(ProductAdminService.class);
+
+        when(productAdminService.getActiveCategories())
+                .thenReturn(List.of(
+                        new ProductCategoryOptionView(
+                                1L,
+                                "케이크"
+                        )
+                ));
+
+        MockMvc mockMvc = MockMvcBuilders
+                .standaloneSetup(
+                        new ProductAdminController(
+                                productAdminService
+                        )
+                )
+                .build();
+
+        mockMvc.perform(
+                        post("/admin/products")
+                                .param("name", "")
+                                .param("basePrice", "-1")
+                                .param("preparationDays", "-1")
+                                .param(
+                                        "cancellationLimitDays",
+                                        "-1"
+                                )
+                )
+                .andExpect(status().isOk())
+                .andExpect(view().name(
+                        "admin/product/form"
+                ))
+                .andExpect(model().attributeHasErrors(
+                        "productForm"
+                ))
+                .andExpect(model().attributeExists(
+                        "categories",
+                        "productTypes"
+                ));
+
+        verify(productAdminService, never())
+                .createProduct(any());
     }
 }

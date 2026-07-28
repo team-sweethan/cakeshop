@@ -13,7 +13,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import com.cakeshop.domain.product.admin.dto.form.ProductAdminSearchCondition;
+import com.cakeshop.domain.product.admin.dto.form.ProductForm;
 import com.cakeshop.domain.product.admin.dto.view.ProductAdminListView;
+import com.cakeshop.domain.product.admin.dto.view.ProductCategoryOptionView;
+import com.cakeshop.domain.product.entity.Product;
 import com.cakeshop.domain.product.entity.ProductStatus;
 import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.error.ProductErrorCode;
@@ -24,6 +27,7 @@ import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -171,5 +175,116 @@ class ProductAdminServiceTests {
                                                 ProductErrorCode.NOT_FOUND
                                         )
                 );
+    }
+
+    @Test
+    void activeCategoriesAreReturned() {
+        ProductCategoryOptionView category =
+                new ProductCategoryOptionView(
+                        1L,
+                        "케이크"
+                );
+
+        when(productMapper.findActiveCategories())
+                .thenReturn(List.of(category));
+
+        List<ProductCategoryOptionView> result =
+                productAdminService.getActiveCategories();
+
+        assertThat(result).containsExactly(category);
+    }
+
+    @Test
+    void createProductRegistersInactiveProduct() {
+        ProductForm form = validProductForm();
+
+        when(productMapper.existsActiveCategoryById(1L))
+                .thenReturn(true);
+
+        // Mapper가 상품을 등록하면서 생성된 ID를 설정하는 상황을 만든다.
+        when(productMapper.insertProduct(any(Product.class)))
+                .thenAnswer(invocation -> {
+                    Product product =
+                            invocation.getArgument(0);
+
+                    product.setId(10L);
+
+                    return 1;
+                });
+
+        long productId =
+                productAdminService.createProduct(form);
+
+        ArgumentCaptor<Product> productCaptor =
+                ArgumentCaptor.forClass(Product.class);
+
+        verify(productMapper)
+                .insertProduct(productCaptor.capture());
+
+        Product savedProduct =
+                productCaptor.getValue();
+
+        assertThat(productId).isEqualTo(10L);
+        assertThat(savedProduct.getCategoryId())
+                .isEqualTo(1L);
+        assertThat(savedProduct.getName())
+                .isEqualTo("신규 케이크");
+        assertThat(savedProduct.getDescription())
+                .isNull();
+        assertThat(savedProduct.getBasePrice())
+                .isEqualByComparingTo("35000");
+        assertThat(savedProduct.getStockQuantity())
+                .isEqualTo(10);
+        assertThat(savedProduct.getProductType())
+                .isEqualTo(ProductType.GENERAL);
+        assertThat(savedProduct.getPreparationDays())
+                .isEqualTo(2);
+        assertThat(savedProduct.getCancellationLimitDays())
+                .isEqualTo(1);
+        assertThat(savedProduct.getStatus())
+                .isEqualTo(ProductStatus.INACTIVE);
+    }
+
+    @Test
+    void createProductWithInactiveCategoryThrowsException() {
+        ProductForm form = validProductForm();
+
+        when(productMapper.existsActiveCategoryById(1L))
+                .thenReturn(false);
+
+        assertThatThrownBy(() ->
+                productAdminService.createProduct(form)
+        )
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        exception ->
+                                assertThat(exception.getErrorCode())
+                                        .isEqualTo(
+                                                ProductErrorCode.INVALID_CATEGORY
+                                        )
+                );
+
+        verify(productMapper, never())
+                .insertProduct(any(Product.class));
+    }
+
+    /**
+     * 상품 등록 테스트에 사용할 정상 입력값을 만든다.
+     */
+    private ProductForm validProductForm() {
+        ProductForm form = new ProductForm();
+
+        form.setCategoryId(1L);
+        form.setName("  신규 케이크  ");
+        form.setDescription("   ");
+        form.setBasePrice(
+                BigDecimal.valueOf(35_000)
+        );
+        form.setStockQuantity(10);
+        form.setProductType(ProductType.GENERAL);
+        form.setPreparationDays(2);
+        form.setCancellationLimitDays(1);
+
+        return form;
     }
 }

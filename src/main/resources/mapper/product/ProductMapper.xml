@@ -286,4 +286,61 @@
         WHERE id = #{productId}
     </update>
 
+    <!-- 상품 등록 화면의 활성 카테고리 목록 조회 -->
+    <select id="findActiveCategories"
+            resultType=
+                    "com.cakeshop.domain.product.admin.dto.view.ProductCategoryOptionView">
+
+        SELECT
+            c.id,
+            c.name
+        FROM categories c
+        WHERE c.is_active = 1
+        ORDER BY
+            c.sort_order ASC,
+            c.id ASC
+    </select>
+
+    <!-- 활성 카테고리 존재 여부 확인 -->
+    <select id="existsActiveCategoryById"
+            resultType="boolean">
+
+        SELECT EXISTS(
+            SELECT 1
+            FROM categories c
+            WHERE c.id = #{categoryId}
+              AND c.is_active = 1
+        )
+    </select>
+
+    <!-- 상품 기본 정보 등록 -->
+    <insert id="insertProduct"
+            parameterType=
+                    "com.cakeshop.domain.product.entity.Product"
+            useGeneratedKeys="true"
+            keyProperty="id">
+
+        INSERT INTO products (
+            category_id,
+            name,
+            description,
+            base_price,
+            stock_quantity,
+            product_type,
+            preparation_days,
+            cancellation_limit_days,
+            status
+        )
+        VALUES (
+                   #{categoryId},
+                   #{name},
+                   #{description, jdbcType=LONGVARCHAR},
+                   #{basePrice},
+                   #{stockQuantity, jdbcType=INTEGER},
+                   #{productType},
+                   #{preparationDays},
+                   #{cancellationLimitDays},
+                   #{status}
+               )
+    </insert>
 </mapper>

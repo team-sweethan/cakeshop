@@ -2,6 +2,7 @@ package com.cakeshop.domain.product.admin.controller;
 
 import com.cakeshop.domain.product.admin.dto.form.AdminStockFilter;
 import com.cakeshop.domain.product.admin.dto.form.ProductAdminSearchCondition;
+import com.cakeshop.domain.product.admin.dto.form.ProductForm;
 import com.cakeshop.domain.product.admin.dto.view.ProductAdminListView;
 import com.cakeshop.domain.product.admin.service.ProductAdminService;
 import com.cakeshop.domain.product.entity.ProductStatus;
@@ -9,6 +10,7 @@ import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 
+import jakarta.validation.Valid;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -158,16 +160,91 @@ public class ProductAdminController {
         }
     }
 
+    /**
+     * 상품 등록 및 수정 화면에서 사용하는 선택지를 전달한다.
+     *
+     * @param model 선택지를 전달할 모델
+     */
+    private void addProductFormOptions(Model model) {
+        // 활성 카테고리 목록을 전달한다.
+        model.addAttribute(
+                "categories",
+                productAdminService.getActiveCategories()
+        );
+
+        // 상품 유형 목록을 전달한다.
+        model.addAttribute(
+                "productTypes",
+                ProductType.values()
+        );
+    }
+
+    /**
+     * 관리자 상품 등록 화면을 반환한다.
+     *
+     * @param model 상품 등록 폼과 선택지를 전달할 모델
+     * @return 상품 등록 템플릿 경로
+     */
     @GetMapping("/admin/products/new")
-    public String createForm() {
+    public String createForm(Model model) {
+        // 비어 있는 상품 등록 폼을 화면에 전달한다.
+        model.addAttribute(
+                "productForm",
+                new ProductForm()
+        );
+
+        // 카테고리와 상품 유형 선택지를 화면에 전달한다.
+        addProductFormOptions(model);
+
         return "admin/product/form";
+    }
+
+    /**
+     * 관리자 상품 등록 요청을 처리한다.
+     *
+     * @param form 상품 등록 입력값
+     * @param bindingResult 입력값 검증 결과
+     * @param model 검증 실패 시 선택지를 다시 전달할 모델
+     * @param redirectAttributes 등록 결과 메시지를 전달할 객체
+     * @return 검증 실패 시 등록 화면, 성공 시 상품 목록으로 이동
+     */
+    @PostMapping("/admin/products")
+    public String create(
+            @Valid
+            @ModelAttribute("productForm")
+            ProductForm form,
+
+            BindingResult bindingResult,
+
+            Model model,
+
+            RedirectAttributes redirectAttributes
+    ) {
+        // 입력값 검증에 실패하면 카테고리와 상품 유형을 다시 전달한다.
+        if (bindingResult.hasErrors()) {
+            addProductFormOptions(model);
+
+            return "admin/product/form";
+        }
+
+        // 검증된 입력값으로 새로운 상품을 등록한다.
+        productAdminService.createProduct(form);
+
+        // 리다이렉트된 목록 화면에 등록 완료 메시지를 전달한다.
+        redirectAttributes.addFlashAttribute(
+                "successMessage",
+                "상품을 등록했습니다."
+        );
+
+        // 새로고침으로 등록 요청이 반복되지 않도록 목록으로 이동한다.
+        return "redirect:/admin/products";
     }
 
     @GetMapping("/admin/products/{productId}/edit")
     public String editForm(
             @PathVariable long productId
     ) {
-        return "admin/product/form";
+        return "redirect:/admin/products";
     }
 
     /**

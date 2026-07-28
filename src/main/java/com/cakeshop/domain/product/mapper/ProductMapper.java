@@ -4,11 +4,13 @@ import java.util.List;
 
 import com.cakeshop.domain.product.admin.dto.form.ProductAdminSearchCondition;
 import com.cakeshop.domain.product.admin.dto.view.ProductAdminListView;
+import com.cakeshop.domain.product.admin.dto.view.ProductCategoryOptionView;
 import com.cakeshop.domain.product.customer.dto.form.ProductSearchCondition;
 import com.cakeshop.domain.product.customer.dto.view.ProductDetailView;
 import com.cakeshop.domain.product.customer.dto.view.ProductListView;
 import com.cakeshop.domain.product.customer.dto.view.ProductOptionRow;
 
+import com.cakeshop.domain.product.entity.Product;
 import com.cakeshop.domain.product.entity.ProductStatus;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -104,4 +106,33 @@ public interface ProductMapper {
             @Param("status")
             ProductStatus status
     );
+
+    /**
+     * 상품 등록 화면에서 선택할 활성 카테고리를 조회한다.
+     *
+     * @return 정렬 순서에 따른 활성 카테고리 목록
+     */
+    List<ProductCategoryOptionView> findActiveCategories();
+
+    /**
+     * 카테고리가 존재하고 활성 상태인지 확인한다.
+     *
+     * @param categoryId 확인할 카테고리 식별자
+     * @return 활성 카테고리가 존재하면 {@code true}
+     */
+    boolean existsActiveCategoryById(
+            @Param("categoryId")
+            long categoryId
+    );
+
+    /**
+     * 새로운 상품의 기본 정보를 등록한다.
+     *
+     * <p>등록 후 생성된 상품 ID는
+     * {@code product.id}에 저장된다.</p>
+     *
+     * @param product 등록할 상품 정보
+     * @return 등록된 상품 행 개수
+     */
+    int insertProduct(Product product);
 }

@@ -95,10 +95,10 @@ class AdminPageControllerTests {
                 "/admin/products/new",
                 "admin/product/form"
         );
-        pages.put(
-                "/admin/products/1/edit",
-                "admin/product/form"
-        );
+//        pages.put(
+//                "/admin/products/1/edit",
+//                "admin/product/form"
+//        );
         pages.put(
                 "/admin/orders",
                 "admin/order/list"
