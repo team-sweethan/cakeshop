@@ -31,8 +31,12 @@ dependencies {
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    // Spring Boot 4부터 @WebMvcTest 슬라이스가 별도 모듈로 분리되었다.
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
     testImplementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter-test:4.0.1'
     testImplementation 'org.springframework.security:spring-security-test'
+    // MockMvc에 Security 필터체인/@WithMockUser를 연결한다 (Boot 4에서 별도 모듈)
+    testImplementation 'org.springframework.boot:spring-boot-security-test'
     testImplementation 'org.testcontainers:testcontainers-mariadb'
 }
 
