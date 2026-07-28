@@ -6,16 +6,30 @@ Spring Boot 4.0.2 · Java 21 · Gradle · Thymeleaf · MyBatis · MariaDB
 
 각 개발자가 PC에 MariaDB를 직접 설치하고 Spring Boot를 실행한다. 기본적으로 각자의 로컬 MariaDB를 사용하고, 필요할 때만 `rds` 프로필로 공용 AWS RDS에 접속한다. 애플리케이션의 로컬 실행에는 Docker가 필요하지 않지만, MariaDB Testcontainers 기반 DB 통합 테스트에는 Docker가 필요하다.
 
-## 로컬 DB 준비
+## 처음 설치하기
 
-1. 각 PC에 MariaDB 11.4를 설치하고 실행한다.
-2. `.env_sample`을 `.env`로 복사하고 `LOCAL_DB_HOST`, `LOCAL_DB_PORT`, `LOCAL_DB_DATABASE`, `LOCAL_DB_USERNAME`, `LOCAL_DB_PASSWORD`를 자신의 환경에 맞게 수정한다.
-3. MariaDB에 빈 `cakeshop` 데이터베이스와 해당 데이터베이스에 DDL을 실행할 수 있는 접속 계정을 생성한다.
-4. `docs/sql`의 파일을 수동으로 실행하지 않고 애플리케이션을 `local` 프로필로 실행한다.
-5. Flyway가 공통 스키마를 적용했는지 확인한다.
-6. `src/main/resources/db/seed/seed-local.sql`을 MariaDB 클라이언트로 실행해 샘플 데이터를 넣는다. 시드는 Flyway 관리 대상이 아니라서 애플리케이션 실행만으로는 들어가지 않는다.
+빈 DB에서 화면이 뜨기까지의 전체 절차다. 이미 로컬 DB가 있고 기동이 실패한다면 아래 「기존 로컬 DB 완전 초기화」로 간다.
 
-데이터베이스를 처음 만드는 SQL은 다음과 같다. `root` 또는 데이터베이스 생성 권한이 있는 계정으로 실행한다.
+### 0. 필요한 것
+
+| | 비고 |
+|---|---|
+| **JDK 21** | Gradle toolchain이 자동으로 받아오지만, 미리 설치돼 있으면 첫 빌드가 빠르다 |
+| **MariaDB 11.4** | 각 PC에 직접 설치한다 |
+| **Docker** | 애플리케이션 실행에는 필요 없다. `gradlew test`의 Testcontainers 통합 테스트에만 필요하다 |
+
+```powershell
+git clone https://github.com/team-sweethan/cakeshop.git
+cd cakeshop
+```
+
+### 1. `.env` 만들기
+
+`.env_sample`을 `.env`로 복사하고 `LOCAL_DB_HOST`, `LOCAL_DB_PORT`, `LOCAL_DB_DATABASE`, `LOCAL_DB_USERNAME`, `LOCAL_DB_PASSWORD`를 자신의 환경에 맞게 고친다. `.env_sample`의 값은 예시이며 **포트가 `3307`로 되어 있으니** MariaDB 기본 포트(`3306`)를 쓴다면 반드시 바꾼다. `.env`는 커밋하지 않는다.
+
+### 2. 빈 데이터베이스 만들기
+
+`root` 또는 데이터베이스 생성 권한이 있는 계정으로 실행한다.
 
 ```sql
 CREATE DATABASE `cakeshop`
@@ -23,9 +37,42 @@ CREATE DATABASE `cakeshop`
     COLLATE utf8mb4_unicode_ci;
 ```
 
-애플리케이션이 사용하는 계정에는 최소한 `cakeshop` 데이터베이스에서 테이블 생성·변경과 데이터 읽기·쓰기에 필요한 권한이 있어야 한다. 저장소의 `.env_sample` 값은 예시이므로 실제 비밀번호를 그대로 커밋하지 않는다.
+애플리케이션이 사용하는 계정에는 최소한 `cakeshop` 데이터베이스에서 테이블 생성·변경과 데이터 읽기·쓰기 권한이 있어야 한다.
 
-### 기존 로컬 DB 완전 초기화
+### 3. 애플리케이션 실행 — Flyway가 스키마를 만든다
+
+`docs/sql`의 파일을 직접 실행하지 않는다. 스키마는 Flyway가 적용한다.
+
+```powershell
+.\gradlew.bat bootRun --args="--spring.profiles.active=local"
+```
+
+macOS·Linux에서는 `./gradlew bootRun --args="--spring.profiles.active=local"`을 사용한다.
+
+### 4. 샘플 데이터 넣기
+
+시드는 Flyway 관리 대상이 아니라서 **애플리케이션 실행만으로는 들어가지 않는다.** 스키마가 올라온 뒤 MariaDB 클라이언트로 직접 실행한다. 호스트·포트·사용자는 자신의 `.env`에 맞게 바꾼다.
+
+```powershell
+mariadb --host=localhost --port=3307 --user=root --password cakeshop `
+  < src\main\resources\db\seed\seed-local.sql
+```
+
+### 5. 확인
+
+```sql
+USE `cakeshop`;
+
+SELECT `installed_rank`, `version`, `description`, `success`
+FROM `flyway_schema_history`
+ORDER BY `installed_rank`;
+```
+
+버전 `0`, `1`, `3`, `20260729.003452`가 모두 `success = 1`이어야 한다. 시드는 Flyway 관리 대상이 아니므로 이 목록에 나타나지 않는다.
+
+`http://localhost:8080/`에서 고객 화면이 뜨고, `admin@cakeshop.local / Admin1234!`로 관리자 로그인이 되면 완료다.
+
+## 기존 로컬 DB 완전 초기화
 
 이 절차는 과거에 `docs/sql`의 DDL을 수동 적용했거나 Flyway 이력이 꼬인 **개인 로컬 DB만** 대상으로 한다. 데이터베이스 전체와 그 안의 모든 테이블, 데이터, `flyway_schema_history`가 삭제된다. 공용 RDS나 보존해야 할 데이터베이스에는 절대 실행하지 않는다.
 
