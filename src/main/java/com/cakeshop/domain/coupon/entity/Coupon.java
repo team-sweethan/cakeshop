@@ -1,6 +1,30 @@
 package com.cakeshop.domain.coupon.entity;
 
-// DB 조회 결과·도메인 상태
+import lombok.Getter;
+import lombok.Setter;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+/**
+ * coupons 테이블 한 행을 표현하는 MyBatis POJO다.
+ * 화면 검증 규칙은 Form DTO에 두고, 이 객체는 Mapper의 조회·저장 파라미터로만 사용한다.
+ */
+@Getter
+@Setter
 public class Coupon {
-    // TODO: 필드 정의 (ERD 확정 후)
+    private Long id;                            // 쿠폰번호
+    private String name;                        // 쿠폰 이름
+    private DiscountType discountType;          // 할인 방식
+    private BigDecimal discountValue;           // 할인 값 - 금액/비율
+    private BigDecimal minimumOrderAmount;      // 최소 주문 금액
+    private BigDecimal maximumDiscountAmount;   // 최대 할인 금액
+    private Integer totalQuantity;              // 발급 가능한 전체 쿠폰 수량
+    private Integer issuedQuantity;             // 현재까지 발급된 쿠폰 수량
+    private LocalDateTime startsAt;             // 쿠폰 발급 시작 일시
+    private LocalDateTime expiresAt;            // 쿠폰 만료 일시
+    private CouponStatus status;                // 쿠폰 상태 - (Default - Active/INACTIVE/ENDED)
+    private Long createdBy;                     // 쿠폰 생성 관리자 회원
+    private LocalDateTime createdAt;            // 쿠폰 생성 일시
+    private LocalDateTime updatedAt;            // 쿠폰 최종 수정 일시
 }
