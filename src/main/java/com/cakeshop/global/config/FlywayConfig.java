@@ -1,7 +1,11 @@
 package com.cakeshop.global.config;
 
+import java.util.Objects;
 import java.util.Set;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
+import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.CoreErrorCode;
 import org.flywaydb.core.api.ErrorCode;
 import org.flywaydb.core.api.FlywayException;
@@ -22,9 +26,13 @@ public class FlywayConfig {
     private static final Set<ErrorCode> LEGACY_LOCAL_DATABASE = Set.of(
             CoreErrorCode.NON_EMPTY_SCHEMA_WITHOUT_SCHEMA_HISTORY_TABLE);
 
-    /** 이력 테이블과 db/migration 의 내용이 어긋났다. */
+    /**
+     * 이력 테이블과 db/migration 의 내용이 어긋났다.
+     *
+     * <p>migration 스크립트 실행 자체가 실패한 경우({@code FAILED_*})는 넣지 않는다.
+     * 조치가 다르다.
+     */
     private static final Set<ErrorCode> HISTORY_MISMATCH = Set.of(
-            CoreErrorCode.VALIDATE_ERROR,
             CoreErrorCode.CHECKSUM_MISMATCH,
             CoreErrorCode.DESCRIPTION_MISMATCH,
             CoreErrorCode.TYPE_MISMATCH,
@@ -39,6 +47,7 @@ public class FlywayConfig {
             CoreErrorCode.DUPLICATE_REPEATABLE_MIGRATION);
 
     // 콘솔 코드페이지에 따라 한글이 깨질 수 있어, 실행에 필요한 명령과 경로는 ASCII 로 적는다.
+    // 명령은 그대로 복사해 실행할 수 있어야 하므로 wrapper 호출과 저장소 루트 기준 경로를 쓴다.
     private static final String LEGACY_LOCAL_DATABASE_GUIDE = """
             로컬 DB가 Flyway 관리 이전 상태입니다.
 
@@ -47,8 +56,10 @@ public class FlywayConfig {
 
             조치: README '기존 로컬 DB 완전 초기화' 절차를 한 번만 실행하세요.
               1. DROP DATABASE / CREATE DATABASE
-              2. gradlew bootRun --args="--spring.profiles.active=local"
-              3. db/seed/seed-local.sql 실행
+              2. .\\gradlew.bat bootRun --args="--spring.profiles.active=local"
+                 (mac, linux: ./gradlew bootRun --args="--spring.profiles.active=local")
+              3. MariaDB 클라이언트에서 아래 파일을 실행
+                 src/main/resources/db/seed/seed-local.sql
 
             baseline-on-migrate 를 임의로 켜지 마세요.
             스키마가 어긋난 채로 '적용됨' 도장만 찍힙니다.
@@ -62,7 +73,8 @@ public class FlywayConfig {
 
             조치
               * 머지된 migration 을 고쳤다면 되돌리고 새 파일로 변경하세요.
-                  gradlew newMigration -Pdesc=<snake_case>
+                  .\\gradlew.bat newMigration -Pdesc=<snake_case>
+                  (mac, linux: ./gradlew newMigration -Pdesc=<snake_case>)
               * 그래도 실패하면 README '기존 로컬 DB 완전 초기화' 절차로
                 로컬 DB 를 다시 만드세요.
 
@@ -75,7 +87,8 @@ public class FlywayConfig {
               다른 브랜치에서 만든 파일과 버전이 겹쳤을 때 생깁니다.
 
             조치: 나중에 만든 파일을 지우고 새로 만든 뒤 내용을 옮기세요.
-                  gradlew newMigration -Pdesc=<snake_case>
+                  .\\gradlew.bat newMigration -Pdesc=<snake_case>
+                  (mac, linux: ./gradlew newMigration -Pdesc=<snake_case>)
 
             migration 파일명은 직접 짓지 마세요. 버전은 생성 시각으로 자동으로 찍힙니다.
             """;
@@ -88,24 +101,52 @@ public class FlywayConfig {
             try {
                 flyway.migrate();
             } catch (FlywayException e) {
-                throw translate(e);
+                throw translate(e, () -> invalidMigrationCodes(flyway));
             }
         };
     }
 
-    static RuntimeException translate(FlywayException cause) {
+    /**
+     * @param validationDetails validate 실패의 세부 error code. 필요할 때만 조회한다.
+     */
+    static RuntimeException translate(FlywayException cause, Supplier<Set<ErrorCode>> validationDetails) {
         ErrorCode errorCode = cause.getErrorCode();
 
         if (LEGACY_LOCAL_DATABASE.contains(errorCode)) {
             return withGuidance(LEGACY_LOCAL_DATABASE_GUIDE, cause);
         }
-        if (HISTORY_MISMATCH.contains(errorCode)) {
-            return withGuidance(HISTORY_MISMATCH_GUIDE, cause);
-        }
         if (DUPLICATE_VERSION.contains(errorCode)) {
             return withGuidance(DUPLICATE_VERSION_GUIDE, cause);
         }
+        if (HISTORY_MISMATCH.contains(errorCode)) {
+            return withGuidance(HISTORY_MISMATCH_GUIDE, cause);
+        }
+
+        // validate 실패는 세부 원인이 무엇이든 VALIDATE_ERROR 하나로 올라온다(DbValidate).
+        // 세부 코드를 따로 조회해 전부 아는 원인일 때만 안내를 붙인다.
+        // 하나라도 모르는 원인이 섞이면 원본 예외가 더 정확하다.
+        if (CoreErrorCode.VALIDATE_ERROR.equals(errorCode)) {
+            Set<ErrorCode> details = validationDetails.get();
+            if (!details.isEmpty() && HISTORY_MISMATCH.containsAll(details)) {
+                return withGuidance(HISTORY_MISMATCH_GUIDE, cause);
+            }
+        }
+
         return cause;
+    }
+
+    private static Set<ErrorCode> invalidMigrationCodes(Flyway flyway) {
+        try {
+            return flyway.validateWithResult().invalidMigrations.stream()
+                    .map(invalid -> invalid.errorDetails)
+                    .filter(Objects::nonNull)
+                    .map(details -> details.errorCode)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toUnmodifiableSet());
+        } catch (RuntimeException e) {
+            // 세부 원인을 못 얻으면 안내를 붙이지 않는다.
+            return Set.of();
+        }
     }
 
     private static IllegalStateException withGuidance(String guide, FlywayException cause) {

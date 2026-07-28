@@ -154,7 +154,8 @@ Controller → Service → Mapper → DB
   특정 PK나 행의 존재를 전제로 한다면 로컬 seed에만 두지 않는다. `rds`에는 애플리케이션이
   자동 실행하지 않으며, 검토·승인된 별도 반영 절차에서 해당 migration을 적용한다.
 - **로컬 샘플 데이터는 migration에 넣지 않는다. [금지]** `src/main/resources/db/seed/seed-local.sql`에 둔다. 이 디렉터리는 Flyway가 스캔하지 않으므로 내용을 고쳐도 DB를 다시 만들 필요가 없다. 시드는 맨 앞에서 기존 로컬 샘플 데이터를 지우고 다시 넣어 몇 번을 실행해도 결과가 같아야 한다.
-- 레거시 `V0`, `V1`, `V3`은 Flyway 도입 이전에 손으로 지은 이름이라 생성기 형식과 다르다. 이후 타임스탬프 버전이 항상 더 크므로(`3 < 20260729.003452`) 순서에 문제가 없고, 한번 적용된 뒤에는 rename이 checksum을 깨뜨리므로 그대로 둔다. `MigrationNamingTests`가 이 셋만 예외로 허용한다.
+- 레거시 `V0`, `V1`, `V3`은 Flyway 도입 이전에 손으로 지은 이름이라 생성기 형식과 다르다. 이후 타임스탬프 버전이 항상 더 크므로(`3 < 20260729.003452`) 순서에 문제가 없어 그대로 둔다. `MigrationNamingTests`가 이 셋만 예외로 허용한다.
+- **적용된 migration의 파일명을 바꾸지 않는다. [금지]** checksum은 파일 **내용**으로 계산하므로 이름만 바꿔서는 checksum이 변하지 않는다. 대신 이력에 기록된 버전·설명과 어긋나 실패한다. 버전은 그대로 두고 설명만 바꾸면 `DESCRIPTION_MISMATCH`, 버전까지 바꾸면 이력의 기존 버전이 미해결이 되고 새 버전은 미적용으로 잡힌다.
 - **Flyway 실패 중 조치가 정해진 것은 한국어 안내로 바꿔 던진다.** `global/config/FlywayConfig.java`가 `FlywayMigrationStrategy`로 `migrate()`를 감싸, 이력 테이블 부재·checksum 불일치·버전 중복을 각각의 조치와 함께 출력한다. 원인을 특정할 수 없는 오류는 원본 예외를 그대로 남긴다. 새로운 실패 유형에 조치가 정해지면 이 클래스에 error code를 추가한다.
 
 ## 7. Entity 규칙
