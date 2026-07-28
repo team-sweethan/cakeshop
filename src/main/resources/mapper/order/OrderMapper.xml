@@ -2,4 +2,190 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.cakeshop.domain.order.mapper.OrderMapper">
     <!-- 사용자 입력은 #{} 만 사용 (${} 금지) -->
+    <insert id="insertOrder" parameterType="com.cakeshop.domain.order.entity.Order" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO orders (
+            order_number,
+            member_id,
+            order_type,
+            orderer_name,
+            orderer_phone,
+            pickup_name,
+            pickup_phone,
+            original_amount,
+            discount_amount,
+            final_amount,
+            status,
+            pickup_at,
+            cancellation_blocked_at,
+            payment_expires_at,
+            request_message
+        )
+        VALUES (
+                   #{orderNumber},
+                   #{memberId},
+                   #{orderType},
+                   #{ordererName},
+                   #{ordererPhone},
+                   #{pickupName},
+                   #{pickupPhone},
+                   #{originalAmount},
+                   #{discountAmount},
+                   #{finalAmount},
+                   #{status},
+                   #{pickupAt},
+                   #{cancellationBlockedAt},
+                   #{paymentExpiresAt},
+                   #{requestMessage}
+               )
+    </insert>
+    <insert id="insertOrderItem" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO order_items (
+            order_id,
+            product_id,
+            product_name,
+            product_type,
+            quantity,
+            base_price,
+            option_amount,
+            total_amount,
+            requirements,
+            preparation_days,
+            cancellation_limit_days
+        )
+        VALUES (
+                   #{orderId},
+                   #{productId},
+                   #{productName},
+                   #{productType},
+                   #{quantity},
+                   #{basePrice},
+                   #{optionAmount},
+                   #{totalAmount},
+                   #{requirements},
+                   #{preparationDays},
+                   #{cancellationLimitDays}
+               )
+    </insert>
+
+    <insert id="insertOrderItemOption"
+            parameterType="com.cakeshop.domain.order.entity.OrderItemOption"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO order_item_options (
+            order_item_id,
+            product_option_id,
+            option_group_name,
+            option_name,
+            additional_price
+        )
+        VALUES (
+            #{orderItemId},
+            #{productOptionId},
+            #{optionGroupName},
+            #{optionName},
+            #{additionalPrice}
+        )
+    </insert>
+
+    <insert id="insertOrderItemImage" parameterType="com.cakeshop.domain.order.entity.OrderItemImage"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO order_item_images (
+            order_item_id,
+            image_url,
+            sort_order
+        )
+        VALUES (
+            #{orderItemId},
+            #{imageUrl},
+            #{sortOrder}
+        )
+    </insert>
+
+    <select id="findOrderById" resultType="com.cakeshop.domain.order.entity.Order">
+        SELECT
+            id,
+            order_number,
+            member_id,
+            order_type,
+            orderer_name,
+            orderer_phone,
+            pickup_name,
+            pickup_phone,
+            original_amount,
+            discount_amount,
+            final_amount,
+            status,
+            pickup_at,
+            cancellation_blocked_at,
+            payment_expires_at,
+            request_message,
+            reject_reason,
+            under_review_at,
+            rejected_at,
+            rejected_by,
+            ready_at,
+            approved_by,
+            picked_up_at,
+            picked_up_by,
+            expired_at,
+            canceled_at,
+            cancel_reason,
+            canceled_by,
+            pickup_reminder_sent_at,
+            created_at,
+            updated_at
+        FROM orders
+        WHERE id = #{orderId}
+    </select>
+
+    <select id="findOrderItemsByOrderId" resultType="com.cakeshop.domain.order.entity.OrderItem">
+        SELECT
+            id,
+            order_id,
+            product_id,
+            product_name,
+            product_type,
+            quantity,
+            base_price,
+            option_amount,
+            total_amount,
+            requirements,
+            preparation_days,
+            cancellation_limit_days
+        FROM order_items
+        WHERE order_id = #{orderId}
+        ORDER BY id
+    </select>
+
+    <select id="findOrderItemOptionsByOrderId"
+            resultType="com.cakeshop.domain.order.entity.OrderItemOption">
+        SELECT
+            oio.id,
+            oio.order_item_id,
+            oio.product_option_id,
+            oio.option_group_name,
+            oio.option_name,
+            oio.additional_price
+        FROM order_item_options oio
+        INNER JOIN order_items oi
+            ON oi.id = oio.order_item_id
+        WHERE oi.order_id = #{orderId}
+        ORDER BY oi.id, oio.id
+    </select>
+
+    <select id="findOrderItemImagesByOrderId"
+            resultType="com.cakeshop.domain.order.entity.OrderItemImage">
+        SELECT
+            oii.id,
+            oii.order_item_id,
+            oii.image_url,
+            oii.sort_order
+        FROM order_item_images oii
+        INNER JOIN order_items oi
+            ON oi.id = oii.order_item_id
+        WHERE oi.order_id = #{orderId}
+        ORDER BY oi.id, oii.sort_order, oii.id
+    </select>
+
 </mapper>
