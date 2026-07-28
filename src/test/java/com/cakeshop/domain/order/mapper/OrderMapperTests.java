@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -31,14 +32,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ActiveProfiles("local")
 // 내장 DB로 바꾸지 않고 개발 PC의 MariaDB를 사용한다.
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+// 각 테스트가 끝나면 JdbcTemplate과 Mapper가 저장한 데이터를 함께 롤백한다.
+@Transactional
 class OrderMapperTests {
 
-    @Autowired
-    private OrderMapper orderMapper;
+    private final OrderMapper orderMapper;
 
     // 회원·상품처럼 주문 저장 전에 필요한 FK 부모 데이터만 준비한다.
+    private final JdbcTemplate jdbcTemplate;
+
     @Autowired
-    private JdbcTemplate jdbcTemplate;
+    OrderMapperTests(OrderMapper orderMapper, JdbcTemplate jdbcTemplate) {
+        this.orderMapper = orderMapper;
+        this.jdbcTemplate = jdbcTemplate;
+    }
 
     // 반복 실행해도 이메일·주문번호 등이 중복되지 않게 붙이는 값이다.
     private String suffix;
@@ -74,6 +81,8 @@ class OrderMapperTests {
                 .usingRecursiveComparison()
                 .ignoringFields("createdAt", "updatedAt")
                 .isEqualTo(order);
+        // orders.order_type에 Java enum 이름 CUSTOM이 그대로 저장·조회되어야 한다.
+        assertThat(savedOrder.getOrderType()).isEqualTo(OrderType.CUSTOM);
         assertThat(savedOrder.getCreatedAt()).isNotNull();
         assertThat(savedOrder.getUpdatedAt()).isNotNull();
     }
