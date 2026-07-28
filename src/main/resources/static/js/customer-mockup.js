@@ -121,28 +121,108 @@
     try { sessionStorage.setItem(PENDING_KEY, JSON.stringify(product)); } catch (error) { /* 세션 저장소 미지원 */ }
   }
 
-  function prepareProduct() {
+  function productDetailRoot() {
+    return document.querySelector("[data-product-detail]");
+  }
+
+  function productDetailQuantity() {
     const output = document.querySelector("[data-quantity-value]");
+    return Math.max(1, Number(output && output.textContent) || 1);
+  }
+
+  function selectedProductOptions() {
+    const root = productDetailRoot();
+    if (!root) return [];
+    return Array.from(root.querySelectorAll("[data-product-option]:checked")).map(function (input) {
+      const group = input.closest("[data-option-group]");
+      return {
+        id: input.dataset.optionId,
+        groupId: group ? group.dataset.optionGroupId : "",
+        groupName: group ? group.dataset.optionGroupName : "",
+        label: input.dataset.optionName,
+        price: Number(input.dataset.optionPrice || 0)
+      };
+    });
+  }
+
+  function validateProductOptions() {
+    const root = productDetailRoot();
+    if (!root) return true;
+    let valid = true;
+    root.querySelectorAll("[data-option-group]").forEach(function (group) {
+      const required = group.dataset.optionRequired === "true";
+      const selected = Boolean(group.querySelector("[data-product-option]:checked"));
+      const error = group.querySelector("[data-option-group-error]");
+      const invalid = required && !selected;
+      group.querySelectorAll("[data-product-option]").forEach(function (input) {
+        input.setAttribute("aria-invalid", String(invalid));
+      });
+      if (error) {
+        error.textContent = (group.dataset.optionGroupName || "필수") + " 옵션을 선택해 주세요.";
+        error.hidden = !invalid;
+      }
+      if (invalid) valid = false;
+    });
+    return valid;
+  }
+
+  function updateProductDetailTotal() {
+    const root = productDetailRoot();
+    if (!root) return;
+    const basePrice = Number(root.dataset.basePrice || 0);
+    const optionPrice = selectedProductOptions().reduce(function (sum, option) {
+      return sum + option.price;
+    }, 0);
+    const quantity = productDetailQuantity();
+    const optionPriceNode = root.querySelector("[data-selected-option-price]");
+    const quantityNode = root.querySelector("[data-selected-quantity]");
+    const totalNode = root.querySelector("[data-product-total-price]");
+    if (optionPriceNode) optionPriceNode.textContent = (optionPrice > 0 ? "+" : "") + optionPrice.toLocaleString("ko-KR") + "원";
+    if (quantityNode) quantityNode.textContent = quantity + "개";
+    if (totalNode) totalNode.textContent = ((basePrice + optionPrice) * quantity).toLocaleString("ko-KR") + "원";
+  }
+
+  function productFromDetail() {
+    const root = productDetailRoot();
+    if (!root) return null;
+    const options = selectedProductOptions();
+    const optionPrice = options.reduce(function (sum, option) {
+      return sum + option.price;
+    }, 0);
+    return {
+      productId: root.dataset.productId,
+      name: root.dataset.productName,
+      type: root.dataset.productType,
+      basePrice: Number(root.dataset.basePrice || 0),
+      optionPrice: optionPrice,
+      optionKey: options.map(function (option) { return option.id; }).sort().join("-") || "no-options",
+      options: options,
+      quantity: productDetailQuantity(),
+      stock: root.dataset.stock ? Number(root.dataset.stock) : 99,
+      available: true
+    };
+  }
+
+  function prepareProduct() {
+    if (!validateProductOptions()) return false;
+    const product = productFromDetail();
+    if (!product) return false;
     try { sessionStorage.removeItem(PICKUP_TARGET_KEY); } catch (error) { /* 세션 저장소 미지원 */ }
-    writePendingProduct({ productId: "cake-strawberry-cream", name: "딸기 생크림 케이크", type: "일반 케이크", basePrice: 35000, optionPrice: 0, quantity: Number(output && output.textContent) || 1, stock: 12 });
+    writePendingProduct(product);
+    return true;
   }
 
   function addProductFromDetail() {
-    const output = document.querySelector("[data-quantity-value]");
-    addCartItem({
-      id: "cake-strawberry-cream|pickup-pending",
-      productId: "cake-strawberry-cream",
-      name: "딸기 생크림 케이크",
-      type: "일반 케이크",
-      basePrice: 35000,
-      optionPrice: 0,
-      quantity: Number(output && output.textContent) || 1,
-      stock: 12,
+    if (!validateProductOptions()) return false;
+    const product = productFromDetail();
+    if (!product) return false;
+    addCartItem(Object.assign({}, product, {
+      id: product.productId + "|" + product.optionKey + "|pickup-pending",
       pickupDate: "",
       pickupTime: "",
-      available: true
-    });
+    }));
     location.href = "/cart";
+    return true;
   }
 
   function pickupTarget() {
@@ -206,7 +286,7 @@
     const output = document.querySelector("[data-quantity-value]");
     const pickup = date.value + " " + time.textContent.trim();
     const item = Object.assign({}, pending, {
-      id: pending.productId + "|" + pickup,
+      id: pending.productId + "|" + (pending.optionKey || "no-options") + "|" + pickup,
       quantity: Number(output && output.textContent) || pending.quantity || 1,
       pickupDate: date.value,
       pickupTime: time.textContent.trim(),
@@ -349,14 +429,17 @@
 
   document.addEventListener("click", function (event) {
     const prepare = event.target.closest("[data-prepare-product]");
-    if (prepare) prepareProduct();
+    if (prepare && !prepareProduct()) event.preventDefault();
     const addProduct = event.target.closest("[data-add-product-cart]");
     if (addProduct) addProductFromDetail();
     const addNormal = event.target.closest("[data-add-normal-cart]");
     if (addNormal) addNormalProduct();
     const addCustom = event.target.closest("[data-add-custom-cart]");
     if (addCustom) addCustomProduct(addCustom);
-    if (event.target.closest("[data-quantity-change]") && document.querySelector("[data-add-normal-cart]")) updatePickupPrice();
+    if (event.target.closest("[data-quantity-change]")) {
+      updateProductDetailTotal();
+      if (document.querySelector("[data-add-normal-cart]")) updatePickupPrice();
+    }
     const readAll = event.target.closest("[data-read-all]");
     if (readAll) {
       document.querySelectorAll(".notification-item").forEach(function (item) { item.classList.remove("is-unread"); const dot = item.querySelector(".notification-dot"); if (dot) dot.remove(); });
@@ -372,13 +455,25 @@
     }
   });
   document.addEventListener("change", function (event) {
-    if (!event.target.matches("[data-check-all]")) return;
-    const form = event.target.closest("form");
-    if (form) form.querySelectorAll('input[type="checkbox"]:not([data-check-all])').forEach(function (box) { box.checked = event.target.checked; });
+    if (event.target.matches("[data-product-option]")) {
+      updateProductDetailTotal();
+      const group = event.target.closest("[data-option-group]");
+      const error = group && group.querySelector("[data-option-group-error]");
+      if (group && group.querySelector("[data-product-option]:checked")) {
+        group.querySelectorAll("[data-product-option]").forEach(function (input) {
+          input.setAttribute("aria-invalid", "false");
+        });
+        if (error) error.hidden = true;
+      }
+    }
+    if (event.target.matches("[data-check-all]")) {
+      const form = event.target.closest("form");
+      if (form) form.querySelectorAll('input[type="checkbox"]:not([data-check-all])').forEach(function (box) { box.checked = event.target.checked; });
+    }
   });
   document.addEventListener("cart:updated", function (event) { updateCartCount(event.detail); });
-  document.addEventListener("includes:loaded", function () { updateCartCount(); initializePickup(); initializeCustomOption(); initializeOrderForm(); });
-  document.addEventListener("DOMContentLoaded", function () { updateCartCount(); initializePickup(); initializeCustomOption(); initializeOrderForm(); });
+  document.addEventListener("includes:loaded", function () { updateCartCount(); initializePickup(); initializeCustomOption(); initializeOrderForm(); updateProductDetailTotal(); });
+  document.addEventListener("DOMContentLoaded", function () { updateCartCount(); initializePickup(); initializeCustomOption(); initializeOrderForm(); updateProductDetailTotal(); });
 })();
 
 /* source: cakeProjectSample/js/cart.js */

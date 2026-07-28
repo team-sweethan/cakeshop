@@ -1,6 +1,38 @@
 package com.cakeshop.domain.product.entity;
 
-// DB 조회 결과·도메인 상태
+import lombok.Getter;
+import lombok.Setter;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+/** DB의 products 한 행을 표현한다. */
+@Getter
+@Setter
 public class Product {
-    // TODO: 필드 정의 (ERD 확정 후)
+
+    private Long id;
+    private Long categoryId;
+    private String name;
+    private String description;
+    private BigDecimal basePrice;
+
+    /**
+     * null: 재고 제한 없음
+     * 0: 품절
+     * 1 이상: 주문 가능 수량
+     */
+    private Integer stockQuantity;
+
+    private ProductType productType; // enum
+
+    private Integer preparationDays;
+    private Integer cancellationLimitDays;
+
+    private ProductStatus status; // enum
+
+    private BigDecimal averageRating;
+    private Integer reviewCount;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }

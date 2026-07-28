@@ -12,10 +12,12 @@ import com.cakeshop.domain.home.controller.HomeController;
 import com.cakeshop.domain.home.service.HomeService;
 import com.cakeshop.domain.member.controller.AuthController;
 import com.cakeshop.domain.member.controller.MyPageController;
+import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.notification.controller.NotificationController;
 import com.cakeshop.domain.order.controller.OrderController;
 import com.cakeshop.domain.payment.controller.PaymentController;
-import com.cakeshop.domain.product.controller.ProductController;
+import com.cakeshop.domain.product.customer.controller.ProductController;
+import com.cakeshop.domain.product.customer.service.ProductService;
 import com.cakeshop.domain.review.controller.ReviewController;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -35,9 +37,9 @@ class CustomerPageControllerTests {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.standaloneSetup(
-            new HomeController(mock(HomeService.class)), new AuthController(), new ProductController(),
+            new HomeController(mock(HomeService.class)), new AuthController(), new ProductController(mock(ProductService.class)),
             new CartController(),
-            new OrderController(), new PaymentController(), new MyPageController(),
+            new OrderController(), new PaymentController(), new MyPageController(mock(MemberService.class)),
             new NotificationController(), new CouponController(), new ReviewController()
         ).build();
 
