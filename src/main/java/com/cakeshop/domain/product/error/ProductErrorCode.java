@@ -14,19 +14,40 @@ public enum ProductErrorCode implements ErrorCode {
             "PRODUCT_002",
             "상품을 찾을 수 없습니다.",
             404
+    ),
+
+    INVALID_CATEGORY(
+            "PRODUCT_003",
+            "선택할 수 없는 카테고리입니다.",
+            400
     );
 
     private final String code;
     private final String message;
     private final int status;
 
-    ProductErrorCode(String code, String message, int status) {
+    ProductErrorCode(
+            String code,
+            String message,
+            int status
+    ) {
         this.code = code;
         this.message = message;
         this.status = status;
     }
 
-    @Override public String code() { return code; }
-    @Override public String message() { return message; }
-    @Override public int status() { return status; }
+    @Override
+    public String code() {
+        return code;
+    }
+
+    @Override
+    public String message() {
+        return message;
+    }
+
+    @Override
+    public int status() {
+        return status;
+    }
 }

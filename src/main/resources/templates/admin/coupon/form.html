@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/common/head :: head(${formMode == 'create'} ? '쿠폰 등록 | 관리자' : '쿠폰 수정 | 관리자')}"></head>
+<body>
+<div class="admin-layout">
+    <aside th:replace="~{fragments/admin/sidebar :: sidebar('coupons')}"></aside>
+
+    <div class="admin-main">
+        <header th:replace="~{fragments/admin/header :: header('쿠폰 관리')}"></header>
+
+        <main class="admin-content">
+            <div th:replace="~{fragments/admin/mock-notice :: notice}"></div>
+
+            <h1 class="admin-page-title" th:text="${formMode == 'create'} ? '쿠폰 등록' : '쿠폰 수정'"> 쿠폰 등록 </h1>
+
+            <form class="panel"
+                  th:action="${formMode == 'create' ? '/admin/coupons/create' : '/admin/coupons/' + couponId + '/edit'}"
+                  th:object="${couponForm}"
+                  method="post">
+
+                <div class="alert alert--error" th:if="${#fields.hasAnyErrors()}">
+                    <strong>입력 내용을 확인해 주세요.</strong>
+                    <ul>
+                        <li th:each="error : ${#fields.allErrors()}" th:text="${error}">
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="form-group">
+                    <label for="name"> 쿠폰명 <span class="required">*</span></label>
+                    <input id="name" class="form-control" th:field="*{name}" maxlength="100" placeholder="쿠폰 이름 입력">
+                    <p class="field-error" th:errors="*{name}"></p>
+                </div>
+
+                <div class="grid grid--2">
+                    <fieldset class="form-group">
+                        <legend> 할인 유형 <span class="required">*</span></legend>
+
+                        <div class="choice-list">
+                            <label class="choice">
+                                <input type="radio" th:field="*{discountType}" value="FIXED_AMOUNT"> 금액 할인
+                            </label>
+
+                            <label class="choice">
+                                <input type="radio" th:field="*{discountType}" value="PERCENTAGE"> 비율 할인
+                            </label>
+                        </div>
+
+                        <p class="field-error" th:errors="*{discountType}"></p>
+                    </fieldset>
+
+                    <div class="form-group">
+                        <label for="discountValue"> 할인값 <span class="required">*</span></label>
+
+                        <input id="discountValue"
+                               class="form-control"
+                               type="number"
+                               min="0.01"
+                               step="0.01"
+                               th:field="*{discountValue}"
+                               placeholder="예: 5000 또는 10">
+
+                        <p class="field-error" th:errors="*{discountValue}"></p>
+                    </div>
+                </div>
+
+                <div class="grid grid--2">
+                    <div class="form-group">
+                        <label for="minimumOrderAmount"> 최소 주문 금액 </label>
+
+                        <input id="minimumOrderAmount"
+                               class="form-control"
+                               type="number"
+                               min="0"
+                               step="1"
+                               th:field="*{minimumOrderAmount}"
+                               placeholder="미입력 시 0원">
+
+                        <p class="field-error" th:errors="*{minimumOrderAmount}"></p>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="maximumDiscountAmount">
+                            최대 할인 금액
+                        </label>
+
+                        <input id="maximumDiscountAmount"
+                               class="form-control"
+                               type="number"
+                               min="0"
+                               step="1"
+                               th:field="*{maximumDiscountAmount}"
+                               placeholder="비율 할인에만 사용">
+
+                        <p class="field-error" th:errors="*{maximumDiscountAmount}"></p>
+                    </div>
+                </div>
+
+                <div class="grid grid--2">
+                    <div class="form-group">
+                        <label for="startsAt"> 시작 일시 <span class="required">*</span></label>
+
+                        <input id="startsAt"
+                               class="form-control"
+                               type="datetime-local"
+                               th:field="*{startsAt}">
+
+                        <p class="field-error" th:errors="*{startsAt}"></p>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="expiresAt"> 종료 일시 <span class="required">*</span></label>
+
+                        <input id="expiresAt"
+                               class="form-control"
+                               type="datetime-local"
+                               th:field="*{expiresAt}">
+
+                        <p class="field-error" th:errors="*{expiresAt}"></p>
+                    </div>
+                </div>
+
+                <fieldset class="form-group">
+                    <legend>발급 대상</legend>
+
+                    <div class="choice-list">
+                        <label class="choice"><input type="radio" disabled checked>전체 회원</label>
+                        <label class="choice"><input type="radio" disabled>첫 주문 회원</label>
+                        <label class="choice"><input type="radio" disabled>생일 회원</label>
+                        <label class="choice"><input type="radio" disabled>특정 회원</label>
+                    </div>
+
+                    <p class="form-help">회원별 쿠폰 발급 기능은 이후 구현 예정입니다.</p>
+                </fieldset>
+
+                <div class="form-group">
+                    <label for="totalQuantity">총 발급 수량 <span class="required">*</span></label>
+
+                    <input id="totalQuantity"
+                           class="form-control"
+                           type="number"
+                           min="1"
+                           step="1"
+                           th:field="*{totalQuantity}"
+                           placeholder="예: 100">
+
+                    <p class="field-error" th:errors="*{totalQuantity}"></p>
+                </div>
+
+                <div class="cluster">
+                    <button class="btn btn--primary" type="submit" th:text="${formMode == 'create'} ? '등록' : '수정'">등록</button>
+                    <a class="btn" th:href="@{/admin/coupons}">취소</a>
+                </div>
+            </form>
+        </main>
+    </div>
+</div>
+</body>
+</html>
