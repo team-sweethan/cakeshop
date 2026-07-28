@@ -80,7 +80,15 @@ SET `status` = CASE
     WHEN `status` = 'READY'
         THEN 'READY_FOR_PICKUP'
     ELSE `status`
-END;
+END
+WHERE `status` IN (
+    'WAITING_APPROVAL',
+    'APPROVED',
+    'PAID',
+    'ACCEPTED',
+    'PREPARING',
+    'READY'
+);
 
 -- 변환된 상태의 기준 시각을 기존 이력에서 보수적으로 채운다.
 UPDATE `orders`
