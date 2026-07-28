@@ -88,13 +88,19 @@ Security 설정 import를 쓴다. **[권장]** — 독립형은 Security 필터�
 
 같은 검증을 두 계층에서 반복하지 않기 위한 구분이다.
 
-> ⚠️ **현재 저장소에는 Security 통합 테스트가 없다.** 즉 위 표의 첫 줄은 아직 아무도 검증하지 않고 있다.
-> 17절 "알려진 공백" 참고.
+> 위 표 첫 줄의 참고 구현은 `StoreAdminControllerSecurityTests`다. `@WebMvcTest(StoreAdminController.class)`에
+> 실제 `SecurityConfig`를 import해 미인증 redirect, `USER` 역할 거부, `ADMIN` 허용, CSRF 누락·정상을 검증한다.
+> 다른 화면에 적용할 때는 대상 Controller와 `@MockitoBean` Service, 기대 역할만 바꾸면 된다.
+> 아직 `/admin/**` 중 store 화면 하나만 덮여 있다. 17절 "알려진 공백" 참고.
 
 ## 3. 위치와 이름 **[권장]**
 
 - 테스트 파일은 대상 코드와 같은 패키지 구조를 `src/test/java` 아래에 따른다.
-- 테스트 클래스명은 `<대상클래스명>Tests`로 작성한다. (현재 100% 지켜지고 있다)
+- 테스트 클래스명은 `<대상클래스명>Tests`로 작성한다.
+    - 특정 클래스가 아니라 **규약이나 설정 자체를 검증**하는 테스트는 검증 대상을 이름으로 삼는다.
+      예: `MigrationNamingTests`, `FlywayMigrationTests`, `RdsProfileConfigurationTests`, `ScreenRenderingTests`. **[허용]**
+    - 한 클래스의 특정 관심사만 떼어 검증하면 접미사를 붙인다. 예: `StoreAdminControllerSecurityTests`. **[허용]**
+- 모든 테스트 클래스는 접미사 `Tests`로 끝난다. `Test`, `TestCase`는 쓰지 않는다.
 - 테스트 메서드명은 `대상_조건이면_결과()` 흐름이 읽히는 lowerCamel + 밑줄 구분을 권장한다.
     - 예: `updateStore_rejectsDuplicateHoliday()`, `suspendedMember_cannotLogIn()`
 - `test1`, `successTest`, `normalCase`처럼 의도를 알 수 없는 이름은 쓰지 않는다.
@@ -272,6 +278,8 @@ class XxxMapperTests { ... }
 - datasource URL·사용자·비밀번호·포트는 container가 제공한 값을 사용한다. 고정 접속 정보를 저장소에 쓰지 않는다.
 - MariaDB image는 명시적인 버전으로 고정한다(현재 `mariadb:11.4.10`). `latest` tag는 **[금지]**.
 - container 선언과 datasource 연결은 위 공통 설정 한 곳에서만 관리한다. 테스트 클래스마다 따로 만들지 않는다.
+  - 예외: Spring이 **기동에 실패해야** 검증이 되는 테스트는 공통 설정을 쓸 수 없다. 이때만 container를
+    직접 선언한다(`FlywayLegacyDatabaseTests`). 이유를 클래스 javadoc에 남긴다. **[허용]**
 - container는 테스트 메서드마다 새로 시작하지 않고 Spring Context 단위로 공유한다.
 - 테스트 간 데이터 격리는 다음 중 하나로 보장한다:
   1. 트랜잭션 rollback (`@MybatisTest`는 기본 rollback)
@@ -288,6 +296,10 @@ class XxxMapperTests { ... }
 - 여러 쓰기 작업의 트랜잭션 rollback 검증
 - 빈 DB에서 Flyway migration 전체 적용 검증 (`FlywayMigrationTests`)
 - migration 파일명 규약·버전 중복 검증 (`MigrationNamingTests` — 리소스만 훑으므로 Docker 불필요)
+- Flyway 실패의 한국어 안내 변환 검증 (`FlywayConfigTests` — 예외만 다루므로 Docker 불필요)
+- Flyway 도입 이전 상태의 로컬 DB 재현 (`FlywayLegacyDatabaseTests`) — 이력 테이블이 없는 DB에서
+  기동이 실패하고 조치 안내가 붙는지 본다. 필요한 상태가 "기동에 실패하는 DB"라서
+  `@MariaDbIntegrationTest`로는 만들 수 없어, **예외적으로 container를 직접 다루는 것을 허용한다.**
 - DB 제약조건, enum·날짜·금액 타입처럼 MariaDB 동작이 중요한 검증
 - DB까지 포함해야 의미가 있는 소수의 핵심 애플리케이션 흐름
 
@@ -308,7 +320,8 @@ Testcontainers 테스트를 돌리려면 **로컬에 Docker가 실행 중**이�
 Flyway와 seed 데이터의 역할 분리는 [`conventions.md`](conventions.md)의 「6-1. Flyway migration
 규약」에서 확정했다. 요약하면 `db/migration`은 Flyway가 관리하는 스키마 변경과 모든 환경에
 필요한 기준 데이터, `db/seed`는 Flyway 밖에서 직접 실행하는 로컬 샘플 데이터다.
-개발 환경 준비 절차는 `CONTRIBUTING.md`에 기록한다(**작성 예정**).
+개발 환경 준비 절차는 [`README.md`](../README.md)의 「로컬 DB 준비」와 「기존 로컬 DB 완전 초기화」를
+정본으로 한다. 빌드·실행 명령은 [`AGENTS.md`](../AGENTS.md)의 「빌드, 테스트, 로컬 실행」에 있다.
 
 ## 10. 파일·네트워크·외부 시스템 **[권장]**
 
@@ -439,12 +452,12 @@ Java 21 + Gradle Wrapper, Docker 확인 후 `./gradlew test`, 실패 시 test re
 - 통합 테스트의 Gradle task 분리
 - flaky test 담당자 지정과 임시 격리 절차
 - required check·branch protection 적용 ([PR 규칙 문서](pull-request.md))
-- `CONTRIBUTING.md`, `database.md` 작성
 
 ### 알려진 공백 (담당 미정, 지금 강제하지 않음)
 
-- **Security 통합 테스트가 없다.** URL 패턴 접근 제어·CSRF·로그인 흐름이 검증되지 않고 있다.
-  `@WebMvcTest` + Security 설정 import 예제를 하나 만들어 두면 이후 복사해 쓸 수 있다.
+- **Security 통합 테스트가 `/admin/store` 하나뿐이다.** `StoreAdminControllerSecurityTests`가
+  참고 구현으로 있지만(미인증 redirect·역할 거부·CSRF), 나머지 `/admin/**` 화면과 로그인·로그아웃
+  흐름은 아직 덮여 있지 않다. 각 도메인 담당자가 같은 형식으로 자기 화면을 추가한다.
 - **다중 쓰기 트랜잭션 rollback 테스트가 없다.** 여러 저장을 묶는 기능이 생기면 함께 추가한다.
 - **메서드 명명 규칙(3절)이 아직 정착되지 않았다.** 새 테스트부터 적용한다.
 

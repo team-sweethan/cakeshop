@@ -2,7 +2,7 @@
 
 - **상태**: 정본 (2026-07-28 확정, v2 제안안 승격)
 - **범위**: Java · Spring MVC · MyBatis · 패키지 · DB 스키마 · Flyway·seed · 공통 코드 기준
-- **제외**: 테스트 작성 규칙, CI, PR — [22. 별도 문서에서 결정할 항목](#22-별도-문서에서-결정할-항목) 참고
+- **제외**: 테스트 작성 규칙, CI, PR — 각각 별도 문서에서 확정했다. [22절](#22-이-문서-밖에서-다루는-항목)에 정본 위치와 미정 항목을 정리했다
 - **관련 문서**: 화면 규격 [frontend-template-format.md](frontend-template-format.md), 상태 설계 [status-design.md](status-design.md)
 
 ---
@@ -109,13 +109,15 @@ Controller → Service → Mapper → DB
 - 생성자 주입을 사용한다. 필드 주입 `@Autowired`는 [금지]. 주입용 생성자는 `@RequiredArgsConstructor` [허용].
 - `@Data`는 Entity·DTO에 사용하지 않는다. 필요한 `@Getter`, `@Setter`만 사용한다.
 - 주석은 구현을 그대로 읽는 대신 선택 이유·제약·부작용을 설명한다. **[권장]**
+- 소스 파일은 UTF-8로 저장한다. `build.gradle`이 `JavaCompile`의 `options.encoding`을 `UTF-8`로 고정하고 있다. JVM 기본 인코딩에 맡기면 Windows(MS949)에서 한글 주석과 문자열이 컴파일하는 PC마다 다르게 깨진다.
+- 콘솔에 그대로 찍히는 문자열(빌드 스크립트 출력, 기동 실패 안내 등)에서 **실행에 필요한 명령·경로는 ASCII로 적는다.** 콘솔 코드페이지에 따라 한글이 깨져도 조치는 읽을 수 있어야 한다.
 
 ### 🔶 합의 필요: import 순서
 
 | 안                 | 순서 | 비고 |
 |-------------------|---|---|
 | 확정안 (기존 store 코드) | 표준 라이브러리 → (빈 줄) → 서드파티(lombok 등) | 현재 코드 전체가 이 순서 |
-> 어느 안이든 **formatter 설정 파일과 함께 확정**한다(22절). formatter 없이 문서로만 정하면 도메인마다 다시 어긋난다. 확정 전까지는 기존 파일의 순서를 건드리지 않는다.
+> 어느 안이든 **formatter 설정 파일과 함께 확정**한다([22절](#22-이-문서-밖에서-다루는-항목)). formatter 없이 문서로만 정하면 도메인마다 다시 어긋난다. 확정 전까지는 기존 파일의 순서를 건드리지 않는다.
 
 ## 6. 데이터베이스 규약
 
@@ -152,7 +154,8 @@ Controller → Service → Mapper → DB
   특정 PK나 행의 존재를 전제로 한다면 로컬 seed에만 두지 않는다. `rds`에는 애플리케이션이
   자동 실행하지 않으며, 검토·승인된 별도 반영 절차에서 해당 migration을 적용한다.
 - **로컬 샘플 데이터는 migration에 넣지 않는다. [금지]** `src/main/resources/db/seed/seed-local.sql`에 둔다. 이 디렉터리는 Flyway가 스캔하지 않으므로 내용을 고쳐도 DB를 다시 만들 필요가 없다. 시드는 맨 앞에서 기존 로컬 샘플 데이터를 지우고 다시 넣어 몇 번을 실행해도 결과가 같아야 한다.
-- 레거시 `V0`, `V1`, `V3`은 이미 RDS와 팀원 로컬에 적용돼 있어 rename하지 않는다.
+- 레거시 `V0`, `V1`, `V3`은 Flyway 도입 이전에 손으로 지은 이름이라 생성기 형식과 다르다. 이후 타임스탬프 버전이 항상 더 크므로(`3 < 20260729.003452`) 순서에 문제가 없고, 한번 적용된 뒤에는 rename이 checksum을 깨뜨리므로 그대로 둔다. `MigrationNamingTests`가 이 셋만 예외로 허용한다.
+- **Flyway 실패 중 조치가 정해진 것은 한국어 안내로 바꿔 던진다.** `global/config/FlywayConfig.java`가 `FlywayMigrationStrategy`로 `migrate()`를 감싸, 이력 테이블 부재·checksum 불일치·버전 중복을 각각의 조치와 함께 출력한다. 원인을 특정할 수 없는 오류는 원본 예외를 그대로 남긴다. 새로운 실패 유형에 조치가 정해지면 이 클래스에 error code를 추가한다.
 
 ## 7. Entity 규칙
 
@@ -360,11 +363,22 @@ AI 코드 리뷰는 보조 수단이며 테스트, CI, 사람의 승인을 대�
 | 2 | import 순서 | A: 표준 → 서드파티 (기존 코드) / B: java → 내부 → 외부 — **formatter 설정과 함께 확정** | [5절](#5-java-작성-스타일) |
 | 3 | 기술 버전 표기 | build.gradle 실제 버전과 대조 후 확정 | [2절](#2-기본-기술-기준) |
 
-## 22. 별도 문서에서 결정할 항목
+## 22. 이 문서 밖에서 다루는 항목
 
-- **상태 설계 문서**: 도메인별 status 인벤토리, 담당자 ☐ 확정 항목, 함정 분류표 (v1에서 이관 — 이관 전까지 v1 해당 절 유효)
-- **페이징 표준**: 무한스크롤/페이지 번호 택1, 카운트 쿼리·`LIMIT/OFFSET` 규약
-- 테스트 종류별 작성 규칙과 최소 범위
-- CI 필수 검사와 브랜치 보호
-- PR·커밋·브랜치 규칙
-- formatter·정적 분석 도구의 구체적 선택 (import 순서 합의와 연동)
+### 다른 문서에서 확정됨
+
+| 항목 | 정본 |
+|---|---|
+| 상태값 설계 — 도메인별 status 인벤토리, 함정 분류표 | [status-design.md](status-design.md) |
+| 테스트 종류별 작성 규칙과 최소 범위 | [testing.md](testing.md) |
+| PR·커밋 규칙, 리뷰 요청과 병합 기준 | [pull-request.md](pull-request.md) |
+| CI 필수 검사 | [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) |
+| 로컬 DB 준비와 초기화 절차 | [README.md](../README.md) |
+
+### 아직 미정
+
+| 항목 | 내용 |
+|---|---|
+| 페이징 표준 | 무한스크롤/페이지 번호 택1, 카운트 쿼리·`LIMIT/OFFSET` 규약 |
+| formatter·정적 분석 도구 선택 | [5절 「🔶 합의 필요: import 순서」](#-합의-필요-import-순서)와 함께 확정한다. 도구 없이 문서로만 정하면 도메인마다 다시 어긋난다 |
+| branch protection·required check 적용 | 현황은 [testing.md 17절](testing.md#17-결정-현황과-알려진-공백)에서 관리한다 |
