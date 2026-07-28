@@ -9,4 +9,8 @@ import org.apache.ibatis.annotations.Param;
 public interface MemberMapper {
 
     Optional<Member> findByEmail(@Param("email") String email);
+
+    int join(Member member);
+
+    int update(Member member);
 }

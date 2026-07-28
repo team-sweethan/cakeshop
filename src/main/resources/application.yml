@@ -2,7 +2,7 @@ spring:
   config:
     import: optional:file:.env[.properties]
   profiles:
-    default: rds
+    default: local
   application:
     name: cakeshop
   thymeleaf:
