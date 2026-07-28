@@ -86,8 +86,9 @@ PR 템플릿의 체크리스트를 확인한다. 해당하지 않는 항목은 �
 2. 자신의 변경 사항을 self-review한다.
 3. 변경한 동작을 검증하는 테스트를 추가하거나 미추가 사유를 기록한다.
 4. 담당자가 다른 코드의 수정 범위를 합의한다.
-5. CI 통과 후 Codex 자동 리뷰의 P0/P1 항목을 해결하거나 처리 근거를 남긴다.
-6. Draft 상태를 해제한다.
+5. CI 통과를 확인한다.
+6. Draft 상태를 해제해 리뷰 가능한 상태로 전환하고 Codex 자동 리뷰가 시작되는지 확인한다.
+7. Codex 자동 리뷰의 P0/P1 항목을 해결하거나 처리 근거를 남긴다.
 
 병합 전에는 전체 CI 성공, 최소 1명의 승인, 미해결 review conversation 정리를 원칙으로 한다. 긴급하게 예외 병합이 필요하면 사유와 후속 조치 이슈를 남기고 팀의 승인을 받는다.
 
@@ -96,6 +97,7 @@ PR 템플릿의 체크리스트를 확인한다. 해당하지 않는 항목은 �
 - 저장소 관리자는 [Codex Code Review 설정](https://chatgpt.com/codex/settings/code-review)에서 `team-sweethan/cakeshop`의 **Code review**와 **Automatic reviews**를 활성화한다.
 - 리뷰는 연결된 ChatGPT/Codex 요금제 사용량으로 실행한다. 별도의 OpenAI API 키, GitHub Secret, 코드 리뷰용 GitHub Actions workflow를 추가하지 않는다.
 - Codex는 루트 `AGENTS.md`의 `## Code Review Rules`를 저장소 전역 리뷰 기준으로 사용한다.
+- 자동 리뷰는 PR을 Draft에서 Ready for review 상태로 전환한 뒤 시작되는지 확인한다.
 - 자동 리뷰가 시작되지 않으면 PR 댓글에 정확히 `@codex review`를 남기고 저장소 연결 및 Automatic reviews 설정을 확인한다.
 - Codex 리뷰는 추가 검토이며 CI, branch protection, 사람의 필수 승인을 대체하지 않는다.
 
