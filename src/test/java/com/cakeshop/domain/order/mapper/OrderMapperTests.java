@@ -78,6 +78,54 @@ class OrderMapperTests {
         assertThat(savedOrder.getUpdatedAt()).isNotNull();
     }
 
+    // 주문 ID와 회원 ID가 모두 일치할 때만 소유 주문으로 확인되는지 검증한다.
+    @Test
+    void existsByIdAndMemberIdChecksOrderOwner() {
+        Order order = newOrder();
+        orderMapper.insertOrder(order);
+
+        // 같은 주문 ID와 실제 주문 회원 ID이므로 true다.
+        assertThat(orderMapper.existsByIdAndMemberId(
+                order.getId(),
+                memberId
+        )).isTrue();
+
+        // 주문 ID는 같지만 다른 회원 ID이므로 false다.
+        assertThat(orderMapper.existsByIdAndMemberId(
+                order.getId(),
+                memberId + 1
+        )).isFalse();
+    }
+
+    // DB의 현재 상태가 예상 상태와 일치할 때만 상태가 변경되는지 검증한다.
+    @Test
+    void updateStatusIfCurrentChangesOnlyMatchingStatus() {
+        Order order = newOrder();
+        orderMapper.insertOrder(order);
+
+        // 실제 상태는 PENDING_PAYMENT이므로 잘못 예상한 READY_FOR_PICKUP 조건은 실패한다.
+        assertThat(orderMapper.updateStatusIfCurrent(
+                order.getId(),
+                OrderStatus.READY_FOR_PICKUP,
+                OrderStatus.UNDER_REVIEW
+        )).isZero();
+        assertThat(orderMapper.findOrderById(order.getId()))
+                .get()
+                .extracting(Order::getStatus)
+                .isEqualTo(OrderStatus.PENDING_PAYMENT);
+
+        // 현재 상태를 정확히 PENDING_PAYMENT로 지정하면 한 행이 변경된다.
+        assertThat(orderMapper.updateStatusIfCurrent(
+                order.getId(),
+                OrderStatus.PENDING_PAYMENT,
+                OrderStatus.UNDER_REVIEW
+        )).isEqualTo(1);
+        assertThat(orderMapper.findOrderById(order.getId()))
+                .get()
+                .extracting(Order::getStatus)
+                .isEqualTo(OrderStatus.UNDER_REVIEW);
+    }
+
     // 주문 하위 데이터 3종을 INSERT하고 orderId로 다시 SELECT하는지 확인한다.
     @Test
     void insertAndFindOrderItemsOptionsAndImages() {

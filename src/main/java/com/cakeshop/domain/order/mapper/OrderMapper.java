@@ -1,9 +1,6 @@
 package com.cakeshop.domain.order.mapper;
 
-import com.cakeshop.domain.order.entity.Order;
-import com.cakeshop.domain.order.entity.OrderItem;
-import com.cakeshop.domain.order.entity.OrderItemImage;
-import com.cakeshop.domain.order.entity.OrderItemOption;
+import com.cakeshop.domain.order.entity.*;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -26,11 +23,22 @@ public interface OrderMapper {
     // [주문 상품] 주문 제작의 참고 이미지 1개 order_item_image에 저장.
     int insertOrderItemImage(OrderItemImage image);
 
+    // 주문 단건 조회
     Optional<Order> findOrderById(@Param("orderId") long orderId);
+
+    // 주문이 해당 회원의 소유인지 확인
+    boolean existsByIdAndMemberId(@Param("orderId") long orderId, @Param("memberId") long memberId);
 
     List<OrderItem> findOrderItemsByOrderId(@Param("orderId") long orderId);
 
     List<OrderItemOption> findOrderItemOptionsByOrderId(@Param("orderId") long orderId);
 
     List<OrderItemImage> findOrderItemImagesByOrderId(@Param("orderId") long orderId);
+
+    // 현재 상태 조건부 변경
+    int updateStatusIfCurrent(
+            @Param("orderId") long orderId,
+            @Param("expectedStatus") OrderStatus expectedStatus,
+            @Param("nextStatus") OrderStatus nextStatus
+    );
 }

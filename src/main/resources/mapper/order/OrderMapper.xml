@@ -25,6 +25,7 @@
                    #{memberId},
                    #{orderType},
                    #{ordererName},
+
                    #{ordererPhone},
                    #{pickupName},
                    #{pickupPhone},
@@ -139,6 +140,15 @@
         WHERE id = #{orderId}
     </select>
 
+    <select id="existsByIdAndMemberId" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM orders
+            WHERE id = #{orderId}
+              AND member_id = #{memberId}
+        )
+    </select>
+
     <select id="findOrderItemsByOrderId" resultType="com.cakeshop.domain.order.entity.OrderItem">
         SELECT
             id,
@@ -187,5 +197,12 @@
         WHERE oi.order_id = #{orderId}
         ORDER BY oi.id, oii.sort_order, oii.id
     </select>
+
+    <update id="updateStatusIfCurrent">
+        UPDATE orders
+        SET status = #{nextStatus}
+        WHERE id = #{orderId}
+          AND status = #{expectedStatus}
+    </update>
 
 </mapper>
