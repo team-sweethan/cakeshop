@@ -29,6 +29,14 @@ CREATE DATABASE `cakeshop`
 
 이 절차는 과거에 `docs/sql`의 DDL을 수동 적용했거나 Flyway 이력이 꼬인 **개인 로컬 DB만** 대상으로 한다. 데이터베이스 전체와 그 안의 모든 테이블, 데이터, `flyway_schema_history`가 삭제된다. 공용 RDS나 보존해야 할 데이터베이스에는 절대 실행하지 않는다.
 
+**Flyway 도입 브랜치가 `dev`에 머지된 뒤 최초 실행**에서 애플리케이션이 다음 오류로 기동하지 못하면 이 절차가 필요한 경우다.
+
+```text
+Found non-empty schema(s) `cakeshop` but no schema history table.
+```
+
+Flyway 도입 이전에 만든 로컬 DB에는 `flyway_schema_history`가 없어서 발생하며 정상이다. 각자 로컬 DB를 **1회 재생성**하면 되고, 이번 한 번으로 끝난다. 이후 샘플 데이터가 바뀌어도 `db/seed/seed-local.sql`만 다시 실행하면 되며 DB를 다시 만들 필요가 없다.
+
 1. 실행 중인 애플리케이션을 `Ctrl+C`로 종료한다.
 2. 보존할 데이터가 있으면 먼저 백업한다.
 3. 접속하려는 호스트·포트·데이터베이스 이름이 `.env`의 `LOCAL_DB_*` 값과 일치하는지 다시 확인한다.
@@ -111,7 +119,7 @@ FROM `flyway_schema_history`
 ORDER BY `installed_rank`;
 ```
 
-`local` 프로필에서는 버전 `0`, `1`, `3`이 모두 성공(`success = 1`)이어야 한다. 시드는 Flyway 관리 대상이 아니므로 이 목록에 나타나지 않는다. 이후 마이그레이션이 추가되면 `20260729.101542` 형태의 타임스탬프 버전이 함께 표시된다. 초기화가 완료되면 `admin@cakeshop.local / Admin1234!` 계정으로 관리자 화면 로그인을 확인한다.
+`local` 프로필에서는 위 목록의 버전 `0`, `1`, `3`, `20260729.003452`가 모두 성공(`success = 1`)이어야 한다. 시드는 Flyway 관리 대상이 아니므로 이 목록에 나타나지 않는다. 이후 마이그레이션이 추가되면 `20260729.101542` 형태의 타임스탬프 버전이 함께 표시된다. 초기화가 완료되면 `admin@cakeshop.local / Admin1234!` 계정으로 관리자 화면 로그인을 확인한다.
 
 자주 발생하는 오류는 다음과 같이 처리한다.
 
@@ -123,7 +131,11 @@ ORDER BY `installed_rank`;
 | `Access denied` | 애플리케이션 계정의 권한 또는 비밀번호가 잘못됨 | `.env` 값과 MariaDB 계정 권한을 확인한다. |
 | `Unknown database 'cakeshop'` | 삭제 후 데이터베이스를 다시 만들지 않음 | `CREATE DATABASE`를 실행하고 다시 시작한다. |
 
+위 오류 중 조치 방법이 정해진 것은 애플리케이션이 기동에 실패할 때 한국어 안내와 함께 로그에 출력한다(`global/config/FlywayConfig.java`). 원인을 특정할 수 없는 오류는 Flyway의 원본 메시지를 그대로 남긴다.
+
 Flyway의 `clean`은 `clean-disabled: true`로 차단되어 있다. 초기화 목적으로 이 보호 설정을 해제하지 않는다. 기존 데이터 보존이 필요하면 전체 삭제를 진행하지 말고 팀과 별도의 전환 마이그레이션 및 baseline 절차를 먼저 합의한다.
+
+로컬 DB 전환과 함께 테스트 실행 조건도 바뀐다. `.\gradlew.bat test`는 MariaDB Testcontainers 기반 DB 통합 테스트를 포함하므로 **실행 중인 Docker가 필요**하다. Docker 없이 실행하면 해당 테스트만 실패한다.
 
 ## 실행 프로필 선택
 

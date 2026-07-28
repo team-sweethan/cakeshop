@@ -40,6 +40,10 @@ dependencies {
     testImplementation 'org.testcontainers:testcontainers-mariadb'
 }
 
+// 소스에 한글 주석과 안내 메시지가 있다. JVM 기본 인코딩(Windows 에서 MS949)에 맡기면
+// 컴파일하는 PC 에 따라 문자열이 깨진다.
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+
 tasks.named('test') { useJUnitPlatform() }
 
 // 마이그레이션 파일명을 사람이 정하면 여러 브랜치에서 같은 버전이 나온다.
