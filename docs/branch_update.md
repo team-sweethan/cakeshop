@@ -6,7 +6,7 @@
 
 | 브랜치 | 최신 커밋일 | 작성자 | 커밋 | 요약 |
 | --- | --- | --- | --- | --- |
-| `chore/branch-status-workflow` | 2026-07-29 | HyunGyu-Cho | 7274d26 | chore: 브랜치 현황 표에서 main 상태를 따로 표기 |
+| `chore/branch-status-workflow` | 2026-07-29 | HyunGyu-Cho | 849d47b | fix: 브랜치 현황 생성기의 표 깨짐과 자기 브랜치 보고 수정 |
 | `dev` | 2026-07-29 | HyunGyu-Cho | 237b0d2 | docs: README에 migration 작성 예시 문서 링크 추가 |
 | `dev_common_rules_fix` | 2026-07-29 | HyunGyu-Cho | b0353b9 | docs: README 처음 설치 절차를 자립적으로 재구성 |
 | `feature/product-detail-update` | 2026-07-28 | 시은 | 5879429 | Merge pull request #20 from team-sweethan/feature/admin-product |
@@ -22,7 +22,7 @@
 | --- | ---: | ---: | --- |
 | `feature/order-payment-entity` | 11 | 43 | 작업 중 |
 | `feature/order-payment-mvp` | 5 | 43 | 작업 중 |
-| `chore/branch-status-workflow` | 2 | 0 | 작업 중 |
+| `chore/branch-status-workflow` | 3 | 0 | 작업 중 |
 | `main` | 0 | 62 | 릴리스 브랜치 |
 | `chore/mac-local-setup` | 0 | 60 | `dev`에 반영 완료 |
 | `feature/coupon` | 0 | 42 | `dev`에 반영 완료 |
@@ -31,3 +31,4 @@
 
 - "앞선 커밋"이 0이면 그 브랜치의 모든 커밋이 이미 `dev`에 들어가 있다는 뜻이다.
 - `main`의 "뒤처진 커밋"은 아직 릴리스되지 않은 `dev`의 작업량이다.
+- 위 수치는 기준 커밋 `237b0d2` 시점의 스냅샷이다. 이 문서를 머지하면 그 커밋과 merge commit 이 `dev`에 얹히므로, 머지 직후의 "뒤처진 커밋" 실제 값은 표보다 1~2 크다.

@@ -19,16 +19,20 @@ HEAD_REF="refs/remotes/origin/HEAD"
 EXCLUDE="${EXCLUDE_BRANCH:-}"
 
 today="$(TZ=Asia/Seoul date +%Y-%m-%d)"
+# 표의 모든 수치는 이 커밋을 기준으로 센 값이다. 문서를 게시하면 dev 가 앞으로
+# 나아가므로, 어느 시점의 스냅샷인지 문서에 남긴다.
+base_sha="$(git rev-parse --short "$BASE")"
 
 # 표의 셀에 들어가는 값. 브랜치명과 사람 이름에는 '|' 가 들어올 수 있고, 그대로 두면
 # 열 구분자로 읽혀 행이 깨진다.
 #
-# 치환문의 '\\|' 는 백슬래시를 남기지 않으므로(bash 가 replacement 의 백슬래시를 먼저
-# 소비한다) 백슬래시를 변수에 담아 넣는다.
-BACKSLASH='\'
+# 백슬래시를 먼저 겹쳐 두지 않으면 원래 '\|' 이던 자리가 '\\|' 이 되고, GFM 은 앞
+# 백슬래시가 뒤 백슬래시를 이스케이프한 것으로 읽어 파이프가 다시 구분자가 된다.
+#
+# bash 의 ${v//.../...} 는 패턴과 치환문 양쪽에서 백슬래시를 삼켜 버려 이 두 단계를
+# 제대로 표현하지 못한다. sed 로 처리한다.
 cell() {
-    local value="$1"
-    printf '%s' "${value//|/${BACKSLASH}|}"
+    printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/|/\\|/g'
 }
 
 # 보고 대상이 아닌 ref 인가. 인자는 전체 refname.
@@ -42,9 +46,12 @@ skip_ref() {
 latest_rows() {
     # refname:short 는 origin/HEAD 를 그냥 "origin" 으로 줄여 버려서 브랜치와 구별되지
     # 않는다. 전체 refname 으로 걸러낸 뒤 접두어를 직접 뗀다.
+    #
+    # 필드 구분자로 탭을 쓰면 탭이 들어간 작성자명과 구별되지 않아 이후 열이 한 칸씩
+    # 밀린다. Git 이 ident 에 허용하지 않는 제어문자 US(0x1F)로 나눈다.
     git for-each-ref --sort=-committerdate refs/remotes/origin \
-        --format='%(refname)%09%(committerdate:short)%09%(authorname)%09%(objectname:short)%09%(contents:subject)' |
-    while IFS=$'\t' read -r ref date author sha subject; do
+        --format='%(refname)%1f%(committerdate:short)%1f%(authorname)%1f%(objectname:short)%1f%(contents:subject)' |
+    while IFS=$'\x1f' read -r ref date author sha subject; do
         skip_ref "$ref" && continue
         printf '| `%s` | %s | %s | %s | %s |\n' \
             "$(cell "${ref#"$PREFIX"}")" "$date" "$(cell "$author")" "$sha" "$(cell "$subject")"
@@ -97,6 +104,8 @@ mkdir -p "$(dirname "$OUT")"
 
     printf '\n- "앞선 커밋"이 0이면 그 브랜치의 모든 커밋이 이미 `dev`에 들어가 있다는 뜻이다.\n'
     printf '%s\n' '- `main`의 "뒤처진 커밋"은 아직 릴리스되지 않은 `dev`의 작업량이다.'
+    printf '%s`%s`%s\n' \
+        '- 위 수치는 기준 커밋 ' "$base_sha" ' 시점의 스냅샷이다. 이 문서를 머지하면 그 커밋과 merge commit 이 `dev`에 얹히므로, 머지 직후의 "뒤처진 커밋" 실제 값은 표보다 1~2 크다.'
 } > "$OUT"
 
 printf 'wrote: %s\n' "$OUT"
