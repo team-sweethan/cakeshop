@@ -34,6 +34,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -70,7 +71,9 @@ class CustomerPageControllerTests {
                         new CartController(),
                         new OrderController(),
                         new PaymentController(),
-                        new MyPageController(memberService),
+                        new MyPageController(
+                                memberService,
+                                mock(SessionRegistry.class)),
                         new NotificationController(),
                         new CouponController(),
                         new ReviewController())
@@ -143,6 +146,8 @@ class CustomerPageControllerTests {
         assertThat(mockupScript)
                 .contains("source: cakeProjectSample/js/cart.js")
                 .contains("location.href = \"/cart\"")
+                .contains("event.preventDefault()")
+                .doesNotContain("event.preventDefalt()")
                 .doesNotContain("/customer/");
     }
 }

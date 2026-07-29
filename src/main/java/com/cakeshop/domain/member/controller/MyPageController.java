@@ -2,7 +2,9 @@ package com.cakeshop.domain.member.controller;
 
 import com.cakeshop.domain.member.dto.form.ProfileUpdateForm;
 import com.cakeshop.domain.member.dto.view.MemberProfileView;
+import com.cakeshop.domain.member.error.MemberErrorCode;
 import com.cakeshop.domain.member.service.MemberService;
+import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.security.MemberDetails;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
@@ -10,6 +12,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.session.SessionInformation;
+import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -22,6 +26,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 public class MyPageController {
 
     private final MemberService memberService;
+    private final SessionRegistry sessionRegistry;
 
     // local public-preview에서 인증 없이 목업 화면을 확인할 때 null 인증 분기를 사용한다.
     // 운영 환경에서는 SecurityConfig가 미인증 접근을 차단한다.
@@ -85,7 +90,19 @@ public class MyPageController {
             return "customer/member/profile-edit";
         }
 
-        memberService.updateMemberInfo(email, form);
+        try {
+            memberService.updateMemberInfo(email, form);
+        } catch (BusinessException exception) {
+            if (exception.getErrorCode() != MemberErrorCode.INVALID_CURRENT_PASSWORD) {
+                throw exception;
+            }
+            bindingResult.rejectValue(
+                    "currentPassword",
+                    MemberErrorCode.INVALID_CURRENT_PASSWORD.code(),
+                    MemberErrorCode.INVALID_CURRENT_PASSWORD.message());
+            form.setEmail(memberService.getMemberProfile(email).email());
+            return "customer/member/profile-edit";
+        }
         return "redirect:/mypage?success=update";
     }
 
@@ -99,7 +116,10 @@ public class MyPageController {
 
         memberService.withdraw(memberDetails.getUsername());
 
-        // 탈퇴 직후 기존 인증 정보로 보호된 화면에 접근하지 못하도록 현재 세션을 종료한다.
+        sessionRegistry.getAllSessions(memberDetails, false)
+                .forEach(SessionInformation::expireNow);
+
+        // 탈퇴 직후 현재 요청의 세션도 즉시 종료한다.
         HttpSession session = request.getSession(false);
         if (session != null) {
             session.invalidate();
