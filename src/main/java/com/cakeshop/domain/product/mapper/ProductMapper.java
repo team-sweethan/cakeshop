@@ -54,6 +54,20 @@ public interface ProductMapper {
     );
 
     /**
+     * 다른 도메인에 제공할 상품 판매 정보를 조회한다.
+     *
+     * <p>상품 존재 여부와 판매 상태를 Service에서 구분할 수 있도록
+     * 기본 가격, 재고 수량, 판매 상태를 함께 조회한다.</p>
+     *
+     * @param productId 조회할 상품 식별자
+     * @return 상품 판매 정보, 존재하지 않으면 {@code null}
+     */
+    Product findSalesInfoById(
+            @Param("productId")
+            long productId
+    );
+
+    /**
      * 판매 중인 상품의 활성 옵션을 그룹 순서와 옵션 순서로 조회한다.
      *
      * @param productId 조회할 상품 식별자

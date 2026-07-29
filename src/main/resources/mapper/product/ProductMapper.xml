@@ -164,6 +164,19 @@
           AND p.status = 'ACTIVE'
     </select>
 
+    <!-- 다른 도메인에 제공할 상품 판매 정보 조회 -->
+    <select id="findSalesInfoById"
+            resultType="com.cakeshop.domain.product.entity.Product">
+
+        SELECT
+            p.id,
+            p.base_price AS basePrice,
+            p.stock_quantity AS stockQuantity,
+            p.status
+        FROM products p
+        WHERE p.id = #{productId}
+    </select>
+
     <!-- 판매 중인 상품의 활성 옵션 조회 -->
     <select id="findPublicOptionRowsByProductId"
             resultType="com.cakeshop.domain.product.customer.dto.view.ProductOptionRow">
@@ -280,9 +293,7 @@
     <!-- 상품 판매 상태 변경 -->
     <update id="updateProductStatus">
         UPDATE products
-        SET
-            status = #{status},
-            updated_at = CURRENT_TIMESTAMP
+        SET status = #{status}
         WHERE id = #{productId}
     </update>
 
@@ -376,8 +387,7 @@
             stock_quantity = #{stockQuantity, jdbcType=INTEGER},
             product_type = #{productType},
             preparation_days = #{preparationDays},
-            cancellation_limit_days = #{cancellationLimitDays},
-            updated_at = CURRENT_TIMESTAMP
+            cancellation_limit_days = #{cancellationLimitDays}
         WHERE id = #{id}
     </update>
 </mapper>
