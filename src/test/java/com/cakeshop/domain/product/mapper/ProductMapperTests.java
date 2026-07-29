@@ -441,6 +441,19 @@ class ProductMapperTests {
                 keyword + " D 판매 중지 상품"
         );
 
+        LocalDateTime previousUpdatedAt =
+                LocalDateTime.of(2000, 1, 1, 0, 0);
+
+        jdbcTemplate.update(
+                """
+                UPDATE products
+                SET updated_at = ?
+                WHERE id = ?
+                """,
+                previousUpdatedAt,
+                productId
+        );
+
         // 판매 중지 상품의 상태를 판매 중으로 변경한다.
         int updatedRows =
                 productMapper.updateProductStatus(
@@ -459,9 +472,21 @@ class ProductMapperTests {
                         productId
                 );
 
-        // 상품 한 건이 수정되고 DB 상태가 ACTIVE로 변경됐는지 확인한다.
+        LocalDateTime actualUpdatedAt =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT updated_at
+                        FROM products
+                        WHERE id = ?
+                        """,
+                        LocalDateTime.class,
+                        productId
+                );
+
+        // 상태 변경과 함께 DB가 수정 시간을 자동으로 갱신했는지 확인한다.
         assertThat(updatedRows).isEqualTo(1);
         assertThat(updatedStatus).isEqualTo("ACTIVE");
+        assertThat(actualUpdatedAt).isAfter(previousUpdatedAt);
     }
 
     @Test
@@ -600,6 +625,19 @@ class ProductMapperTests {
         product.setPreparationDays(3);
         product.setCancellationLimitDays(2);
 
+        LocalDateTime previousUpdatedAt =
+                LocalDateTime.of(2000, 1, 1, 0, 0);
+
+        jdbcTemplate.update(
+                """
+                UPDATE products
+                SET updated_at = ?
+                WHERE id = ?
+                """,
+                previousUpdatedAt,
+                optionProductId
+        );
+
         int updatedRows =
                 productMapper.updateProduct(product);
 
@@ -617,6 +655,17 @@ class ProductMapperTests {
                 String.class,
                 optionProductId
         );
+
+        LocalDateTime actualUpdatedAt =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT updated_at
+                        FROM products
+                        WHERE id = ?
+                        """,
+                        LocalDateTime.class,
+                        optionProductId
+                );
 
         assertThat(updatedRows).isEqualTo(1);
         assertThat(updatedForm).isNotNull();
@@ -637,6 +686,7 @@ class ProductMapperTests {
 
         // 기본 정보 수정 후에도 기존 판매 상태는 유지되어야 한다.
         assertThat(status).isEqualTo("ACTIVE");
+        assertThat(actualUpdatedAt).isAfter(previousUpdatedAt);
     }
 
     @Test
