@@ -295,6 +295,38 @@ class ProductMapperTests {
     }
 
     @Test
+    void findSalesInfoById_existingProduct_returnsSalesFields() {
+        Long productId = jdbcTemplate.queryForObject(
+                """
+                SELECT id
+                FROM products
+                WHERE name = ?
+                """,
+                Long.class,
+                keyword + " D 판매 중지 상품"
+        );
+
+        Product product =
+                productMapper.findSalesInfoById(productId);
+
+        assertThat(product).isNotNull();
+        assertThat(product.getId()).isEqualTo(productId);
+        assertThat(product.getBasePrice())
+                .isEqualByComparingTo("40000");
+        assertThat(product.getStockQuantity()).isEqualTo(5);
+        assertThat(product.getStatus())
+                .isEqualTo(ProductStatus.INACTIVE);
+    }
+
+    @Test
+    void findSalesInfoById_missingProduct_returnsNull() {
+        Product product =
+                productMapper.findSalesInfoById(Long.MAX_VALUE);
+
+        assertThat(product).isNull();
+    }
+
+    @Test
     void detailOptionsIncludeOnlyActiveOptionsInOrder() {
         assertThat(productMapper
                 .findPublicOptionRowsByProductId(optionProductId))
