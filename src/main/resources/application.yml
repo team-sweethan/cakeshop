@@ -13,6 +13,14 @@ spring:
       # 매장·상품 등의 이미지 업로드 상한. 기본값(1MB)은 사진에 너무 작다.
       max-file-size: 5MB
       max-request-size: 10MB
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    validate-on-migrate: true
+    clean-disabled: true
+    # 파일명의 타임스탬프는 '만든 시각'이라 머지 순서와 다를 수 있다.
+    # 늦게 머지된 낮은 버전도 받아들이지 않으면 validate 가 실패한다.
+    out-of-order: true
 
 server:
   tomcat:
@@ -64,3 +72,7 @@ spring:
     url: "jdbc:mariadb://${RDS_ENDPOINT}:${RDS_PORT:3306}/${RDS_DATABASE}?sslMode=trust"
     username: ${RDS_USERNAME}
     password: ${RDS_PASSWORD}
+  flyway:
+    # 애플리케이션 기동으로 공용 RDS 스키마가 변경되지 않도록 차단한다.
+    # RDS 스키마 변경은 검토·승인된 별도 반영 절차로만 수행한다.
+    enabled: false

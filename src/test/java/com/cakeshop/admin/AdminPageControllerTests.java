@@ -5,8 +5,20 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+import com.cakeshop.domain.product.admin.service.ProductAdminService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
 import com.cakeshop.domain.community.controller.CommunityAdminController;
 import com.cakeshop.domain.coupon.controller.CouponAdminController;
+import com.cakeshop.domain.coupon.service.CouponAdminService;
 import com.cakeshop.domain.member.controller.MemberAdminController;
 import com.cakeshop.domain.notification.controller.NotificationAdminController;
 import com.cakeshop.domain.order.controller.FulfillmentAdminController;
@@ -15,13 +27,6 @@ import com.cakeshop.domain.payment.controller.PaymentAdminController;
 import com.cakeshop.domain.product.admin.controller.ProductAdminController;
 import com.cakeshop.domain.review.controller.ReviewAdminController;
 import com.cakeshop.domain.statistics.controller.StatisticsAdminController;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 class AdminPageControllerTests {
 
@@ -32,10 +37,10 @@ class AdminPageControllerTests {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.standaloneSetup(
-            new StatisticsAdminController(), new ProductAdminController(), new OrderAdminController(),
-            new FulfillmentAdminController(), new PaymentAdminController(), new CouponAdminController(),
+            new StatisticsAdminController(), new ProductAdminController(Mockito.mock(ProductAdminService.class)), new OrderAdminController(),
+            new FulfillmentAdminController(), new PaymentAdminController(),
             new MemberAdminController(), new ReviewAdminController(), new NotificationAdminController(),
-            new CommunityAdminController()
+            new CommunityAdminController(), new CouponAdminController(Mockito.mock(CouponAdminService.class))
         ).build();
 
         pages.put("/admin", "admin/dashboard");
@@ -47,12 +52,14 @@ class AdminPageControllerTests {
         pages.put("/admin/orders/1", "admin/order/detail");
         pages.put("/admin/fulfillment", "admin/fulfillment/list");
         pages.put("/admin/payments", "admin/payment/list");
-        pages.put("/admin/coupons", "admin/coupon/list");
         pages.put("/admin/members", "admin/member/list");
         pages.put("/admin/reviews", "admin/review/list");
         pages.put("/admin/notifications", "admin/notification/list");
         pages.put("/admin/community", "admin/community/list");
         pages.put("/admin/community/15", "admin/community/detail");
+        pages.put("/admin/coupons", "admin/coupon/list");
+        pages.put("/admin/coupons/create", "admin/coupon/form");
+        pages.put("/admin/coupons/1/edit", "admin/coupon/form");
     }
 
     @Test
