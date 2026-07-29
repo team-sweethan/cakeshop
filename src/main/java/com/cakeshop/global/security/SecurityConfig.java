@@ -70,7 +70,14 @@ public class SecurityConfig {
                 .maximumSessions(-1)
                 .sessionRegistry(sessionRegistry)
             )
-            .logout(logout -> logout.logoutSuccessUrl("/"));
+            .logout(logout -> logout
+                .logoutUrl("/logout")
+                .logoutSuccessUrl("/?logout")
+                .invalidateHttpSession(true)
+                .clearAuthentication(true)
+                .deleteCookies("JSESSIONID")
+                .permitAll()
+            );
         return http.build();
     }
 
