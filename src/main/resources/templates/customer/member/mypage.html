@@ -26,7 +26,9 @@
         <a class="btn btn--block" href="/mypage/profile">회원정보 수정</a>
       </nav>
       <hr class="divider">
-      <a class="btn" href="/logout">로그아웃</a>
+      <form th:action="@{/logout}" method="post">
+        <button class="btn" type="submit">로그아웃</button>
+      </form>
     </aside>
     <div>
       <section class="section">
