@@ -1,0 +1,74 @@
+name: Branch Status
+
+# 브랜치 현황 문서(docs/branch_update.md)를 매일 다시 만들어 PR로 올린다.
+# dev 에 직접 push 하지 않고, chore/branch-status 브랜치 하나를 계속 덮어쓴다.
+
+on:
+  schedule:
+    # GitHub 의 cron 은 UTC 기준이다. 15:00 UTC = 다음 날 00:00 KST.
+    # 러너가 붐비면 수십 분 밀릴 수 있어 정각은 보장되지 않는다.
+    - cron: "0 15 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: branch-status
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: Update branch status doc
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      DOC: docs/branch_update.md
+      WORK_BRANCH: chore/branch-status
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          ref: dev
+          # 브랜치 간 앞/뒤 커밋 수를 세려면 전체 히스토리가 필요하다.
+          fetch-depth: 0
+
+      - name: Generate document
+        run: ./.github/scripts/branch-status.sh "$DOC"
+
+      - name: Stop if unchanged
+        id: diff
+        run: |
+          if git diff --quiet -- "$DOC"; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "변경 없음. PR 을 만들지 않는다."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit to work branch
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -C "$WORK_BRANCH"
+          git add "$DOC"
+          git commit -m "docs: 브랜치 현황 자동 갱신 ($(TZ=Asia/Seoul date +%Y-%m-%d))"
+          git push --force origin "$WORK_BRANCH"
+
+      - name: Open pull request if none is open
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          if [ -n "$(gh pr list --head "$WORK_BRANCH" --base dev --state open --json number --jq '.[].number')" ]; then
+            echo "이미 열려 있는 PR 에 새 커밋이 실렸다."
+          else
+            gh pr create \
+              --base dev \
+              --head "$WORK_BRANCH" \
+              --title "docs: 브랜치 현황 자동 갱신" \
+              --body "\`.github/workflows/branch-status.yml\` 이 매일 00시(KST)에 \`$DOC\` 를 다시 만든 결과입니다. 내용을 검토한 뒤 머지해 주세요."
+          fi
