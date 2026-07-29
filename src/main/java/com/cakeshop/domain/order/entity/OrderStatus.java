@@ -17,7 +17,7 @@ public enum OrderStatus {
     public boolean canTransitionTo(OrderStatus next) {
         return switch (this) {
             case PENDING_PAYMENT ->
-                Set.of(UNDER_REVIEW, READY_FOR_PICKUP, CANCELED, EXPIRED).contains(next);
+                Set.of(UNDER_REVIEW, READY_FOR_PICKUP, EXPIRED).contains(next);
             case UNDER_REVIEW ->
                 Set.of(READY_FOR_PICKUP, REJECTED, CANCELED).contains(next);
             case READY_FOR_PICKUP ->

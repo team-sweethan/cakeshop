@@ -181,6 +181,50 @@ class PaymentMapperTests {
         assertThat(savedCount).isZero();
     }
 
+    @Test
+    void onlyOneRequestedCancellationIsAllowedPerPayment() {
+        Payment payment = insertPayment("CANCELLATION");
+
+        assertThat(insertRequestedCancellation(payment.getId(), "FIRST", 40_000, "REQUESTED"))
+                .isEqualTo(1);
+
+        Integer generatedColumnAndTimestampCount = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM payment_cancellations
+                WHERE payment_id = ?
+                  AND active_requested_payment_id = ?
+                  AND updated_at IS NOT NULL
+                """,
+                Integer.class,
+                payment.getId(),
+                payment.getId()
+        );
+        assertThat(generatedColumnAndTimestampCount).isOne();
+
+        assertThatThrownBy(() ->
+                insertRequestedCancellation(payment.getId(), "SECOND", 40_000, "REQUESTED")
+        ).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void invalidPaymentCancellationStatusCannotBeStored() {
+        Payment payment = insertPayment("INVALID-CANCELLATION-STATUS");
+
+        assertThatThrownBy(() ->
+                insertRequestedCancellation(payment.getId(), "INVALID-STATUS", 40_000, "INVALID")
+        ).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void nonPositiveCancellationAmountCannotBeStored() {
+        Payment payment = insertPayment("INVALID-CANCELLATION-AMOUNT");
+
+        assertThatThrownBy(() ->
+                insertRequestedCancellation(payment.getId(), "ZERO-AMOUNT", 0, "REQUESTED")
+        ).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
     private Payment insertPayment(String label) {
         Payment payment = newPayment(label);
         paymentMapper.insertReadyPayment(payment);
@@ -194,6 +238,30 @@ class PaymentMapperTests {
         payment.setIdempotencyKey("IDEMPOTENCY-" + label + "-" + suffix);
         payment.setAmount(BigDecimal.valueOf(40_000));
         return payment;
+    }
+
+    private int insertRequestedCancellation(
+            long paymentId,
+            String label,
+            long cancelAmount,
+            String status
+    ) {
+        return jdbcTemplate.update(
+                """
+                INSERT INTO payment_cancellations (
+                    payment_id,
+                    idempotency_key,
+                    cancel_amount,
+                    cancel_reason,
+                    status
+                )
+                VALUES (?, ?, ?, '테스트 환불', ?)
+                """,
+                paymentId,
+                "CANCEL-" + label + "-" + suffix,
+                cancelAmount,
+                status
+        );
     }
 
     private Payment findPayment(long paymentId) {

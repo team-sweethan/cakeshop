@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.mybatis.spring.boot.test.autoconfigure.MybatisTest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +22,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * OrderMapper가 실제 DB에 주문 데이터를 저장하고 조회하는지 확인하는 통합 테스트다.
@@ -132,6 +134,17 @@ class OrderMapperTests {
                 .get()
                 .extracting(Order::getStatus)
                 .isEqualTo(OrderStatus.UNDER_REVIEW);
+    }
+
+    @Test
+    void invalidOrderStatusCannotBeStored() {
+        Order order = newOrder();
+        orderMapper.insertOrder(order);
+
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                "UPDATE orders SET status = 'INVALID_STATUS' WHERE id = ?",
+                order.getId()
+        )).isInstanceOf(DataIntegrityViolationException.class);
     }
 
     // 주문 하위 데이터 3종을 INSERT하고 orderId로 다시 SELECT하는지 확인한다.
