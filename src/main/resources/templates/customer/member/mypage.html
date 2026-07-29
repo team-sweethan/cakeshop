@@ -50,6 +50,12 @@
             <span class="data-row__label">닉네임</span>
             <span th:text="${member.nickname}"></span>
           </div>
+          <div class="data-row">
+            <span class="data-row__label">생년월일</span>
+            <span th:text="${member.birthDate != null
+                    ? #temporals.format(member.birthDate, 'yyyy-MM-dd')
+                    : '미등록'}"></span>
+          </div>
           <a class="btn" href="/mypage/profile" style="margin-top:8px">정보 수정</a>
         </div>
       </section>

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
+import java.time.LocalDate;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -33,7 +34,8 @@ class SignupFormTests {
                         "passwordConfirmed",
                         "name",
                         "nickname",
-                        "phone");
+                        "phone",
+                        "birthDate");
     }
 
     @Test
@@ -45,6 +47,7 @@ class SignupFormTests {
         form.setName("홍길동");
         form.setNickname("케이크러버");
         form.setPhone("010-1234-5678");
+        form.setBirthDate(LocalDate.of(2000, 1, 15));
 
         assertThat(validator.validate(form)).isEmpty();
     }
@@ -58,6 +61,7 @@ class SignupFormTests {
         form.setName("홍길동");
         form.setNickname("케이크러버");
         form.setPhone("010-1234-5678");
+        form.setBirthDate(LocalDate.of(2000, 1, 15));
 
         assertThat(validator.validate(form))
                 .extracting(violation -> violation.getPropertyPath().toString())
@@ -73,9 +77,42 @@ class SignupFormTests {
         form.setName("가".repeat(51));
         form.setNickname("케이크러버");
         form.setPhone("010-1234-5678");
+        form.setBirthDate(LocalDate.of(2000, 1, 15));
 
         assertThat(validator.validate(form))
                 .extracting(violation -> violation.getPropertyPath().toString())
                 .contains("name");
+    }
+
+    @Test
+    void validate_birthDateToday_rejectsForm() {
+        SignupForm form = validSignupForm();
+        form.setBirthDate(LocalDate.now());
+
+        assertThat(validator.validate(form))
+                .extracting(violation -> violation.getPropertyPath().toString())
+                .contains("birthDate");
+    }
+
+    @Test
+    void validate_birthDateFuture_rejectsForm() {
+        SignupForm form = validSignupForm();
+        form.setBirthDate(LocalDate.now().plusDays(1));
+
+        assertThat(validator.validate(form))
+                .extracting(violation -> violation.getPropertyPath().toString())
+                .contains("birthDate");
+    }
+
+    private SignupForm validSignupForm() {
+        SignupForm form = new SignupForm();
+        form.setEmail("member@cakeshop.local");
+        form.setPassword("Password1!");
+        form.setPasswordConfirm("Password1!");
+        form.setName("홍길동");
+        form.setNickname("케이크러버");
+        form.setPhone("010-1234-5678");
+        form.setBirthDate(LocalDate.of(2000, 1, 15));
+        return form;
     }
 }

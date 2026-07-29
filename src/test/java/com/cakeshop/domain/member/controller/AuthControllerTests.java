@@ -15,6 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.cakeshop.domain.member.dto.form.SignupForm;
 import com.cakeshop.domain.member.service.MemberService;
+import java.time.LocalDate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
@@ -45,7 +46,7 @@ class AuthControllerTests {
                 .andExpect(status().isOk())
                 .andExpect(view().name("customer/member/signup"))
                 .andExpect(model().attributeHasFieldErrors(
-                        "signupForm", "email", "password", "name", "nickname", "phone"));
+                        "signupForm", "email", "password", "name", "nickname", "phone", "birthDate"));
 
         verify(memberService, never()).join(org.mockito.ArgumentMatchers.any(SignupForm.class));
     }
@@ -58,7 +59,8 @@ class AuthControllerTests {
                         .param("passwordConfirm", "Password1!")
                         .param("name", "홍길동")
                         .param("nickname", "길동이")
-                        .param("phone", "010-1234-5678"))
+                        .param("phone", "010-1234-5678")
+                        .param("birthDate", "2000-01-15"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/login"))
                 .andExpect(flash().attribute("successMessage", "회원가입이 완료되었습니다!"));
@@ -77,7 +79,8 @@ class AuthControllerTests {
                         .param("passwordConfirm", "Password1!")
                         .param("name", "홍길동")
                         .param("nickname", "길동이")
-                        .param("phone", "010-1234-5678"))
+                        .param("phone", "010-1234-5678")
+                        .param("birthDate", "2000-01-15"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("customer/member/signup"))
                 .andExpect(model().attributeHasFieldErrors("signupForm", "email"))
@@ -91,6 +94,7 @@ class AuthControllerTests {
         assertThat(returnedForm.getName()).isEqualTo("홍길동");
         assertThat(returnedForm.getNickname()).isEqualTo("길동이");
         assertThat(returnedForm.getPhone()).isEqualTo("010-1234-5678");
+        assertThat(returnedForm.getBirthDate()).isEqualTo(LocalDate.of(2000, 1, 15));
         verify(memberService, never()).join(
                 org.mockito.ArgumentMatchers.any(SignupForm.class));
     }
