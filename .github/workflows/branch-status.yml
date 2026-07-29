@@ -38,6 +38,10 @@ jobs:
           fetch-depth: 0
 
       - name: Generate document
+        # 작업 브랜치는 이 문서를 담는 그릇일 뿐이고, 문서를 만든 직후 커밋이 얹혀서
+        # 기록된 SHA 와 앞선 커밋 수가 곧바로 어긋난다. 보고 대상에서 뺀다.
+        env:
+          EXCLUDE_BRANCH: ${{ env.WORK_BRANCH }}
         run: ./.github/scripts/branch-status.sh "$DOC"
 
       - name: Stop if unchanged
@@ -60,6 +64,10 @@ jobs:
           git commit -m "docs: 브랜치 현황 자동 갱신 ($(TZ=Asia/Seoul date +%Y-%m-%d))"
           git push --force origin "$WORK_BRANCH"
 
+      # GITHUB_TOKEN 이 연 PR 에는 ci.yml 이 돌지 않는다(토큰이 만든 이벤트는 다른
+      # 워크플로를 깨우지 않는다). 이 PR 은 마크다운 한 개만 바꾸므로 Gradle 테스트로
+      # 검증할 대상이 없어 그대로 둔다. CI 체크가 필요해지면 PAT 이나 GitHub App
+      # 토큰으로 바꿔야 한다.
       - name: Open pull request if none is open
         if: steps.diff.outputs.changed == 'true'
         run: |
@@ -70,5 +78,62 @@ jobs:
               --base dev \
               --head "$WORK_BRANCH" \
               --title "docs: 브랜치 현황 자동 갱신" \
-              --body "\`.github/workflows/branch-status.yml\` 이 매일 00시(KST)에 \`$DOC\` 를 다시 만든 결과입니다. 내용을 검토한 뒤 머지해 주세요."
+              --body-file - <<BODY
+          ## 변경 목적
+
+          \`docs/branch_update.md\` 의 브랜치 현황을 최신 상태로 유지한다. 이 PR 은
+          \`.github/workflows/branch-status.yml\` 이 매일 00시(KST)에 자동으로 연다.
+
+          ## 주요 변경 사항
+
+          - \`$DOC\` 한 파일만 다시 생성했다. 내용은 전부 Git 메타데이터에서 나오며
+            사람이 쓴 문장은 없다.
+          - 생성 로직은 \`.github/scripts/branch-status.sh\` 에 있다. 문서가 이상하면
+            문서가 아니라 이 스크립트를 고친다.
+
+          ## 테스트 결과
+
+          - 실행 명령: 없음
+          - 결과: 해당 없음
+          - 미실행 사유: 마크다운 문서 한 개만 바뀐다. 애플리케이션 코드, 설정,
+            테스트가 포함되지 않아 Gradle 테스트로 검증할 대상이 없다.
+            생성 스크립트 자체의 검증은 스크립트를 바꾸는 PR 에서 수행한다.
+
+          ## DB / Flyway 변경
+
+          - [x] 없음
+          - [ ] 있음
+
+          - migration: 없음
+          - seed (\`db/seed/seed-local.sql\`): 변경 없음
+          - 기존 데이터 및 운영 환경 영향: 없음
+
+          ## 리뷰어가 집중해서 볼 부분
+
+          표의 브랜치 목록과 앞/뒤 커밋 수가 실제 저장소 상태와 맞는지 확인한다.
+          값이 어긋난다면 생성 시점과 검토 시점 사이에 push 가 있었을 수 있다.
+
+          ## Codex 자동 리뷰
+
+          - [ ] Codex 자동 리뷰가 완료되었습니다.
+          - [ ] Codex가 제기한 P0/P1 항목을 해결했거나 처리 근거를 남겼습니다.
+
+          ## 관련 이슈
+
+          없음
+
+          ## 체크리스트
+
+          - [x] 하나의 목적만 포함한 PR입니다.
+          - [x] 변경 사항을 self-review했습니다. (자동 생성 문서)
+          - [ ] 전체 로컬 테스트를 실행하고 결과를 작성했습니다. (위 사유 참고)
+          - [x] 테스트 코드를 추가했거나 미추가 사유를 작성했습니다.
+          - [x] DB/Flyway 변경 여부와 영향을 작성했습니다.
+          - [x] 기존 Flyway migration을 수정하지 않았습니다.
+          - [x] 로컬 seed가 운영 환경에서 실행되지 않는지 확인했습니다.
+          - [x] 민감 정보, \`.env\`, 디버그 코드를 포함하지 않았습니다.
+          - [x] 코드 컨벤션과 테스트 작성 규칙을 확인했습니다.
+          - [x] 관련 문서 변경 필요 여부를 확인했습니다.
+          - [x] 다른 담당자의 코드 수정 여부와 합의 내용을 확인했습니다.
+          BODY
           fi

@@ -7,14 +7,36 @@
 #
 #   ./.github/scripts/branch-status.sh [출력경로]
 #
+# EXCLUDE_BRANCH 환경 변수로 브랜치 하나를 보고서에서 뺄 수 있다. 워크플로가 결과를
+# 담아 두는 작업 브랜치를 스스로 보고하지 않게 하는 용도다.
+#
 set -euo pipefail
 
 OUT="${1:-docs/branch_update.md}"
 BASE="origin/dev"
 PREFIX="refs/remotes/origin/"
 HEAD_REF="refs/remotes/origin/HEAD"
+EXCLUDE="${EXCLUDE_BRANCH:-}"
 
 today="$(TZ=Asia/Seoul date +%Y-%m-%d)"
+
+# 표의 셀에 들어가는 값. 브랜치명과 사람 이름에는 '|' 가 들어올 수 있고, 그대로 두면
+# 열 구분자로 읽혀 행이 깨진다.
+#
+# 치환문의 '\\|' 는 백슬래시를 남기지 않으므로(bash 가 replacement 의 백슬래시를 먼저
+# 소비한다) 백슬래시를 변수에 담아 넣는다.
+BACKSLASH='\'
+cell() {
+    local value="$1"
+    printf '%s' "${value//|/${BACKSLASH}|}"
+}
+
+# 보고 대상이 아닌 ref 인가. 인자는 전체 refname.
+skip_ref() {
+    [ "$1" = "$HEAD_REF" ] && return 0
+    [ -n "$EXCLUDE" ] && [ "${1#"$PREFIX"}" = "$EXCLUDE" ] && return 0
+    return 1
+}
 
 # 최신 커밋 표: 커밋이 최근인 브랜치부터.
 latest_rows() {
@@ -23,9 +45,9 @@ latest_rows() {
     git for-each-ref --sort=-committerdate refs/remotes/origin \
         --format='%(refname)%09%(committerdate:short)%09%(authorname)%09%(objectname:short)%09%(contents:subject)' |
     while IFS=$'\t' read -r ref date author sha subject; do
-        [ "$ref" = "$HEAD_REF" ] && continue
+        skip_ref "$ref" && continue
         printf '| `%s` | %s | %s | %s | %s |\n' \
-            "${ref#"$PREFIX"}" "$date" "$author" "$sha" "${subject//|/\\|}"
+            "$(cell "${ref#"$PREFIX"}")" "$date" "$(cell "$author")" "$sha" "$(cell "$subject")"
     done
 }
 
@@ -33,7 +55,7 @@ latest_rows() {
 divergence_rows() {
     git for-each-ref --format='%(refname)' refs/remotes/origin |
     while read -r full; do
-        [ "$full" = "$HEAD_REF" ] && continue
+        skip_ref "$full" && continue
         ref="origin/${full#"$PREFIX"}"
         [ "$ref" = "$BASE" ] && continue
         # --left-right --count 는 "뒤처진수<TAB>앞선수" 순으로 낸다.
@@ -53,7 +75,7 @@ divergence_rows() {
     done |
     sort -k1,1nr -k2,2nr |
     while IFS=$'\t' read -r ahead behind name status; do
-        printf '| `%s` | %s | %s | %s |\n' "$name" "$ahead" "$behind" "$status"
+        printf '| `%s` | %s | %s | %s |\n' "$(cell "$name")" "$ahead" "$behind" "$status"
     done
 }
 
