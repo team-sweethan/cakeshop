@@ -3,3 +3,12 @@
   <div class="alert alert--success" th:if="${successMessage}" th:text="${successMessage}"></div>
   <div class="alert alert--error" th:if="${errorMessage}" th:text="${errorMessage}"></div>
 </div>
+
+<th:block th:fragment="popup">
+  <script data-common-alert-popup th:if="${successMessage}" th:inline="javascript">
+    window.alert([[${successMessage}]]);
+  </script>
+  <script data-common-alert-popup th:if="${errorMessage}" th:inline="javascript">
+    window.alert([[${errorMessage}]]);
+  </script>
+</th:block>
