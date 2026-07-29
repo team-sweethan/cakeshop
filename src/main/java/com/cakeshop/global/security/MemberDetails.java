@@ -18,8 +18,7 @@ public class MemberDetails extends User {
 
         this.member = member; // member 필드 초기화
     }
-
-    public Long getMemberId(){
+    public Long getMemberId() {
         return member.getId();
     }
 }

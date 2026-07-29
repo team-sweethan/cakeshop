@@ -6,11 +6,19 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.cakeshop.domain.product.admin.dto.form.AdminStockFilter;
+import com.cakeshop.domain.product.admin.dto.form.ProductAdminSearchCondition;
+import com.cakeshop.domain.product.admin.dto.form.ProductForm;
+import com.cakeshop.domain.product.admin.dto.view.ProductAdminListView;
+import com.cakeshop.domain.product.admin.dto.view.ProductCategoryOptionView;
 import com.cakeshop.domain.product.customer.dto.form.ProductSearchCondition;
 import com.cakeshop.domain.product.customer.dto.form.ProductSort;
 import com.cakeshop.domain.product.customer.dto.form.StockFilter;
 import com.cakeshop.domain.product.customer.dto.view.ProductListView;
+import com.cakeshop.domain.product.entity.Product;
+import com.cakeshop.domain.product.entity.ProductStatus;
 import com.cakeshop.domain.product.entity.ProductType;
+import com.cakeshop.global.config.MariaDbIntegrationTest;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,10 +26,9 @@ import org.mybatis.spring.boot.test.autoconfigure.MybatisTest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 
 @MybatisTest
-@ActiveProfiles("local")
+@MariaDbIntegrationTest
 @AutoConfigureTestDatabase(
         replace = AutoConfigureTestDatabase.Replace.NONE
 )
@@ -344,5 +351,316 @@ class ProductMapperTests {
                 reviewCount,
                 createdAt
         );
+    }
+
+    @Test
+    void adminListIncludesActiveAndInactiveProducts() {
+        ProductAdminSearchCondition condition =
+                new ProductAdminSearchCondition();
+
+        Long expectedCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM products",
+                Long.class
+        );
+
+        List<ProductAdminListView> products =
+                productMapper.findAdminProducts(
+                        condition,
+                        expectedCount.intValue(),
+                        0
+                );
+
+        assertThat(
+                productMapper.countAdminProducts(condition)
+        ).isEqualTo(expectedCount);
+
+        List<ProductAdminListView> testProducts =
+                products.stream()
+                        .filter(product ->
+                                product.name().startsWith(keyword)
+                        )
+                        .toList();
+
+        assertThat(testProducts)
+                .extracting(ProductAdminListView::name)
+                .containsExactly(
+                        keyword + " F 10만원 초과 주문 제작",
+                        keyword + " E 최대 가격 상품",
+                        keyword + " D 판매 중지 상품",
+                        keyword + " C 인기 주문 제작",
+                        keyword + " B 품절 상품",
+                        keyword + " A 당일 재고 상품"
+                );
+
+        assertThat(testProducts)
+                .anyMatch(product ->
+                        product.status()
+                                == ProductStatus.INACTIVE
+                );
+    }
+
+    @Test
+    void adminSearchConditionsCanBeCombined() {
+        ProductAdminSearchCondition condition =
+                new ProductAdminSearchCondition();
+
+        condition.setKeyword(keyword + " B 품절");
+        condition.setType(ProductType.GENERAL);
+        condition.setStatus(ProductStatus.ACTIVE);
+        condition.setStock(
+                AdminStockFilter.OUT_OF_STOCK
+        );
+
+        assertThat(
+                productMapper.countAdminProducts(condition)
+        ).isEqualTo(1);
+
+        List<ProductAdminListView> products =
+                productMapper.findAdminProducts(
+                        condition,
+                        10,
+                        0
+                );
+
+        assertThat(products)
+                .extracting(ProductAdminListView::name)
+                .containsExactly(
+                        keyword + " B 품절 상품"
+                );
+    }
+
+    @Test
+    void adminCanChangeProductStatus() {
+        Long productId = jdbcTemplate.queryForObject(
+                """
+                SELECT id
+                FROM products
+                WHERE name = ?
+                """,
+                Long.class,
+                keyword + " D 판매 중지 상품"
+        );
+
+        // 판매 중지 상품의 상태를 판매 중으로 변경한다.
+        int updatedRows =
+                productMapper.updateProductStatus(
+                        productId,
+                        ProductStatus.ACTIVE
+                );
+
+        String updatedStatus =
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT status
+                        FROM products
+                        WHERE id = ?
+                        """,
+                        String.class,
+                        productId
+                );
+
+        // 상품 한 건이 수정되고 DB 상태가 ACTIVE로 변경됐는지 확인한다.
+        assertThat(updatedRows).isEqualTo(1);
+        assertThat(updatedStatus).isEqualTo("ACTIVE");
+    }
+
+    @Test
+    void changingStatusOfMissingProductReturnsZero() {
+        int updatedRows =
+                productMapper.updateProductStatus(
+                        Long.MAX_VALUE,
+                        ProductStatus.INACTIVE
+                );
+
+        // 존재하지 않는 상품은 변경된 행이 없어야 한다.
+        assertThat(updatedRows).isZero();
+    }
+
+    @Test
+    void activeCategoriesCanBeQueried() {
+        List<ProductCategoryOptionView> categories =
+                productMapper.findActiveCategories();
+
+        // setUp에서 추가한 활성 카테고리가 목록에 포함되는지 확인한다.
+        assertThat(categories)
+                .anyMatch(category ->
+                        category.id().equals(categoryId)
+                );
+
+        // 활성 카테고리의 존재 여부가 true인지 확인한다.
+        assertThat(
+                productMapper.existsActiveCategoryById(categoryId)
+        ).isTrue();
+    }
+
+    @Test
+    void inactiveCategoryIsNotAvailable() {
+        // 조회하기 전에 카테고리를 비활성화한다.
+        jdbcTemplate.update(
+                """
+                UPDATE categories
+                SET is_active = 0
+                WHERE id = ?
+                """,
+                categoryId
+        );
+
+        // 비활성 카테고리는 선택 가능한 카테고리로 판단하지 않아야 한다.
+        assertThat(
+                productMapper.existsActiveCategoryById(categoryId)
+        ).isFalse();
+
+        List<ProductCategoryOptionView> categories =
+                productMapper.findActiveCategories();
+
+        // 등록 화면의 카테고리 목록에서도 제외되는지 확인한다.
+        assertThat(categories)
+                .noneMatch(category ->
+                        category.id().equals(categoryId)
+                );
+    }
+
+    @Test
+    void adminCanInsertInactiveProduct() {
+        Product product = new Product();
+
+        product.setCategoryId(categoryId);
+        product.setName(keyword + " 신규 상품");
+        product.setDescription("상품 등록 테스트");
+        product.setBasePrice(
+                BigDecimal.valueOf(45_000)
+        );
+        product.setStockQuantity(10);
+        product.setProductType(ProductType.GENERAL);
+        product.setPreparationDays(2);
+        product.setCancellationLimitDays(1);
+        product.setStatus(ProductStatus.INACTIVE);
+
+        int insertedRows =
+                productMapper.insertProduct(product);
+
+        // 상품 한 건이 등록되고 ID가 생성됐는지 확인한다.
+        assertThat(insertedRows).isEqualTo(1);
+        assertThat(product.getId()).isNotNull();
+
+        String status = jdbcTemplate.queryForObject(
+                """
+                SELECT status
+                FROM products
+                WHERE id = ?
+                """,
+                String.class,
+                product.getId()
+        );
+
+        assertThat(status).isEqualTo("INACTIVE");
+    }
+
+    @Test
+    void adminProductFormContainsExistingValues() {
+        ProductForm form =
+                productMapper.findAdminProductFormById(
+                        optionProductId
+                );
+
+        assertThat(form).isNotNull();
+        assertThat(form.getCategoryId())
+                .isEqualTo(categoryId);
+        assertThat(form.getName())
+                .isEqualTo(
+                        keyword + " A 당일 재고 상품"
+                );
+        assertThat(form.getDescription())
+                .isEmpty();
+        assertThat(form.getBasePrice())
+                .isEqualByComparingTo("10000");
+        assertThat(form.getStockQuantity())
+                .isEqualTo(10);
+        assertThat(form.getProductType())
+                .isEqualTo(ProductType.GENERAL);
+        assertThat(form.getPreparationDays())
+                .isZero();
+        assertThat(form.getCancellationLimitDays())
+                .isZero();
+    }
+
+    @Test
+    void adminCanUpdateProductWithoutChangingStatus() {
+        Product product = new Product();
+
+        product.setId(optionProductId);
+        product.setCategoryId(categoryId);
+        product.setName(keyword + " 수정 상품");
+        product.setDescription("수정된 상품 설명");
+        product.setBasePrice(
+                BigDecimal.valueOf(55_000)
+        );
+        product.setStockQuantity(null);
+        product.setProductType(ProductType.CUSTOM);
+        product.setPreparationDays(3);
+        product.setCancellationLimitDays(2);
+
+        int updatedRows =
+                productMapper.updateProduct(product);
+
+        ProductForm updatedForm =
+                productMapper.findAdminProductFormById(
+                        optionProductId
+                );
+
+        String status = jdbcTemplate.queryForObject(
+                """
+                SELECT status
+                FROM products
+                WHERE id = ?
+                """,
+                String.class,
+                optionProductId
+        );
+
+        assertThat(updatedRows).isEqualTo(1);
+        assertThat(updatedForm).isNotNull();
+        assertThat(updatedForm.getName())
+                .isEqualTo(keyword + " 수정 상품");
+        assertThat(updatedForm.getDescription())
+                .isEqualTo("수정된 상품 설명");
+        assertThat(updatedForm.getBasePrice())
+                .isEqualByComparingTo("55000");
+        assertThat(updatedForm.getStockQuantity())
+                .isNull();
+        assertThat(updatedForm.getProductType())
+                .isEqualTo(ProductType.CUSTOM);
+        assertThat(updatedForm.getPreparationDays())
+                .isEqualTo(3);
+        assertThat(updatedForm.getCancellationLimitDays())
+                .isEqualTo(2);
+
+        // 기본 정보 수정 후에도 기존 판매 상태는 유지되어야 한다.
+        assertThat(status).isEqualTo("ACTIVE");
+    }
+
+    @Test
+    void missingProductCannotBeReadOrUpdated() {
+        assertThat(
+                productMapper.findAdminProductFormById(
+                        Long.MAX_VALUE
+                )
+        ).isNull();
+
+        Product product = new Product();
+
+        product.setId(Long.MAX_VALUE);
+        product.setCategoryId(categoryId);
+        product.setName(keyword + " 존재하지 않는 상품");
+        product.setDescription(null);
+        product.setBasePrice(BigDecimal.ZERO);
+        product.setStockQuantity(null);
+        product.setProductType(ProductType.GENERAL);
+        product.setPreparationDays(0);
+        product.setCancellationLimitDays(0);
+
+        assertThat(
+                productMapper.updateProduct(product)
+        ).isZero();
     }
 }

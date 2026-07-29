@@ -9,4 +9,4 @@ application-prod.yml
 uploads/
 .DS_Store
 .codex/
-AGENTS.md
+bin/
