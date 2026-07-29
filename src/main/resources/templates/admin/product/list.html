@@ -166,8 +166,21 @@
                         </td>
 
                         <!-- 상품명 -->
-                        <td th:text="${product.name}">
-                            상품명
+                        <td>
+                            <div class="cluster">
+                                <span th:text="${product.name}">
+                                    상품명
+                                </span>
+
+                                <!-- 상품 옵션 관리 -->
+                                <a class="btn"
+                                   th:href=
+                                           "@{/admin/products/{productId}/options(
+                           productId=${product.id}
+                       )}">
+                                    옵션 관리
+                                </a>
+                            </div>
                         </td>
 
                         <!-- 상품 유형 -->

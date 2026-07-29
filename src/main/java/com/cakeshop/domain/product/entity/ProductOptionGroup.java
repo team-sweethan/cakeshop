@@ -1,19 +1,18 @@
 package com.cakeshop.domain.product.entity;
 
-import java.math.BigDecimal;
-
 import lombok.Getter;
 import lombok.Setter;
 
-/** DB의 product_options 한 행을 표현한다. */
+/** DB의 product_option_groups 한 행을 표현한다. */
 @Getter
 @Setter
-public class ProductOption {
+public class ProductOptionGroup {
 
     private Long id;
-    private Long optionGroupId;
+    private Long productId;
     private String name;
-    private BigDecimal additionalPrice;
+    private boolean required;
+    private ProductOptionSelectionType selectionType;
     private ProductOptionStatus status;
     private Integer sortOrder;
 }
