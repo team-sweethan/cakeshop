@@ -46,17 +46,29 @@ tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
 
 tasks.named('test') { useJUnitPlatform() }
 
-// 마이그레이션 파일명을 사람이 정하면 여러 브랜치에서 같은 버전이 나온다.
-// 버전은 생성 시각으로 찍고, 개발자는 설명만 넘긴다.
-//   gradlew newMigration -Pdesc=add_coupon_table
+// migration 은 초안(docs/sql/draft) → 승격(db/migration) 두 단계로 만든다.
+//   gradlew newMigration     -Pdesc=add_coupon_table   # 초안 생성
+//   gradlew promoteMigration -Pdesc=add_coupon_table   # SQL 을 다 쓴 뒤 승격
+//
+// 곧바로 db/migration 에 빈 파일을 만들면, SQL 을 채우기 전에 devtools 재시작 등으로
+// Flyway 가 그 빈 파일을 적용해 이력에 checksum 을 박아버린다. 그 뒤 SQL 을 채우면
+// CHECKSUM_MISMATCH 로 앱이 뜨지 않는다. 초안은 클래스패스 밖에 두어 이 창을 없앤다.
+//
+// 파일명을 사람이 정하면 여러 브랜치에서 같은 버전이 나오므로, 버전은 승격 시각으로
+// 찍고 개발자는 설명만 넘긴다.
+def migrationDraftMarker = '-- >>> SQL >>>'
+def migrationDescPattern = /[a-z0-9]+(_[a-z0-9]+)*/
+
 tasks.register('newMigration') {
     group = 'cakeshop'
-    description = '타임스탬프 규칙에 맞는 빈 Flyway migration 파일을 만든다. 예: -Pdesc=add_coupon_table'
+    description = 'Flyway migration 초안을 docs/sql/draft 에 만든다. 예: -Pdesc=add_coupon_table'
 
     // configuration cache 대응: 설정 시점 값만 캡처하고 doLast 안에서 project를 참조하지 않는다.
-    def migrationDir = layout.projectDirectory.dir('src/main/resources/db/migration').asFile
+    def draftDir = layout.projectDirectory.dir('docs/sql/draft').asFile
     def projectDir = layout.projectDirectory.asFile
     def descProvider = providers.gradleProperty('desc')
+    def marker = migrationDraftMarker
+    def descPattern = migrationDescPattern
 
     doLast {
         def desc = descProvider.getOrNull()
@@ -67,10 +79,97 @@ tasks.register('newMigration') {
                     '  e.g. gradlew newMigration -Pdesc=add_coupon_table'
             )
         }
-        if (!(desc ==~ /[a-z0-9]+(_[a-z0-9]+)*/)) {
+        if (!(desc ==~ descPattern)) {
             throw new GradleException(
                     "-Pdesc must be lower snake_case, but was '${desc}'\n" +
                     '  e.g. add_coupon_table, drop_legacy_index'
+            )
+        }
+
+        def target = new File(draftDir, "${desc}.sql")
+        if (target.exists()) {
+            throw new GradleException(
+                    "draft already exists: docs/sql/draft/${desc}.sql\n" +
+                    '  keep writing in it, or promote it:\n' +
+                    "    gradlew promoteMigration -Pdesc=${desc}"
+            )
+        }
+
+        draftDir.mkdirs()
+        target.setText("""\
+-- ${desc} (초안)
+--
+-- 규칙
+-- * 로컬 샘플 데이터는 여기 넣지 않는다. db/seed/seed-local.sql 을 쓴다.
+-- * 서로 의존하는 DDL 은 파일을 나누지 말고 이 파일에 함께 담는다.
+-- * SQL 위에 '왜 필요한지'를 주석으로 단다. '무엇을 하는지'는 SQL 이 말한다.
+--
+-- 이 파일은 아직 Flyway 가 보지 않는다. 다 쓰면 아래 명령으로 승격한다.
+--     gradlew promoteMigration -Pdesc=${desc}
+${marker}
+
+""", 'UTF-8')
+
+        println "created: ${projectDir.toPath().relativize(target.toPath()).toString().replace('\\', '/')}"
+        println "next:    gradlew promoteMigration -Pdesc=${desc}"
+    }
+}
+
+tasks.register('promoteMigration') {
+    group = 'cakeshop'
+    description = '완성된 초안을 db/migration 으로 승격한다. 예: -Pdesc=add_coupon_table'
+
+    def draftDir = layout.projectDirectory.dir('docs/sql/draft').asFile
+    def migrationDir = layout.projectDirectory.dir('src/main/resources/db/migration').asFile
+    def projectDir = layout.projectDirectory.asFile
+    def descProvider = providers.gradleProperty('desc')
+    def marker = migrationDraftMarker
+    def descPattern = migrationDescPattern
+
+    doLast {
+        def desc = descProvider.getOrNull()
+        if (!desc?.trim()) {
+            def drafts = (draftDir.listFiles() ?: new File[0])*.name.findAll { it.endsWith('.sql') }.sort()
+            throw new GradleException(
+                    'usage: gradlew promoteMigration -Pdesc=<snake_case_description>\n' +
+                    (drafts ? '  drafts: ' + drafts.join(', ') : '  (no draft in docs/sql/draft)')
+            )
+        }
+        if (!(desc ==~ descPattern)) {
+            throw new GradleException(
+                    "-Pdesc must be lower snake_case, but was '${desc}'\n" +
+                    '  e.g. add_coupon_table, drop_legacy_index'
+            )
+        }
+
+        def draft = new File(draftDir, "${desc}.sql")
+        if (!draft.exists()) {
+            throw new GradleException(
+                    "draft not found: docs/sql/draft/${desc}.sql\n" +
+                    "  create it first: gradlew newMigration -Pdesc=${desc}"
+            )
+        }
+
+        def text = draft.getText('UTF-8')
+        def markerAt = text.indexOf(marker)
+        if (markerAt < 0) {
+            throw new GradleException(
+                    "draft lost its marker line: docs/sql/draft/${desc}.sql\n" +
+                    "  restore this line and put your SQL below it:\n" +
+                    "    ${marker}"
+            )
+        }
+
+        def body = text.substring(markerAt + marker.length()).trim()
+        // 이번 사고의 직접 차단: 주석만 있는 파일도 Flyway 에는 유효한 migration 이라
+        // 적용되고 checksum 이 박힌다. 실행되는 SQL 이 없으면 승격을 막는다.
+        def executable = body.readLines()
+                .collect { it.replaceFirst(/--.*$/, '').trim() }
+                .findAll { it }
+        if (!executable) {
+            throw new GradleException(
+                    "draft has no SQL yet: docs/sql/draft/${desc}.sql\n" +
+                    "  write SQL below the marker line, then promote again."
             )
         }
 
@@ -94,8 +193,21 @@ tasks.register('newMigration') {
 -- * 로컬 샘플 데이터는 여기 넣지 않는다. db/seed/seed-local.sql 을 쓴다.
 -- * 서로 의존하는 DDL 은 파일을 나누지 말고 이 파일에 함께 담는다.
 
+${body}
 """, 'UTF-8')
 
-        println "created: ${projectDir.toPath().relativize(target.toPath()).toString().replace('\\', '/')}"
+        if (!draft.delete()) {
+            // 승격본이 정답이므로 초안이 남아 있으면 다음 promote 가 헷갈린다. 지우도록 알린다.
+            println "warn: could not delete docs/sql/draft/${desc}.sql - remove it manually"
+        }
+
+        // 멱등성은 자동으로 판정할 수 없어 막지 않고 알리기만 한다.
+        def joined = executable.join(' ').toUpperCase(java.util.Locale.ROOT)
+        if (joined.contains('INSERT ') && !(joined.contains('NOT EXISTS') || joined.contains('LEFT JOIN'))) {
+            println 'warn: INSERT without an idempotent guard (WHERE NOT EXISTS / LEFT JOIN ... IS NULL).'
+            println '      see docs/flyway_make_sample.md'
+        }
+
+        println "promoted: ${projectDir.toPath().relativize(target.toPath()).toString().replace('\\', '/')}"
     }
 }

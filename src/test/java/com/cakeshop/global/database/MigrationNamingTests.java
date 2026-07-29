@@ -3,6 +3,7 @@ package com.cakeshop.global.database;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -49,8 +50,9 @@ class MigrationNamingTests {
 
     private static final String HOW_TO_CREATE = """
 
-            마이그레이션 파일은 직접 만들지 않는다. 아래 명령으로 생성한다.
-              gradlew newMigration -Pdesc=add_coupon_table""";
+            마이그레이션 파일은 직접 만들지 않는다. 아래 두 단계로 생성한다.
+              gradlew newMigration     -Pdesc=add_coupon_table
+              gradlew promoteMigration -Pdesc=add_coupon_table""";
 
     @Test
     void migrationVersionsAreUnique() throws IOException {
@@ -98,6 +100,33 @@ class MigrationNamingTests {
                 .isEmpty();
     }
 
+    /**
+     * 주석만 있는 파일도 Flyway 에는 유효한 migration 이라 적용되고 checksum 이 박힌다.
+     * 그 상태로 커밋되면, 나중에 SQL 을 채우는 순간 팀원 전원이 CHECKSUM_MISMATCH 를 만난다.
+     * {@code promoteMigration}이 승격 시점에 막지만 손으로 만든 파일까지 여기서 잡는다.
+     */
+    @Test
+    void migrationFilesContainExecutableSql() throws IOException {
+        List<String> empty = new ArrayList<>();
+        for (Resource resource : resources("classpath*:db/migration/*.sql")) {
+            String sql = resource.getContentAsString(StandardCharsets.UTF_8);
+            boolean hasStatement = sql.lines()
+                    .map(line -> line.replaceFirst("--.*$", "").trim())
+                    .anyMatch(line -> !line.isEmpty());
+            if (!hasStatement) {
+                empty.add(resource.getFilename());
+            }
+        }
+
+        assertThat(empty)
+                .as("""
+                        주석만 있고 실행되는 SQL 이 없는 migration 이다. 이대로 적용되면 이력에
+                        checksum 이 박혀, 나중에 SQL 을 채울 때 팀원 전원이 CHECKSUM_MISMATCH 를
+                        만난다. SQL 을 채우거나 파일을 지운다."""
+                        + HOW_TO_CREATE)
+                .isEmpty();
+    }
+
     @Test
     void seedDirectoryHasNoVersionedMigrations() throws IOException {
         List<String> versioned = resourceNames("classpath*:db/seed/*.sql").stream()
@@ -129,9 +158,12 @@ class MigrationNamingTests {
         return Optional.of(fileName.substring(1, separator).replace('_', '.'));
     }
 
+    private static Resource[] resources(String locationPattern) throws IOException {
+        return new PathMatchingResourcePatternResolver().getResources(locationPattern);
+    }
+
     private static List<String> resourceNames(String locationPattern) throws IOException {
-        Resource[] resources = new PathMatchingResourcePatternResolver().getResources(locationPattern);
-        return Arrays.stream(resources)
+        return Arrays.stream(resources(locationPattern))
                 .map(Resource::getFilename)
                 .filter(Objects::nonNull)
                 .sorted()

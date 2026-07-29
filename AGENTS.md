@@ -71,7 +71,7 @@ domain/<도메인>/
 
 최근 이력과 `docs/pull-request.md`에 따라 커밋 제목은 `<type>: 한글 요약` 형식으로 작성한다. 예: `fix: 회원 이름 컬럼 마이그레이션 추가`. type은 `feat`, `fix`, `refactor`, `test`, `docs`, `ci`, `chore`를 사용한다.
 
-PR 하나에는 하나의 목적만 담는다. 본문에 변경 목적, 주요 변경, 테스트 결과, DB/Flyway 영향, 집중 리뷰 사항, 관련 이슈를 작성하고 화면 변경에는 스크린샷을 첨부한다. 공유된 Flyway migration은 수정하지 말고 새 versioned migration을 추가한다. 파일명은 직접 짓지 않고 `gradlew newMigration -Pdesc=<snake_case>`로 만든다(자세한 규약은 `docs/conventions.md` 6-1절). CI 통과, 미해결 리뷰 정리, 최소 1명 승인을 병합 조건으로 한다.
+PR 하나에는 하나의 목적만 담는다. 본문에 변경 목적, 주요 변경, 테스트 결과, DB/Flyway 영향, 집중 리뷰 사항, 관련 이슈를 작성하고 화면 변경에는 스크린샷을 첨부한다. 공유된 Flyway migration은 수정하지 말고 새 versioned migration을 추가한다. 파일명은 직접 짓지 않고 `gradlew newMigration -Pdesc=<snake_case>`로 초안을 만든 뒤 `gradlew promoteMigration -Pdesc=<snake_case>`로 승격한다(자세한 규약은 `docs/conventions.md` 6-1절). CI 통과, 미해결 리뷰 정리, 최소 1명 승인을 병합 조건으로 한다.
 
 ## 보안과 설정
 

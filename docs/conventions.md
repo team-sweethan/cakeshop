@@ -139,16 +139,18 @@ Controller → Service → Mapper → DB
 ### 6-1. Flyway migration 규약
 
 - **파일명을 직접 짓지 않는다. [금지]** 여러 사람이 동시에 브랜치를 나눠 작업하면 같은 버전 번호가 나오고, Git은 파일명이 다르면 조용히 둘 다 머지한다. 충돌은 머지 뒤 앱을 띄울 때야 드러난다.
-- **생성은 항상 아래 명령으로 한다.**
+- **생성은 항상 아래 두 단계로 한다. 초안 → 승격이다.**
 
   ```powershell
-  .\gradlew.bat newMigration -Pdesc=add_coupon_table
+  .\gradlew.bat newMigration     -Pdesc=add_coupon_table   # docs/sql/draft/add_coupon_table.sql
+  .\gradlew.bat promoteMigration -Pdesc=add_coupon_table   # SQL 을 다 쓴 뒤
   ```
 
-  `src/main/resources/db/migration/V<yyyyMMdd>_<HHmmss>__<snake_case>.sql`이 만들어진다. `-Pdesc`는 소문자 `snake_case`만 받는다. 같은 초에 만들어진 파일이 있으면 자동으로 1초 밀어서 생성한다.
+  승격 시점에 `src/main/resources/db/migration/V<yyyyMMdd>_<HHmmss>__<snake_case>.sql`이 만들어진다. `-Pdesc`는 소문자 `snake_case`만 받는다. 같은 초의 버전이 이미 있으면 자동으로 1초 밀어서 만든다.
+- **db/migration에 미완성 파일을 두지 않는다. [금지]** 주석만 있는 파일도 Flyway에는 유효한 migration이라, SQL을 채우기 전에 devtools 재시작 등으로 적용되면 이력에 checksum이 박힌다. 그 뒤 SQL을 채우면 `CHECKSUM_MISMATCH`가 난다. 초안을 클래스패스 밖(`docs/sql/draft/`, gitignore 대상)에 두는 이유이고, `promoteMigration`은 실행되는 SQL이 없는 초안의 승격을 거부한다. 보조로 `spring.devtools.restart.additional-exclude`가 `db/migration/**`, `db/seed/**` 저장 시의 재시작을 막고, `MigrationNamingTests`가 주석뿐인 migration을 CI에서 잡는다.
 - **분 단위 버전(`V20260729_1015__x.sql`)은 [금지].** Flyway는 버전 조각을 숫자로 비교하므로 초 단위와 섞이면 `1015 < 101542`가 되어 나중에 만든 파일이 먼저 실행된다. `MigrationNamingTests`가 CI에서 잡는다.
 - **머지된 migration은 수정하지 않는다. [금지]** checksum이 바뀌면 팀원 전원이 로컬 DB를 다시 만들어야 한다. 변경이 필요하면 새 migration을 만든다.
-- **서로 의존하는 DDL은 한 파일·한 PR에 담는다.** 타임스탬프는 "만든 시각"이라 머지 순서와 다를 수 있어 `out-of-order: true`를 켜 두었다. 파일이 나뉘면 머신마다 적용 순서가 달라질 수 있다.
+- **서로 의존하는 DDL은 한 파일·한 PR에 담는다.** 타임스탬프는 "승격 시각"이라 머지 순서와 다를 수 있어 `out-of-order: true`를 켜 두었다(승격 뒤 리뷰를 거치므로, 먼저 승격한 쪽이 나중에 머지될 수 있다). 파일이 나뉘면 머신마다 적용 순서가 달라질 수 있고, Testcontainers 테스트는 빈 DB에 버전 순서대로 적용하므로 뒤섞인 순서를 대신 검증해 주지 않는다.
 - **Flyway 자동 실행 범위는 `local`, `test`로 제한한다.** `rds` 프로필에서는 Flyway를 비활성화하고, 검토·승인된 별도 반영 절차 없이 애플리케이션이 공용 DB 스키마를 변경하지 못하게 한다.
 - **모든 환경의 실행에 필요한 기준 데이터는 versioned migration으로 관리한다.** 애플리케이션이
   특정 PK나 행의 존재를 전제로 한다면 로컬 seed에만 두지 않는다. `rds`에는 애플리케이션이

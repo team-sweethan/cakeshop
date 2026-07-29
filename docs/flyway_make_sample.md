@@ -4,32 +4,40 @@
 [`README.md`의 「새 migration 만들기」](../README.md#새-migration-만들기)를 따르고,
 Flyway와 seed의 역할 분리는 [`conventions.md`](conventions.md)를 본다.
 
-## 1. 생성 직후 받는 템플릿
+## 1. 생성 직후 받는 초안
 
 ```powershell
 .\gradlew.bat newMigration -Pdesc=add_coupon_table
 ```
 
 ```
-created: src/main/resources/db/migration/V20260729_101542__add_coupon_table.sql
+created: docs/sql/draft/add_coupon_table.sql
+next:    gradlew promoteMigration -Pdesc=add_coupon_table
 ```
 
-생성된 파일은 다음 내용만 담고 있다 (템플릿 정의는 `build.gradle`의 `newMigration` 태스크).
+초안은 `db/migration`이 **아니라** `docs/sql/draft/`에 생긴다. 클래스패스 밖이라 Flyway가
+보지 못하고, 따라서 SQL을 쓰는 도중에 앱이 떠도 적용될 일이 없다. 파일명에 버전도 아직 없다.
+
+초안은 다음 내용만 담고 있다 (템플릿 정의는 `build.gradle`의 `newMigration` 태스크).
 
 ```sql
--- add_coupon_table
--- 생성: 2026-07-29 10:15:42
+-- add_coupon_table (초안)
 --
 -- 규칙
--- * 이 파일은 머지된 뒤 절대 수정하지 않는다. 변경이 필요하면 새 migration 을 만든다.
 -- * 로컬 샘플 데이터는 여기 넣지 않는다. db/seed/seed-local.sql 을 쓴다.
 -- * 서로 의존하는 DDL 은 파일을 나누지 말고 이 파일에 함께 담는다.
+-- * SQL 위에 '왜 필요한지'를 주석으로 단다. '무엇을 하는지'는 SQL 이 말한다.
+--
+-- 이 파일은 아직 Flyway 가 보지 않는다. 다 쓰면 아래 명령으로 승격한다.
+--     gradlew promoteMigration -Pdesc=add_coupon_table
+-- >>> SQL >>>
 
 ```
 
-머리말 7줄이 전부이고, 그 아래 빈 곳에 SQL을 채운다. **머리말은 지우지 않고 그대로 둔다.**
+`-- >>> SQL >>>` **아래에** SQL을 채운다. 위쪽 머리말은 승격할 때 정식 머리말로 교체되므로
+그대로 둔다. 마커 줄을 지우면 승격이 거부된다.
 
-- 파일명은 직접 짓지 않는다. 버전은 생성 시각(`yyyyMMdd_HHmmss`)으로 자동으로 찍히며,
+- 파일명은 직접 짓지 않는다. 버전은 **승격 시각**(`yyyyMMdd_HHmmss`)으로 자동으로 찍히며,
   같은 초의 버전이 이미 있으면 1초 밀어서 만든다.
 - 직접 정하는 값은 `-Pdesc` 하나뿐이며 **소문자 snake_case**(`[a-z0-9]+(_[a-z0-9]+)*`)만 받는다.
   대문자·하이픈·한글은 태스크가 거부한다.
@@ -37,7 +45,7 @@ created: src/main/resources/db/migration/V20260729_101542__add_coupon_table.sql
 ## 2. 기준 데이터 보충 예시 (저장소 실물)
 
 `V20260729_003452__provision_default_store.sql`은 모든 환경에 필요한 대표 매장을 보장한다.
-템플릿 머리말 아래에 다음이 이어진다.
+승격된 머리말 아래에 다음이 이어진다.
 
 ```sql
 -- StoreService.DEFAULT_STORE_ID가 참조하는 대표 매장은 모든 환경의 실행 필수 데이터다.
@@ -91,7 +99,28 @@ CREATE TABLE `coupons` (
 서로 의존하는 DDL(테이블 생성 → 그 테이블에 컬럼 추가)은 파일을 나누지 말고 한 파일·한 PR에 담는다.
 `out-of-order: true` 설정이라 나누면 머신마다 적용 순서가 달라질 수 있다.
 
-## 5. 작성 후 확인
+## 5. 승격과 확인
+
+작성이 끝나면 승격한다. 이 시점에 버전이 찍히고 파일이 `db/migration`으로 옮겨진다.
+
+```powershell
+.\gradlew.bat promoteMigration -Pdesc=add_coupon_table
+```
+
+```
+promoted: src/main/resources/db/migration/V20260729_101542__add_coupon_table.sql
+```
+
+승격이 막히는 경우와 대처는 다음과 같다.
+
+| 메시지 | 뜻 |
+| --- | --- |
+| `draft has no SQL yet` | 마커 아래가 비었거나 주석뿐이다. 주석만 있는 파일도 Flyway는 적용해 checksum을 박으므로 승격시키지 않는다 |
+| `draft lost its marker line` | `-- >>> SQL >>>` 줄을 지웠다. 되살리고 그 아래에 SQL을 둔다 |
+| `draft not found` | 이미 승격했거나 `-Pdesc`가 초안 파일명과 다르다 |
+| `warn: INSERT without an idempotent guard` | 경고일 뿐 승격은 된다. 3절의 멱등 패턴을 의도적으로 뺀 것인지 확인한다 |
+
+이어서 로컬에 적용해 본다.
 
 ```powershell
 .\gradlew.bat bootRun --args="--spring.profiles.active=local"
@@ -112,7 +141,18 @@ ORDER BY `installed_rank`;
 ## 6. 머지된 뒤에는 손대지 않는다
 
 머지된 migration을 고치면 checksum이 바뀌어 **팀원 전원이 로컬 DB를 다시 만들어야 한다.**
-머지 전 자기 브랜치에서는 자유롭게 고쳐도 된다.
+
+머지 전 자기 브랜치라면 고쳐도 되지만, **이미 로컬에 적용된 뒤라면 내 DB에는 checksum이
+남아 있다.** 그대로 고치면 다음 기동에서 `CHECKSUM_MISMATCH`가 난다. 해당 버전의 이력 행을
+지우고 다시 띄운다.
+
+```sql
+USE `cakeshop`;
+DELETE FROM `flyway_schema_history` WHERE `version` = '20260729.101542';
+```
+
+이 방법은 **아직 아무에게도 공유되지 않은** migration에만 쓴다. 이미 적용된 DDL이 있다면
+그 변경을 되돌리는 것은 별도로 해야 한다.
 
 - **내용 수정 [금지]** — checksum 불일치. 변경이 필요하면 새 migration을 만든다.
 - **파일명 변경 [금지]** — checksum은 파일 내용으로 계산하므로 이름만 바꿔도 이력의 버전·설명과

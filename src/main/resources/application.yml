@@ -13,12 +13,18 @@ spring:
       # 매장·상품 등의 이미지 업로드 상한. 기본값(1MB)은 사진에 너무 작다.
       max-file-size: 5MB
       max-request-size: 10MB
+  devtools:
+    restart:
+      # migration/seed 파일을 저장할 때마다 앱이 재시작되면, SQL 을 다 쓰기 전의 파일이
+      # Flyway 에 적용돼 checksum 이 박힌다. 기본 제외 목록은 두고 이 둘만 더한다.
+      additional-exclude: db/migration/**,db/seed/**
   flyway:
     enabled: true
     locations: classpath:db/migration
     validate-on-migrate: true
     clean-disabled: true
-    # 파일명의 타임스탬프는 '만든 시각'이라 머지 순서와 다를 수 있다.
+    # 파일명의 타임스탬프는 '승격 시각'이라 머지 순서와 다를 수 있다.
+    # 승격 뒤 리뷰를 거쳐 머지되므로, 먼저 승격한 쪽이 나중에 머지될 수 있다.
     # 늦게 머지된 낮은 버전도 받아들이지 않으면 validate 가 실패한다.
     out-of-order: true
 

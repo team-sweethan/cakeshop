@@ -7,5 +7,7 @@ out/
 application-prod.yml
 .env
 uploads/
+# migration 초안. 승격(gradlew promoteMigration)한 결과만 커밋한다.
+docs/sql/draft/
 .DS_Store
 bin/

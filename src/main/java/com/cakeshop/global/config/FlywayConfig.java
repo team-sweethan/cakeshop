@@ -74,11 +74,15 @@ public class FlywayConfig {
             조치
               * 머지된 migration 을 고쳤다면 되돌리고 새 파일로 변경하세요.
                   .\\gradlew.bat newMigration -Pdesc=<snake_case>
-                  (mac, linux: ./gradlew newMigration -Pdesc=<snake_case>)
+                  .\\gradlew.bat promoteMigration -Pdesc=<snake_case>
+                  (mac, linux: ./gradlew ...)
+              * 아직 아무에게도 공유하지 않은 내 브랜치의 migration 이라면,
+                그 버전의 이력 행만 지우고 다시 띄우세요.
+                  DELETE FROM `flyway_schema_history` WHERE `version` = '<version>';
               * 그래도 실패하면 README '기존 로컬 DB 완전 초기화' 절차로
                 로컬 DB 를 다시 만드세요.
 
-            flyway_schema_history 를 직접 수정하지 마세요.
+            공유된 migration 의 이력 행은 지우지 마세요. 스키마와 이력이 어긋납니다.
             """;
 
     private static final String DUPLICATE_VERSION_GUIDE = """
@@ -88,9 +92,10 @@ public class FlywayConfig {
 
             조치: 나중에 만든 파일을 지우고 새로 만든 뒤 내용을 옮기세요.
                   .\\gradlew.bat newMigration -Pdesc=<snake_case>
-                  (mac, linux: ./gradlew newMigration -Pdesc=<snake_case>)
+                  .\\gradlew.bat promoteMigration -Pdesc=<snake_case>
+                  (mac, linux: ./gradlew ...)
 
-            migration 파일명은 직접 짓지 마세요. 버전은 생성 시각으로 자동으로 찍힙니다.
+            migration 파일명은 직접 짓지 마세요. 버전은 승격 시각으로 자동으로 찍힙니다.
             """;
 
     private static final String BORDER = "*".repeat(70);

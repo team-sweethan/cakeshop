@@ -167,7 +167,9 @@ Remove-Item Env:SPRING_PROFILES_ACTIVE -ErrorAction SilentlyContinue
 
 ### 새 migration 만들기
 
-#### 1. 파일 생성
+**초안을 먼저 만들고, SQL을 다 쓴 뒤에 승격한다.** `db/migration`에 빈 파일을 먼저 두면, SQL을 채우기 전에 devtools 재시작 등으로 Flyway가 그 파일을 적용해 이력에 checksum을 박아버린다. 그 뒤 SQL을 채우면 `CHECKSUM_MISMATCH`로 앱이 뜨지 않는다. 초안은 클래스패스 밖(`docs/sql/draft/`)에 있어 Flyway가 보지 못한다.
+
+#### 1. 초안 생성
 
 파일명은 직접 짓지 않는다. 여러 사람이 동시에 브랜치를 나눠 작업하면 같은 버전 번호가 나오고, Git은 파일명이 다르면 조용히 둘 다 머지하기 때문이다. 충돌은 머지 뒤 앱을 띄울 때야 드러난다. 아래 명령으로 만든다.
 
@@ -175,18 +177,19 @@ Remove-Item Env:SPRING_PROFILES_ACTIVE -ErrorAction SilentlyContinue
 .\gradlew.bat newMigration -Pdesc=add_coupon_table
 ```
 ```
-created: src/main/resources/db/migration/V20260729_101542__add_coupon_table.sql
+created: docs/sql/draft/add_coupon_table.sql
+next:    gradlew promoteMigration -Pdesc=add_coupon_table
 ```
 
-직접 정하는 것은 `-Pdesc` 하나뿐이다. 버전은 생성 시각(`yyyyMMdd_HHmmss`)으로 자동으로 찍히고, 같은 초의 버전이 이미 있으면 1초 밀어서 생성한다. 파일은 규칙 주석이 들어간 템플릿으로 만들어진다.
+직접 정하는 것은 `-Pdesc` 하나뿐이다. **소문자 snake_case**(`[a-z0-9]+(_[a-z0-9]+)*`)만 받으며 대문자·하이픈·한글은 태스크가 거부한다. 예: `add_coupon_table`, `drop_legacy_index`.
 
-`-Pdesc`는 필수이며 **소문자 snake_case**(`[a-z0-9]+(_[a-z0-9]+)*`)만 받는다. 대문자·하이픈·한글은 태스크가 거부한다. 예: `add_coupon_table`, `drop_legacy_index`.
+초안은 gitignore 대상이라 커밋되지 않는다. 커밋되는 것은 3단계에서 승격된 파일이다.
 
 작성 예시와 포맷은 [`docs/flyway_make_sample.md`](docs/flyway_make_sample.md)를 참고한다.
 
 #### 2. DDL 작성
 
-생성된 파일에 SQL을 채운다.
+초안의 `-- >>> SQL >>>` 줄 **아래에** SQL을 채운다. 그 위쪽 머리말은 승격할 때 정식 머리말로 교체되므로 손대지 않아도 된다.
 
 | 규칙 | 이유 |
 |---|---|
@@ -194,7 +197,23 @@ created: src/main/resources/db/migration/V20260729_101542__add_coupon_table.sql
 | 로컬 샘플 데이터는 넣지 않는다 **[금지]** | `db/seed/seed-local.sql`에 둔다. 시드는 Flyway가 스캔하지 않아 고쳐도 DB 재생성이 필요 없다 |
 | 모든 환경에 필요한 기준 데이터는 여기 넣는다 | 애플리케이션이 특정 PK나 행의 존재를 전제한다면 seed에만 두면 안 된다 (예: `V20260729_003452__provision_default_store.sql`) |
 
-#### 3. 로컬 적용 확인
+#### 3. 승격
+
+```powershell
+.\gradlew.bat promoteMigration -Pdesc=add_coupon_table
+```
+```
+promoted: src/main/resources/db/migration/V20260729_101542__add_coupon_table.sql
+```
+
+이때 버전이 **승격 시각**(`yyyyMMdd_HHmmss`)으로 찍히고, 같은 초의 버전이 이미 있으면 1초 밀어서 만든다. 초안 파일은 지워진다.
+
+- 실행되는 SQL이 없으면(주석만 있으면) 승격을 거부한다. 위에 적은 checksum 사고를 여기서 끊는다.
+- `INSERT`가 있는데 멱등 보호(`WHERE NOT EXISTS` / `LEFT JOIN ... IS NULL`)가 안 보이면 경고를 찍는다. 막지는 않으니 의도한 것인지 확인한다.
+
+승격 뒤 SQL을 더 고쳐야 하면, 아직 머지 전이고 **앱을 아직 안 띄웠다면** 파일을 그대로 고쳐도 된다. 이미 로컬에 적용된 뒤라면 `flyway_schema_history`에서 해당 버전 행을 지우고 다시 띄운다.
+
+#### 4. 로컬 적용 확인
 
 ```powershell
 .\gradlew.bat bootRun --args="--spring.profiles.active=local"
@@ -212,15 +231,15 @@ ORDER BY `installed_rank`;
 
 기존 `0`, `1`, `3`, `20260729.003452` 뒤에 새 타임스탬프 버전이 `success = 1`로 붙어야 한다.
 
-#### 4. 테스트
+#### 5. 테스트
 
 ```powershell
 .\gradlew.bat test
 ```
 
-`MigrationNamingTests`가 명명 규약을 검사하고, `test` 프로필의 Testcontainers 통합 테스트가 빈 DB에 전체 migration을 처음부터 적용해 본다. **Docker가 실행 중이어야 한다.**
+`MigrationNamingTests`가 명명 규약과 빈 migration 여부를 검사하고, `test` 프로필의 Testcontainers 통합 테스트가 빈 DB에 전체 migration을 처음부터 적용해 본다. **Docker가 실행 중이어야 한다.**
 
-#### 5. PR
+#### 6. PR
 
 `docs/pull-request.md` 절차를 따른다. 스키마 변경은 리뷰 대상이며, `rds` 반영은 별도 검토·승인 절차다. 애플리케이션 기동은 RDS 스키마를 바꾸지 않는다.
 
