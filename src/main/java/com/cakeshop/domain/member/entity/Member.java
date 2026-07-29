@@ -2,7 +2,11 @@ package com.cakeshop.domain.member.entity;
 
 import java.time.LocalDateTime;
 
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 /** 인증 조회에도 사용하는 회원 영속 모델이다. 비밀번호는 BCrypt 해시만 저장한다. */
 @Getter
@@ -18,7 +22,7 @@ public class Member {
     private String nickname;
     private String phone;
     private String role;
-    private String status;
+    private MemberStatus status;
     private LocalDateTime suspendedAt;
     private String suspendedReason;
     private LocalDateTime createdAt;

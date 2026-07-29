@@ -1,6 +1,7 @@
 package com.cakeshop.domain.home.controller;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 import static org.mockito.Mockito.mock;
@@ -31,6 +32,16 @@ class HomeControllerTests {
     void homeReturnsMainTemplate() throws Exception {
         mockMvc.perform(get("/"))
             .andExpect(status().isOk())
+            .andExpect(view().name("home/main"));
+    }
+
+    @Test
+    void home_logoutParameter_addsSuccessMessage() throws Exception {
+        mockMvc.perform(get("/").param("logout", ""))
+            .andExpect(status().isOk())
+            .andExpect(model().attribute(
+                    "successMessage",
+                    "로그아웃되었습니다."))
             .andExpect(view().name("home/main"));
     }
 }

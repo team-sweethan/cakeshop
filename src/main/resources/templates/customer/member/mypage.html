@@ -16,7 +16,7 @@
   <h1>마이페이지</h1>
   <div class="layout-sidebar">
     <aside class="panel">
-      <strong th:text="${member.name}"></strong>
+      <strong th:text="${member.nickname}"></strong>
       <p class="text-muted" th:text="${member.email}"></p>
       <nav class="stack" style="margin-top:12px">
         <a class="btn btn--block" href="/orders/1">주문 내역</a>
@@ -26,7 +26,9 @@
         <a class="btn btn--block" href="/mypage/profile">회원정보 수정</a>
       </nav>
       <hr class="divider">
-      <a class="btn" href="/logout">로그아웃</a>
+      <form th:action="@{/logout}" method="post">
+        <button class="btn" type="submit">로그아웃</button>
+      </form>
     </aside>
     <div>
       <section class="section">
@@ -43,6 +45,10 @@
           <div class="data-row">
             <span class="data-row__label">전화번호</span>
             <span th:text="${member.phone}"></span>
+          </div>
+          <div class="data-row">
+            <span class="data-row__label">닉네임</span>
+            <span th:text="${member.nickname}"></span>
           </div>
           <a class="btn" href="/mypage/profile" style="margin-top:8px">정보 수정</a>
         </div>
