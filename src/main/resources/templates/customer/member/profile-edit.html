@@ -25,6 +25,11 @@
           <p class="form-error" th:if="${#fields.hasErrors('name')}" th:errors="*{name}"></p>
         </div>
         <div class="form-group">
+          <label class="form-label" for="profile-nickname">닉네임 <span class="required">*</span></label>
+          <input class="form-control" id="profile-nickname" th:field="*{nickname}" required maxlength="50">
+          <p class="form-error" th:if="${#fields.hasErrors('nickname')}" th:errors="*{nickname}"></p>
+        </div>
+        <div class="form-group">
           <label class="form-label" for="profile-email">이메일</label>
           <input class="form-control" id="profile-email" type="email" th:field="*{email}" readonly>
           <p class="form-error" th:if="${#fields.hasErrors('email')}" th:errors="*{email}"></p>
@@ -56,6 +61,7 @@
           <p class="form-error" th:if="${#fields.hasErrors('newPasswordConfirm')}" th:errors="*{newPasswordConfirm}"></p>
           <p class="form-error" th:if="${#fields.hasErrors('passwordChangeComplete')}" th:errors="*{passwordChangeComplete}"></p>
           <p class="form-error" th:if="${#fields.hasErrors('newPasswordConfirmed')}" th:errors="*{newPasswordConfirmed}"></p>
+          <p class="form-help" id="new-password-match-message" aria-live="polite"></p>
         </div>
 
         <button class="btn btn--primary" type="submit">변경사항 저장</button>
@@ -95,6 +101,27 @@
   phoneInput.addEventListener('input', (event) => {
     event.target.value = formatPhoneNumber(event.target.value);
   });
+
+  const newPasswordInput = document.getElementById('new-password');
+  const newPasswordConfirmInput = document.getElementById('new-password-confirm');
+  const newPasswordMatchMessage = document.getElementById('new-password-match-message');
+
+  function updateNewPasswordMatchMessage() {
+    if (!newPasswordConfirmInput.value) {
+      newPasswordMatchMessage.innerText = "";
+      newPasswordMatchMessage.className = "form-help";
+      return;
+    }
+
+    const matches = newPasswordInput.value === newPasswordConfirmInput.value;
+    newPasswordMatchMessage.innerText = matches
+            ? "비밀번호가 일치합니다."
+            : "비밀번호가 일치하지 않습니다.";
+    newPasswordMatchMessage.className = matches ? "form-success" : "form-error";
+  }
+
+  newPasswordInput.addEventListener('input', updateNewPasswordMatchMessage);
+  newPasswordConfirmInput.addEventListener('input', updateNewPasswordMatchMessage);
 </script>
 </body>
 </html>

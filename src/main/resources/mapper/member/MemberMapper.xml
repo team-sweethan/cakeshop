@@ -31,6 +31,7 @@
         UPDATE members
         <set>
             <if test="name != null">name = #{name},</if>
+            <if test="nickname != null">nickname = #{nickname},</if>
             <if test="phone != null">phone = #{phone},</if>
             <if test="password != null">password = #{password},</if>
         </set>

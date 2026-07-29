@@ -61,6 +61,7 @@ class MemberServiceTests {
                 .build();
         ProfileUpdateForm form = new ProfileUpdateForm();
         form.setName("새 이름");
+        form.setNickname("새닉네임");
         form.setPhone("010-1234-5678");
         when(memberMapper.findByEmail(member.getEmail())).thenReturn(Optional.of(member));
         when(memberMapper.update(any(Member.class))).thenReturn(1);
@@ -73,6 +74,7 @@ class MemberServiceTests {
         verify(passwordEncoder, never()).encode(org.mockito.ArgumentMatchers.anyString());
         verify(memberMapper).update(member);
         org.assertj.core.api.Assertions.assertThat(member.getName()).isEqualTo("새 이름");
+        org.assertj.core.api.Assertions.assertThat(member.getNickname()).isEqualTo("새닉네임");
         org.assertj.core.api.Assertions.assertThat(member.getPhone()).isEqualTo("010-1234-5678");
         org.assertj.core.api.Assertions.assertThat(member.getPassword()).isNull();
     }
@@ -127,6 +129,7 @@ class MemberServiceTests {
 
         assertThat(member.getPassword()).isEqualTo("encoded-new-password");
         assertThat(member.getName()).isEqualTo(form.getName());
+        assertThat(member.getNickname()).isEqualTo(form.getNickname());
         assertThat(member.getPhone()).isEqualTo(form.getPhone());
         verify(memberMapper).update(member);
     }
@@ -140,6 +143,7 @@ class MemberServiceTests {
                 .build();
         ProfileUpdateForm form = new ProfileUpdateForm();
         form.setName("홍길동");
+        form.setNickname("케이크러버");
         form.setPhone("010-1234-5678");
         when(memberMapper.findByEmail(member.getEmail()))
                 .thenReturn(Optional.of(member));
@@ -213,6 +217,7 @@ class MemberServiceTests {
     private ProfileUpdateForm passwordChangeForm() {
         ProfileUpdateForm form = new ProfileUpdateForm();
         form.setName("홍길동");
+        form.setNickname("케이크러버");
         form.setPhone("010-1234-5678");
         form.setCurrentPassword("Current1!");
         form.setNewPassword("NewPassword1!");

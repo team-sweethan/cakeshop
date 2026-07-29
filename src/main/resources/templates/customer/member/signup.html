@@ -139,7 +139,7 @@
               emailFormatMessage.innerText = "";
               emailResultMessage.innerText = data.message;
               emailResultMessage.className = data.available
-                      ? "form-help"
+                      ? "form-success"
                       : "form-error";
             })
             .catch(error => {
@@ -164,7 +164,7 @@
     passwordMatchMessage.innerText = matches
             ? "비밀번호가 일치합니다."
             : "비밀번호가 일치하지 않습니다.";
-    passwordMatchMessage.className = matches ? "form-help" : "form-error";
+    passwordMatchMessage.className = matches ? "form-success" : "form-error";
   }
 
   passwordInput.addEventListener('input', updatePasswordMatchMessage);

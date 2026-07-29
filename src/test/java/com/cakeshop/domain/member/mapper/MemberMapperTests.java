@@ -106,6 +106,7 @@ class MemberMapperTests {
         Member updateMember = new Member();
         updateMember.setId(memberId);
         updateMember.setName("수정된 이름");
+        updateMember.setNickname("수정된닉네임");
         updateMember.setPhone("010-9876-5432");
 
         int updatedRows = memberMapper.update(updateMember);
@@ -115,6 +116,7 @@ class MemberMapperTests {
 
         assertThat(updatedRows).isEqualTo(1);
         assertThat(updatedMember.getName()).isEqualTo("수정된 이름");
+        assertThat(updatedMember.getNickname()).isEqualTo("수정된닉네임");
         assertThat(updatedMember.getPhone()).isEqualTo("010-9876-5432");
         assertThat(updatedMember.getUpdatedAt()).isAfter(UPDATED_AT);
     }

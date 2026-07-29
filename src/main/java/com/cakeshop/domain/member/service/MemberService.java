@@ -69,6 +69,7 @@ public class MemberService {
         }
 
         member.setName(form.getName());
+        member.setNickname(form.getNickname());
         member.setPhone(form.getPhone());
 
         if (memberMapper.update(member) == 0) {
