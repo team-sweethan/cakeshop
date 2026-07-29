@@ -192,6 +192,7 @@
         FROM products p
         INNER JOIN product_option_groups pog
                 ON pog.product_id = p.id
+               AND pog.status = 'ACTIVE'
         INNER JOIN product_options po
                 ON po.option_group_id = pog.id
                AND po.status = 'ACTIVE'
@@ -203,6 +204,153 @@
             po.sort_order ASC,
             po.id ASC
     </select>
+
+    <!-- 관리자 옵션 관리 화면의 그룹과 옵션 조회 -->
+    <select id="findAdminOptionRowsByProductId"
+            resultType="com.cakeshop.domain.product.admin.dto.view.ProductOptionAdminRow">
+
+        SELECT
+            pog.id AS groupId,
+            pog.name AS groupName,
+            pog.required,
+            pog.selection_type AS selectionType,
+            pog.status AS groupStatus,
+            pog.sort_order AS groupSortOrder,
+            po.id AS optionId,
+            po.name AS optionName,
+            po.additional_price AS additionalPrice,
+            po.status AS optionStatus,
+            po.sort_order AS optionSortOrder
+        FROM product_option_groups pog
+        LEFT JOIN product_options po
+               ON po.option_group_id = pog.id
+        WHERE pog.product_id = #{productId}
+        ORDER BY
+            pog.sort_order ASC,
+            pog.id ASC,
+            po.sort_order ASC,
+            po.id ASC
+    </select>
+
+    <!-- 옵션 그룹의 상품 소유 관계 확인 -->
+    <select id="existsOptionGroupById"
+            resultType="boolean">
+
+        SELECT EXISTS (
+            SELECT 1
+            FROM product_option_groups pog
+            WHERE pog.id = #{optionGroupId}
+              AND pog.product_id = #{productId}
+        )
+    </select>
+
+    <!-- 개별 옵션의 상품 및 그룹 소유 관계 확인 -->
+    <select id="existsProductOptionById"
+            resultType="boolean">
+
+        SELECT EXISTS (
+            SELECT 1
+            FROM product_options po
+            INNER JOIN product_option_groups pog
+                    ON pog.id = po.option_group_id
+            WHERE po.id = #{optionId}
+              AND po.option_group_id = #{optionGroupId}
+              AND pog.product_id = #{productId}
+        )
+    </select>
+
+    <!-- 옵션 그룹 등록 -->
+    <insert id="insertOptionGroup"
+            parameterType=
+                    "com.cakeshop.domain.product.entity.ProductOptionGroup"
+            useGeneratedKeys="true"
+            keyProperty="id">
+
+        INSERT INTO product_option_groups (
+            product_id,
+            name,
+            required,
+            selection_type,
+            status,
+            sort_order
+        )
+        VALUES (
+            #{productId},
+            #{name},
+            #{required},
+            #{selectionType},
+            #{status},
+            #{sortOrder}
+        )
+    </insert>
+
+    <!-- 옵션 그룹 수정 및 활성 상태 변경 -->
+    <update id="updateOptionGroup">
+        UPDATE product_option_groups
+        SET
+            name = #{optionGroup.name},
+            required = #{optionGroup.required},
+            selection_type = #{optionGroup.selectionType},
+            status = #{optionGroup.status}
+        WHERE id = #{optionGroup.id}
+          AND product_id = #{productId}
+    </update>
+
+    <!-- 옵션 그룹 표시 순서 변경 -->
+    <update id="updateOptionGroupSortOrder">
+        UPDATE product_option_groups
+        SET sort_order = #{sortOrder}
+        WHERE id = #{optionGroupId}
+          AND product_id = #{productId}
+    </update>
+
+    <!-- 개별 옵션 등록 -->
+    <insert id="insertProductOption"
+            parameterType=
+                    "com.cakeshop.domain.product.entity.ProductOption"
+            useGeneratedKeys="true"
+            keyProperty="id">
+
+        INSERT INTO product_options (
+            option_group_id,
+            name,
+            additional_price,
+            status,
+            sort_order
+        )
+        VALUES (
+            #{optionGroupId},
+            #{name},
+            #{additionalPrice},
+            #{status},
+            #{sortOrder}
+        )
+    </insert>
+
+    <!-- 개별 옵션 수정 및 활성 상태 변경 -->
+    <update id="updateProductOption">
+        UPDATE product_options po
+        INNER JOIN product_option_groups pog
+                ON pog.id = po.option_group_id
+        SET
+            po.name = #{option.name},
+            po.additional_price = #{option.additionalPrice},
+            po.status = #{option.status}
+        WHERE po.id = #{option.id}
+          AND po.option_group_id = #{optionGroupId}
+          AND pog.product_id = #{productId}
+    </update>
+
+    <!-- 개별 옵션 표시 순서 변경 -->
+    <update id="updateProductOptionSortOrder">
+        UPDATE product_options po
+        INNER JOIN product_option_groups pog
+                ON pog.id = po.option_group_id
+        SET po.sort_order = #{sortOrder}
+        WHERE po.id = #{optionId}
+          AND po.option_group_id = #{optionGroupId}
+          AND pog.product_id = #{productId}
+    </update>
 
     <!-- 관리자 상품 목록에서 공통으로 사용하는 검색 및 필터 조건 -->
     <sql id="adminProductConditions">
