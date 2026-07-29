@@ -38,7 +38,11 @@ divergence_rows() {
         [ "$ref" = "$BASE" ] && continue
         # --left-right --count 는 "뒤처진수<TAB>앞선수" 순으로 낸다.
         read -r behind ahead < <(git rev-list --left-right --count "$BASE...$ref")
-        if [ "$ahead" -gt 0 ]; then
+        if [ "$ref" = "origin/main" ]; then
+            # main 은 릴리스 브랜치라 dev 를 앞설 일이 없다. 다른 브랜치와 같은
+            # 기준으로 "반영 완료"라고 적으면 병합 대기 중인 작업처럼 읽힌다.
+            status='릴리스 브랜치'
+        elif [ "$ahead" -gt 0 ]; then
             status='작업 중'
         elif [ "$behind" -eq 0 ]; then
             status='`dev`와 동일'
@@ -70,7 +74,7 @@ mkdir -p "$(dirname "$OUT")"
     divergence_rows
 
     printf '\n- "앞선 커밋"이 0이면 그 브랜치의 모든 커밋이 이미 `dev`에 들어가 있다는 뜻이다.\n'
-    printf '%s\n' '- `main`은 릴리스 브랜치라 앞선 커밋이 0인 것이 정상이다.'
+    printf '%s\n' '- `main`의 "뒤처진 커밋"은 아직 릴리스되지 않은 `dev`의 작업량이다.'
 } > "$OUT"
 
 printf 'wrote: %s\n' "$OUT"
