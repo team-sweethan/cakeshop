@@ -44,6 +44,18 @@ jobs:
           EXCLUDE_BRANCH: ${{ env.WORK_BRANCH }}
         run: ./.github/scripts/branch-status.sh "$DOC"
 
+      # GITHUB_TOKEN 이 연 PR 에는 ci.yml 이 돌지 않는다. 대신 PR 을 열기 전에 여기서
+      # 검증한다. 이 PR 이 마크다운 한 개만 바꾼다는 사실 자체가 검증 대상이다.
+      - name: Verify only the document changed
+        run: |
+          changed="$(git diff --name-only)"
+          if [ -n "$changed" ] && [ "$changed" != "$DOC" ]; then
+            echo "::error::$DOC 외의 파일이 바뀌었다. 이 워크플로는 문서만 갱신해야 한다."
+            echo "$changed"
+            exit 1
+          fi
+          bash -n ./.github/scripts/branch-status.sh
+
       - name: Stop if unchanged
         id: diff
         run: |
@@ -65,9 +77,12 @@ jobs:
           git push --force origin "$WORK_BRANCH"
 
       # GITHUB_TOKEN 이 연 PR 에는 ci.yml 이 돌지 않는다(토큰이 만든 이벤트는 다른
-      # 워크플로를 깨우지 않는다). 이 PR 은 마크다운 한 개만 바꾸므로 Gradle 테스트로
-      # 검증할 대상이 없어 그대로 둔다. CI 체크가 필요해지면 PAT 이나 GitHub App
-      # 토큰으로 바꿔야 한다.
+      # 워크플로를 깨우지 않는다). 검증은 위의 "Verify only the document changed"
+      # 스텝이 대신하며, 바뀌는 것이 마크다운 한 개뿐이라 Gradle 테스트로 검증할
+      # 대상이 없다는 사실 자체를 거기서 강제한다.
+      #
+      # dev 에 branch protection 을 걸어 ci.yml 을 필수 체크로 만들면 이 PR 은 머지할
+      # 수 없게 된다. 그때는 PAT 이나 GitHub App 토큰으로 바꿔야 한다.
       - name: Open pull request if none is open
         if: steps.diff.outputs.changed == 'true'
         run: |

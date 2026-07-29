@@ -47,11 +47,20 @@ latest_rows() {
     # refname:short 는 origin/HEAD 를 그냥 "origin" 으로 줄여 버려서 브랜치와 구별되지
     # 않는다. 전체 refname 으로 걸러낸 뒤 접두어를 직접 뗀다.
     #
-    # 필드 구분자로 탭을 쓰면 탭이 들어간 작성자명과 구별되지 않아 이후 열이 한 칸씩
-    # 밀린다. Git 이 ident 에 허용하지 않는 제어문자 US(0x1F)로 나눈다.
+    # 필드는 NUL 로 나눈다. 작성자명에는 탭도 US(0x1F)도 들어갈 수 있어서, 그런
+    # 구분자를 쓰면 이름 안의 문자와 구별되지 않아 이후 열이 밀린다. NUL 만은
+    # Git 이 값에 담을 수 없다.
+    #
+    # 레코드 끝의 %00 뒤에 for-each-ref 가 줄바꿈을 붙이므로, 다음 레코드의 첫 필드
+    # 앞에 그 줄바꿈이 남는다. 읽은 뒤에 떼어 낸다.
     git for-each-ref --sort=-committerdate refs/remotes/origin \
-        --format='%(refname)%1f%(committerdate:short)%1f%(authorname)%1f%(objectname:short)%1f%(contents:subject)' |
-    while IFS=$'\x1f' read -r ref date author sha subject; do
+        --format='%(refname)%00%(committerdate:short)%00%(authorname)%00%(objectname:short)%00%(contents:subject)%00' |
+    while IFS= read -r -d '' ref &&
+          IFS= read -r -d '' date &&
+          IFS= read -r -d '' author &&
+          IFS= read -r -d '' sha &&
+          IFS= read -r -d '' subject; do
+        ref="${ref#$'\n'}"
         skip_ref "$ref" && continue
         printf '| `%s` | %s | %s | %s | %s |\n' \
             "$(cell "${ref#"$PREFIX"}")" "$date" "$(cell "$author")" "$sha" "$(cell "$subject")"
@@ -105,7 +114,7 @@ mkdir -p "$(dirname "$OUT")"
     printf '\n- "앞선 커밋"이 0이면 그 브랜치의 모든 커밋이 이미 `dev`에 들어가 있다는 뜻이다.\n'
     printf '%s\n' '- `main`의 "뒤처진 커밋"은 아직 릴리스되지 않은 `dev`의 작업량이다.'
     printf '%s`%s`%s\n' \
-        '- 위 수치는 기준 커밋 ' "$base_sha" ' 시점의 스냅샷이다. 이 문서를 머지하면 그 커밋과 merge commit 이 `dev`에 얹히므로, 머지 직후의 "뒤처진 커밋" 실제 값은 표보다 1~2 크다.'
+        '- 위 수치는 기준 커밋 ' "$base_sha" ' 시점의 스냅샷이다. 실제 값은 이 문서가 머지되는 순간 이미 더 커져 있다. 이 문서 자신의 커밋과 merge commit 이 `dev`에 얹히고(1~2), 그 사이 다른 PR 이 먼저 머지됐다면 그 커밋 수만큼 더 더해진다. 정확한 값은 `git rev-list --left-right --count origin/dev...origin/<브랜치>`로 확인한다.'
 } > "$OUT"
 
 printf 'wrote: %s\n' "$OUT"
