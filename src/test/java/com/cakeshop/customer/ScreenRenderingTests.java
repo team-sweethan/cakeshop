@@ -1,5 +1,7 @@
 package com.cakeshop.customer;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -59,6 +61,28 @@ class ScreenRenderingTests {
         };
 
         assertScreensRender(paths);
+    }
+
+    @Test
+    @WithUserDetails(
+        value = "admin@cakeshop.local",
+        userDetailsServiceBeanName = "memberDetailsService"
+    )
+    void productOptionAdminScreenRendersWithSeededAdmin()
+            throws Exception {
+        assertScreensRender(new String[] {"/admin/products"});
+
+        mockMvc.perform(get("/admin/products/1/options"))
+            .andExpect(status().isOk())
+            .andExpect(content().contentTypeCompatibleWith("text/html"))
+            .andExpect(content().string(containsString("옵션:")))
+            .andExpect(content().string(containsString("1호")))
+            .andExpect(content().string(containsString("2호")))
+            .andExpect(content().string(containsString("위로 이동")))
+            .andExpect(content().string(containsString("아래로 이동")))
+            .andExpect(content().string(not(
+                containsString("name=\"sortOrder\"")
+            )));
     }
 
     private void assertScreensRender(String[] paths) throws Exception {
