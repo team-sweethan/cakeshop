@@ -48,6 +48,15 @@ class ScreenRenderingTests {
     }
 
     @Test
+    void login_successMessage_rendersCommonPopupFragment() throws Exception {
+        mockMvc.perform(get("/login")
+                .flashAttr("successMessage", "회원가입이 완료되었습니다!"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("data-common-alert-popup")))
+            .andExpect(content().string(containsString("window.alert(")));
+    }
+
+    @Test
     @WithUserDetails(
         value = "user@cakeshop.local",
         userDetailsServiceBeanName = "memberDetailsService"

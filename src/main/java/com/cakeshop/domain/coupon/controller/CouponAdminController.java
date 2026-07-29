@@ -78,7 +78,7 @@ public class CouponAdminController {
         }
 
         try {
-            couponAdminService.insertCoupon(form, member.getMember().getId());
+            couponAdminService.insertCoupon(form, member.getMemberId());
 
             redirectAttributes.addFlashAttribute(
                     "successMessage",

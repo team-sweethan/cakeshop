@@ -13,8 +13,9 @@ import com.cakeshop.domain.coupon.controller.CouponController;
 import com.cakeshop.domain.home.controller.HomeController;
 import com.cakeshop.domain.home.service.HomeService;
 import com.cakeshop.domain.member.controller.AuthController;
+import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
+import com.cakeshop.domain.member.dto.view.MemberProfileView;
 import com.cakeshop.domain.member.controller.MyPageController;
-import com.cakeshop.domain.member.entity.Member;
 import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.notification.controller.NotificationController;
 import com.cakeshop.domain.order.controller.OrderController;
@@ -33,6 +34,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -44,30 +46,34 @@ class CustomerPageControllerTests {
 
     @BeforeEach
     void setUp() {
-        Member loginMember = Member.builder()
-                .id(1L)
-                .email("customer@cakeshop.local")
-                .password("dummy")
-                .role("CUSTOMER")
-                .build();
-
-        MemberDetails principal = new MemberDetails(loginMember);
+        MemberDetails principal = new MemberDetails(new MemberAuthenticationView(
+                1L,
+                "customer@cakeshop.local",
+                "dummy",
+                "CUSTOMER",
+                true));
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(
                         principal, null, principal.getAuthorities()));
 
         MemberService memberService = mock(MemberService.class);
-        when(memberService.getMemberByEmail(anyString()))
-                .thenReturn(loginMember);
+        when(memberService.getMemberProfile(anyString()))
+                .thenReturn(new MemberProfileView(
+                        "customer@cakeshop.local",
+                        "고객",
+                        "케이크러버",
+                        "010-1234-5678"));
 
         mockMvc = MockMvcBuilders.standaloneSetup(
                         new HomeController(mock(HomeService.class)),
-                        new AuthController(),
+                        new AuthController(memberService),
                         new ProductController(mock(ProductService.class)),
                         new CartController(),
                         new OrderController(),
                         new PaymentController(),
-                        new MyPageController(memberService),
+                        new MyPageController(
+                                memberService,
+                                mock(SessionRegistry.class)),
                         new NotificationController(),
                         new CouponController(),
                         new ReviewController())
@@ -140,6 +146,8 @@ class CustomerPageControllerTests {
         assertThat(mockupScript)
                 .contains("source: cakeProjectSample/js/cart.js")
                 .contains("location.href = \"/cart\"")
+                .contains("event.preventDefault()")
+                .doesNotContain("event.preventDefalt()")
                 .doesNotContain("/customer/");
     }
 }

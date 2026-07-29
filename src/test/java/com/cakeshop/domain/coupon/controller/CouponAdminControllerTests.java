@@ -23,6 +23,7 @@ import com.cakeshop.domain.coupon.entity.DiscountType;
 import com.cakeshop.domain.coupon.error.CouponErrorCode;
 import com.cakeshop.domain.coupon.service.CouponAdminService;
 import com.cakeshop.domain.member.entity.Member;
+import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
@@ -232,7 +233,12 @@ class CouponAdminControllerTests {
             .password("encoded-password")
             .role("ADMIN")
             .build();
-        MemberDetails memberDetails = new MemberDetails(member);
+        MemberDetails memberDetails = new MemberDetails(new MemberAuthenticationView(
+                member.getId(),
+                member.getEmail(),
+                member.getPassword(),
+                member.getRole(),
+                true));
 
         SecurityContextHolder.getContext().setAuthentication(
             new UsernamePasswordAuthenticationToken(
