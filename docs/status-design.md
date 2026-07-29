@@ -39,7 +39,8 @@
 |---|---|---|---|---|
 | `members.status` | 수민 | 정상 / 이용 제한 | `ACTIVE / SUSPENDED / WITHDRAWN` | 거의 확정 |
 | `products.status` | 시은 | 판매 중 / 판매 중지 | `ACTIVE / INACTIVE` | 거의 확정 |
-| `product_options.status` | 시은 | (표기 없음) | `ACTIVE / INACTIVE` ? | ☐ 열림 |
+| `product_option_groups.status` | 시은 | 활성 / 비활성 | `ACTIVE / INACTIVE` | ✅ 정책 확정 |
+| `product_options.status` | 시은 | 활성 / 비활성 | `ACTIVE / INACTIVE` | ✅ 정책 확정 |
 | `orders.status` | 주환 | 승인대기/승인/거절/결제대기/결제완료/접수/제작중/픽업준비/픽업완료 | **`OrderStatus` 11개 (확정)** | ✅ 코드 확정 |
 | `payments.status` | 주환 | 결제 완료 / 결제 대기 | **`PaymentStatus` 6개 (확정)** | ✅ 코드 확정 |
 | `payment_cancellations.status` | 주환 | 취소 요청 | `REQUESTED / DONE / REJECTED` ? | ☐ 열림 |
@@ -50,6 +51,15 @@
 | `post_reports.status` | 현규 | (신고 처리) | `PENDING / ACCEPTED / REJECTED` | 거의 확정 |
 | `reviews.status` | 현규 | 숨김 | `VISIBLE / HIDDEN` ? | ☐ 열림 |
 | `chat_rooms.status` | 민정 | 상담가능 / 상담중 / 미답변 | `OPEN / CLOSED` ? (아래 함정 참고) | ☐ 열림 |
+
+### 상품 옵션 상태 정책
+
+- `product_option_groups.status`와 `product_options.status`는
+  `ACTIVE / INACTIVE`를 사용한다.
+- 관리자 삭제 요청은 물리 삭제하지 않고 `INACTIVE`로 변경한다.
+- 비활성 그룹과 옵션은 관리자 화면에 남겨 재활성화할 수 있다.
+- 고객 화면에는 그룹과 옵션이 모두 `ACTIVE`인 경우만 노출한다.
+- 장바구니·주문이 참조할 수 있는 옵션 행의 식별자는 삭제하지 않는다.
 
 ### 이미 확정된 두 enum
 
@@ -119,7 +129,6 @@ READY / DONE / CANCELED / PARTIAL_CANCELED / ABORTED / EXPIRED
 
 | 담당 | 채울 것 |
 |---|---|
-| 시은 | `product_options.status` 필요 여부 확정 |
 | 주환 | `payment_cancellations.status` 값 확정 |
 | 정후 | `coupons.status`(캠페인 상태) 값 확정 |
 | 현규 | `comments.status` / `reviews.status`(숨김) 값 확정 |

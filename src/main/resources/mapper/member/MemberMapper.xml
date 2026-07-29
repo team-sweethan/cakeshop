@@ -12,19 +12,20 @@
         <result property="updatedAt" column="updated_at"/>
         <result property="withdrawnAt" column="withdrawn_at"/>
         <result property="name" column="name"/>
+        <result property="birthDate" column="birth_date"/>
     </resultMap>
 
     <!-- 인증 입력도 문자열 치환 없이 #{}로 바인딩한다. -->
     <select id="findByEmail" resultMap="memberResultMap">
         SELECT id, email, password, nickname, role, status,
-               created_at, updated_at, withdrawn_at, phone, name
+               created_at, updated_at, withdrawn_at, phone, name, birth_date
           FROM members
          WHERE email = #{email}
     </select>
 
     <insert id="join" parameterType="com.cakeshop.domain.member.entity.Member">
-        INSERT INTO members (email, password, nickname, role, name, created_at, phone)
-        VALUES (#{email}, #{password}, #{nickname}, #{role}, #{name}, NOW(), #{phone})
+        INSERT INTO members (email, password, nickname, role, name, created_at, phone, birth_date)
+        VALUES (#{email}, #{password}, #{nickname}, #{role}, #{name}, NOW(), #{phone}, #{birthDate})
     </insert>
 
     <update id="update" parameterType="com.cakeshop.domain.member.entity.Member">

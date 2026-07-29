@@ -37,6 +37,7 @@ public class MemberService {
                 .name(form.getName())
                 .nickname(form.getNickname())
                 .phone(form.getPhone())
+                .birthDate(form.getBirthDate())
                 .role("USER")
                 .build();
         memberMapper.join(member);
@@ -85,7 +86,8 @@ public class MemberService {
                 member.getEmail(),
                 member.getName(),
                 member.getNickname(),
-                member.getPhone());
+                member.getPhone(),
+                member.getBirthDate());
     }
 
     @Transactional

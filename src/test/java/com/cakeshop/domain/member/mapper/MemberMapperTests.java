@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.cakeshop.domain.member.entity.Member;
 import com.cakeshop.domain.member.entity.MemberStatus;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
 import org.mybatis.spring.boot.test.autoconfigure.MybatisTest;
@@ -43,6 +44,7 @@ class MemberMapperTests {
         assertThat(member.getCreatedAt()).isEqualTo(CREATED_AT);
         assertThat(member.getUpdatedAt()).isEqualTo(UPDATED_AT);
         assertThat(member.getWithdrawnAt()).isNull();
+        assertThat(member.getBirthDate()).isNull();
     }
 
     @Test
@@ -103,6 +105,11 @@ class MemberMapperTests {
     void update_existingMember_updatesFieldsAndDatabaseTimestamp() {
         String email = uniqueEmail("update");
         Long memberId = insertMember(email, MemberStatus.ACTIVE);
+        LocalDate birthDate = LocalDate.of(2000, 1, 15);
+        jdbcTemplate.update(
+                "UPDATE members SET birth_date = ? WHERE id = ?",
+                birthDate,
+                memberId);
         Member updateMember = new Member();
         updateMember.setId(memberId);
         updateMember.setName("수정된 이름");
@@ -118,6 +125,7 @@ class MemberMapperTests {
         assertThat(updatedMember.getName()).isEqualTo("수정된 이름");
         assertThat(updatedMember.getNickname()).isEqualTo("수정된닉네임");
         assertThat(updatedMember.getPhone()).isEqualTo("010-9876-5432");
+        assertThat(updatedMember.getBirthDate()).isEqualTo(birthDate);
         assertThat(updatedMember.getUpdatedAt()).isAfter(UPDATED_AT);
     }
 
@@ -130,6 +138,7 @@ class MemberMapperTests {
                 .name("가입 회원")
                 .nickname("신규회원")
                 .phone("010-1234-5678")
+                .birthDate(LocalDate.of(2000, 1, 15))
                 .role("USER")
                 .build();
 
@@ -145,6 +154,7 @@ class MemberMapperTests {
         assertThat(insertedMember.getName()).isEqualTo("가입 회원");
         assertThat(insertedMember.getNickname()).isEqualTo("신규회원");
         assertThat(insertedMember.getPhone()).isEqualTo("010-1234-5678");
+        assertThat(insertedMember.getBirthDate()).isEqualTo(LocalDate.of(2000, 1, 15));
         assertThat(insertedMember.getRole()).isEqualTo("USER");
         assertThat(insertedMember.getStatus())
                 .isEqualTo(MemberStatus.ACTIVE);
