@@ -1,6 +1,7 @@
 name: Branch Status
 
-# 브랜치 현황 문서(docs/branch_update.md)를 매일 다시 만들어 PR로 올린다.
+# 브랜치 현황 문서(docs/branch_update.md)와 HTML 요약(docs/branch_status.html)을
+# 매일 다시 만들어 PR로 올린다.
 # dev 에 직접 push 하지 않고, chore/branch-status 브랜치 하나를 계속 덮어쓴다.
 
 on:
@@ -26,6 +27,7 @@ jobs:
 
     env:
       DOC: docs/branch_update.md
+      HTML: docs/branch_status.html
       WORK_BRANCH: chore/branch-status
       GH_TOKEN: ${{ github.token }}
 
@@ -42,16 +44,19 @@ jobs:
         # 기록된 SHA 와 앞선 커밋 수가 곧바로 어긋난다. 보고 대상에서 뺀다.
         env:
           EXCLUDE_BRANCH: ${{ env.WORK_BRANCH }}
-        run: ./.github/scripts/branch-status.sh "$DOC"
+        run: ./.github/scripts/branch-status.sh "$DOC" "$HTML"
 
       # GITHUB_TOKEN 이 연 PR 에는 ci.yml 이 돌지 않는다. 대신 PR 을 열기 전에 여기서
-      # 검증한다. 이 PR 이 마크다운 한 개만 바꾼다는 사실 자체가 검증 대상이다.
-      - name: Verify only the document changed
+      # 검증한다. 이 PR 이 생성 대상 문서 두 개만 바꾼다는 사실 자체가 검증 대상이다.
+      - name: Verify only the documents changed
         run: |
-          changed="$(git diff --name-only)"
-          if [ -n "$changed" ] && [ "$changed" != "$DOC" ]; then
-            echo "::error::$DOC 외의 파일이 바뀌었다. 이 워크플로는 문서만 갱신해야 한다."
-            echo "$changed"
+          # git diff 는 추적 중인 파일만 본다. 생성 대상이 아직 커밋된 적 없으면
+          # untracked 로 남아 diff 에 잡히지 않으므로, 여기서는 status 로 본다.
+          changed="$(git status --porcelain --untracked-files=all | cut -c4-)"
+          unexpected="$(printf '%s' "$changed" | grep -v -x -e "$DOC" -e "$HTML" || true)"
+          if [ -n "$unexpected" ]; then
+            echo "::error::$DOC, $HTML 외의 파일이 바뀌었다. 이 워크플로는 이 두 문서만 갱신해야 한다."
+            echo "$unexpected"
             exit 1
           fi
           bash -n ./.github/scripts/branch-status.sh
@@ -59,7 +64,9 @@ jobs:
       - name: Stop if unchanged
         id: diff
         run: |
-          if git diff --quiet -- "$DOC"; then
+          # 위와 같은 이유로 diff 가 아니라 status 로 판단한다. diff 로 보면 아직
+          # 커밋된 적 없는 생성물이 "변경 없음" 으로 읽혀 영영 커밋되지 않는다.
+          if [ -z "$(git status --porcelain --untracked-files=all -- "$DOC" "$HTML")" ]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "변경 없음. PR 을 만들지 않는다."
           else
@@ -72,13 +79,13 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -C "$WORK_BRANCH"
-          git add "$DOC"
+          git add "$DOC" "$HTML"
           git commit -m "docs: 브랜치 현황 자동 갱신 ($(TZ=Asia/Seoul date +%Y-%m-%d))"
           git push --force origin "$WORK_BRANCH"
 
       # GITHUB_TOKEN 이 연 PR 에는 ci.yml 이 돌지 않는다(토큰이 만든 이벤트는 다른
-      # 워크플로를 깨우지 않는다). 검증은 위의 "Verify only the document changed"
-      # 스텝이 대신하며, 바뀌는 것이 마크다운 한 개뿐이라 Gradle 테스트로 검증할
+      # 워크플로를 깨우지 않는다). 검증은 위의 "Verify only the documents changed"
+      # 스텝이 대신하며, 바뀌는 것이 생성 대상 문서 두 개뿐이라 Gradle 테스트로 검증할
       # 대상이 없다는 사실 자체를 거기서 강제한다.
       #
       # dev 에 branch protection 을 걸어 ci.yml 을 필수 체크로 만들면 이 PR 은 머지할
@@ -96,13 +103,14 @@ jobs:
               --body-file - <<BODY
           ## 변경 목적
 
-          \`docs/branch_update.md\` 의 브랜치 현황을 최신 상태로 유지한다. 이 PR 은
+          브랜치 현황 문서를 최신 상태로 유지한다. 이 PR 은
           \`.github/workflows/branch-status.yml\` 이 매일 00시(KST)에 자동으로 연다.
 
           ## 주요 변경 사항
 
-          - \`$DOC\` 한 파일만 다시 생성했다. 내용은 전부 Git 메타데이터에서 나오며
-            사람이 쓴 문장은 없다.
+          - \`$DOC\` 와 \`$HTML\` 두 파일만 다시 생성했다. 내용은 전부 Git
+            메타데이터에서 나오며 사람이 쓴 문장은 없다.
+          - 두 파일은 같은 수집 결과에서 나오므로 서로 다른 시점을 가리키지 않는다.
           - 생성 로직은 \`.github/scripts/branch-status.sh\` 에 있다. 문서가 이상하면
             문서가 아니라 이 스크립트를 고친다.
 
@@ -110,7 +118,7 @@ jobs:
 
           - 실행 명령: 없음
           - 결과: 해당 없음
-          - 미실행 사유: 마크다운 문서 한 개만 바뀐다. 애플리케이션 코드, 설정,
+          - 미실행 사유: 생성된 문서 두 개만 바뀐다. 애플리케이션 코드, 설정,
             테스트가 포함되지 않아 Gradle 테스트로 검증할 대상이 없다.
             생성 스크립트 자체의 검증은 스크립트를 바꾸는 PR 에서 수행한다.
 

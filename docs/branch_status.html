@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>브랜치 현황 한눈에 보기</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #f1f5f9;
+  --panel: #ffffff;
+  --line: #d8e0ea;
+  --text: #16202e;
+  --muted: #5b6b80;
+  --blue: #2563eb;
+  --green: #16a34a;
+  --orange: #ea580c;
+  --gray: #64748b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e141c;
+    --panel: #161f2b;
+    --line: #2a3849;
+    --text: #e6edf5;
+    --muted: #94a6bb;
+    --blue: #60a5fa;
+    --green: #4ade80;
+    --orange: #fb923c;
+    --gray: #94a3b8;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 2rem 1.25rem 3rem;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.6 "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+}
+.wrap { max-width: 1180px; margin: 0 auto; }
+header { text-align: center; margin-bottom: 2rem; }
+h1 { margin: 0 0 .35rem; font-size: clamp(1.6rem, 4vw, 2.4rem); letter-spacing: -.02em; }
+.sub { margin: 0; color: var(--muted); }
+section {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 1.35rem 1.4rem 1.5rem;
+  margin-bottom: 1.25rem;
+}
+h2 {
+  margin: 0 0 1.1rem;
+  font-size: 1.05rem;
+  color: var(--blue);
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+}
+h2::before {
+  content: counter(sec);
+  counter-increment: sec;
+  display: grid;
+  place-items: center;
+  width: 1.6em;
+  height: 1.6em;
+  border-radius: 50%;
+  background: var(--blue);
+  color: #fff;
+  font-size: .85em;
+}
+.wrap { counter-reset: sec; }
+
+/* 기준 브랜치 */
+.spine-head {
+  border: 2px solid var(--blue);
+  border-radius: 12px;
+  padding: .9rem 1.1rem;
+  margin-bottom: 1.25rem;
+  background: color-mix(in srgb, var(--blue) 8%, transparent);
+}
+.spine-name { font-weight: 700; font-size: 1.15rem; color: var(--blue); }
+.spine-meta { color: var(--muted); font-size: .87rem; margin-top: .15rem; }
+.spine-subject { margin-top: .4rem; }
+
+/* 브랜치 카드 */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(265px, 1fr));
+  gap: .9rem;
+}
+.card {
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--gray);
+  border-radius: 10px;
+  padding: .85rem 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+}
+.card.wip { border-left-color: var(--orange); }
+.card.merged, .card.same { border-left-color: var(--green); }
+.card.release { border-left-color: var(--gray); }
+.card h3 { margin: 0; font-size: .97rem; word-break: break-all; }
+.card dl { margin: 0; display: grid; gap: .1rem; font-size: .85rem; }
+.card dl div { display: flex; gap: .5rem; }
+.card dt { color: var(--muted); min-width: 5.2em; }
+.card dd { margin: 0; }
+.subject { margin: 0; font-size: .88rem; color: var(--muted); }
+.counts { margin: 0; display: flex; gap: .5rem; font-size: .82rem; }
+.counts span { padding: .1rem .5rem; border-radius: 5px; background: color-mix(in srgb, var(--gray) 15%, transparent); }
+code { font-family: ui-monospace, Consolas, monospace; font-size: .92em; }
+
+/* 상태 배지 */
+.badge {
+  align-self: flex-start;
+  padding: .2rem .6rem;
+  border-radius: 999px;
+  font-size: .8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.badge.wip { background: color-mix(in srgb, var(--orange) 18%, transparent); color: var(--orange); }
+.badge.merged, .badge.same { background: color-mix(in srgb, var(--green) 18%, transparent); color: var(--green); }
+.badge.release { background: color-mix(in srgb, var(--gray) 18%, transparent); color: var(--gray); }
+
+/* 표 */
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 520px; }
+th, td { padding: .55rem .7rem; border-bottom: 1px solid var(--line); text-align: left; }
+thead th { background: color-mix(in srgb, var(--blue) 10%, transparent); font-size: .87rem; }
+tbody th { font-weight: 500; word-break: break-all; }
+.num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.num.zero { color: var(--green); }
+.num.nonzero { color: var(--orange); }
+
+/* 해석 */
+ol.notes { margin: 0; padding-left: 1.3rem; display: grid; gap: .5rem; }
+footer { color: var(--muted); font-size: .84rem; text-align: center; margin-top: 1.5rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>브랜치 현황 한눈에 보기</h1>
+  <p class="sub">2026-07-29 기준 · 최신 커밋 및 병합 상태 요약</p>
+</header>
+<section>
+  <h2>브랜치별 최신 커밋</h2>
+  <div class="spine-head">
+    <div class="spine-name">dev</div>
+    <div class="spine-meta">2026-07-29 · 시은 · <code>7a733df</code></div>
+    <div class="spine-subject">Merge pull request #38 from team-sweethan/feature/product-sales-query</div>
+  </div>
+  <div class="cards">
+  <article class="card wip">
+    <h3>feature/order-payment-entity</h3>
+    <dl>
+      <div><dt>최신 커밋일</dt><dd>2026-07-29</dd></div>
+      <div><dt>작성자</dt><dd>juhwanz</dd></div>
+      <div><dt>커밋</dt><dd><code>83c6c8c</code></dd></div>
+    </dl>
+    <p class="subject">test: 주문·결제 통합 테스트를 최신 DB 설정에 맞춤</p>
+    <p class="counts"><span class="ahead">앞선 15</span><span class="behind">뒤처진 4</span></p>
+    <span class="badge wip">작업 중</span>
+  </article>
+  <article class="card same">
+    <h3>feature/product-option-management</h3>
+    <dl>
+      <div><dt>최신 커밋일</dt><dd>2026-07-29</dd></div>
+      <div><dt>작성자</dt><dd>시은</dd></div>
+      <div><dt>커밋</dt><dd><code>7a733df</code></dd></div>
+    </dl>
+    <p class="subject">Merge pull request #38 from team-sweethan/feature/product-sales-query</p>
+    <p class="counts"><span class="ahead">앞선 0</span><span class="behind">뒤처진 0</span></p>
+    <span class="badge same">dev와 동일</span>
+  </article>
+  <article class="card wip">
+    <h3>feature/member-account-management</h3>
+    <dl>
+      <div><dt>최신 커밋일</dt><dd>2026-07-29</dd></div>
+      <div><dt>작성자</dt><dd>sm</dd></div>
+      <div><dt>커밋</dt><dd><code>1d5bfa6</code></dd></div>
+    </dl>
+    <p class="subject">fix: 회원 계정 관리 리뷰 사항 반영</p>
+    <p class="counts"><span class="ahead">앞선 3</span><span class="behind">뒤처진 2</span></p>
+    <span class="badge wip">작업 중</span>
+  </article>
+  <article class="card wip">
+    <h3>chore/branch-status-workflow</h3>
+    <dl>
+      <div><dt>최신 커밋일</dt><dd>2026-07-29</dd></div>
+      <div><dt>작성자</dt><dd>HyunGyu-Cho</dd></div>
+      <div><dt>커밋</dt><dd><code>90a0de2</code></dd></div>
+    </dl>
+    <p class="subject">fix: 필드 구분자를 NUL 로 바꾸고 게시 후 오차 설명을 정정</p>
+    <p class="counts"><span class="ahead">앞선 5</span><span class="behind">뒤처진 4</span></p>
+    <span class="badge wip">작업 중</span>
+  </article>
+  <article class="card wip">
+    <h3>feature/order-payment-mvp</h3>
+    <dl>
+      <div><dt>최신 커밋일</dt><dd>2026-07-29</dd></div>
+      <div><dt>작성자</dt><dd>juhwanz</dd></div>
+      <div><dt>커밋</dt><dd><code>7616fa0</code></dd></div>
+    </dl>
+    <p class="subject">merge: dev 브랜치 최신화 반영</p>
+    <p class="counts"><span class="ahead">앞선 6</span><span class="behind">뒤처진 4</span></p>
+    <span class="badge wip">작업 중</span>
+  </article>
+  <article class="card merged">
+    <h3>dev_common_rules_fix</h3>
+    <dl>
+      <div><dt>최신 커밋일</dt><dd>2026-07-29</dd></div>
+      <div><dt>작성자</dt><dd>HyunGyu-Cho</dd></div>
+      <div><dt>커밋</dt><dd><code>b0353b9</code></dd></div>
+    </dl>
+    <p class="subject">docs: README 처음 설치 절차를 자립적으로 재구성</p>
+    <p class="counts"><span class="ahead">앞선 0</span><span class="behind">뒤처진 9</span></p>
+    <span class="badge merged">dev에 반영 완료</span>
+  </article>
+  <article class="card merged">
+    <h3>feature/coupon</h3>
+    <dl>
+      <div><dt>최신 커밋일</dt><dd>2026-07-28</dd></div>
+      <div><dt>작성자</dt><dd>leejunghoo</dd></div>
+      <div><dt>커밋</dt><dd><code>5abb464</code></dd></div>
+    </dl>
+    <p class="subject">관리자 쿠폰 목록/등록/수정/상태변경 작업 (회원 관련된 쿠폰 내용은 이후 구현 예정)</p>
+    <p class="counts"><span class="ahead">앞선 0</span><span class="behind">뒤처진 46</span></p>
+    <span class="badge merged">dev에 반영 완료</span>
+  </article>
+  <article class="card merged">
+    <h3>chore/mac-local-setup</h3>
+    <dl>
+      <div><dt>최신 커밋일</dt><dd>2026-07-24</dd></div>
+      <div><dt>작성자</dt><dd>hxtchhxkxr</dd></div>
+      <div><dt>커밋</dt><dd><code>280e9d5</code></dd></div>
+    </dl>
+    <p class="subject">fix: 매장 관리자 테스트의 FlashMessage 참조 수정</p>
+    <p class="counts"><span class="ahead">앞선 0</span><span class="behind">뒤처진 64</span></p>
+    <span class="badge merged">dev에 반영 완료</span>
+  </article>
+  <article class="card release">
+    <h3>main</h3>
+    <dl>
+      <div><dt>최신 커밋일</dt><dd>2026-07-24</dd></div>
+      <div><dt>작성자</dt><dd>HyunGyu-Cho</dd></div>
+      <div><dt>커밋</dt><dd><code>2ef4477</code></dd></div>
+    </dl>
+    <p class="subject">skeleton code</p>
+    <p class="counts"><span class="ahead">앞선 0</span><span class="behind">뒤처진 66</span></p>
+    <span class="badge release">릴리스 브랜치</span>
+  </article>
+  </div>
+</section>
+<section>
+  <h2>dev 기준 앞/뒤 커밋 수</h2>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>브랜치</th><th class="num">앞선 커밋<br>(dev에 없는 커밋)</th><th class="num">뒤처진 커밋<br>(dev에 있는 커밋)</th><th>상태</th></tr></thead>
+      <tbody>
+      <tr>
+        <th scope="row">feature/order-payment-entity</th>
+        <td class="num nonzero">15</td>
+        <td class="num">4</td>
+        <td><span class="badge wip">작업 중</span></td>
+      </tr>
+      <tr>
+        <th scope="row">feature/order-payment-mvp</th>
+        <td class="num nonzero">6</td>
+        <td class="num">4</td>
+        <td><span class="badge wip">작업 중</span></td>
+      </tr>
+      <tr>
+        <th scope="row">chore/branch-status-workflow</th>
+        <td class="num nonzero">5</td>
+        <td class="num">4</td>
+        <td><span class="badge wip">작업 중</span></td>
+      </tr>
+      <tr>
+        <th scope="row">feature/member-account-management</th>
+        <td class="num nonzero">3</td>
+        <td class="num">2</td>
+        <td><span class="badge wip">작업 중</span></td>
+      </tr>
+      <tr>
+        <th scope="row">main</th>
+        <td class="num zero">0</td>
+        <td class="num">66</td>
+        <td><span class="badge release">릴리스 브랜치</span></td>
+      </tr>
+      <tr>
+        <th scope="row">chore/mac-local-setup</th>
+        <td class="num zero">0</td>
+        <td class="num">64</td>
+        <td><span class="badge merged">dev에 반영 완료</span></td>
+      </tr>
+      <tr>
+        <th scope="row">feature/coupon</th>
+        <td class="num zero">0</td>
+        <td class="num">46</td>
+        <td><span class="badge merged">dev에 반영 완료</span></td>
+      </tr>
+      <tr>
+        <th scope="row">dev_common_rules_fix</th>
+        <td class="num zero">0</td>
+        <td class="num">9</td>
+        <td><span class="badge merged">dev에 반영 완료</span></td>
+      </tr>
+      <tr>
+        <th scope="row">feature/product-option-management</th>
+        <td class="num zero">0</td>
+        <td class="num">0</td>
+        <td><span class="badge same">dev와 동일</span></td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+<section>
+  <h2>해석 포인트</h2>
+  <ol class="notes">
+    <li>"앞선 커밋" = 해당 브랜치에는 있지만 dev에는 아직 없는 커밋 수.</li>
+    <li>"뒤처진 커밋" = dev에는 있지만 해당 브랜치에는 없는 커밋 수.</li>
+    <li>"앞선 커밋"이 0이면 그 브랜치의 모든 커밋이 이미 dev에 들어갔다는 뜻이다.</li>
+    <li>main은 릴리스 브랜치라 앞선 커밋이 0인 것이 정상이다. main의 "뒤처진 커밋"은 아직 릴리스되지 않은 dev의 작업량이다.</li>
+  </ol>
+</section>
+<footer>
+  이 페이지는 <code>.github/scripts/branch-status.sh</code> 가 매일 00시(KST)에 다시 만든다. 손으로 고쳐도 다음 실행 때 사라진다.<br>
+  위 수치는 기준 커밋 <code>7a733df</code> 시점의 스냅샷이다. 정확한 값은 <code>git rev-list --left-right --count origin/dev...origin/&lt;브랜치&gt;</code> 로 확인한다.
+</footer>
+</div>
+</body>
+</html>
