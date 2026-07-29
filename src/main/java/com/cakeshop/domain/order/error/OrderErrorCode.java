@@ -4,7 +4,14 @@ import com.cakeshop.global.error.ErrorCode;
 
 public enum OrderErrorCode implements ErrorCode {
 
-    INVALID_STATUS_TRANSITION("ORDER_001", "허용되지 않는 주문 상태 변경입니다.", 400);
+    INVALID_STATUS_TRANSITION("ORDER_001", "허용되지 않는 주문 상태 변경입니다.", 400),
+    MEMBER_NOT_AVAILABLE("ORDER_002", "주문 가능한 로그인 회원이 아닙니다.", 403),
+    EMPTY_ORDER_ITEMS("ORDER_003", "주문할 상품이 없습니다.", 400),
+    GENERAL_PRODUCT_REQUIRED("ORDER_004", "일반 상품만 함께 주문할 수 있습니다.", 400),
+    INVALID_QUANTITY("ORDER_005", "상품 수량이 올바르지 않습니다.", 400),
+    INVALID_PRODUCT_OPTION("ORDER_006", "상품 옵션 선택이 올바르지 않습니다.", 400),
+    ORDER_SAVE_FAILED("ORDER_007", "주문 저장에 실패했습니다.", 500),
+    PAYMENT_SAVE_FAILED("ORDER_008", "결제 준비 저장에 실패했습니다.", 500);
 
     private final String code;
     private final String message;
