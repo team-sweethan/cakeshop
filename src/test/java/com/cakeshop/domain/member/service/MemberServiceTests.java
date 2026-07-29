@@ -15,10 +15,12 @@ import com.cakeshop.domain.member.entity.MemberStatus;
 import com.cakeshop.domain.member.error.MemberErrorCode;
 import com.cakeshop.domain.member.mapper.MemberMapper;
 import com.cakeshop.global.error.BusinessException;
+import java.time.LocalDate;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -51,6 +53,25 @@ class MemberServiceTests {
     }
 
     @Test
+    void join_validForm_mapsAndPersistsBirthDate() {
+        SignupForm form = new SignupForm();
+        form.setEmail("member@cakeshop.local");
+        form.setPassword("Password1!");
+        form.setName("홍길동");
+        form.setNickname("케이크러버");
+        form.setPhone("010-1234-5678");
+        form.setBirthDate(LocalDate.of(2000, 1, 15));
+        when(memberMapper.findByEmail(form.getEmail())).thenReturn(Optional.empty());
+        when(passwordEncoder.encode(form.getPassword())).thenReturn("encoded-password");
+
+        memberService.join(form);
+
+        ArgumentCaptor<Member> captor = ArgumentCaptor.forClass(Member.class);
+        verify(memberMapper).join(captor.capture());
+        assertThat(captor.getValue().getBirthDate()).isEqualTo(form.getBirthDate());
+    }
+
+    @Test
     void updateMemberInfo_passwordBlank_updatesBasicInfoWithoutPassword() {
         Member member = Member.builder()
                 .id(1L)
@@ -58,6 +79,7 @@ class MemberServiceTests {
                 .password("encoded-password")
                 .name("기존 이름")
                 .phone("010-0000-0000")
+                .birthDate(LocalDate.of(2000, 1, 15))
                 .build();
         ProfileUpdateForm form = new ProfileUpdateForm();
         form.setName("새 이름");
@@ -76,6 +98,8 @@ class MemberServiceTests {
         org.assertj.core.api.Assertions.assertThat(member.getName()).isEqualTo("새 이름");
         org.assertj.core.api.Assertions.assertThat(member.getNickname()).isEqualTo("새닉네임");
         org.assertj.core.api.Assertions.assertThat(member.getPhone()).isEqualTo("010-1234-5678");
+        org.assertj.core.api.Assertions.assertThat(member.getBirthDate())
+                .isEqualTo(LocalDate.of(2000, 1, 15));
         org.assertj.core.api.Assertions.assertThat(member.getPassword()).isNull();
     }
 
@@ -166,6 +190,7 @@ class MemberServiceTests {
                 .name("홍길동")
                 .nickname("케이크러버")
                 .phone("010-1234-5678")
+                .birthDate(LocalDate.of(2000, 1, 15))
                 .build();
         when(memberMapper.findByEmail(member.getEmail()))
                 .thenReturn(Optional.of(member));
@@ -177,7 +202,8 @@ class MemberServiceTests {
                 member.getEmail(),
                 member.getName(),
                 member.getNickname(),
-                member.getPhone()));
+                member.getPhone(),
+                member.getBirthDate()));
     }
 
     @Test

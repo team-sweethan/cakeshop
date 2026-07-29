@@ -16,6 +16,7 @@ import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.security.MemberDetails;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
+import java.time.LocalDate;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -115,7 +116,8 @@ class MyPageControllerTests {
                         memberDetails.getUsername(),
                         "회원",
                         "닉네임",
-                        "010-1234-5678"));
+                        "010-1234-5678",
+                        LocalDate.of(2000, 1, 15)));
 
         String viewName = myPageController.updateProfile(
                 memberDetails,

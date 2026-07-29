@@ -1,5 +1,6 @@
 package com.cakeshop.domain.member.entity;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import lombok.AllArgsConstructor;
@@ -29,5 +30,6 @@ public class Member {
     private LocalDateTime updatedAt;
     private LocalDateTime withdrawnAt;
     private String name;
+    private LocalDate birthDate;
 
 }

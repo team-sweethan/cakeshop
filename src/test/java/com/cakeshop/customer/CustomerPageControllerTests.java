@@ -26,6 +26,7 @@ import com.cakeshop.domain.review.controller.ReviewController;
 import com.cakeshop.global.security.MemberDetails;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
@@ -62,7 +63,8 @@ class CustomerPageControllerTests {
                         "customer@cakeshop.local",
                         "고객",
                         "케이크러버",
-                        "010-1234-5678"));
+                        "010-1234-5678",
+                        LocalDate.of(2000, 1, 15)));
 
         mockMvc = MockMvcBuilders.standaloneSetup(
                         new HomeController(mock(HomeService.class)),

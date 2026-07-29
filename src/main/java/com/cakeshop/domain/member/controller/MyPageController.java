@@ -36,7 +36,7 @@ public class MyPageController {
             Model model) {
 
         if (memberDetails == null) {
-            model.addAttribute("member", new MemberProfileView("", "", "", ""));
+            model.addAttribute("member", new MemberProfileView("", "", "", "", null));
             return "customer/member/mypage";
         }
 
@@ -57,7 +57,8 @@ public class MyPageController {
                             "hong@test.com",
                             "홍길동",
                             "케이크러버",
-                            "010-1234-5678");
+                            "010-1234-5678",
+                            null);
             model.addAttribute("profileForm", ProfileUpdateForm.from(mock));
             return "customer/member/profile-edit";
         }
