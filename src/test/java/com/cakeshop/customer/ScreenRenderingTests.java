@@ -1,5 +1,6 @@
 package com.cakeshop.customer;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -43,6 +44,15 @@ class ScreenRenderingTests {
         };
 
         assertScreensRender(paths);
+    }
+
+    @Test
+    void login_successMessage_rendersCommonPopupFragment() throws Exception {
+        mockMvc.perform(get("/login")
+                .flashAttr("successMessage", "회원가입이 완료되었습니다!"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("data-common-alert-popup")))
+            .andExpect(content().string(containsString("window.alert(")));
     }
 
     @Test
