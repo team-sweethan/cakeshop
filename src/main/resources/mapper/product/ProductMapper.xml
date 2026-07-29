@@ -280,9 +280,7 @@
     <!-- 상품 판매 상태 변경 -->
     <update id="updateProductStatus">
         UPDATE products
-        SET
-            status = #{status},
-            updated_at = CURRENT_TIMESTAMP
+        SET status = #{status}
         WHERE id = #{productId}
     </update>
 
@@ -376,8 +374,7 @@
             stock_quantity = #{stockQuantity, jdbcType=INTEGER},
             product_type = #{productType},
             preparation_days = #{preparationDays},
-            cancellation_limit_days = #{cancellationLimitDays},
-            updated_at = CURRENT_TIMESTAMP
+            cancellation_limit_days = #{cancellationLimitDays}
         WHERE id = #{id}
     </update>
 </mapper>
