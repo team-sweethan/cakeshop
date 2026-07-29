@@ -7,13 +7,13 @@ import com.cakeshop.domain.order.entity.OrderItemOption;
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.product.entity.ProductType;
+import com.cakeshop.global.config.MariaDbIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mybatis.spring.boot.test.autoconfigure.MybatisTest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -28,9 +28,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * @MybatisTest가 테스트 종료 후 트랜잭션을 롤백하므로 데이터는 DB에 남지 않는다.
  */
 @MybatisTest
-// application.yml의 local DB 접속 설정을 사용한다.
-@ActiveProfiles("local")
-// 내장 DB로 바꾸지 않고 개발 PC의 MariaDB를 사용한다.
+// 내장 DB로 바꾸지 않고 Testcontainers의 MariaDB를 사용한다.
+@MariaDbIntegrationTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 // 각 테스트가 끝나면 JdbcTemplate과 Mapper가 저장한 데이터를 함께 롤백한다.
 @Transactional
@@ -266,14 +265,16 @@ class OrderMapperTests {
                 INSERT INTO members (
                     email,
                     password,
+                    name,
                     nickname,
                     phone,
                     role,
                     status
                 )
-                VALUES (?, NULL, ?, ?, 'USER', 'ACTIVE')
+                VALUES (?, NULL, ?, ?, ?, 'USER', 'ACTIVE')
                 """,
                 email,
+                "주문 테스트 회원",
                 "주문테스트",
                 "010-0000-0000"
         );

@@ -2,6 +2,7 @@ package com.cakeshop.domain.payment.mapper;
 
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.entity.PaymentStatus;
+import com.cakeshop.global.config.MariaDbIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mybatis.spring.boot.test.autoconfigure.MybatisTest;
@@ -9,7 +10,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * JdbcTemplate은 결제의 FK 부모인 회원과 주문 준비에만 사용한다.
  */
 @MybatisTest
-@ActiveProfiles("local")
+@MariaDbIntegrationTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 // 각 테스트가 끝나면 JdbcTemplate과 Mapper가 저장한 데이터를 함께 롤백한다.
 @Transactional
@@ -211,14 +211,16 @@ class PaymentMapperTests {
                 INSERT INTO members (
                     email,
                     password,
+                    name,
                     nickname,
                     phone,
                     role,
                     status
                 )
-                VALUES (?, NULL, ?, ?, 'USER', 'ACTIVE')
+                VALUES (?, NULL, ?, ?, ?, 'USER', 'ACTIVE')
                 """,
                 email,
+                "결제 테스트 회원",
                 "결제테스트",
                 "010-0000-0000"
         );

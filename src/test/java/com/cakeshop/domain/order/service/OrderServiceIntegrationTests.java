@@ -15,6 +15,7 @@ import com.cakeshop.domain.product.customer.dto.view.ProductDetailView;
 import com.cakeshop.domain.product.customer.dto.view.ProductOptionRow;
 import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.mapper.ProductMapper;
+import com.cakeshop.global.config.MariaDbIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mybatis.spring.boot.test.autoconfigure.MybatisTest;
@@ -23,7 +24,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,7 +36,7 @@ import static org.mockito.Mockito.when;
 
 @MybatisTest
 @Import(OrderService.class)
-@ActiveProfiles("local")
+@MariaDbIntegrationTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Transactional
 class OrderServiceIntegrationTests {
@@ -168,14 +168,16 @@ class OrderServiceIntegrationTests {
                 INSERT INTO members (
                     email,
                     password,
+                    name,
                     nickname,
                     phone,
                     role,
                     status
                 )
-                VALUES (?, NULL, ?, ?, 'USER', 'ACTIVE')
+                VALUES (?, NULL, ?, ?, ?, 'USER', 'ACTIVE')
                 """,
                 email,
+                "주문 서비스 테스트 회원",
                 "주문서비스테스트",
                 "010-0000-0000"
         );
