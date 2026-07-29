@@ -337,13 +337,17 @@ h2.section-title {
     resize: vertical
 }
 
-.form-help, .form-error {
+.form-help, .form-success, .form-error {
     font-size: var(--font-xs);
     margin-top: 2px
 }
 
 .form-help {
     color: var(--color-muted)
+}
+
+.form-success {
+    color: var(--color-info)
 }
 
 .form-error {

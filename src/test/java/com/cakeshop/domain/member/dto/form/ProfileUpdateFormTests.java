@@ -46,6 +46,7 @@ class ProfileUpdateFormTests {
         ProfileUpdateForm form = new ProfileUpdateForm();
         form.setEmail("member@cakeshop.local");
         form.setName("홍길동");
+        form.setNickname("케이크러버");
         form.setPhone("010-1234-5678");
         return form;
     }
