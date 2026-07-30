@@ -9,6 +9,7 @@ import static org.mockito.ArgumentMatchers.any;
 
 import com.cakeshop.domain.member.dto.form.ProfileUpdateForm;
 import com.cakeshop.domain.member.dto.form.SignupForm;
+import com.cakeshop.domain.member.dto.view.EmailRecoveryResult;
 import com.cakeshop.domain.member.dto.view.MemberProfileView;
 import com.cakeshop.domain.member.dto.view.RecoveredEmailView;
 import com.cakeshop.domain.member.entity.Member;
@@ -220,15 +221,19 @@ class MemberServiceTests {
                         "ab@example.com",
                         "x@example.com"));
 
-        List<RecoveredEmailView> result = memberService.findEmails(
+        EmailRecoveryResult result = memberService.findEmails(
                 " 홍길동 ",
                 birthDate,
                 "010-1234-5678");
 
-        assertThat(result).containsExactly(
-                new RecoveredEmailView("member@example.com", "me****@example.com"),
-                new RecoveredEmailView("ab@example.com", "a*@example.com"),
-                new RecoveredEmailView("x@example.com", "*@example.com"));
+        assertThat(result.emails()).containsExactly(
+                "member@example.com",
+                "ab@example.com",
+                "x@example.com");
+        assertThat(result.views()).containsExactly(
+                new RecoveredEmailView(0, "me****@example.com"),
+                new RecoveredEmailView(1, "a*@example.com"),
+                new RecoveredEmailView(2, "*@example.com"));
     }
 
     @Test
@@ -243,7 +248,7 @@ class MemberServiceTests {
         assertThat(memberService.findEmails(
                 "홍길동",
                 birthDate,
-                "01012345678")).isEmpty();
+                "01012345678").emails()).isEmpty();
     }
 
     @Test

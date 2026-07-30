@@ -2,6 +2,7 @@ package com.cakeshop.domain.member.service;
 
 import com.cakeshop.domain.member.dto.form.ProfileUpdateForm;
 import com.cakeshop.domain.member.dto.form.SignupForm;
+import com.cakeshop.domain.member.dto.view.EmailRecoveryResult;
 import com.cakeshop.domain.member.dto.view.MemberProfileView;
 import com.cakeshop.domain.member.dto.view.RecoveredEmailView;
 import com.cakeshop.domain.member.entity.Member;
@@ -11,6 +12,7 @@ import com.cakeshop.domain.member.mapper.MemberMapper;
 import com.cakeshop.global.error.BusinessException;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.stream.IntStream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -55,13 +57,15 @@ public class MemberService {
     }
 
     @Transactional(readOnly = true)
-    public List<RecoveredEmailView> findEmails(String name, LocalDate birthDate, String phone) {
+    public EmailRecoveryResult findEmails(String name, LocalDate birthDate, String phone) {
         String normalizedName = name.trim();
         String normalizedPhone = phone.replace("-", "");
-        return memberMapper.findEmailsByMemberInfo(normalizedName, birthDate, normalizedPhone)
-                .stream()
-                .map(email -> new RecoveredEmailView(email, maskEmail(email)))
+        List<String> emails =
+                memberMapper.findEmailsByMemberInfo(normalizedName, birthDate, normalizedPhone);
+        List<RecoveredEmailView> views = IntStream.range(0, emails.size())
+                .mapToObj(index -> new RecoveredEmailView(index, maskEmail(emails.get(index))))
                 .toList();
+        return new EmailRecoveryResult(emails, views);
     }
 
     @Transactional

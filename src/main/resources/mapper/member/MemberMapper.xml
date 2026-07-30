@@ -29,6 +29,7 @@
          WHERE name = #{name}
            AND birth_date = #{birthDate}
            AND REPLACE(phone, '-', '') = #{phone}
+           AND status = 'ACTIVE'
          ORDER BY created_at DESC, id DESC
     </select>
 

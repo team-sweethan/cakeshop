@@ -11,6 +11,7 @@
 </head>
 <body>
 <header th:replace="~{fragments/common/header :: header}"></header>
+<th:block th:replace="~{fragments/common/alert :: popup}"></th:block>
 <main class="page-container page-container--narrow">
   <section class="panel auth-card section">
     <h1>이메일 찾기</h1>
@@ -59,7 +60,7 @@
       <form class="form-stack" th:action="@{/find-email/login}" method="post">
         <div class="choice-list">
           <label class="choice" th:each="recoveredEmail, status : ${recoveredEmails}">
-            <input type="radio" name="selectedEmail" th:value="${recoveredEmail.email}"
+            <input type="radio" name="selectedIndex" th:value="${recoveredEmail.selectionIndex}"
                    th:checked="${status.first}" required>
             <span th:text="${recoveredEmail.maskedEmail}"></span>
           </label>

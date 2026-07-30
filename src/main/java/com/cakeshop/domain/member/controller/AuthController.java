@@ -3,8 +3,10 @@ package com.cakeshop.domain.member.controller;
 import com.cakeshop.domain.member.dto.form.EmailRecoveryForm;
 import com.cakeshop.domain.member.dto.form.SignupForm;
 import com.cakeshop.domain.member.dto.view.EmailAvailabilityView;
+import com.cakeshop.domain.member.dto.view.EmailRecoveryResult;
 import com.cakeshop.domain.member.error.MemberErrorCode;
 import com.cakeshop.domain.member.service.MemberService;
+import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +23,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @Controller
 @RequiredArgsConstructor
 public class AuthController {
+
+    private static final String RECOVERED_EMAILS_SESSION_KEY = "recoveredEmails";
 
     private final MemberService memberService;
 
@@ -51,16 +55,20 @@ public class AuthController {
     public String findEmail(
             @Valid @ModelAttribute("emailRecoveryForm") EmailRecoveryForm form,
             BindingResult bindingResult,
-            Model model) {
+            Model model,
+            HttpSession session) {
         model.addAttribute("recoveredEmails", List.of());
         model.addAttribute("searched", false);
         if (bindingResult.hasErrors()) {
             return "customer/member/find-email";
         }
 
-        model.addAttribute(
-                "recoveredEmails",
-                memberService.findEmails(form.getName(), form.getBirthDate(), form.getPhone()));
+        EmailRecoveryResult result =
+                memberService.findEmails(form.getName(), form.getBirthDate(), form.getPhone());
+        session.setAttribute(
+                RECOVERED_EMAILS_SESSION_KEY,
+                new RecoveredEmailSession(result.emails()));
+        model.addAttribute("recoveredEmails", result.views());
         model.addAttribute("searched", true);
         return "customer/member/find-email";
     }
@@ -68,10 +76,32 @@ public class AuthController {
     // 찾은 이메일로 로그인 화면 이동
     @PostMapping("/find-email/login")
     public String loginWithRecoveredEmail(
-            @RequestParam String selectedEmail,
+            @RequestParam int selectedIndex,
+            HttpSession session,
             RedirectAttributes redirectAttributes) {
-        redirectAttributes.addFlashAttribute("recoveredEmail", selectedEmail);
+        RecoveredEmailSession recoveredEmailSession =
+                (RecoveredEmailSession) session.getAttribute(RECOVERED_EMAILS_SESSION_KEY);
+        session.removeAttribute(RECOVERED_EMAILS_SESSION_KEY);
+        if (recoveredEmailSession == null
+                || selectedIndex < 0
+                || selectedIndex >= recoveredEmailSession.emails().size()) {
+            redirectAttributes.addFlashAttribute(
+                    "errorMessage",
+                    "이메일을 다시 찾아 주세요.");
+            return "redirect:/find-email";
+        }
+
+        redirectAttributes.addFlashAttribute(
+                "recoveredEmail",
+                recoveredEmailSession.emails().get(selectedIndex));
         return "redirect:/login";
+    }
+
+    private record RecoveredEmailSession(List<String> emails) {
+
+        private RecoveredEmailSession {
+            emails = List.copyOf(emails);
+        }
     }
 
     // 회원가입 처리

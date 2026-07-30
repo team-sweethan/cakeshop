@@ -49,7 +49,7 @@ class MemberMapperTests {
     }
 
     @Test
-    void findEmailsByMemberInfo_matchingMembers_returnsAllEmailsInRecentOrder() {
+    void findEmailsByMemberInfo_matchingMembers_returnsOnlyActiveEmails() {
         String firstEmail = uniqueEmail("recovery-first");
         String secondEmail = uniqueEmail("recovery-second");
         Long firstId = insertMember(firstEmail, MemberStatus.ACTIVE);
@@ -67,7 +67,7 @@ class MemberMapperTests {
                 birthDate,
                 "01012345678");
 
-        assertThat(emails).containsExactly(secondEmail, firstEmail);
+        assertThat(emails).containsExactly(firstEmail);
     }
 
     @Test

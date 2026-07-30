@@ -15,12 +15,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.cakeshop.domain.member.dto.form.EmailRecoveryForm;
 import com.cakeshop.domain.member.dto.form.SignupForm;
+import com.cakeshop.domain.member.dto.view.EmailRecoveryResult;
 import com.cakeshop.domain.member.dto.view.RecoveredEmailView;
 import com.cakeshop.domain.member.service.MemberService;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -159,26 +161,57 @@ class AuthControllerTests {
     void findEmail_matchingMember_rendersMaskedEmailList() throws Exception {
         LocalDate birthDate = LocalDate.of(2000, 1, 15);
         RecoveredEmailView recoveredEmail =
-                new RecoveredEmailView("member@example.com", "me****@example.com");
+                new RecoveredEmailView(0, "me****@example.com");
         when(memberService.findEmails("홍길동", birthDate, "010-1234-5678"))
-                .thenReturn(List.of(recoveredEmail));
+                .thenReturn(new EmailRecoveryResult(
+                        List.of("member@example.com"),
+                        List.of(recoveredEmail)));
 
-        mockMvc.perform(post("/find-email")
+        MvcResult result = mockMvc.perform(post("/find-email")
                         .param("name", "홍길동")
                         .param("birthDate", birthDate.toString())
                         .param("phone", "010-1234-5678"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("customer/member/find-email"))
                 .andExpect(model().attribute("searched", true))
-                .andExpect(model().attribute("recoveredEmails", List.of(recoveredEmail)));
+                .andExpect(model().attribute("recoveredEmails", List.of(recoveredEmail)))
+                .andReturn();
+
+        assertThat(result.getResponse().getContentAsString())
+                .doesNotContain("member@example.com");
     }
 
     @Test
-    void loginWithRecoveredEmail_selectedEmail_redirectsWithFlashAttribute() throws Exception {
+    void loginWithRecoveredEmail_selectedIndex_redirectsWithFlashAttribute() throws Exception {
+        LocalDate birthDate = LocalDate.of(2000, 1, 15);
+        when(memberService.findEmails("홍길동", birthDate, "010-1234-5678"))
+                .thenReturn(new EmailRecoveryResult(
+                        List.of("member@example.com"),
+                        List.of(new RecoveredEmailView(0, "me****@example.com"))));
+        MvcResult recoveryResult = mockMvc.perform(post("/find-email")
+                        .param("name", "홍길동")
+                        .param("birthDate", birthDate.toString())
+                        .param("phone", "010-1234-5678"))
+                .andReturn();
+        MockHttpSession session =
+                (MockHttpSession) recoveryResult.getRequest().getSession(false);
+
         mockMvc.perform(post("/find-email/login")
-                        .param("selectedEmail", "member@example.com"))
+                        .session(session)
+                        .param("selectedIndex", "0"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/login"))
                 .andExpect(flash().attribute("recoveredEmail", "member@example.com"));
+
+        assertThat(session.getAttribute("recoveredEmails")).isNull();
+    }
+
+    @Test
+    void loginWithRecoveredEmail_missingRecoverySession_redirectsToRecovery() throws Exception {
+        mockMvc.perform(post("/find-email/login")
+                        .param("selectedIndex", "0"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/find-email"))
+                .andExpect(flash().attribute("errorMessage", "이메일을 다시 찾아 주세요."));
     }
 }
