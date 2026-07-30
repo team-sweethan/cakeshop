@@ -333,10 +333,9 @@ class OrderMapperTests {
                     base_price,
                     product_type,
                     preparation_days,
-                    cancellation_limit_days,
                     status
                 )
-                VALUES (?, ?, '', 40000, 'CUSTOM', 3, 2, 'ACTIVE')
+                VALUES (?, ?, '', 40000, 'CUSTOM', 3, 'ACTIVE')
                 """,
                 categoryId,
                 productName
