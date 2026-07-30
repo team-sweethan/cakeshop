@@ -311,6 +311,13 @@ class ProductMapperTests {
 
         assertThat(product).isNotNull();
         assertThat(product.getId()).isEqualTo(productId);
+        assertThat(product.getName())
+                .isEqualTo(
+                        keyword + " D 판매 중지 상품"
+                );
+        assertThat(product.getProductType())
+                .isEqualTo(ProductType.GENERAL);
+        assertThat(product.getPreparationDays()).isZero();
         assertThat(product.getBasePrice())
                 .isEqualByComparingTo("40000");
         assertThat(product.getStockQuantity()).isEqualTo(5);

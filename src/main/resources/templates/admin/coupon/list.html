@@ -13,7 +13,9 @@
 
             <div class="cluster cluster--between">
                 <h1 class="admin-page-title">쿠폰 관리</h1>
-                <button class="btn btn--primary" type="button" th:onclick="|location.href='@{/admin/coupons/create}'|">+ 쿠폰 등록</button>
+                <button class="btn btn--primary" type="button" th:onclick="|location.href='@{/admin/coupons/create}'|">+
+                    쿠폰 등록
+                </button>
             </div>
 
             <form class="panel"
@@ -83,7 +85,13 @@
                         <td th:text="${coupon.id}">1</td>
 
                         <td>
-                            <a th:href="@{/admin/coupons/{couponId}/detail(couponId=${coupon.id})}" th:text="${coupon.name}">
+                            <a th:href="@{/admin/coupons/{couponId}/detail(
+                                   couponId=${coupon.id},
+                                   keyword=${condition.keyword},
+                                   status=${condition.status},
+                                   page=${pageResult.page}
+                               )}"
+                               th:text="${coupon.name}">
                                 첫 주문 할인 쿠폰
                             </a>
                         </td>
@@ -121,7 +129,8 @@
 
                         <td>
                             <div class="cluster">
-                                <a class="btn" th:if="${coupon.status != 'ENDED'}" th:href="@{/admin/coupons/{couponId}/edit(couponId=${coupon.id})}">수정</a>
+                                <a class="btn" th:if="${coupon.status != 'ENDED'}"
+                                   th:href="@{/admin/coupons/{couponId}/edit(couponId=${coupon.id})}">수정</a>
 
                                 <form th:if="${coupon.status == 'ACTIVE'}"
                                       th:action="@{/admin/coupons/{couponId}/deactivate(couponId=${coupon.id})}"
@@ -134,7 +143,7 @@
                                       th:action="@{/admin/coupons/{couponId}/activate(couponId=${coupon.id})}"
                                       method="post">
 
-                                    <button class="btn btn--success" type="submit" >발급 재개</button>
+                                    <button class="btn btn--success" type="submit">발급 재개</button>
                                 </form>
                             </div>
                         </td>
@@ -148,44 +157,54 @@
                  aria-label="페이지 이동"
                  style="justify-content: center; margin-top: 16px">
 
+                <!-- 이전/다음은 한 페이지씩이 아니라 현재 번호 블록 단위로 이동한다. -->
                 <a class="btn"
-                   th:if="${pageResult.page > 1}"
+                   th:if="${pageNavigation.hasPreviousBlock}"
                    th:href="@{/admin/coupons(
                    keyword=${condition.keyword},
                    status=${condition.status},
-                   page=${pageResult.page - 1},
-                   size=${pageResult.size}
-                   )}">
+                   page=${pageNavigation.previousPage}
+               )}">
                     이전
                 </a>
 
-                <span class="btn btn--disabled" th:unless="${pageResult.page > 1}">이전</span>
+                <span class="btn btn--disabled"
+                      th:unless="${pageNavigation.hasPreviousBlock}">
+                    이전
+                </span>
 
+                <!-- startPage부터 endPage까지만 렌더링해 전체 페이지 번호 노출을 막는다. -->
                 <a class="btn"
                    th:each="pageNumber :
-               ${#numbers.sequence(1, pageResult.totalPages)}"
+                   ${#numbers.sequence(
+                       pageNavigation.startPage,
+                       pageNavigation.endPage
+                   )}"
                    th:text="${pageNumber}"
                    th:classappend="${pageNumber == pageResult.page}
-               ? ' is-active'"
+                   ? ' is-active'"
                    th:href="@{/admin/coupons(
                    keyword=${condition.keyword},
                    status=${condition.status},
-                   page=${pageNumber},
-                   size=${pageResult.size})}">
+                   page=${pageNumber}
+               )}">
                     1
                 </a>
 
                 <a class="btn"
-                   th:if="${pageResult.page < pageResult.totalPages}"
+                   th:if="${pageNavigation.hasNextBlock}"
                    th:href="@{/admin/coupons(
                    keyword=${condition.keyword},
                    status=${condition.status},
-                   page=${pageResult.page + 1},
-                   size=${pageResult.size})}">
+                   page=${pageNavigation.nextPage}
+               )}">
                     다음
                 </a>
 
-                <span class="btn btn--disabled" th:unless="${pageResult.page < pageResult.totalPages}">다음</span>
+                <span class="btn btn--disabled"
+                      th:unless="${pageNavigation.hasNextBlock}">
+                    다음
+                </span>
             </nav>
         </main>
     </div>

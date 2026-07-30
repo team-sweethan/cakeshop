@@ -164,6 +164,9 @@
 
         SELECT
             p.id,
+            p.name,
+            p.product_type AS productType,
+            p.preparation_days AS preparationDays,
             p.base_price AS basePrice,
             p.stock_quantity AS stockQuantity,
             p.status
