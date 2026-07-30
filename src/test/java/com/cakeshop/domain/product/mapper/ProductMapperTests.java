@@ -334,6 +334,102 @@ class ProductMapperTests {
     }
 
     @Test
+    void decreaseStockIfAvailable_requestsExceedStock_neverMakesStockNegative() {
+        Long productId = jdbcTemplate.queryForObject(
+                """
+                SELECT id
+                FROM products
+                WHERE name = ?
+                """,
+                Long.class,
+                keyword + " A 일반 재고 상품"
+        );
+
+        int firstUpdate =
+                productMapper.decreaseStockIfAvailable(
+                        productId,
+                        7
+                );
+        int secondUpdate =
+                productMapper.decreaseStockIfAvailable(
+                        productId,
+                        7
+                );
+
+        assertThat(firstUpdate).isEqualTo(1);
+        assertThat(secondUpdate).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                """
+                SELECT stock_quantity
+                FROM products
+                WHERE id = ?
+                """,
+                Integer.class,
+                productId
+        )).isEqualTo(3);
+    }
+
+    @Test
+    void decreaseStockIfAvailable_customProduct_doesNotChangeStock() {
+        Long productId = jdbcTemplate.queryForObject(
+                """
+                SELECT id
+                FROM products
+                WHERE name = ?
+                """,
+                Long.class,
+                keyword + " C 인기 주문 제작"
+        );
+
+        int updatedRows =
+                productMapper.decreaseStockIfAvailable(
+                        productId,
+                        1
+                );
+
+        assertThat(updatedRows).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                """
+                SELECT stock_quantity
+                FROM products
+                WHERE id = ?
+                """,
+                Integer.class,
+                productId
+        )).isNull();
+    }
+
+    @Test
+    void restoreLimitedStock_inactiveGeneralProduct_restoresStock() {
+        Long productId = jdbcTemplate.queryForObject(
+                """
+                SELECT id
+                FROM products
+                WHERE name = ?
+                """,
+                Long.class,
+                keyword + " D 판매 중지 상품"
+        );
+
+        int updatedRows =
+                productMapper.restoreLimitedStock(
+                        productId,
+                        3
+                );
+
+        assertThat(updatedRows).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                """
+                SELECT stock_quantity
+                FROM products
+                WHERE id = ?
+                """,
+                Integer.class,
+                productId
+        )).isEqualTo(8);
+    }
+
+    @Test
     void detailOptionsIncludeOnlyActiveOptionsInOrder() {
         assertThat(productMapper
                 .findPublicOptionRowsByProductId(optionProductId))

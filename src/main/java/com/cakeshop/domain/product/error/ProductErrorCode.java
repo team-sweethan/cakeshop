@@ -50,6 +50,18 @@ public enum ProductErrorCode implements ErrorCode {
             "PRODUCT_008",
             "상품 유형에 맞는 준비 일수를 입력해 주세요.",
             400
+    ),
+
+    INVALID_STOCK_QUANTITY(
+            "PRODUCT_009",
+            "재고 변경 수량은 1개 이상이어야 합니다.",
+            400
+    ),
+
+    INSUFFICIENT_STOCK(
+            "PRODUCT_010",
+            "주문 가능한 상품 재고가 부족합니다.",
+            409
     );
 
     private final String code;

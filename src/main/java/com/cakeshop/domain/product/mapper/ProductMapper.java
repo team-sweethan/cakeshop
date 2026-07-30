@@ -72,6 +72,42 @@ public interface ProductMapper {
     );
 
     /**
+     * 판매 중인 일반 상품의 유한 재고를 요청 수량만큼 차감한다.
+     *
+     * <p>현재 재고가 요청 수량 이상인 경우에만 갱신하므로
+     * 동시에 여러 주문이 요청돼도 재고가 음수가 되지 않는다.</p>
+     *
+     * @param productId 재고를 차감할 상품 식별자
+     * @param quantity 차감할 수량
+     * @return 재고가 차감된 상품 행 개수
+     */
+    int decreaseStockIfAvailable(
+            @Param("productId")
+            long productId,
+
+            @Param("quantity")
+            int quantity
+    );
+
+    /**
+     * 일반 상품의 유한 재고를 요청 수량만큼 복구한다.
+     *
+     * <p>복구의 중복 실행 방지는 호출하는 주문·결제 도메인이
+     * 주문 상태 전이와 함께 보장해야 한다.</p>
+     *
+     * @param productId 재고를 복구할 상품 식별자
+     * @param quantity 복구할 수량
+     * @return 재고가 복구된 상품 행 개수
+     */
+    int restoreLimitedStock(
+            @Param("productId")
+            long productId,
+
+            @Param("quantity")
+            int quantity
+    );
+
+    /**
      * 판매 중인 상품의 활성 옵션을 그룹 순서와 옵션 순서로 조회한다.
      *
      * @param productId 조회할 상품 식별자
