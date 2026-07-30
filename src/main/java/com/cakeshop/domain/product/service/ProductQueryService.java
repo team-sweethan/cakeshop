@@ -49,6 +49,9 @@ public class ProductQueryService {
 
         return new ProductSalesInfo(
                 product.getId(),
+                product.getName(),
+                product.getProductType(),
+                product.getPreparationDays(),
                 available,
                 product.getBasePrice(),
                 stockQuantity
