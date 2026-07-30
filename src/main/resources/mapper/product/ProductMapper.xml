@@ -187,12 +187,11 @@
               #{quantity}
     </update>
 
-    <!-- 일반 상품의 유한 재고 복구 -->
+    <!-- 앞서 차감한 유한 재고 복구: 현재 상품 유형과 판매 상태는 판단하지 않음 -->
     <update id="restoreLimitedStock">
         UPDATE products
         SET stock_quantity = stock_quantity + #{quantity}
         WHERE id = #{productId}
-          AND product_type = 'GENERAL'
           AND stock_quantity IS NOT NULL
     </update>
 

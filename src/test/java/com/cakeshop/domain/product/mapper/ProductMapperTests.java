@@ -430,6 +430,83 @@ class ProductMapperTests {
     }
 
     @Test
+    void restoreLimitedStock_productChangedToCustom_restoresPreviouslyDeductedStock() {
+        Long productId = jdbcTemplate.queryForObject(
+                """
+                SELECT id
+                FROM products
+                WHERE name = ?
+                """,
+                Long.class,
+                keyword + " D 판매 중지 상품"
+        );
+        jdbcTemplate.update(
+                """
+                UPDATE products
+                SET product_type = 'CUSTOM',
+                    preparation_days = 1
+                WHERE id = ?
+                """,
+                productId
+        );
+
+        int updatedRows =
+                productMapper.restoreLimitedStock(
+                        productId,
+                        3
+                );
+
+        assertThat(updatedRows).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                """
+                SELECT stock_quantity
+                FROM products
+                WHERE id = ?
+                """,
+                Integer.class,
+                productId
+        )).isEqualTo(8);
+    }
+
+    @Test
+    void restoreLimitedStock_stockChangedToUnlimited_doesNotInventFiniteStock() {
+        Long productId = jdbcTemplate.queryForObject(
+                """
+                SELECT id
+                FROM products
+                WHERE name = ?
+                """,
+                Long.class,
+                keyword + " D 판매 중지 상품"
+        );
+        jdbcTemplate.update(
+                """
+                UPDATE products
+                SET stock_quantity = NULL
+                WHERE id = ?
+                """,
+                productId
+        );
+
+        int updatedRows =
+                productMapper.restoreLimitedStock(
+                        productId,
+                        3
+                );
+
+        assertThat(updatedRows).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                """
+                SELECT stock_quantity
+                FROM products
+                WHERE id = ?
+                """,
+                Integer.class,
+                productId
+        )).isNull();
+    }
+
+    @Test
     void detailOptionsIncludeOnlyActiveOptionsInOrder() {
         assertThat(productMapper
                 .findPublicOptionRowsByProductId(optionProductId))

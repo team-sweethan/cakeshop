@@ -28,15 +28,18 @@ public class ProductStockService {
     /**
      * 결제에 성공한 일반 상품의 재고를 차감한다.
      *
-     * <p>주문 제작 상품과 무제한 재고 상품은 차감하지 않는다.</p>
+     * <p>주문 제작 상품과 무제한 재고 상품은 차감하지 않는다.
+     * 반환값은 주문·결제 도메인이 차감 이력을 저장하는 데 사용한다.</p>
      *
      * @param productId 재고를 차감할 상품 식별자
      * @param quantity 차감할 수량
+     * @return 유한 재고를 실제로 차감했으면 {@code true},
+     *         차감 대상이 아니면 {@code false}
      * @throws BusinessException 상품이 없거나 판매 중이 아니거나
      *         재고가 부족한 경우
      */
     @Transactional
-    public void decreaseStock(long productId, int quantity) {
+    public boolean decreaseStock(long productId, int quantity) {
         validateQuantity(quantity);
 
         Product product = getProduct(productId);
@@ -48,7 +51,7 @@ public class ProductStockService {
         }
 
         if (isNotStockManaged(product)) {
-            return;
+            return false;
         }
 
         int updatedRows =
@@ -62,31 +65,42 @@ public class ProductStockService {
                     ProductErrorCode.INSUFFICIENT_STOCK
             );
         }
+
+        return true;
     }
 
     /**
-     * 취소된 일반 상품 주문에서 앞서 차감한 재고를 복구한다.
+     * 주문·결제 시점에 실제로 차감한 재고를 복구한다.
      *
-     * <p>판매가 중지된 뒤에도 이미 차감한 재고는 복구한다.
-     * 주문 제작 상품과 무제한 재고 상품은 복구하지 않는다.</p>
+     * <p>호출자는 저장한 차감 이력을 기준으로 이 메서드를 호출해야 한다.
+     * 상품 유형이나 판매 상태가 차감 후 변경됐더라도 복구를 시도한다.</p>
      *
      * @param productId 재고를 복구할 상품 식별자
      * @param quantity 복구할 수량
-     * @throws BusinessException 상품이 없거나 수량이 잘못된 경우
+     * @throws BusinessException 상품이 없거나 수량이 잘못됐거나
+     *         앞서 차감한 재고를 복구할 수 없는 경우
      */
     @Transactional
     public void restoreStock(long productId, int quantity) {
         validateQuantity(quantity);
 
-        Product product = getProduct(productId);
+        int updatedRows = productMapper.restoreLimitedStock(
+                productId,
+                quantity
+        );
 
-        if (isNotStockManaged(product)) {
+        if (updatedRows == 1) {
             return;
         }
 
-        productMapper.restoreLimitedStock(
-                productId,
-                quantity
+        if (productMapper.findSalesInfoById(productId) == null) {
+            throw new BusinessException(
+                    ProductErrorCode.NOT_FOUND
+            );
+        }
+
+        throw new BusinessException(
+                ProductErrorCode.STOCK_RESTORE_FAILED
         );
     }
 

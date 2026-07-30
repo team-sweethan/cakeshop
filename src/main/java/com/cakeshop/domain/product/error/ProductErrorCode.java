@@ -62,6 +62,12 @@ public enum ProductErrorCode implements ErrorCode {
             "PRODUCT_010",
             "주문 가능한 상품 재고가 부족합니다.",
             409
+    ),
+
+    STOCK_RESTORE_FAILED(
+            "PRODUCT_011",
+            "차감된 상품 재고를 복구할 수 없습니다.",
+            409
     );
 
     private final String code;

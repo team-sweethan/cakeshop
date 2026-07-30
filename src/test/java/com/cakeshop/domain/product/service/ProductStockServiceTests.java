@@ -29,7 +29,7 @@ class ProductStockServiceTests {
     private ProductStockService productStockService;
 
     @Test
-    void decreaseStock_generalLimitedStock_decreasesStock() {
+    void decreaseStock_generalLimitedStock_returnsTrue() {
         when(productMapper.findSalesInfoById(1L))
                 .thenReturn(product(
                         ProductType.GENERAL,
@@ -39,8 +39,10 @@ class ProductStockServiceTests {
         when(productMapper.decreaseStockIfAvailable(1L, 3))
                 .thenReturn(1);
 
-        productStockService.decreaseStock(1L, 3);
+        boolean stockDeducted =
+                productStockService.decreaseStock(1L, 3);
 
+        assertThat(stockDeducted).isTrue();
         verify(productMapper)
                 .decreaseStockIfAvailable(1L, 3);
     }
@@ -69,7 +71,7 @@ class ProductStockServiceTests {
     }
 
     @Test
-    void decreaseStock_unlimitedStock_doesNotUpdateStock() {
+    void decreaseStock_unlimitedStock_returnsFalse() {
         when(productMapper.findSalesInfoById(1L))
                 .thenReturn(product(
                         ProductType.GENERAL,
@@ -77,14 +79,16 @@ class ProductStockServiceTests {
                         null
                 ));
 
-        productStockService.decreaseStock(1L, 3);
+        boolean stockDeducted =
+                productStockService.decreaseStock(1L, 3);
 
+        assertThat(stockDeducted).isFalse();
         verify(productMapper, never())
                 .decreaseStockIfAvailable(1L, 3);
     }
 
     @Test
-    void decreaseStock_customProduct_doesNotUpdateStock() {
+    void decreaseStock_customProduct_returnsFalse() {
         when(productMapper.findSalesInfoById(1L))
                 .thenReturn(product(
                         ProductType.CUSTOM,
@@ -92,8 +96,10 @@ class ProductStockServiceTests {
                         5
                 ));
 
-        productStockService.decreaseStock(1L, 3);
+        boolean stockDeducted =
+                productStockService.decreaseStock(1L, 3);
 
+        assertThat(stockDeducted).isFalse();
         verify(productMapper, never())
                 .decreaseStockIfAvailable(1L, 3);
     }
@@ -154,37 +160,45 @@ class ProductStockServiceTests {
     }
 
     @Test
-    void restoreStock_generalLimitedStock_restoresStock() {
-        when(productMapper.findSalesInfoById(1L))
-                .thenReturn(product(
-                        ProductType.GENERAL,
-                        ProductStatus.INACTIVE,
-                        2
-                ));
+    void restoreStock_deductedStock_restoresWithoutCheckingCurrentProduct() {
+        when(productMapper.restoreLimitedStock(1L, 3))
+                .thenReturn(1);
 
         productStockService.restoreStock(1L, 3);
 
         verify(productMapper)
                 .restoreLimitedStock(1L, 3);
+        verify(productMapper, never())
+                .findSalesInfoById(1L);
     }
 
     @Test
-    void restoreStock_customProduct_doesNotUpdateStock() {
+    void restoreStock_restoreNotApplied_throwsStockRestoreFailed() {
+        when(productMapper.restoreLimitedStock(1L, 3))
+                .thenReturn(0);
         when(productMapper.findSalesInfoById(1L))
                 .thenReturn(product(
                         ProductType.CUSTOM,
                         ProductStatus.ACTIVE,
-                        5
+                        null
                 ));
 
-        productStockService.restoreStock(1L, 3);
-
-        verify(productMapper, never())
-                .restoreLimitedStock(1L, 3);
+        assertThatThrownBy(() ->
+                productStockService.restoreStock(1L, 3)
+        ).isInstanceOfSatisfying(
+                BusinessException.class,
+                exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(
+                                        ProductErrorCode.STOCK_RESTORE_FAILED
+                                )
+        );
     }
 
     @Test
     void restoreStock_missingProduct_throwsNotFound() {
+        when(productMapper.restoreLimitedStock(999L, 1))
+                .thenReturn(0);
         when(productMapper.findSalesInfoById(999L))
                 .thenReturn(null);
 
@@ -198,6 +212,23 @@ class ProductStockServiceTests {
                                         ProductErrorCode.NOT_FOUND
                                 )
         );
+    }
+
+    @Test
+    void restoreStock_zeroQuantity_throwsInvalidStockQuantity() {
+        assertThatThrownBy(() ->
+                productStockService.restoreStock(1L, 0)
+        ).isInstanceOfSatisfying(
+                BusinessException.class,
+                exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(
+                                        ProductErrorCode.INVALID_STOCK_QUANTITY
+                                )
+        );
+
+        verify(productMapper, never())
+                .restoreLimitedStock(1L, 0);
     }
 
     private Product product(
