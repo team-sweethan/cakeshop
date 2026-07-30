@@ -1,6 +1,8 @@
 package com.cakeshop.domain.payment.mapper;
 
 import com.cakeshop.domain.payment.entity.Payment;
+import com.cakeshop.domain.payment.entity.PaymentCancellation;
+import com.cakeshop.domain.payment.entity.PaymentCancellationStatus;
 import com.cakeshop.domain.payment.entity.PaymentStatus;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
@@ -189,6 +191,62 @@ class PaymentMapperTests {
     }
 
     @Test
+    void insertPaymentCancellationAndFindPaymentCancellationById() {
+        Payment payment = insertPayment("CANCELLATION-MAPPER");
+        PaymentCancellation cancellation =
+                newPaymentCancellation(payment.getId(), "MAPPER");
+
+        assertThat(paymentMapper.insertPaymentCancellation(cancellation)).isEqualTo(1);
+        assertThat(cancellation.getId()).isNotNull();
+
+        PaymentCancellation saved = paymentMapper
+                .findPaymentCancellationById(cancellation.getId())
+                .orElseThrow();
+
+        assertThat(saved.getPaymentId()).isEqualTo(payment.getId());
+        assertThat(saved.getIdempotencyKey()).isEqualTo(cancellation.getIdempotencyKey());
+        assertThat(saved.getCancelAmount()).isEqualByComparingTo(cancellation.getCancelAmount());
+        assertThat(saved.getCancelReason()).isEqualTo(cancellation.getCancelReason());
+        assertThat(saved.getRequestType()).isEqualTo(cancellation.getRequestType());
+        assertThat(saved.getRequestedBy()).isEqualTo(memberId);
+        assertThat(saved.getStatus()).isEqualTo(PaymentCancellationStatus.REQUESTED);
+        assertThat(saved.getActiveRequestedPaymentId()).isEqualTo(payment.getId());
+        assertThat(saved.getRequestedAt()).isNotNull();
+        assertThat(saved.getCreatedAt()).isNotNull();
+        assertThat(saved.getUpdatedAt()).isNotNull();
+    }
+
+    @Test
+    void updateCancellationStatusIfCurrentChangesOnlyMatchingStatus() {
+        Payment payment = insertPayment("CANCELLATION-STATUS");
+        PaymentCancellation cancellation =
+                newPaymentCancellation(payment.getId(), "STATUS");
+        paymentMapper.insertPaymentCancellation(cancellation);
+
+        assertThat(paymentMapper.updateCancellationStatusIfCurrent(
+                cancellation.getId(),
+                PaymentCancellationStatus.FAILED,
+                PaymentCancellationStatus.DONE
+        )).isZero();
+        assertThat(paymentMapper.findPaymentCancellationById(cancellation.getId()))
+                .get()
+                .extracting(PaymentCancellation::getStatus)
+                .isEqualTo(PaymentCancellationStatus.REQUESTED);
+
+        assertThat(paymentMapper.updateCancellationStatusIfCurrent(
+                cancellation.getId(),
+                PaymentCancellationStatus.REQUESTED,
+                PaymentCancellationStatus.DONE
+        )).isEqualTo(1);
+
+        PaymentCancellation completed = paymentMapper
+                .findPaymentCancellationById(cancellation.getId())
+                .orElseThrow();
+        assertThat(completed.getStatus()).isEqualTo(PaymentCancellationStatus.DONE);
+        assertThat(completed.getActiveRequestedPaymentId()).isNull();
+    }
+
+    @Test
     void onlyOneRequestedCancellationIsAllowedPerPayment() {
         Payment payment = insertPayment("CANCELLATION");
 
@@ -248,6 +306,17 @@ class PaymentMapperTests {
         payment.setIdempotencyKey("IDEMPOTENCY-" + label + "-" + suffix);
         payment.setAmount(BigDecimal.valueOf(40_000));
         return payment;
+    }
+
+    private PaymentCancellation newPaymentCancellation(long paymentId, String label) {
+        PaymentCancellation cancellation = new PaymentCancellation();
+        cancellation.setPaymentId(paymentId);
+        cancellation.setIdempotencyKey("CANCEL-MAPPER-" + label + "-" + suffix);
+        cancellation.setCancelAmount(BigDecimal.valueOf(40_000));
+        cancellation.setCancelReason("테스트 환불");
+        cancellation.setRequestType("CUSTOMER_CANCEL");
+        cancellation.setRequestedBy(memberId);
+        return cancellation;
     }
 
     private int insertRequestedCancellation(

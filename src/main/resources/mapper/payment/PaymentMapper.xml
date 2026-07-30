@@ -65,4 +65,58 @@
         WHERE id = #{paymentId}
           AND status = #{expectedStatus}
     </update>
+
+    <insert id="insertPaymentCancellation"
+            parameterType="com.cakeshop.domain.payment.entity.PaymentCancellation"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO payment_cancellations (
+            payment_id,
+            idempotency_key,
+            cancel_amount,
+            cancel_reason,
+            request_type,
+            requested_by,
+            status
+        )
+        VALUES (
+            #{paymentId},
+            #{idempotencyKey},
+            #{cancelAmount},
+            #{cancelReason},
+            #{requestType},
+            #{requestedBy},
+            'REQUESTED'
+        )
+    </insert>
+
+    <select id="findPaymentCancellationById"
+            resultType="com.cakeshop.domain.payment.entity.PaymentCancellation">
+        SELECT
+            id,
+            payment_id,
+            idempotency_key,
+            cancel_amount,
+            cancel_reason,
+            request_type,
+            requested_by,
+            status,
+            active_requested_payment_id,
+            transaction_key,
+            failure_code,
+            failure_message,
+            requested_at,
+            canceled_at,
+            created_at,
+            updated_at
+        FROM payment_cancellations
+        WHERE id = #{cancellationId}
+    </select>
+
+    <update id="updateCancellationStatusIfCurrent">
+        UPDATE payment_cancellations
+        SET status = #{nextStatus}
+        WHERE id = #{cancellationId}
+          AND status = #{expectedStatus}
+    </update>
 </mapper>
