@@ -2,12 +2,17 @@ package com.cakeshop.domain.member.service;
 
 import com.cakeshop.domain.member.dto.form.ProfileUpdateForm;
 import com.cakeshop.domain.member.dto.form.SignupForm;
+import com.cakeshop.domain.member.dto.view.EmailRecoveryResult;
 import com.cakeshop.domain.member.dto.view.MemberProfileView;
+import com.cakeshop.domain.member.dto.view.RecoveredEmailView;
 import com.cakeshop.domain.member.entity.Member;
 import com.cakeshop.domain.member.entity.MemberStatus;
 import com.cakeshop.domain.member.error.MemberErrorCode;
 import com.cakeshop.domain.member.mapper.MemberMapper;
 import com.cakeshop.global.error.BusinessException;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.stream.IntStream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -49,6 +54,18 @@ public class MemberService {
     @Transactional(readOnly = true)
     public boolean checkEmailDuplicate(String email) {
         return memberMapper.findByEmail(email).isPresent();
+    }
+
+    @Transactional(readOnly = true)
+    public EmailRecoveryResult findEmails(String name, LocalDate birthDate, String phone) {
+        String normalizedName = name.trim();
+        String normalizedPhone = phone.replace("-", "");
+        List<String> emails =
+                memberMapper.findEmailsByMemberInfo(normalizedName, birthDate, normalizedPhone);
+        List<RecoveredEmailView> views = IntStream.range(0, emails.size())
+                .mapToObj(index -> new RecoveredEmailView(index, maskEmail(emails.get(index))))
+                .toList();
+        return new EmailRecoveryResult(emails, views);
     }
 
     @Transactional
@@ -101,6 +118,20 @@ public class MemberService {
         if (memberMapper.withdrawById(member.getId(), MemberStatus.WITHDRAWN) == 0) {
             throw new BusinessException(MemberErrorCode.WITHDRAW_FAILED);
         }
+    }
+
+    private String maskEmail(String email) {
+        int atIndex = email.indexOf('@');
+        if (atIndex <= 0) {
+            return "***";
+        }
+
+        String localPart = email.substring(0, atIndex);
+        String domainPart = email.substring(atIndex);
+        int visibleLength = localPart.length() >= 3 ? 2 : Math.max(localPart.length() - 1, 0);
+        return localPart.substring(0, visibleLength)
+                + "*".repeat(localPart.length() - visibleLength)
+                + domainPart;
     }
 
 }
