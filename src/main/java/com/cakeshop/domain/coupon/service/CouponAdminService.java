@@ -108,54 +108,17 @@ public class CouponAdminService {
 
         Coupon coupon = findCoupon(couponId);
 
-        // 1. 종료된 쿠폰은 수정 불가
-        if (coupon.getStatus() == CouponStatus.ENDED) {
-            throw new BusinessException(CouponErrorCode.CANNOT_EDIT_ENDED_COUPON);
-        }
-
-        // 2. 이미 발급한 수량보다 총수량을 줄이면 발급 이력과 모순된다.
-        if (form.getTotalQuantity() < coupon.getIssuedQuantity()) {
-            throw new BusinessException(
-                    CouponErrorCode.QUANTITY_BELOW_ISSUED
-            );
-        }
-
-        // 3. 시작 시각 이후에는 이미 노출된 발급 조건을 변경하지 못하게 한다.
-        boolean isFullEdit = coupon.getStartsAt().isAfter(LocalDateTime.now());
-
-        if (!isFullEdit) {
-            // 제한된 수정만 가능하므로, 수정 불가능한 필드가 변경되었는지 검증한다.
-            if (coupon.getDiscountType() != form.getDiscountType()) {
-                throw new BusinessException(CouponErrorCode.CANNOT_MODIFY_FIELDS);
-            }
-            if (coupon.getDiscountValue() == null || form.getDiscountValue() == null || coupon.getDiscountValue().compareTo(form.getDiscountValue()) != 0) {
-                throw new BusinessException(CouponErrorCode.CANNOT_MODIFY_FIELDS);
-            }
-            if (coupon.getMinimumOrderAmount() == null || form.getMinimumOrderAmount() == null || coupon.getMinimumOrderAmount().compareTo(form.getMinimumOrderAmount()) != 0) {
-                throw new BusinessException(CouponErrorCode.CANNOT_MODIFY_FIELDS);
-            }
-            if (coupon.getMaximumDiscountAmount() == null) {
-                if (form.getMaximumDiscountAmount() != null) {
-                    throw new BusinessException(CouponErrorCode.CANNOT_MODIFY_FIELDS);
-                }
-            } else {
-                if (form.getMaximumDiscountAmount() == null || coupon.getMaximumDiscountAmount().compareTo(form.getMaximumDiscountAmount()) != 0) {
-                    throw new BusinessException(CouponErrorCode.CANNOT_MODIFY_FIELDS);
-                }
-            }
-            if (coupon.getStartsAt() == null || !coupon.getStartsAt().equals(form.getStartsAt())) {
-                throw new BusinessException(CouponErrorCode.CANNOT_MODIFY_FIELDS);
-            }
-
-            // 종료 일시는 기존 종료 일시보다 이전이면 안 되며, 동일 시각은 허용한다.
-            if (form.getExpiresAt() == null || coupon.getExpiresAt() == null || form.getExpiresAt().isBefore(coupon.getExpiresAt())) {
-                throw new BusinessException(CouponErrorCode.EXPIRES_AT_EXTENSION_ONLY);
-            }
-        }
+        boolean isFullEdit = validateUpdate(coupon, form);
 
         applyForm(coupon, form);
 
-        if (couponMapper.updateCoupon(coupon) != 1) {
+        int updated = isFullEdit
+                ? couponMapper.updateCouponBeforeStart(coupon)
+                : couponMapper.updateCouponAfterStart(coupon);
+
+        if (updated != 1) {
+            // 조회와 UPDATE 사이에 상태·시각·발급 수량이 달라졌다면 최신 상태로 다시 판정한다.
+            validateUpdate(findCoupon(couponId), form);
             throw new BusinessException(CouponErrorCode.UPDATE_FAILED);
         }
     }
@@ -216,6 +179,49 @@ public class CouponAdminService {
                 .orElseThrow(() -> new BusinessException(
                         CouponErrorCode.NOT_FOUND
                 ));
+    }
+
+    /**
+     * 현재 DB 상태를 기준으로 수정 가능 범위를 검증하고, 전체 수정 여부를 반환한다.
+     * 반환값은 SQL의 전체 수정/제한 수정 분기를 결정하며, SQL도 같은 조건을 다시 확인한다.
+     */
+    private boolean validateUpdate(Coupon coupon, CouponUpdateForm form) {
+        if (coupon.getStatus() == CouponStatus.ENDED) {
+            throw new BusinessException(CouponErrorCode.CANNOT_EDIT_ENDED_COUPON);
+        }
+
+        if (form.getTotalQuantity() < coupon.getIssuedQuantity()) {
+            throw new BusinessException(CouponErrorCode.QUANTITY_BELOW_ISSUED);
+        }
+
+        boolean isFullEdit = coupon.getStartsAt().isAfter(LocalDateTime.now());
+        if (isFullEdit) {
+            return true;
+        }
+
+        if (coupon.getDiscountType() != form.getDiscountType()
+                || !sameAmount(coupon.getDiscountValue(), form.getDiscountValue())
+                || !sameAmount(coupon.getMinimumOrderAmount(), form.getMinimumOrderAmount())
+                || !sameAmount(coupon.getMaximumDiscountAmount(), form.getMaximumDiscountAmount())
+                || !coupon.getStartsAt().equals(form.getStartsAt())) {
+            throw new BusinessException(CouponErrorCode.CANNOT_MODIFY_FIELDS);
+        }
+
+        // 종료 일시는 기존 종료 일시보다 이전이면 안 되며, 동일 시각은 허용한다.
+        if (form.getExpiresAt() == null || coupon.getExpiresAt() == null
+                || form.getExpiresAt().isBefore(coupon.getExpiresAt())) {
+            throw new BusinessException(CouponErrorCode.EXPIRES_AT_EXTENSION_ONLY);
+        }
+
+        return false;
+    }
+
+    /** 두 할인 금액이 모두 null인 경우도 같은 값으로 취급한다. */
+    private boolean sameAmount(java.math.BigDecimal left, java.math.BigDecimal right) {
+        if (left == null || right == null) {
+            return left == right;
+        }
+        return left.compareTo(right) == 0;
     }
 
     /** 등록/수정 화면에서 변경 가능한 항목만 Entity에 복사한다. */

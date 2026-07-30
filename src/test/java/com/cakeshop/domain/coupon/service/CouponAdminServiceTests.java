@@ -127,7 +127,8 @@ class CouponAdminServiceTests {
             .extracting(exception -> ((BusinessException) exception).getErrorCode())
             .isEqualTo(CouponErrorCode.QUANTITY_BELOW_ISSUED);
 
-        verify(couponMapper, never()).updateCoupon(any());
+        verify(couponMapper, never()).updateCouponBeforeStart(any());
+        verify(couponMapper, never()).updateCouponAfterStart(any());
     }
 
     @Test
@@ -225,7 +226,7 @@ class CouponAdminServiceTests {
         coupon.setDiscountValue(BigDecimal.valueOf(3000));
         coupon.setMinimumOrderAmount(BigDecimal.valueOf(10000));
         when(couponMapper.findCouponById(1L)).thenReturn(Optional.of(coupon));
-        when(couponMapper.updateCoupon(any())).thenReturn(1);
+        when(couponMapper.updateCouponAfterStart(any())).thenReturn(1);
 
         CouponUpdateForm form = updateForm();
         form.setStartsAt(coupon.getStartsAt());
@@ -239,7 +240,7 @@ class CouponAdminServiceTests {
 
         couponAdminService.updateCoupon(1L, form);
 
-        verify(couponMapper).updateCoupon(any());
+        verify(couponMapper).updateCouponAfterStart(any());
     }
 
     @Test
@@ -251,7 +252,7 @@ class CouponAdminServiceTests {
         coupon.setDiscountValue(BigDecimal.valueOf(3000));
         coupon.setMinimumOrderAmount(BigDecimal.valueOf(10000));
         when(couponMapper.findCouponById(1L)).thenReturn(Optional.of(coupon));
-        when(couponMapper.updateCoupon(any())).thenReturn(1);
+        when(couponMapper.updateCouponBeforeStart(any())).thenReturn(1);
 
         CouponUpdateForm form = updateForm();
         // startsAt이 미래이므로 제한을 받지 않고 할인값 변경 등이 가능해야 함
@@ -260,7 +261,37 @@ class CouponAdminServiceTests {
 
         couponAdminService.updateCoupon(1L, form);
 
-        verify(couponMapper).updateCoupon(any());
+        verify(couponMapper).updateCouponBeforeStart(any());
+    }
+
+    @Test
+    void updateRechecksStatusWhenLimitedUpdateAffectsNoRows() {
+        Coupon beforeUpdate = coupon(
+            CouponStatus.ACTIVE, 10, 1, LocalDateTime.now().plusDays(2)
+        );
+        beforeUpdate.setStartsAt(LocalDateTime.now().minusDays(1));
+
+        Coupon endedAfterCheck = coupon(
+            CouponStatus.ENDED, 10, 1, LocalDateTime.now().minusSeconds(1)
+        );
+        when(couponMapper.findCouponById(1L)).thenReturn(
+            Optional.of(beforeUpdate), Optional.of(endedAfterCheck)
+        );
+        when(couponMapper.updateCouponAfterStart(any())).thenReturn(0);
+
+        CouponUpdateForm form = updateForm();
+        form.setStartsAt(beforeUpdate.getStartsAt());
+        form.setDiscountType(beforeUpdate.getDiscountType());
+        form.setDiscountValue(beforeUpdate.getDiscountValue());
+        form.setMinimumOrderAmount(beforeUpdate.getMinimumOrderAmount());
+        form.setExpiresAt(beforeUpdate.getExpiresAt());
+
+        assertThatThrownBy(() -> couponAdminService.updateCoupon(1L, form))
+            .isInstanceOf(BusinessException.class)
+            .extracting(exception -> ((BusinessException) exception).getErrorCode())
+            .isEqualTo(CouponErrorCode.CANNOT_EDIT_ENDED_COUPON);
+
+        verify(couponMapper).updateCouponAfterStart(any());
     }
 
     @Test

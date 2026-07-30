@@ -169,20 +169,6 @@
                     <a class="btn" th:href="@{/admin/coupons}">취소</a>
                 </div>
             </form>
-
-            <!-- 제한 수정 화면의 비활성 입력값도 서버 검증을 위해 제출 직전에 다시 활성화한다. -->
-            <script>
-                document.addEventListener("DOMContentLoaded", function() {
-                    const form = document.querySelector("form");
-                    if (form) {
-                        form.addEventListener("submit", function() {
-                            form.querySelectorAll("input:disabled, select:disabled").forEach(function(el) {
-                                el.disabled = false;
-                            });
-                        });
-                    }
-                });
-            </script>
         </main>
     </div>
 </div>

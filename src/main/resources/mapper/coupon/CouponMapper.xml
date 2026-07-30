@@ -141,8 +141,8 @@
         <include refid="couponSearchConditions"/>
     </select>
 
-    <update id="updateCoupon">
-        <!-- issued_quantity, status, created/updated 시각은 화면 수정 대상에서 제외한다. -->
+    <update id="updateCouponBeforeStart">
+        <!-- 시작 전 상태를 WHERE에서도 확인해 조회 후 시작된 쿠폰의 전체 수정을 막는다. -->
         UPDATE coupons
         SET
             name = #{name},
@@ -154,6 +154,27 @@
             starts_at = #{startsAt},
             expires_at = #{expiresAt}
         WHERE id = #{id}
+          AND status IN ('ACTIVE', 'INACTIVE')
+          AND starts_at &gt; NOW(6)
+          AND expires_at &gt; NOW(6)
+    </update>
+
+    <update id="updateCouponAfterStart">
+        <!--
+            시작 후에는 발급 조건을 바꾸지 않고 이름·총 수량·종료 일시만 수정한다.
+            WHERE 조건이 조회 후 상태 변경, 발급 수량 증가, 종료 시각 경과를 다시 방어한다.
+        -->
+        UPDATE coupons
+        SET
+            name = #{name},
+            total_quantity = #{totalQuantity},
+            expires_at = #{expiresAt}
+        WHERE id = #{id}
+          AND status IN ('ACTIVE', 'INACTIVE')
+          AND starts_at &lt;= NOW(6)
+          AND expires_at &gt; NOW(6)
+          AND issued_quantity &lt;= #{totalQuantity}
+          AND expires_at &lt;= #{expiresAt}
     </update>
 
     <update id="updateStatus">
