@@ -62,6 +62,7 @@ public class AuthController {
             BindingResult bindingResult,
             Model model,
             HttpSession session) {
+        session.removeAttribute(RECOVERED_EMAILS_SESSION_KEY);
         model.addAttribute("recoveredEmails", List.of());
         model.addAttribute("searched", false);
         if (bindingResult.hasErrors()) {
