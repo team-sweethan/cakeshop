@@ -29,9 +29,6 @@ public class ProductSearchCondition {
     /** 주문 가능 또는 품절 재고 조건. */
     private StockFilter stock;
 
-    /** 당일 픽업 가능 상품만 조회할지 여부. */
-    private boolean sameDay;
-
     /** 상품 정렬 조건. */
     private ProductSort sort = ProductSort.POPULAR;
 

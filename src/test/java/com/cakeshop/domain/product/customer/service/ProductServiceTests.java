@@ -99,7 +99,6 @@ class ProductServiceTests {
                 BigDecimal.valueOf(35_000),
                 ProductType.GENERAL,
                 10,
-                2,
                 BigDecimal.valueOf(4.8),
                 12,
                 null

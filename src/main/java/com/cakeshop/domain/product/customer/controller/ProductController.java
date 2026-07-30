@@ -132,10 +132,6 @@ public class ProductController {
             condition.setSort(ProductSort.POPULAR);
         }
 
-        if (bindingResult.hasFieldErrors("sameDay")) {
-            condition.setSameDay(false);
-        }
-
         if (bindingResult.hasFieldErrors("minPrice")) {
             condition.setMinPrice(BigDecimal.ZERO);
         }
