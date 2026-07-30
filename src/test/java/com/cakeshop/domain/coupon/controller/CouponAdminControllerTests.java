@@ -71,34 +71,45 @@ class CouponAdminControllerTests {
     @Test
     void listBindsSearchConditionAndPaging() throws Exception {
         PageResult<CouponView> result = new PageResult<>(
-            List.of(), new PageRequest(2, 10), 11
+                List.of(),
+                new PageRequest(2, PageRequest.DEFAULT_SIZE),
+                21
         );
-        when(couponAdminService.getCoupons(any(), any())).thenReturn(result);
+
+        when(couponAdminService.getCoupons(any(), any()))
+                .thenReturn(result);
 
         mockMvc.perform(get("/admin/coupons")
-                .param("keyword", " 여름 ")
-                .param("status", "ACTIVE")
-                .param("page", "2")
-                .param("size", "10"))
-            .andExpect(status().isOk())
-            .andExpect(view().name("admin/coupon/list"))
-            .andExpect(model().attribute("pageResult", result))
-            .andExpect(model().attributeExists("condition"));
+                        .param("keyword", " 여름 ")
+                        .param("status", "ACTIVE")
+                        .param("page", "2"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("admin/coupon/list"))
+                .andExpect(model().attribute("pageResult", result))
+                .andExpect(model().attributeExists("condition"))
+                .andExpect(model().attributeExists("pageNavigation"));
 
         ArgumentCaptor<CouponSearchCondition> conditionCaptor =
-            ArgumentCaptor.forClass(CouponSearchCondition.class);
+                ArgumentCaptor.forClass(CouponSearchCondition.class);
         ArgumentCaptor<PageRequest> pageCaptor =
-            ArgumentCaptor.forClass(PageRequest.class);
+                ArgumentCaptor.forClass(PageRequest.class);
 
         verify(couponAdminService).getCoupons(
-            conditionCaptor.capture(), pageCaptor.capture()
+                conditionCaptor.capture(),
+                pageCaptor.capture()
         );
 
-        assertThat(conditionCaptor.getValue().getKeyword()).isEqualTo(" 여름 ");
-        assertThat(conditionCaptor.getValue().getStatus()).isEqualTo(CouponStatus.ACTIVE);
-        assertThat(pageCaptor.getValue().getPage()).isEqualTo(2);
-        assertThat(pageCaptor.getValue().getSize()).isEqualTo(10);
-        assertThat(pageCaptor.getValue().getOffset()).isEqualTo(10);
+        CouponSearchCondition capturedCondition =
+                conditionCaptor.getValue();
+
+        PageRequest capturedPageRequest =
+                pageCaptor.getValue();
+
+        assertThat(capturedCondition.getKeyword()).isEqualTo(" 여름 ");
+        assertThat(capturedCondition.getStatus()).isEqualTo(CouponStatus.ACTIVE);
+        assertThat(capturedPageRequest.getPage()).isEqualTo(2);
+        assertThat(capturedPageRequest.getSize()).isEqualTo(PageRequest.DEFAULT_SIZE);
+        assertThat(capturedPageRequest.getOffset()).isEqualTo((2 - 1) * PageRequest.DEFAULT_SIZE);
     }
 
     @Test
