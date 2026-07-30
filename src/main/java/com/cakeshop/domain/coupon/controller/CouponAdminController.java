@@ -38,10 +38,9 @@ public class CouponAdminController {
     @GetMapping
     public String coupons(@ModelAttribute CouponSearchCondition condition,
                           @RequestParam(required = false) Integer page,
-                          @RequestParam(required = false) Integer size,
                           Model model) {
 
-        PageRequest pageRequest = new PageRequest(page, size);
+        PageRequest pageRequest = new PageRequest(page, PageRequest.DEFAULT_SIZE);
 
         PageResult<CouponView> pageResult = couponAdminService.getCoupons(
                 condition,
