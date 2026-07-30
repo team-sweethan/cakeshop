@@ -122,7 +122,7 @@ class PaymentMapperTests {
     }
 
     @Test
-    void applyCancellationIfCurrent_recordsProviderStatusAndTimeConditionally() {
+    void cancelIfDone_recordsProviderStatusAndTimeConditionally() {
         Payment payment = insertPayment("DONE-TO-CANCELED");
         LocalDateTime approvedAt =
                 LocalDateTime.of(2026, 8, 1, 12, 1);
@@ -136,27 +136,8 @@ class PaymentMapperTests {
                 approvedAt
         );
 
-        assertThat(paymentMapper.applyCancellationIfCurrent(
+        assertThat(paymentMapper.cancelIfDone(
                 payment.getId(),
-                PaymentStatus.READY,
-                PaymentStatus.CANCELED,
-                "CANCELED",
-                canceledAt
-        )).isZero();
-        assertThat(paymentMapper.applyCancellationIfCurrent(
-                payment.getId(),
-                PaymentStatus.DONE,
-                PaymentStatus.ABORTED,
-                "ABORTED",
-                canceledAt
-        )).isZero();
-        assertThat(findPayment(payment.getId()).getStatus())
-                .isEqualTo(PaymentStatus.DONE);
-
-        assertThat(paymentMapper.applyCancellationIfCurrent(
-                payment.getId(),
-                PaymentStatus.DONE,
-                PaymentStatus.CANCELED,
                 "CANCELED",
                 canceledAt
         )).isEqualTo(1);
@@ -164,6 +145,24 @@ class PaymentMapperTests {
         assertThat(canceled.getStatus()).isEqualTo(PaymentStatus.CANCELED);
         assertThat(canceled.getProviderStatus()).isEqualTo("CANCELED");
         assertThat(canceled.getCanceledAt()).isEqualTo(canceledAt);
+        assertThat(paymentMapper.cancelIfDone(
+                payment.getId(),
+                "CANCELED",
+                canceledAt.plusMinutes(1)
+        )).isZero();
+    }
+
+    @Test
+    void cancelIfDone_doesNotCancelReadyPayment() {
+        Payment payment = insertPayment("READY-CANNOT-CANCEL");
+
+        assertThat(paymentMapper.cancelIfDone(
+                payment.getId(),
+                "CANCELED",
+                LocalDateTime.of(2026, 8, 1, 12, 5)
+        )).isZero();
+        assertThat(findPayment(payment.getId()).getStatus())
+                .isEqualTo(PaymentStatus.READY);
     }
 
     @Test

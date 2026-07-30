@@ -2,7 +2,6 @@ package com.cakeshop.domain.payment.mapper;
 
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.entity.PaymentCancellation;
-import com.cakeshop.domain.payment.entity.PaymentStatus;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -44,11 +43,9 @@ public interface PaymentMapper {
             @Param("failureMessage") String failureMessage
     );
 
-    // 결제 취소 결과를 현재 결제 상태 조건과 함께 반영한다.
-    int applyCancellationIfCurrent(
+    // DONE 결제의 전체 취소 결과와 취소 시각을 함께 기록한다.
+    int cancelIfDone(
             @Param("paymentId") long paymentId,
-            @Param("expectedStatus") PaymentStatus expectedStatus,
-            @Param("nextStatus") PaymentStatus nextStatus,
             @Param("providerStatus") String providerStatus,
             @Param("canceledAt") LocalDateTime canceledAt
     );

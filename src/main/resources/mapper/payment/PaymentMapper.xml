@@ -92,15 +92,13 @@
           AND status = 'READY'
     </update>
 
-    <update id="applyCancellationIfCurrent">
+    <update id="cancelIfDone">
         UPDATE payments
-        SET status = #{nextStatus},
+        SET status = 'CANCELED',
             provider_status = #{providerStatus},
             canceled_at = #{canceledAt}
         WHERE id = #{paymentId}
-          AND status = #{expectedStatus}
-          AND status IN ('DONE', 'PARTIAL_CANCELED')
-          AND #{nextStatus} IN ('PARTIAL_CANCELED', 'CANCELED')
+          AND status = 'DONE'
     </update>
 
     <insert id="insertPaymentCancellation"
