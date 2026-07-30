@@ -1,6 +1,26 @@
 package com.cakeshop.domain.order.entity;
 
-// DB 조회 결과·도메인 상태
+import com.cakeshop.domain.product.entity.ProductType;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.math.BigDecimal;
+
+/** DB의 order_items 한 행을 표현한다. */
+@Getter
+@Setter
 public class OrderItem {
-    // TODO: 필드 정의 (ERD 확정 후)
+
+    private Long id;
+    private Long orderId;
+    private Long productId;
+    private String productName;
+    private ProductType productType;
+    private Integer quantity;
+    private BigDecimal basePrice;
+    private BigDecimal optionAmount;
+    private BigDecimal totalAmount;
+    private String requirements;
+    private Integer preparationDays;
+    private Integer cancellationLimitDays;
 }
