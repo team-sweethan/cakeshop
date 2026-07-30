@@ -23,12 +23,12 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-            // 웹훅 경로만 CSRF 제외 — 전체 비활성화 금지
-            .csrf(csrf -> csrf.ignoringRequestMatchers("/webhooks/toss"))
+            // 웹훅 및 알림 REST API 경로 CSRF 제외 — 전체 비활성화 금지
+            .csrf(csrf -> csrf.ignoringRequestMatchers("/webhooks/toss", "/api/notifications/**"))
             .authorizeHttpRequests(auth -> {
                 // ① 공개 GET을 먼저 선언 (matcher 순서 = 우선순위)
                 auth.requestMatchers("/", "/login", "/signup", "/join","/emailCheck" ,"/products/**", "/cart", "/screens",
-                        "/favicon.ico", "/css/**", "/js/**", "/images/**", "/uploads/**", "/error").permitAll();
+                        "/api/notifications/unread-count", "/favicon.ico", "/css/**", "/js/**", "/images/**", "/uploads/**", "/error").permitAll();
                 // 로드밸런서/헬스체크가 인증 없이 호출할 수 있도록 허용 (그 외 actuator 엔드포인트는 미노출)
                 auth.requestMatchers("/actuator/health", "/actuator/health/**").permitAll();
                 auth.requestMatchers(HttpMethod.GET, "/community", "/community/{id:\\d+}").permitAll();

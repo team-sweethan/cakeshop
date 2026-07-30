@@ -16,7 +16,9 @@ import com.cakeshop.domain.member.controller.AuthController;
 import com.cakeshop.domain.member.controller.MyPageController;
 import com.cakeshop.domain.member.entity.Member;
 import com.cakeshop.domain.member.service.MemberService;
-import com.cakeshop.domain.notification.controller.NotificationController;
+import com.cakeshop.domain.notification.controller.NotificationUserController;
+import com.cakeshop.domain.notification.service.NotificationService;
+import com.cakeshop.domain.store.service.StoreService;
 import com.cakeshop.domain.order.controller.OrderController;
 import com.cakeshop.domain.payment.controller.PaymentController;
 import com.cakeshop.domain.product.customer.controller.ProductController;
@@ -68,7 +70,7 @@ class CustomerPageControllerTests {
                         new OrderController(),
                         new PaymentController(),
                         new MyPageController(memberService),
-                        new NotificationController(),
+                        new NotificationUserController(mock(NotificationService.class), mock(StoreService.class)),
                         new CouponController(),
                         new ReviewController())
                 .setCustomArgumentResolvers(

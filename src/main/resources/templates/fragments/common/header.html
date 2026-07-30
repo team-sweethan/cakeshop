@@ -9,7 +9,7 @@
     <div class="customer-header__actions">
       <a class="btn" sec:authorize="hasRole('ADMIN')" th:href="@{/admin/store}">관리자</a>
       <a class="btn" th:href="@{/products}">검색</a>
-      <a class="btn" sec:authorize="isAuthenticated()" th:href="@{/notifications}">알림</a>
+      <a class="btn" sec:authorize="isAuthenticated()" th:href="@{/notifications}">알림 <span class="badge" data-unread-count style="display: none;">0</span></a>
 <!--      <a class="btn" th:href="@{/cart}" data-cart-count>장바구니 (0)</a>-->
       <!-- 로그인 한 경우에만 장바구니를 띄우도록 수정. -->
       <a class="btn" sec:authorize="isAuthenticated()" th:href="@{/cart}" data-cart-count>장바구니 (0)</a>
