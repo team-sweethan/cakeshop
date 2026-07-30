@@ -238,7 +238,6 @@ public class CouponAdminController {
             @PathVariable Long couponId,
             @ModelAttribute CouponSearchCondition condition,
             @RequestParam(required = false) Integer page,
-            @RequestParam(required = false) Integer size,
             Model model) {
         model.addAttribute(
                 "couponForm",
@@ -248,7 +247,6 @@ public class CouponAdminController {
         // 상세 화면의 목록 버튼이 사용자가 보던 검색 결과와 페이지로 돌아가도록 보존한다.
         model.addAttribute("condition", condition);
         model.addAttribute("page", page);
-        model.addAttribute("size", size);
 
         return "admin/coupon/detail";
     }

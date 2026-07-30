@@ -249,13 +249,11 @@ class CouponAdminControllerTests {
         mockMvc.perform(get("/admin/coupons/3/detail")
                 .param("keyword", "여름")
                 .param("status", "ACTIVE")
-                .param("page", "6")
-                .param("size", "15"))
+                .param("page", "6"))
             .andExpect(status().isOk())
             .andExpect(view().name("admin/coupon/detail"))
             .andExpect(model().attribute("couponForm", form))
             .andExpect(model().attribute("page", 6))
-            .andExpect(model().attribute("size", 15))
             .andExpect(model().attributeExists("condition"));
 
         verify(couponAdminService).getDetailCoupon(3L);
