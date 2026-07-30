@@ -52,9 +52,6 @@ public class ProductDetailView {
     /** 주문일부터 상품 준비까지 필요한 최소 일수. */
     private Integer preparationDays;
 
-    /** 고객이 주문을 취소할 수 있는 픽업일 기준 제한 일수. */
-    private Integer cancellationLimitDays;
-
     /** 상품 후기의 평균 평점. */
     private BigDecimal averageRating;
 

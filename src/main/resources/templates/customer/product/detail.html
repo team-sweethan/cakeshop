@@ -174,26 +174,6 @@
           </span>
       </div>
 
-      <!-- 주문 취소 제한 기간 -->
-      <div class="data-row">
-          <span class="data-row__label">
-            취소 가능 기간
-          </span>
-
-        <!-- 제한 일수가 0인 상품 -->
-        <span th:if="${product.cancellationLimitDays == 0}">
-            픽업 전까지 취소 가능
-          </span>
-
-        <!-- 제한 일수가 1일 이상인 상품 -->
-        <span
-                th:if="${product.cancellationLimitDays > 0}"
-                th:text="|픽업일 ${product.cancellationLimitDays}일 전까지 취소 가능|"
-        >
-            픽업일 2일 전까지 취소 가능
-          </span>
-      </div>
-
       <!-- 실제 상품 옵션 -->
       <div class="section" style="margin-top:16px">
         <h3 class="form-label">선택 가능한 옵션</h3>

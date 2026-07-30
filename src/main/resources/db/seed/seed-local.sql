@@ -150,7 +150,6 @@ INSERT INTO `products` (
     `stock_quantity`,
     `product_type`,
     `preparation_days`,
-    `cancellation_limit_days`,
     `status`
 )
 SELECT
@@ -161,7 +160,6 @@ SELECT
     sample.`stock_quantity`,
     sample.`product_type`,
     sample.`preparation_days`,
-    sample.`cancellation_limit_days`,
     sample.`status`
 FROM `categories` c
 CROSS JOIN (
@@ -172,8 +170,7 @@ CROSS JOIN (
         35000 AS `base_price`,
         12 AS `stock_quantity`,
         'GENERAL' AS `product_type`,
-        2 AS `preparation_days`,
-        1 AS `cancellation_limit_days`,
+        0 AS `preparation_days`,
         'ACTIVE' AS `status`
 
     UNION ALL
@@ -185,8 +182,7 @@ CROSS JOIN (
         42000,
         8,
         'GENERAL',
-        2,
-        1,
+        0,
         'ACTIVE'
 
     UNION ALL
@@ -198,8 +194,7 @@ CROSS JOIN (
         39000,
         3,
         'GENERAL',
-        3,
-        2,
+        0,
         'ACTIVE'
 
     UNION ALL
@@ -211,20 +206,18 @@ CROSS JOIN (
         40000,
         0,
         'GENERAL',
-        2,
-        1,
+        0,
         'ACTIVE'
 
     UNION ALL
 
-    -- 당근 케이크: 당일 픽업 가능 상품
+    -- 당근 케이크: 일반 재고 상품
     SELECT
         '호두 당근 케이크',
         '당근과 호두를 넣고 크림치즈 프로스팅을 올린 케이크입니다.',
         32000,
         10,
         'GENERAL',
-        0,
         0,
         'ACTIVE'
 
@@ -238,7 +231,6 @@ CROSS JOIN (
         NULL,
         'CUSTOM',
         4,
-        3,
         'ACTIVE'
 
     UNION ALL
@@ -250,20 +242,18 @@ CROSS JOIN (
         30000,
         20,
         'GENERAL',
-        1,
-        1,
+        0,
         'ACTIVE'
 
     UNION ALL
 
-    -- 망고 케이크: 당일 픽업 상품이 품절된 경우 확인용
+    -- 망고 케이크: 일반 상품이 품절된 경우 확인용
     SELECT
         '애플망고 요거트 케이크',
-        '애플망고와 산뜻한 요거트 크림을 올린 당일 픽업 케이크입니다.',
+        '애플망고와 산뜻한 요거트 크림을 올린 케이크입니다.',
         45000,
         0,
         'GENERAL',
-        0,
         0,
         'ACTIVE'
 
@@ -276,8 +266,7 @@ CROSS JOIN (
         46000,
         5,
         'GENERAL',
-        2,
-        1,
+        0,
         'ACTIVE'
 
     UNION ALL
@@ -289,20 +278,18 @@ CROSS JOIN (
         43000,
         1,
         'GENERAL',
-        2,
-        1,
+        0,
         'ACTIVE'
 
     UNION ALL
 
-    -- 레몬 치즈케이크: 당일 픽업 가능한 재고 상품
+    -- 레몬 치즈케이크: 재고가 넉넉한 일반 상품
     SELECT
         '레몬 바스크 치즈케이크',
         '상큼한 레몬 향을 더해 구운 진한 바스크 치즈케이크입니다.',
         36000,
         15,
         'GENERAL',
-        0,
         0,
         'ACTIVE'
 
@@ -315,8 +302,7 @@ CROSS JOIN (
         41000,
         2,
         'GENERAL',
-        3,
-        2,
+        0,
         'ACTIVE'
 
     UNION ALL
@@ -328,8 +314,7 @@ CROSS JOIN (
         44000,
         7,
         'GENERAL',
-        2,
-        1,
+        0,
         'ACTIVE'
 
     UNION ALL
@@ -341,20 +326,18 @@ CROSS JOIN (
         48000,
         0,
         'GENERAL',
-        3,
-        2,
+        0,
         'ACTIVE'
 
     UNION ALL
 
-    -- 미니 케이크: 최저 가격대와 당일 픽업 확인용
+    -- 미니 케이크: 최저 가격대 확인용
     SELECT
         '미니 도시락 케이크',
-        '한두 명이 가볍게 즐기기 좋은 작은 크기의 당일 픽업 케이크입니다.',
+        '한두 명이 가볍게 즐기기 좋은 작은 크기의 케이크입니다.',
         18000,
         25,
         'GENERAL',
-        0,
         0,
         'ACTIVE'
 
@@ -367,8 +350,7 @@ CROSS JOIN (
         100000,
         1,
         'GENERAL',
-        7,
-        5,
+        0,
         'ACTIVE'
 
     UNION ALL
@@ -381,7 +363,6 @@ CROSS JOIN (
         NULL,
         'CUSTOM',
         14,
-        7,
         'ACTIVE'
 
     UNION ALL
@@ -394,7 +375,6 @@ CROSS JOIN (
         NULL,
         'CUSTOM',
         4,
-        3,
         'ACTIVE'
 
     UNION ALL
@@ -407,7 +387,6 @@ CROSS JOIN (
         NULL,
         'CUSTOM',
         5,
-        4,
         'ACTIVE'
 
     UNION ALL
@@ -420,7 +399,6 @@ CROSS JOIN (
         NULL,
         'CUSTOM',
         7,
-        5,
         'ACTIVE'
 
     UNION ALL
@@ -433,7 +411,6 @@ CROSS JOIN (
         NULL,
         'CUSTOM',
         6,
-        4,
         'ACTIVE'
 
     UNION ALL
@@ -446,7 +423,6 @@ CROSS JOIN (
         NULL,
         'CUSTOM',
         4,
-        3,
         'ACTIVE'
 
     UNION ALL
@@ -459,7 +435,6 @@ CROSS JOIN (
         NULL,
         'CUSTOM',
         3,
-        2,
         'ACTIVE'
 
     UNION ALL
@@ -472,19 +447,17 @@ CROSS JOIN (
         0,
         'CUSTOM',
         5,
-        4,
         'ACTIVE'
 
     UNION ALL
 
-    -- 쌀 케이크: 당일 픽업과 일반 상품 검색 확인용
+    -- 쌀 케이크: 일반 상품 검색 확인용
     SELECT
         '백설기 생화 케이크',
-        '담백한 백설기 위에 생화 느낌의 장식을 올린 당일 픽업 상품입니다.',
+        '담백한 백설기 위에 생화 느낌의 장식을 올린 케이크입니다.',
         52000,
         6,
         'GENERAL',
-        0,
         0,
         'ACTIVE'
 
@@ -497,8 +470,7 @@ CROSS JOIN (
         37000,
         6,
         'GENERAL',
-        2,
-        1,
+        0,
         'INACTIVE'
 
     UNION ALL
@@ -510,8 +482,7 @@ CROSS JOIN (
         47000,
         4,
         'GENERAL',
-        2,
-        1,
+        0,
         'INACTIVE'
 ) sample
 WHERE c.`code` = 'CAKE'

@@ -44,6 +44,12 @@ public enum ProductErrorCode implements ErrorCode {
             "PRODUCT_007",
             "상품 옵션 입력값을 확인해 주세요.",
             400
+    ),
+
+    INVALID_PRODUCT_POLICY(
+            "PRODUCT_008",
+            "상품 유형에 맞는 준비 일수를 입력해 주세요.",
+            400
     );
 
     private final String code;

@@ -154,7 +154,6 @@
             p.stock_quantity,
             p.product_type,
             p.preparation_days,
-            p.cancellation_limit_days,
             p.average_rating,
             p.review_count
         FROM products p
@@ -487,7 +486,6 @@
             stock_quantity,
             product_type,
             preparation_days,
-            cancellation_limit_days,
             status
         )
         VALUES (
@@ -498,7 +496,6 @@
                    #{stockQuantity, jdbcType=INTEGER},
                    #{productType},
                    #{preparationDays},
-                   #{cancellationLimitDays},
                    #{status}
                )
     </insert>
@@ -515,8 +512,7 @@
             p.base_price AS basePrice,
             p.stock_quantity AS stockQuantity,
             p.product_type AS productType,
-            p.preparation_days AS preparationDays,
-            p.cancellation_limit_days AS cancellationLimitDays
+            p.preparation_days AS preparationDays
         FROM products p
         WHERE p.id = #{productId}
     </select>
@@ -534,8 +530,7 @@
             base_price = #{basePrice},
             stock_quantity = #{stockQuantity, jdbcType=INTEGER},
             product_type = #{productType},
-            preparation_days = #{preparationDays},
-            cancellation_limit_days = #{cancellationLimitDays}
+            preparation_days = #{preparationDays}
         WHERE id = #{id}
     </update>
 </mapper>

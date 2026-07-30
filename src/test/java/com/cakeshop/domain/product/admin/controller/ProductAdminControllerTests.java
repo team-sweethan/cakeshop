@@ -253,11 +253,7 @@ class ProductAdminControllerTests {
                                 .param("basePrice", "35000")
                                 .param("stockQuantity", "10")
                                 .param("productType", "GENERAL")
-                                .param("preparationDays", "2")
-                                .param(
-                                        "cancellationLimitDays",
-                                        "1"
-                                )
+                                .param("preparationDays", "0")
                 )
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl(
@@ -311,10 +307,6 @@ class ProductAdminControllerTests {
                                 .param("name", "")
                                 .param("basePrice", "-1")
                                 .param("preparationDays", "-1")
-                                .param(
-                                        "cancellationLimitDays",
-                                        "-1"
-                                )
                 )
                 .andExpect(status().isOk())
                 .andExpect(view().name(
@@ -326,6 +318,49 @@ class ProductAdminControllerTests {
                 .andExpect(model().attributeExists(
                         "categories",
                         "productTypes"
+                ));
+
+        verify(productAdminService, never())
+                .createProduct(any());
+    }
+
+    @Test
+    void createProduct_customPreparationZero_returnsCreatePage()
+            throws Exception {
+        ProductAdminService productAdminService =
+                mock(ProductAdminService.class);
+
+        when(productAdminService.getActiveCategories())
+                .thenReturn(List.of(
+                        new ProductCategoryOptionView(
+                                1L,
+                                "케이크"
+                        )
+                ));
+
+        MockMvc mockMvc = MockMvcBuilders
+                .standaloneSetup(
+                        new ProductAdminController(
+                                productAdminService
+                        )
+                )
+                .build();
+
+        mockMvc.perform(
+                        post("/admin/products")
+                                .param("categoryId", "1")
+                                .param("name", "주문 제작 케이크")
+                                .param("basePrice", "55000")
+                                .param("productType", "CUSTOM")
+                                .param("preparationDays", "0")
+                )
+                .andExpect(status().isOk())
+                .andExpect(view().name(
+                        "admin/product/form"
+                ))
+                .andExpect(model().attributeHasFieldErrors(
+                        "productForm",
+                        "preparationPolicyValid"
                 ));
 
         verify(productAdminService, never())
@@ -413,10 +448,6 @@ class ProductAdminControllerTests {
                                 .param("stockQuantity", "5")
                                 .param("productType", "CUSTOM")
                                 .param("preparationDays", "3")
-                                .param(
-                                        "cancellationLimitDays",
-                                        "2"
-                                )
                 )
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl(
@@ -447,8 +478,6 @@ class ProductAdminControllerTests {
         assertThat(form.getProductType())
                 .isEqualTo(ProductType.CUSTOM);
         assertThat(form.getPreparationDays()).isEqualTo(3);
-        assertThat(form.getCancellationLimitDays())
-                .isEqualTo(2);
     }
 
     @Test
@@ -478,10 +507,6 @@ class ProductAdminControllerTests {
                                 .param("name", "")
                                 .param("basePrice", "-1")
                                 .param("preparationDays", "-1")
-                                .param(
-                                        "cancellationLimitDays",
-                                        "-1"
-                                )
                 )
                 .andExpect(status().isOk())
                 .andExpect(view().name(
@@ -522,8 +547,7 @@ class ProductAdminControllerTests {
         );
         form.setStockQuantity(10);
         form.setProductType(ProductType.GENERAL);
-        form.setPreparationDays(2);
-        form.setCancellationLimitDays(1);
+        form.setPreparationDays(0);
 
         return form;
     }
