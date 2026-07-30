@@ -19,7 +19,11 @@ public enum CouponErrorCode implements ErrorCode {
     NOT_ACTIVE("COUPON_009", "발급 중인 쿠폰만 중지할 수 있습니다.", 400),
     DEACTIVATE_FAILED("COUPON_010", "쿠폰 발급 중지에 실패했습니다.", 500),
     NOT_INACTIVE("COUPON_011", "발급 중지된 쿠폰만 발급을 재개할 수 있습니다.", 400),
-    ACTIVATE_FAILED("COUPON_012", "쿠폰 발급 재개에 실패했습니다.", 500);
+    ACTIVATE_FAILED("COUPON_012", "쿠폰 발급 재개에 실패했습니다.", 500),
+    // 쿠폰 수정 가능 범위(종료/시작 시각)에 따른 정책 위반 오류다.
+    CANNOT_EDIT_ENDED_COUPON("COUPON_013", "종료된 쿠폰은 수정할 수 없습니다.", 400),
+    CANNOT_MODIFY_FIELDS("COUPON_014", "수정 불가능한 필드가 변경되었습니다.", 400),
+    EXPIRES_AT_EXTENSION_ONLY("COUPON_015", "쿠폰 종료 일시는 연장만 가능합니다.", 400);
 
     private final String code;
     private final String message;

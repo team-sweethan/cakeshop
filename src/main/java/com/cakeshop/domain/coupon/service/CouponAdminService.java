@@ -80,11 +80,24 @@ public class CouponAdminService {
         );
     }
 
-    /** 수정 화면에 필요한 값만 담은 Form을 반환한다. */
+    /**
+     * 수정 화면에 필요한 값을 반환한다.
+     * 종료 쿠폰은 수정 대상이 아니며, 시작 시각을 기준으로 전체/제한 수정 범위를 계산한다.
+     */
     @Transactional(readOnly = true)
     public CouponUpdateForm getUpdateForm(Long couponId) {
         Coupon coupon = findCoupon(couponId);
-        return CouponUpdateForm.from(coupon);
+
+        if (coupon.getStatus() == CouponStatus.ENDED) {
+            throw new BusinessException(CouponErrorCode.CANNOT_EDIT_ENDED_COUPON);
+        }
+
+        CouponUpdateForm form = CouponUpdateForm.from(coupon);
+        // 시작 전에는 정책을 자유롭게 바꿀 수 있고, 시작 후에는 발급 조건 변경을 막는다.
+        boolean isFullEdit = coupon.getStartsAt().isAfter(LocalDateTime.now());
+        form.setFullEdit(isFullEdit);
+
+        return form;
     }
 
     /** 이미 발급한 수량보다 총 발급 수량을 낮추지 못하도록 검증한 뒤 수정한다. */
@@ -95,16 +108,17 @@ public class CouponAdminService {
 
         Coupon coupon = findCoupon(couponId);
 
-        // 이미 발급한 수량보다 총수량을 줄이면 발급 이력과 모순된다.
-        if (form.getTotalQuantity() < coupon.getIssuedQuantity()) {
-            throw new BusinessException(
-                    CouponErrorCode.QUANTITY_BELOW_ISSUED
-            );
-        }
+        boolean isFullEdit = validateUpdate(coupon, form);
 
         applyForm(coupon, form);
 
-        if (couponMapper.updateCoupon(coupon) != 1) {
+        int updated = isFullEdit
+                ? couponMapper.updateCouponBeforeStart(coupon)
+                : couponMapper.updateCouponAfterStart(coupon);
+
+        if (updated != 1) {
+            // 조회와 UPDATE 사이에 상태·시각·발급 수량이 달라졌다면 최신 상태로 다시 판정한다.
+            validateUpdate(findCoupon(couponId), form);
             throw new BusinessException(CouponErrorCode.UPDATE_FAILED);
         }
     }
@@ -167,6 +181,49 @@ public class CouponAdminService {
                 ));
     }
 
+    /**
+     * 현재 DB 상태를 기준으로 수정 가능 범위를 검증하고, 전체 수정 여부를 반환한다.
+     * 반환값은 SQL의 전체 수정/제한 수정 분기를 결정하며, SQL도 같은 조건을 다시 확인한다.
+     */
+    private boolean validateUpdate(Coupon coupon, CouponUpdateForm form) {
+        if (coupon.getStatus() == CouponStatus.ENDED) {
+            throw new BusinessException(CouponErrorCode.CANNOT_EDIT_ENDED_COUPON);
+        }
+
+        if (form.getTotalQuantity() < coupon.getIssuedQuantity()) {
+            throw new BusinessException(CouponErrorCode.QUANTITY_BELOW_ISSUED);
+        }
+
+        boolean isFullEdit = coupon.getStartsAt().isAfter(LocalDateTime.now());
+        if (isFullEdit) {
+            return true;
+        }
+
+        if (coupon.getDiscountType() != form.getDiscountType()
+                || !sameAmount(coupon.getDiscountValue(), form.getDiscountValue())
+                || !sameAmount(coupon.getMinimumOrderAmount(), form.getMinimumOrderAmount())
+                || !sameAmount(coupon.getMaximumDiscountAmount(), form.getMaximumDiscountAmount())
+                || !coupon.getStartsAt().equals(form.getStartsAt())) {
+            throw new BusinessException(CouponErrorCode.CANNOT_MODIFY_FIELDS);
+        }
+
+        // 종료 일시는 기존 종료 일시보다 이전이면 안 되며, 동일 시각은 허용한다.
+        if (form.getExpiresAt() == null || coupon.getExpiresAt() == null
+                || form.getExpiresAt().isBefore(coupon.getExpiresAt())) {
+            throw new BusinessException(CouponErrorCode.EXPIRES_AT_EXTENSION_ONLY);
+        }
+
+        return false;
+    }
+
+    /** 두 할인 금액이 모두 null인 경우도 같은 값으로 취급한다. */
+    private boolean sameAmount(java.math.BigDecimal left, java.math.BigDecimal right) {
+        if (left == null || right == null) {
+            return left == right;
+        }
+        return left.compareTo(right) == 0;
+    }
+
     /** 등록/수정 화면에서 변경 가능한 항목만 Entity에 복사한다. */
     private void applyForm(
             Coupon coupon,
@@ -188,5 +245,18 @@ public class CouponAdminService {
 
         coupon.setStartsAt(form.getStartsAt());
         coupon.setExpiresAt(form.getExpiresAt());
+    }
+
+    /**
+     * 종료 쿠폰도 포함해 상세 화면에 필요한 Form을 반환한다.
+     * 수정 화면 조회와 달리 ENDED 상태를 예외로 처리하지 않는다.
+     */
+    @Transactional(readOnly = true)
+    public CouponUpdateForm getDetailCoupon(Long couponId) {
+        Coupon coupon = findCoupon(couponId);
+        CouponUpdateForm form = CouponUpdateForm.from(coupon);
+        boolean isFullEdit = coupon.getStartsAt().isAfter(LocalDateTime.now());
+        form.setFullEdit(isFullEdit);
+        return form;
     }
 }
