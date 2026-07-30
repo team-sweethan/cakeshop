@@ -5,6 +5,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.response.SecurityMockMvcResultMatchers.unauthenticated;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -55,9 +56,30 @@ class MemberLogoutSecurityTests {
     }
 
     @Test
-    void myPage_logoutUsesPostForm() throws Exception {
+    void passwordRecovery_remoteRequest_isForbidden() throws Exception {
+        mockMvc.perform(get("/find-password")
+                        .with(user("member@cakeshop.local"))
+                        .with(request -> {
+                            request.setRemoteAddr("203.0.113.10");
+                            return request;
+                        }))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void passwordRecovery_loopbackRequest_passesSecurityRules() throws Exception {
+        mockMvc.perform(get("/find-password")
+                        .with(request -> {
+                            request.setRemoteAddr("127.0.0.1");
+                            return request;
+                        }))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void commonHeader_logoutUsesPostForm() throws Exception {
         String template =
-                new ClassPathResource("templates/customer/member/mypage.html")
+                new ClassPathResource("templates/fragments/common/header.html")
                         .getContentAsString(StandardCharsets.UTF_8);
 
         assertThat(template)

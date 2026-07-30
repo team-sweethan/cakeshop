@@ -18,9 +18,21 @@ public interface MemberMapper {
             @Param("birthDate") LocalDate birthDate,
             @Param("phone") String phone);
 
+    Optional<Member> findPasswordRecoveryMember(
+            @Param("email") String email,
+            @Param("name") String name,
+            @Param("birthDate") LocalDate birthDate,
+            @Param("phone") String phone);
+
     int join(Member member);
 
     int update(Member member);
+
+    Optional<String> findActivePasswordForUpdate(@Param("id") Long id);
+
+    int updatePasswordForActiveMember(
+            @Param("id") Long id,
+            @Param("password") String password);
 
     int withdrawById(
             @Param("id") Long id,

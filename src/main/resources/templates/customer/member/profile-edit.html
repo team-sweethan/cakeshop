@@ -72,8 +72,28 @@
   <section class="section">
     <h2 class="section-title">회원 탈퇴</h2>
     <div class="panel panel--danger panel--dashed">
-      <p class="text-muted">탈퇴 즉시 로그아웃되며 이 계정으로 다시 로그인할 수 없습니다.</p>
-      <form th:action="@{/mypage/withdraw}" method="post">
+      <ul class="text-muted">
+        <li>탈퇴 즉시 로그아웃되며 이 계정으로 다시 로그인할 수 없습니다.</li>
+        <li>법령에 따라 보관해야 하는 거래기록은 정해진 기간 동안 별도로 보관될 수 있습니다.</li>
+        <li>작성한 게시물과 주문 관련 처리 기준은 추후 연결되는 각 기능의 정책을 따릅니다.</li>
+      </ul>
+      <form class="form-stack" th:action="@{/mypage/withdraw}" method="post"
+            th:object="${withdrawForm}">
+        <div class="form-group">
+          <label class="form-label" for="withdraw-current-password">현재 비밀번호</label>
+          <input class="form-control" id="withdraw-current-password" type="password"
+                 th:field="*{currentPassword}" maxlength="100"
+                 autocomplete="current-password" required>
+          <p class="form-error" th:if="${#fields.hasErrors('currentPassword')}"
+             th:errors="*{currentPassword}"></p>
+        </div>
+        <label class="choice" for="withdrawal-confirmed">
+          <input id="withdrawal-confirmed" type="checkbox"
+                 th:field="*{withdrawalConfirmed}" required>
+          <span>위 회원 탈퇴 안내를 확인했습니다.</span>
+        </label>
+        <p class="form-error" th:if="${#fields.hasErrors('withdrawalConfirmed')}"
+           th:errors="*{withdrawalConfirmed}"></p>
         <button class="btn btn--danger" type="submit" data-confirm="회원 탈퇴를 진행하시겠습니까?">회원 탈퇴</button>
       </form>
     </div>

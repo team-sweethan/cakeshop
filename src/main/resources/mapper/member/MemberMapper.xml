@@ -33,6 +33,17 @@
          ORDER BY created_at DESC, id DESC
     </select>
 
+    <select id="findPasswordRecoveryMember" resultMap="memberResultMap">
+        SELECT id, email
+          FROM members
+         WHERE email = #{email}
+           AND name = #{name}
+           AND birth_date = #{birthDate}
+           AND REPLACE(phone, '-', '') = #{phone}
+           AND status = 'ACTIVE'
+           AND password IS NOT NULL
+    </select>
+
     <insert id="join" parameterType="com.cakeshop.domain.member.entity.Member">
         INSERT INTO members (email, password, nickname, role, name, created_at, phone, birth_date)
         VALUES (#{email}, #{password}, #{nickname}, #{role}, #{name}, NOW(), #{phone}, #{birthDate})
@@ -47,6 +58,23 @@
             <if test="password != null">password = #{password},</if>
         </set>
         WHERE id = #{id}
+    </update>
+
+    <select id="findActivePasswordForUpdate" resultType="string">
+        SELECT password
+          FROM members
+         WHERE id = #{id}
+           AND status = 'ACTIVE'
+           AND password IS NOT NULL
+           FOR UPDATE
+    </select>
+
+    <update id="updatePasswordForActiveMember">
+        UPDATE members
+           SET password = #{password}
+         WHERE id = #{id}
+           AND status = 'ACTIVE'
+           AND password IS NOT NULL
     </update>
 
     <update id="withdrawById">

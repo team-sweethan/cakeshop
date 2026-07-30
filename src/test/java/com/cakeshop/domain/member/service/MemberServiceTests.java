@@ -11,6 +11,8 @@ import com.cakeshop.domain.member.dto.form.ProfileUpdateForm;
 import com.cakeshop.domain.member.dto.form.SignupForm;
 import com.cakeshop.domain.member.dto.view.EmailRecoveryResult;
 import com.cakeshop.domain.member.dto.view.MemberProfileView;
+import com.cakeshop.domain.member.dto.view.PasswordRecoveryTarget;
+import com.cakeshop.domain.member.dto.view.PasswordResetResult;
 import com.cakeshop.domain.member.dto.view.RecoveredEmailView;
 import com.cakeshop.domain.member.entity.Member;
 import com.cakeshop.domain.member.entity.MemberStatus;
@@ -252,16 +254,82 @@ class MemberServiceTests {
     }
 
     @Test
+    void findPasswordRecoveryMember_validInfo_normalizesAndReturnsCanonicalTarget() {
+        LocalDate birthDate = LocalDate.of(2000, 1, 15);
+        Member member = Member.builder()
+                .id(7L)
+                .email("Member@example.com")
+                .build();
+        when(memberMapper.findPasswordRecoveryMember(
+                "member@example.com",
+                "홍길동",
+                birthDate,
+                "01012345678"))
+                .thenReturn(Optional.of(member));
+
+        Optional<PasswordRecoveryTarget> target = memberService.findPasswordRecoveryMember(
+                " member@example.com ",
+                " 홍길동 ",
+                birthDate,
+                "010-1234-5678");
+
+        assertThat(target).contains(new PasswordRecoveryTarget(7L, "Member@example.com"));
+    }
+
+    @Test
+    void resetPassword_activeMember_encodesAndUpdatesPassword() {
+        when(memberMapper.findActivePasswordForUpdate(7L))
+                .thenReturn(Optional.of("encoded-current-password"));
+        when(passwordEncoder.matches("NewPassword1!", "encoded-current-password"))
+                .thenReturn(false);
+        when(passwordEncoder.encode("NewPassword1!")).thenReturn("encoded-new-password");
+        when(memberMapper.updatePasswordForActiveMember(7L, "encoded-new-password"))
+                .thenReturn(1);
+
+        assertThat(memberService.resetPassword(7L, "NewPassword1!"))
+                .isEqualTo(PasswordResetResult.SUCCESS);
+
+        verify(memberMapper).updatePasswordForActiveMember(7L, "encoded-new-password");
+    }
+
+    @Test
+    void resetPassword_memberNoLongerActive_returnsFalse() {
+        when(memberMapper.findActivePasswordForUpdate(7L)).thenReturn(Optional.empty());
+
+        assertThat(memberService.resetPassword(7L, "NewPassword1!"))
+                .isEqualTo(PasswordResetResult.UNAVAILABLE);
+        verify(passwordEncoder, never()).encode("NewPassword1!");
+    }
+
+    @Test
+    void resetPassword_sameAsCurrentPassword_returnsSamePasswordResult() {
+        when(memberMapper.findActivePasswordForUpdate(7L))
+                .thenReturn(Optional.of("encoded-current-password"));
+        when(passwordEncoder.matches("CurrentPassword1!", "encoded-current-password"))
+                .thenReturn(true);
+
+        assertThat(memberService.resetPassword(7L, "CurrentPassword1!"))
+                .isEqualTo(PasswordResetResult.SAME_AS_CURRENT);
+
+        verify(passwordEncoder, never()).encode("CurrentPassword1!");
+        verify(memberMapper, never()).updatePasswordForActiveMember(
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
     void withdraw_activeMember_withdrawsByPersistentId() {
         Member member = Member.builder()
                 .id(7L)
                 .email("member@cakeshop.local")
+                .password("encoded-password")
                 .status(MemberStatus.ACTIVE)
                 .build();
         when(memberMapper.findByEmail(member.getEmail())).thenReturn(Optional.of(member));
+        when(passwordEncoder.matches("CurrentPassword1!", member.getPassword())).thenReturn(true);
         when(memberMapper.withdrawById(member.getId(), MemberStatus.WITHDRAWN)).thenReturn(1);
 
-        memberService.withdraw(member.getEmail());
+        memberService.withdraw(member.getEmail(), "CurrentPassword1!");
 
         verify(memberMapper).withdrawById(member.getId(), MemberStatus.WITHDRAWN);
     }
@@ -271,14 +339,37 @@ class MemberServiceTests {
         Member member = Member.builder()
                 .id(7L)
                 .email("member@cakeshop.local")
+                .password("encoded-password")
                 .status(MemberStatus.WITHDRAWN)
                 .build();
         when(memberMapper.findByEmail(member.getEmail())).thenReturn(Optional.of(member));
+        when(passwordEncoder.matches("CurrentPassword1!", member.getPassword())).thenReturn(true);
 
-        assertThatThrownBy(() -> memberService.withdraw(member.getEmail()))
+        assertThatThrownBy(() -> memberService.withdraw(member.getEmail(), "CurrentPassword1!"))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(MemberErrorCode.INVALID_STATUS_TRANSITION);
+
+        verify(memberMapper, never()).withdrawById(
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.any(MemberStatus.class));
+    }
+
+    @Test
+    void withdraw_invalidCurrentPassword_throwsMemberBusinessException() {
+        Member member = Member.builder()
+                .id(7L)
+                .email("member@cakeshop.local")
+                .password("encoded-password")
+                .status(MemberStatus.ACTIVE)
+                .build();
+        when(memberMapper.findByEmail(member.getEmail())).thenReturn(Optional.of(member));
+        when(passwordEncoder.matches("WrongPassword1!", member.getPassword())).thenReturn(false);
+
+        assertThatThrownBy(() -> memberService.withdraw(member.getEmail(), "WrongPassword1!"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(MemberErrorCode.INVALID_CURRENT_PASSWORD);
 
         verify(memberMapper, never()).withdrawById(
                 org.mockito.ArgumentMatchers.anyLong(),
