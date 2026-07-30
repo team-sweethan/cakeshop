@@ -29,6 +29,7 @@ import org.springframework.security.core.session.SessionInformation;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @ExtendWith(MockitoExtension.class)
 class MyPageControllerTests {
@@ -57,6 +58,9 @@ class MyPageControllerTests {
     @Mock
     private Model model;
 
+    @Mock
+    private RedirectAttributes redirectAttributes;
+
     @InjectMocks
     private MyPageController myPageController;
 
@@ -79,15 +83,21 @@ class MyPageControllerTests {
                         currentSessionInformation,
                         otherSessionInformation));
 
-        String viewName = myPageController.withdraw(memberDetails, request);
+        String viewName = myPageController.withdraw(
+                memberDetails,
+                request,
+                redirectAttributes);
 
-        assertThat(viewName).isEqualTo("redirect:/login?withdrawn");
+        assertThat(viewName).isEqualTo("redirect:/login");
         assertThat(SecurityContextHolder.getContext().getAuthentication())
                 .isNull();
         verify(memberService).withdraw(memberDetails.getUsername());
         verify(currentSessionInformation).expireNow();
         verify(otherSessionInformation).expireNow();
         verify(session).invalidate();
+        verify(redirectAttributes).addFlashAttribute(
+                "successMessage",
+                "회원 탈퇴가 완료되었습니다.");
     }
 
     @Test
@@ -154,7 +164,10 @@ class MyPageControllerTests {
 
     @Test
     void withdraw_unauthenticatedMember_redirectsWithoutWithdrawing() {
-        String viewName = myPageController.withdraw(null, request);
+        String viewName = myPageController.withdraw(
+                null,
+                request,
+                redirectAttributes);
 
         assertThat(viewName).isEqualTo("redirect:/login");
         verifyNoInteractions(memberService, request);

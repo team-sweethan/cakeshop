@@ -5,6 +5,7 @@ import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.cakeshop.global.config.MariaDbIntegrationTest;
@@ -55,6 +56,21 @@ class ScreenRenderingTests {
             .andExpect(status().isOk())
             .andExpect(content().string(containsString("data-common-alert-popup")))
             .andExpect(content().string(containsString("window.alert(")));
+    }
+
+    @Test
+    void login_recoveredEmail_prefillsEmailInput() throws Exception {
+        mockMvc.perform(get("/login")
+                .flashAttr("recoveredEmail", "member@example.com"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("value=\"member@example.com\"")));
+    }
+
+    @Test
+    void myPage_unauthenticatedMember_redirectsToLoginEvenInPublicPreview() throws Exception {
+        mockMvc.perform(get("/mypage"))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/login"));
     }
 
     @Test

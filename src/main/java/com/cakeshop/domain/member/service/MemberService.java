@@ -3,6 +3,7 @@ package com.cakeshop.domain.member.service;
 import com.cakeshop.domain.member.dto.form.ProfileUpdateForm;
 import com.cakeshop.domain.member.dto.form.SignupForm;
 import com.cakeshop.domain.member.dto.view.MemberProfileView;
+import com.cakeshop.domain.member.dto.view.RecoveredEmailView;
 import com.cakeshop.domain.member.entity.Member;
 import com.cakeshop.domain.member.entity.MemberStatus;
 import com.cakeshop.domain.member.error.MemberErrorCode;
@@ -54,12 +55,12 @@ public class MemberService {
     }
 
     @Transactional(readOnly = true)
-    public List<String> findMaskedEmails(String name, LocalDate birthDate, String phone) {
+    public List<RecoveredEmailView> findEmails(String name, LocalDate birthDate, String phone) {
         String normalizedName = name.trim();
         String normalizedPhone = phone.replace("-", "");
         return memberMapper.findEmailsByMemberInfo(normalizedName, birthDate, normalizedPhone)
                 .stream()
-                .map(this::maskEmail)
+                .map(email -> new RecoveredEmailView(email, maskEmail(email)))
                 .toList();
     }
 

@@ -12,9 +12,6 @@
 <body>
 <header th:replace="~{fragments/common/header :: header}"></header>
 <th:block th:replace="~{fragments/common/alert :: popup}"></th:block>
-<script th:if="${param.withdrawn}" th:inline="javascript">
-  window.alert('회원 탈퇴가 완료되었습니다.');
-</script>
 <main class="page-container page-container--narrow">
   <section class="panel auth-card section">
     <h1>로그인</h1>
@@ -24,7 +21,8 @@
     <form class="form-stack" th:action="@{/login}" method="post">
       <div class="form-group">
         <label for="email">이메일</label>
-        <input id="email" class="form-control" type="email" name="email" autocomplete="username" required autofocus>
+        <input id="email" class="form-control" type="email" name="email"
+               th:value="${recoveredEmail}" autocomplete="username" required autofocus>
       </div>
       <div class="form-group">
         <label for="password">비밀번호</label>

@@ -10,6 +10,7 @@ import static org.mockito.ArgumentMatchers.any;
 import com.cakeshop.domain.member.dto.form.ProfileUpdateForm;
 import com.cakeshop.domain.member.dto.form.SignupForm;
 import com.cakeshop.domain.member.dto.view.MemberProfileView;
+import com.cakeshop.domain.member.dto.view.RecoveredEmailView;
 import com.cakeshop.domain.member.entity.Member;
 import com.cakeshop.domain.member.entity.MemberStatus;
 import com.cakeshop.domain.member.error.MemberErrorCode;
@@ -208,7 +209,7 @@ class MemberServiceTests {
     }
 
     @Test
-    void findMaskedEmails_matchingMembers_normalizesInputAndMasksAllEmails() {
+    void findEmails_matchingMembers_normalizesInputAndMasksAllEmails() {
         LocalDate birthDate = LocalDate.of(2000, 1, 15);
         when(memberMapper.findEmailsByMemberInfo(
                 "홍길동",
@@ -219,19 +220,19 @@ class MemberServiceTests {
                         "ab@example.com",
                         "x@example.com"));
 
-        List<String> result = memberService.findMaskedEmails(
+        List<RecoveredEmailView> result = memberService.findEmails(
                 " 홍길동 ",
                 birthDate,
                 "010-1234-5678");
 
         assertThat(result).containsExactly(
-                "me****@example.com",
-                "a*@example.com",
-                "*@example.com");
+                new RecoveredEmailView("member@example.com", "me****@example.com"),
+                new RecoveredEmailView("ab@example.com", "a*@example.com"),
+                new RecoveredEmailView("x@example.com", "*@example.com"));
     }
 
     @Test
-    void findMaskedEmails_noMatchingMember_returnsEmptyList() {
+    void findEmails_noMatchingMember_returnsEmptyList() {
         LocalDate birthDate = LocalDate.of(2000, 1, 15);
         when(memberMapper.findEmailsByMemberInfo(
                 "홍길동",
@@ -239,7 +240,7 @@ class MemberServiceTests {
                 "01012345678"))
                 .thenReturn(List.of());
 
-        assertThat(memberService.findMaskedEmails(
+        assertThat(memberService.findEmails(
                 "홍길동",
                 birthDate,
                 "01012345678")).isEmpty();

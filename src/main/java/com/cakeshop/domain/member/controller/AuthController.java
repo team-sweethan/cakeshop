@@ -6,6 +6,7 @@ import com.cakeshop.domain.member.dto.view.EmailAvailabilityView;
 import com.cakeshop.domain.member.error.MemberErrorCode;
 import com.cakeshop.domain.member.service.MemberService;
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -36,26 +37,41 @@ public class AuthController {
         return "customer/member/signup";
     }
 
+    // 이메일 찾기 화면
     @GetMapping("/find-email")
     public String findEmail(Model model) {
         model.addAttribute("emailRecoveryForm", new EmailRecoveryForm());
+        model.addAttribute("recoveredEmails", List.of());
+        model.addAttribute("searched", false);
         return "customer/member/find-email";
     }
 
+    // 이메일 찾기 처리
     @PostMapping("/find-email")
     public String findEmail(
             @Valid @ModelAttribute("emailRecoveryForm") EmailRecoveryForm form,
             BindingResult bindingResult,
             Model model) {
+        model.addAttribute("recoveredEmails", List.of());
+        model.addAttribute("searched", false);
         if (bindingResult.hasErrors()) {
             return "customer/member/find-email";
         }
 
         model.addAttribute(
-                "maskedEmails",
-                memberService.findMaskedEmails(form.getName(), form.getBirthDate(), form.getPhone()));
+                "recoveredEmails",
+                memberService.findEmails(form.getName(), form.getBirthDate(), form.getPhone()));
         model.addAttribute("searched", true);
         return "customer/member/find-email";
+    }
+
+    // 찾은 이메일로 로그인 화면 이동
+    @PostMapping("/find-email/login")
+    public String loginWithRecoveredEmail(
+            @RequestParam String selectedEmail,
+            RedirectAttributes redirectAttributes) {
+        redirectAttributes.addFlashAttribute("recoveredEmail", selectedEmail);
+        return "redirect:/login";
     }
 
     // 회원가입 처리

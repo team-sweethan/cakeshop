@@ -15,6 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.cakeshop.domain.member.dto.form.EmailRecoveryForm;
 import com.cakeshop.domain.member.dto.form.SignupForm;
+import com.cakeshop.domain.member.dto.view.RecoveredEmailView;
 import com.cakeshop.domain.member.service.MemberService;
 import java.time.LocalDate;
 import java.util.List;
@@ -148,7 +149,7 @@ class AuthControllerTests {
                 .andExpect(model().attributeHasFieldErrors(
                         "emailRecoveryForm", "name", "birthDate", "phone"));
 
-        verify(memberService, never()).findMaskedEmails(
+        verify(memberService, never()).findEmails(
                 org.mockito.ArgumentMatchers.anyString(),
                 org.mockito.ArgumentMatchers.any(LocalDate.class),
                 org.mockito.ArgumentMatchers.anyString());
@@ -157,8 +158,10 @@ class AuthControllerTests {
     @Test
     void findEmail_matchingMember_rendersMaskedEmailList() throws Exception {
         LocalDate birthDate = LocalDate.of(2000, 1, 15);
-        when(memberService.findMaskedEmails("홍길동", birthDate, "010-1234-5678"))
-                .thenReturn(List.of("me****@example.com"));
+        RecoveredEmailView recoveredEmail =
+                new RecoveredEmailView("member@example.com", "me****@example.com");
+        when(memberService.findEmails("홍길동", birthDate, "010-1234-5678"))
+                .thenReturn(List.of(recoveredEmail));
 
         mockMvc.perform(post("/find-email")
                         .param("name", "홍길동")
@@ -167,6 +170,15 @@ class AuthControllerTests {
                 .andExpect(status().isOk())
                 .andExpect(view().name("customer/member/find-email"))
                 .andExpect(model().attribute("searched", true))
-                .andExpect(model().attribute("maskedEmails", List.of("me****@example.com")));
+                .andExpect(model().attribute("recoveredEmails", List.of(recoveredEmail)));
+    }
+
+    @Test
+    void loginWithRecoveredEmail_selectedEmail_redirectsWithFlashAttribute() throws Exception {
+        mockMvc.perform(post("/find-email/login")
+                        .param("selectedEmail", "member@example.com"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login"))
+                .andExpect(flash().attribute("recoveredEmail", "member@example.com"));
     }
 }
