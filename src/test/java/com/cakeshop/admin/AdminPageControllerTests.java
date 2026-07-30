@@ -1,14 +1,21 @@
 package com.cakeshop.admin;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
+import com.cakeshop.domain.coupon.dto.form.CouponSearchCondition;
+import com.cakeshop.domain.coupon.dto.view.CouponView;
 import com.cakeshop.domain.product.admin.service.ProductAdminService;
+import com.cakeshop.global.common.paging.PageRequest;
+import com.cakeshop.global.common.paging.PageResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -36,11 +43,25 @@ class AdminPageControllerTests {
 
     @BeforeEach
     void setUp() {
+
+        CouponAdminService couponAdminService =
+                Mockito.mock(CouponAdminService.class);
+
+        // 관리자 공통 페이지 테스트에서 목록 컨트롤러가 페이징 값을 계산할 수 있도록 빈 결과를 반환한다.
+        when(couponAdminService.getCoupons(
+                any(CouponSearchCondition.class),
+                any(PageRequest.class)
+        )).thenReturn(new PageResult<CouponView>(
+                List.of(),
+                new PageRequest(null, null),
+                0
+        ));
+
         mockMvc = MockMvcBuilders.standaloneSetup(
             new StatisticsAdminController(), new ProductAdminController(Mockito.mock(ProductAdminService.class)), new OrderAdminController(),
             new FulfillmentAdminController(), new PaymentAdminController(),
             new MemberAdminController(), new ReviewAdminController(), new NotificationAdminController(),
-            new CommunityAdminController(), new CouponAdminController(Mockito.mock(CouponAdminService.class))
+            new CommunityAdminController(), new CouponAdminController(couponAdminService)
         ).build();
 
         pages.put("/admin", "admin/dashboard");

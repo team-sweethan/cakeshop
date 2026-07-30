@@ -69,7 +69,7 @@
                         <input id="startsAt"
                                class="form-control"
                                type="datetime-local"
-                               th:value="${couponForm.startsAt}"
+                               th:value="${#temporals.format(couponForm.startsAt, 'yyyy-MM-dd''T''HH:mm')}"
                                disabled>
                     </div>
 
@@ -78,7 +78,7 @@
                         <input id="expiresAt"
                                class="form-control"
                                type="datetime-local"
-                               th:value="${couponForm.expiresAt}"
+                               th:value="${#temporals.format(couponForm.expiresAt, 'yyyy-MM-dd''T''HH:mm')}"
                                disabled>
                     </div>
                 </div>
@@ -105,7 +105,15 @@
 
                 <div class="cluster">
                     <a class="btn btn--primary" th:if="${#strings.toString(couponForm.status) != 'ENDED'}" th:href="@{/admin/coupons/{couponId}/edit(couponId=${couponId})}">수정</a>
-                    <a class="btn" th:href="@{/admin/coupons}">목록</a>
+                    <a class="btn"
+                       th:href="@{/admin/coupons(
+                           keyword=${condition.keyword},
+                           status=${condition.status},
+                           page=${page},
+                           size=${size}
+                       )}">
+                        목록
+                    </a>
                 </div>
             </div>
 

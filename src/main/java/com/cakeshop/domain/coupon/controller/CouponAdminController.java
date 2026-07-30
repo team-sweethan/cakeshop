@@ -6,6 +6,7 @@ import com.cakeshop.domain.coupon.dto.form.CouponUpdateForm;
 import com.cakeshop.domain.coupon.dto.view.CouponView;
 import com.cakeshop.domain.coupon.error.CouponErrorCode;
 import com.cakeshop.domain.coupon.service.CouponAdminService;
+import com.cakeshop.global.common.paging.PageNavigation;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
@@ -47,8 +48,16 @@ public class CouponAdminController {
                 pageRequest
         );
 
+        // 목록 조회 결과와 분리해, 화면에 표시할 페이지 번호 블록만 공통 객체로 계산한다.
+        PageNavigation pageNavigation =
+                PageNavigation.of(
+                        pageResult.getPage(),
+                        pageResult.getTotalPages()
+                );
+
         model.addAttribute("condition", condition);
         model.addAttribute("pageResult", pageResult);
+        model.addAttribute("pageNavigation", pageNavigation);
 
         return "admin/coupon/list";
     }
@@ -226,13 +235,21 @@ public class CouponAdminController {
      * 종료 쿠폰도 이 화면에서는 조회할 수 있지만 수정 버튼은 노출하지 않는다.
      */
     @GetMapping("{couponId}/detail")
-    public String couponDetail(@PathVariable Long couponId, Model model) {
+    public String couponDetail(
+            @PathVariable Long couponId,
+            @ModelAttribute CouponSearchCondition condition,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            Model model) {
         model.addAttribute(
                 "couponForm",
                 couponAdminService.getDetailCoupon(couponId)
         );
         model.addAttribute("couponId", couponId);
-        model.addAttribute("formMode", "detail");
+        // 상세 화면의 목록 버튼이 사용자가 보던 검색 결과와 페이지로 돌아가도록 보존한다.
+        model.addAttribute("condition", condition);
+        model.addAttribute("page", page);
+        model.addAttribute("size", size);
 
         return "admin/coupon/detail";
     }
