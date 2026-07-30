@@ -1,5 +1,6 @@
 package com.cakeshop.domain.member.controller;
 
+import com.cakeshop.domain.member.dto.form.EmailRecoveryForm;
 import com.cakeshop.domain.member.dto.form.SignupForm;
 import com.cakeshop.domain.member.dto.view.EmailAvailabilityView;
 import com.cakeshop.domain.member.error.MemberErrorCode;
@@ -33,6 +34,28 @@ public class AuthController {
     public String signup(Model model) {
         model.addAttribute("signupForm", new SignupForm());
         return "customer/member/signup";
+    }
+
+    @GetMapping("/find-email")
+    public String findEmail(Model model) {
+        model.addAttribute("emailRecoveryForm", new EmailRecoveryForm());
+        return "customer/member/find-email";
+    }
+
+    @PostMapping("/find-email")
+    public String findEmail(
+            @Valid @ModelAttribute("emailRecoveryForm") EmailRecoveryForm form,
+            BindingResult bindingResult,
+            Model model) {
+        if (bindingResult.hasErrors()) {
+            return "customer/member/find-email";
+        }
+
+        model.addAttribute(
+                "maskedEmails",
+                memberService.findMaskedEmails(form.getName(), form.getBirthDate(), form.getPhone()));
+        model.addAttribute("searched", true);
+        return "customer/member/find-email";
     }
 
     // 회원가입 처리

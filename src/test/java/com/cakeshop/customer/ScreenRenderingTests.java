@@ -41,7 +41,8 @@ class ScreenRenderingTests {
     @Test
     void publicScreensRenderWithoutAuthentication() throws Exception {
         String[] paths = {
-            "/screens", "/login", "/signup", "/products", "/products/1", "/cart"
+            "/screens", "/login", "/signup", "/find-email",
+            "/products", "/products/1", "/cart"
         };
 
         assertScreensRender(paths);

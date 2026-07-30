@@ -8,6 +8,7 @@ import com.cakeshop.domain.member.entity.MemberStatus;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.mybatis.spring.boot.test.autoconfigure.MybatisTest;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,6 +46,43 @@ class MemberMapperTests {
         assertThat(member.getUpdatedAt()).isEqualTo(UPDATED_AT);
         assertThat(member.getWithdrawnAt()).isNull();
         assertThat(member.getBirthDate()).isNull();
+    }
+
+    @Test
+    void findEmailsByMemberInfo_matchingMembers_returnsAllEmailsInRecentOrder() {
+        String firstEmail = uniqueEmail("recovery-first");
+        String secondEmail = uniqueEmail("recovery-second");
+        Long firstId = insertMember(firstEmail, MemberStatus.ACTIVE);
+        Long secondId = insertMember(secondEmail, MemberStatus.WITHDRAWN);
+        LocalDate birthDate = LocalDate.of(2000, 1, 15);
+        jdbcTemplate.update(
+                "UPDATE members SET birth_date = ?, phone = ? WHERE id IN (?, ?)",
+                birthDate,
+                "010-1234-5678",
+                firstId,
+                secondId);
+
+        List<String> emails = memberMapper.findEmailsByMemberInfo(
+                "매퍼 테스트",
+                birthDate,
+                "01012345678");
+
+        assertThat(emails).containsExactly(secondEmail, firstEmail);
+    }
+
+    @Test
+    void findEmailsByMemberInfo_mismatchedInfo_returnsEmptyList() {
+        String email = uniqueEmail("recovery-mismatch");
+        Long memberId = insertMember(email, MemberStatus.ACTIVE);
+        jdbcTemplate.update(
+                "UPDATE members SET birth_date = ? WHERE id = ?",
+                LocalDate.of(2000, 1, 15),
+                memberId);
+
+        assertThat(memberMapper.findEmailsByMemberInfo(
+                "다른 이름",
+                LocalDate.of(2000, 1, 15),
+                "01000000000")).isEmpty();
     }
 
     @Test

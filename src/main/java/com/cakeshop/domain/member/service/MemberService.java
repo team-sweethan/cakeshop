@@ -8,6 +8,8 @@ import com.cakeshop.domain.member.entity.MemberStatus;
 import com.cakeshop.domain.member.error.MemberErrorCode;
 import com.cakeshop.domain.member.mapper.MemberMapper;
 import com.cakeshop.global.error.BusinessException;
+import java.time.LocalDate;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -49,6 +51,16 @@ public class MemberService {
     @Transactional(readOnly = true)
     public boolean checkEmailDuplicate(String email) {
         return memberMapper.findByEmail(email).isPresent();
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> findMaskedEmails(String name, LocalDate birthDate, String phone) {
+        String normalizedName = name.trim();
+        String normalizedPhone = phone.replace("-", "");
+        return memberMapper.findEmailsByMemberInfo(normalizedName, birthDate, normalizedPhone)
+                .stream()
+                .map(this::maskEmail)
+                .toList();
     }
 
     @Transactional
@@ -101,6 +113,20 @@ public class MemberService {
         if (memberMapper.withdrawById(member.getId(), MemberStatus.WITHDRAWN) == 0) {
             throw new BusinessException(MemberErrorCode.WITHDRAW_FAILED);
         }
+    }
+
+    private String maskEmail(String email) {
+        int atIndex = email.indexOf('@');
+        if (atIndex <= 0) {
+            return "***";
+        }
+
+        String localPart = email.substring(0, atIndex);
+        String domainPart = email.substring(atIndex);
+        int visibleLength = localPart.length() >= 3 ? 2 : Math.max(localPart.length() - 1, 0);
+        return localPart.substring(0, visibleLength)
+                + "*".repeat(localPart.length() - visibleLength)
+                + domainPart;
     }
 
 }

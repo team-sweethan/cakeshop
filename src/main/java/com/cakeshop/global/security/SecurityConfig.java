@@ -33,7 +33,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> {
                 // ① 공개 GET을 먼저 선언 (matcher 순서 = 우선순위)
                 auth.requestMatchers(
-                        "/", "/login", "/signup", "/join", "/emailCheck",
+                        "/", "/login", "/signup", "/join", "/emailCheck", "/find-email",
                         "/products/**", "/cart", "/screens", "/favicon.ico",
                         "/css/**", "/js/**", "/images/**", "/uploads/**", "/error")
                         .permitAll();

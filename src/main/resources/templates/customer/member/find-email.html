@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>이메일 찾기 | 케이크 쇼핑몰</title>
+  <link rel="stylesheet" th:href="@{/css/app.css}">
+  <link rel="stylesheet" th:href="@{/css/customer-mockup.css}">
+  <script defer th:src="@{/js/app.js}"></script>
+</head>
+<body>
+<header th:replace="~{fragments/common/header :: header}"></header>
+<main class="page-container page-container--narrow">
+  <section class="panel auth-card section">
+    <h1>이메일 찾기</h1>
+    <p class="form-help">회원가입 시 입력한 정보를 입력해 주세요.</p>
+
+    <form class="form-stack" th:action="@{/find-email}" th:object="${emailRecoveryForm}" method="post">
+      <div class="form-group">
+        <label class="form-label" for="recovery-name">이름</label>
+        <input class="form-control" id="recovery-name" th:field="*{name}" maxlength="50" required autofocus>
+        <p class="form-error" th:if="${#fields.hasErrors('name')}" th:errors="*{name}"></p>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="recovery-birth-date">생년월일</label>
+        <input class="form-control" id="recovery-birth-date" th:field="*{birthDate}" type="date" required>
+        <p class="form-error" th:if="${#fields.hasErrors('birthDate')}" th:errors="*{birthDate}"></p>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="recovery-phone">전화번호</label>
+        <input class="form-control" id="recovery-phone" th:field="*{phone}" type="tel"
+               placeholder="010-0000-0000" maxlength="13" required>
+        <p class="form-error" th:if="${#fields.hasErrors('phone')}" th:errors="*{phone}"></p>
+      </div>
+
+      <button class="btn btn--primary btn--block" type="submit">이메일 찾기</button>
+    </form>
+
+    <div class="section" th:if="${searched}">
+      <div th:if="${!#lists.isEmpty(maskedEmails)}">
+        <h2 class="section-title">가입 이메일</h2>
+        <ul>
+          <li th:each="email : ${maskedEmails}" th:text="${email}"></li>
+        </ul>
+      </div>
+      <p class="alert alert--error" th:if="${#lists.isEmpty(maskedEmails)}">
+        입력한 정보와 일치하는 이메일을 찾을 수 없습니다.
+      </p>
+    </div>
+
+    <div class="cluster">
+      <a class="btn" th:href="@{/login}">로그인으로 돌아가기</a>
+    </div>
+  </section>
+</main>
+<footer th:replace="~{fragments/common/footer :: footer(${store})}"></footer>
+</body>
+</html>

@@ -13,9 +13,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import com.cakeshop.domain.member.dto.form.EmailRecoveryForm;
 import com.cakeshop.domain.member.dto.form.SignupForm;
 import com.cakeshop.domain.member.service.MemberService;
 import java.time.LocalDate;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
@@ -125,5 +127,46 @@ class AuthControllerTests {
                 .andExpect(jsonPath("$.available").value(true))
                 .andExpect(jsonPath("$.message")
                         .value("사용 가능한 이메일입니다."));
+    }
+
+    @Test
+    void findEmail_get_rendersRecoveryForm() throws Exception {
+        mockMvc.perform(get("/find-email"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("customer/member/find-email"))
+                .andExpect(model().attributeExists("emailRecoveryForm"));
+    }
+
+    @Test
+    void findEmail_invalidInput_rendersErrorsWithoutCallingService() throws Exception {
+        mockMvc.perform(post("/find-email")
+                        .param("name", " ")
+                        .param("birthDate", LocalDate.now().plusDays(1).toString())
+                        .param("phone", "1234"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("customer/member/find-email"))
+                .andExpect(model().attributeHasFieldErrors(
+                        "emailRecoveryForm", "name", "birthDate", "phone"));
+
+        verify(memberService, never()).findMaskedEmails(
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any(LocalDate.class),
+                org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
+    void findEmail_matchingMember_rendersMaskedEmailList() throws Exception {
+        LocalDate birthDate = LocalDate.of(2000, 1, 15);
+        when(memberService.findMaskedEmails("홍길동", birthDate, "010-1234-5678"))
+                .thenReturn(List.of("me****@example.com"));
+
+        mockMvc.perform(post("/find-email")
+                        .param("name", "홍길동")
+                        .param("birthDate", birthDate.toString())
+                        .param("phone", "010-1234-5678"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("customer/member/find-email"))
+                .andExpect(model().attribute("searched", true))
+                .andExpect(model().attribute("maskedEmails", List.of("me****@example.com")));
     }
 }

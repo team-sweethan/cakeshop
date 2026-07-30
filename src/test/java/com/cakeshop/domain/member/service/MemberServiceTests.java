@@ -16,6 +16,7 @@ import com.cakeshop.domain.member.error.MemberErrorCode;
 import com.cakeshop.domain.member.mapper.MemberMapper;
 import com.cakeshop.global.error.BusinessException;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -204,6 +205,44 @@ class MemberServiceTests {
                 member.getNickname(),
                 member.getPhone(),
                 member.getBirthDate()));
+    }
+
+    @Test
+    void findMaskedEmails_matchingMembers_normalizesInputAndMasksAllEmails() {
+        LocalDate birthDate = LocalDate.of(2000, 1, 15);
+        when(memberMapper.findEmailsByMemberInfo(
+                "홍길동",
+                birthDate,
+                "01012345678"))
+                .thenReturn(List.of(
+                        "member@example.com",
+                        "ab@example.com",
+                        "x@example.com"));
+
+        List<String> result = memberService.findMaskedEmails(
+                " 홍길동 ",
+                birthDate,
+                "010-1234-5678");
+
+        assertThat(result).containsExactly(
+                "me****@example.com",
+                "a*@example.com",
+                "*@example.com");
+    }
+
+    @Test
+    void findMaskedEmails_noMatchingMember_returnsEmptyList() {
+        LocalDate birthDate = LocalDate.of(2000, 1, 15);
+        when(memberMapper.findEmailsByMemberInfo(
+                "홍길동",
+                birthDate,
+                "01012345678"))
+                .thenReturn(List.of());
+
+        assertThat(memberService.findMaskedEmails(
+                "홍길동",
+                birthDate,
+                "01012345678")).isEmpty();
     }
 
     @Test

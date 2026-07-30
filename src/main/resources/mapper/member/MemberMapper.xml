@@ -23,6 +23,15 @@
          WHERE email = #{email}
     </select>
 
+    <select id="findEmailsByMemberInfo" resultType="string">
+        SELECT email
+          FROM members
+         WHERE name = #{name}
+           AND birth_date = #{birthDate}
+           AND REPLACE(phone, '-', '') = #{phone}
+         ORDER BY created_at DESC, id DESC
+    </select>
+
     <insert id="join" parameterType="com.cakeshop.domain.member.entity.Member">
         INSERT INTO members (email, password, nickname, role, name, created_at, phone, birth_date)
         VALUES (#{email}, #{password}, #{nickname}, #{role}, #{name}, NOW(), #{phone}, #{birthDate})
