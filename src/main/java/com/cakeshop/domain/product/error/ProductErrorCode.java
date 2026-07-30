@@ -68,6 +68,12 @@ public enum ProductErrorCode implements ErrorCode {
             "PRODUCT_011",
             "차감된 상품 재고를 복구할 수 없습니다.",
             409
+    ),
+
+    UPDATE_CONFLICT(
+            "PRODUCT_012",
+            "다른 주문으로 재고가 변경되었습니다. 최신 정보를 확인한 후 다시 수정해 주세요.",
+            409
     );
 
     private final String code;

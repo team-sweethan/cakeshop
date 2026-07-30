@@ -67,6 +67,14 @@ public class ProductForm {
     )
     private Integer stockQuantity;
 
+    /**
+     * 수정 화면을 열었을 때의 재고 수량.
+     *
+     * <p>관리자가 수정하는 동안 결제에 의해 재고가 변경됐는지
+     * 비교하는 값이며, 상품 등록에서는 사용하지 않는다.</p>
+     */
+    private Integer originalStockQuantity;
+
     /** 일반 케이크 또는 주문 제작 상품 유형. */
     @NotNull(message = "상품 유형을 선택해 주세요.")
     private ProductType productType;

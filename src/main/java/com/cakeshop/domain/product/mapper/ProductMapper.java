@@ -299,7 +299,14 @@ public interface ProductMapper {
      * <p>판매 상태, 평점, 리뷰 수와 상품 옵션은 변경하지 않는다.</p>
      *
      * @param product 수정할 상품 정보
+     * @param originalStockQuantity 수정 화면을 열었을 때의 재고 수량
      * @return 수정된 상품 행 개수
      */
-    int updateProduct(Product product);
+    int updateProduct(
+            @Param("product")
+            Product product,
+
+            @Param("originalStockQuantity")
+            Integer originalStockQuantity
+    );
 }

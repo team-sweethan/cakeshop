@@ -376,7 +376,10 @@ class ProductAdminServiceTests {
                 .thenReturn(existingForm);
         when(productMapper.existsActiveCategoryById(1L))
                 .thenReturn(true);
-        when(productMapper.updateProduct(any(Product.class)))
+        when(productMapper.updateProduct(
+                any(Product.class),
+                any()
+        ))
                 .thenReturn(1);
 
         productAdminService.updateProduct(
@@ -388,7 +391,10 @@ class ProductAdminServiceTests {
                 ArgumentCaptor.forClass(Product.class);
 
         verify(productMapper)
-                .updateProduct(productCaptor.capture());
+                .updateProduct(
+                        productCaptor.capture(),
+                        any()
+                );
 
         Product updatedProduct =
                 productCaptor.getValue();
@@ -404,6 +410,8 @@ class ProductAdminServiceTests {
                 .isEqualByComparingTo("45000");
         assertThat(updatedProduct.getStockQuantity())
                 .isNull();
+        assertThat(updateForm.getOriginalStockQuantity())
+                .isEqualTo(10);
         assertThat(updatedProduct.getProductType())
                 .isEqualTo(ProductType.CUSTOM);
         assertThat(updatedProduct.getPreparationDays())
@@ -438,7 +446,10 @@ class ProductAdminServiceTests {
         verify(productMapper, never())
                 .existsActiveCategoryById(anyLong());
         verify(productMapper, never())
-                .updateProduct(any(Product.class));
+                .updateProduct(
+                        any(Product.class),
+                        any()
+                );
     }
 
     @Test
@@ -466,18 +477,60 @@ class ProductAdminServiceTests {
                 );
 
         verify(productMapper, never())
-                .updateProduct(any(Product.class));
+                .updateProduct(
+                        any(Product.class),
+                        any()
+                );
     }
 
     @Test
-    void updateProductWithNoAffectedRowThrowsNotFoundException() {
+    void updateProductWithChangedStockThrowsUpdateConflictException() {
         ProductForm form = validProductForm();
 
         when(productMapper.findAdminProductFormById(1L))
-                .thenReturn(validProductForm());
+                .thenReturn(
+                        validProductForm(),
+                        validProductForm()
+                );
         when(productMapper.existsActiveCategoryById(1L))
                 .thenReturn(true);
-        when(productMapper.updateProduct(any(Product.class)))
+        when(productMapper.updateProduct(
+                any(Product.class),
+                any()
+        ))
+                .thenReturn(0);
+
+        assertThatThrownBy(() ->
+                productAdminService.updateProduct(
+                        1L,
+                        form
+                )
+        )
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        exception ->
+                                assertThat(exception.getErrorCode())
+                                        .isEqualTo(
+                                                ProductErrorCode.UPDATE_CONFLICT
+                                        )
+                );
+    }
+
+    @Test
+    void updateProductDeletedDuringUpdateThrowsNotFoundException() {
+        ProductForm form = validProductForm();
+
+        when(productMapper.findAdminProductFormById(1L))
+                .thenReturn(
+                        validProductForm(),
+                        (ProductForm) null
+                );
+        when(productMapper.existsActiveCategoryById(1L))
+                .thenReturn(true);
+        when(productMapper.updateProduct(
+                any(Product.class),
+                any()
+        ))
                 .thenReturn(0);
 
         assertThatThrownBy(() ->
@@ -509,6 +562,7 @@ class ProductAdminServiceTests {
                 BigDecimal.valueOf(35_000)
         );
         form.setStockQuantity(10);
+        form.setOriginalStockQuantity(10);
         form.setProductType(ProductType.GENERAL);
         form.setPreparationDays(0);
 

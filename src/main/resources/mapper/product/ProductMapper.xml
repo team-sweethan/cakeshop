@@ -530,6 +530,7 @@
             p.description,
             p.base_price AS basePrice,
             p.stock_quantity AS stockQuantity,
+            p.stock_quantity AS originalStockQuantity,
             p.product_type AS productType,
             p.preparation_days AS preparationDays
         FROM products p
@@ -537,19 +538,20 @@
     </select>
 
     <!-- 상품 기본 정보 수정 -->
-    <update id="updateProduct"
-            parameterType=
-                    "com.cakeshop.domain.product.entity.Product">
+    <update id="updateProduct">
 
         UPDATE products
         SET
-            category_id = #{categoryId},
-            name = #{name},
-            description = #{description, jdbcType=LONGVARCHAR},
-            base_price = #{basePrice},
-            stock_quantity = #{stockQuantity, jdbcType=INTEGER},
-            product_type = #{productType},
-            preparation_days = #{preparationDays}
-        WHERE id = #{id}
+            category_id = #{product.categoryId},
+            name = #{product.name},
+            description = #{product.description, jdbcType=LONGVARCHAR},
+            base_price = #{product.basePrice},
+            stock_quantity = #{product.stockQuantity, jdbcType=INTEGER},
+            product_type = #{product.productType},
+            preparation_days = #{product.preparationDays}
+        WHERE id = #{product.id}
+          AND stock_quantity
+              <![CDATA[ <=> ]]>
+              #{originalStockQuantity, jdbcType=INTEGER}
     </update>
 </mapper>

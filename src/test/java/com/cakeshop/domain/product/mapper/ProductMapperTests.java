@@ -811,6 +811,8 @@ class ProductMapperTests {
                 .isEqualByComparingTo("10000");
         assertThat(form.getStockQuantity())
                 .isEqualTo(10);
+        assertThat(form.getOriginalStockQuantity())
+                .isEqualTo(10);
         assertThat(form.getProductType())
                 .isEqualTo(ProductType.GENERAL);
         assertThat(form.getPreparationDays())
@@ -819,6 +821,10 @@ class ProductMapperTests {
 
     @Test
     void adminCanUpdateProductWithoutChangingStatus() {
+        ProductForm originalForm =
+                productMapper.findAdminProductFormById(
+                        optionProductId
+                );
         Product product = new Product();
 
         product.setId(optionProductId);
@@ -846,7 +852,10 @@ class ProductMapperTests {
         );
 
         int updatedRows =
-                productMapper.updateProduct(product);
+                productMapper.updateProduct(
+                        product,
+                        originalForm.getOriginalStockQuantity()
+                );
 
         ProductForm updatedForm =
                 productMapper.findAdminProductFormById(
@@ -895,6 +904,54 @@ class ProductMapperTests {
     }
 
     @Test
+    void adminUpdateWithStaleStock_doesNotOverwritePaymentDeduction() {
+        ProductForm staleForm =
+                productMapper.findAdminProductFormById(
+                        optionProductId
+                );
+        int deductedRows =
+                productMapper.decreaseStockIfAvailable(
+                        optionProductId,
+                        3
+                );
+
+        Product product = new Product();
+
+        product.setId(optionProductId);
+        product.setCategoryId(staleForm.getCategoryId());
+        product.setName(staleForm.getName());
+        product.setDescription(staleForm.getDescription());
+        product.setBasePrice(staleForm.getBasePrice());
+        product.setStockQuantity(
+                staleForm.getStockQuantity()
+        );
+        product.setProductType(staleForm.getProductType());
+        product.setPreparationDays(
+                staleForm.getPreparationDays()
+        );
+
+        int updatedRows =
+                productMapper.updateProduct(
+                        product,
+                        staleForm.getOriginalStockQuantity()
+                );
+
+        Integer currentStock = jdbcTemplate.queryForObject(
+                """
+                SELECT stock_quantity
+                FROM products
+                WHERE id = ?
+                """,
+                Integer.class,
+                optionProductId
+        );
+
+        assertThat(deductedRows).isEqualTo(1);
+        assertThat(updatedRows).isZero();
+        assertThat(currentStock).isEqualTo(7);
+    }
+
+    @Test
     void missingProductCannotBeReadOrUpdated() {
         assertThat(
                 productMapper.findAdminProductFormById(
@@ -914,7 +971,10 @@ class ProductMapperTests {
         product.setPreparationDays(0);
 
         assertThat(
-                productMapper.updateProduct(product)
+                productMapper.updateProduct(
+                        product,
+                        null
+                )
         ).isZero();
     }
 }
