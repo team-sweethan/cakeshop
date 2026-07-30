@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import com.cakeshop.domain.product.dto.view.ProductSalesInfo;
 import com.cakeshop.domain.product.entity.Product;
 import com.cakeshop.domain.product.entity.ProductStatus;
+import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.error.ProductErrorCode;
 import com.cakeshop.domain.product.mapper.ProductMapper;
 import com.cakeshop.global.error.BusinessException;
@@ -42,6 +43,11 @@ class ProductQueryServiceTests {
                 productQueryService.getSalesInfo(1L);
 
         assertThat(result.productId()).isEqualTo(1L);
+        assertThat(result.productName())
+                .isEqualTo("딸기 생크림 케이크");
+        assertThat(result.productType())
+                .isEqualTo(ProductType.CUSTOM);
+        assertThat(result.preparationDays()).isEqualTo(3);
         assertThat(result.available()).isTrue();
         assertThat(result.basePrice())
                 .isEqualByComparingTo("35000");
@@ -128,6 +134,9 @@ class ProductQueryServiceTests {
         Product product = new Product();
 
         product.setId(1L);
+        product.setName("딸기 생크림 케이크");
+        product.setProductType(ProductType.CUSTOM);
+        product.setPreparationDays(3);
         product.setBasePrice(
                 BigDecimal.valueOf(35_000)
         );
