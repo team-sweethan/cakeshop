@@ -46,6 +46,7 @@
             status,
             provider_status,
             active_paid_order_id,
+            active_ready_order_id,
             failure_code,
             failure_message,
             requested_at,

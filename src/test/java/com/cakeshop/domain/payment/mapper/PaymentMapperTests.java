@@ -55,29 +55,35 @@ class PaymentMapperTests {
     // READY 결제를 INSERT한 뒤 주문 ID로 다시 조회한다.
     @Test
     void insertReadyPaymentAndFindPaymentsByOrderId() {
-        Payment firstPayment = newPayment("FIRST");
-        Payment secondPayment = newPayment("SECOND");
+        Payment payment = newPayment("READY");
 
-        assertThat(paymentMapper.insertReadyPayment(firstPayment)).isEqualTo(1);
-        assertThat(paymentMapper.insertReadyPayment(secondPayment)).isEqualTo(1);
-        assertThat(firstPayment.getId()).isNotNull();
-        assertThat(secondPayment.getId()).isNotNull();
+        assertThat(paymentMapper.insertReadyPayment(payment)).isEqualTo(1);
+        assertThat(payment.getId()).isNotNull();
 
         List<Payment> payments =
                 paymentMapper.findPaymentsByOrderId(orderId);
 
         assertThat(payments)
                 .extracting(Payment::getId)
-                .containsExactly(firstPayment.getId(), secondPayment.getId());
+                .containsExactly(payment.getId());
         assertThat(payments)
                 .extracting(Payment::getStatus)
                 .containsOnly(PaymentStatus.READY);
         assertThat(payments)
                 .extracting(Payment::getTossOrderId)
-                .containsExactly(
-                        firstPayment.getTossOrderId(),
-                        secondPayment.getTossOrderId()
-                );
+                .containsExactly(payment.getTossOrderId());
+        assertThat(payments)
+                .extracting(Payment::getActiveReadyOrderId)
+                .containsExactly(orderId);
+    }
+
+    // 한 주문에서 READY 결제는 UNIQUE 제약에 따라 한 건만 허용되는지 확인한다.
+    @Test
+    void onlyOneReadyPaymentIsAllowedPerOrder() {
+        insertPayment("FIRST-READY");
+
+        assertThatThrownBy(() -> insertPayment("SECOND-READY"))
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     // READY 상태일 때만 DONE으로 바뀌는지 확인한다.
@@ -133,13 +139,14 @@ class PaymentMapperTests {
     @Test
     void onlyOneDonePaymentIsAllowedPerOrder() {
         Payment firstPayment = insertPayment("FIRST-DONE");
-        Payment secondPayment = insertPayment("SECOND-DONE");
 
         assertThat(paymentMapper.updateStatusIfCurrent(
                 firstPayment.getId(),
                 PaymentStatus.READY,
                 PaymentStatus.DONE
         )).isEqualTo(1);
+
+        Payment secondPayment = insertPayment("SECOND-DONE");
 
         // 두 번째 결제도 DONE이 되면 같은 order_id가 생성 열에 중복되므로 DB가 거부한다.
         assertThatThrownBy(() -> paymentMapper.updateStatusIfCurrent(
@@ -194,11 +201,14 @@ class PaymentMapperTests {
                 FROM payment_cancellations
                 WHERE payment_id = ?
                   AND active_requested_payment_id = ?
+                  AND request_type = 'CUSTOMER_CANCEL'
+                  AND requested_by = ?
                   AND updated_at IS NOT NULL
                 """,
                 Integer.class,
                 payment.getId(),
-                payment.getId()
+                payment.getId(),
+                memberId
         );
         assertThat(generatedColumnAndTimestampCount).isOne();
 
@@ -253,13 +263,16 @@ class PaymentMapperTests {
                     idempotency_key,
                     cancel_amount,
                     cancel_reason,
+                    request_type,
+                    requested_by,
                     status
                 )
-                VALUES (?, ?, ?, '테스트 환불', ?)
+                VALUES (?, ?, ?, '테스트 환불', 'CUSTOMER_CANCEL', ?, ?)
                 """,
                 paymentId,
                 "CANCEL-" + label + "-" + suffix,
                 cancelAmount,
+                memberId,
                 status
         );
     }

@@ -21,6 +21,7 @@ public class Payment {
     private PaymentStatus status;
     private String providerStatus;
     private Long activePaidOrderId;
+    private Long activeReadyOrderId;
     private String failureCode;
     private String failureMessage;
     private LocalDateTime requestedAt;
