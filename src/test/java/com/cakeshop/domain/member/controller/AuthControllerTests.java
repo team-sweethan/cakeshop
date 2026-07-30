@@ -214,4 +214,31 @@ class AuthControllerTests {
                 .andExpect(redirectedUrl("/find-email"))
                 .andExpect(flash().attribute("errorMessage", "이메일을 다시 찾아 주세요."));
     }
+
+    @Test
+    void findEmail_getAfterRecovery_clearsPreviousRecoverySession() throws Exception {
+        LocalDate birthDate = LocalDate.of(2000, 1, 15);
+        when(memberService.findEmails("홍길동", birthDate, "010-1234-5678"))
+                .thenReturn(new EmailRecoveryResult(
+                        List.of("member@example.com"),
+                        List.of(new RecoveredEmailView(0, "me****@example.com"))));
+        MvcResult recoveryResult = mockMvc.perform(post("/find-email")
+                        .param("name", "홍길동")
+                        .param("birthDate", birthDate.toString())
+                        .param("phone", "010-1234-5678"))
+                .andReturn();
+        MockHttpSession session =
+                (MockHttpSession) recoveryResult.getRequest().getSession(false);
+
+        mockMvc.perform(get("/find-email").session(session))
+                .andExpect(status().isOk());
+
+        assertThat(session.getAttribute("recoveredEmails")).isNull();
+        mockMvc.perform(post("/find-email/login")
+                        .session(session)
+                        .param("selectedIndex", "0"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/find-email"))
+                .andExpect(flash().attribute("errorMessage", "이메일을 다시 찾아 주세요."));
+    }
 }

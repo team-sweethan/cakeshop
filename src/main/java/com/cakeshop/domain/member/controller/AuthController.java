@@ -6,6 +6,7 @@ import com.cakeshop.domain.member.dto.view.EmailAvailabilityView;
 import com.cakeshop.domain.member.dto.view.EmailRecoveryResult;
 import com.cakeshop.domain.member.error.MemberErrorCode;
 import com.cakeshop.domain.member.service.MemberService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -43,7 +44,11 @@ public class AuthController {
 
     // 이메일 찾기 화면
     @GetMapping("/find-email")
-    public String findEmail(Model model) {
+    public String findEmail(Model model, HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            session.removeAttribute(RECOVERED_EMAILS_SESSION_KEY);
+        }
         model.addAttribute("emailRecoveryForm", new EmailRecoveryForm());
         model.addAttribute("recoveredEmails", List.of());
         model.addAttribute("searched", false);
