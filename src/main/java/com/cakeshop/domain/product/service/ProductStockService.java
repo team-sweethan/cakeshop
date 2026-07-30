@@ -61,6 +61,19 @@ public class ProductStockService {
                 );
 
         if (updatedRows == 0) {
+            Product currentProduct = getProduct(productId);
+
+            if (currentProduct.getStatus()
+                    != ProductStatus.ACTIVE) {
+                throw new BusinessException(
+                        ProductErrorCode.NOT_ON_SALE
+                );
+            }
+
+            if (isNotStockManaged(currentProduct)) {
+                return false;
+            }
+
             throw new BusinessException(
                     ProductErrorCode.INSUFFICIENT_STOCK
             );
@@ -73,7 +86,9 @@ public class ProductStockService {
      * 주문·결제 시점에 실제로 차감한 재고를 복구한다.
      *
      * <p>호출자는 저장한 차감 이력을 기준으로 이 메서드를 호출해야 한다.
-     * 상품 유형이나 판매 상태가 차감 후 변경됐더라도 복구를 시도한다.</p>
+     * 상품 유형이나 판매 상태가 차감 후 변경됐더라도 복구를 시도한다.
+     * 복구 전에 무제한 재고로 전환됐다면 별도로 더할 유한 재고가
+     * 없으므로 정상 처리한다.</p>
      *
      * @param productId 재고를 복구할 상품 식별자
      * @param quantity 복구할 수량
@@ -93,10 +108,10 @@ public class ProductStockService {
             return;
         }
 
-        if (productMapper.findSalesInfoById(productId) == null) {
-            throw new BusinessException(
-                    ProductErrorCode.NOT_FOUND
-            );
+        Product currentProduct = getProduct(productId);
+
+        if (currentProduct.getStockQuantity() == null) {
+            return;
         }
 
         throw new BusinessException(

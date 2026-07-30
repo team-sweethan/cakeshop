@@ -71,6 +71,86 @@ class ProductStockServiceTests {
     }
 
     @Test
+    void decreaseStock_changedToUnlimitedDuringUpdate_returnsFalse() {
+        when(productMapper.findSalesInfoById(1L))
+                .thenReturn(
+                        product(
+                                ProductType.GENERAL,
+                                ProductStatus.ACTIVE,
+                                5
+                        ),
+                        product(
+                                ProductType.GENERAL,
+                                ProductStatus.ACTIVE,
+                                null
+                        )
+                );
+        when(productMapper.decreaseStockIfAvailable(1L, 3))
+                .thenReturn(0);
+
+        boolean stockDeducted =
+                productStockService.decreaseStock(1L, 3);
+
+        assertThat(stockDeducted).isFalse();
+        verify(productMapper)
+                .decreaseStockIfAvailable(1L, 3);
+    }
+
+    @Test
+    void decreaseStock_changedToCustomDuringUpdate_returnsFalse() {
+        when(productMapper.findSalesInfoById(1L))
+                .thenReturn(
+                        product(
+                                ProductType.GENERAL,
+                                ProductStatus.ACTIVE,
+                                5
+                        ),
+                        product(
+                                ProductType.CUSTOM,
+                                ProductStatus.ACTIVE,
+                                5
+                        )
+                );
+        when(productMapper.decreaseStockIfAvailable(1L, 3))
+                .thenReturn(0);
+
+        boolean stockDeducted =
+                productStockService.decreaseStock(1L, 3);
+
+        assertThat(stockDeducted).isFalse();
+    }
+
+    @Test
+    void decreaseStock_changedToInactiveDuringUpdate_throwsNotOnSale() {
+        when(productMapper.findSalesInfoById(1L))
+                .thenReturn(
+                        product(
+                                ProductType.GENERAL,
+                                ProductStatus.ACTIVE,
+                                5
+                        ),
+                        product(
+                                ProductType.GENERAL,
+                                ProductStatus.INACTIVE,
+                                5
+                        )
+                );
+        when(productMapper.decreaseStockIfAvailable(1L, 3))
+                .thenReturn(0);
+
+        assertThatThrownBy(() ->
+                productStockService.decreaseStock(1L, 3)
+        ).isInstanceOfSatisfying(
+                BusinessException.class,
+                exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(
+                                        ProductErrorCode.NOT_ON_SALE
+                                )
+        );
+    }
+
+    @Test
     void decreaseStock_unlimitedStock_returnsFalse() {
         when(productMapper.findSalesInfoById(1L))
                 .thenReturn(product(
@@ -173,7 +253,7 @@ class ProductStockServiceTests {
     }
 
     @Test
-    void restoreStock_restoreNotApplied_throwsStockRestoreFailed() {
+    void restoreStock_changedToUnlimited_treatsRestoreAsComplete() {
         when(productMapper.restoreLimitedStock(1L, 3))
                 .thenReturn(0);
         when(productMapper.findSalesInfoById(1L))
@@ -181,6 +261,20 @@ class ProductStockServiceTests {
                         ProductType.CUSTOM,
                         ProductStatus.ACTIVE,
                         null
+                ));
+
+        productStockService.restoreStock(1L, 3);
+    }
+
+    @Test
+    void restoreStock_finiteStockNotRestored_throwsStockRestoreFailed() {
+        when(productMapper.restoreLimitedStock(1L, 3))
+                .thenReturn(0);
+        when(productMapper.findSalesInfoById(1L))
+                .thenReturn(product(
+                        ProductType.GENERAL,
+                        ProductStatus.ACTIVE,
+                        5
                 ));
 
         assertThatThrownBy(() ->
