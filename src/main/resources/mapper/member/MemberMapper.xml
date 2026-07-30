@@ -15,6 +15,60 @@
         <result property="birthDate" column="birth_date"/>
     </resultMap>
 
+    <sql id="adminMemberSearchConditions">
+        <choose>
+            <when test="condition.members">
+                role = 'USER'
+                AND status IN ('ACTIVE', 'SUSPENDED')
+            </when>
+            <when test="condition.withdrawn">
+                role = 'USER'
+                AND status = 'WITHDRAWN'
+            </when>
+            <otherwise>
+                role = 'ADMIN'
+            </otherwise>
+        </choose>
+        <if test="condition.keyword != null and !condition.keyword.isBlank()">
+            AND (
+                name LIKE CONCAT('%', #{condition.keyword}, '%')
+                OR email LIKE CONCAT('%', #{condition.keyword}, '%')
+                OR REPLACE(phone, '-', '')
+                    LIKE CONCAT(
+                        '%',
+                        REPLACE(#{condition.keyword}, '-', ''),
+                        '%'
+                    )
+            )
+        </if>
+        <if test="condition.members and condition.status != null">
+            AND status = #{condition.status}
+        </if>
+    </sql>
+
+    <select id="findAdminMembers"
+            resultType="com.cakeshop.domain.member.dto.view.MemberAdminListRow">
+        SELECT id,
+               name,
+               email,
+               phone,
+               birth_date,
+               status,
+               created_at,
+               withdrawn_at
+          FROM members
+         WHERE <include refid="adminMemberSearchConditions"/>
+         ORDER BY created_at DESC, id DESC
+         LIMIT #{size}
+        OFFSET #{offset}
+    </select>
+
+    <select id="countAdminMembers" resultType="long">
+        SELECT COUNT(*)
+          FROM members
+         WHERE <include refid="adminMemberSearchConditions"/>
+    </select>
+
     <!-- 인증 입력도 문자열 치환 없이 #{}로 바인딩한다. -->
     <select id="findByEmail" resultMap="memberResultMap">
         SELECT id, email, password, nickname, role, status,

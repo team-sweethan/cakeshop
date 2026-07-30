@@ -1,8 +1,165 @@
-<!doctype html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>회원 관리 | 관리자</title><link rel="stylesheet" th:href="@{/css/app.css}"></head><body>
-<div class="admin-layout"><aside th:replace="~{fragments/admin/sidebar :: sidebar('members')}"></aside><div class="admin-main"><header th:replace="~{fragments/admin/header :: header('회원 관리')}"></header><main class="admin-content">
-<div th:replace="~{fragments/admin/mock-notice :: notice}"></div><h1 class="admin-page-title">회원 관리</h1><form class="admin-toolbar" method="get" th:action="@{/admin/members}"><input class="form-control" name="name" aria-label="이름 검색" placeholder="이름 검색"><input class="form-control" name="email" aria-label="이메일 검색" placeholder="이메일 검색"><select class="form-control" name="status" aria-label="회원 상태"><option>상태 전체</option><option>정상</option><option>이용 제한</option></select><button class="btn" type="submit">검색</button></form>
-<div class="table-wrap"><table class="data-table"><thead><tr><th>이름</th><th>이메일</th><th>전화번호</th><th>가입일</th><th>주문 횟수</th><th>회원 상태</th><th>관리</th></tr></thead><tbody>
-<tr><td>홍길동</td><td>hong@example.com</td><td>010-0000-0000</td><td>2024.01.15</td><td>12회</td><td><span class="badge badge--success">정상</span></td><td><div class="cluster"><button class="btn" type="button">상세</button><button class="btn btn--danger" type="button" data-confirm="이용을 제한하시겠습니까?">이용 제한</button></div></td></tr>
-<tr><td>이영희</td><td>lee@example.com</td><td>010-1111-1111</td><td>2024.02.20</td><td>5회</td><td><span class="badge badge--success">정상</span></td><td><div class="cluster"><button class="btn" type="button">상세</button><button class="btn btn--danger" type="button">이용 제한</button></div></td></tr>
-<tr><td>박민수</td><td>park@example.com</td><td>010-2222-2222</td><td>2024.03.10</td><td>2회</td><td><span class="badge badge--danger">이용 제한</span></td><td><div class="cluster"><button class="btn" type="button">상세</button><button class="btn btn--danger" type="button">제한 해제</button></div></td></tr>
-</tbody></table></div></main></div></div></body></html>
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>회원 관리 | 관리자</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+    <link rel="stylesheet" th:href="@{/css/member-admin.css}">
+</head>
+<body>
+<div class="admin-layout">
+    <aside th:replace="~{fragments/admin/sidebar :: sidebar('members')}"></aside>
+    <div class="admin-main">
+        <header th:replace="~{fragments/admin/header :: header('회원 관리')}"></header>
+        <main class="admin-content">
+            <h1 class="admin-page-title">회원 관리</h1>
+
+            <div class="member-admin-summary">
+                <nav class="member-admin-tabs" aria-label="회원 구분">
+                    <a class="member-admin-tab"
+                       th:classappend="${condition.members} ? ' is-current'"
+                       th:href="@{/admin/members(tab='members')}">회원</a>
+                    <a class="member-admin-tab"
+                       th:classappend="${condition.withdrawn} ? ' is-current'"
+                       th:href="@{/admin/members(tab='withdrawn')}">탈퇴</a>
+                    <a class="member-admin-tab"
+                       th:classappend="${condition.admins} ? ' is-current'"
+                       th:href="@{/admin/members(tab='admins')}">관리자</a>
+                </nav>
+
+                <div class="member-admin-actions">
+                    <div class="member-admin-result">
+                        <p th:text="|총 ${pageResult.totalElements}명|">총 0명</p>
+                    </div>
+
+                    <form class="member-admin-search"
+                          method="get"
+                          th:action="@{/admin/members}">
+                        <input type="hidden"
+                               name="tab"
+                               th:value="${condition.listType.queryValue}">
+                        <input class="form-control"
+                               name="keyword"
+                               th:value="${condition.keyword}"
+                               aria-label="회원 검색"
+                               placeholder="이름·이메일·전화번호 검색">
+                        <button class="btn" type="submit">검색</button>
+                        <a class="btn btn--outline"
+                           th:href="@{/admin/members(tab=${condition.listType.queryValue})}">
+                            초기화
+                        </a>
+                    </form>
+                </div>
+            </div>
+
+            <div class="table-wrap">
+                <table class="data-table">
+                    <thead>
+                    <tr>
+                        <th>이름</th>
+                        <th>이메일</th>
+                        <th>전화번호</th>
+                        <th>생년월일</th>
+                        <th>가입일</th>
+                        <th th:if="${condition.withdrawn}">탈퇴일</th>
+                        <th class="member-admin-status-column"
+                            th:unless="${condition.withdrawn}">
+                            <div class="member-admin-status-heading">
+                                <span>상태</span>
+                                <form method="get"
+                                      th:action="@{/admin/members}"
+                                      th:if="${condition.members}">
+                                    <input type="hidden"
+                                           name="tab"
+                                           th:value="${condition.listType.queryValue}">
+                                    <input type="hidden"
+                                           name="keyword"
+                                           th:value="${condition.keyword}">
+                                    <select class="form-control"
+                                            name="status"
+                                            aria-label="회원 상태"
+                                            onchange="this.form.submit()">
+                                        <option value="">상태 전체</option>
+                                        <option th:each="memberStatus : ${memberStatuses}"
+                                                th:value="${memberStatus}"
+                                                th:selected="${condition.status == memberStatus}"
+                                                th:text="${memberStatus.name() == 'ACTIVE' ? '정상' : '이용정지'}">
+                                        </option>
+                                    </select>
+                                </form>
+                            </div>
+                        </th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="member : ${pageResult.content}">
+                        <td th:text="${member.name ?: '-'}">회원 이름</td>
+                        <td th:text="${member.maskedEmail}">su***@example.com</td>
+                        <td th:text="${member.maskedPhone}">010-****-1234</td>
+                        <td th:text="${member.birthDate == null
+                            ? '-'
+                            : #temporals.format(member.birthDate, 'yyyy.MM.dd')}">
+                            2000.01.01
+                        </td>
+                        <td th:text="${#temporals.format(member.createdAt, 'yyyy.MM.dd')}">
+                            2026.07.30
+                        </td>
+                        <td th:if="${condition.withdrawn}"
+                            th:text="${member.withdrawnAt == null
+                                ? '-'
+                                : #temporals.format(member.withdrawnAt, 'yyyy.MM.dd')}">
+                            2026.07.30
+                        </td>
+                        <td class="member-admin-status-column"
+                            th:unless="${condition.withdrawn}">
+                            <span class="badge"
+                                  th:classappend="${member.status.name() == 'ACTIVE'}
+                                      ? ' badge--success'
+                                      : ' badge--danger'"
+                                  th:text="${member.status.name() == 'ACTIVE'}
+                                      ? '정상'
+                                      : '이용정지'">
+                                정상
+                            </span>
+                        </td>
+                    </tr>
+                    <tr th:if="${pageResult.content.isEmpty()}">
+                        <td colspan="6">조건에 맞는 회원이 없습니다.</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <nav class="cluster"
+                 th:if="${pageResult.totalPages > 1}"
+                 aria-label="회원 목록 페이지">
+                <a class="btn btn--outline"
+                   th:if="${pageResult.page > 1}"
+                   th:href="@{/admin/members(
+                       tab=${condition.listType.queryValue},
+                       keyword=${condition.keyword},
+                       status=${condition.status},
+                       page=${pageResult.page - 1},
+                       size=${pageResult.size}
+                   )}">
+                    이전
+                </a>
+                <span th:text="|${pageResult.page} / ${pageResult.totalPages}|">1 / 1</span>
+                <a class="btn btn--outline"
+                   th:if="${pageResult.page < pageResult.totalPages}"
+                   th:href="@{/admin/members(
+                       tab=${condition.listType.queryValue},
+                       keyword=${condition.keyword},
+                       status=${condition.status},
+                       page=${pageResult.page + 1},
+                       size=${pageResult.size}
+                   )}">
+                    다음
+                </a>
+            </nav>
+        </main>
+    </div>
+</div>
+</body>
+</html>
