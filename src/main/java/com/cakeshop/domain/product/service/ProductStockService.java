@@ -42,7 +42,7 @@ public class ProductStockService {
     public boolean decreaseStock(long productId, int quantity) {
         validateQuantity(quantity);
 
-        Product product = getProduct(productId);
+        Product product = getProductForUpdate(productId);
 
         if (product.getStatus() != ProductStatus.ACTIVE) {
             throw new BusinessException(
@@ -61,19 +61,6 @@ public class ProductStockService {
                 );
 
         if (updatedRows == 0) {
-            Product currentProduct = getProduct(productId);
-
-            if (currentProduct.getStatus()
-                    != ProductStatus.ACTIVE) {
-                throw new BusinessException(
-                        ProductErrorCode.NOT_ON_SALE
-                );
-            }
-
-            if (isNotStockManaged(currentProduct)) {
-                return false;
-            }
-
             throw new BusinessException(
                     ProductErrorCode.INSUFFICIENT_STOCK
             );
@@ -99,6 +86,12 @@ public class ProductStockService {
     public void restoreStock(long productId, int quantity) {
         validateQuantity(quantity);
 
+        Product product = getProductForUpdate(productId);
+
+        if (product.getStockQuantity() == null) {
+            return;
+        }
+
         int updatedRows = productMapper.restoreLimitedStock(
                 productId,
                 quantity
@@ -108,20 +101,16 @@ public class ProductStockService {
             return;
         }
 
-        Product currentProduct = getProduct(productId);
-
-        if (currentProduct.getStockQuantity() == null) {
-            return;
-        }
-
         throw new BusinessException(
                 ProductErrorCode.STOCK_RESTORE_FAILED
         );
     }
 
-    private Product getProduct(long productId) {
+    private Product getProductForUpdate(long productId) {
         Product product =
-                productMapper.findSalesInfoById(productId);
+                productMapper.findSalesInfoByIdForUpdate(
+                        productId
+                );
 
         if (product == null) {
             throw new BusinessException(

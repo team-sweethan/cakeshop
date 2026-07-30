@@ -72,6 +72,20 @@ public interface ProductMapper {
     );
 
     /**
+     * 재고 변경 판단에 사용할 상품 판매 정보를 잠금 조회한다.
+     *
+     * <p>반드시 트랜잭션 안에서 호출하며, 재고 변경이 끝날 때까지
+     * 관리자 수정과 다른 재고 변경이 같은 상품을 갱신하지 못하게 한다.</p>
+     *
+     * @param productId 잠금 조회할 상품 식별자
+     * @return 상품 판매 정보, 존재하지 않으면 {@code null}
+     */
+    Product findSalesInfoByIdForUpdate(
+            @Param("productId")
+            long productId
+    );
+
+    /**
      * 판매 중인 일반 상품의 유한 재고를 요청 수량만큼 차감한다.
      *
      * <p>현재 재고가 요청 수량 이상인 경우에만 갱신하므로

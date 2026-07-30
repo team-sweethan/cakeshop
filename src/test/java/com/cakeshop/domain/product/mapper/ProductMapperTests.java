@@ -334,6 +334,32 @@ class ProductMapperTests {
     }
 
     @Test
+    void findSalesInfoByIdForUpdate_existingProduct_returnsLockedSalesInfo() {
+        Long productId = jdbcTemplate.queryForObject(
+                """
+                SELECT id
+                FROM products
+                WHERE name = ?
+                """,
+                Long.class,
+                keyword + " A 일반 재고 상품"
+        );
+
+        Product product =
+                productMapper.findSalesInfoByIdForUpdate(
+                        productId
+                );
+
+        assertThat(product).isNotNull();
+        assertThat(product.getId()).isEqualTo(productId);
+        assertThat(product.getProductType())
+                .isEqualTo(ProductType.GENERAL);
+        assertThat(product.getStockQuantity()).isEqualTo(10);
+        assertThat(product.getStatus())
+                .isEqualTo(ProductStatus.ACTIVE);
+    }
+
+    @Test
     void decreaseStockIfAvailable_requestsExceedStock_neverMakesStockNegative() {
         Long productId = jdbcTemplate.queryForObject(
                 """
