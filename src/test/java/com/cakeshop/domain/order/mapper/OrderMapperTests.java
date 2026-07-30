@@ -107,33 +107,209 @@ class OrderMapperTests {
         )).isFalse();
     }
 
-    // DB의 현재 상태가 예상 상태와 일치할 때만 상태가 변경되는지 검증한다.
     @Test
-    void updateStatusIfCurrentChangesOnlyMatchingStatus() {
+    void approveIfUnderReview_recordsStatusTimeAndProcessorConditionally() {
         Order order = newOrder();
         orderMapper.insertOrder(order);
+        LocalDateTime underReviewAt =
+                LocalDateTime.of(2026, 8, 1, 12, 1);
+        LocalDateTime readyAt =
+                LocalDateTime.of(2026, 8, 1, 12, 5);
 
-        // 실제 상태는 PENDING_PAYMENT이므로 잘못 예상한 READY_FOR_PICKUP 조건은 실패한다.
-        assertThat(orderMapper.updateStatusIfCurrent(
+        assertThat(orderMapper.approveIfUnderReview(
+                order.getId(),
+                memberId,
+                readyAt
+        )).isZero();
+
+        assertThat(orderMapper.markUnderReviewAfterPaymentIfPending(
+                order.getId(),
+                underReviewAt
+        )).isEqualTo(1);
+        Order underReview = orderMapper.findOrderById(order.getId())
+                .orElseThrow();
+        assertThat(underReview.getStatus()).isEqualTo(OrderStatus.UNDER_REVIEW);
+        assertThat(underReview.getUnderReviewAt()).isEqualTo(underReviewAt);
+
+        assertThat(orderMapper.approveIfUnderReview(
+                order.getId(),
+                memberId,
+                readyAt
+        )).isEqualTo(1);
+        Order approved = orderMapper.findOrderById(order.getId())
+                .orElseThrow();
+        assertThat(approved.getStatus()).isEqualTo(OrderStatus.READY_FOR_PICKUP);
+        assertThat(approved.getApprovedBy()).isEqualTo(memberId);
+        assertThat(approved.getReadyAt()).isEqualTo(readyAt);
+
+        assertThat(orderMapper.approveIfUnderReview(
+                order.getId(),
+                memberId,
+                readyAt.plusMinutes(1)
+        )).isZero();
+        assertThat(orderMapper.cancelIfCurrent(
                 order.getId(),
                 OrderStatus.READY_FOR_PICKUP,
-                OrderStatus.UNDER_REVIEW
+                "CUSTOMER",
+                "승인 후 취소 시도",
+                readyAt.plusMinutes(1)
         )).isZero();
-        assertThat(orderMapper.findOrderById(order.getId()))
-                .get()
-                .extracting(Order::getStatus)
-                .isEqualTo(OrderStatus.PENDING_PAYMENT);
+    }
 
-        // 현재 상태를 정확히 PENDING_PAYMENT로 지정하면 한 행이 변경된다.
-        assertThat(orderMapper.updateStatusIfCurrent(
+    @Test
+    void markPickedUpIfReady_recordsStatusTimeAndProcessorConditionally() {
+        Order order = newOrder();
+        order.setOrderType(OrderType.GENERAL);
+        orderMapper.insertOrder(order);
+        LocalDateTime readyAt =
+                LocalDateTime.of(2026, 8, 1, 12, 1);
+        LocalDateTime pickedUpAt =
+                LocalDateTime.of(2026, 8, 10, 14, 5);
+
+        assertThat(orderMapper.markReadyForPickupAfterPaymentIfPending(
+                order.getId(),
+                readyAt
+        )).isEqualTo(1);
+        assertThat(orderMapper.markPickedUpIfReady(
+                order.getId(),
+                memberId,
+                pickedUpAt
+        )).isEqualTo(1);
+
+        Order pickedUp = orderMapper.findOrderById(order.getId())
+                .orElseThrow();
+        assertThat(pickedUp.getStatus()).isEqualTo(OrderStatus.PICKED_UP);
+        assertThat(pickedUp.getReadyAt()).isEqualTo(readyAt);
+        assertThat(pickedUp.getPickedUpBy()).isEqualTo(memberId);
+        assertThat(pickedUp.getPickedUpAt()).isEqualTo(pickedUpAt);
+        assertThat(orderMapper.markPickedUpIfReady(
+                order.getId(),
+                memberId,
+                pickedUpAt.plusMinutes(1)
+        )).isZero();
+    }
+
+    @Test
+    void rejectIfUnderReview_recordsReasonTimeAndProcessorConditionally() {
+        Order order = newOrder();
+        orderMapper.insertOrder(order);
+        LocalDateTime underReviewAt =
+                LocalDateTime.of(2026, 8, 1, 12, 1);
+        LocalDateTime rejectedAt =
+                LocalDateTime.of(2026, 8, 1, 12, 5);
+
+        orderMapper.markUnderReviewAfterPaymentIfPending(
+                order.getId(),
+                underReviewAt
+        );
+        assertThat(orderMapper.rejectIfUnderReview(
+                order.getId(),
+                memberId,
+                rejectedAt,
+                "제작 일정이 부족합니다."
+        )).isEqualTo(1);
+
+        Order rejected = orderMapper.findOrderById(order.getId())
+                .orElseThrow();
+        assertThat(rejected.getStatus()).isEqualTo(OrderStatus.REJECTED);
+        assertThat(rejected.getRejectedBy()).isEqualTo(memberId);
+        assertThat(rejected.getRejectedAt()).isEqualTo(rejectedAt);
+        assertThat(rejected.getRejectReason()).isEqualTo("제작 일정이 부족합니다.");
+        assertThat(orderMapper.rejectIfUnderReview(
+                order.getId(),
+                memberId,
+                rejectedAt.plusMinutes(1),
+                "다시 반려"
+        )).isZero();
+    }
+
+    @Test
+    void expireIfPendingPayment_recordsStatusAndTimeConditionally() {
+        Order order = newOrder();
+        orderMapper.insertOrder(order);
+        LocalDateTime expiredAt =
+                LocalDateTime.of(2026, 8, 1, 12, 11);
+
+        assertThat(orderMapper.expireIfPendingPayment(
+                order.getId(),
+                expiredAt
+        )).isEqualTo(1);
+
+        Order expired = orderMapper.findOrderById(order.getId())
+                .orElseThrow();
+        assertThat(expired.getStatus()).isEqualTo(OrderStatus.EXPIRED);
+        assertThat(expired.getExpiredAt()).isEqualTo(expiredAt);
+        assertThat(orderMapper.expireIfPendingPayment(
+                order.getId(),
+                expiredAt.plusMinutes(1)
+        )).isZero();
+    }
+
+    @Test
+    void cancelIfCurrent_recordsActorReasonAndTimeOnlyFromCancelableStatus() {
+        Order order = newOrder();
+        orderMapper.insertOrder(order);
+        LocalDateTime underReviewAt =
+                LocalDateTime.of(2026, 8, 1, 12, 1);
+        LocalDateTime canceledAt =
+                LocalDateTime.of(2026, 8, 1, 12, 5);
+
+        assertThat(orderMapper.cancelIfCurrent(
                 order.getId(),
                 OrderStatus.PENDING_PAYMENT,
-                OrderStatus.UNDER_REVIEW
+                "CUSTOMER",
+                "단순 변심",
+                canceledAt
+        )).isZero();
+
+        orderMapper.markUnderReviewAfterPaymentIfPending(
+                order.getId(),
+                underReviewAt
+        );
+        assertThat(orderMapper.cancelIfCurrent(
+                order.getId(),
+                OrderStatus.UNDER_REVIEW,
+                "CUSTOMER",
+                "단순 변심",
+                canceledAt
         )).isEqualTo(1);
-        assertThat(orderMapper.findOrderById(order.getId()))
-                .get()
-                .extracting(Order::getStatus)
-                .isEqualTo(OrderStatus.UNDER_REVIEW);
+
+        Order canceled = orderMapper.findOrderById(order.getId())
+                .orElseThrow();
+        assertThat(canceled.getStatus()).isEqualTo(OrderStatus.CANCELED);
+        assertThat(canceled.getCanceledBy()).isEqualTo("CUSTOMER");
+        assertThat(canceled.getCancelReason()).isEqualTo("단순 변심");
+        assertThat(canceled.getCanceledAt()).isEqualTo(canceledAt);
+    }
+
+    @Test
+    void cancelIfCurrent_allowsGeneralOrderOnlyAfterPayment() {
+        Order order = newOrder();
+        order.setOrderType(OrderType.GENERAL);
+        orderMapper.insertOrder(order);
+        LocalDateTime readyAt =
+                LocalDateTime.of(2026, 8, 1, 12, 1);
+        LocalDateTime canceledAt =
+                LocalDateTime.of(2026, 8, 1, 12, 5);
+
+        orderMapper.markReadyForPickupAfterPaymentIfPending(
+                order.getId(),
+                readyAt
+        );
+        assertThat(orderMapper.cancelIfCurrent(
+                order.getId(),
+                OrderStatus.READY_FOR_PICKUP,
+                "CUSTOMER",
+                "픽업 전 취소",
+                canceledAt
+        )).isEqualTo(1);
+
+        Order canceled = orderMapper.findOrderById(order.getId())
+                .orElseThrow();
+        assertThat(canceled.getStatus()).isEqualTo(OrderStatus.CANCELED);
+        assertThat(canceled.getCanceledBy()).isEqualTo("CUSTOMER");
+        assertThat(canceled.getCancelReason()).isEqualTo("픽업 전 취소");
+        assertThat(canceled.getCanceledAt()).isEqualTo(canceledAt);
     }
 
     @Test

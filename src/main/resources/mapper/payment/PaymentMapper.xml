@@ -59,11 +59,48 @@
         ORDER BY id
     </select>
 
-    <update id="updateStatusIfCurrent">
+    <update id="completeIfReady">
         UPDATE payments
-        SET status = #{nextStatus}
+        SET status = 'DONE',
+            payment_key = #{paymentKey},
+            method = #{method},
+            provider_status = #{providerStatus},
+            approved_at = #{approvedAt},
+            failure_code = NULL,
+            failure_message = NULL
+        WHERE id = #{paymentId}
+          AND status = 'READY'
+    </update>
+
+    <update id="abortIfReady">
+        UPDATE payments
+        SET status = 'ABORTED',
+            provider_status = #{providerStatus},
+            failure_code = #{failureCode},
+            failure_message = #{failureMessage}
+        WHERE id = #{paymentId}
+          AND status = 'READY'
+    </update>
+
+    <update id="expireIfReady">
+        UPDATE payments
+        SET status = 'EXPIRED',
+            provider_status = #{providerStatus},
+            failure_code = #{failureCode},
+            failure_message = #{failureMessage}
+        WHERE id = #{paymentId}
+          AND status = 'READY'
+    </update>
+
+    <update id="applyCancellationIfCurrent">
+        UPDATE payments
+        SET status = #{nextStatus},
+            provider_status = #{providerStatus},
+            canceled_at = #{canceledAt}
         WHERE id = #{paymentId}
           AND status = #{expectedStatus}
+          AND status IN ('DONE', 'PARTIAL_CANCELED')
+          AND #{nextStatus} IN ('PARTIAL_CANCELED', 'CANCELED')
     </update>
 
     <insert id="insertPaymentCancellation"
@@ -113,10 +150,23 @@
         WHERE id = #{cancellationId}
     </select>
 
-    <update id="updateCancellationStatusIfCurrent">
+    <update id="completeCancellationIfRequested">
         UPDATE payment_cancellations
-        SET status = #{nextStatus}
+        SET status = 'DONE',
+            transaction_key = #{transactionKey},
+            canceled_at = #{canceledAt},
+            failure_code = NULL,
+            failure_message = NULL
         WHERE id = #{cancellationId}
-          AND status = #{expectedStatus}
+          AND status = 'REQUESTED'
+    </update>
+
+    <update id="failCancellationIfRequested">
+        UPDATE payment_cancellations
+        SET status = 'FAILED',
+            failure_code = #{failureCode},
+            failure_message = #{failureMessage}
+        WHERE id = #{cancellationId}
+          AND status = 'REQUESTED'
     </update>
 </mapper>
