@@ -71,7 +71,7 @@ class ProductMapperTests {
         );
 
         insertProduct(
-                "A 당일 재고 상품",
+                "A 일반 재고 상품",
                 10_000,
                 10,
                 ProductType.GENERAL,
@@ -86,7 +86,7 @@ class ProductMapperTests {
                 20_000,
                 0,
                 ProductType.GENERAL,
-                2,
+                0,
                 "ACTIVE",
                 "4.00",
                 1,
@@ -119,7 +119,7 @@ class ProductMapperTests {
                 100_000,
                 1,
                 ProductType.GENERAL,
-                3,
+                0,
                 "ACTIVE",
                 "3.00",
                 0,
@@ -140,7 +140,7 @@ class ProductMapperTests {
         optionProductId = jdbcTemplate.queryForObject(
                 "SELECT id FROM products WHERE name = ?",
                 Long.class,
-                keyword + " A 당일 재고 상품"
+                keyword + " A 일반 재고 상품"
         );
 
         jdbcTemplate.update(
@@ -215,7 +215,7 @@ class ProductMapperTests {
         assertThat(firstPage)
                 .extracting(ProductListView::name)
                 .containsExactly(
-                        keyword + " A 당일 재고 상품",
+                        keyword + " A 일반 재고 상품",
                         keyword + " B 품절 상품"
                 );
 
@@ -228,14 +228,13 @@ class ProductMapperTests {
     }
 
     @Test
-    void typeStockAndSameDayFiltersCanBeCombined() {
+    void typeAndStockFiltersCanBeCombined() {
         ProductSearchCondition condition =
                 baseCondition();
 
         condition.setMaxPrice(BigDecimal.valueOf(200_000));
         condition.setType(ProductType.GENERAL);
         condition.setStock(StockFilter.AVAILABLE);
-        condition.setSameDay(true);
 
         List<ProductListView> products =
                 productMapper.findPublicProducts(
@@ -247,7 +246,8 @@ class ProductMapperTests {
         assertThat(products)
                 .extracting(ProductListView::name)
                 .containsExactly(
-                        keyword + " A 당일 재고 상품"
+                        keyword + " A 일반 재고 상품",
+                        keyword + " E 최대 가격 상품"
                 );
     }
 
@@ -288,7 +288,7 @@ class ProductMapperTests {
                 .containsExactly(
                         keyword + " C 인기 주문 제작",
                         keyword + " F 10만원 초과 주문 제작",
-                        keyword + " A 당일 재고 상품",
+                        keyword + " A 일반 재고 상품",
                         keyword + " B 품절 상품",
                         keyword + " E 최대 가격 상품"
                 );
@@ -364,13 +364,12 @@ class ProductMapperTests {
                     stock_quantity,
                     product_type,
                     preparation_days,
-                    cancellation_limit_days,
                     status,
                     average_rating,
                     review_count,
                     created_at
                 )
-                VALUES (?, ?, '', ?, ?, ?, ?, 0, ?, ?, ?, ?)
+                VALUES (?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 categoryId,
                 keyword + " " + name,
@@ -421,7 +420,7 @@ class ProductMapperTests {
                         keyword + " D 판매 중지 상품",
                         keyword + " C 인기 주문 제작",
                         keyword + " B 품절 상품",
-                        keyword + " A 당일 재고 상품"
+                        keyword + " A 일반 재고 상품"
                 );
 
         assertThat(testProducts)
@@ -589,8 +588,7 @@ class ProductMapperTests {
         );
         product.setStockQuantity(10);
         product.setProductType(ProductType.GENERAL);
-        product.setPreparationDays(2);
-        product.setCancellationLimitDays(1);
+        product.setPreparationDays(0);
         product.setStatus(ProductStatus.INACTIVE);
 
         int insertedRows =
@@ -625,7 +623,7 @@ class ProductMapperTests {
                 .isEqualTo(categoryId);
         assertThat(form.getName())
                 .isEqualTo(
-                        keyword + " A 당일 재고 상품"
+                        keyword + " A 일반 재고 상품"
                 );
         assertThat(form.getDescription())
                 .isEmpty();
@@ -636,8 +634,6 @@ class ProductMapperTests {
         assertThat(form.getProductType())
                 .isEqualTo(ProductType.GENERAL);
         assertThat(form.getPreparationDays())
-                .isZero();
-        assertThat(form.getCancellationLimitDays())
                 .isZero();
     }
 
@@ -655,7 +651,6 @@ class ProductMapperTests {
         product.setStockQuantity(null);
         product.setProductType(ProductType.CUSTOM);
         product.setPreparationDays(3);
-        product.setCancellationLimitDays(2);
 
         LocalDateTime previousUpdatedAt =
                 LocalDateTime.of(2000, 1, 1, 0, 0);
@@ -713,8 +708,6 @@ class ProductMapperTests {
                 .isEqualTo(ProductType.CUSTOM);
         assertThat(updatedForm.getPreparationDays())
                 .isEqualTo(3);
-        assertThat(updatedForm.getCancellationLimitDays())
-                .isEqualTo(2);
 
         // 기본 정보 수정 후에도 기존 판매 상태는 유지되어야 한다.
         assertThat(status).isEqualTo("ACTIVE");
@@ -739,7 +732,6 @@ class ProductMapperTests {
         product.setStockQuantity(null);
         product.setProductType(ProductType.GENERAL);
         product.setPreparationDays(0);
-        product.setCancellationLimitDays(0);
 
         assertThat(
                 productMapper.updateProduct(product)

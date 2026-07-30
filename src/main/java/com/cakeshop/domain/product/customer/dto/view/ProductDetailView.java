@@ -49,11 +49,8 @@ public class ProductDetailView {
     /** 일반 상품, 주문 제작 상품 등을 구분하는 상품 유형. */
     private ProductType productType;
 
-    /** 주문일부터 상품 준비까지 필요한 최소 일수. */
+    /** 주문 제작 상품이 관리자 승인 후 준비되기까지 필요한 최소 일수. */
     private Integer preparationDays;
-
-    /** 고객이 주문을 취소할 수 있는 픽업일 기준 제한 일수. */
-    private Integer cancellationLimitDays;
 
     /** 상품 후기의 평균 평점. */
     private BigDecimal averageRating;

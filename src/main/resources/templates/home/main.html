@@ -28,7 +28,7 @@
     <section class="section" aria-labelledby="category-title">
       <h2 id="category-title" class="section-title">카테고리</h2>
 
-      <div class="grid grid--3">
+      <div class="grid grid--2">
         <a class="category-card"
            th:href="@{/products(type='GENERAL')}">
           <div class="category-card__name">일반 케이크</div>
@@ -47,14 +47,6 @@
           <span class="note">상품 목록 →</span>
         </a>
 
-        <a class="category-card"
-           th:href="@{/products(sameDay=true)}">
-          <div class="category-card__name">당일 픽업</div>
-          <div class="category-card__desc">
-            오늘 바로 픽업 가능한 상품
-          </div>
-          <span class="note">상품 목록 →</span>
-        </a>
       </div>
     </section>
 
@@ -114,12 +106,6 @@
               <span class="badge"
                     th:text="${product.productType.displayName}">
                 상품 유형
-              </span>
-
-              <!-- 준비 기간이 0일인 상품에만 당일 픽업 배지를 출력한다. -->
-              <span class="badge badge--info"
-                    th:if="${product.sameDayPickup}">
-                당일 픽업
               </span>
 
               <!-- 재고 수량이 0인 상품에만 품절 배지를 출력한다. -->

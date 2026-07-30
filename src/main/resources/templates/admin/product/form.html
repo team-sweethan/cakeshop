@@ -16,6 +16,10 @@
 
   <link rel="stylesheet"
         th:href="@{/css/app.css}">
+
+  <script defer
+          th:src="@{/js/product-admin-form.js}">
+  </script>
 </head>
 
 <body>
@@ -153,6 +157,7 @@
 
                 <select id="productType"
                         class="form-control"
+                        data-product-type
                         th:field="*{productType}"
                         required>
 
@@ -266,6 +271,7 @@
                 <input id="preparationDays"
                        class="form-control"
                        type="number"
+                       data-preparation-days
                        th:field="*{preparationDays}"
                        min="0"
                        max="65535"
@@ -273,40 +279,20 @@
                        required>
 
                 <p class="form-help">
-                  0일이면 당일 픽업이 가능한 상품입니다.
+                  일반 상품은 0일로 고정되며,
+                  주문 제작 상품은 1일 이상 입력해야 합니다.
                 </p>
 
                 <p class="field-error"
                    th:errors="*{preparationDays}">
                   상품 준비 일수를 확인해 주세요.
                 </p>
+
+                <p class="field-error"
+                   th:errors="*{preparationPolicyValid}">
+                  상품 유형에 맞는 준비 일수를 확인해 주세요.
+                </p>
               </div>
-            </div>
-
-            <!-- 취소 제한 일수 -->
-            <div class="form-group">
-              <label for="cancellationLimitDays">
-                취소 제한 일수
-                <span class="required">*</span>
-              </label>
-
-              <input id="cancellationLimitDays"
-                     class="form-control"
-                     type="number"
-                     th:field="*{cancellationLimitDays}"
-                     min="0"
-                     max="65535"
-                     step="1"
-                     required>
-
-              <p class="form-help">
-                예를 들어 2일이면 픽업일 2일 전부터 취소가 제한됩니다.
-              </p>
-
-              <p class="field-error"
-                 th:errors="*{cancellationLimitDays}">
-                취소 제한 일수를 확인해 주세요.
-              </p>
             </div>
 
             <!-- 등록 화면 안내 -->

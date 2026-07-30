@@ -12,7 +12,6 @@ import com.cakeshop.domain.product.entity.ProductType;
  * @param basePrice 기본 판매 가격
  * @param productType 상품 유형
  * @param stockQuantity 현재 재고 수량
- * @param preparationDays 상품 준비에 필요한 일수
  * @param averageRating 평균 평점
  * @param reviewCount 후기 개수
  * @param thumbnailUrl 대표 이미지 URL
@@ -23,7 +22,6 @@ public record ProductListView(
         BigDecimal basePrice,
         ProductType productType,
         Integer stockQuantity,
-        Integer preparationDays,
         BigDecimal averageRating,
         Integer reviewCount,
         String thumbnailUrl
@@ -56,12 +54,4 @@ public record ProductListView(
         return stockQuantity == null || stockQuantity > 0;
     }
 
-    /**
-     * 당일 픽업 가능한 상품인지 확인한다.
-     *
-     * @return 준비 일수가 0이면 {@code true}
-     */
-    public boolean isSameDayPickup() {
-        return preparationDays != null && preparationDays == 0;
-    }
 }

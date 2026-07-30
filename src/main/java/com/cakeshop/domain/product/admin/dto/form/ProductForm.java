@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 
 import com.cakeshop.domain.product.entity.ProductType;
 
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Max;
@@ -82,17 +83,24 @@ public class ProductForm {
     )
     private Integer preparationDays = 0;
 
-    /** 취소할 수 있는 픽업일 이전 제한 일수. */
-    @NotNull(message = "취소 제한 일수를 입력해 주세요.")
-    @Min(
-            value = 0,
-            message = "취소 제한 일수는 0일 이상이어야 합니다."
+    /**
+     * 주문 제작 상품의 준비 기간이 최소 1일인지 확인한다.
+     *
+     * <p>일반 상품의 기간은 Service에서 0일로 정규화한다.</p>
+     *
+     * @return 상품 유형별 준비 기간 정책을 만족하면 {@code true}
+     */
+    @AssertTrue(
+            message = "주문 제작 상품의 준비 일수는 1일 이상이어야 합니다."
     )
-    @Max(
-            value = 65_535,
-            message = "취소 제한 일수가 너무 큽니다."
-    )
-    private Integer cancellationLimitDays = 0;
+    public boolean isPreparationPolicyValid() {
+        if (productType == null || preparationDays == null) {
+            return true;
+        }
+
+        return productType == ProductType.GENERAL
+                || preparationDays >= 1;
+    }
 
     /**
      * 앞뒤 공백을 제거한 상품명을 반환한다.

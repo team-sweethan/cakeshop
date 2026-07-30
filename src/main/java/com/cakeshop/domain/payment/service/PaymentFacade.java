@@ -4,5 +4,5 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class PaymentFacade {
-    // TODO: 검증 → 토스 승인 → 주문 PAID 전이 조정 (payment → order 단방향)
+    // TODO: 검증 → 결제 DONE 기록 → 주문 유형별 READY_FOR_PICKUP/UNDER_REVIEW 전이
 }

@@ -53,7 +53,6 @@ class ProductControllerTests {
                         .param("keyword", "딸기")
                         .param("type", "GENERAL")
                         .param("stock", "AVAILABLE")
-                        .param("sameDay", "true")
                         .param("sort", "PRICE_ASC")
                         .param("page", "2"))
                 .andExpect(status().isOk())
@@ -89,7 +88,6 @@ class ProductControllerTests {
                 .isEqualTo(ProductType.GENERAL);
         assertThat(condition.getStock())
                 .isEqualTo(StockFilter.AVAILABLE);
-        assertThat(condition.isSameDay()).isTrue();
         assertThat(condition.getSort())
                 .isEqualTo(ProductSort.PRICE_ASC);
 
@@ -122,7 +120,6 @@ class ProductControllerTests {
         mockMvc.perform(get("/products")
                         .param("type", "UNKNOWN")
                         .param("stock", "UNKNOWN")
-                        .param("sameDay", "UNKNOWN")
                         .param("sort", "UNKNOWN")
                         .param("minPrice", "not-a-number")
                         .param("maxPrice", "not-a-number")
@@ -148,7 +145,6 @@ class ProductControllerTests {
 
         assertThat(condition.getType()).isNull();
         assertThat(condition.getStock()).isNull();
-        assertThat(condition.isSameDay()).isFalse();
         assertThat(condition.getSort())
                 .isEqualTo(ProductSort.POPULAR);
         assertThat(condition.getMinPrice())

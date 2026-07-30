@@ -68,10 +68,9 @@ class ProductOptionMapperTests {
                     stock_quantity,
                     product_type,
                     preparation_days,
-                    cancellation_limit_days,
                     status
                 )
-                VALUES (?, ?, 35000, 10, 'GENERAL', 0, 0, 'ACTIVE')
+                VALUES (?, ?, 35000, 10, 'GENERAL', 0, 'ACTIVE')
                 """,
                 categoryId,
                 "옵션 테스트 상품 " + suffix
