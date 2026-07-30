@@ -8,6 +8,7 @@ import com.cakeshop.domain.product.admin.dto.view.ProductAdminListView;
 import com.cakeshop.domain.product.admin.dto.view.ProductCategoryOptionView;
 import com.cakeshop.domain.product.entity.Product;
 import com.cakeshop.domain.product.entity.ProductStatus;
+import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.error.ProductErrorCode;
 import com.cakeshop.domain.product.mapper.ProductMapper;
 import com.cakeshop.global.common.paging.PageRequest;
@@ -144,6 +145,9 @@ public class ProductAdminService {
             );
         }
 
+        // 상품 유형에 맞게 준비 기간을 정규화하고 검증한다.
+        applyProductPreparationPolicy(form);
+
         // 검증된 등록 폼을 DB에 저장할 Product 객체로 변환한다.
         Product product = new Product();
 
@@ -159,9 +163,6 @@ public class ProductAdminService {
         product.setProductType(form.getProductType());
         product.setPreparationDays(
                 form.getPreparationDays()
-        );
-        product.setCancellationLimitDays(
-                form.getCancellationLimitDays()
         );
 
         // 옵션과 내용을 확인한 후 판매를 시작할 수 있도록 기본 상태를 판매 중지로 설정한다.
@@ -232,6 +233,9 @@ public class ProductAdminService {
             );
         }
 
+        // 상품 유형에 맞게 준비 기간을 정규화하고 검증한다.
+        applyProductPreparationPolicy(form);
+
         // 검증된 수정 폼을 DB 업데이트에 사용할 Product 객체로 변환한다.
         Product product = new Product();
 
@@ -249,9 +253,6 @@ public class ProductAdminService {
         product.setPreparationDays(
                 form.getPreparationDays()
         );
-        product.setCancellationLimitDays(
-                form.getCancellationLimitDays()
-        );
 
         // 상품의 기본 정보만 수정한다.
         int updatedRows =
@@ -261,6 +262,39 @@ public class ProductAdminService {
         if (updatedRows == 0) {
             throw new BusinessException(
                     ProductErrorCode.NOT_FOUND
+            );
+        }
+    }
+
+    /**
+     * 상품 유형별 준비 기간 정책을 적용한다.
+     *
+     * <p>일반 상품은 0일로 정규화하고 주문 제작 상품은
+     * 준비 기간이 1일 이상이어야 한다.</p>
+     *
+     * @param form 정규화하고 검증할 상품 입력값
+     * @throws BusinessException 상품 기간 정책을 만족하지 않는 경우
+     */
+    private void applyProductPreparationPolicy(ProductForm form) {
+        if (form == null || form.getProductType() == null) {
+            throw new BusinessException(
+                    ProductErrorCode.INVALID_PRODUCT_POLICY
+            );
+        }
+
+        if (form.getProductType() == ProductType.GENERAL) {
+            form.setPreparationDays(0);
+
+            return;
+        }
+
+        Integer preparationDays =
+                form.getPreparationDays();
+
+        if (preparationDays == null
+                || preparationDays < 1) {
+            throw new BusinessException(
+                    ProductErrorCode.INVALID_PRODUCT_POLICY
             );
         }
     }

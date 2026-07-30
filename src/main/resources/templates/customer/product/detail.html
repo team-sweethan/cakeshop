@@ -160,37 +160,32 @@
             픽업 가능일
           </span>
 
-        <!-- 준비 기간이 0일인 상품 -->
-        <span th:if="${product.preparationDays == 0}">
+        <!-- 일반 상품 -->
+        <span th:if="${product.productType.name() == 'GENERAL'}">
             당일부터 픽업 가능
           </span>
 
-        <!-- 준비 기간이 1일 이상인 상품 -->
+        <!-- 주문 제작 상품 -->
         <span
-                th:if="${product.preparationDays > 0}"
-                th:text="|주문일로부터 ${product.preparationDays}일 후 픽업 가능|"
+                th:if="${product.productType.name() == 'CUSTOM'}"
+                th:text="|관리자 승인일로부터 ${product.preparationDays}일 후 픽업 가능|"
         >
-            주문일로부터 2일 후 픽업 가능
+            관리자 승인일로부터 2일 후 픽업 가능
           </span>
       </div>
 
-      <!-- 주문 취소 제한 기간 -->
+      <!-- 상품 유형별 취소 가능 기간 -->
       <div class="data-row">
           <span class="data-row__label">
             취소 가능 기간
           </span>
 
-        <!-- 제한 일수가 0인 상품 -->
-        <span th:if="${product.cancellationLimitDays == 0}">
-            픽업 전까지 취소 가능
+        <span th:if="${product.productType.name() == 'GENERAL'}">
+            픽업 예정 시각 전까지 취소 가능
           </span>
 
-        <!-- 제한 일수가 1일 이상인 상품 -->
-        <span
-                th:if="${product.cancellationLimitDays > 0}"
-                th:text="|픽업일 ${product.cancellationLimitDays}일 전까지 취소 가능|"
-        >
-            픽업일 2일 전까지 취소 가능
+        <span th:if="${product.productType.name() == 'CUSTOM'}">
+            관리자 승인 전까지 취소 가능
           </span>
       </div>
 

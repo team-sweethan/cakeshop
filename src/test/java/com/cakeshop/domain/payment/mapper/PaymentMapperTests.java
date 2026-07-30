@@ -333,10 +333,9 @@ class PaymentMapperTests {
                     base_price,
                     product_type,
                     preparation_days,
-                    cancellation_limit_days,
                     status
                 )
-                VALUES (?, ?, '', 40000, 'GENERAL', 0, 0, 'ACTIVE')
+                VALUES (?, ?, '', 40000, 'GENERAL', 0, 'ACTIVE')
                 """,
                 categoryId,
                 productName

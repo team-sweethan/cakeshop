@@ -239,11 +239,67 @@ class ProductAdminServiceTests {
         assertThat(savedProduct.getProductType())
                 .isEqualTo(ProductType.GENERAL);
         assertThat(savedProduct.getPreparationDays())
-                .isEqualTo(2);
-        assertThat(savedProduct.getCancellationLimitDays())
-                .isEqualTo(1);
+                .isZero();
         assertThat(savedProduct.getStatus())
                 .isEqualTo(ProductStatus.INACTIVE);
+    }
+
+    @Test
+    void createProduct_generalWithSubmittedPreparation_normalizesPreparationToZero() {
+        ProductForm form = validProductForm();
+
+        form.setPreparationDays(3);
+
+        when(productMapper.existsActiveCategoryById(1L))
+                .thenReturn(true);
+        when(productMapper.insertProduct(any(Product.class)))
+                .thenAnswer(invocation -> {
+                    Product product =
+                            invocation.getArgument(0);
+
+                    product.setId(10L);
+
+                    return 1;
+                });
+
+        productAdminService.createProduct(form);
+
+        ArgumentCaptor<Product> productCaptor =
+                ArgumentCaptor.forClass(Product.class);
+
+        verify(productMapper)
+                .insertProduct(productCaptor.capture());
+
+        Product savedProduct =
+                productCaptor.getValue();
+
+        assertThat(savedProduct.getPreparationDays()).isZero();
+    }
+
+    @Test
+    void createProduct_customPreparationLessThanOne_throwsException() {
+        ProductForm form = validProductForm();
+
+        form.setProductType(ProductType.CUSTOM);
+        form.setPreparationDays(0);
+
+        when(productMapper.existsActiveCategoryById(1L))
+                .thenReturn(true);
+
+        assertThatThrownBy(() ->
+                productAdminService.createProduct(form)
+        )
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        exception ->
+                                assertThat(exception.getErrorCode())
+                                        .isEqualTo(
+                                                ProductErrorCode.INVALID_PRODUCT_POLICY
+                                        )
+                );
+
+        verify(productMapper, never())
+                .insertProduct(any(Product.class));
     }
 
     @Test
@@ -315,7 +371,6 @@ class ProductAdminServiceTests {
         updateForm.setStockQuantity(null);
         updateForm.setProductType(ProductType.CUSTOM);
         updateForm.setPreparationDays(3);
-        updateForm.setCancellationLimitDays(2);
 
         when(productMapper.findAdminProductFormById(1L))
                 .thenReturn(existingForm);
@@ -353,8 +408,6 @@ class ProductAdminServiceTests {
                 .isEqualTo(ProductType.CUSTOM);
         assertThat(updatedProduct.getPreparationDays())
                 .isEqualTo(3);
-        assertThat(updatedProduct.getCancellationLimitDays())
-                .isEqualTo(2);
 
         // 기본 정보 수정에서는 판매 상태를 변경하지 않는다.
         assertThat(updatedProduct.getStatus()).isNull();
@@ -457,8 +510,7 @@ class ProductAdminServiceTests {
         );
         form.setStockQuantity(10);
         form.setProductType(ProductType.GENERAL);
-        form.setPreparationDays(2);
-        form.setCancellationLimitDays(1);
+        form.setPreparationDays(0);
 
         return form;
     }
