@@ -80,8 +80,8 @@ class MemberAdminServiceTests {
                             .isEqualTo("su***@example.com");
                     assertThat(member.maskedPhone())
                             .isEqualTo("010-****-5678");
-                    assertThat(member.birthDate())
-                            .isEqualTo(LocalDate.of(2000, 1, 15));
+                    assertThat(member.maskedBirthDate())
+                            .isEqualTo("2000.**.**");
                 });
         assertThat(result.getPage()).isEqualTo(2);
         assertThat(result.getTotalPages()).isEqualTo(2);
@@ -98,6 +98,44 @@ class MemberAdminServiceTests {
         memberAdminService.getMembers(condition, new PageRequest(1, 10));
 
         assertThat(condition.getStatus()).isNull();
+    }
+
+    @Test
+    void getMembers_shortEmail_masksAtLeastOneCharacter() {
+        MemberAdminSearchCondition condition = new MemberAdminSearchCondition();
+        MemberAdminListRow oneCharacterEmail = new MemberAdminListRow(
+                1L,
+                "한글자",
+                "a@example.com",
+                null,
+                null,
+                MemberStatus.ACTIVE,
+                LocalDateTime.now(),
+                null);
+        MemberAdminListRow twoCharacterEmail = new MemberAdminListRow(
+                2L,
+                "두글자",
+                "ab@example.com",
+                null,
+                null,
+                MemberStatus.ACTIVE,
+                LocalDateTime.now(),
+                null);
+
+        when(memberMapper.countAdminMembers(condition)).thenReturn(2L);
+        when(memberMapper.findAdminMembers(condition, 10, 0))
+                .thenReturn(List.of(oneCharacterEmail, twoCharacterEmail));
+
+        PageResult<MemberAdminListView> result =
+                memberAdminService.getMembers(
+                        condition,
+                        new PageRequest(1, 10));
+
+        assertThat(result.getContent())
+                .extracting(MemberAdminListView::maskedEmail)
+                .containsExactly(
+                        "***@example.com",
+                        "a***@example.com");
     }
 
     @Test

@@ -1,6 +1,5 @@
 package com.cakeshop.domain.member.dto.view;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import com.cakeshop.domain.member.entity.MemberStatus;
@@ -13,7 +12,7 @@ public record MemberAdminListView(
         String name,
         String maskedEmail,
         String maskedPhone,
-        LocalDate birthDate,
+        String maskedBirthDate,
         MemberStatus status,
         LocalDateTime createdAt,
         LocalDateTime withdrawnAt

@@ -1,8 +1,10 @@
 package com.cakeshop.domain.member.controller;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
@@ -63,5 +65,26 @@ class MemberAdminControllerSecurityTests {
         mockMvc.perform(get("/admin/members"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("admin/member/list"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void members_statusFilter_searchFormKeepsCurrentStatus() throws Exception {
+        PageResult<MemberAdminListView> pageResult =
+                new PageResult<>(
+                        List.of(),
+                        new PageRequest(1, 10),
+                        0);
+
+        when(memberAdminService.getMembers(any(), any()))
+                .thenReturn(pageResult);
+
+        mockMvc.perform(get("/admin/members")
+                        .param("status", "SUSPENDED"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(
+                        containsString("name=\"status\"")))
+                .andExpect(content().string(
+                        containsString("value=\"SUSPENDED\"")));
     }
 }

@@ -79,7 +79,7 @@ public class MemberAdminService {
                 row.name(),
                 maskEmail(row.email()),
                 maskPhone(row.phone()),
-                row.birthDate(),
+                maskBirthDate(row),
                 row.status(),
                 row.createdAt(),
                 row.withdrawnAt());
@@ -98,7 +98,8 @@ public class MemberAdminService {
 
         String localPart = email.substring(0, separatorIndex);
         String domain = email.substring(separatorIndex + 1);
-        int visibleLength = Math.min(2, localPart.length());
+        int visibleLength =
+                Math.min(2, Math.max(0, localPart.length() - 1));
 
         return localPart.substring(0, visibleLength)
                 + "***@"
@@ -120,5 +121,13 @@ public class MemberAdminService {
         String suffix = digits.substring(digits.length() - 4);
 
         return prefix + "-****-" + suffix;
+    }
+
+    private String maskBirthDate(MemberAdminListRow row) {
+        if (row.birthDate() == null) {
+            return EMPTY_DISPLAY_VALUE;
+        }
+
+        return row.birthDate().getYear() + ".**.**";
     }
 }

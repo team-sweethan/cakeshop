@@ -39,6 +39,10 @@
                         <input type="hidden"
                                name="tab"
                                th:value="${condition.listType.queryValue}">
+                        <input type="hidden"
+                               name="status"
+                               th:if="${condition.status != null}"
+                               th:value="${condition.status}">
                         <input class="form-control"
                                name="keyword"
                                th:value="${condition.keyword}"
@@ -97,11 +101,7 @@
                         <td th:text="${member.name ?: '-'}">회원 이름</td>
                         <td th:text="${member.maskedEmail}">su***@example.com</td>
                         <td th:text="${member.maskedPhone}">010-****-1234</td>
-                        <td th:text="${member.birthDate == null
-                            ? '-'
-                            : #temporals.format(member.birthDate, 'yyyy.MM.dd')}">
-                            2000.01.01
-                        </td>
+                        <td th:text="${member.maskedBirthDate}">2000.**.**</td>
                         <td th:text="${#temporals.format(member.createdAt, 'yyyy.MM.dd')}">
                             2026.07.30
                         </td>
