@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="ko"
+      xmlns:th="http://www.thymeleaf.org">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0">
+  <title>상품 옵션 관리 | 관리자</title>
+  <link rel="stylesheet"
+        th:href="@{/css/app.css}">
+</head>
+
+<body>
+<div class="admin-layout">
+  <aside th:replace=
+                 "~{fragments/admin/sidebar :: sidebar('products')}">
+  </aside>
+
+  <div class="admin-main">
+    <header th:replace=
+                    "~{fragments/admin/header :: header('상품 관리')}">
+    </header>
+
+    <main class="admin-content">
+      <div class="cluster cluster--between">
+        <div>
+          <h1 class="admin-page-title">
+            상품 옵션 관리
+          </h1>
+          <p class="note"
+             th:text="${management.productName}">
+            상품명
+          </p>
+        </div>
+
+        <a class="btn"
+           th:href="@{/admin/products}">
+          상품 목록
+        </a>
+      </div>
+
+      <div th:replace=
+                   "~{fragments/common/alert :: alert}">
+      </div>
+
+      <details class="option-disclosure panel section"
+               th:open="${openCreate == true}">
+        <summary class="option-disclosure__summary">
+          <strong>＋ 새 옵션 그룹 추가</strong>
+          <span class="text-muted">
+            그룹 이름과 선택 방식을 설정합니다.
+          </span>
+        </summary>
+
+        <div class="option-disclosure__body">
+          <form class="grid grid--2"
+                method="post"
+                th:action=
+                        "@{/admin/products/{productId}/option-groups(
+                        productId=${management.productId}
+                    )}">
+          <div class="form-group">
+            <label for="new-group-name">그룹 이름</label>
+            <input id="new-group-name"
+                   class="form-control"
+                   name="name"
+                   maxlength="100"
+                   required>
+          </div>
+
+          <div class="form-group">
+            <label for="new-selection-type">선택 방식</label>
+            <select id="new-selection-type"
+                    class="form-control"
+                    name="selectionType"
+                    required>
+              <option th:each="type : ${selectionTypes}"
+                      th:value="${type}"
+                      th:text="${type.displayName}">
+                선택 방식
+              </option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="new-group-status">상태</label>
+            <select id="new-group-status"
+                    class="form-control"
+                    name="status"
+                    required>
+              <option th:each="status : ${optionStatuses}"
+                      th:value="${status}"
+                      th:text="${status.displayName}">
+                상태
+              </option>
+            </select>
+          </div>
+
+          <label class="form-group">
+            <span>필수 선택</span>
+            <input type="checkbox"
+                   name="required"
+                   value="true">
+          </label>
+
+            <div class="form-group">
+              <button class="btn btn--primary"
+                      type="submit">
+                그룹 추가
+              </button>
+            </div>
+          </form>
+        </div>
+      </details>
+
+      <div class="stack"
+           th:if="${!management.optionGroups.isEmpty()}">
+        <section class="option-group panel"
+                 th:each=
+                         "group, groupStat : ${management.optionGroups}">
+          <div class="option-group__order-controls">
+            <form method="post"
+                  th:action=
+                          "@{/admin/products/{productId}/option-groups/{groupId}/order(
+                          productId=${management.productId},
+                          groupId=${group.id}
+                      )}">
+              <input type="hidden"
+                     name="direction"
+                     value="UP">
+              <button class="btn"
+                      type="submit"
+                      th:disabled="${groupStat.first}"
+                      th:aria-label="|${group.name} 그룹을 위로 이동|"
+                      title="위로 이동">
+                ↑
+              </button>
+            </form>
+
+            <form method="post"
+                  th:action=
+                          "@{/admin/products/{productId}/option-groups/{groupId}/order(
+                          productId=${management.productId},
+                          groupId=${group.id}
+                      )}">
+              <input type="hidden"
+                     name="direction"
+                     value="DOWN">
+              <button class="btn"
+                      type="submit"
+                      th:disabled="${groupStat.last}"
+                      th:aria-label="|${group.name} 그룹을 아래로 이동|"
+                      title="아래로 이동">
+                ↓
+              </button>
+            </form>
+          </div>
+
+          <details class="option-group__details"
+                   th:open=
+                           "${openGroup != null and openGroup == group.id}">
+          <summary class="option-group__summary">
+            <span class="option-group__identity">
+              <strong th:text="${group.name}">
+                옵션 그룹
+              </strong>
+              <span class="text-muted"
+                    th:text="|표시 순서 ${groupStat.count}|">
+                표시 순서
+              </span>
+
+              <span class="option-group__options">
+                <span class="text-muted">
+                  옵션:
+                </span>
+                <span class="text-muted"
+                      th:if="${group.options.isEmpty()}">
+                  등록된 옵션 없음
+                </span>
+                <span th:each="option : ${group.options}"
+                      th:class=
+                              "${option.status.name() == 'ACTIVE'
+                              ? 'option-chip'
+                              : 'option-chip option-chip--inactive'}"
+                      th:text="${option.name}"
+                      th:title=
+                              "${option.status.name() == 'INACTIVE'
+                              ? '비활성 옵션'
+                              : null}">
+                  옵션명
+                </span>
+              </span>
+            </span>
+
+            <span class="option-group__meta">
+              <span class="badge"
+                    th:text="${group.selectionType.displayName}">
+                선택 방식
+              </span>
+              <span class="badge"
+                    th:text=
+                            "${group.required ? '필수' : '선택사항'}">
+                선택 여부
+              </span>
+              <span th:class=
+                            "${group.status.name() == 'ACTIVE'
+                            ? 'badge badge--success'
+                            : 'badge badge--danger'}"
+                    th:text="${group.status.displayName}">
+                상태
+              </span>
+              <span class="text-muted"
+                    th:text="|옵션 ${group.options.size()}개|">
+                옵션 개수
+              </span>
+            </span>
+          </summary>
+
+          <div class="option-group__body">
+            <h2 class="section-title">
+              그룹 설정
+            </h2>
+
+          <form class="grid grid--2"
+                method="post"
+                th:action=
+                        "@{/admin/products/{productId}/option-groups/{groupId}(
+                        productId=${management.productId},
+                        groupId=${group.id}
+                    )}">
+            <div class="form-group">
+              <label th:for="${'group-name-' + group.id}">
+                그룹 이름
+              </label>
+              <input class="form-control"
+                     th:id="${'group-name-' + group.id}"
+                     name="name"
+                     th:value="${group.name}"
+                     maxlength="100"
+                     required>
+            </div>
+
+            <div class="form-group">
+              <label th:for="${'group-type-' + group.id}">
+                선택 방식
+              </label>
+              <select class="form-control"
+                      th:id="${'group-type-' + group.id}"
+                      name="selectionType">
+                <option th:each="type : ${selectionTypes}"
+                        th:value="${type}"
+                        th:text="${type.displayName}"
+                        th:selected="${type == group.selectionType}">
+                  선택 방식
+                </option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label th:for="${'group-status-' + group.id}">
+                상태
+              </label>
+              <select class="form-control"
+                      th:id="${'group-status-' + group.id}"
+                      name="status">
+                <option th:each="status : ${optionStatuses}"
+                        th:value="${status}"
+                        th:text="${status.displayName}"
+                        th:selected="${status == group.status}">
+                  상태
+                </option>
+              </select>
+            </div>
+
+            <label class="form-group">
+              <span>필수 선택</span>
+              <input type="checkbox"
+                     name="required"
+                     value="true"
+                     th:checked="${group.required}">
+            </label>
+
+            <div class="form-group">
+              <button class="btn btn--primary"
+                      type="submit">
+                그룹 저장
+              </button>
+            </div>
+          </form>
+
+          <h2 class="section-title option-settings-title">
+            옵션 설정
+          </h2>
+
+          <div class="table-wrap section">
+            <table class="data-table">
+              <thead>
+              <tr>
+                <th>옵션명</th>
+                <th>추가 가격</th>
+                <th>상태</th>
+                <th>순서</th>
+                <th>관리</th>
+              </tr>
+              </thead>
+              <tbody>
+              <tr th:each=
+                          "option, optionStat : ${group.options}">
+                <td>
+                  <input class="form-control"
+                         name="name"
+                         th:value="${option.name}"
+                         th:attr=
+                                 "form=${'option-form-' + option.id}"
+                         maxlength="100"
+                         required>
+                </td>
+                <td>
+                  <input class="form-control"
+                         type="number"
+                         name="additionalPrice"
+                         min="0"
+                         th:value="${option.additionalPrice}"
+                         th:attr=
+                                 "form=${'option-form-' + option.id}"
+                         required>
+                </td>
+                <td>
+                  <select class="form-control"
+                          name="status"
+                          th:attr=
+                                  "form=${'option-form-' + option.id}">
+                    <option th:each=
+                                    "status : ${optionStatuses}"
+                            th:value="${status}"
+                            th:text="${status.displayName}"
+                            th:selected=
+                                    "${status == option.status}">
+                      상태
+                    </option>
+                  </select>
+                </td>
+                <td th:text="${optionStat.count}">
+                  1
+                </td>
+                <td>
+                  <div class="cluster">
+                    <form method="post"
+                          th:id="${'option-form-' + option.id}"
+                          th:action=
+                                  "@{/admin/products/{productId}/option-groups/{groupId}/options/{optionId}(
+                                  productId=${management.productId},
+                                  groupId=${group.id},
+                                  optionId=${option.id}
+                              )}">
+                      <button class="btn"
+                              type="submit">
+                        저장
+                      </button>
+                    </form>
+
+                    <form method="post"
+                          th:action=
+                                  "@{/admin/products/{productId}/option-groups/{groupId}/options/{optionId}/order(
+                                  productId=${management.productId},
+                                  groupId=${group.id},
+                                  optionId=${option.id}
+                              )}">
+                      <input type="hidden"
+                             name="direction"
+                             value="UP">
+                      <button class="btn"
+                              type="submit"
+                              th:disabled="${optionStat.first}"
+                              th:aria-label="|${option.name} 옵션을 위로 이동|">
+                        ↑
+                      </button>
+                    </form>
+
+                    <form method="post"
+                          th:action=
+                                  "@{/admin/products/{productId}/option-groups/{groupId}/options/{optionId}/order(
+                                  productId=${management.productId},
+                                  groupId=${group.id},
+                                  optionId=${option.id}
+                              )}">
+                      <input type="hidden"
+                             name="direction"
+                             value="DOWN">
+                      <button class="btn"
+                              type="submit"
+                              th:disabled="${optionStat.last}"
+                              th:aria-label="|${option.name} 옵션을 아래로 이동|">
+                        ↓
+                      </button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+
+              <tr th:if="${group.options.isEmpty()}">
+                <td colspan="5">
+                  등록된 옵션이 없습니다.
+                </td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+
+            <details class="option-disclosure option-disclosure--nested"
+                     th:open=
+                             "${openOptionCreate != null
+                             and openOptionCreate == group.id}">
+              <summary class="option-disclosure__summary">
+                <strong>＋ 새 옵션 추가</strong>
+                <span class="text-muted">
+                  이 그룹에 선택 항목을 등록합니다.
+                </span>
+              </summary>
+
+              <div class="option-disclosure__body">
+                <form class="grid grid--2"
+                      method="post"
+                      th:action=
+                              "@{/admin/products/{productId}/option-groups/{groupId}/options(
+                              productId=${management.productId},
+                              groupId=${group.id}
+                          )}">
+                  <div class="form-group">
+                    <label th:for="${'new-option-name-' + group.id}">
+                      새 옵션 이름
+                    </label>
+                    <input class="form-control"
+                           th:id="${'new-option-name-' + group.id}"
+                           name="name"
+                           maxlength="100"
+                           required>
+                  </div>
+
+                  <div class="form-group">
+                    <label th:for="${'new-option-price-' + group.id}">
+                      추가 가격
+                    </label>
+                    <input class="form-control"
+                           th:id="${'new-option-price-' + group.id}"
+                           type="number"
+                           name="additionalPrice"
+                           min="0"
+                           value="0"
+                           required>
+                  </div>
+
+                  <div class="form-group">
+                    <label th:for="${'new-option-status-' + group.id}">
+                      상태
+                    </label>
+                    <select class="form-control"
+                            th:id="${'new-option-status-' + group.id}"
+                            name="status">
+                      <option th:each="status : ${optionStatuses}"
+                              th:value="${status}"
+                              th:text="${status.displayName}">
+                        상태
+                      </option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <button class="btn btn--primary"
+                            type="submit">
+                      옵션 추가
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </details>
+          </div>
+          </details>
+        </section>
+      </div>
+
+      <div class="panel"
+           th:if="${management.optionGroups.isEmpty()}">
+        등록된 옵션 그룹이 없습니다.
+      </div>
+    </main>
+  </div>
+</div>
+</body>
+</html>

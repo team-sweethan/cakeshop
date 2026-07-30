@@ -7,30 +7,53 @@
         <result property="password" column="password"/>
         <result property="nickname" column="nickname"/>
         <result property="role" column="role"/>
+        <result property="status" column="status"/>
         <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="withdrawnAt" column="withdrawn_at"/>
         <result property="name" column="name"/>
+        <result property="birthDate" column="birth_date"/>
     </resultMap>
 
     <!-- 인증 입력도 문자열 치환 없이 #{}로 바인딩한다. -->
     <select id="findByEmail" resultMap="memberResultMap">
-        SELECT id, email, password, nickname, role, created_at, phone, name
+        SELECT id, email, password, nickname, role, status,
+               created_at, updated_at, withdrawn_at, phone, name, birth_date
           FROM members
          WHERE email = #{email}
     </select>
 
+    <select id="findEmailsByMemberInfo" resultType="string">
+        SELECT email
+          FROM members
+         WHERE name = #{name}
+           AND birth_date = #{birthDate}
+           AND REPLACE(phone, '-', '') = #{phone}
+           AND status = 'ACTIVE'
+         ORDER BY created_at DESC, id DESC
+    </select>
+
     <insert id="join" parameterType="com.cakeshop.domain.member.entity.Member">
-        INSERT INTO members (email, password, nickname, role, name, created_at, phone)
-        VALUES (#{email}, #{password}, #{nickname}, #{role}, #{name}, NOW(), #{phone})
+        INSERT INTO members (email, password, nickname, role, name, created_at, phone, birth_date)
+        VALUES (#{email}, #{password}, #{nickname}, #{role}, #{name}, NOW(), #{phone}, #{birthDate})
     </insert>
 
     <update id="update" parameterType="com.cakeshop.domain.member.entity.Member">
         UPDATE members
         <set>
             <if test="name != null">name = #{name},</if>
+            <if test="nickname != null">nickname = #{nickname},</if>
             <if test="phone != null">phone = #{phone},</if>
             <if test="password != null">password = #{password},</if>
-            updated_at = NOW() <!-- 수정 시간을 현재 시간으로 갱신 -->
         </set>
         WHERE id = #{id}
+    </update>
+
+    <update id="withdrawById">
+        UPDATE members
+           SET status = #{status},
+               withdrawn_at = CURRENT_TIMESTAMP(6)
+         WHERE id = #{id}
+           AND status != #{status}
     </update>
 </mapper>

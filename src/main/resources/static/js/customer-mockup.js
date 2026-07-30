@@ -60,7 +60,7 @@
     if (button.matches("[data-tab]")) activateTab(button);
     if (button.dataset.modalOpen) openModal(button.dataset.modalOpen);
     if (button.matches("[data-modal-close]")) closeModal(button);
-    if (button.dataset.confirm && !window.confirm(button.dataset.confirm)) event.preventDefalt();
+    if (button.dataset.confirm && !window.confirm(button.dataset.confirm)) event.preventDefault();
   });
   document.addEventListener("submit", function (event) {
     const form = event.target;

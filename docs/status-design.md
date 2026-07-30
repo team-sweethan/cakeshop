@@ -39,8 +39,9 @@
 |---|---|---|---|---|
 | `members.status` | 수민 | 정상 / 이용 제한 | `ACTIVE / SUSPENDED / WITHDRAWN` | 거의 확정 |
 | `products.status` | 시은 | 판매 중 / 판매 중지 | `ACTIVE / INACTIVE` | 거의 확정 |
-| `product_options.status` | 시은 | (표기 없음) | `ACTIVE / INACTIVE` ? | ☐ 열림 |
-| `orders.status` | 주환 | 승인대기/승인/거절/결제대기/결제완료/접수/제작중/픽업준비/픽업완료 | **`OrderStatus` 11개 (확정)** | ✅ 코드 확정 |
+| `product_option_groups.status` | 시은 | 활성 / 비활성 | `ACTIVE / INACTIVE` | ✅ 정책 확정 |
+| `product_options.status` | 시은 | 활성 / 비활성 | `ACTIVE / INACTIVE` | ✅ 정책 확정 |
+| `orders.status` | 주환 | 결제대기/검토중/픽업대기/픽업완료/취소/반려/만료 | **`OrderStatus` 7개 (확정)** | ✅ 코드 확정 |
 | `payments.status` | 주환 | 결제 완료 / 결제 대기 | **`PaymentStatus` 6개 (확정)** | ✅ 코드 확정 |
 | `payment_cancellations.status` | 주환 | 취소 요청 | `REQUESTED / DONE / REJECTED` ? | ☐ 열림 |
 | `coupons.status` | 정후 | 발급 중 | `ACTIVE / INACTIVE / ENDED` ? | ☐ 열림 |
@@ -51,20 +52,42 @@
 | `reviews.status` | 현규 | 숨김 | `VISIBLE / HIDDEN` ? | ☐ 열림 |
 | `chat_rooms.status` | 민정 | 상담가능 / 상담중 / 미답변 | `OPEN / CLOSED` ? (아래 함정 참고) | ☐ 열림 |
 
+### 상품 옵션 상태 정책
+
+- `product_option_groups.status`와 `product_options.status`는
+  `ACTIVE / INACTIVE`를 사용한다.
+- 관리자 삭제 요청은 물리 삭제하지 않고 `INACTIVE`로 변경한다.
+- 비활성 그룹과 옵션은 관리자 화면에 남겨 재활성화할 수 있다.
+- 고객 화면에는 그룹과 옵션이 모두 `ACTIVE`인 경우만 노출한다.
+- 장바구니·주문이 참조할 수 있는 옵션 행의 식별자는 삭제하지 않는다.
+
 ### 이미 확정된 두 enum
 
-**`OrderStatus` (주문·주문제작 공통, 11개 + 전이규칙 — 코드에 확정됨)**
+**`OrderStatus` (주문 상태 7개 + 전이 규칙 — 코드에 확정됨)**
 
-```
-정상 흐름:
-WAITING_APPROVAL → APPROVED → PENDING_PAYMENT → PAID → ACCEPTED → PREPARING → READY → PICKED_UP
+```text
+일반 상품:
+PENDING_PAYMENT → READY_FOR_PICKUP → PICKED_UP
+
+주문 제작 상품:
+PENDING_PAYMENT → UNDER_REVIEW → READY_FOR_PICKUP → PICKED_UP
+
 예외 흐름:
-WAITING_APPROVAL → REJECTED           (주문제작 거절, 최종)
-PENDING_PAYMENT  → EXPIRED            (결제 시간 초과, 최종)
-* 대부분 상태     → CANCELED           (취소, 최종)
-최종 상태: REJECTED / PICKED_UP / CANCELED / EXPIRED
+PENDING_PAYMENT  → EXPIRED
+UNDER_REVIEW     → REJECTED
+UNDER_REVIEW     → CANCELED
+READY_FOR_PICKUP → CANCELED
+
+최종 상태:
+PICKED_UP / CANCELED / REJECTED / EXPIRED
 ```
-전이 규칙은 `OrderStatus.canTransitionTo()`가 소유한다. SQL의 `CHECK`는 11개 값 집합만 나열한다.
+
+결제 완료 여부는 `orders.status`에 저장하지 않고 `payments.status = DONE`으로 관리한다.
+전이 규칙은 `OrderStatus.canTransitionTo()`가 소유하며, SQL의 `CHECK`는 7개 값 집합만 나열한다.
+
+이전 개발 단계에서 사용한 11개 주문 상태 데이터는 새 상태로 자동 변환하지 않는다.
+보존해야 하는 운영 주문 데이터가 없으므로, 이전 상태가 저장된 개발 DB는 초기화한 뒤
+Flyway migration을 다시 적용한다.
 
 **`PaymentStatus` (토스 결제 상태, 6개 — 코드에 확정됨. 주문 enum과 절대 섞지 않는다)**
 
@@ -119,7 +142,6 @@ READY / DONE / CANCELED / PARTIAL_CANCELED / ABORTED / EXPIRED
 
 | 담당 | 채울 것 |
 |---|---|
-| 시은 | `product_options.status` 필요 여부 확정 |
 | 주환 | `payment_cancellations.status` 값 확정 |
 | 정후 | `coupons.status`(캠페인 상태) 값 확정 |
 | 현규 | `comments.status` / `reviews.status`(숨김) 값 확정 |

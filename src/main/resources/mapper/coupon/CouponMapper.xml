@@ -100,13 +100,34 @@
         <include refid="couponSearchConditions"/>
 
         ORDER BY
-            CASE CASE WHEN expires_at &lt;= NOW(6) THEN 'ENDED' ELSE status END
-            WHEN 'ACTIVE' THEN 1
-            WHEN 'INACTIVE' THEN 2
-            WHEN 'ENDED' THEN 3
+            <!-- 만료 시각이 지난 쿠폰은 스케줄러 실행 전에도 종료 그룹으로 우선 정렬한다. -->
+            CASE
+            WHEN expires_at &lt;= NOW(6) THEN 3
+            WHEN status = 'ACTIVE' THEN 1
+            WHEN status = 'INACTIVE' THEN 2
             ELSE 4
             END,
-            created_at DESC,
+
+            <!-- 발급 중은 종료 임박순으로 운영자가 우선 확인한다. -->
+            CASE
+            WHEN status = 'ACTIVE'
+            AND expires_at &gt; NOW(6)
+            THEN expires_at
+            END ASC,
+
+            <!-- 발급 중지는 최근 상태 변경/수정 순으로 확인한다. -->
+            CASE
+            WHEN status = 'INACTIVE'
+            AND expires_at &gt; NOW(6)
+            THEN updated_at
+            END DESC,
+
+            <!-- 종료 쿠폰은 가장 최근에 종료된 항목부터 확인한다. -->
+            CASE
+            WHEN expires_at &lt;= NOW(6)
+            THEN expires_at
+            END DESC,
+
             id DESC
         LIMIT #{size}
         OFFSET #{offset}
@@ -120,8 +141,8 @@
         <include refid="couponSearchConditions"/>
     </select>
 
-    <update id="updateCoupon">
-        <!-- issued_quantity, status, created/updated 시각은 화면 수정 대상에서 제외한다. -->
+    <update id="updateCouponBeforeStart">
+        <!-- 시작 전 상태를 WHERE에서도 확인해 조회 후 시작된 쿠폰의 전체 수정을 막는다. -->
         UPDATE coupons
         SET
             name = #{name},
@@ -133,6 +154,27 @@
             starts_at = #{startsAt},
             expires_at = #{expiresAt}
         WHERE id = #{id}
+          AND status IN ('ACTIVE', 'INACTIVE')
+          AND starts_at &gt; NOW(6)
+          AND expires_at &gt; NOW(6)
+    </update>
+
+    <update id="updateCouponAfterStart">
+        <!--
+            시작 후에는 발급 조건을 바꾸지 않고 이름·총 수량·종료 일시만 수정한다.
+            WHERE 조건이 조회 후 상태 변경, 발급 수량 증가, 종료 시각 경과를 다시 방어한다.
+        -->
+        UPDATE coupons
+        SET
+            name = #{name},
+            total_quantity = #{totalQuantity},
+            expires_at = #{expiresAt}
+        WHERE id = #{id}
+          AND status IN ('ACTIVE', 'INACTIVE')
+          AND starts_at &lt;= NOW(6)
+          AND expires_at &gt; NOW(6)
+          AND issued_quantity &lt;= #{totalQuantity}
+          AND expires_at &lt;= #{expiresAt}
     </update>
 
     <update id="updateStatus">

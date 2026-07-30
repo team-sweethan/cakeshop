@@ -23,6 +23,7 @@ import com.cakeshop.domain.coupon.entity.DiscountType;
 import com.cakeshop.domain.coupon.error.CouponErrorCode;
 import com.cakeshop.domain.coupon.service.CouponAdminService;
 import com.cakeshop.domain.member.entity.Member;
+import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
@@ -200,6 +201,36 @@ class CouponAdminControllerTests {
     }
 
     @Test
+    void editEndedCouponFormRedirectsWithErrorMessage() throws Exception {
+        doThrow(new BusinessException(CouponErrorCode.CANNOT_EDIT_ENDED_COUPON))
+            .when(couponAdminService).getUpdateForm(3L);
+
+        mockMvc.perform(get("/admin/coupons/3/edit"))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/admin/coupons"))
+            .andExpect(flash().attribute("errorMessage", CouponErrorCode.CANNOT_EDIT_ENDED_COUPON.message()));
+    }
+
+    @Test
+    void editEndedCouponRedirectsWithErrorMessage() throws Exception {
+        doThrow(new BusinessException(CouponErrorCode.CANNOT_EDIT_ENDED_COUPON))
+            .when(couponAdminService).updateCoupon(org.mockito.ArgumentMatchers.eq(3L), any());
+
+        mockMvc.perform(post("/admin/coupons/3/edit")
+                .param("name", "수정된 쿠폰")
+                .param("discountType", "PERCENTAGE")
+                .param("discountValue", "10")
+                .param("minimumOrderAmount", "10000")
+                .param("maximumDiscountAmount", "5000")
+                .param("totalQuantity", "100")
+                .param("startsAt", "2026-08-01T09:00")
+                .param("expiresAt", "2026-08-31T23:59"))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/admin/coupons"))
+            .andExpect(flash().attribute("errorMessage", CouponErrorCode.CANNOT_EDIT_ENDED_COUPON.message()));
+    }
+
+    @Test
     void deactivateFailureRedirectsWithErrorMessage() throws Exception {
         doThrow(new BusinessException(CouponErrorCode.NOT_ACTIVE))
             .when(couponAdminService).deactivateCoupon(3L);
@@ -232,7 +263,12 @@ class CouponAdminControllerTests {
             .password("encoded-password")
             .role("ADMIN")
             .build();
-        MemberDetails memberDetails = new MemberDetails(member);
+        MemberDetails memberDetails = new MemberDetails(new MemberAuthenticationView(
+                member.getId(),
+                member.getEmail(),
+                member.getPassword(),
+                member.getRole(),
+                true));
 
         SecurityContextHolder.getContext().setAuthentication(
             new UsernamePasswordAuthenticationToken(

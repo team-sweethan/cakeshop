@@ -1,8 +1,11 @@
 package com.cakeshop.customer;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.cakeshop.global.config.MariaDbIntegrationTest;
@@ -39,10 +42,35 @@ class ScreenRenderingTests {
     @Test
     void publicScreensRenderWithoutAuthentication() throws Exception {
         String[] paths = {
-            "/screens", "/login", "/signup", "/products", "/products/1", "/cart"
+            "/screens", "/login", "/signup", "/find-email",
+            "/products", "/products/1", "/cart"
         };
 
         assertScreensRender(paths);
+    }
+
+    @Test
+    void login_successMessage_rendersCommonPopupFragment() throws Exception {
+        mockMvc.perform(get("/login")
+                .flashAttr("successMessage", "회원가입이 완료되었습니다!"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("data-common-alert-popup")))
+            .andExpect(content().string(containsString("window.alert(")));
+    }
+
+    @Test
+    void login_recoveredEmail_prefillsEmailInput() throws Exception {
+        mockMvc.perform(get("/login")
+                .flashAttr("recoveredEmail", "member@example.com"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("value=\"member@example.com\"")));
+    }
+
+    @Test
+    void myPage_unauthenticatedMember_redirectsToLoginEvenInPublicPreview() throws Exception {
+        mockMvc.perform(get("/mypage"))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/login"));
     }
 
     @Test
@@ -59,6 +87,28 @@ class ScreenRenderingTests {
         };
 
         assertScreensRender(paths);
+    }
+
+    @Test
+    @WithUserDetails(
+        value = "admin@cakeshop.local",
+        userDetailsServiceBeanName = "memberDetailsService"
+    )
+    void productOptionAdminScreenRendersWithSeededAdmin()
+            throws Exception {
+        assertScreensRender(new String[] {"/admin/products"});
+
+        mockMvc.perform(get("/admin/products/1/options"))
+            .andExpect(status().isOk())
+            .andExpect(content().contentTypeCompatibleWith("text/html"))
+            .andExpect(content().string(containsString("옵션:")))
+            .andExpect(content().string(containsString("1호")))
+            .andExpect(content().string(containsString("2호")))
+            .andExpect(content().string(containsString("위로 이동")))
+            .andExpect(content().string(containsString("아래로 이동")))
+            .andExpect(content().string(not(
+                containsString("name=\"sortOrder\"")
+            )));
     }
 
     private void assertScreensRender(String[] paths) throws Exception {

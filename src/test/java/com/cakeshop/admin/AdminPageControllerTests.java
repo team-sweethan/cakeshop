@@ -60,6 +60,7 @@ class AdminPageControllerTests {
         pages.put("/admin/coupons", "admin/coupon/list");
         pages.put("/admin/coupons/create", "admin/coupon/form");
         pages.put("/admin/coupons/1/edit", "admin/coupon/form");
+        pages.put("/admin/coupons/1/detail", "admin/coupon/detail");
     }
 
     @Test

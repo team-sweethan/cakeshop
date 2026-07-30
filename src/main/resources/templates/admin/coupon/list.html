@@ -9,7 +9,6 @@
         <header th:replace="~{fragments/admin/header :: header('쿠폰 관리')}"></header>
 
         <main class="admin-content">
-            <div th:replace="~{fragments/admin/mock-notice :: notice}"></div>
             <div th:replace="~{fragments/common/alert :: alert}"></div>
 
             <div class="cluster cluster--between">
@@ -83,8 +82,10 @@
                     <tr th:each="coupon : ${pageResult.content}">
                         <td th:text="${coupon.id}">1</td>
 
-                        <td th:text="${coupon.name}">
-                            첫 주문 할인 쿠폰
+                        <td>
+                            <a th:href="@{/admin/coupons/{couponId}/detail(couponId=${coupon.id})}" th:text="${coupon.name}">
+                                첫 주문 할인 쿠폰
+                            </a>
                         </td>
 
                         <td th:switch="${coupon.discountType}">
@@ -120,7 +121,7 @@
 
                         <td>
                             <div class="cluster">
-                                <a class="btn" th:href="@{/admin/coupons/{couponId}/edit(couponId=${coupon.id})}">수정</a>
+                                <a class="btn" th:if="${coupon.status != 'ENDED'}" th:href="@{/admin/coupons/{couponId}/edit(couponId=${coupon.id})}">수정</a>
 
                                 <form th:if="${coupon.status == 'ACTIVE'}"
                                       th:action="@{/admin/coupons/{couponId}/deactivate(couponId=${coupon.id})}"

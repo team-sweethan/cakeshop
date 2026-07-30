@@ -2,8 +2,17 @@ package com.cakeshop.domain.member.service;
 
 import com.cakeshop.domain.member.dto.form.ProfileUpdateForm;
 import com.cakeshop.domain.member.dto.form.SignupForm;
+import com.cakeshop.domain.member.dto.view.EmailRecoveryResult;
+import com.cakeshop.domain.member.dto.view.MemberProfileView;
+import com.cakeshop.domain.member.dto.view.RecoveredEmailView;
 import com.cakeshop.domain.member.entity.Member;
+import com.cakeshop.domain.member.entity.MemberStatus;
+import com.cakeshop.domain.member.error.MemberErrorCode;
 import com.cakeshop.domain.member.mapper.MemberMapper;
+import com.cakeshop.global.error.BusinessException;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.stream.IntStream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -22,7 +31,7 @@ public class MemberService {
     @Transactional
     public void join(SignupForm form) {
         if (memberMapper.findByEmail(form.getEmail()).isPresent()) {
-            throw new IllegalArgumentException("이미 사용 중인 이메일입니다.");
+            throw new BusinessException(MemberErrorCode.DUPLICATE_EMAIL);
         }
 
         String encodedPassword = passwordEncoder.encode(form.getPassword());
@@ -33,6 +42,7 @@ public class MemberService {
                 .name(form.getName())
                 .nickname(form.getNickname())
                 .phone(form.getPhone())
+                .birthDate(form.getBirthDate())
                 .role("USER")
                 .build();
         memberMapper.join(member);
@@ -46,34 +56,82 @@ public class MemberService {
         return memberMapper.findByEmail(email).isPresent();
     }
 
-    // 회원정보 수정
+    @Transactional(readOnly = true)
+    public EmailRecoveryResult findEmails(String name, LocalDate birthDate, String phone) {
+        String normalizedName = name.trim();
+        String normalizedPhone = phone.replace("-", "");
+        List<String> emails =
+                memberMapper.findEmailsByMemberInfo(normalizedName, birthDate, normalizedPhone);
+        List<RecoveredEmailView> views = IntStream.range(0, emails.size())
+                .mapToObj(index -> new RecoveredEmailView(index, maskEmail(emails.get(index))))
+                .toList();
+        return new EmailRecoveryResult(emails, views);
+    }
+
+    @Transactional
     public void updateMemberInfo(String email, ProfileUpdateForm form) {
-        // 1. DB에서 조회 (Optional 사용)
         Member member = memberMapper.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회원입니다."));
+                .orElseThrow(() -> new BusinessException(MemberErrorCode.NOT_FOUND));
 
-        // 2. 비밀번호 검증 (현재 비밀번호)
-        if (!passwordEncoder.matches(form.getCurrentPassword(), member.getPassword())) {
-            throw new IllegalArgumentException("현재 비밀번호가 일치하지 않습니다.");
+        if (form.isPasswordChangeRequested()) {
+            if (!passwordEncoder.matches(form.getCurrentPassword(), member.getPassword())) {
+                throw new BusinessException(MemberErrorCode.INVALID_CURRENT_PASSWORD);
+            }
+            if (!form.getNewPassword().equals(form.getNewPasswordConfirm())) {
+                throw new BusinessException(MemberErrorCode.PASSWORD_MISMATCH);
+            }
+            member.setPassword(passwordEncoder.encode(form.getNewPassword()));
+        } else {
+            // MyBatis 동적 UPDATE가 비밀번호 컬럼을 제외하도록 조회한 해시를 비운다.
+            member.setPassword(null);
         }
 
-        // 3. 새 비밀번호 확인 일치 여부
-        if (!form.getNewPassword().equals(form.getNewPasswordConfirm())) {
-            throw new IllegalArgumentException("새 비밀번호가 일치하지 않습니다.");
-        }
-
-        // 4. 값 업데이트
         member.setName(form.getName());
+        member.setNickname(form.getNickname());
         member.setPhone(form.getPhone());
-        member.setPassword(passwordEncoder.encode(form.getNewPassword())); // 암호화 저장
 
-        // 5. DB 업데이트 및 결과 확인
         if (memberMapper.update(member) == 0) {
-            throw new RuntimeException("회원 정보 수정에 실패했습니다.");
+            throw new BusinessException(MemberErrorCode.UPDATE_FAILED);
         }
     }
-    public Member getMemberByEmail(String email) {
-        return memberMapper.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
+
+    @Transactional(readOnly = true)
+    public MemberProfileView getMemberProfile(String email) {
+        Member member = memberMapper.findByEmail(email)
+                .orElseThrow(() -> new BusinessException(MemberErrorCode.NOT_FOUND));
+        return new MemberProfileView(
+                member.getEmail(),
+                member.getName(),
+                member.getNickname(),
+                member.getPhone(),
+                member.getBirthDate());
     }
+
+    @Transactional
+    public void withdraw(String email) {
+        Member member = memberMapper.findByEmail(email)
+                .orElseThrow(() -> new BusinessException(MemberErrorCode.NOT_FOUND));
+        if (member.getStatus() == null
+                || !member.getStatus().canTransitionTo(MemberStatus.WITHDRAWN)) {
+            throw new BusinessException(MemberErrorCode.INVALID_STATUS_TRANSITION);
+        }
+        if (memberMapper.withdrawById(member.getId(), MemberStatus.WITHDRAWN) == 0) {
+            throw new BusinessException(MemberErrorCode.WITHDRAW_FAILED);
+        }
+    }
+
+    private String maskEmail(String email) {
+        int atIndex = email.indexOf('@');
+        if (atIndex <= 0) {
+            return "***";
+        }
+
+        String localPart = email.substring(0, atIndex);
+        String domainPart = email.substring(atIndex);
+        int visibleLength = localPart.length() >= 3 ? 2 : Math.max(localPart.length() - 1, 0);
+        return localPart.substring(0, visibleLength)
+                + "*".repeat(localPart.length() - visibleLength)
+                + domainPart;
+    }
+
 }

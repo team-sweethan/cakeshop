@@ -20,6 +20,30 @@ public enum ProductErrorCode implements ErrorCode {
             "PRODUCT_003",
             "선택할 수 없는 카테고리입니다.",
             400
+    ),
+
+    OPTION_GROUP_NOT_FOUND(
+            "PRODUCT_004",
+            "옵션 그룹을 찾을 수 없습니다.",
+            404
+    ),
+
+    OPTION_NOT_FOUND(
+            "PRODUCT_005",
+            "상품 옵션을 찾을 수 없습니다.",
+            404
+    ),
+
+    INVALID_OPTION_GROUP(
+            "PRODUCT_006",
+            "옵션 그룹 입력값을 확인해 주세요.",
+            400
+    ),
+
+    INVALID_OPTION(
+            "PRODUCT_007",
+            "상품 옵션 입력값을 확인해 주세요.",
+            400
     );
 
     private final String code;

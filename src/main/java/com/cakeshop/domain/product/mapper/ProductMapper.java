@@ -6,12 +6,15 @@ import com.cakeshop.domain.product.admin.dto.form.ProductAdminSearchCondition;
 import com.cakeshop.domain.product.admin.dto.form.ProductForm;
 import com.cakeshop.domain.product.admin.dto.view.ProductAdminListView;
 import com.cakeshop.domain.product.admin.dto.view.ProductCategoryOptionView;
+import com.cakeshop.domain.product.admin.dto.view.ProductOptionAdminRow;
 import com.cakeshop.domain.product.customer.dto.form.ProductSearchCondition;
 import com.cakeshop.domain.product.customer.dto.view.ProductDetailView;
 import com.cakeshop.domain.product.customer.dto.view.ProductListView;
 import com.cakeshop.domain.product.customer.dto.view.ProductOptionRow;
 
 import com.cakeshop.domain.product.entity.Product;
+import com.cakeshop.domain.product.entity.ProductOption;
+import com.cakeshop.domain.product.entity.ProductOptionGroup;
 import com.cakeshop.domain.product.entity.ProductStatus;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -54,6 +57,20 @@ public interface ProductMapper {
     );
 
     /**
+     * 다른 도메인에 제공할 상품 판매 정보를 조회한다.
+     *
+     * <p>상품 존재 여부와 판매 상태를 Service에서 구분할 수 있도록
+     * 기본 가격, 재고 수량, 판매 상태를 함께 조회한다.</p>
+     *
+     * @param productId 조회할 상품 식별자
+     * @return 상품 판매 정보, 존재하지 않으면 {@code null}
+     */
+    Product findSalesInfoById(
+            @Param("productId")
+            long productId
+    );
+
+    /**
      * 판매 중인 상품의 활성 옵션을 그룹 순서와 옵션 순서로 조회한다.
      *
      * @param productId 조회할 상품 식별자
@@ -61,6 +78,96 @@ public interface ProductMapper {
      */
     List<ProductOptionRow> findPublicOptionRowsByProductId(
             @Param("productId") long productId
+    );
+
+    /**
+     * 관리자 옵션 관리 화면에 표시할 그룹과 옵션을 조회한다.
+     *
+     * @param productId 조회할 상품 식별자
+     * @return 비활성 항목을 포함한 옵션 조회 행
+     */
+    List<ProductOptionAdminRow> findAdminOptionRowsByProductId(
+            @Param("productId")
+            long productId
+    );
+
+    /**
+     * 옵션 그룹이 지정한 상품에 속하는지 확인한다.
+     */
+    boolean existsOptionGroupById(
+            @Param("productId")
+            long productId,
+
+            @Param("optionGroupId")
+            long optionGroupId
+    );
+
+    /**
+     * 개별 옵션이 지정한 상품과 옵션 그룹에 속하는지 확인한다.
+     */
+    boolean existsProductOptionById(
+            @Param("productId")
+            long productId,
+
+            @Param("optionGroupId")
+            long optionGroupId,
+
+            @Param("optionId")
+            long optionId
+    );
+
+    /** 새로운 옵션 그룹을 등록한다. */
+    int insertOptionGroup(ProductOptionGroup optionGroup);
+
+    /** 지정한 상품의 옵션 그룹을 수정한다. */
+    int updateOptionGroup(
+            @Param("productId")
+            long productId,
+
+            @Param("optionGroup")
+            ProductOptionGroup optionGroup
+    );
+
+    /** 지정한 상품에 속한 옵션 그룹의 표시 순서를 변경한다. */
+    int updateOptionGroupSortOrder(
+            @Param("productId")
+            long productId,
+
+            @Param("optionGroupId")
+            long optionGroupId,
+
+            @Param("sortOrder")
+            int sortOrder
+    );
+
+    /** 옵션 그룹에 새로운 개별 옵션을 등록한다. */
+    int insertProductOption(ProductOption productOption);
+
+    /** 지정한 상품과 그룹의 개별 옵션을 수정한다. */
+    int updateProductOption(
+            @Param("productId")
+            long productId,
+
+            @Param("optionGroupId")
+            long optionGroupId,
+
+            @Param("option")
+            ProductOption option
+    );
+
+    /** 지정한 상품과 그룹에 속한 개별 옵션의 표시 순서를 변경한다. */
+    int updateProductOptionSortOrder(
+            @Param("productId")
+            long productId,
+
+            @Param("optionGroupId")
+            long optionGroupId,
+
+            @Param("optionId")
+            long optionId,
+
+            @Param("sortOrder")
+            int sortOrder
     );
 
     /**

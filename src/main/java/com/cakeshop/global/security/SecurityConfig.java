@@ -8,7 +8,10 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.core.session.SessionRegistry;
+import org.springframework.security.core.session.SessionRegistryImpl;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.session.HttpSessionEventPublisher;
 
 @Configuration
 @EnableWebSecurity
@@ -21,14 +24,20 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(
+            HttpSecurity http,
+            SessionRegistry sessionRegistry) throws Exception {
         http
             // 웹훅 및 알림 REST API 경로 CSRF 제외 — 전체 비활성화 금지
             .csrf(csrf -> csrf.ignoringRequestMatchers("/webhooks/toss", "/api/notifications/**"))
             .authorizeHttpRequests(auth -> {
                 // ① 공개 GET을 먼저 선언 (matcher 순서 = 우선순위)
-                auth.requestMatchers("/", "/login", "/signup", "/join","/emailCheck" ,"/products/**", "/cart", "/screens",
-                        "/api/notifications/unread-count", "/favicon.ico", "/css/**", "/js/**", "/images/**", "/uploads/**", "/error").permitAll();
+                auth.requestMatchers(
+                        "/", "/login", "/signup", "/join", "/emailCheck", "/find-email",
+                        "/find-email/login", "/api/notifications/unread-count",
+                        "/products/**", "/cart", "/screens", "/favicon.ico",
+                        "/css/**", "/js/**", "/images/**", "/uploads/**", "/error")
+                        .permitAll();
                 // 로드밸런서/헬스체크가 인증 없이 호출할 수 있도록 허용 (그 외 actuator 엔드포인트는 미노출)
                 auth.requestMatchers("/actuator/health", "/actuator/health/**").permitAll();
                 auth.requestMatchers(HttpMethod.GET, "/community", "/community/{id:\\d+}").permitAll();
@@ -37,8 +46,11 @@ public class SecurityConfig {
                 if (publicPreview) {
                     // local 프로필에서만 고객 목업 흐름을 로그인 없이 확인한다.
                     // 관리자 화면은 preview에서도 열지 않는다 — 아래 /admin/** 규칙에 따라 관리자 로그인이 필요하다.
-                    auth.requestMatchers(HttpMethod.GET,
-                        "/orders/**", "/mypage/**", "/notifications", "/reviews/**", "/community/new", "/chat").permitAll();
+                    auth.requestMatchers(
+                            HttpMethod.GET,
+                            "/orders/**", "/notifications",
+                            "/reviews/**", "/community/new", "/chat")
+                            .permitAll();
                 }
 
                 // ② 관리자. 모든 관리자 화면은 관리자 로그인을 요구한다.
@@ -55,8 +67,29 @@ public class SecurityConfig {
                 .successHandler(new RoleBasedAuthenticationSuccessHandler())
                 .permitAll()
             )
-            .logout(logout -> logout.logoutSuccessUrl("/"));
+            .sessionManagement(session -> session
+                .maximumSessions(-1)
+                .sessionRegistry(sessionRegistry)
+            )
+            .logout(logout -> logout
+                .logoutUrl("/logout")
+                .logoutSuccessUrl("/?logout")
+                .invalidateHttpSession(true)
+                .clearAuthentication(true)
+                .deleteCookies("JSESSIONID")
+                .permitAll()
+            );
         return http.build();
+    }
+
+    @Bean
+    public SessionRegistry sessionRegistry() {
+        return new SessionRegistryImpl();
+    }
+
+    @Bean
+    public HttpSessionEventPublisher httpSessionEventPublisher() {
+        return new HttpSessionEventPublisher();
     }
 
     @Bean
