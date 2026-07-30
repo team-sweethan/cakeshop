@@ -58,6 +58,7 @@
       <h2 id="email-results-modal-title">가입 이메일 목록</h2>
       <p class="form-help">로그인할 이메일을 선택해 주세요.</p>
       <form class="form-stack" th:action="@{/find-email/login}" method="post">
+        <input type="hidden" name="recoveryToken" th:value="${recoveryToken}">
         <div class="choice-list">
           <label class="choice" th:each="recoveredEmail, status : ${recoveredEmails}">
             <input type="radio" name="selectedIndex" th:value="${recoveredEmail.selectionIndex}"

@@ -195,10 +195,13 @@ class AuthControllerTests {
                 .andReturn();
         MockHttpSession session =
                 (MockHttpSession) recoveryResult.getRequest().getSession(false);
+        String recoveryToken =
+                (String) recoveryResult.getModelAndView().getModel().get("recoveryToken");
 
         mockMvc.perform(post("/find-email/login")
                         .session(session)
-                        .param("selectedIndex", "0"))
+                        .param("selectedIndex", "0")
+                        .param("recoveryToken", recoveryToken))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/login"))
                 .andExpect(flash().attribute("recoveredEmail", "member@example.com"));
@@ -209,10 +212,37 @@ class AuthControllerTests {
     @Test
     void loginWithRecoveredEmail_missingRecoverySession_redirectsToRecovery() throws Exception {
         mockMvc.perform(post("/find-email/login")
-                        .param("selectedIndex", "0"))
+                        .param("selectedIndex", "0")
+                        .param("recoveryToken", "unused-token"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/find-email"))
                 .andExpect(flash().attribute("errorMessage", "이메일을 다시 찾아 주세요."));
+    }
+
+    @Test
+    void loginWithRecoveredEmail_invalidToken_redirectsToRecoveryAndClearsSession() throws Exception {
+        LocalDate birthDate = LocalDate.of(2000, 1, 15);
+        when(memberService.findEmails("홍길동", birthDate, "010-1234-5678"))
+                .thenReturn(new EmailRecoveryResult(
+                        List.of("member@example.com"),
+                        List.of(new RecoveredEmailView(0, "me****@example.com"))));
+        MvcResult recoveryResult = mockMvc.perform(post("/find-email")
+                        .param("name", "홍길동")
+                        .param("birthDate", birthDate.toString())
+                        .param("phone", "010-1234-5678"))
+                .andReturn();
+        MockHttpSession session =
+                (MockHttpSession) recoveryResult.getRequest().getSession(false);
+
+        mockMvc.perform(post("/find-email/login")
+                        .session(session)
+                        .param("selectedIndex", "0")
+                        .param("recoveryToken", "invalid-token"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/find-email"))
+                .andExpect(flash().attribute("errorMessage", "이메일을 다시 찾아 주세요."));
+
+        assertThat(session.getAttribute("recoveredEmails")).isNull();
     }
 
     @Test
@@ -229,6 +259,8 @@ class AuthControllerTests {
                 .andReturn();
         MockHttpSession session =
                 (MockHttpSession) recoveryResult.getRequest().getSession(false);
+        String recoveryToken =
+                (String) recoveryResult.getModelAndView().getModel().get("recoveryToken");
 
         mockMvc.perform(get("/find-email").session(session))
                 .andExpect(status().isOk());
@@ -236,7 +268,8 @@ class AuthControllerTests {
         assertThat(session.getAttribute("recoveredEmails")).isNull();
         mockMvc.perform(post("/find-email/login")
                         .session(session)
-                        .param("selectedIndex", "0"))
+                        .param("selectedIndex", "0")
+                        .param("recoveryToken", recoveryToken))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/find-email"))
                 .andExpect(flash().attribute("errorMessage", "이메일을 다시 찾아 주세요."));
@@ -256,6 +289,8 @@ class AuthControllerTests {
                 .andReturn();
         MockHttpSession session =
                 (MockHttpSession) recoveryResult.getRequest().getSession(false);
+        String recoveryToken =
+                (String) recoveryResult.getModelAndView().getModel().get("recoveryToken");
 
         mockMvc.perform(post("/find-email")
                         .session(session)
@@ -269,7 +304,8 @@ class AuthControllerTests {
         assertThat(session.getAttribute("recoveredEmails")).isNull();
         mockMvc.perform(post("/find-email/login")
                         .session(session)
-                        .param("selectedIndex", "0"))
+                        .param("selectedIndex", "0")
+                        .param("recoveryToken", recoveryToken))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/find-email"))
                 .andExpect(flash().attribute("errorMessage", "이메일을 다시 찾아 주세요."));

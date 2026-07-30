@@ -9,7 +9,10 @@ import com.cakeshop.domain.member.service.MemberService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -26,6 +29,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class AuthController {
 
     private static final String RECOVERED_EMAILS_SESSION_KEY = "recoveredEmails";
+    private static final Duration RECOVERY_SESSION_TTL = Duration.ofMinutes(5);
 
     private final MemberService memberService;
 
@@ -71,10 +75,15 @@ public class AuthController {
 
         EmailRecoveryResult result =
                 memberService.findEmails(form.getName(), form.getBirthDate(), form.getPhone());
+        String recoveryToken = UUID.randomUUID().toString();
         session.setAttribute(
                 RECOVERED_EMAILS_SESSION_KEY,
-                new RecoveredEmailSession(result.emails()));
+                new EmailRecoverySession(
+                        result.emails(),
+                        recoveryToken,
+                        Instant.now().plus(RECOVERY_SESSION_TTL)));
         model.addAttribute("recoveredEmails", result.views());
+        model.addAttribute("recoveryToken", recoveryToken);
         model.addAttribute("searched", true);
         return "customer/member/find-email";
     }
@@ -83,14 +92,14 @@ public class AuthController {
     @PostMapping("/find-email/login")
     public String loginWithRecoveredEmail(
             @RequestParam int selectedIndex,
+            @RequestParam String recoveryToken,
             HttpSession session,
             RedirectAttributes redirectAttributes) {
-        RecoveredEmailSession recoveredEmailSession =
-                (RecoveredEmailSession) session.getAttribute(RECOVERED_EMAILS_SESSION_KEY);
+        EmailRecoverySession recoveredEmailSession =
+                (EmailRecoverySession) session.getAttribute(RECOVERED_EMAILS_SESSION_KEY);
         session.removeAttribute(RECOVERED_EMAILS_SESSION_KEY);
         if (recoveredEmailSession == null
-                || selectedIndex < 0
-                || selectedIndex >= recoveredEmailSession.emails().size()) {
+                || !recoveredEmailSession.canSelect(recoveryToken, selectedIndex, Instant.now())) {
             redirectAttributes.addFlashAttribute(
                     "errorMessage",
                     "이메일을 다시 찾아 주세요.");
@@ -101,13 +110,6 @@ public class AuthController {
                 "recoveredEmail",
                 recoveredEmailSession.emails().get(selectedIndex));
         return "redirect:/login";
-    }
-
-    private record RecoveredEmailSession(List<String> emails) {
-
-        private RecoveredEmailSession {
-            emails = List.copyOf(emails);
-        }
     }
 
     // 회원가입 처리
