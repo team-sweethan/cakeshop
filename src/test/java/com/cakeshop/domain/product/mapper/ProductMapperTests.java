@@ -334,6 +334,205 @@ class ProductMapperTests {
     }
 
     @Test
+    void findSalesInfoByIdForUpdate_existingProduct_returnsLockedSalesInfo() {
+        Long productId = jdbcTemplate.queryForObject(
+                """
+                SELECT id
+                FROM products
+                WHERE name = ?
+                """,
+                Long.class,
+                keyword + " A 일반 재고 상품"
+        );
+
+        Product product =
+                productMapper.findSalesInfoByIdForUpdate(
+                        productId
+                );
+
+        assertThat(product).isNotNull();
+        assertThat(product.getId()).isEqualTo(productId);
+        assertThat(product.getProductType())
+                .isEqualTo(ProductType.GENERAL);
+        assertThat(product.getStockQuantity()).isEqualTo(10);
+        assertThat(product.getStatus())
+                .isEqualTo(ProductStatus.ACTIVE);
+    }
+
+    @Test
+    void decreaseStockIfAvailable_requestsExceedStock_neverMakesStockNegative() {
+        Long productId = jdbcTemplate.queryForObject(
+                """
+                SELECT id
+                FROM products
+                WHERE name = ?
+                """,
+                Long.class,
+                keyword + " A 일반 재고 상품"
+        );
+
+        int firstUpdate =
+                productMapper.decreaseStockIfAvailable(
+                        productId,
+                        7
+                );
+        int secondUpdate =
+                productMapper.decreaseStockIfAvailable(
+                        productId,
+                        7
+                );
+
+        assertThat(firstUpdate).isEqualTo(1);
+        assertThat(secondUpdate).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                """
+                SELECT stock_quantity
+                FROM products
+                WHERE id = ?
+                """,
+                Integer.class,
+                productId
+        )).isEqualTo(3);
+    }
+
+    @Test
+    void decreaseStockIfAvailable_customProduct_doesNotChangeStock() {
+        Long productId = jdbcTemplate.queryForObject(
+                """
+                SELECT id
+                FROM products
+                WHERE name = ?
+                """,
+                Long.class,
+                keyword + " C 인기 주문 제작"
+        );
+
+        int updatedRows =
+                productMapper.decreaseStockIfAvailable(
+                        productId,
+                        1
+                );
+
+        assertThat(updatedRows).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                """
+                SELECT stock_quantity
+                FROM products
+                WHERE id = ?
+                """,
+                Integer.class,
+                productId
+        )).isNull();
+    }
+
+    @Test
+    void restoreLimitedStock_inactiveGeneralProduct_restoresStock() {
+        Long productId = jdbcTemplate.queryForObject(
+                """
+                SELECT id
+                FROM products
+                WHERE name = ?
+                """,
+                Long.class,
+                keyword + " D 판매 중지 상품"
+        );
+
+        int updatedRows =
+                productMapper.restoreLimitedStock(
+                        productId,
+                        3
+                );
+
+        assertThat(updatedRows).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                """
+                SELECT stock_quantity
+                FROM products
+                WHERE id = ?
+                """,
+                Integer.class,
+                productId
+        )).isEqualTo(8);
+    }
+
+    @Test
+    void restoreLimitedStock_productChangedToCustom_restoresPreviouslyDeductedStock() {
+        Long productId = jdbcTemplate.queryForObject(
+                """
+                SELECT id
+                FROM products
+                WHERE name = ?
+                """,
+                Long.class,
+                keyword + " D 판매 중지 상품"
+        );
+        jdbcTemplate.update(
+                """
+                UPDATE products
+                SET product_type = 'CUSTOM',
+                    preparation_days = 1
+                WHERE id = ?
+                """,
+                productId
+        );
+
+        int updatedRows =
+                productMapper.restoreLimitedStock(
+                        productId,
+                        3
+                );
+
+        assertThat(updatedRows).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                """
+                SELECT stock_quantity
+                FROM products
+                WHERE id = ?
+                """,
+                Integer.class,
+                productId
+        )).isEqualTo(8);
+    }
+
+    @Test
+    void restoreLimitedStock_stockChangedToUnlimited_doesNotInventFiniteStock() {
+        Long productId = jdbcTemplate.queryForObject(
+                """
+                SELECT id
+                FROM products
+                WHERE name = ?
+                """,
+                Long.class,
+                keyword + " D 판매 중지 상품"
+        );
+        jdbcTemplate.update(
+                """
+                UPDATE products
+                SET stock_quantity = NULL
+                WHERE id = ?
+                """,
+                productId
+        );
+
+        int updatedRows =
+                productMapper.restoreLimitedStock(
+                        productId,
+                        3
+                );
+
+        assertThat(updatedRows).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                """
+                SELECT stock_quantity
+                FROM products
+                WHERE id = ?
+                """,
+                Integer.class,
+                productId
+        )).isNull();
+    }
+
+    @Test
     void detailOptionsIncludeOnlyActiveOptionsInOrder() {
         assertThat(productMapper
                 .findPublicOptionRowsByProductId(optionProductId))
@@ -638,6 +837,8 @@ class ProductMapperTests {
                 .isEqualByComparingTo("10000");
         assertThat(form.getStockQuantity())
                 .isEqualTo(10);
+        assertThat(form.getOriginalStockQuantity())
+                .isEqualTo(10);
         assertThat(form.getProductType())
                 .isEqualTo(ProductType.GENERAL);
         assertThat(form.getPreparationDays())
@@ -646,6 +847,10 @@ class ProductMapperTests {
 
     @Test
     void adminCanUpdateProductWithoutChangingStatus() {
+        ProductForm originalForm =
+                productMapper.findAdminProductFormById(
+                        optionProductId
+                );
         Product product = new Product();
 
         product.setId(optionProductId);
@@ -673,7 +878,10 @@ class ProductMapperTests {
         );
 
         int updatedRows =
-                productMapper.updateProduct(product);
+                productMapper.updateProduct(
+                        product,
+                        originalForm.getOriginalStockQuantity()
+                );
 
         ProductForm updatedForm =
                 productMapper.findAdminProductFormById(
@@ -722,6 +930,54 @@ class ProductMapperTests {
     }
 
     @Test
+    void adminUpdateWithStaleStock_doesNotOverwritePaymentDeduction() {
+        ProductForm staleForm =
+                productMapper.findAdminProductFormById(
+                        optionProductId
+                );
+        int deductedRows =
+                productMapper.decreaseStockIfAvailable(
+                        optionProductId,
+                        3
+                );
+
+        Product product = new Product();
+
+        product.setId(optionProductId);
+        product.setCategoryId(staleForm.getCategoryId());
+        product.setName(staleForm.getName());
+        product.setDescription(staleForm.getDescription());
+        product.setBasePrice(staleForm.getBasePrice());
+        product.setStockQuantity(
+                staleForm.getStockQuantity()
+        );
+        product.setProductType(staleForm.getProductType());
+        product.setPreparationDays(
+                staleForm.getPreparationDays()
+        );
+
+        int updatedRows =
+                productMapper.updateProduct(
+                        product,
+                        staleForm.getOriginalStockQuantity()
+                );
+
+        Integer currentStock = jdbcTemplate.queryForObject(
+                """
+                SELECT stock_quantity
+                FROM products
+                WHERE id = ?
+                """,
+                Integer.class,
+                optionProductId
+        );
+
+        assertThat(deductedRows).isEqualTo(1);
+        assertThat(updatedRows).isZero();
+        assertThat(currentStock).isEqualTo(7);
+    }
+
+    @Test
     void missingProductCannotBeReadOrUpdated() {
         assertThat(
                 productMapper.findAdminProductFormById(
@@ -741,7 +997,10 @@ class ProductMapperTests {
         product.setPreparationDays(0);
 
         assertThat(
-                productMapper.updateProduct(product)
+                productMapper.updateProduct(
+                        product,
+                        null
+                )
         ).isZero();
     }
 }

@@ -214,9 +214,12 @@ public class ProductAdminService {
             ProductForm form
     ) {
         // 수정할 상품이 실제로 존재하는지 확인한다.
-        if (productMapper.findAdminProductFormById(
-                productId
-        ) == null) {
+        ProductForm existingForm =
+                productMapper.findAdminProductFormById(
+                        productId
+                );
+
+        if (existingForm == null) {
             throw new BusinessException(
                     ProductErrorCode.NOT_FOUND
             );
@@ -256,12 +259,23 @@ public class ProductAdminService {
 
         // 상품의 기본 정보만 수정한다.
         int updatedRows =
-                productMapper.updateProduct(product);
+                productMapper.updateProduct(
+                        product,
+                        form.getOriginalStockQuantity()
+                );
 
-        // 상품이 동시에 삭제되는 등의 이유로 수정되지 않았다면 NOT_FOUND로 처리한다.
+        // 상품이 삭제됐거나 결제로 재고가 변경돼 수정되지 않은 원인을 구분한다.
         if (updatedRows == 0) {
+            if (productMapper.findAdminProductFormById(
+                    productId
+            ) == null) {
+                throw new BusinessException(
+                        ProductErrorCode.NOT_FOUND
+                );
+            }
+
             throw new BusinessException(
-                    ProductErrorCode.NOT_FOUND
+                    ProductErrorCode.UPDATE_CONFLICT
             );
         }
     }

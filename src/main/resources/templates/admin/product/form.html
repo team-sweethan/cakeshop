@@ -65,6 +65,11 @@
             th:action="${formAction}"
             th:object="${productForm}">
 
+        <!-- 수정 화면을 연 시점의 재고로 결제 차감과의 충돌을 감지한다. -->
+        <input type="hidden"
+               th:if="${editMode}"
+               th:field="*{originalStockQuantity}">
+
         <!-- 전체 입력값 오류 안내 -->
         <div class="alert alert--error"
              th:if="${#fields.hasAnyErrors()}">

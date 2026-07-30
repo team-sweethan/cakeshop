@@ -446,6 +446,7 @@ class ProductAdminControllerTests {
                                 .param("description", "수정된 상품 설명")
                                 .param("basePrice", "45000")
                                 .param("stockQuantity", "5")
+                                .param("originalStockQuantity", "10")
                                 .param("productType", "CUSTOM")
                                 .param("preparationDays", "3")
                 )
@@ -475,6 +476,8 @@ class ProductAdminControllerTests {
         assertThat(form.getBasePrice())
                 .isEqualByComparingTo("45000");
         assertThat(form.getStockQuantity()).isEqualTo(5);
+        assertThat(form.getOriginalStockQuantity())
+                .isEqualTo(10);
         assertThat(form.getProductType())
                 .isEqualTo(ProductType.CUSTOM);
         assertThat(form.getPreparationDays()).isEqualTo(3);
@@ -546,6 +549,7 @@ class ProductAdminControllerTests {
                 BigDecimal.valueOf(35_000)
         );
         form.setStockQuantity(10);
+        form.setOriginalStockQuantity(10);
         form.setProductType(ProductType.GENERAL);
         form.setPreparationDays(0);
 
