@@ -4,6 +4,7 @@ import com.cakeshop.domain.coupon.dto.form.CouponCreateForm;
 import com.cakeshop.domain.coupon.dto.form.CouponSearchCondition;
 import com.cakeshop.domain.coupon.dto.form.CouponUpdateForm;
 import com.cakeshop.domain.coupon.dto.view.CouponView;
+import com.cakeshop.domain.coupon.error.CouponErrorCode;
 import com.cakeshop.domain.coupon.service.CouponAdminService;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
@@ -96,15 +97,24 @@ public class CouponAdminController {
 
     /** 기존 쿠폰 값을 수정 Form으로 변환해 수정 화면에 제공한다. */
     @GetMapping("{couponId}/edit")
-    public String updateCouponForm(@PathVariable Long couponId, Model model) {
-        model.addAttribute(
-                "couponForm",
-                couponAdminService.getUpdateForm(couponId)
-        );
-        model.addAttribute("couponId", couponId);
-        model.addAttribute("formMode", "update");
+    public String updateCouponForm(@PathVariable Long couponId, Model model, RedirectAttributes redirectAttributes) {
+        try {
+            // 서비스에서 종료 쿠폰을 차단하므로, 수정 화면에는 수정 가능한 쿠폰만 진입한다.
+            model.addAttribute(
+                    "couponForm",
+                    couponAdminService.getUpdateForm(couponId)
+            );
+            model.addAttribute("couponId", couponId);
+            model.addAttribute("formMode", "update");
 
-        return "admin/coupon/form";
+            return "admin/coupon/form";
+        } catch (BusinessException e) {
+            redirectAttributes.addFlashAttribute(
+                    "errorMessage",
+                    e.getErrorCode().message()
+            );
+            return "redirect:/admin/coupons";
+        }
     }
 
     /** 수정 요청을 처리한다. 업무 규칙 위반은 목록 화면의 Flash 오류로 전달한다. */
@@ -118,7 +128,13 @@ public class CouponAdminController {
         if (bindingResult.hasErrors()) {
             model.addAttribute("couponId", couponId);
             model.addAttribute("formMode", "update");
-
+            try {
+                // 요청 Form에는 fullEdit가 없으므로, DB 기준 수정 가능 범위를 다시 채운다.
+                CouponUpdateForm originalForm = couponAdminService.getUpdateForm(couponId);
+                form.setFullEdit(originalForm.isFullEdit());
+            } catch (BusinessException e) {
+                // 종료 처리 등으로 조회할 수 없어진 경우에는 기본값으로 렌더링한다.
+            }
             return "admin/coupon/form";
         }
 
@@ -130,6 +146,25 @@ public class CouponAdminController {
                     "쿠폰을 수정했습니다."
             );
         } catch (BusinessException e) {
+            if (e.getErrorCode() == CouponErrorCode.EXPIRES_AT_EXTENSION_ONLY) {
+                // 사용자가 즉시 고칠 수 있는 종료 일시 오류는 목록으로 보내지 않고 Form에 표시한다.
+                bindingResult.rejectValue(
+                        "expiresAt",
+                        e.getErrorCode().code(),
+                        e.getErrorCode().message()
+                );
+
+                // 비활성화할 필드를 결정할 수 있도록 현재 수정 범위를 다시 조회한다.
+                CouponUpdateForm originalForm =
+                        couponAdminService.getDetailCoupon(couponId);
+
+                form.setFullEdit(originalForm.isFullEdit());
+                model.addAttribute("couponId", couponId);
+                model.addAttribute("formMode", "update");
+
+                return "admin/coupon/form";
+            }
+
             redirectAttributes.addFlashAttribute(
                     "errorMessage",
                     e.getErrorCode().message()
@@ -185,5 +220,20 @@ public class CouponAdminController {
         }
 
         return "redirect:/admin/coupons";
+    }
+    /**
+     * 쿠폰 기본 정보와 향후 발급 회원 기능의 안내를 보여 주는 읽기 전용 상세 화면이다.
+     * 종료 쿠폰도 이 화면에서는 조회할 수 있지만 수정 버튼은 노출하지 않는다.
+     */
+    @GetMapping("{couponId}/detail")
+    public String couponDetail(@PathVariable Long couponId, Model model) {
+        model.addAttribute(
+                "couponForm",
+                couponAdminService.getDetailCoupon(couponId)
+        );
+        model.addAttribute("couponId", couponId);
+        model.addAttribute("formMode", "detail");
+
+        return "admin/coupon/detail";
     }
 }

@@ -9,8 +9,6 @@
         <header th:replace="~{fragments/admin/header :: header('쿠폰 관리')}"></header>
 
         <main class="admin-content">
-            <div th:replace="~{fragments/admin/mock-notice :: notice}"></div>
-
             <h1 class="admin-page-title" th:text="${formMode == 'create'} ? '쿠폰 등록' : '쿠폰 수정'"> 쿠폰 등록 </h1>
 
             <form class="panel"
@@ -26,6 +24,15 @@
                     </ul>
                 </div>
 
+                <!-- 서버의 제한 수정 정책을 저장 전에 사용자에게 안내한다. -->
+                <div class="alert alert--info" th:if="${formMode == 'update'}" style="margin-bottom: 20px;">
+                    <strong>쿠폰 수정 안내</strong>
+                    <ul style="margin: 8px 0 0 0; padding-left: 20px; line-height: 1.6;">
+                        <li>쿠폰 시작 전에는 모든 정보를 수정할 수 있습니다.</li>
+                        <li style="color: var(--color-danger, #d9534f); font-weight: 500;">쿠폰 시작 후에는 쿠폰명, 종료 일시, 총 발급 수량만 제한적으로 수정할 수 있습니다.</li>
+                    </ul>
+                </div>
+
                 <div class="form-group">
                     <label for="name"> 쿠폰명 <span class="required">*</span></label>
                     <input id="name" class="form-control" th:field="*{name}" maxlength="100" placeholder="쿠폰 이름 입력">
@@ -38,13 +45,15 @@
 
                         <div class="choice-list">
                             <label class="choice">
-                                <input type="radio" th:field="*{discountType}" value="FIXED_AMOUNT"> 금액 할인
+                                <input type="radio" th:field="*{discountType}" value="FIXED_AMOUNT" th:disabled="${formMode == 'update' && !couponForm.fullEdit}"> 금액 할인
                             </label>
 
                             <label class="choice">
-                                <input type="radio" th:field="*{discountType}" value="PERCENTAGE"> 비율 할인
+                                <input type="radio" th:field="*{discountType}" value="PERCENTAGE" th:disabled="${formMode == 'update' && !couponForm.fullEdit}"> 비율 할인
                             </label>
                         </div>
+                        <!-- disabled 입력값은 전송되지 않으므로 기존 값은 hidden으로 함께 전송한다. -->
+                        <input type="hidden" name="discountType" th:value="*{discountType}" th:if="${formMode == 'update' && !couponForm.fullEdit}">
 
                         <p class="field-error" th:errors="*{discountType}"></p>
                     </fieldset>
@@ -58,7 +67,9 @@
                                min="0.01"
                                step="0.01"
                                th:field="*{discountValue}"
-                               placeholder="예: 5000 또는 10">
+                               placeholder="예: 5000 또는 10"
+                               th:disabled="${formMode == 'update' && !couponForm.fullEdit}">
+                        <input type="hidden" name="discountValue" th:value="*{discountValue}" th:if="${formMode == 'update' && !couponForm.fullEdit}">
 
                         <p class="field-error" th:errors="*{discountValue}"></p>
                     </div>
@@ -74,7 +85,9 @@
                                min="0"
                                step="1"
                                th:field="*{minimumOrderAmount}"
-                               placeholder="미입력 시 0원">
+                               placeholder="미입력 시 0원"
+                               th:disabled="${formMode == 'update' && !couponForm.fullEdit}">
+                        <input type="hidden" name="minimumOrderAmount" th:value="*{minimumOrderAmount}" th:if="${formMode == 'update' && !couponForm.fullEdit}">
 
                         <p class="field-error" th:errors="*{minimumOrderAmount}"></p>
                     </div>
@@ -90,7 +103,9 @@
                                min="0"
                                step="1"
                                th:field="*{maximumDiscountAmount}"
-                               placeholder="비율 할인에만 사용">
+                               placeholder="비율 할인에만 사용"
+                               th:disabled="${formMode == 'update' && !couponForm.fullEdit}">
+                        <input type="hidden" name="maximumDiscountAmount" th:value="*{maximumDiscountAmount}" th:if="${formMode == 'update' && !couponForm.fullEdit}">
 
                         <p class="field-error" th:errors="*{maximumDiscountAmount}"></p>
                     </div>
@@ -103,7 +118,9 @@
                         <input id="startsAt"
                                class="form-control"
                                type="datetime-local"
-                               th:field="*{startsAt}">
+                               th:field="*{startsAt}"
+                               th:disabled="${formMode == 'update' && !couponForm.fullEdit}">
+                        <input type="hidden" name="startsAt" th:value="*{startsAt}" th:if="${formMode == 'update' && !couponForm.fullEdit}">
 
                         <p class="field-error" th:errors="*{startsAt}"></p>
                     </div>
@@ -152,6 +169,20 @@
                     <a class="btn" th:href="@{/admin/coupons}">취소</a>
                 </div>
             </form>
+
+            <!-- 제한 수정 화면의 비활성 입력값도 서버 검증을 위해 제출 직전에 다시 활성화한다. -->
+            <script>
+                document.addEventListener("DOMContentLoaded", function() {
+                    const form = document.querySelector("form");
+                    if (form) {
+                        form.addEventListener("submit", function() {
+                            form.querySelectorAll("input:disabled, select:disabled").forEach(function(el) {
+                                el.disabled = false;
+                            });
+                        });
+                    }
+                });
+            </script>
         </main>
     </div>
 </div>

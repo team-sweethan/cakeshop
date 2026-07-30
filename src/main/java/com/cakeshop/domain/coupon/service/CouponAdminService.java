@@ -80,11 +80,24 @@ public class CouponAdminService {
         );
     }
 
-    /** 수정 화면에 필요한 값만 담은 Form을 반환한다. */
+    /**
+     * 수정 화면에 필요한 값을 반환한다.
+     * 종료 쿠폰은 수정 대상이 아니며, 시작 시각을 기준으로 전체/제한 수정 범위를 계산한다.
+     */
     @Transactional(readOnly = true)
     public CouponUpdateForm getUpdateForm(Long couponId) {
         Coupon coupon = findCoupon(couponId);
-        return CouponUpdateForm.from(coupon);
+
+        if (coupon.getStatus() == CouponStatus.ENDED) {
+            throw new BusinessException(CouponErrorCode.CANNOT_EDIT_ENDED_COUPON);
+        }
+
+        CouponUpdateForm form = CouponUpdateForm.from(coupon);
+        // 시작 전에는 정책을 자유롭게 바꿀 수 있고, 시작 후에는 발급 조건 변경을 막는다.
+        boolean isFullEdit = coupon.getStartsAt().isAfter(LocalDateTime.now());
+        form.setFullEdit(isFullEdit);
+
+        return form;
     }
 
     /** 이미 발급한 수량보다 총 발급 수량을 낮추지 못하도록 검증한 뒤 수정한다. */
@@ -95,11 +108,49 @@ public class CouponAdminService {
 
         Coupon coupon = findCoupon(couponId);
 
-        // 이미 발급한 수량보다 총수량을 줄이면 발급 이력과 모순된다.
+        // 1. 종료된 쿠폰은 수정 불가
+        if (coupon.getStatus() == CouponStatus.ENDED) {
+            throw new BusinessException(CouponErrorCode.CANNOT_EDIT_ENDED_COUPON);
+        }
+
+        // 2. 이미 발급한 수량보다 총수량을 줄이면 발급 이력과 모순된다.
         if (form.getTotalQuantity() < coupon.getIssuedQuantity()) {
             throw new BusinessException(
                     CouponErrorCode.QUANTITY_BELOW_ISSUED
             );
+        }
+
+        // 3. 시작 시각 이후에는 이미 노출된 발급 조건을 변경하지 못하게 한다.
+        boolean isFullEdit = coupon.getStartsAt().isAfter(LocalDateTime.now());
+
+        if (!isFullEdit) {
+            // 제한된 수정만 가능하므로, 수정 불가능한 필드가 변경되었는지 검증한다.
+            if (coupon.getDiscountType() != form.getDiscountType()) {
+                throw new BusinessException(CouponErrorCode.CANNOT_MODIFY_FIELDS);
+            }
+            if (coupon.getDiscountValue() == null || form.getDiscountValue() == null || coupon.getDiscountValue().compareTo(form.getDiscountValue()) != 0) {
+                throw new BusinessException(CouponErrorCode.CANNOT_MODIFY_FIELDS);
+            }
+            if (coupon.getMinimumOrderAmount() == null || form.getMinimumOrderAmount() == null || coupon.getMinimumOrderAmount().compareTo(form.getMinimumOrderAmount()) != 0) {
+                throw new BusinessException(CouponErrorCode.CANNOT_MODIFY_FIELDS);
+            }
+            if (coupon.getMaximumDiscountAmount() == null) {
+                if (form.getMaximumDiscountAmount() != null) {
+                    throw new BusinessException(CouponErrorCode.CANNOT_MODIFY_FIELDS);
+                }
+            } else {
+                if (form.getMaximumDiscountAmount() == null || coupon.getMaximumDiscountAmount().compareTo(form.getMaximumDiscountAmount()) != 0) {
+                    throw new BusinessException(CouponErrorCode.CANNOT_MODIFY_FIELDS);
+                }
+            }
+            if (coupon.getStartsAt() == null || !coupon.getStartsAt().equals(form.getStartsAt())) {
+                throw new BusinessException(CouponErrorCode.CANNOT_MODIFY_FIELDS);
+            }
+
+            // 종료 일시는 기존 종료 일시보다 이전이면 안 되며, 동일 시각은 허용한다.
+            if (form.getExpiresAt() == null || coupon.getExpiresAt() == null || form.getExpiresAt().isBefore(coupon.getExpiresAt())) {
+                throw new BusinessException(CouponErrorCode.EXPIRES_AT_EXTENSION_ONLY);
+            }
         }
 
         applyForm(coupon, form);
@@ -188,5 +239,18 @@ public class CouponAdminService {
 
         coupon.setStartsAt(form.getStartsAt());
         coupon.setExpiresAt(form.getExpiresAt());
+    }
+
+    /**
+     * 종료 쿠폰도 포함해 상세 화면에 필요한 Form을 반환한다.
+     * 수정 화면 조회와 달리 ENDED 상태를 예외로 처리하지 않는다.
+     */
+    @Transactional(readOnly = true)
+    public CouponUpdateForm getDetailCoupon(Long couponId) {
+        Coupon coupon = findCoupon(couponId);
+        CouponUpdateForm form = CouponUpdateForm.from(coupon);
+        boolean isFullEdit = coupon.getStartsAt().isAfter(LocalDateTime.now());
+        form.setFullEdit(isFullEdit);
+        return form;
     }
 }

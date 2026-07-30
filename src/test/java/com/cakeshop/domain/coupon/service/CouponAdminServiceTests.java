@@ -131,6 +131,139 @@ class CouponAdminServiceTests {
     }
 
     @Test
+    void getUpdateFormThrowsWhenCouponIsEnded() {
+        Coupon coupon = coupon(CouponStatus.ENDED, 10, 0, LocalDateTime.now().minusDays(1));
+        when(couponMapper.findCouponById(1L)).thenReturn(Optional.of(coupon));
+
+        assertThatThrownBy(() -> couponAdminService.getUpdateForm(1L))
+            .isInstanceOf(BusinessException.class)
+            .extracting(exception -> ((BusinessException) exception).getErrorCode())
+            .isEqualTo(CouponErrorCode.CANNOT_EDIT_ENDED_COUPON);
+    }
+
+    @Test
+    void updateThrowsWhenCouponIsEnded() {
+        Coupon coupon = coupon(CouponStatus.ENDED, 10, 0, LocalDateTime.now().minusDays(1));
+        when(couponMapper.findCouponById(1L)).thenReturn(Optional.of(coupon));
+
+        assertThatThrownBy(() -> couponAdminService.updateCoupon(1L, updateForm()))
+            .isInstanceOf(BusinessException.class)
+            .extracting(exception -> ((BusinessException) exception).getErrorCode())
+            .isEqualTo(CouponErrorCode.CANNOT_EDIT_ENDED_COUPON);
+    }
+
+    @Test
+    void updateRejectsForbiddenFieldModificationWhenLimitedEdit() {
+        // startsAt이 과거이고, 이미 발급 수량(issuedQuantity)이 1인 상태
+        Coupon coupon = coupon(CouponStatus.ACTIVE, 10, 1, LocalDateTime.now().plusDays(1));
+        coupon.setStartsAt(LocalDateTime.now().minusDays(1));
+        coupon.setDiscountType(DiscountType.FIXED_AMOUNT);
+        coupon.setDiscountValue(BigDecimal.valueOf(3000));
+        coupon.setMinimumOrderAmount(BigDecimal.valueOf(10000));
+        when(couponMapper.findCouponById(1L)).thenReturn(Optional.of(coupon));
+
+        CouponUpdateForm form = updateForm();
+        form.setStartsAt(coupon.getStartsAt());
+        // 수정 금지 필드인 할인값을 변경 시도
+        form.setDiscountValue(BigDecimal.valueOf(5000));
+
+        assertThatThrownBy(() -> couponAdminService.updateCoupon(1L, form))
+            .isInstanceOf(BusinessException.class)
+            .extracting(exception -> ((BusinessException) exception).getErrorCode())
+            .isEqualTo(CouponErrorCode.CANNOT_MODIFY_FIELDS);
+    }
+
+    @Test
+    void updateRejectsForbiddenFieldModificationWhenStartsAtIsPassedEvenIfIssuedQuantityIsZero() {
+        // startsAt이 과거이고, 발급 수량(issuedQuantity)은 0인 상태
+        Coupon coupon = coupon(CouponStatus.ACTIVE, 10, 0, LocalDateTime.now().plusDays(1));
+        coupon.setStartsAt(LocalDateTime.now().minusDays(1));
+        coupon.setDiscountType(DiscountType.FIXED_AMOUNT);
+        coupon.setDiscountValue(BigDecimal.valueOf(3000));
+        coupon.setMinimumOrderAmount(BigDecimal.valueOf(10000));
+        when(couponMapper.findCouponById(1L)).thenReturn(Optional.of(coupon));
+
+        CouponUpdateForm form = updateForm();
+        form.setStartsAt(coupon.getStartsAt());
+        // 수정 금지 필드인 할인값을 변경 시도
+        form.setDiscountValue(BigDecimal.valueOf(5000));
+
+        assertThatThrownBy(() -> couponAdminService.updateCoupon(1L, form))
+            .isInstanceOf(BusinessException.class)
+            .extracting(exception -> ((BusinessException) exception).getErrorCode())
+            .isEqualTo(CouponErrorCode.CANNOT_MODIFY_FIELDS);
+    }
+
+    @Test
+    void updateRejectsExpiryDateShorteningWhenLimitedEdit() {
+        Coupon coupon = coupon(CouponStatus.ACTIVE, 10, 1, LocalDateTime.now().plusDays(2));
+        coupon.setStartsAt(LocalDateTime.now().minusDays(1));
+        coupon.setDiscountType(DiscountType.FIXED_AMOUNT);
+        coupon.setDiscountValue(BigDecimal.valueOf(3000));
+        coupon.setMinimumOrderAmount(BigDecimal.valueOf(10000));
+        when(couponMapper.findCouponById(1L)).thenReturn(Optional.of(coupon));
+
+        CouponUpdateForm form = updateForm();
+        form.setStartsAt(coupon.getStartsAt());
+        form.setDiscountType(coupon.getDiscountType());
+        form.setDiscountValue(coupon.getDiscountValue());
+        form.setMinimumOrderAmount(coupon.getMinimumOrderAmount());
+        // 종료 일시를 기존 2일 뒤보다 앞당겨서 1일 뒤로 변경 시도
+        form.setExpiresAt(LocalDateTime.now().plusDays(1));
+
+        assertThatThrownBy(() -> couponAdminService.updateCoupon(1L, form))
+            .isInstanceOf(BusinessException.class)
+            .extracting(exception -> ((BusinessException) exception).getErrorCode())
+            .isEqualTo(CouponErrorCode.EXPIRES_AT_EXTENSION_ONLY);
+    }
+
+    @Test
+    void updateAllowsAllowedFieldsWhenLimitedEdit() {
+        Coupon coupon = coupon(CouponStatus.ACTIVE, 10, 1, LocalDateTime.now().plusDays(2));
+        coupon.setStartsAt(LocalDateTime.now().minusDays(1));
+        coupon.setDiscountType(DiscountType.FIXED_AMOUNT);
+        coupon.setDiscountValue(BigDecimal.valueOf(3000));
+        coupon.setMinimumOrderAmount(BigDecimal.valueOf(10000));
+        when(couponMapper.findCouponById(1L)).thenReturn(Optional.of(coupon));
+        when(couponMapper.updateCoupon(any())).thenReturn(1);
+
+        CouponUpdateForm form = updateForm();
+        form.setStartsAt(coupon.getStartsAt());
+        form.setDiscountType(coupon.getDiscountType());
+        form.setDiscountValue(coupon.getDiscountValue());
+        form.setMinimumOrderAmount(coupon.getMinimumOrderAmount());
+        // 종료 일시 연장, 쿠폰명 변경, 총 수량 연장
+        form.setName("이름 수정");
+        form.setTotalQuantity(20L);
+        form.setExpiresAt(LocalDateTime.now().plusDays(3));
+
+        couponAdminService.updateCoupon(1L, form);
+
+        verify(couponMapper).updateCoupon(any());
+    }
+
+    @Test
+    void updateAllowsAllFieldsWhenFullEditDueToFutureStartsAt() {
+        // startsAt이 미래인 상태
+        Coupon coupon = coupon(CouponStatus.ACTIVE, 10, 0, LocalDateTime.now().plusDays(5));
+        coupon.setStartsAt(LocalDateTime.now().plusDays(1));
+        coupon.setDiscountType(DiscountType.FIXED_AMOUNT);
+        coupon.setDiscountValue(BigDecimal.valueOf(3000));
+        coupon.setMinimumOrderAmount(BigDecimal.valueOf(10000));
+        when(couponMapper.findCouponById(1L)).thenReturn(Optional.of(coupon));
+        when(couponMapper.updateCoupon(any())).thenReturn(1);
+
+        CouponUpdateForm form = updateForm();
+        // startsAt이 미래이므로 제한을 받지 않고 할인값 변경 등이 가능해야 함
+        form.setDiscountValue(BigDecimal.valueOf(5000));
+        form.setStartsAt(LocalDateTime.now().plusDays(2));
+
+        couponAdminService.updateCoupon(1L, form);
+
+        verify(couponMapper).updateCoupon(any());
+    }
+
+    @Test
     void deactivateChangesActiveCouponToInactive() {
         when(couponMapper.findCouponById(1L)).thenReturn(Optional.of(
             coupon(CouponStatus.ACTIVE, 10, 0, LocalDateTime.now().plusDays(1))
@@ -227,6 +360,10 @@ class CouponAdminServiceTests {
         coupon.setStatus(status);
         coupon.setTotalQuantity(totalQuantity);
         coupon.setIssuedQuantity(issuedQuantity);
+        coupon.setStartsAt(LocalDateTime.now().minusDays(1));
+        coupon.setDiscountType(DiscountType.FIXED_AMOUNT);
+        coupon.setDiscountValue(BigDecimal.valueOf(3000));
+        coupon.setMinimumOrderAmount(BigDecimal.valueOf(10000));
         coupon.setExpiresAt(expiresAt);
         return coupon;
     }

@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/common/head :: head('쿠폰 상세 정보 | 관리자')}"></head>
+<body>
+<div class="admin-layout">
+    <aside th:replace="~{fragments/admin/sidebar :: sidebar('coupons')}"></aside>
+
+    <div class="admin-main">
+        <header th:replace="~{fragments/admin/header :: header('쿠폰 관리')}"></header>
+
+        <main class="admin-content">
+            <h1 class="admin-page-title">쿠폰 상세 정보</h1>
+
+            <!-- 수정 Form과 분리된 읽기 전용 영역: 화면 값은 저장 요청으로 전송하지 않는다. -->
+            <div class="panel">
+                <div class="form-group">
+                    <label for="name"> 쿠폰명 </label>
+                    <input id="name" class="form-control" th:value="${couponForm.name}" disabled>
+                </div>
+
+                <div class="grid grid--2">
+                    <fieldset class="form-group">
+                        <legend> 할인 유형 </legend>
+
+                        <div class="choice-list">
+                            <label class="choice">
+                                <input type="radio" name="discountType" value="FIXED_AMOUNT" th:checked="${#strings.toString(couponForm.discountType) == 'FIXED_AMOUNT'}" disabled> 금액 할인
+                            </label>
+
+                            <label class="choice">
+                                <input type="radio" name="discountType" value="PERCENTAGE" th:checked="${#strings.toString(couponForm.discountType) == 'PERCENTAGE'}" disabled> 비율 할인
+                            </label>
+                        </div>
+                    </fieldset>
+
+                    <div class="form-group">
+                        <label for="discountValue"> 할인값 </label>
+                        <input id="discountValue"
+                               class="form-control"
+                               type="number"
+                               th:value="${couponForm.discountValue}"
+                               disabled>
+                    </div>
+                </div>
+
+                <div class="grid grid--2">
+                    <div class="form-group">
+                        <label for="minimumOrderAmount"> 최소 주문 금액 </label>
+                        <input id="minimumOrderAmount"
+                               class="form-control"
+                               type="number"
+                               th:value="${couponForm.minimumOrderAmount}"
+                               disabled>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="maximumDiscountAmount"> 최대 할인 금액 </label>
+                        <input id="maximumDiscountAmount"
+                               class="form-control"
+                               type="number"
+                               th:value="${couponForm.maximumDiscountAmount}"
+                               disabled>
+                    </div>
+                </div>
+
+                <div class="grid grid--2">
+                    <div class="form-group">
+                        <label for="startsAt"> 시작 일시 </label>
+                        <input id="startsAt"
+                               class="form-control"
+                               type="datetime-local"
+                               th:value="${couponForm.startsAt}"
+                               disabled>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="expiresAt"> 종료 일시 </label>
+                        <input id="expiresAt"
+                               class="form-control"
+                               type="datetime-local"
+                               th:value="${couponForm.expiresAt}"
+                               disabled>
+                    </div>
+                </div>
+
+                <fieldset class="form-group">
+                    <legend>발급 대상</legend>
+
+                    <div class="choice-list">
+                        <label class="choice"><input type="radio" disabled checked>전체 회원</label>
+                        <label class="choice"><input type="radio" disabled>첫 주문 회원</label>
+                        <label class="choice"><input type="radio" disabled>생일 회원</label>
+                        <label class="choice"><input type="radio" disabled>특정 회원</label>
+                    </div>
+                </fieldset>
+
+                <div class="form-group">
+                    <label for="totalQuantity">총 발급 수량</label>
+                    <input id="totalQuantity"
+                           class="form-control"
+                           type="number"
+                           th:value="${couponForm.totalQuantity}"
+                           disabled>
+                </div>
+
+                <div class="cluster">
+                    <a class="btn btn--primary" th:if="${#strings.toString(couponForm.status) != 'ENDED'}" th:href="@{/admin/coupons/{couponId}/edit(couponId=${couponId})}">수정</a>
+                    <a class="btn" th:href="@{/admin/coupons}">목록</a>
+                </div>
+            </div>
+
+            <!-- member_coupons 연동 전까지의 미구현 목업 영역이다. -->
+            <div class="panel" style="margin-top: 24px;">
+                <div class="cluster cluster--between" style="margin-bottom: 16px;">
+                    <h2 class="section-title" style="margin: 0; font-size: 1.25rem;">발급 회원 목록</h2>
+                    <span class="badge badge--warning">추후 구현 예정</span>
+                </div>
+                
+                <div class="table-wrap">
+                    <table class="data-table">
+                        <thead>
+                        <tr>
+                            <th>회원 ID</th>
+                            <th>이름</th>
+                            <th>이메일</th>
+                            <th>발급일시</th>
+                            <th>사용 여부</th>
+                            <th>사용일시</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr>
+                            <td>12</td>
+                            <td>김철수</td>
+                            <td>chulsoo@example.com</td>
+                            <td>2026-07-28 10:00</td>
+                            <td><span class="badge badge--success">사용완료</span></td>
+                            <td>2026-07-29 12:30</td>
+                        </tr>
+                        <tr>
+                            <td>45</td>
+                            <td>이영희</td>
+                            <td>younghee@example.com</td>
+                            <td>2026-07-28 11:15</td>
+                            <td><span class="badge badge--warning">미사용</span></td>
+                            <td>-</td>
+                        </tr>
+                        <tr>
+                            <td>78</td>
+                            <td>박민수</td>
+                            <td>minsu@example.com</td>
+                            <td>2026-07-29 09:00</td>
+                            <td><span class="badge badge--warning">미사용</span></td>
+                            <td>-</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="form-help" style="margin-top: 8px;">※ 현재는 데모용 목업 데이터이며, 실제 발급 회원 데이터 연동 기능은 추후 개발될 예정입니다.</p>
+            </div>
+
+            <!-- 회원 검색·개별 발급 기능 연동 전까지의 미구현 목업 영역이다. -->
+            <div class="panel" style="margin-top: 24px;">
+                <div class="cluster cluster--between" style="margin-bottom: 16px;">
+                    <h2 class="section-title" style="margin: 0; font-size: 1.25rem;">쿠폰 개별 발급</h2>
+                    <span class="badge badge--warning">추후 구현 예정</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="memberSearch">발급 대상 회원 검색</label>
+                    <div class="cluster" style="gap: 8px; margin-top: 8px;">
+                        <input id="memberSearch" class="form-control" style="flex: 1; max-width: 400px;" placeholder="회원 이름 또는 이메일 입력" disabled>
+                        <button class="btn" type="button" disabled>검색</button>
+                    </div>
+                    <p class="form-help" style="margin-top: 8px;">※ 회원을 검색하여 해당 회원에게 이 쿠폰을 직접 수동 발급할 수 있는 기능이 추가될 예정입니다.</p>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+</body>
+</html>
