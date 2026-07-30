@@ -34,7 +34,8 @@ public class SecurityConfig {
                 // ① 공개 GET을 먼저 선언 (matcher 순서 = 우선순위)
                 auth.requestMatchers(
                         "/", "/login", "/signup", "/join", "/emailCheck", "/find-email",
-                        "/find-email/login",
+                        "/find-email/login", "/find-password", "/find-password/verify",
+                        "/reset-password",
                         "/products/**", "/cart", "/screens", "/favicon.ico",
                         "/css/**", "/js/**", "/images/**", "/uploads/**", "/error")
                         .permitAll();

@@ -332,6 +332,18 @@ h2.section-title {
     color: #9ca3af
 }
 
+.birth-date-selects {
+    display: grid;
+    gap: var(--space-2);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-top: var(--space-2)
+}
+
+.birth-date-selects .form-control {
+    min-width: 0;
+    width: 100%
+}
+
 .form-control--textarea {
     min-height: 74px;
     resize: vertical

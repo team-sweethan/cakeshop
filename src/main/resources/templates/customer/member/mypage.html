@@ -25,10 +25,6 @@
         <a class="btn btn--block" href="/reviews/new">작성할 후기</a>
         <a class="btn btn--block" href="/mypage/profile">회원정보 수정</a>
       </nav>
-      <hr class="divider">
-      <form th:action="@{/logout}" method="post">
-        <button class="btn" type="submit">로그아웃</button>
-      </form>
     </aside>
     <div>
       <section class="section">
@@ -56,7 +52,6 @@
                     ? #temporals.format(member.birthDate, 'yyyy-MM-dd')
                     : '미등록'}"></span>
           </div>
-          <a class="btn" href="/mypage/profile" style="margin-top:8px">정보 수정</a>
         </div>
       </section>
 

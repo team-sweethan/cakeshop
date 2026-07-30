@@ -55,9 +55,9 @@ class MemberLogoutSecurityTests {
     }
 
     @Test
-    void myPage_logoutUsesPostForm() throws Exception {
+    void commonHeader_logoutUsesPostForm() throws Exception {
         String template =
-                new ClassPathResource("templates/customer/member/mypage.html")
+                new ClassPathResource("templates/fragments/common/header.html")
                         .getContentAsString(StandardCharsets.UTF_8);
 
         assertThat(template)
