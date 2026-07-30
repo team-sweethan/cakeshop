@@ -20,6 +20,7 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
 @RequiredArgsConstructor
@@ -28,41 +29,22 @@ public class MyPageController {
     private final MemberService memberService;
     private final SessionRegistry sessionRegistry;
 
-    // local public-preview에서 인증 없이 목업 화면을 확인할 때 null 인증 분기를 사용한다.
-    // 운영 환경에서는 SecurityConfig가 미인증 접근을 차단한다.
+    // 마이페이지 조회
     @GetMapping("/mypage")
     public String myPage(
             @AuthenticationPrincipal MemberDetails memberDetails,
             Model model) {
-
-        if (memberDetails == null) {
-            model.addAttribute("member", new MemberProfileView("", "", "", "", null));
-            return "customer/member/mypage";
-        }
-
         String email = memberDetails.getUsername();
         model.addAttribute("member", memberService.getMemberProfile(email));
 
         return "customer/member/mypage";
     }
 
+    // 회원정보 수정 화면
     @GetMapping("/mypage/profile")
     public String profile(
             @AuthenticationPrincipal MemberDetails memberDetails,
             Model model) {
-
-        if (memberDetails == null) {
-            MemberProfileView mock =
-                    new MemberProfileView(
-                            "hong@test.com",
-                            "홍길동",
-                            "케이크러버",
-                            "010-1234-5678",
-                            null);
-            model.addAttribute("profileForm", ProfileUpdateForm.from(mock));
-            return "customer/member/profile-edit";
-        }
-
         String email = memberDetails.getUsername();
         MemberProfileView member = memberService.getMemberProfile(email);
 
@@ -91,6 +73,7 @@ public class MyPageController {
             return "customer/member/profile-edit";
         }
 
+        // 현재 비밀번호 불일치처럼 화면에서 바로 수정할 수 있는 업무 오류만 필드 오류로 변환한다.
         try {
             memberService.updateMemberInfo(email, form);
         } catch (BusinessException exception) {
@@ -110,7 +93,8 @@ public class MyPageController {
     @PostMapping("/mypage/withdraw")
     public String withdraw(
             @AuthenticationPrincipal MemberDetails memberDetails,
-            HttpServletRequest request) {
+            HttpServletRequest request,
+            RedirectAttributes redirectAttributes) {
         if (memberDetails == null) {
             return "redirect:/login";
         }
@@ -126,6 +110,7 @@ public class MyPageController {
             session.invalidate();
         }
         SecurityContextHolder.clearContext();
-        return "redirect:/login?withdrawn";
+        redirectAttributes.addFlashAttribute("successMessage", "회원 탈퇴가 완료되었습니다.");
+        return "redirect:/login";
     }
 }

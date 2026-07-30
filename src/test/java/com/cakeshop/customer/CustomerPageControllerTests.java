@@ -86,6 +86,7 @@ class CustomerPageControllerTests {
         pages.put("/screens", "home/screens");
         pages.put("/login", "auth/login");
         pages.put("/signup", "customer/member/signup");
+        pages.put("/find-email", "customer/member/find-email");
         pages.put("/products", "customer/product/list");
         pages.put("/products/1", "customer/product/detail");
         pages.put("/cart", "customer/cart/list");

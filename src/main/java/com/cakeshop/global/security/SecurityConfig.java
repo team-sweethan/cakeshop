@@ -33,7 +33,8 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> {
                 // ① 공개 GET을 먼저 선언 (matcher 순서 = 우선순위)
                 auth.requestMatchers(
-                        "/", "/login", "/signup", "/join", "/emailCheck",
+                        "/", "/login", "/signup", "/join", "/emailCheck", "/find-email",
+                        "/find-email/login",
                         "/products/**", "/cart", "/screens", "/favicon.ico",
                         "/css/**", "/js/**", "/images/**", "/uploads/**", "/error")
                         .permitAll();
@@ -47,7 +48,7 @@ public class SecurityConfig {
                     // 관리자 화면은 preview에서도 열지 않는다 — 아래 /admin/** 규칙에 따라 관리자 로그인이 필요하다.
                     auth.requestMatchers(
                             HttpMethod.GET,
-                            "/orders/**", "/mypage/**", "/notifications",
+                            "/orders/**", "/notifications",
                             "/reviews/**", "/community/new", "/chat")
                             .permitAll();
                 }

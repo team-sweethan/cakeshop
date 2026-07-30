@@ -6,25 +6,22 @@ import lombok.Setter;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-/** DB의 payments 한 행을 표현한다. */
+/** DB의 payment_cancellations 한 행을 표현한다. */
 @Getter
 @Setter
-public class Payment {
+public class PaymentCancellation {
 
     private Long id;
-    private Long orderId;
-    private String tossOrderId;
-    private String paymentKey;
+    private Long paymentId;
     private String idempotencyKey;
-    private String method;
-    private BigDecimal amount;
-    private PaymentStatus status;
-    private String providerStatus;
-    private Long activePaidOrderId;
+    private BigDecimal cancelAmount;
+    private String cancelReason;
+    private PaymentCancellationStatus status;
+    private Long activeRequestedPaymentId;
+    private String transactionKey;
     private String failureCode;
     private String failureMessage;
     private LocalDateTime requestedAt;
-    private LocalDateTime approvedAt;
     private LocalDateTime canceledAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

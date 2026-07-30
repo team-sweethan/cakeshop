@@ -9,13 +9,16 @@ import static org.mockito.ArgumentMatchers.any;
 
 import com.cakeshop.domain.member.dto.form.ProfileUpdateForm;
 import com.cakeshop.domain.member.dto.form.SignupForm;
+import com.cakeshop.domain.member.dto.view.EmailRecoveryResult;
 import com.cakeshop.domain.member.dto.view.MemberProfileView;
+import com.cakeshop.domain.member.dto.view.RecoveredEmailView;
 import com.cakeshop.domain.member.entity.Member;
 import com.cakeshop.domain.member.entity.MemberStatus;
 import com.cakeshop.domain.member.error.MemberErrorCode;
 import com.cakeshop.domain.member.mapper.MemberMapper;
 import com.cakeshop.global.error.BusinessException;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -204,6 +207,48 @@ class MemberServiceTests {
                 member.getNickname(),
                 member.getPhone(),
                 member.getBirthDate()));
+    }
+
+    @Test
+    void findEmails_matchingMembers_normalizesInputAndMasksAllEmails() {
+        LocalDate birthDate = LocalDate.of(2000, 1, 15);
+        when(memberMapper.findEmailsByMemberInfo(
+                "홍길동",
+                birthDate,
+                "01012345678"))
+                .thenReturn(List.of(
+                        "member@example.com",
+                        "ab@example.com",
+                        "x@example.com"));
+
+        EmailRecoveryResult result = memberService.findEmails(
+                " 홍길동 ",
+                birthDate,
+                "010-1234-5678");
+
+        assertThat(result.emails()).containsExactly(
+                "member@example.com",
+                "ab@example.com",
+                "x@example.com");
+        assertThat(result.views()).containsExactly(
+                new RecoveredEmailView(0, "me****@example.com"),
+                new RecoveredEmailView(1, "a*@example.com"),
+                new RecoveredEmailView(2, "*@example.com"));
+    }
+
+    @Test
+    void findEmails_noMatchingMember_returnsEmptyList() {
+        LocalDate birthDate = LocalDate.of(2000, 1, 15);
+        when(memberMapper.findEmailsByMemberInfo(
+                "홍길동",
+                birthDate,
+                "01012345678"))
+                .thenReturn(List.of());
+
+        assertThat(memberService.findEmails(
+                "홍길동",
+                birthDate,
+                "01012345678").emails()).isEmpty();
     }
 
     @Test

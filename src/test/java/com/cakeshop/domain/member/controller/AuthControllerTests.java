@@ -13,11 +13,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import com.cakeshop.domain.member.dto.form.EmailRecoveryForm;
 import com.cakeshop.domain.member.dto.form.SignupForm;
+import com.cakeshop.domain.member.dto.view.EmailRecoveryResult;
+import com.cakeshop.domain.member.dto.view.RecoveredEmailView;
 import com.cakeshop.domain.member.service.MemberService;
 import java.time.LocalDate;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -125,5 +130,184 @@ class AuthControllerTests {
                 .andExpect(jsonPath("$.available").value(true))
                 .andExpect(jsonPath("$.message")
                         .value("사용 가능한 이메일입니다."));
+    }
+
+    @Test
+    void findEmail_get_rendersRecoveryForm() throws Exception {
+        mockMvc.perform(get("/find-email"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("customer/member/find-email"))
+                .andExpect(model().attributeExists("emailRecoveryForm"));
+    }
+
+    @Test
+    void findEmail_invalidInput_rendersErrorsWithoutCallingService() throws Exception {
+        mockMvc.perform(post("/find-email")
+                        .param("name", " ")
+                        .param("birthDate", LocalDate.now().plusDays(1).toString())
+                        .param("phone", "1234"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("customer/member/find-email"))
+                .andExpect(model().attributeHasFieldErrors(
+                        "emailRecoveryForm", "name", "birthDate", "phone"));
+
+        verify(memberService, never()).findEmails(
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any(LocalDate.class),
+                org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
+    void findEmail_matchingMember_rendersMaskedEmailList() throws Exception {
+        LocalDate birthDate = LocalDate.of(2000, 1, 15);
+        RecoveredEmailView recoveredEmail =
+                new RecoveredEmailView(0, "me****@example.com");
+        when(memberService.findEmails("홍길동", birthDate, "010-1234-5678"))
+                .thenReturn(new EmailRecoveryResult(
+                        List.of("member@example.com"),
+                        List.of(recoveredEmail)));
+
+        MvcResult result = mockMvc.perform(post("/find-email")
+                        .param("name", "홍길동")
+                        .param("birthDate", birthDate.toString())
+                        .param("phone", "010-1234-5678"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("customer/member/find-email"))
+                .andExpect(model().attribute("searched", true))
+                .andExpect(model().attribute("recoveredEmails", List.of(recoveredEmail)))
+                .andReturn();
+
+        assertThat(result.getResponse().getContentAsString())
+                .doesNotContain("member@example.com");
+    }
+
+    @Test
+    void loginWithRecoveredEmail_selectedIndex_redirectsWithFlashAttribute() throws Exception {
+        LocalDate birthDate = LocalDate.of(2000, 1, 15);
+        when(memberService.findEmails("홍길동", birthDate, "010-1234-5678"))
+                .thenReturn(new EmailRecoveryResult(
+                        List.of("member@example.com"),
+                        List.of(new RecoveredEmailView(0, "me****@example.com"))));
+        MvcResult recoveryResult = mockMvc.perform(post("/find-email")
+                        .param("name", "홍길동")
+                        .param("birthDate", birthDate.toString())
+                        .param("phone", "010-1234-5678"))
+                .andReturn();
+        MockHttpSession session =
+                (MockHttpSession) recoveryResult.getRequest().getSession(false);
+        String recoveryToken =
+                (String) recoveryResult.getModelAndView().getModel().get("recoveryToken");
+
+        mockMvc.perform(post("/find-email/login")
+                        .session(session)
+                        .param("selectedIndex", "0")
+                        .param("recoveryToken", recoveryToken))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login"))
+                .andExpect(flash().attribute("recoveredEmail", "member@example.com"));
+
+        assertThat(session.getAttribute("recoveredEmails")).isNull();
+    }
+
+    @Test
+    void loginWithRecoveredEmail_missingRecoverySession_redirectsToRecovery() throws Exception {
+        mockMvc.perform(post("/find-email/login")
+                        .param("selectedIndex", "0")
+                        .param("recoveryToken", "unused-token"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/find-email"))
+                .andExpect(flash().attribute("errorMessage", "이메일을 다시 찾아 주세요."));
+    }
+
+    @Test
+    void loginWithRecoveredEmail_invalidToken_redirectsToRecoveryAndClearsSession() throws Exception {
+        LocalDate birthDate = LocalDate.of(2000, 1, 15);
+        when(memberService.findEmails("홍길동", birthDate, "010-1234-5678"))
+                .thenReturn(new EmailRecoveryResult(
+                        List.of("member@example.com"),
+                        List.of(new RecoveredEmailView(0, "me****@example.com"))));
+        MvcResult recoveryResult = mockMvc.perform(post("/find-email")
+                        .param("name", "홍길동")
+                        .param("birthDate", birthDate.toString())
+                        .param("phone", "010-1234-5678"))
+                .andReturn();
+        MockHttpSession session =
+                (MockHttpSession) recoveryResult.getRequest().getSession(false);
+
+        mockMvc.perform(post("/find-email/login")
+                        .session(session)
+                        .param("selectedIndex", "0")
+                        .param("recoveryToken", "invalid-token"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/find-email"))
+                .andExpect(flash().attribute("errorMessage", "이메일을 다시 찾아 주세요."));
+
+        assertThat(session.getAttribute("recoveredEmails")).isNull();
+    }
+
+    @Test
+    void findEmail_getAfterRecovery_clearsPreviousRecoverySession() throws Exception {
+        LocalDate birthDate = LocalDate.of(2000, 1, 15);
+        when(memberService.findEmails("홍길동", birthDate, "010-1234-5678"))
+                .thenReturn(new EmailRecoveryResult(
+                        List.of("member@example.com"),
+                        List.of(new RecoveredEmailView(0, "me****@example.com"))));
+        MvcResult recoveryResult = mockMvc.perform(post("/find-email")
+                        .param("name", "홍길동")
+                        .param("birthDate", birthDate.toString())
+                        .param("phone", "010-1234-5678"))
+                .andReturn();
+        MockHttpSession session =
+                (MockHttpSession) recoveryResult.getRequest().getSession(false);
+        String recoveryToken =
+                (String) recoveryResult.getModelAndView().getModel().get("recoveryToken");
+
+        mockMvc.perform(get("/find-email").session(session))
+                .andExpect(status().isOk());
+
+        assertThat(session.getAttribute("recoveredEmails")).isNull();
+        mockMvc.perform(post("/find-email/login")
+                        .session(session)
+                        .param("selectedIndex", "0")
+                        .param("recoveryToken", recoveryToken))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/find-email"))
+                .andExpect(flash().attribute("errorMessage", "이메일을 다시 찾아 주세요."));
+    }
+
+    @Test
+    void findEmail_invalidSubmissionAfterRecovery_clearsPreviousRecoverySession() throws Exception {
+        LocalDate birthDate = LocalDate.of(2000, 1, 15);
+        when(memberService.findEmails("홍길동", birthDate, "010-1234-5678"))
+                .thenReturn(new EmailRecoveryResult(
+                        List.of("member@example.com"),
+                        List.of(new RecoveredEmailView(0, "me****@example.com"))));
+        MvcResult recoveryResult = mockMvc.perform(post("/find-email")
+                        .param("name", "홍길동")
+                        .param("birthDate", birthDate.toString())
+                        .param("phone", "010-1234-5678"))
+                .andReturn();
+        MockHttpSession session =
+                (MockHttpSession) recoveryResult.getRequest().getSession(false);
+        String recoveryToken =
+                (String) recoveryResult.getModelAndView().getModel().get("recoveryToken");
+
+        mockMvc.perform(post("/find-email")
+                        .session(session)
+                        .param("name", " ")
+                        .param("birthDate", birthDate.toString())
+                        .param("phone", "1234"))
+                .andExpect(status().isOk())
+                .andExpect(model().attributeHasFieldErrors(
+                        "emailRecoveryForm", "name", "phone"));
+
+        assertThat(session.getAttribute("recoveredEmails")).isNull();
+        mockMvc.perform(post("/find-email/login")
+                        .session(session)
+                        .param("selectedIndex", "0")
+                        .param("recoveryToken", recoveryToken))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/find-email"))
+                .andExpect(flash().attribute("errorMessage", "이메일을 다시 찾아 주세요."));
     }
 }

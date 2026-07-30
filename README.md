@@ -320,6 +320,7 @@ CREATE DATABASE `cakeshop`
 | `NON_EMPTY_SCHEMA_WITHOUT_SCHEMA_HISTORY_TABLE` | 기존 수동 스키마가 남아 있음 | 로컬 DB가 맞는지 확인한 뒤 데이터베이스 전체를 다시 생성한다. 임의로 baseline을 켜지 않는다. |
 | `Table ... already exists` | 테이블만 일부 삭제했거나 다른 DB에 접속함 | `.env` 접속 정보를 확인하고 데이터베이스 전체를 다시 생성한다. |
 | 샘플 이메일·매장 PK 중복 | 기존 샘플 데이터가 남아 있음 | 테이블 단위 삭제 대신 로컬 데이터베이스 전체를 초기화한다. |
+| `chk_order_payment_migration_guard` 실패 | 이전 11개 주문 상태 또는 자동 변환할 수 없는 주문·결제 데이터가 남아 있음 | 개인 로컬 DB는 백업 후 전체 초기화한다. 공용 RDS나 보존 대상 DB에서는 적용을 중단하고 주문·결제 담당자와 데이터를 검토한다. |
 | `Access denied` | 애플리케이션 계정의 권한 또는 비밀번호가 잘못됨 | `.env` 값과 MariaDB 계정 권한을 확인한다. |
 | `Unknown database 'cakeshop'` | 삭제 후 데이터베이스를 다시 만들지 않음 | `CREATE DATABASE`를 실행하고 다시 시작한다. |
 
