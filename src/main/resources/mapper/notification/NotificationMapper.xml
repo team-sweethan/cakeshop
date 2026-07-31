@@ -4,9 +4,9 @@
     <!-- 사용자 입력은 #{} 만 사용 (${} 금지) -->
     
     <!--알림 DB에 저장-->
-    <insert id = "save" parameterType="Notification">
+    <!--알림 DB에 저장-->
+    <insert id="save" parameterType="Notification" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO notifications (
-            id,
             receiver_id, 
             actor_id, 
             order_id, 
@@ -26,7 +26,7 @@
             event_key, 
             created_at
         )
-        VALUES (#{id}, 
+        VALUES (
             #{receiverId}, 
             #{actorId}, 
             #{orderId}, 
@@ -98,35 +98,31 @@
         )
     </select>
 
+    <!-- 수신 회원 전화번호 조회 (알림톡/SMS 발송용) -->
+    <select id="findReceiverPhone" resultType="string">
+        SELECT phone FROM members WHERE id = #{receiverId}
+    </select>
+
     <!--카카오 알림톡으로도 보내기-->
-    <insert id="saveDelivery" parameterType="NotificationDelivery">
+    <insert id="saveDelivery" parameterType="NotificationDelivery" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO notification_deliveries (
-            id,
             notification_id,
-            channel,
             recipient,
             template_code,
             provider_message_id,
             status,
-            failure_code,
             failure_reason,
-            requested_at,
-            sent_at,
             delivered_at,
             created_at,
             updated_at
         )
-        VALUES (#{id},
+        VALUES (
             #{notificationId},
-            #{channel},
             #{recipient},
             #{templateCode},
             #{providerMessageId},
             #{status},
-            #{failureCode},
             #{failureReason},
-            #{requestedAt},
-            #{sentAt},
             #{deliveredAt},
             #{createdAt},
             #{updatedAt})

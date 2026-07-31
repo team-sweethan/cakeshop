@@ -42,6 +42,6 @@ public enum NotificationType {
     }
 
     public String formatContent(Object... args) {
-        return String.format(this.defaultContent, args);
+        return String.format(this.defaultContent, args); // 알림 내용 만들어서 반환.
     }
 }

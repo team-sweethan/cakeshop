@@ -58,4 +58,23 @@ public class NotificationApiController {
         }
         return ResponseEntity.ok().build();
     }
+
+    // 📱 스마트폰 카카오/SMS 발송 테스트용 전용 API
+    @GetMapping("/test-kakao")
+    public ResponseEntity<String> testKakaoNotification(@AuthenticationPrincipal MemberDetails memberDetails) {
+        if (memberDetails == null) {
+            return ResponseEntity.status(401).body("로그인 후 접속해 주세요. (http://localhost:8080/login)");
+        }
+        try {
+            notificationService.makeNotification(com.cakeshop.domain.notification.dto.form.NotificationRequest.builder()
+                    .receiverId(memberDetails.getMemberId())
+                    .type(com.cakeshop.domain.notification.entity.NotificationType.ORDER_PAID)
+                    .args(new Object[]{"ORD-TEST-9999"})
+                    .deliveryScope(com.cakeshop.domain.notification.entity.DeliveryScope.WEB_AND_SMS)
+                    .build());
+            return ResponseEntity.ok("📱 테스트 알림이 성공적으로 전송되었습니다! 핸드폰을 확인해 보세요!");
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("테스트 실패 상세 원인: " + e.getClass().getName() + " : " + e.getMessage());
+        }
+    }
 }

@@ -37,6 +37,16 @@ mybatis:
 app:
   mockup:
     public-preview: false
+  kakao:
+    alimtalk:
+      enabled: false
+      # 솔라피 API Key & API Secret (발급받으신 값을 아래 적으시면 실제 스마트폰으로 카카오톡/문자가 전송됩니다)
+      api-key: "NCSEZJCAQK6WEWMB"
+      api-secret: "BS7INVLQ3U79TVZ2KLZT0WOYPU5DK40F"
+      # 등록하신 본인 휴대폰 번호 (하이픈 제외, 예: 01012345678)
+      sender-phone: "01099043410"
+      # 카카오톡 채널 발신프로필 ID (선택 사항)
+      pf-id: ${KAKAO_ALIMTALK_PF_ID:}
   file:
     # 업로드 파일을 저장할 로컬 외부 디렉토리 (프로젝트 밖). .env 의 FILE_UPLOAD_DIR 로 지정.
     upload-dir: ${FILE_UPLOAD_DIR:${user.home}/cakeshop-uploads}
