@@ -198,11 +198,122 @@
         ORDER BY oi.id, oii.sort_order, oii.id
     </select>
 
-    <update id="updateStatusIfCurrent">
+    <update id="markUnderReviewAfterPaymentIfPending">
         UPDATE orders
-        SET status = #{nextStatus}
+        SET status = 'UNDER_REVIEW',
+            under_review_at = #{underReviewAt}
+        WHERE id = #{orderId}
+          AND order_type = 'CUSTOM'
+          AND status = 'PENDING_PAYMENT'
+          AND EXISTS (
+              SELECT 1
+              FROM payments AS payment
+              WHERE payment.order_id = orders.id
+                AND payment.status = 'DONE'
+          )
+    </update>
+
+    <update id="markReadyForPickupAfterPaymentIfPending">
+        UPDATE orders
+        SET status = 'READY_FOR_PICKUP',
+            ready_at = #{readyAt}
+        WHERE id = #{orderId}
+          AND order_type = 'GENERAL'
+          AND status = 'PENDING_PAYMENT'
+          AND EXISTS (
+              SELECT 1
+              FROM payments AS payment
+              WHERE payment.order_id = orders.id
+                AND payment.status = 'DONE'
+          )
+    </update>
+
+    <update id="approveIfUnderReview">
+        UPDATE orders
+        SET status = 'READY_FOR_PICKUP',
+            approved_by = #{approvedBy},
+            ready_at = #{readyAt}
+        WHERE id = #{orderId}
+          AND order_type = 'CUSTOM'
+          AND status = 'UNDER_REVIEW'
+          AND EXISTS (
+              SELECT 1
+              FROM payments AS payment
+              WHERE payment.order_id = orders.id
+                AND payment.status = 'DONE'
+          )
+    </update>
+
+    <update id="rejectIfUnderReview">
+        UPDATE orders
+        SET status = 'REJECTED',
+            rejected_by = #{rejectedBy},
+            rejected_at = #{rejectedAt},
+            reject_reason = #{rejectReason}
+        WHERE id = #{orderId}
+          AND order_type = 'CUSTOM'
+          AND status = 'UNDER_REVIEW'
+          AND EXISTS (
+              SELECT 1
+              FROM payments AS payment
+              WHERE payment.order_id = orders.id
+                AND payment.status = 'CANCELED'
+          )
+    </update>
+
+    <update id="markPickedUpIfReady">
+        UPDATE orders
+        SET status = 'PICKED_UP',
+            picked_up_by = #{pickedUpBy},
+            picked_up_at = #{pickedUpAt}
+        WHERE id = #{orderId}
+          AND status = 'READY_FOR_PICKUP'
+          AND EXISTS (
+              SELECT 1
+              FROM payments AS payment
+              WHERE payment.order_id = orders.id
+                AND payment.status = 'DONE'
+          )
+    </update>
+
+    <update id="expireIfPendingPayment">
+        UPDATE orders AS current_order
+        LEFT JOIN payments AS payment
+            ON payment.order_id = current_order.id
+            AND payment.status IN ('READY', 'DONE')
+        SET current_order.status = 'EXPIRED',
+            current_order.expired_at = #{expiredAt},
+            payment.status = 'EXPIRED',
+            payment.provider_status = 'EXPIRED',
+            payment.failure_code = 'ORDER_EXPIRED',
+            payment.failure_message = '주문 결제 제한 시간이 지났습니다.'
+        WHERE current_order.id = #{orderId}
+          AND current_order.status = 'PENDING_PAYMENT'
+          AND (payment.id IS NULL OR payment.status = 'READY')
+    </update>
+
+    <update id="cancelIfCurrent">
+        UPDATE orders
+        SET status = 'CANCELED',
+            canceled_by = #{canceledBy},
+            cancel_reason = #{cancelReason},
+            canceled_at = #{canceledAt}
         WHERE id = #{orderId}
           AND status = #{expectedStatus}
+          AND EXISTS (
+              SELECT 1
+              FROM payments AS payment
+              WHERE payment.order_id = orders.id
+                AND payment.status = 'CANCELED'
+          )
+          AND (
+              (order_type = 'CUSTOM' AND status = 'UNDER_REVIEW')
+              OR (
+                  order_type = 'GENERAL'
+                  AND status = 'READY_FOR_PICKUP'
+                  AND #{canceledAt} &lt; pickup_at
+              )
+          )
     </update>
 
 </mapper>
