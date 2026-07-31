@@ -35,7 +35,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 @MybatisTest
-@Import(OrderService.class)
+@Import({
+        OrderService.class,
+        OrderOptionValidator.class
+})
 @MariaDbIntegrationTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)

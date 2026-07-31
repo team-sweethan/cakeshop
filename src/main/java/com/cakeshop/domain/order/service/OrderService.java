@@ -8,12 +8,10 @@ import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.order.mapper.OrderMapper;
+import com.cakeshop.domain.order.service.OrderOptionValidator.ValidatedOption;
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.entity.PaymentStatus;
 import com.cakeshop.domain.payment.mapper.PaymentMapper;
-import com.cakeshop.domain.product.customer.dto.view.ProductOptionGroupView;
-import com.cakeshop.domain.product.customer.dto.view.ProductOptionItemView;
-import com.cakeshop.domain.product.customer.service.ProductService;
 import com.cakeshop.domain.product.dto.view.ProductSalesInfo;
 import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.error.ProductErrorCode;
@@ -26,11 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -40,20 +34,20 @@ public class OrderService {
     private static final long PAYMENT_EXPIRATION_MINUTES = 10L;
 
     private final ProductQueryService productQueryService;
-    private final ProductService productService;
+    private final OrderOptionValidator orderOptionValidator;
     private final OrderMapper orderMapper;
     private final PaymentMapper paymentMapper;
     private final Clock clock;
 
     public OrderService(
             ProductQueryService productQueryService,
-            ProductService productService,
+            OrderOptionValidator orderOptionValidator,
             OrderMapper orderMapper,
             PaymentMapper paymentMapper,
             Clock clock
     ) {
         this.productQueryService = productQueryService;
-        this.productService = productService;
+        this.orderOptionValidator = orderOptionValidator;
         this.orderMapper = orderMapper;
         this.paymentMapper = paymentMapper;
         this.clock = clock;
@@ -131,10 +125,13 @@ public class OrderService {
         }
         validateStock(product, form.getQuantity());
 
-        List<PreparedOption> selectedOptions =
-                resolveSelectedOptions(product.productId(), form.getOptionIds());
+        List<ValidatedOption> selectedOptions =
+                orderOptionValidator.validate(
+                        product.productId(),
+                        form.getOptionIds()
+                );
         BigDecimal optionAmount = selectedOptions.stream()
-                .map(PreparedOption::additionalPrice)
+                .map(ValidatedOption::additionalPrice)
                 .reduce(ZERO, BigDecimal::add);
         BigDecimal totalAmount = product.basePrice()
                 .add(optionAmount)
@@ -155,63 +152,6 @@ public class OrderService {
                 || stockQuantity != null && stockQuantity < quantity) {
             throw new BusinessException(ProductErrorCode.INSUFFICIENT_STOCK);
         }
-    }
-
-    private List<PreparedOption> resolveSelectedOptions(
-            long productId,
-            List<Long> requestedOptionIds
-    ) {
-        List<ProductOptionGroupView> optionGroups =
-                productService.getPublicOptionGroups(productId);
-        List<Long> optionIds =
-                requestedOptionIds == null ? List.of() : requestedOptionIds;
-        Set<Long> uniqueOptionIds = new HashSet<>();
-
-        for (Long optionId : optionIds) {
-            if (optionId == null || optionId <= 0 || !uniqueOptionIds.add(optionId)) {
-                throw new BusinessException(OrderErrorCode.INVALID_PRODUCT_OPTION);
-            }
-        }
-
-        Map<Long, PreparedOption> optionsById = new HashMap<>();
-        for (ProductOptionGroupView group : optionGroups) {
-            long selectedCount = group.options().stream()
-                    .filter(option -> uniqueOptionIds.contains(option.id()))
-                    .count();
-            if (group.required() && selectedCount == 0) {
-                throw new BusinessException(OrderErrorCode.INVALID_PRODUCT_OPTION);
-            }
-            if ("SINGLE".equals(group.selectionType()) && selectedCount > 1) {
-                throw new BusinessException(OrderErrorCode.INVALID_PRODUCT_OPTION);
-            }
-
-            for (ProductOptionItemView option : group.options()) {
-                if (option.additionalPrice() == null
-                        || option.additionalPrice().signum() < 0) {
-                    throw new BusinessException(CommonErrorCode.INTERNAL_ERROR);
-                }
-                PreparedOption previous = optionsById.put(
-                        option.id(),
-                        new PreparedOption(
-                                option.id(),
-                                group.name(),
-                                option.name(),
-                                option.additionalPrice()
-                        )
-                );
-                if (previous != null) {
-                    throw new BusinessException(CommonErrorCode.INTERNAL_ERROR);
-                }
-            }
-        }
-
-        if (!optionsById.keySet().containsAll(uniqueOptionIds)) {
-            throw new BusinessException(OrderErrorCode.INVALID_PRODUCT_OPTION);
-        }
-
-        return optionIds.stream()
-                .map(optionsById::get)
-                .toList();
     }
 
     private Order createOrder(
@@ -256,10 +196,10 @@ public class OrderService {
                 OrderErrorCode.ORDER_SAVE_FAILED
         );
 
-        for (PreparedOption selectedOption : preparedItem.selectedOptions()) {
+        for (ValidatedOption selectedOption : preparedItem.selectedOptions()) {
             OrderItemOption snapshot = new OrderItemOption();
             snapshot.setOrderItemId(orderItem.getId());
-            snapshot.setProductOptionId(selectedOption.id());
+            snapshot.setProductOptionId(selectedOption.optionId());
             snapshot.setOptionGroupName(selectedOption.groupName());
             snapshot.setOptionName(selectedOption.optionName());
             snapshot.setAdditionalPrice(selectedOption.additionalPrice());
@@ -301,17 +241,9 @@ public class OrderService {
     private record PreparedOrderItem(
             ProductSalesInfo product,
             int quantity,
-            List<PreparedOption> selectedOptions,
+            List<ValidatedOption> selectedOptions,
             BigDecimal optionAmount,
             BigDecimal totalAmount
-    ) {
-    }
-
-    private record PreparedOption(
-            long id,
-            String groupName,
-            String optionName,
-            BigDecimal additionalPrice
     ) {
     }
 }

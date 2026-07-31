@@ -38,7 +38,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 @MybatisTest
-@Import(OrderService.class)
+@Import({
+        OrderService.class,
+        OrderOptionValidator.class
+})
 @MariaDbIntegrationTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Transactional

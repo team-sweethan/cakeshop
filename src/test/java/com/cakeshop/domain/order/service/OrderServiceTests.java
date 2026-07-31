@@ -8,12 +8,10 @@ import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.order.mapper.OrderMapper;
+import com.cakeshop.domain.order.service.OrderOptionValidator.ValidatedOption;
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.entity.PaymentStatus;
 import com.cakeshop.domain.payment.mapper.PaymentMapper;
-import com.cakeshop.domain.product.customer.dto.view.ProductOptionGroupView;
-import com.cakeshop.domain.product.customer.dto.view.ProductOptionItemView;
-import com.cakeshop.domain.product.customer.service.ProductService;
 import com.cakeshop.domain.product.dto.view.ProductSalesInfo;
 import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.error.ProductErrorCode;
@@ -58,7 +56,7 @@ class OrderServiceTests {
     private ProductQueryService productQueryService;
 
     @Mock
-    private ProductService productService;
+    private OrderOptionValidator orderOptionValidator;
 
     @Mock
     private OrderMapper orderMapper;
@@ -72,7 +70,7 @@ class OrderServiceTests {
     void setUp() {
         orderService = new OrderService(
                 productQueryService,
-                productService,
+                orderOptionValidator,
                 orderMapper,
                 paymentMapper,
                 FIXED_CLOCK
@@ -90,20 +88,14 @@ class OrderServiceTests {
                         30_000,
                         2
                 );
-        ProductOptionGroupView optionGroup = new ProductOptionGroupView(
-                11L,
-                "크기",
-                true,
-                "SINGLE",
-                List.of(new ProductOptionItemView(
+        when(productQueryService.getSalesInfo(1L)).thenReturn(product);
+        when(orderOptionValidator.validate(1L, List.of(101L)))
+                .thenReturn(List.of(new ValidatedOption(
                         101L,
+                        "크기",
                         "2호",
                         BigDecimal.valueOf(5_000)
-                ))
-        );
-        when(productQueryService.getSalesInfo(1L)).thenReturn(product);
-        when(productService.getPublicOptionGroups(1L))
-                .thenReturn(List.of(optionGroup));
+                )));
         when(orderMapper.insertOrder(any(Order.class))).thenAnswer(invocation -> {
             invocation.<Order>getArgument(0).setId(100L);
             return 1;
@@ -165,12 +157,13 @@ class OrderServiceTests {
 
         InOrder saveOrder = inOrder(
                 productQueryService,
-                productService,
+                orderOptionValidator,
                 orderMapper,
                 paymentMapper
         );
         saveOrder.verify(productQueryService).getSalesInfo(1L);
-        saveOrder.verify(productService).getPublicOptionGroups(1L);
+        saveOrder.verify(orderOptionValidator)
+                .validate(1L, List.of(101L));
         saveOrder.verify(orderMapper).insertOrder(any(Order.class));
         saveOrder.verify(orderMapper).insertOrderItem(any(OrderItem.class));
         saveOrder.verify(orderMapper).insertOrderItemOption(any(OrderItemOption.class));
@@ -231,7 +224,7 @@ class OrderServiceTests {
                         .isEqualTo(ProductErrorCode.NOT_ON_SALE)
         );
 
-        verify(productService, never()).getPublicOptionGroups(1L);
+        verify(orderOptionValidator, never()).validate(1L, List.of());
         verify(orderMapper, never()).insertOrder(any(Order.class));
     }
 
@@ -257,7 +250,7 @@ class OrderServiceTests {
                         .isEqualTo(ProductErrorCode.INSUFFICIENT_STOCK)
         );
 
-        verify(productService, never()).getPublicOptionGroups(1L);
+        verify(orderOptionValidator, never()).validate(1L, List.of());
         verify(orderMapper, never()).insertOrder(any(Order.class));
     }
 
@@ -283,7 +276,7 @@ class OrderServiceTests {
                         .isEqualTo(ProductErrorCode.INSUFFICIENT_STOCK)
         );
 
-        verify(productService, never()).getPublicOptionGroups(1L);
+        verify(orderOptionValidator, never()).validate(1L, List.of());
         verify(orderMapper, never()).insertOrder(any(Order.class));
     }
 
@@ -305,7 +298,7 @@ class OrderServiceTests {
     }
 
     @Test
-    void createGeneralOrder_optionNotBelongingToProduct_throwsInvalidOption() {
+    void createGeneralOrder_optionValidationFails_doesNotSaveOrder() {
         when(productQueryService.getSalesInfo(1L))
                 .thenReturn(product(
                         1L,
@@ -313,72 +306,24 @@ class OrderServiceTests {
                         "딸기 케이크",
                         30_000
                 ));
-        when(productService.getPublicOptionGroups(1L))
-                .thenReturn(List.of(optionGroup(
-                        true,
-                        "SINGLE",
-                        option(101L, "1호", 0)
-                )));
-
-        assertInvalidOption(form(1L, 1, List.of(999L)));
-    }
-
-    @Test
-    void createGeneralOrder_duplicateOption_throwsInvalidOption() {
-        when(productQueryService.getSalesInfo(1L))
-                .thenReturn(product(
-                        1L,
-                        ProductType.GENERAL,
-                        "딸기 케이크",
-                        30_000
+        when(orderOptionValidator.validate(1L, List.of(999L)))
+                .thenThrow(new BusinessException(
+                        OrderErrorCode.INVALID_PRODUCT_OPTION
                 ));
-        when(productService.getPublicOptionGroups(1L))
-                .thenReturn(List.of(optionGroup(
-                        true,
-                        "SINGLE",
-                        option(101L, "1호", 0)
-                )));
 
-        assertInvalidOption(form(1L, 1, List.of(101L, 101L)));
-    }
+        assertThatThrownBy(() ->
+                orderService.createGeneralOrder(
+                        10L,
+                        form(1L, 1, List.of(999L))
+                )
+        ).isInstanceOfSatisfying(
+                BusinessException.class,
+                error -> assertThat(error.getErrorCode())
+                        .isEqualTo(OrderErrorCode.INVALID_PRODUCT_OPTION)
+        );
 
-    @Test
-    void createGeneralOrder_requiredOptionMissing_throwsInvalidOption() {
-        when(productQueryService.getSalesInfo(1L))
-                .thenReturn(product(
-                        1L,
-                        ProductType.GENERAL,
-                        "딸기 케이크",
-                        30_000
-                ));
-        when(productService.getPublicOptionGroups(1L))
-                .thenReturn(List.of(optionGroup(
-                        true,
-                        "SINGLE",
-                        option(101L, "1호", 0)
-                )));
-
-        assertInvalidOption(form(1L, 1, List.of()));
-    }
-
-    @Test
-    void createGeneralOrder_multipleOptionsFromSingleGroup_throwsInvalidOption() {
-        when(productQueryService.getSalesInfo(1L))
-                .thenReturn(product(
-                        1L,
-                        ProductType.GENERAL,
-                        "딸기 케이크",
-                        30_000
-                ));
-        when(productService.getPublicOptionGroups(1L))
-                .thenReturn(List.of(optionGroup(
-                        false,
-                        "SINGLE",
-                        option(101L, "1호", 0),
-                        option(102L, "2호", 5_000)
-                )));
-
-        assertInvalidOption(form(1L, 1, List.of(101L, 102L)));
+        verify(orderMapper, never()).insertOrder(any(Order.class));
+        verify(paymentMapper, never()).insertReadyPayment(any(Payment.class));
     }
 
     @Test
@@ -419,45 +364,6 @@ class OrderServiceTests {
                 BigDecimal.valueOf(basePrice),
                 stockQuantity
         );
-    }
-
-    private ProductOptionGroupView optionGroup(
-            boolean required,
-            String selectionType,
-            ProductOptionItemView... options
-    ) {
-        return new ProductOptionGroupView(
-                11L,
-                "크기",
-                required,
-                selectionType,
-                List.of(options)
-        );
-    }
-
-    private ProductOptionItemView option(
-            long id,
-            String name,
-            long additionalPrice
-    ) {
-        return new ProductOptionItemView(
-                id,
-                name,
-                BigDecimal.valueOf(additionalPrice)
-        );
-    }
-
-    private void assertInvalidOption(GeneralOrderForm form) {
-        assertThatThrownBy(() ->
-                orderService.createGeneralOrder(10L, form)
-        ).isInstanceOfSatisfying(
-                BusinessException.class,
-                error -> assertThat(error.getErrorCode())
-                        .isEqualTo(OrderErrorCode.INVALID_PRODUCT_OPTION)
-        );
-
-        verify(orderMapper, never()).insertOrder(any(Order.class));
-        verify(paymentMapper, never()).insertReadyPayment(any(Payment.class));
     }
 
     private GeneralOrderForm form(
