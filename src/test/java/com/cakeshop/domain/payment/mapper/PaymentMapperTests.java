@@ -90,6 +90,24 @@ class PaymentMapperTests {
     }
 
     @Test
+    void insertReadyPayment_requiresPendingOrderAndMatchingAmount() {
+        Payment wrongAmount = newPayment("WRONG-AMOUNT");
+        wrongAmount.setAmount(BigDecimal.valueOf(39_000));
+
+        assertThat(paymentMapper.insertReadyPayment(wrongAmount)).isZero();
+        assertThat(wrongAmount.getId()).isNull();
+
+        jdbcTemplate.update(
+                "UPDATE orders SET status = 'EXPIRED' WHERE id = ?",
+                orderId
+        );
+        Payment expiredOrderPayment = newPayment("EXPIRED-ORDER");
+
+        assertThat(paymentMapper.insertReadyPayment(expiredOrderPayment)).isZero();
+        assertThat(expiredOrderPayment.getId()).isNull();
+    }
+
+    @Test
     void completeIfReady_recordsApprovalDataConditionally() {
         Payment payment = insertPayment("READY-TO-DONE");
         LocalDateTime approvedAt =
@@ -119,6 +137,25 @@ class PaymentMapperTests {
                 "DONE",
                 approvedAt.plusMinutes(1)
         )).isZero();
+    }
+
+    @Test
+    void completeIfReady_doesNotCompleteAfterOrderExpires() {
+        Payment payment = insertPayment("EXPIRED-ORDER-CANNOT-COMPLETE");
+        jdbcTemplate.update(
+                "UPDATE orders SET status = 'EXPIRED' WHERE id = ?",
+                orderId
+        );
+
+        assertThat(paymentMapper.completeIfReady(
+                payment.getId(),
+                "PAYMENT-KEY-EXPIRED-" + suffix,
+                "CARD",
+                "DONE",
+                LocalDateTime.of(2026, 8, 1, 12, 11)
+        )).isZero();
+        assertThat(findPayment(payment.getId()).getStatus())
+                .isEqualTo(PaymentStatus.READY);
     }
 
     @Test
@@ -336,7 +373,7 @@ class PaymentMapperTests {
                 cancellation.getId(),
                 "CANCEL-TRANSACTION-" + suffix,
                 canceledAt
-        )).isEqualTo(1);
+        )).isPositive();
 
         PaymentCancellation completed = paymentMapper
                 .findPaymentCancellationById(cancellation.getId())
@@ -348,11 +385,20 @@ class PaymentMapperTests {
         assertThat(completed.getCanceledAt()).isEqualTo(canceledAt);
         assertThat(completed.getFailureCode()).isNull();
         assertThat(completed.getFailureMessage()).isNull();
+        Payment canceledPayment = findPayment(payment.getId());
+        assertThat(canceledPayment.getStatus()).isEqualTo(PaymentStatus.CANCELED);
+        assertThat(canceledPayment.getProviderStatus()).isEqualTo("CANCELED");
+        assertThat(canceledPayment.getCanceledAt()).isEqualTo(canceledAt);
         assertThat(paymentMapper.completeCancellationIfRequested(
                 cancellation.getId(),
                 "OTHER-TRANSACTION-" + suffix,
                 canceledAt.plusMinutes(1)
         )).isZero();
+
+        PaymentCancellation duplicate =
+                newPaymentCancellation(payment.getId(), "AFTER-COMPLETION");
+        assertThat(paymentMapper.insertPaymentCancellation(duplicate)).isZero();
+        assertThat(duplicate.getId()).isNull();
     }
 
     @Test

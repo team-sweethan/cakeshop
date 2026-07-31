@@ -205,6 +205,12 @@
         WHERE id = #{orderId}
           AND order_type = 'CUSTOM'
           AND status = 'PENDING_PAYMENT'
+          AND EXISTS (
+              SELECT 1
+              FROM payments AS payment
+              WHERE payment.order_id = orders.id
+                AND payment.status = 'DONE'
+          )
     </update>
 
     <update id="markReadyForPickupAfterPaymentIfPending">
@@ -214,6 +220,12 @@
         WHERE id = #{orderId}
           AND order_type = 'GENERAL'
           AND status = 'PENDING_PAYMENT'
+          AND EXISTS (
+              SELECT 1
+              FROM payments AS payment
+              WHERE payment.order_id = orders.id
+                AND payment.status = 'DONE'
+          )
     </update>
 
     <update id="approveIfUnderReview">
@@ -224,6 +236,12 @@
         WHERE id = #{orderId}
           AND order_type = 'CUSTOM'
           AND status = 'UNDER_REVIEW'
+          AND EXISTS (
+              SELECT 1
+              FROM payments AS payment
+              WHERE payment.order_id = orders.id
+                AND payment.status = 'DONE'
+          )
     </update>
 
     <update id="rejectIfUnderReview">
@@ -235,6 +253,12 @@
         WHERE id = #{orderId}
           AND order_type = 'CUSTOM'
           AND status = 'UNDER_REVIEW'
+          AND EXISTS (
+              SELECT 1
+              FROM payments AS payment
+              WHERE payment.order_id = orders.id
+                AND payment.status = 'CANCELED'
+          )
     </update>
 
     <update id="markPickedUpIfReady">
@@ -244,14 +268,28 @@
             picked_up_at = #{pickedUpAt}
         WHERE id = #{orderId}
           AND status = 'READY_FOR_PICKUP'
+          AND EXISTS (
+              SELECT 1
+              FROM payments AS payment
+              WHERE payment.order_id = orders.id
+                AND payment.status = 'DONE'
+          )
     </update>
 
     <update id="expireIfPendingPayment">
-        UPDATE orders
-        SET status = 'EXPIRED',
-            expired_at = #{expiredAt}
-        WHERE id = #{orderId}
-          AND status = 'PENDING_PAYMENT'
+        UPDATE orders AS current_order
+        LEFT JOIN payments AS payment
+            ON payment.order_id = current_order.id
+            AND payment.status IN ('READY', 'DONE')
+        SET current_order.status = 'EXPIRED',
+            current_order.expired_at = #{expiredAt},
+            payment.status = 'EXPIRED',
+            payment.provider_status = 'EXPIRED',
+            payment.failure_code = 'ORDER_EXPIRED',
+            payment.failure_message = '주문 결제 제한 시간이 지났습니다.'
+        WHERE current_order.id = #{orderId}
+          AND current_order.status = 'PENDING_PAYMENT'
+          AND (payment.id IS NULL OR payment.status = 'READY')
     </update>
 
     <update id="cancelIfCurrent">
@@ -262,6 +300,12 @@
             canceled_at = #{canceledAt}
         WHERE id = #{orderId}
           AND status = #{expectedStatus}
+          AND EXISTS (
+              SELECT 1
+              FROM payments AS payment
+              WHERE payment.order_id = orders.id
+                AND payment.status = 'CANCELED'
+          )
           AND (
               (order_type = 'CUSTOM' AND status = 'UNDER_REVIEW')
               OR (

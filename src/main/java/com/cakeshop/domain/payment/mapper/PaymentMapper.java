@@ -12,13 +12,13 @@ import java.util.Optional;
 @Mapper
 public interface PaymentMapper {
 
-    // 결제 시도 생성. XML에서 상태를 READY로 고정한다.
+    // 결제 대기 주문에 금액이 일치하는 결제 시도를 생성하고 상태를 READY로 고정한다.
     int insertReadyPayment(Payment payment);
 
     // 한 주문에서 발생한 모든 결제 시도를 조회한다.
     List<Payment> findPaymentsByOrderId(@Param("orderId") long orderId);
 
-    // READY 결제의 승인 결과와 승인 시각을 함께 기록한다.
+    // 결제 대기 주문의 READY 결제에만 승인 결과와 승인 시각을 함께 기록한다.
     int completeIfReady(
             @Param("paymentId") long paymentId,
             @Param("paymentKey") String paymentKey,
@@ -58,7 +58,7 @@ public interface PaymentMapper {
             @Param("cancellationId") long cancellationId
     );
 
-    // REQUESTED 환불 요청의 PG 거래키와 처리 완료 시각을 함께 기록한다.
+    // REQUESTED 환불과 부모 DONE 결제를 함께 완료·취소 처리한다.
     int completeCancellationIfRequested(
             @Param("cancellationId") long cancellationId,
             @Param("transactionKey") String transactionKey,

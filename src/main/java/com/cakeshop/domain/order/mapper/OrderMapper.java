@@ -40,26 +40,26 @@ public interface OrderMapper {
 
     List<OrderItemImage> findOrderItemImagesByOrderId(@Param("orderId") long orderId);
 
-    // 결제가 끝난 주문 제작 주문을 관리자 검토 상태로 전이한다.
+    // DONE 결제가 있는 주문 제작 주문을 관리자 검토 상태로 전이한다.
     int markUnderReviewAfterPaymentIfPending(
             @Param("orderId") long orderId,
             @Param("underReviewAt") LocalDateTime underReviewAt
     );
 
-    // 결제가 끝난 일반 주문을 픽업 대기 상태로 전이한다.
+    // DONE 결제가 있는 일반 주문을 픽업 대기 상태로 전이한다.
     int markReadyForPickupAfterPaymentIfPending(
             @Param("orderId") long orderId,
             @Param("readyAt") LocalDateTime readyAt
     );
 
-    // 검토 중인 주문 제작 주문을 승인하고 처리자와 처리 시각을 기록한다.
+    // DONE 결제가 유지되는 검토 중 주문 제작을 승인하고 처리 정보를 기록한다.
     int approveIfUnderReview(
             @Param("orderId") long orderId,
             @Param("approvedBy") long approvedBy,
             @Param("readyAt") LocalDateTime readyAt
     );
 
-    // 검토 중인 주문 제작 주문을 반려하고 사유·처리자·처리 시각을 기록한다.
+    // 결제 취소가 끝난 검토 중 주문 제작을 반려하고 처리 정보를 기록한다.
     int rejectIfUnderReview(
             @Param("orderId") long orderId,
             @Param("rejectedBy") long rejectedBy,
@@ -67,20 +67,20 @@ public interface OrderMapper {
             @Param("rejectReason") String rejectReason
     );
 
-    // 픽업 대기 주문의 수령 완료 시각과 처리자를 기록한다.
+    // DONE 결제가 유지되는 픽업 대기 주문의 수령 완료 정보를 기록한다.
     int markPickedUpIfReady(
             @Param("orderId") long orderId,
             @Param("pickedUpBy") long pickedUpBy,
             @Param("pickedUpAt") LocalDateTime pickedUpAt
     );
 
-    // 결제 대기 주문을 만료 처리한다.
+    // 결제 대기 주문과 연결된 READY 결제를 함께 만료 처리한다.
     int expireIfPendingPayment(
             @Param("orderId") long orderId,
             @Param("expiredAt") LocalDateTime expiredAt
     );
 
-    // 취소 가능한 현재 상태가 일치할 때 취소 주체·사유·처리 시각을 함께 기록한다.
+    // 결제 취소가 끝나고 취소 가능한 현재 상태가 일치할 때 주문을 취소한다.
     int cancelIfCurrent(
             @Param("orderId") long orderId,
             @Param("expectedStatus") OrderStatus expectedStatus,

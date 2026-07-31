@@ -125,6 +125,11 @@ class OrderMapperTests {
         assertThat(orderMapper.markUnderReviewAfterPaymentIfPending(
                 order.getId(),
                 underReviewAt
+        )).isZero();
+        insertPayment(order.getId(), "DONE", "CUSTOM-APPROVAL");
+        assertThat(orderMapper.markUnderReviewAfterPaymentIfPending(
+                order.getId(),
+                underReviewAt
         )).isEqualTo(1);
         Order underReview = orderMapper.findOrderById(order.getId())
                 .orElseThrow();
@@ -169,6 +174,11 @@ class OrderMapperTests {
         assertThat(orderMapper.markReadyForPickupAfterPaymentIfPending(
                 order.getId(),
                 readyAt
+        )).isZero();
+        insertPayment(order.getId(), "DONE", "GENERAL-PICKUP");
+        assertThat(orderMapper.markReadyForPickupAfterPaymentIfPending(
+                order.getId(),
+                readyAt
         )).isEqualTo(1);
         assertThat(orderMapper.markPickedUpIfReady(
                 order.getId(),
@@ -198,10 +208,19 @@ class OrderMapperTests {
         LocalDateTime rejectedAt =
                 LocalDateTime.of(2026, 8, 1, 12, 5);
 
+        long paymentId =
+                insertPayment(order.getId(), "DONE", "CUSTOM-REJECTION");
         orderMapper.markUnderReviewAfterPaymentIfPending(
                 order.getId(),
                 underReviewAt
         );
+        assertThat(orderMapper.rejectIfUnderReview(
+                order.getId(),
+                memberId,
+                rejectedAt,
+                "환불 전 반려 시도"
+        )).isZero();
+        cancelPayment(paymentId, rejectedAt);
         assertThat(orderMapper.rejectIfUnderReview(
                 order.getId(),
                 memberId,
@@ -229,16 +248,20 @@ class OrderMapperTests {
         orderMapper.insertOrder(order);
         LocalDateTime expiredAt =
                 LocalDateTime.of(2026, 8, 1, 12, 11);
+        long paymentId =
+                insertPayment(order.getId(), "READY", "ORDER-EXPIRATION");
 
         assertThat(orderMapper.expireIfPendingPayment(
                 order.getId(),
                 expiredAt
-        )).isEqualTo(1);
+        )).isPositive();
 
         Order expired = orderMapper.findOrderById(order.getId())
                 .orElseThrow();
         assertThat(expired.getStatus()).isEqualTo(OrderStatus.EXPIRED);
         assertThat(expired.getExpiredAt()).isEqualTo(expiredAt);
+        assertThat(findPaymentStatus(paymentId)).isEqualTo("EXPIRED");
+        assertThat(findPaymentFailureCode(paymentId)).isEqualTo("ORDER_EXPIRED");
         assertThat(orderMapper.expireIfPendingPayment(
                 order.getId(),
                 expiredAt.plusMinutes(1)
@@ -262,10 +285,20 @@ class OrderMapperTests {
                 canceledAt
         )).isZero();
 
+        long paymentId =
+                insertPayment(order.getId(), "DONE", "CUSTOM-CANCELLATION");
         orderMapper.markUnderReviewAfterPaymentIfPending(
                 order.getId(),
                 underReviewAt
         );
+        assertThat(orderMapper.cancelIfCurrent(
+                order.getId(),
+                OrderStatus.UNDER_REVIEW,
+                "CUSTOMER",
+                "단순 변심",
+                canceledAt
+        )).isZero();
+        cancelPayment(paymentId, canceledAt);
         assertThat(orderMapper.cancelIfCurrent(
                 order.getId(),
                 OrderStatus.UNDER_REVIEW,
@@ -292,10 +325,20 @@ class OrderMapperTests {
         LocalDateTime canceledAt =
                 LocalDateTime.of(2026, 8, 1, 12, 5);
 
+        long paymentId =
+                insertPayment(order.getId(), "DONE", "GENERAL-CANCELLATION");
         orderMapper.markReadyForPickupAfterPaymentIfPending(
                 order.getId(),
                 readyAt
         );
+        assertThat(orderMapper.cancelIfCurrent(
+                order.getId(),
+                OrderStatus.READY_FOR_PICKUP,
+                "CUSTOMER",
+                "환불 전 취소 시도",
+                canceledAt
+        )).isZero();
+        cancelPayment(paymentId, canceledAt);
         assertThat(orderMapper.cancelIfCurrent(
                 order.getId(),
                 OrderStatus.READY_FOR_PICKUP,
@@ -320,10 +363,13 @@ class OrderMapperTests {
         LocalDateTime readyAt =
                 LocalDateTime.of(2026, 8, 1, 12, 1);
 
+        long paymentId =
+                insertPayment(order.getId(), "DONE", "GENERAL-CUTOFF");
         orderMapper.markReadyForPickupAfterPaymentIfPending(
                 order.getId(),
                 readyAt
         );
+        cancelPayment(paymentId, readyAt.plusMinutes(1));
         assertThat(orderMapper.cancelIfCurrent(
                 order.getId(),
                 OrderStatus.READY_FOR_PICKUP,
@@ -345,6 +391,42 @@ class OrderMapperTests {
         assertThat(unchanged.getCanceledAt()).isNull();
         assertThat(unchanged.getCancelReason()).isNull();
         assertThat(unchanged.getCanceledBy()).isNull();
+    }
+
+    @Test
+    void expireIfPendingPayment_doesNotExpireOrderWithDonePayment() {
+        Order order = newOrder();
+        orderMapper.insertOrder(order);
+        long paymentId =
+                insertPayment(order.getId(), "DONE", "DONE-NOT-EXPIRED");
+
+        assertThat(orderMapper.expireIfPendingPayment(
+                order.getId(),
+                LocalDateTime.of(2026, 8, 1, 12, 11)
+        )).isZero();
+
+        assertThat(orderMapper.findOrderById(order.getId())
+                .orElseThrow()
+                .getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        assertThat(findPaymentStatus(paymentId)).isEqualTo("DONE");
+    }
+
+    @Test
+    void expireIfPendingPayment_expiresOrderWithoutPaymentAttempt() {
+        Order order = newOrder();
+        orderMapper.insertOrder(order);
+        LocalDateTime expiredAt =
+                LocalDateTime.of(2026, 8, 1, 12, 11);
+
+        assertThat(orderMapper.expireIfPendingPayment(
+                order.getId(),
+                expiredAt
+        )).isEqualTo(1);
+
+        Order expired = orderMapper.findOrderById(order.getId())
+                .orElseThrow();
+        assertThat(expired.getStatus()).isEqualTo(OrderStatus.EXPIRED);
+        assertThat(expired.getExpiredAt()).isEqualTo(expiredAt);
     }
 
     @Test
@@ -478,6 +560,69 @@ class OrderMapperTests {
         image.setImageUrl(imageUrl);
         image.setSortOrder(sortOrder);
         return image;
+    }
+
+    private long insertPayment(long orderId, String status, String label) {
+        String tossOrderId = "ORDER-MAPPER-TOSS-" + label + "-" + suffix;
+        jdbcTemplate.update(
+                """
+                INSERT INTO payments (
+                    order_id,
+                    toss_order_id,
+                    payment_key,
+                    idempotency_key,
+                    method,
+                    amount,
+                    status,
+                    provider_status,
+                    approved_at
+                )
+                VALUES (?, ?, ?, ?, 'CARD', 40000, ?, ?, CURRENT_TIMESTAMP(6))
+                """,
+                orderId,
+                tossOrderId,
+                "ORDER-MAPPER-PAYMENT-" + label + "-" + suffix,
+                "ORDER-MAPPER-IDEMPOTENCY-" + label + "-" + suffix,
+                status,
+                status
+        );
+
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM payments WHERE toss_order_id = ?",
+                Long.class,
+                tossOrderId
+        );
+    }
+
+    private void cancelPayment(long paymentId, LocalDateTime canceledAt) {
+        jdbcTemplate.update(
+                """
+                UPDATE payments
+                SET status = 'CANCELED',
+                    provider_status = 'CANCELED',
+                    canceled_at = ?
+                WHERE id = ?
+                  AND status = 'DONE'
+                """,
+                canceledAt,
+                paymentId
+        );
+    }
+
+    private String findPaymentStatus(long paymentId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT status FROM payments WHERE id = ?",
+                String.class,
+                paymentId
+        );
+    }
+
+    private String findPaymentFailureCode(long paymentId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT failure_code FROM payments WHERE id = ?",
+                String.class,
+                paymentId
+        );
     }
 
     // orders.member_id FK를 만족시킬 회원을 JdbcTemplate으로 준비한다.
