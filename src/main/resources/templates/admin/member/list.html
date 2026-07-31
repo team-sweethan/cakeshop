@@ -98,7 +98,13 @@
                     </thead>
                     <tbody>
                     <tr th:each="member : ${pageResult.content}">
-                        <td th:text="${member.name ?: '-'}">회원 이름</td>
+                        <td>
+                            <a class="member-admin-name-link"
+                               th:href="@{/admin/members/{memberId}(memberId=${member.id})}"
+                               th:text="${member.name ?: '-'}">
+                                회원 이름
+                            </a>
+                        </td>
                         <td th:text="${member.maskedEmail}">su***@example.com</td>
                         <td th:text="${member.maskedPhone}">010-****-1234</td>
                         <td th:text="${member.maskedBirthDate}">2000.**.**</td>

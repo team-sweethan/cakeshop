@@ -2,6 +2,7 @@ package com.cakeshop.domain.member.controller;
 
 import com.cakeshop.domain.member.dto.form.MemberAdminListType;
 import com.cakeshop.domain.member.dto.form.MemberAdminSearchCondition;
+import com.cakeshop.domain.member.dto.view.MemberAdminDetailView;
 import com.cakeshop.domain.member.dto.view.MemberAdminListView;
 import com.cakeshop.domain.member.entity.MemberStatus;
 import com.cakeshop.domain.member.service.MemberAdminService;
@@ -12,6 +13,7 @@ import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 
 @Controller
@@ -62,6 +64,18 @@ public class MemberAdminController {
                 });
 
         return "admin/member/list";
+    }
+
+    // 관리자 회원 상세
+    @GetMapping("/admin/members/{memberId}")
+    public String memberDetail(
+            @PathVariable Long memberId,
+            Model model) {
+        MemberAdminDetailView member =
+                memberAdminService.getMemberDetail(memberId);
+
+        model.addAttribute("member", member);
+        return "admin/member/detail";
     }
 
     private Integer parsePositiveInteger(String value) {

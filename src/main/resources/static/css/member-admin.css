@@ -98,6 +98,65 @@
     white-space: nowrap;
 }
 
+.member-admin-name-link {
+    color: #2f5d50;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.member-admin-name-link:hover,
+.member-admin-name-link:focus-visible {
+    text-decoration: underline;
+}
+
+.member-admin-detail-header {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.member-admin-detail-header .admin-page-title {
+    margin-bottom: 0;
+}
+
+.member-admin-detail-section + .member-admin-detail-section {
+    margin-top: 24px;
+}
+
+.member-admin-detail-title {
+    font-size: 1.1rem;
+    margin: 0 0 16px;
+}
+
+.member-admin-detail-grid {
+    display: grid;
+    gap: 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.member-admin-detail-item {
+    border-bottom: 1px solid #e5e7eb;
+    display: grid;
+    gap: 16px;
+    grid-template-columns: 120px minmax(0, 1fr);
+    min-width: 0;
+    padding: 14px 8px;
+}
+
+.member-admin-detail-label {
+    color: #6b7280;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.member-admin-detail-value {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
 @media (max-width: 900px) {
     .member-admin-search {
         flex-wrap: wrap;
@@ -122,5 +181,9 @@
 
     .member-admin-tabs {
         gap: 18px;
+    }
+
+    .member-admin-detail-grid {
+        grid-template-columns: 1fr;
     }
 }
