@@ -14,10 +14,21 @@
         issued_quantity AS issuedQuantity,
         starts_at AS startsAt,
         expires_at AS expiresAt,
-        CASE WHEN expires_at &lt;= NOW(6) THEN 'ENDED' ELSE status END AS status,
+        status AS status,
         created_by AS createdBy,
         created_at AS createdAt,
         updated_at AS updatedAt
+    </sql>
+
+    <!-- 저장 상태와 기간·수량을 우선순위대로 조합해 화면 상태를 계산한다. -->
+    <sql id="couponDisplayStatus">
+        CASE
+            WHEN expires_at &lt;= NOW(6) THEN 'ENDED'
+            WHEN issued_quantity &gt;= total_quantity THEN 'EXHAUSTED'
+            WHEN status = 'INACTIVE' THEN 'INACTIVE'
+            WHEN starts_at &gt; NOW(6) THEN 'SCHEDULED'
+            ELSE 'ACTIVE'
+        END
     </sql>
 
     <!-- 목록과 COUNT가 반드시 같은 검색 조건을 사용하도록 공통 SQL 조각으로 둔다. -->
@@ -33,14 +44,29 @@
 
             <if test="condition.status != null">
                 <choose>
+                    <when test="condition.status.name() == 'SCHEDULED'">
+                        AND status = 'ACTIVE'
+                        AND starts_at &gt; NOW(6)
+                        AND expires_at &gt; NOW(6)
+                        AND issued_quantity &lt; total_quantity
+                    </when>
                     <when test="condition.status.name() == 'ACTIVE'">
-                        AND status = 'ACTIVE' AND expires_at &gt; NOW(6)
+                        AND status = 'ACTIVE'
+                        AND starts_at &lt;= NOW(6)
+                        AND expires_at &gt; NOW(6)
+                        AND issued_quantity &lt; total_quantity
                     </when>
                     <when test="condition.status.name() == 'INACTIVE'">
-                        AND status = 'INACTIVE' AND expires_at &gt; NOW(6)
+                        AND status = 'INACTIVE'
+                        AND expires_at &gt; NOW(6)
+                        AND issued_quantity &lt; total_quantity
+                    </when>
+                    <when test="condition.status.name() == 'EXHAUSTED'">
+                        AND expires_at &gt; NOW(6)
+                        AND issued_quantity &gt;= total_quantity
                     </when>
                     <when test="condition.status.name() == 'ENDED'">
-                        AND (status = 'ENDED' OR (status IN ('ACTIVE', 'INACTIVE') AND expires_at &lt;= NOW(6)))
+                        AND expires_at &lt;= NOW(6)
                     </when>
                 </choose>
             </if>
@@ -94,7 +120,7 @@
             issued_quantity AS issuedQuantity,
             starts_at AS startsAt,
             expires_at AS expiresAt,
-            CASE WHEN expires_at &lt;= NOW(6) THEN 'ENDED' ELSE status END AS status
+            <include refid="couponDisplayStatus"/> AS displayStatus
         FROM coupons
 
         <include refid="couponSearchConditions"/>
@@ -102,16 +128,19 @@
         ORDER BY
             <!-- 만료 시각이 지난 쿠폰은 스케줄러 실행 전에도 종료 그룹으로 우선 정렬한다. -->
             CASE
-            WHEN expires_at &lt;= NOW(6) THEN 3
-            WHEN status = 'ACTIVE' THEN 1
+            WHEN expires_at &lt;= NOW(6) THEN 5
+            WHEN issued_quantity &gt;= total_quantity THEN 4
             WHEN status = 'INACTIVE' THEN 2
-            ELSE 4
+            WHEN starts_at &gt; NOW(6) THEN 3
+            ELSE 1
             END,
 
             <!-- 발급 중은 종료 임박순으로 운영자가 우선 확인한다. -->
             CASE
             WHEN status = 'ACTIVE'
+            AND starts_at &lt;= NOW(6)
             AND expires_at &gt; NOW(6)
+            AND issued_quantity &lt; total_quantity
             THEN expires_at
             END ASC,
 
@@ -119,8 +148,17 @@
             CASE
             WHEN status = 'INACTIVE'
             AND expires_at &gt; NOW(6)
+            AND issued_quantity &lt; total_quantity
             THEN updated_at
             END DESC,
+
+            CASE
+            WHEN status = 'ACTIVE'
+            AND starts_at &gt; NOW(6)
+            AND expires_at &gt; NOW(6)
+            AND issued_quantity &lt; total_quantity
+            THEN starts_at
+            END ASC,
 
             <!-- 종료 쿠폰은 가장 최근에 종료된 항목부터 확인한다. -->
             CASE
@@ -174,7 +212,8 @@
           AND starts_at &lt;= NOW(6)
           AND expires_at &gt; NOW(6)
           AND issued_quantity &lt;= #{totalQuantity}
-          AND expires_at &lt;= #{expiresAt}
+          <!-- 기존 DATETIME(6)의 초·밀리초 차이는 화면에서 표현하지 않으므로 같은 분까지 허용한다. -->
+          AND expires_at &lt; DATE_ADD(#{expiresAt}, INTERVAL 1 MINUTE)
     </update>
 
     <update id="updateStatus">
@@ -185,11 +224,4 @@
     </update>
 
     <!-- ACTIVE·INACTIVE(재개할 수 없도록 만료된) 상태를 ENDED로 일괄 전환한다. -->
-    <update id="endExpiredCoupons">
-        UPDATE coupons
-        SET status = 'ENDED'
-        WHERE status IN ('ACTIVE', 'INACTIVE')
-          AND expires_at &lt;= NOW(6)
-    </update>
-
 </mapper>

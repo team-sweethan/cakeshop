@@ -13,6 +13,7 @@ import com.cakeshop.domain.coupon.dto.form.CouponSearchCondition;
 import com.cakeshop.domain.coupon.dto.form.CouponUpdateForm;
 import com.cakeshop.domain.coupon.dto.view.CouponView;
 import com.cakeshop.domain.coupon.entity.Coupon;
+import com.cakeshop.domain.coupon.entity.CouponDisplayStatus;
 import com.cakeshop.domain.coupon.entity.CouponStatus;
 import com.cakeshop.domain.coupon.entity.DiscountType;
 import com.cakeshop.domain.coupon.error.CouponErrorCode;
@@ -99,7 +100,7 @@ class CouponAdminServiceTests {
             1L, "여름 할인", "FIXED_AMOUNT", BigDecimal.valueOf(3000),
             BigDecimal.valueOf(10000), null, 100, 0,
             LocalDateTime.of(2026, 8, 1, 9, 0),
-            LocalDateTime.of(2026, 8, 31, 23, 59), "ACTIVE"
+            LocalDateTime.of(2026, 8, 31, 23, 59), CouponDisplayStatus.ACTIVE
         );
         when(couponMapper.countCoupons(condition)).thenReturn(11L);
         when(couponMapper.findCoupons(condition, 10, 10)).thenReturn(List.of(coupon));
@@ -133,7 +134,7 @@ class CouponAdminServiceTests {
 
     @Test
     void getUpdateFormThrowsWhenCouponIsEnded() {
-        Coupon coupon = coupon(CouponStatus.ENDED, 10, 0, LocalDateTime.now().minusDays(1));
+        Coupon coupon = coupon(CouponStatus.ACTIVE, 10, 0, LocalDateTime.now().minusDays(1));
         when(couponMapper.findCouponById(1L)).thenReturn(Optional.of(coupon));
 
         assertThatThrownBy(() -> couponAdminService.getUpdateForm(1L))
@@ -144,7 +145,7 @@ class CouponAdminServiceTests {
 
     @Test
     void updateThrowsWhenCouponIsEnded() {
-        Coupon coupon = coupon(CouponStatus.ENDED, 10, 0, LocalDateTime.now().minusDays(1));
+        Coupon coupon = coupon(CouponStatus.ACTIVE, 10, 0, LocalDateTime.now().minusDays(1));
         when(couponMapper.findCouponById(1L)).thenReturn(Optional.of(coupon));
 
         assertThatThrownBy(() -> couponAdminService.updateCoupon(1L, updateForm()))
@@ -244,6 +245,30 @@ class CouponAdminServiceTests {
     }
 
     @Test
+    void updateAllowsSameExpiryMinuteWhenStoredValueHasSecondsAndNanoseconds() {
+        LocalDateTime storedExpiresAt = LocalDateTime.now()
+                .plusDays(2)
+                .withSecond(32)
+                .withNano(123_000_000);
+        Coupon coupon = coupon(CouponStatus.ACTIVE, 10, 1, storedExpiresAt);
+        coupon.setStartsAt(LocalDateTime.now().minusDays(1));
+        when(couponMapper.findCouponById(1L)).thenReturn(Optional.of(coupon));
+        when(couponMapper.updateCouponAfterStart(any())).thenReturn(1);
+
+        CouponUpdateForm form = updateForm();
+        form.setStartsAt(coupon.getStartsAt());
+        form.setDiscountType(coupon.getDiscountType());
+        form.setDiscountValue(coupon.getDiscountValue());
+        form.setMinimumOrderAmount(coupon.getMinimumOrderAmount());
+        // 화면은 분 단위까지만 표시하므로 기존 종료 일시의 초·나노초는 전송하지 않는다.
+        form.setExpiresAt(storedExpiresAt.withSecond(0).withNano(0));
+
+        couponAdminService.updateCoupon(1L, form);
+
+        verify(couponMapper).updateCouponAfterStart(any());
+    }
+
+    @Test
     void updateAllowsAllFieldsWhenFullEditDueToFutureStartsAt() {
         // startsAt이 미래인 상태
         Coupon coupon = coupon(CouponStatus.ACTIVE, 10, 0, LocalDateTime.now().plusDays(5));
@@ -272,7 +297,7 @@ class CouponAdminServiceTests {
         beforeUpdate.setStartsAt(LocalDateTime.now().minusDays(1));
 
         Coupon endedAfterCheck = coupon(
-            CouponStatus.ENDED, 10, 1, LocalDateTime.now().minusSeconds(1)
+            CouponStatus.ACTIVE, 10, 1, LocalDateTime.now().minusSeconds(1)
         );
         when(couponMapper.findCouponById(1L)).thenReturn(
             Optional.of(beforeUpdate), Optional.of(endedAfterCheck)
@@ -344,16 +369,6 @@ class CouponAdminServiceTests {
         couponAdminService.activateCoupon(1L);
 
         verify(couponMapper).updateStatus(1L, CouponStatus.ACTIVE);
-    }
-
-    @Test
-    void endExpiredCouponsReturnsUpdatedCount() {
-        when(couponMapper.endExpiredCoupons()).thenReturn(3);
-
-        int updatedCount = couponAdminService.endExpiredCoupons();
-
-        assertThat(updatedCount).isEqualTo(3);
-        verify(couponMapper).endExpiredCoupons();
     }
 
     private CouponCreateForm createForm() {

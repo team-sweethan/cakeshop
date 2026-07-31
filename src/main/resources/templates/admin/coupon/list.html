@@ -41,8 +41,10 @@
                                 class="form-control"
                                 th:field="*{status}">
                             <option value="">전체 상태</option>
+                            <option value="SCHEDULED">발급 예정</option>
                             <option value="ACTIVE">발급 중</option>
                             <option value="INACTIVE">발급 중지</option>
+                            <option value="EXHAUSTED">수량 소진</option>
                             <option value="ENDED">종료</option>
                         </select>
                     </div>
@@ -58,6 +60,9 @@
                     </a>
                 </div>
             </form>
+
+            <!-- 검색 조건이 적용된 전체 결과 건수를 검색 영역과 목록 사이에 표시한다. -->
+            <p class="text-muted">총<strong th:text="${pageResult.totalElements}">0</strong>건</p>
 
             <div class="table-wrap section">
                 <table class="data-table">
@@ -121,25 +126,27 @@
                             <span th:text="${#temporals.format(coupon.expiresAt,'yyyy-MM-dd HH:mm')}">2026-07-31 23:59</span>
                         </td>
 
-                        <td th:switch="${coupon.status}">
+                        <td th:switch="${#strings.toString(coupon.displayStatus)}">
+                            <span th:case="'SCHEDULED'" class="badge badge--info">발급 예정</span>
                             <span th:case="'ACTIVE'" class="badge badge--success">발급 중</span>
                             <span th:case="'INACTIVE'" class="badge badge--warning">발급 중지</span>
+                            <span th:case="'EXHAUSTED'" class="badge badge--warning">수량 소진</span>
                             <span th:case="'ENDED'" class="badge badge--danger">종료</span>
                         </td>
 
                         <td>
                             <div class="cluster">
-                                <a class="btn" th:if="${coupon.status != 'ENDED'}"
+                                <a class="btn" th:if="${#strings.toString(coupon.displayStatus) != 'ENDED'}"
                                    th:href="@{/admin/coupons/{couponId}/edit(couponId=${coupon.id})}">수정</a>
 
-                                <form th:if="${coupon.status == 'ACTIVE'}"
+                                <form th:if="${#strings.toString(coupon.displayStatus) == 'ACTIVE'}"
                                       th:action="@{/admin/coupons/{couponId}/deactivate(couponId=${coupon.id})}"
                                       method="post">
 
                                     <button class="btn btn--danger" type="submit">발급 중지</button>
                                 </form>
 
-                                <form th:if="${coupon.status == 'INACTIVE'}"
+                                <form th:if="${#strings.toString(coupon.displayStatus) == 'INACTIVE'}"
                                       th:action="@{/admin/coupons/{couponId}/activate(couponId=${coupon.id})}"
                                       method="post">
 

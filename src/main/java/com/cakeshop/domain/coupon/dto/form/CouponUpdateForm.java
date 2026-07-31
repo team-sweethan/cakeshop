@@ -1,7 +1,7 @@
 package com.cakeshop.domain.coupon.dto.form;
 
 import com.cakeshop.domain.coupon.entity.Coupon;
-import com.cakeshop.domain.coupon.entity.CouponStatus;
+import com.cakeshop.domain.coupon.entity.CouponDisplayStatus;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -12,8 +12,8 @@ import lombok.Setter;
 @Setter
 public class CouponUpdateForm extends CouponCreateForm {
 
-    /** 상세/수정 화면에서 상태를 표시하고 종료 쿠폰의 수정 버튼을 숨기는 데 사용한다. */
-    private CouponStatus status;
+    /** 상세/수정 화면에서 종료 쿠폰의 수정 버튼을 숨기는 화면 계산 상태다. */
+    private CouponDisplayStatus displayStatus;
 
     /** 시작 전이면 전체 수정, 시작 후면 제한 수정 화면을 렌더링하기 위한 서버 계산값이다. */
     private boolean fullEdit;
@@ -30,9 +30,6 @@ public class CouponUpdateForm extends CouponCreateForm {
         form.setTotalQuantity(coupon.getTotalQuantity().longValue());
         form.setStartsAt(coupon.getStartsAt());
         form.setExpiresAt(coupon.getExpiresAt());
-        // 상태는 요청값으로 신뢰하지 않고, 조회한 Entity의 값만 화면에 제공한다.
-        form.setStatus(coupon.getStatus());
-
         return form;
     }
 }
