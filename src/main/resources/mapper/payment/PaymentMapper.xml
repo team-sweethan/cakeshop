@@ -45,8 +45,7 @@
             amount,
             status,
             provider_status,
-            active_paid_order_id,
-            active_ready_order_id,
+            active_payment_order_id,
             failure_code,
             failure_message,
             requested_at,
@@ -114,15 +113,17 @@
             requested_by,
             status
         )
-        VALUES (
-            #{paymentId},
+        SELECT
+            payment.id,
             #{idempotencyKey},
             #{cancelAmount},
             #{cancelReason},
             #{requestType},
             #{requestedBy},
             'REQUESTED'
-        )
+        FROM payments AS payment
+        WHERE payment.id = #{paymentId}
+          AND payment.status = 'DONE'
     </insert>
 
     <select id="findPaymentCancellationById"

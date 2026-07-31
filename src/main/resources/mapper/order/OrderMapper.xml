@@ -264,7 +264,11 @@
           AND status = #{expectedStatus}
           AND (
               (order_type = 'CUSTOM' AND status = 'UNDER_REVIEW')
-              OR (order_type = 'GENERAL' AND status = 'READY_FOR_PICKUP')
+              OR (
+                  order_type = 'GENERAL'
+                  AND status = 'READY_FOR_PICKUP'
+                  AND #{canceledAt} &lt; pickup_at
+              )
           )
     </update>
 

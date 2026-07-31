@@ -76,7 +76,7 @@ class PaymentMapperTests {
                 .extracting(Payment::getTossOrderId)
                 .containsExactly(payment.getTossOrderId());
         assertThat(payments)
-                .extracting(Payment::getActiveReadyOrderId)
+                .extracting(Payment::getActivePaymentOrderId)
                 .containsExactly(orderId);
     }
 
@@ -207,34 +207,16 @@ class PaymentMapperTests {
         assertThat(expired.getFailureMessage()).isEqualTo("결제 유효 시간이 지났습니다.");
     }
 
-    // 한 주문에서 DONE 결제는 UNIQUE 제약에 따라 한 건만 허용되는지 확인한다.
     @Test
-    void onlyOneDonePaymentIsAllowedPerOrder() {
+    void readyPaymentCannotBeCreatedWhenDonePaymentExists() {
         Payment firstPayment = insertPayment("FIRST-DONE");
 
-        assertThat(paymentMapper.completeIfReady(
-                firstPayment.getId(),
-                "PAYMENT-KEY-FIRST-DONE-" + suffix,
-                "CARD",
-                "DONE",
-                LocalDateTime.of(2026, 8, 1, 12, 1)
-        )).isEqualTo(1);
+        completePayment(firstPayment, "FIRST-DONE");
+        assertThat(findPayment(firstPayment.getId()).getActivePaymentOrderId())
+                .isEqualTo(orderId);
 
-        Payment secondPayment = insertPayment("SECOND-DONE");
-
-        // 두 번째 결제도 DONE이 되면 같은 order_id가 생성 열에 중복되므로 DB가 거부한다.
-        assertThatThrownBy(() -> paymentMapper.completeIfReady(
-                secondPayment.getId(),
-                "PAYMENT-KEY-SECOND-DONE-" + suffix,
-                "CARD",
-                "DONE",
-                LocalDateTime.of(2026, 8, 1, 12, 2)
-        )).isInstanceOf(DataIntegrityViolationException.class);
-
-        assertThat(findPayment(firstPayment.getId()).getStatus())
-                .isEqualTo(PaymentStatus.DONE);
-        assertThat(findPayment(secondPayment.getId()).getStatus())
-                .isEqualTo(PaymentStatus.READY);
+        assertThatThrownBy(() -> insertPayment("SECOND-AFTER-DONE"))
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     // Java enum에 없는 상태값을 직접 저장해도 DB CHECK 제약이 거부하는지 확인한다.
@@ -267,6 +249,7 @@ class PaymentMapperTests {
     @Test
     void insertPaymentCancellationAndFindPaymentCancellationById() {
         Payment payment = insertPayment("CANCELLATION-MAPPER");
+        completePayment(payment, "CANCELLATION-MAPPER");
         PaymentCancellation cancellation =
                 newPaymentCancellation(payment.getId(), "MAPPER");
 
@@ -291,8 +274,30 @@ class PaymentMapperTests {
     }
 
     @Test
+    void insertPaymentCancellation_doesNotInsertForReadyPayment() {
+        Payment payment = insertPayment("READY-CANCELLATION");
+        PaymentCancellation cancellation =
+                newPaymentCancellation(payment.getId(), "READY");
+
+        assertThat(paymentMapper.insertPaymentCancellation(cancellation)).isZero();
+        assertThat(cancellation.getId()).isNull();
+
+        Integer savedCount = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM payment_cancellations
+                WHERE idempotency_key = ?
+                """,
+                Integer.class,
+                cancellation.getIdempotencyKey()
+        );
+        assertThat(savedCount).isZero();
+    }
+
+    @Test
     void completeCancellationIfRequested_recordsTransactionAndTimeConditionally() {
         Payment payment = insertPayment("CANCELLATION-STATUS");
+        completePayment(payment, "CANCELLATION-STATUS");
         PaymentCancellation cancellation =
                 newPaymentCancellation(payment.getId(), "STATUS");
         paymentMapper.insertPaymentCancellation(cancellation);
@@ -325,6 +330,7 @@ class PaymentMapperTests {
     @Test
     void failCancellationIfRequested_recordsFailureDataConditionally() {
         Payment payment = insertPayment("CANCELLATION-FAILURE");
+        completePayment(payment, "CANCELLATION-FAILURE");
         PaymentCancellation cancellation =
                 newPaymentCancellation(payment.getId(), "FAILURE");
         paymentMapper.insertPaymentCancellation(cancellation);
@@ -352,6 +358,7 @@ class PaymentMapperTests {
     @Test
     void onlyOneRequestedCancellationIsAllowedPerPayment() {
         Payment payment = insertPayment("CANCELLATION");
+        completePayment(payment, "CANCELLATION");
 
         assertThat(insertRequestedCancellation(payment.getId(), "FIRST", 40_000, "REQUESTED"))
                 .isEqualTo(1);
@@ -381,6 +388,7 @@ class PaymentMapperTests {
     @Test
     void invalidPaymentCancellationStatusCannotBeStored() {
         Payment payment = insertPayment("INVALID-CANCELLATION-STATUS");
+        completePayment(payment, "INVALID-CANCELLATION-STATUS");
 
         assertThatThrownBy(() ->
                 insertRequestedCancellation(payment.getId(), "INVALID-STATUS", 40_000, "INVALID")
@@ -390,6 +398,7 @@ class PaymentMapperTests {
     @Test
     void nonPositiveCancellationAmountCannotBeStored() {
         Payment payment = insertPayment("INVALID-CANCELLATION-AMOUNT");
+        completePayment(payment, "INVALID-CANCELLATION-AMOUNT");
 
         assertThatThrownBy(() ->
                 insertRequestedCancellation(payment.getId(), "ZERO-AMOUNT", 0, "REQUESTED")
@@ -400,6 +409,16 @@ class PaymentMapperTests {
         Payment payment = newPayment(label);
         paymentMapper.insertReadyPayment(payment);
         return payment;
+    }
+
+    private void completePayment(Payment payment, String label) {
+        assertThat(paymentMapper.completeIfReady(
+                payment.getId(),
+                "PAYMENT-KEY-" + label + "-" + suffix,
+                "CARD",
+                "DONE",
+                LocalDateTime.of(2026, 8, 1, 12, 1)
+        )).isEqualTo(1);
     }
 
     private Payment newPayment(String label) {

@@ -313,6 +313,41 @@ class OrderMapperTests {
     }
 
     @Test
+    void cancelIfCurrent_rejectsGeneralOrderAtOrAfterPickupTime() {
+        Order order = newOrder();
+        order.setOrderType(OrderType.GENERAL);
+        orderMapper.insertOrder(order);
+        LocalDateTime readyAt =
+                LocalDateTime.of(2026, 8, 1, 12, 1);
+
+        orderMapper.markReadyForPickupAfterPaymentIfPending(
+                order.getId(),
+                readyAt
+        );
+        assertThat(orderMapper.cancelIfCurrent(
+                order.getId(),
+                OrderStatus.READY_FOR_PICKUP,
+                "CUSTOMER",
+                "픽업 시각 취소",
+                order.getPickupAt()
+        )).isZero();
+        assertThat(orderMapper.cancelIfCurrent(
+                order.getId(),
+                OrderStatus.READY_FOR_PICKUP,
+                "CUSTOMER",
+                "픽업 이후 취소",
+                order.getPickupAt().plusSeconds(1)
+        )).isZero();
+
+        Order unchanged = orderMapper.findOrderById(order.getId())
+                .orElseThrow();
+        assertThat(unchanged.getStatus()).isEqualTo(OrderStatus.READY_FOR_PICKUP);
+        assertThat(unchanged.getCanceledAt()).isNull();
+        assertThat(unchanged.getCancelReason()).isNull();
+        assertThat(unchanged.getCanceledBy()).isNull();
+    }
+
+    @Test
     void invalidOrderStatusCannotBeStored() {
         Order order = newOrder();
         orderMapper.insertOrder(order);

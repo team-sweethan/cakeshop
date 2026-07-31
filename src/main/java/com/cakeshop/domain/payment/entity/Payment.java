@@ -20,8 +20,7 @@ public class Payment {
     private BigDecimal amount;
     private PaymentStatus status;
     private String providerStatus;
-    private Long activePaidOrderId;
-    private Long activeReadyOrderId;
+    private Long activePaymentOrderId;
     private String failureCode;
     private String failureMessage;
     private LocalDateTime requestedAt;
