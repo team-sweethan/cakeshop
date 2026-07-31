@@ -17,7 +17,10 @@ import com.cakeshop.domain.product.admin.dto.form.ProductAdminSearchCondition;
 import com.cakeshop.domain.product.admin.dto.form.ProductForm;
 import com.cakeshop.domain.product.admin.dto.view.ProductAdminListView;
 import com.cakeshop.domain.product.admin.dto.view.ProductCategoryOptionView;
+import com.cakeshop.domain.product.admin.dto.view.ProductOptionAdminRow;
 import com.cakeshop.domain.product.entity.Product;
+import com.cakeshop.domain.product.entity.ProductOptionSelectionType;
+import com.cakeshop.domain.product.entity.ProductOptionStatus;
 import com.cakeshop.domain.product.entity.ProductStatus;
 import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.error.ProductErrorCode;
@@ -136,6 +139,8 @@ class ProductAdminServiceTests {
 
     @Test
     void changeProductStatusUpdatesProduct() {
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(productWithStatus(ProductStatus.ACTIVE));
         when(productMapper.updateProductStatus(
                 1L,
                 ProductStatus.INACTIVE
@@ -156,10 +161,8 @@ class ProductAdminServiceTests {
 
     @Test
     void changeStatusOfMissingProductThrowsException() {
-        when(productMapper.updateProductStatus(
-                999L,
-                ProductStatus.INACTIVE
-        )).thenReturn(0);
+        when(productMapper.findSalesInfoByIdForUpdate(999L))
+                .thenReturn(null);
 
         // 존재하지 않는 상품은 NOT_FOUND 예외로 처리되는지 확인한다.
         assertThatThrownBy(() ->
@@ -176,6 +179,75 @@ class ProductAdminServiceTests {
                                                 ProductErrorCode.NOT_FOUND
                                         )
                 );
+
+        verify(productMapper, never())
+                .updateProductStatus(
+                        anyLong(),
+                        any(ProductStatus.class)
+                );
+    }
+
+    @Test
+    void startSale_requiredGroupWithoutActiveOption_throwsPolicyError() {
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(productWithStatus(ProductStatus.INACTIVE));
+        when(productMapper
+                .findAdminOptionRowsByProductIdForUpdate(1L))
+                .thenReturn(List.of(
+                        requiredGroupRow(
+                                null,
+                                null
+                        )
+                ));
+
+        assertThatThrownBy(() ->
+                productAdminService.changeProductStatus(
+                        1L,
+                        ProductStatus.ACTIVE
+                )
+        ).isInstanceOfSatisfying(
+                BusinessException.class,
+                exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(
+                                        ProductErrorCode
+                                                .REQUIRED_OPTION_GROUP_EMPTY
+                                )
+        );
+
+        verify(productMapper, never())
+                .updateProductStatus(
+                        anyLong(),
+                        any(ProductStatus.class)
+                );
+    }
+
+    @Test
+    void startSale_requiredGroupWithActiveOption_updatesProduct() {
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(productWithStatus(ProductStatus.INACTIVE));
+        when(productMapper
+                .findAdminOptionRowsByProductIdForUpdate(1L))
+                .thenReturn(List.of(
+                        requiredGroupRow(
+                                11L,
+                                ProductOptionStatus.ACTIVE
+                        )
+                ));
+        when(productMapper.updateProductStatus(
+                1L,
+                ProductStatus.ACTIVE
+        )).thenReturn(1);
+
+        productAdminService.changeProductStatus(
+                1L,
+                ProductStatus.ACTIVE
+        );
+
+        verify(productMapper).updateProductStatus(
+                1L,
+                ProductStatus.ACTIVE
+        );
     }
 
     @Test
@@ -552,6 +624,34 @@ class ProductAdminServiceTests {
     /**
      * 상품 등록 테스트에 사용할 정상 입력값을 만든다.
      */
+    private Product productWithStatus(ProductStatus status) {
+        Product product = new Product();
+
+        product.setId(1L);
+        product.setStatus(status);
+
+        return product;
+    }
+
+    private ProductOptionAdminRow requiredGroupRow(
+            Long optionId,
+            ProductOptionStatus optionStatus
+    ) {
+        return new ProductOptionAdminRow(
+                10L,
+                "크기",
+                true,
+                ProductOptionSelectionType.SINGLE,
+                ProductOptionStatus.ACTIVE,
+                1,
+                optionId,
+                optionId == null ? null : "1호",
+                optionId == null ? null : BigDecimal.ZERO,
+                optionStatus,
+                optionId == null ? null : 1
+        );
+    }
+
     private ProductForm validProductForm() {
         ProductForm form = new ProductForm();
 
