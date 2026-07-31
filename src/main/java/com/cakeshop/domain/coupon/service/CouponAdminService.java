@@ -131,7 +131,11 @@ public class CouponAdminService {
     public void deactivateCoupon(Long couponId) {
         Coupon coupon = findCoupon(couponId);
 
-        if (displayStatusOf(coupon) != CouponDisplayStatus.ACTIVE) {
+        if (coupon.getStatus() != CouponStatus.ACTIVE) {
+            throw new BusinessException(CouponErrorCode.NOT_ACTIVE);
+        }
+
+        if (!coupon.getExpiresAt().isAfter(LocalDateTime.now())) {
             throw new BusinessException(CouponErrorCode.NOT_ACTIVE);
         }
 
@@ -157,10 +161,6 @@ public class CouponAdminService {
         // 스케줄러 실행 전이라도 만료 시각이 지났다면 재개를 막는다.
         if (!coupon.getExpiresAt().isAfter(LocalDateTime.now())) {
             throw new BusinessException(CouponErrorCode.EXPIRED_COUPON);
-        }
-
-        if (displayStatusOf(coupon) != CouponDisplayStatus.INACTIVE) {
-            throw new BusinessException(CouponErrorCode.NOT_INACTIVE);
         }
 
         if (couponMapper.updateStatus(

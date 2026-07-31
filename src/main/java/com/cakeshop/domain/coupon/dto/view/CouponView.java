@@ -3,6 +3,7 @@ package com.cakeshop.domain.coupon.dto.view;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import com.cakeshop.domain.coupon.entity.CouponDisplayStatus;
+import com.cakeshop.domain.coupon.entity.CouponStatus;
 
 /**
  * 관리자 목록 화면에 필요한 조회 전용 값이다.
@@ -19,6 +20,7 @@ public record CouponView(
         Integer issuedQuantity,
         LocalDateTime startsAt,
         LocalDateTime expiresAt,
+        CouponStatus adminStatus,
         CouponDisplayStatus displayStatus
 ) {
 }

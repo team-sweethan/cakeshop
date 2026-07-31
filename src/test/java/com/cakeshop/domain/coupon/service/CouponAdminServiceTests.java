@@ -100,7 +100,8 @@ class CouponAdminServiceTests {
             1L, "여름 할인", "FIXED_AMOUNT", BigDecimal.valueOf(3000),
             BigDecimal.valueOf(10000), null, 100, 0,
             LocalDateTime.of(2026, 8, 1, 9, 0),
-            LocalDateTime.of(2026, 8, 31, 23, 59), CouponDisplayStatus.ACTIVE
+            LocalDateTime.of(2026, 8, 31, 23, 59),
+            CouponStatus.ACTIVE, CouponDisplayStatus.ACTIVE
         );
         when(couponMapper.countCoupons(condition)).thenReturn(11L);
         when(couponMapper.findCoupons(condition, 10, 10)).thenReturn(List.of(coupon));
@@ -343,6 +344,18 @@ class CouponAdminServiceTests {
             .isEqualTo(CouponErrorCode.NOT_ACTIVE);
 
         verify(couponMapper, never()).updateStatus(any(), any());
+    }
+
+    @Test
+    void deactivateAllowsScheduledCouponWhenAdministratorStatusIsActive() {
+        Coupon coupon = coupon(CouponStatus.ACTIVE, 10, 0, LocalDateTime.now().plusDays(1));
+        coupon.setStartsAt(LocalDateTime.now().plusHours(1));
+        when(couponMapper.findCouponById(1L)).thenReturn(Optional.of(coupon));
+        when(couponMapper.updateStatus(1L, CouponStatus.INACTIVE)).thenReturn(1);
+
+        couponAdminService.deactivateCoupon(1L);
+
+        verify(couponMapper).updateStatus(1L, CouponStatus.INACTIVE);
     }
 
     @Test

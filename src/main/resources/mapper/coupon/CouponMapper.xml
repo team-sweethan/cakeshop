@@ -120,6 +120,7 @@
             issued_quantity AS issuedQuantity,
             starts_at AS startsAt,
             expires_at AS expiresAt,
+            status AS adminStatus,
             <include refid="couponDisplayStatus"/> AS displayStatus
         FROM coupons
 
@@ -223,5 +224,4 @@
         WHERE id = #{couponId}
     </update>
 
-    <!-- ACTIVE·INACTIVE(재개할 수 없도록 만료된) 상태를 ENDED로 일괄 전환한다. -->
 </mapper>
