@@ -16,6 +16,7 @@ import com.cakeshop.domain.product.customer.dto.view.ProductOptionItemView;
 import com.cakeshop.domain.product.customer.service.ProductService;
 import com.cakeshop.domain.product.dto.view.ProductSalesInfo;
 import com.cakeshop.domain.product.entity.ProductType;
+import com.cakeshop.domain.product.error.ProductErrorCode;
 import com.cakeshop.domain.product.service.ProductQueryService;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.error.CommonErrorCode;
@@ -118,6 +119,7 @@ public class OrderService {
         if (product.basePrice() == null || product.basePrice().signum() < 0) {
             throw new BusinessException(CommonErrorCode.INTERNAL_ERROR);
         }
+        validateStock(product, form.getQuantity());
 
         List<PreparedOption> selectedOptions =
                 resolveSelectedOptions(product.productId(), form.getOptionIds());
@@ -135,6 +137,14 @@ public class OrderService {
                 optionAmount,
                 totalAmount
         );
+    }
+
+    private void validateStock(ProductSalesInfo product, int quantity) {
+        Integer stockQuantity = product.stockQuantity();
+        if (!product.available()
+                || stockQuantity != null && stockQuantity < quantity) {
+            throw new BusinessException(ProductErrorCode.INSUFFICIENT_STOCK);
+        }
     }
 
     private List<PreparedOption> resolveSelectedOptions(

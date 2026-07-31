@@ -16,6 +16,7 @@ import com.cakeshop.domain.product.customer.dto.view.ProductOptionItemView;
 import com.cakeshop.domain.product.customer.service.ProductService;
 import com.cakeshop.domain.product.dto.view.ProductSalesInfo;
 import com.cakeshop.domain.product.entity.ProductType;
+import com.cakeshop.domain.product.error.ProductErrorCode;
 import com.cakeshop.domain.product.service.ProductQueryService;
 import com.cakeshop.global.error.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
@@ -70,7 +71,13 @@ class OrderServiceTests {
     void createGeneralOrderRecalculatesAmountsAndSavesSnapshotsAndReadyPayment() {
         long memberId = 10L;
         ProductSalesInfo product =
-                product(1L, ProductType.GENERAL, "딸기 케이크", 30_000);
+                product(
+                        1L,
+                        ProductType.GENERAL,
+                        "딸기 케이크",
+                        30_000,
+                        2
+                );
         ProductOptionGroupView optionGroup = new ProductOptionGroupView(
                 11L,
                 "크기",
@@ -202,6 +209,155 @@ class OrderServiceTests {
     }
 
     @Test
+    void createGeneralOrder_inactiveProduct_throwsNotOnSale() {
+        when(productQueryService.getSalesInfo(1L))
+                .thenThrow(new BusinessException(ProductErrorCode.NOT_ON_SALE));
+
+        assertThatThrownBy(() ->
+                orderService.createGeneralOrder(
+                        10L,
+                        form(1L, 1, List.of())
+                )
+        ).isInstanceOfSatisfying(
+                BusinessException.class,
+                error -> assertThat(error.getErrorCode())
+                        .isEqualTo(ProductErrorCode.NOT_ON_SALE)
+        );
+
+        verify(productService, never()).getPublicOptionGroups(1L);
+        verify(orderMapper, never()).insertOrder(any(Order.class));
+    }
+
+    @Test
+    void createGeneralOrder_outOfStockProduct_throwsInsufficientStock() {
+        when(productQueryService.getSalesInfo(1L))
+                .thenReturn(product(
+                        1L,
+                        ProductType.GENERAL,
+                        "품절 케이크",
+                        30_000,
+                        0
+                ));
+
+        assertThatThrownBy(() ->
+                orderService.createGeneralOrder(
+                        10L,
+                        form(1L, 1, List.of())
+                )
+        ).isInstanceOfSatisfying(
+                BusinessException.class,
+                error -> assertThat(error.getErrorCode())
+                        .isEqualTo(ProductErrorCode.INSUFFICIENT_STOCK)
+        );
+
+        verify(productService, never()).getPublicOptionGroups(1L);
+        verify(orderMapper, never()).insertOrder(any(Order.class));
+    }
+
+    @Test
+    void createGeneralOrder_quantityExceedsStock_throwsInsufficientStock() {
+        when(productQueryService.getSalesInfo(1L))
+                .thenReturn(product(
+                        1L,
+                        ProductType.GENERAL,
+                        "재고 제한 케이크",
+                        30_000,
+                        2
+                ));
+
+        assertThatThrownBy(() ->
+                orderService.createGeneralOrder(
+                        10L,
+                        form(1L, 3, List.of())
+                )
+        ).isInstanceOfSatisfying(
+                BusinessException.class,
+                error -> assertThat(error.getErrorCode())
+                        .isEqualTo(ProductErrorCode.INSUFFICIENT_STOCK)
+        );
+
+        verify(productService, never()).getPublicOptionGroups(1L);
+        verify(orderMapper, never()).insertOrder(any(Order.class));
+    }
+
+    @Test
+    void createGeneralOrder_optionNotBelongingToProduct_throwsInvalidOption() {
+        when(productQueryService.getSalesInfo(1L))
+                .thenReturn(product(
+                        1L,
+                        ProductType.GENERAL,
+                        "딸기 케이크",
+                        30_000
+                ));
+        when(productService.getPublicOptionGroups(1L))
+                .thenReturn(List.of(optionGroup(
+                        true,
+                        "SINGLE",
+                        option(101L, "1호", 0)
+                )));
+
+        assertInvalidOption(form(1L, 1, List.of(999L)));
+    }
+
+    @Test
+    void createGeneralOrder_duplicateOption_throwsInvalidOption() {
+        when(productQueryService.getSalesInfo(1L))
+                .thenReturn(product(
+                        1L,
+                        ProductType.GENERAL,
+                        "딸기 케이크",
+                        30_000
+                ));
+        when(productService.getPublicOptionGroups(1L))
+                .thenReturn(List.of(optionGroup(
+                        true,
+                        "SINGLE",
+                        option(101L, "1호", 0)
+                )));
+
+        assertInvalidOption(form(1L, 1, List.of(101L, 101L)));
+    }
+
+    @Test
+    void createGeneralOrder_requiredOptionMissing_throwsInvalidOption() {
+        when(productQueryService.getSalesInfo(1L))
+                .thenReturn(product(
+                        1L,
+                        ProductType.GENERAL,
+                        "딸기 케이크",
+                        30_000
+                ));
+        when(productService.getPublicOptionGroups(1L))
+                .thenReturn(List.of(optionGroup(
+                        true,
+                        "SINGLE",
+                        option(101L, "1호", 0)
+                )));
+
+        assertInvalidOption(form(1L, 1, List.of()));
+    }
+
+    @Test
+    void createGeneralOrder_multipleOptionsFromSingleGroup_throwsInvalidOption() {
+        when(productQueryService.getSalesInfo(1L))
+                .thenReturn(product(
+                        1L,
+                        ProductType.GENERAL,
+                        "딸기 케이크",
+                        30_000
+                ));
+        when(productService.getPublicOptionGroups(1L))
+                .thenReturn(List.of(optionGroup(
+                        false,
+                        "SINGLE",
+                        option(101L, "1호", 0),
+                        option(102L, "2호", 5_000)
+                )));
+
+        assertInvalidOption(form(1L, 1, List.of(101L, 102L)));
+    }
+
+    @Test
     void createGeneralOrderIsTransactional() throws NoSuchMethodException {
         Transactional transactional = OrderService.class
                 .getMethod(
@@ -220,15 +376,64 @@ class OrderServiceTests {
             String name,
             long basePrice
     ) {
+        return product(id, productType, name, basePrice, null);
+    }
+
+    private ProductSalesInfo product(
+            long id,
+            ProductType productType,
+            String name,
+            long basePrice,
+            Integer stockQuantity
+    ) {
         return new ProductSalesInfo(
                 id,
                 name,
                 productType,
                 0,
-                true,
+                stockQuantity == null || stockQuantity > 0,
                 BigDecimal.valueOf(basePrice),
-                null
+                stockQuantity
         );
+    }
+
+    private ProductOptionGroupView optionGroup(
+            boolean required,
+            String selectionType,
+            ProductOptionItemView... options
+    ) {
+        return new ProductOptionGroupView(
+                11L,
+                "크기",
+                required,
+                selectionType,
+                List.of(options)
+        );
+    }
+
+    private ProductOptionItemView option(
+            long id,
+            String name,
+            long additionalPrice
+    ) {
+        return new ProductOptionItemView(
+                id,
+                name,
+                BigDecimal.valueOf(additionalPrice)
+        );
+    }
+
+    private void assertInvalidOption(GeneralOrderForm form) {
+        assertThatThrownBy(() ->
+                orderService.createGeneralOrder(10L, form)
+        ).isInstanceOfSatisfying(
+                BusinessException.class,
+                error -> assertThat(error.getErrorCode())
+                        .isEqualTo(OrderErrorCode.INVALID_PRODUCT_OPTION)
+        );
+
+        verify(orderMapper, never()).insertOrder(any(Order.class));
+        verify(paymentMapper, never()).insertReadyPayment(any(Payment.class));
     }
 
     private GeneralOrderForm form(
