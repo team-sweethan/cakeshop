@@ -7,6 +7,8 @@ import com.cakeshop.domain.product.admin.dto.view.ProductOptionManagementView;
 import com.cakeshop.domain.product.admin.service.ProductOptionAdminService;
 import com.cakeshop.domain.product.entity.ProductOptionSelectionType;
 import com.cakeshop.domain.product.entity.ProductOptionStatus;
+import com.cakeshop.domain.product.error.ProductErrorCode;
+import com.cakeshop.global.error.BusinessException;
 
 import jakarta.validation.Valid;
 import org.springframework.stereotype.Controller;
@@ -112,11 +114,20 @@ public class ProductOptionAdminController {
             return redirectToOptions(productId);
         }
 
-        productOptionAdminService.updateOptionGroup(
-                productId,
-                optionGroupId,
-                form
-        );
+        try {
+            productOptionAdminService.updateOptionGroup(
+                    productId,
+                    optionGroupId,
+                    form
+            );
+        } catch (BusinessException exception) {
+            return handleRequiredOptionPolicyError(
+                    exception,
+                    productId,
+                    optionGroupId,
+                    redirectAttributes
+            );
+        }
 
         redirectAttributes.addFlashAttribute(
                 "successMessage",
@@ -212,12 +223,21 @@ public class ProductOptionAdminController {
             return redirectToOptions(productId);
         }
 
-        productOptionAdminService.updateOption(
-                productId,
-                optionGroupId,
-                optionId,
-                form
-        );
+        try {
+            productOptionAdminService.updateOption(
+                    productId,
+                    optionGroupId,
+                    optionId,
+                    form
+            );
+        } catch (BusinessException exception) {
+            return handleRequiredOptionPolicyError(
+                    exception,
+                    productId,
+                    optionGroupId,
+                    redirectAttributes
+            );
+        }
 
         redirectAttributes.addFlashAttribute(
                 "successMessage",
@@ -278,6 +298,26 @@ public class ProductOptionAdminController {
         return "redirect:/admin/products/"
                 + productId
                 + "/options";
+    }
+
+    private String handleRequiredOptionPolicyError(
+            BusinessException exception,
+            long productId,
+            long optionGroupId,
+            RedirectAttributes redirectAttributes
+    ) {
+        if (exception.getErrorCode()
+                != ProductErrorCode.REQUIRED_OPTION_GROUP_EMPTY) {
+            throw exception;
+        }
+
+        redirectAttributes.addFlashAttribute(
+                "errorMessage",
+                exception.getErrorCode().message()
+        );
+        openGroup(redirectAttributes, optionGroupId);
+
+        return redirectToOptions(productId);
     }
 
     private void openGroup(
