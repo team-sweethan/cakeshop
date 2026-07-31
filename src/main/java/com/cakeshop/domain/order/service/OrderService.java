@@ -1,7 +1,6 @@
 package com.cakeshop.domain.order.service;
 
-import com.cakeshop.domain.order.dto.form.CreateOrderForm;
-import com.cakeshop.domain.order.dto.form.OrderItemForm;
+import com.cakeshop.domain.order.dto.form.GeneralOrderForm;
 import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.order.entity.OrderItem;
 import com.cakeshop.domain.order.entity.OrderItemOption;
@@ -25,7 +24,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -62,14 +60,12 @@ public class OrderService {
      * @return 결제 화면으로 이동할 때 사용할 주문 ID
      */
     @Transactional
-    public long createGeneralOrder(long memberId, CreateOrderForm form) {
+    public long createGeneralOrder(long memberId, GeneralOrderForm form) {
         validateActiveMember(memberId);
         validateForm(form);
 
-        List<PreparedOrderItem> preparedItems = prepareItems(form.getItems());
-        BigDecimal originalAmount = preparedItems.stream()
-                .map(PreparedOrderItem::totalAmount)
-                .reduce(ZERO, BigDecimal::add);
+        PreparedOrderItem preparedItem = prepareItem(form);
+        BigDecimal originalAmount = preparedItem.totalAmount();
         LocalDateTime now = LocalDateTime.now();
 
         if (form.getPickupAt() == null || !form.getPickupAt().isAfter(now)) {
@@ -79,9 +75,7 @@ public class OrderService {
         Order order = createOrder(memberId, form, originalAmount, now);
         requireOneRow(orderMapper.insertOrder(order), OrderErrorCode.ORDER_SAVE_FAILED);
 
-        for (PreparedOrderItem preparedItem : preparedItems) {
-            saveOrderItem(order.getId(), preparedItem);
-        }
+        saveOrderItem(order.getId(), preparedItem);
 
         Payment payment = createReadyPayment(order);
         requireOneRow(
@@ -98,7 +92,7 @@ public class OrderService {
         }
     }
 
-    private void validateForm(CreateOrderForm form) {
+    private void validateForm(GeneralOrderForm form) {
         if (form == null
                 || isBlank(form.getOrdererName())
                 || isBlank(form.getOrdererPhone())
@@ -106,50 +100,41 @@ public class OrderService {
                 || isBlank(form.getPickupPhone())) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
-        if (form.getItems() == null || form.getItems().isEmpty()) {
+        if (form.getProductId() == null) {
             throw new BusinessException(OrderErrorCode.EMPTY_ORDER_ITEMS);
         }
     }
 
-    private List<PreparedOrderItem> prepareItems(List<OrderItemForm> itemForms) {
-        List<PreparedOrderItem> result = new ArrayList<>();
-
-        for (OrderItemForm itemForm : itemForms) {
-            if (itemForm == null || itemForm.getProductId() == null) {
-                throw new BusinessException(CommonErrorCode.INVALID_INPUT);
-            }
-            if (itemForm.getQuantity() == null || itemForm.getQuantity() <= 0) {
-                throw new BusinessException(OrderErrorCode.INVALID_QUANTITY);
-            }
-
-            ProductSalesInfo product =
-                    productQueryService.getSalesInfo(itemForm.getProductId());
-            if (product.productType() != ProductType.GENERAL) {
-                throw new BusinessException(OrderErrorCode.GENERAL_PRODUCT_REQUIRED);
-            }
-            if (product.basePrice() == null || product.basePrice().signum() < 0) {
-                throw new BusinessException(CommonErrorCode.INTERNAL_ERROR);
-            }
-
-            List<PreparedOption> selectedOptions =
-                    resolveSelectedOptions(product.productId(), itemForm.getOptionIds());
-            BigDecimal optionAmount = selectedOptions.stream()
-                    .map(PreparedOption::additionalPrice)
-                    .reduce(ZERO, BigDecimal::add);
-            BigDecimal totalAmount = product.basePrice()
-                    .add(optionAmount)
-                    .multiply(BigDecimal.valueOf(itemForm.getQuantity()));
-
-            result.add(new PreparedOrderItem(
-                    product,
-                    itemForm.getQuantity(),
-                    selectedOptions,
-                    optionAmount,
-                    totalAmount
-            ));
+    private PreparedOrderItem prepareItem(GeneralOrderForm form) {
+        if (form.getQuantity() == null || form.getQuantity() <= 0) {
+            throw new BusinessException(OrderErrorCode.INVALID_QUANTITY);
         }
 
-        return result;
+        ProductSalesInfo product =
+                productQueryService.getSalesInfo(form.getProductId());
+        if (product.productType() != ProductType.GENERAL) {
+            throw new BusinessException(OrderErrorCode.GENERAL_PRODUCT_REQUIRED);
+        }
+        if (product.basePrice() == null || product.basePrice().signum() < 0) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_ERROR);
+        }
+
+        List<PreparedOption> selectedOptions =
+                resolveSelectedOptions(product.productId(), form.getOptionIds());
+        BigDecimal optionAmount = selectedOptions.stream()
+                .map(PreparedOption::additionalPrice)
+                .reduce(ZERO, BigDecimal::add);
+        BigDecimal totalAmount = product.basePrice()
+                .add(optionAmount)
+                .multiply(BigDecimal.valueOf(form.getQuantity()));
+
+        return new PreparedOrderItem(
+                product,
+                form.getQuantity(),
+                selectedOptions,
+                optionAmount,
+                totalAmount
+        );
     }
 
     private List<PreparedOption> resolveSelectedOptions(
@@ -211,7 +196,7 @@ public class OrderService {
 
     private Order createOrder(
             long memberId,
-            CreateOrderForm form,
+            GeneralOrderForm form,
             BigDecimal originalAmount,
             LocalDateTime now
     ) {

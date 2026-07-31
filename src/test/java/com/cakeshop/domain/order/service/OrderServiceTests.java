@@ -1,7 +1,6 @@
 package com.cakeshop.domain.order.service;
 
-import com.cakeshop.domain.order.dto.form.CreateOrderForm;
-import com.cakeshop.domain.order.dto.form.OrderItemForm;
+import com.cakeshop.domain.order.dto.form.GeneralOrderForm;
 import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.order.entity.OrderItem;
 import com.cakeshop.domain.order.entity.OrderItemOption;
@@ -96,7 +95,7 @@ class OrderServiceTests {
         });
         when(orderMapper.insertOrderItemOption(any(OrderItemOption.class))).thenReturn(1);
         when(paymentMapper.insertReadyPayment(any(Payment.class))).thenReturn(1);
-        CreateOrderForm form = form(item(1L, 2, List.of(101L)));
+        GeneralOrderForm form = form(1L, 2, List.of(101L));
         LocalDateTime beforeCreation = LocalDateTime.now();
 
         long orderId = orderService.createGeneralOrder(memberId, form);
@@ -168,7 +167,7 @@ class OrderServiceTests {
     void createGeneralOrderRejectsInvalidMemberIdBeforeProductLookup() {
         assertThatThrownBy(() -> orderService.createGeneralOrder(
                 0L,
-                form(item(1L, 1, List.of()))
+                form(1L, 1, List.of())
         )).isInstanceOfSatisfying(
                 BusinessException.class,
                 error -> assertThat(error.getErrorCode())
@@ -181,16 +180,7 @@ class OrderServiceTests {
     }
 
     @Test
-    void createGeneralOrderRejectsMixedGeneralAndCustomProductsBeforeSaving() {
-        when(productQueryService.getSalesInfo(1L))
-                .thenReturn(product(
-                        1L,
-                        ProductType.GENERAL,
-                        "일반 케이크",
-                        30_000
-                ));
-        when(productService.getPublicOptionGroups(1L))
-                .thenReturn(List.of());
+    void createGeneralOrderRejectsCustomProductBeforeSaving() {
         when(productQueryService.getSalesInfo(2L))
                 .thenReturn(product(
                         2L,
@@ -198,10 +188,7 @@ class OrderServiceTests {
                         "주문 제작 케이크",
                         50_000
                 ));
-        CreateOrderForm form = form(
-                item(1L, 1, List.of()),
-                item(2L, 1, List.of())
-        );
+        GeneralOrderForm form = form(2L, 1, List.of());
 
         assertThatThrownBy(() -> orderService.createGeneralOrder(10L, form))
                 .isInstanceOfSatisfying(
@@ -220,7 +207,7 @@ class OrderServiceTests {
                 .getMethod(
                         "createGeneralOrder",
                         long.class,
-                        CreateOrderForm.class
+                        GeneralOrderForm.class
                 )
                 .getAnnotation(Transactional.class);
 
@@ -244,27 +231,21 @@ class OrderServiceTests {
         );
     }
 
-    private CreateOrderForm form(OrderItemForm... items) {
-        CreateOrderForm form = new CreateOrderForm();
+    private GeneralOrderForm form(
+            long productId,
+            int quantity,
+            List<Long> optionIds
+    ) {
+        GeneralOrderForm form = new GeneralOrderForm();
         form.setOrdererName(" 주문자 ");
         form.setOrdererPhone(" 010-1111-2222 ");
         form.setPickupName(" 수령자 ");
         form.setPickupPhone(" 010-3333-4444 ");
         form.setPickupAt(LocalDateTime.now().plusDays(3));
         form.setRequestMessage(" 초는 빼주세요. ");
-        form.setItems(List.of(items));
+        form.setProductId(productId);
+        form.setQuantity(quantity);
+        form.setOptionIds(optionIds);
         return form;
-    }
-
-    private OrderItemForm item(
-            long productId,
-            int quantity,
-            List<Long> optionIds
-    ) {
-        OrderItemForm item = new OrderItemForm();
-        item.setProductId(productId);
-        item.setQuantity(quantity);
-        item.setOptionIds(optionIds);
-        return item;
     }
 }

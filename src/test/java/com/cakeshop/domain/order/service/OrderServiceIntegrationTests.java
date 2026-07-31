@@ -1,7 +1,6 @@
 package com.cakeshop.domain.order.service;
 
-import com.cakeshop.domain.order.dto.form.CreateOrderForm;
-import com.cakeshop.domain.order.dto.form.OrderItemForm;
+import com.cakeshop.domain.order.dto.form.GeneralOrderForm;
 import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.order.entity.OrderItem;
 import com.cakeshop.domain.order.entity.OrderItemOption;
@@ -85,7 +84,7 @@ class OrderServiceIntegrationTests {
     void createGeneralOrderPersistsCalculatedSnapshotsAndReadyPayment() {
         // 실제 Spring Bean이 트랜잭션 프록시로 감싸져 있어야 전체 저장이 한 트랜잭션에 참여한다.
         assertThat(AopUtils.isAopProxy(orderService)).isTrue();
-        CreateOrderForm form = createForm();
+        GeneralOrderForm form = createForm();
         LocalDateTime beforeCreation = LocalDateTime.now();
 
         long orderId = orderService.createGeneralOrder(memberId, form);
@@ -153,20 +152,17 @@ class OrderServiceIntegrationTests {
                 )));
     }
 
-    private CreateOrderForm createForm() {
-        OrderItemForm item = new OrderItemForm();
-        item.setProductId(productId);
-        item.setQuantity(2);
-        item.setOptionIds(List.of(productOptionId));
-
-        CreateOrderForm form = new CreateOrderForm();
+    private GeneralOrderForm createForm() {
+        GeneralOrderForm form = new GeneralOrderForm();
         form.setOrdererName("주문자");
         form.setOrdererPhone("010-1111-2222");
         form.setPickupName("수령자");
         form.setPickupPhone("010-3333-4444");
         form.setPickupAt(LocalDateTime.now().plusDays(3));
         form.setRequestMessage("초는 빼주세요.");
-        form.setItems(List.of(item));
+        form.setProductId(productId);
+        form.setQuantity(2);
+        form.setOptionIds(List.of(productOptionId));
         return form;
     }
 
