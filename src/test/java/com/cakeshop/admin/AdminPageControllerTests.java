@@ -28,6 +28,7 @@ import com.cakeshop.domain.coupon.controller.CouponAdminController;
 import com.cakeshop.domain.coupon.service.CouponAdminService;
 import com.cakeshop.domain.member.controller.MemberAdminController;
 import com.cakeshop.domain.member.service.MemberAdminService;
+import com.cakeshop.domain.member.service.MemberSessionService;
 import com.cakeshop.domain.notification.controller.NotificationAdminController;
 import com.cakeshop.domain.order.controller.FulfillmentAdminController;
 import com.cakeshop.domain.order.controller.OrderAdminController;
@@ -59,11 +60,19 @@ class AdminPageControllerTests {
         ));
 
         mockMvc = MockMvcBuilders.standaloneSetup(
-            new StatisticsAdminController(), new ProductAdminController(Mockito.mock(ProductAdminService.class)), new OrderAdminController(),
-            new FulfillmentAdminController(), new PaymentAdminController(),
-            new MemberAdminController(Mockito.mock(MemberAdminService.class)),
-            new ReviewAdminController(), new NotificationAdminController(),
-            new CommunityAdminController(), new CouponAdminController(couponAdminService)
+                new StatisticsAdminController(),
+                new ProductAdminController(
+                        Mockito.mock(ProductAdminService.class)),
+                new OrderAdminController(),
+                new FulfillmentAdminController(),
+                new PaymentAdminController(),
+                new MemberAdminController(
+                        Mockito.mock(MemberAdminService.class),
+                        Mockito.mock(MemberSessionService.class)),
+                new ReviewAdminController(),
+                new NotificationAdminController(),
+                new CommunityAdminController(),
+                new CouponAdminController(couponAdminService)
         ).build();
 
         pages.put("/admin", "admin/dashboard");

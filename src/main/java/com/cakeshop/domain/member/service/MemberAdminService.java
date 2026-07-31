@@ -101,6 +101,64 @@ public class MemberAdminService {
                 row.withdrawnAt());
     }
 
+    @Transactional
+    public String suspendMember(Long memberId, String reason) {
+        if (reason == null || reason.isBlank()) {
+            throw new BusinessException(
+                    MemberErrorCode.INVALID_SUSPENSION_REASON);
+        }
+
+        String normalizedReason = reason.trim();
+
+        if (normalizedReason.length() > 500) {
+            throw new BusinessException(
+                    MemberErrorCode.INVALID_SUSPENSION_REASON);
+        }
+
+        MemberAdminDetailRow member =
+                memberMapper.findAdminMemberDetail(memberId)
+                        .orElseThrow(() ->
+                                new BusinessException(MemberErrorCode.NOT_FOUND));
+
+        if (!"USER".equals(member.role())
+                || member.status() != MemberStatus.ACTIVE) {
+            throw new BusinessException(MemberErrorCode.INVALID_STATUS_TRANSITION);
+        }
+
+        int updatedRows =
+                memberMapper.suspendActiveUser(
+                        memberId,
+                        normalizedReason);
+
+        if (updatedRows != 1) {
+            throw new BusinessException(
+                    MemberErrorCode.INVALID_STATUS_TRANSITION);
+        }
+        return member.email();
+    }
+
+    @Transactional
+    public void activateMember(Long memberId) {
+        MemberAdminDetailRow member =
+                memberMapper.findAdminMemberDetail(memberId)
+                        .orElseThrow(() ->
+                                new BusinessException(MemberErrorCode.NOT_FOUND));
+
+        if (!"USER".equals(member.role())
+                || member.status() != MemberStatus.SUSPENDED) {
+            throw new BusinessException(
+                    MemberErrorCode.INVALID_STATUS_TRANSITION);
+        }
+
+        int updatedRows =
+                memberMapper.activateSuspendedUser(memberId);
+
+        if (updatedRows != 1) {
+            throw new BusinessException(
+                    MemberErrorCode.INVALID_STATUS_TRANSITION);
+        }
+    }
+
     private MemberAdminListView toListView(MemberAdminListRow row) {
         return new MemberAdminListView(
                 row.id(),

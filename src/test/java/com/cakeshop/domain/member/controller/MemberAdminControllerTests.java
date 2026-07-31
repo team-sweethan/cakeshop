@@ -3,10 +3,14 @@ package com.cakeshop.domain.member.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
@@ -19,6 +23,7 @@ import com.cakeshop.domain.member.dto.view.MemberAdminDetailView;
 import com.cakeshop.domain.member.dto.view.MemberAdminListView;
 import com.cakeshop.domain.member.entity.MemberStatus;
 import com.cakeshop.domain.member.service.MemberAdminService;
+import com.cakeshop.domain.member.service.MemberSessionService;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import org.junit.jupiter.api.Test;
@@ -43,7 +48,9 @@ class MemberAdminControllerTests {
 
         MockMvc mockMvc = MockMvcBuilders
                 .standaloneSetup(
-                        new MemberAdminController(memberAdminService))
+                        new MemberAdminController(
+                                memberAdminService,
+                                mock(MemberSessionService.class)))
                 .build();
 
         mockMvc.perform(get("/admin/members")
@@ -88,7 +95,9 @@ class MemberAdminControllerTests {
 
         MockMvc mockMvc = MockMvcBuilders
                 .standaloneSetup(
-                        new MemberAdminController(memberAdminService))
+                        new MemberAdminController(
+                                memberAdminService,
+                                mock(MemberSessionService.class)))
                 .build();
 
         mockMvc.perform(get("/admin/members")
@@ -125,7 +134,9 @@ class MemberAdminControllerTests {
 
         MockMvc mockMvc = MockMvcBuilders
                 .standaloneSetup(
-                        new MemberAdminController(memberAdminService))
+                        new MemberAdminController(
+                                memberAdminService,
+                                mock(MemberSessionService.class)))
                 .build();
 
         mockMvc.perform(get("/admin/members/1"))
@@ -134,6 +145,86 @@ class MemberAdminControllerTests {
                 .andExpect(model().attribute("member", member));
 
         verify(memberAdminService).getMemberDetail(1L);
+    }
+
+    @Test
+    void suspendMember_validReason_expiresSessionsAndRedirects()
+            throws Exception {
+        MemberAdminService memberAdminService =
+                mock(MemberAdminService.class);
+        MemberSessionService memberSessionService =
+                mock(MemberSessionService.class);
+        when(memberAdminService.suspendMember(
+                1L,
+                "정지 사유"))
+                .thenReturn("member@example.com");
+        MockMvc mockMvc = MockMvcBuilders
+                .standaloneSetup(
+                        new MemberAdminController(
+                                memberAdminService,
+                                memberSessionService))
+                .build();
+
+        mockMvc.perform(post("/admin/members/1/suspend")
+                        .param("reason", "정지 사유"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/admin/members"))
+                .andExpect(flash().attribute(
+                        "successMessage",
+                        "회원 이용을 정지했습니다."));
+
+        verify(memberAdminService).suspendMember(1L, "정지 사유");
+        verify(memberSessionService)
+                .expireSessionsByEmail("member@example.com");
+    }
+
+    @Test
+    void suspendMember_blankReason_redirectsWithError()
+            throws Exception {
+        MemberAdminService memberAdminService =
+                mock(MemberAdminService.class);
+        MemberSessionService memberSessionService =
+                mock(MemberSessionService.class);
+        MockMvc mockMvc = MockMvcBuilders
+                .standaloneSetup(
+                        new MemberAdminController(
+                                memberAdminService,
+                                memberSessionService))
+                .build();
+
+        mockMvc.perform(post("/admin/members/1/suspend")
+                        .param("reason", "   "))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/admin/members"))
+                .andExpect(flash().attribute(
+                        "errorMessage",
+                        "이용정지 사유를 확인해 주세요."));
+
+        verify(memberAdminService, never())
+                .suspendMember(any(), any());
+        verify(memberSessionService, never())
+                .expireSessionsByEmail(any());
+    }
+
+    @Test
+    void activateMember_suspendedMember_redirects() throws Exception {
+        MemberAdminService memberAdminService =
+                mock(MemberAdminService.class);
+        MockMvc mockMvc = MockMvcBuilders
+                .standaloneSetup(
+                        new MemberAdminController(
+                                memberAdminService,
+                                mock(MemberSessionService.class)))
+                .build();
+
+        mockMvc.perform(post("/admin/members/1/activate"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/admin/members"))
+                .andExpect(flash().attribute(
+                        "successMessage",
+                        "회원 이용정지를 해제했습니다."));
+
+        verify(memberAdminService).activateMember(1L);
     }
 
     private MemberAdminDetailView detail() {

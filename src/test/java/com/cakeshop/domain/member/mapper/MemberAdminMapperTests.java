@@ -149,6 +149,69 @@ class MemberAdminMapperTests {
                 .isEmpty();
     }
 
+    @Test
+    void suspendActiveUser_activeUser_updatesSuspensionInformation() {
+        Long memberId = memberId("active");
+
+        int updatedRows =
+                memberMapper.suspendActiveUser(
+                        memberId,
+                        "관리자 테스트 정지 사유");
+
+        assertThat(updatedRows).isEqualTo(1);
+        assertThat(memberMapper.findAdminMemberDetail(memberId))
+                .hasValueSatisfying(member -> {
+                    assertThat(member.status())
+                            .isEqualTo(MemberStatus.SUSPENDED);
+                    assertThat(member.suspendedAt()).isNotNull();
+                    assertThat(member.suspendedReason())
+                            .isEqualTo("관리자 테스트 정지 사유");
+                });
+    }
+
+    @Test
+    void suspendActiveUser_invalidTargets_updatesNothing() {
+        assertThat(memberMapper.suspendActiveUser(
+                memberId("suspended"),
+                "중복 정지"))
+                .isZero();
+        assertThat(memberMapper.suspendActiveUser(
+                memberId("withdrawn"),
+                "탈퇴 회원 정지"))
+                .isZero();
+        assertThat(memberMapper.suspendActiveUser(
+                memberId("admin"),
+                "관리자 정지"))
+                .isZero();
+    }
+
+    @Test
+    void activateSuspendedUser_suspendedUser_clearsSuspensionInformation() {
+        Long memberId = memberId("suspended");
+
+        int updatedRows =
+                memberMapper.activateSuspendedUser(memberId);
+
+        assertThat(updatedRows).isEqualTo(1);
+        assertThat(memberMapper.findAdminMemberDetail(memberId))
+                .hasValueSatisfying(member -> {
+                    assertThat(member.status())
+                            .isEqualTo(MemberStatus.ACTIVE);
+                    assertThat(member.suspendedAt()).isNull();
+                    assertThat(member.suspendedReason()).isNull();
+                });
+    }
+
+    @Test
+    void activateSuspendedUser_invalidTargets_updatesNothing() {
+        assertThat(memberMapper.activateSuspendedUser(memberId("active")))
+                .isZero();
+        assertThat(memberMapper.activateSuspendedUser(memberId("withdrawn")))
+                .isZero();
+        assertThat(memberMapper.activateSuspendedUser(memberId("admin")))
+                .isZero();
+    }
+
     private MemberAdminSearchCondition condition(MemberAdminListType listType) {
         MemberAdminSearchCondition condition = new MemberAdminSearchCondition();
 
@@ -156,6 +219,13 @@ class MemberAdminMapperTests {
         condition.setKeyword(marker);
 
         return condition;
+    }
+
+    private Long memberId(String account) {
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM members WHERE email = ?",
+                Long.class,
+                email(account));
     }
 
     private void insertMember(

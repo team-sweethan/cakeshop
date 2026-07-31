@@ -25,6 +25,13 @@ public interface MemberMapper {
     Optional<MemberAdminDetailRow> findAdminMemberDetail(
             @Param("memberId") Long memberId);
 
+    int suspendActiveUser(
+            @Param("memberId") Long memberId,
+            @Param("suspendedReason") String suspendedReason);
+
+    int activateSuspendedUser(
+            @Param("memberId") Long memberId);
+
     Optional<Member> findByEmail(@Param("email") String email);
 
     List<String> findEmailsByMemberInfo(
