@@ -10,7 +10,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -145,9 +144,9 @@ class MemberAdminControllerTests {
                 1L,
                 "관리자 조회 회원",
                 "member",
-                "member@example.com",
-                "010-1234-5678",
-                LocalDate.of(2000, 1, 1),
+                "me***@example.com",
+                "010-****-5678",
+                "2000.**.**",
                 "USER",
                 MemberStatus.ACTIVE,
                 registeredAt,

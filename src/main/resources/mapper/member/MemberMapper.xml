@@ -70,7 +70,7 @@
     </select>
 
     <select id="findAdminMemberDetail"
-            resultType="com.cakeshop.domain.member.dto.view.MemberAdminDetailView">
+            resultType="com.cakeshop.domain.member.dto.view.MemberAdminDetailRow">
         SELECT id,
                name,
                nickname,

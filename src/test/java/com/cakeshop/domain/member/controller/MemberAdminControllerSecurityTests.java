@@ -1,6 +1,7 @@
 package com.cakeshop.domain.member.controller;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -9,7 +10,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -108,9 +108,9 @@ class MemberAdminControllerSecurityTests {
                 1L,
                 "관리자 조회 회원",
                 "member",
-                "member@example.com",
-                "010-1234-5678",
-                LocalDate.of(2000, 1, 1),
+                "me***@example.com",
+                "010-****-5678",
+                "2000.**.**",
                 "USER",
                 MemberStatus.ACTIVE,
                 registeredAt,
@@ -126,6 +126,8 @@ class MemberAdminControllerSecurityTests {
                 .andExpect(status().isOk())
                 .andExpect(view().name("admin/member/detail"))
                 .andExpect(content().string(
-                        containsString("member@example.com")));
+                        containsString("me***@example.com")))
+                .andExpect(content().string(
+                        not(containsString("member@example.com"))));
     }
 }

@@ -46,20 +46,18 @@
                     <div class="member-admin-detail-item">
                         <dt class="member-admin-detail-label">이메일</dt>
                         <dd class="member-admin-detail-value"
-                            th:text="${member.email ?: '-'}">member@example.com</dd>
+                            th:text="${member.maskedEmail}">me***@example.com</dd>
                     </div>
                     <div class="member-admin-detail-item">
                         <dt class="member-admin-detail-label">전화번호</dt>
                         <dd class="member-admin-detail-value"
-                            th:text="${member.phone ?: '-'}">010-1234-5678</dd>
+                            th:text="${member.maskedPhone}">010-****-5678</dd>
                     </div>
                     <div class="member-admin-detail-item">
                         <dt class="member-admin-detail-label">생년월일</dt>
                         <dd class="member-admin-detail-value"
-                            th:text="${member.birthDate == null
-                                ? '-'
-                                : #temporals.format(member.birthDate, 'yyyy.MM.dd')}">
-                            2000.01.01
+                            th:text="${member.maskedBirthDate}">
+                            2000.**.**
                         </dd>
                     </div>
                 </dl>

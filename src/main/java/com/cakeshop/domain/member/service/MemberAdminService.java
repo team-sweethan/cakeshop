@@ -1,9 +1,11 @@
 package com.cakeshop.domain.member.service;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import com.cakeshop.domain.member.dto.form.MemberAdminListType;
 import com.cakeshop.domain.member.dto.form.MemberAdminSearchCondition;
+import com.cakeshop.domain.member.dto.view.MemberAdminDetailRow;
 import com.cakeshop.domain.member.dto.view.MemberAdminDetailView;
 import com.cakeshop.domain.member.dto.view.MemberAdminListRow;
 import com.cakeshop.domain.member.dto.view.MemberAdminListView;
@@ -78,9 +80,25 @@ public class MemberAdminService {
 
     @Transactional(readOnly = true)
     public MemberAdminDetailView getMemberDetail(Long memberId) {
-        return memberMapper.findAdminMemberDetail(memberId)
+        MemberAdminDetailRow row =
+                memberMapper.findAdminMemberDetail(memberId)
                 .orElseThrow(() ->
                         new BusinessException(MemberErrorCode.NOT_FOUND));
+
+        return new MemberAdminDetailView(
+                row.id(),
+                row.name(),
+                row.nickname(),
+                maskEmail(row.email()),
+                maskPhone(row.phone()),
+                maskBirthDate(row.birthDate()),
+                row.role(),
+                row.status(),
+                row.createdAt(),
+                row.updatedAt(),
+                row.suspendedAt(),
+                row.suspendedReason(),
+                row.withdrawnAt());
     }
 
     private MemberAdminListView toListView(MemberAdminListRow row) {
@@ -89,7 +107,7 @@ public class MemberAdminService {
                 row.name(),
                 maskEmail(row.email()),
                 maskPhone(row.phone()),
-                maskBirthDate(row),
+                maskBirthDate(row.birthDate()),
                 row.status(),
                 row.createdAt(),
                 row.withdrawnAt());
@@ -133,11 +151,11 @@ public class MemberAdminService {
         return prefix + "-****-" + suffix;
     }
 
-    private String maskBirthDate(MemberAdminListRow row) {
-        if (row.birthDate() == null) {
+    private String maskBirthDate(LocalDate birthDate) {
+        if (birthDate == null) {
             return EMPTY_DISPLAY_VALUE;
         }
 
-        return row.birthDate().getYear() + ".**.**";
+        return birthDate.getYear() + ".**.**";
     }
 }

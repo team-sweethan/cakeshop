@@ -15,6 +15,7 @@ import java.util.Optional;
 
 import com.cakeshop.domain.member.dto.form.MemberAdminListType;
 import com.cakeshop.domain.member.dto.form.MemberAdminSearchCondition;
+import com.cakeshop.domain.member.dto.view.MemberAdminDetailRow;
 import com.cakeshop.domain.member.dto.view.MemberAdminDetailView;
 import com.cakeshop.domain.member.dto.view.MemberAdminListRow;
 import com.cakeshop.domain.member.dto.view.MemberAdminListView;
@@ -157,7 +158,7 @@ class MemberAdminServiceTests {
 
     @Test
     void getMemberDetail_existingMember_returnsDetail() {
-        MemberAdminDetailView detail = new MemberAdminDetailView(
+        MemberAdminDetailRow row = new MemberAdminDetailRow(
                 1L,
                 "관리자 조회 회원",
                 "member",
@@ -172,12 +173,14 @@ class MemberAdminServiceTests {
                 null,
                 null);
         when(memberMapper.findAdminMemberDetail(1L))
-                .thenReturn(Optional.of(detail));
+                .thenReturn(Optional.of(row));
 
         MemberAdminDetailView result =
                 memberAdminService.getMemberDetail(1L);
 
-        assertThat(result).isSameAs(detail);
+        assertThat(result.maskedEmail()).isEqualTo("me***@example.com");
+        assertThat(result.maskedPhone()).isEqualTo("010-****-5678");
+        assertThat(result.maskedBirthDate()).isEqualTo("2000.**.**");
     }
 
     @Test
