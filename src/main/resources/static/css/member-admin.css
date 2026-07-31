@@ -157,6 +157,41 @@
     overflow-wrap: anywhere;
 }
 
+.member-admin-status-actions {
+    align-items: center;
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.member-admin-status-actions form {
+    margin: 0;
+}
+
+.member-admin-status-action {
+    align-items: center;
+    display: inline-flex;
+    justify-content: center;
+    min-width: 82px;
+    padding: 6px 10px;
+    white-space: nowrap;
+}
+
+.member-admin-modal-title {
+    font-size: 1.2rem;
+    margin: 0 0 8px;
+}
+
+.member-admin-modal-description {
+    color: #6b7280;
+    margin: 0 0 16px;
+}
+
+.member-admin-modal-reason {
+    min-height: 112px;
+    resize: vertical;
+}
+
 @media (max-width: 900px) {
     .member-admin-search {
         flex-wrap: wrap;
