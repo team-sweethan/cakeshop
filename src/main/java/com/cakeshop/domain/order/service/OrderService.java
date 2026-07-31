@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -42,17 +43,20 @@ public class OrderService {
     private final ProductService productService;
     private final OrderMapper orderMapper;
     private final PaymentMapper paymentMapper;
+    private final Clock clock;
 
     public OrderService(
             ProductQueryService productQueryService,
             ProductService productService,
             OrderMapper orderMapper,
-            PaymentMapper paymentMapper
+            PaymentMapper paymentMapper,
+            Clock clock
     ) {
         this.productQueryService = productQueryService;
         this.productService = productService;
         this.orderMapper = orderMapper;
         this.paymentMapper = paymentMapper;
+        this.clock = clock;
     }
 
     /**
@@ -65,13 +69,10 @@ public class OrderService {
         validateActiveMember(memberId);
         validateForm(form);
 
+        LocalDateTime now = LocalDateTime.now(clock);
+        validatePickupAt(form.getPickupAt(), now);
         PreparedOrderItem preparedItem = prepareItem(form);
         BigDecimal originalAmount = preparedItem.totalAmount();
-        LocalDateTime now = LocalDateTime.now();
-
-        if (form.getPickupAt() == null || !form.getPickupAt().isAfter(now)) {
-            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
-        }
 
         Order order = createOrder(memberId, form, originalAmount, now);
         requireOneRow(orderMapper.insertOrder(order), OrderErrorCode.ORDER_SAVE_FAILED);
@@ -90,6 +91,15 @@ public class OrderService {
     private void validateActiveMember(long memberId) {
         if (memberId <= 0) {
             throw new BusinessException(OrderErrorCode.MEMBER_NOT_AVAILABLE);
+        }
+    }
+
+    private void validatePickupAt(
+            LocalDateTime pickupAt,
+            LocalDateTime now
+    ) {
+        if (pickupAt == null || !pickupAt.isAfter(now)) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
     }
 

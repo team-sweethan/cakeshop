@@ -19,6 +19,7 @@ import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.error.ProductErrorCode;
 import com.cakeshop.domain.product.service.ProductQueryService;
 import com.cakeshop.global.error.BusinessException;
+import com.cakeshop.global.error.CommonErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,7 +30,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -42,6 +45,14 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class OrderServiceTests {
+
+    private static final ZoneId TEST_ZONE = ZoneId.of("Asia/Seoul");
+    private static final LocalDateTime FIXED_NOW =
+            LocalDateTime.of(2026, 7, 31, 10, 0);
+    private static final Clock FIXED_CLOCK = Clock.fixed(
+            FIXED_NOW.atZone(TEST_ZONE).toInstant(),
+            TEST_ZONE
+    );
 
     @Mock
     private ProductQueryService productQueryService;
@@ -63,7 +74,8 @@ class OrderServiceTests {
                 productQueryService,
                 productService,
                 orderMapper,
-                paymentMapper
+                paymentMapper,
+                FIXED_CLOCK
         );
     }
 
@@ -103,11 +115,9 @@ class OrderServiceTests {
         when(orderMapper.insertOrderItemOption(any(OrderItemOption.class))).thenReturn(1);
         when(paymentMapper.insertReadyPayment(any(Payment.class))).thenReturn(1);
         GeneralOrderForm form = form(1L, 2, List.of(101L));
-        LocalDateTime beforeCreation = LocalDateTime.now();
 
         long orderId = orderService.createGeneralOrder(memberId, form);
 
-        LocalDateTime afterCreation = LocalDateTime.now();
         assertThat(orderId).isEqualTo(100L);
 
         ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
@@ -120,10 +130,7 @@ class OrderServiceTests {
         assertThat(order.getDiscountAmount()).isEqualByComparingTo("0");
         assertThat(order.getFinalAmount()).isEqualByComparingTo("70000");
         assertThat(order.getPaymentExpiresAt())
-                .isBetween(
-                        beforeCreation.plusMinutes(10),
-                        afterCreation.plusMinutes(10)
-                );
+                .isEqualTo(FIXED_NOW.plusMinutes(10));
 
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
         verify(orderMapper).insertOrderItem(itemCaptor.capture());
@@ -277,6 +284,23 @@ class OrderServiceTests {
         );
 
         verify(productService, never()).getPublicOptionGroups(1L);
+        verify(orderMapper, never()).insertOrder(any(Order.class));
+    }
+
+    @Test
+    void createGeneralOrder_pickupAtCurrentTime_throwsInvalidInput() {
+        GeneralOrderForm form = form(1L, 1, List.of());
+        form.setPickupAt(FIXED_NOW);
+
+        assertThatThrownBy(() ->
+                orderService.createGeneralOrder(10L, form)
+        ).isInstanceOfSatisfying(
+                BusinessException.class,
+                error -> assertThat(error.getErrorCode())
+                        .isEqualTo(CommonErrorCode.INVALID_INPUT)
+        );
+
+        verify(productQueryService, never()).getSalesInfo(1L);
         verify(orderMapper, never()).insertOrder(any(Order.class));
     }
 
@@ -446,7 +470,7 @@ class OrderServiceTests {
         form.setOrdererPhone(" 010-1111-2222 ");
         form.setPickupName(" 수령자 ");
         form.setPickupPhone(" 010-3333-4444 ");
-        form.setPickupAt(LocalDateTime.now().plusDays(3));
+        form.setPickupAt(FIXED_NOW.plusDays(3));
         form.setRequestMessage(" 초는 빼주세요. ");
         form.setProductId(productId);
         form.setQuantity(quantity);

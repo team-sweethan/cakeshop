@@ -29,7 +29,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -42,6 +44,10 @@ import static org.mockito.Mockito.when;
 @Transactional
 class OrderServiceIntegrationTests {
 
+    private static final ZoneId TEST_ZONE = ZoneId.of("Asia/Seoul");
+    private static final LocalDateTime FIXED_NOW =
+            LocalDateTime.of(2026, 7, 31, 10, 0);
+
     private final OrderService orderService;
     private final OrderMapper orderMapper;
     private final PaymentMapper paymentMapper;
@@ -52,6 +58,9 @@ class OrderServiceIntegrationTests {
 
     @MockitoBean
     private ProductService productService;
+
+    @MockitoBean
+    private Clock clock;
 
     private String suffix;
     private long memberId;
@@ -78,6 +87,9 @@ class OrderServiceIntegrationTests {
         productId = insertProduct();
         productOptionId = insertProductOption();
         stubProductLookup();
+        when(clock.instant())
+                .thenReturn(FIXED_NOW.atZone(TEST_ZONE).toInstant());
+        when(clock.getZone()).thenReturn(TEST_ZONE);
     }
 
     @Test
@@ -85,11 +97,9 @@ class OrderServiceIntegrationTests {
         // 실제 Spring Bean이 트랜잭션 프록시로 감싸져 있어야 전체 저장이 한 트랜잭션에 참여한다.
         assertThat(AopUtils.isAopProxy(orderService)).isTrue();
         GeneralOrderForm form = createForm();
-        LocalDateTime beforeCreation = LocalDateTime.now();
 
         long orderId = orderService.createGeneralOrder(memberId, form);
 
-        LocalDateTime afterCreation = LocalDateTime.now();
         Order order = orderMapper.findOrderById(orderId).orElseThrow();
         assertThat(order.getMemberId()).isEqualTo(memberId);
         assertThat(order.getOrderType()).isEqualTo(OrderType.GENERAL);
@@ -98,10 +108,7 @@ class OrderServiceIntegrationTests {
         assertThat(order.getDiscountAmount()).isEqualByComparingTo("0");
         assertThat(order.getFinalAmount()).isEqualByComparingTo("70000");
         assertThat(order.getPaymentExpiresAt())
-                .isBetween(
-                        beforeCreation.plusMinutes(10).minusSeconds(1),
-                        afterCreation.plusMinutes(10).plusSeconds(1)
-                );
+                .isEqualTo(FIXED_NOW.plusMinutes(10));
 
         OrderItem savedItem = orderMapper.findOrderItemsByOrderId(orderId)
                 .getFirst();
@@ -158,7 +165,7 @@ class OrderServiceIntegrationTests {
         form.setOrdererPhone("010-1111-2222");
         form.setPickupName("수령자");
         form.setPickupPhone("010-3333-4444");
-        form.setPickupAt(LocalDateTime.now().plusDays(3));
+        form.setPickupAt(FIXED_NOW.plusDays(3));
         form.setRequestMessage("초는 빼주세요.");
         form.setProductId(productId);
         form.setQuantity(2);
