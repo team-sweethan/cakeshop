@@ -11,10 +11,12 @@ import com.cakeshop.domain.order.mapper.OrderMapper;
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.entity.PaymentStatus;
 import com.cakeshop.domain.payment.mapper.PaymentMapper;
-import com.cakeshop.domain.product.customer.dto.view.ProductDetailView;
-import com.cakeshop.domain.product.customer.dto.view.ProductOptionRow;
+import com.cakeshop.domain.product.customer.dto.view.ProductOptionGroupView;
+import com.cakeshop.domain.product.customer.dto.view.ProductOptionItemView;
+import com.cakeshop.domain.product.customer.service.ProductService;
+import com.cakeshop.domain.product.dto.view.ProductSalesInfo;
 import com.cakeshop.domain.product.entity.ProductType;
-import com.cakeshop.domain.product.mapper.ProductMapper;
+import com.cakeshop.domain.product.service.ProductQueryService;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,7 +49,10 @@ class OrderServiceIntegrationTests {
     private final JdbcTemplate jdbcTemplate;
 
     @MockitoBean
-    private ProductMapper productMapper;
+    private ProductQueryService productQueryService;
+
+    @MockitoBean
+    private ProductService productService;
 
     private String suffix;
     private long memberId;
@@ -124,22 +129,27 @@ class OrderServiceIntegrationTests {
     }
 
     private void stubProductLookup() {
-        ProductDetailView product = new ProductDetailView();
-        product.setId(productId);
-        product.setName("일반 주문 서비스 상품 " + suffix);
-        product.setBasePrice(BigDecimal.valueOf(30_000));
-        product.setProductType(ProductType.GENERAL);
-        product.setPreparationDays(0);
-        when(productMapper.findPublicDetailById(productId)).thenReturn(product);
-        when(productMapper.findPublicOptionRowsByProductId(productId))
-                .thenReturn(List.of(new ProductOptionRow(
+        ProductSalesInfo product = new ProductSalesInfo(
+                productId,
+                "일반 주문 서비스 상품 " + suffix,
+                ProductType.GENERAL,
+                0,
+                true,
+                BigDecimal.valueOf(30_000),
+                null
+        );
+        when(productQueryService.getSalesInfo(productId)).thenReturn(product);
+        when(productService.getPublicOptionGroups(productId))
+                .thenReturn(List.of(new ProductOptionGroupView(
                         1L,
                         "크기",
                         true,
                         "SINGLE",
-                        productOptionId,
-                        "2호",
-                        BigDecimal.valueOf(5_000)
+                        List.of(new ProductOptionItemView(
+                                productOptionId,
+                                "2호",
+                                BigDecimal.valueOf(5_000)
+                        ))
                 )));
     }
 

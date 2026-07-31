@@ -12,10 +12,12 @@ import com.cakeshop.domain.order.mapper.OrderMapper;
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.entity.PaymentStatus;
 import com.cakeshop.domain.payment.mapper.PaymentMapper;
-import com.cakeshop.domain.product.customer.dto.view.ProductOptionRow;
-import com.cakeshop.domain.product.customer.dto.view.ProductDetailView;
+import com.cakeshop.domain.product.customer.dto.view.ProductOptionGroupView;
+import com.cakeshop.domain.product.customer.dto.view.ProductOptionItemView;
+import com.cakeshop.domain.product.customer.service.ProductService;
+import com.cakeshop.domain.product.dto.view.ProductSalesInfo;
 import com.cakeshop.domain.product.entity.ProductType;
-import com.cakeshop.domain.product.mapper.ProductMapper;
+import com.cakeshop.domain.product.service.ProductQueryService;
 import com.cakeshop.global.error.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,7 +44,10 @@ import static org.mockito.Mockito.when;
 class OrderServiceTests {
 
     @Mock
-    private ProductMapper productMapper;
+    private ProductQueryService productQueryService;
+
+    @Mock
+    private ProductService productService;
 
     @Mock
     private OrderMapper orderMapper;
@@ -55,7 +60,8 @@ class OrderServiceTests {
     @BeforeEach
     void setUp() {
         orderService = new OrderService(
-                productMapper,
+                productQueryService,
+                productService,
                 orderMapper,
                 paymentMapper
         );
@@ -64,20 +70,22 @@ class OrderServiceTests {
     @Test
     void createGeneralOrderRecalculatesAmountsAndSavesSnapshotsAndReadyPayment() {
         long memberId = 10L;
-        ProductDetailView product =
+        ProductSalesInfo product =
                 product(1L, ProductType.GENERAL, "딸기 케이크", 30_000);
-        ProductOptionRow option = new ProductOptionRow(
+        ProductOptionGroupView optionGroup = new ProductOptionGroupView(
                 11L,
                 "크기",
                 true,
                 "SINGLE",
-                101L,
-                "2호",
-                BigDecimal.valueOf(5_000)
+                List.of(new ProductOptionItemView(
+                        101L,
+                        "2호",
+                        BigDecimal.valueOf(5_000)
+                ))
         );
-        when(productMapper.findPublicDetailById(1L)).thenReturn(product);
-        when(productMapper.findPublicOptionRowsByProductId(1L))
-                .thenReturn(List.of(option));
+        when(productQueryService.getSalesInfo(1L)).thenReturn(product);
+        when(productService.getPublicOptionGroups(1L))
+                .thenReturn(List.of(optionGroup));
         when(orderMapper.insertOrder(any(Order.class))).thenAnswer(invocation -> {
             invocation.<Order>getArgument(0).setId(100L);
             return 1;
@@ -143,12 +151,13 @@ class OrderServiceTests {
         });
 
         InOrder saveOrder = inOrder(
-                productMapper,
+                productQueryService,
+                productService,
                 orderMapper,
                 paymentMapper
         );
-        saveOrder.verify(productMapper).findPublicDetailById(1L);
-        saveOrder.verify(productMapper).findPublicOptionRowsByProductId(1L);
+        saveOrder.verify(productQueryService).getSalesInfo(1L);
+        saveOrder.verify(productService).getPublicOptionGroups(1L);
         saveOrder.verify(orderMapper).insertOrder(any(Order.class));
         saveOrder.verify(orderMapper).insertOrderItem(any(OrderItem.class));
         saveOrder.verify(orderMapper).insertOrderItemOption(any(OrderItemOption.class));
@@ -166,23 +175,23 @@ class OrderServiceTests {
                         .isEqualTo(OrderErrorCode.MEMBER_NOT_AVAILABLE)
         );
 
-        verify(productMapper, never()).findPublicDetailById(1L);
+        verify(productQueryService, never()).getSalesInfo(1L);
         verify(orderMapper, never()).insertOrder(any(Order.class));
         verify(paymentMapper, never()).insertReadyPayment(any(Payment.class));
     }
 
     @Test
     void createGeneralOrderRejectsMixedGeneralAndCustomProductsBeforeSaving() {
-        when(productMapper.findPublicDetailById(1L))
+        when(productQueryService.getSalesInfo(1L))
                 .thenReturn(product(
                         1L,
                         ProductType.GENERAL,
                         "일반 케이크",
                         30_000
                 ));
-        when(productMapper.findPublicOptionRowsByProductId(1L))
+        when(productService.getPublicOptionGroups(1L))
                 .thenReturn(List.of());
-        when(productMapper.findPublicDetailById(2L))
+        when(productQueryService.getSalesInfo(2L))
                 .thenReturn(product(
                         2L,
                         ProductType.CUSTOM,
@@ -218,19 +227,21 @@ class OrderServiceTests {
         assertThat(transactional).isNotNull();
     }
 
-    private ProductDetailView product(
+    private ProductSalesInfo product(
             long id,
             ProductType productType,
             String name,
             long basePrice
     ) {
-        ProductDetailView product = new ProductDetailView();
-        product.setId(id);
-        product.setProductType(productType);
-        product.setName(name);
-        product.setBasePrice(BigDecimal.valueOf(basePrice));
-        product.setPreparationDays(0);
-        return product;
+        return new ProductSalesInfo(
+                id,
+                name,
+                productType,
+                0,
+                true,
+                BigDecimal.valueOf(basePrice),
+                null
+        );
     }
 
     private CreateOrderForm form(OrderItemForm... items) {

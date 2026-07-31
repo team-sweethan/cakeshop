@@ -12,11 +12,12 @@ import com.cakeshop.domain.order.mapper.OrderMapper;
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.entity.PaymentStatus;
 import com.cakeshop.domain.payment.mapper.PaymentMapper;
-import com.cakeshop.domain.product.customer.dto.view.ProductDetailView;
-import com.cakeshop.domain.product.customer.dto.view.ProductOptionRow;
+import com.cakeshop.domain.product.customer.dto.view.ProductOptionGroupView;
+import com.cakeshop.domain.product.customer.dto.view.ProductOptionItemView;
+import com.cakeshop.domain.product.customer.service.ProductService;
+import com.cakeshop.domain.product.dto.view.ProductSalesInfo;
 import com.cakeshop.domain.product.entity.ProductType;
-import com.cakeshop.domain.product.error.ProductErrorCode;
-import com.cakeshop.domain.product.mapper.ProductMapper;
+import com.cakeshop.domain.product.service.ProductQueryService;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.error.CommonErrorCode;
 import org.springframework.stereotype.Service;
@@ -31,7 +32,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 public class OrderService {
@@ -39,16 +39,19 @@ public class OrderService {
     private static final BigDecimal ZERO = BigDecimal.ZERO;
     private static final long PAYMENT_EXPIRATION_MINUTES = 10L;
 
-    private final ProductMapper productMapper;
+    private final ProductQueryService productQueryService;
+    private final ProductService productService;
     private final OrderMapper orderMapper;
     private final PaymentMapper paymentMapper;
 
     public OrderService(
-            ProductMapper productMapper,
+            ProductQueryService productQueryService,
+            ProductService productService,
             OrderMapper orderMapper,
             PaymentMapper paymentMapper
     ) {
-        this.productMapper = productMapper;
+        this.productQueryService = productQueryService;
+        this.productService = productService;
         this.orderMapper = orderMapper;
         this.paymentMapper = paymentMapper;
     }
@@ -119,23 +122,21 @@ public class OrderService {
                 throw new BusinessException(OrderErrorCode.INVALID_QUANTITY);
             }
 
-            ProductDetailView product = productMapper.findPublicDetailById(itemForm.getProductId());
-            if (product == null) {
-                throw new BusinessException(ProductErrorCode.NOT_FOUND);
-            }
-            if (product.getProductType() != ProductType.GENERAL) {
+            ProductSalesInfo product =
+                    productQueryService.getSalesInfo(itemForm.getProductId());
+            if (product.productType() != ProductType.GENERAL) {
                 throw new BusinessException(OrderErrorCode.GENERAL_PRODUCT_REQUIRED);
             }
-            if (product.getBasePrice() == null || product.getBasePrice().signum() < 0) {
+            if (product.basePrice() == null || product.basePrice().signum() < 0) {
                 throw new BusinessException(CommonErrorCode.INTERNAL_ERROR);
             }
 
-            List<ProductOptionRow> selectedOptions =
-                    resolveSelectedOptions(product.getId(), itemForm.getOptionIds());
+            List<PreparedOption> selectedOptions =
+                    resolveSelectedOptions(product.productId(), itemForm.getOptionIds());
             BigDecimal optionAmount = selectedOptions.stream()
-                    .map(ProductOptionRow::additionalPrice)
+                    .map(PreparedOption::additionalPrice)
                     .reduce(ZERO, BigDecimal::add);
-            BigDecimal totalAmount = product.getBasePrice()
+            BigDecimal totalAmount = product.basePrice()
                     .add(optionAmount)
                     .multiply(BigDecimal.valueOf(itemForm.getQuantity()));
 
@@ -151,12 +152,12 @@ public class OrderService {
         return result;
     }
 
-    private List<ProductOptionRow> resolveSelectedOptions(
+    private List<PreparedOption> resolveSelectedOptions(
             long productId,
             List<Long> requestedOptionIds
     ) {
-        List<ProductOptionRow> availableOptions =
-                productMapper.findPublicOptionRowsByProductId(productId);
+        List<ProductOptionGroupView> optionGroups =
+                productService.getPublicOptionGroups(productId);
         List<Long> optionIds =
                 requestedOptionIds == null ? List.of() : requestedOptionIds;
         Set<Long> uniqueOptionIds = new HashSet<>();
@@ -167,46 +168,45 @@ public class OrderService {
             }
         }
 
-        Map<Long, ProductOptionRow> optionsById = new HashMap<>();
-        for (ProductOptionRow option : availableOptions) {
-            if (option.additionalPrice() == null
-                    || option.additionalPrice().signum() < 0) {
-                throw new BusinessException(CommonErrorCode.INTERNAL_ERROR);
+        Map<Long, PreparedOption> optionsById = new HashMap<>();
+        for (ProductOptionGroupView group : optionGroups) {
+            long selectedCount = group.options().stream()
+                    .filter(option -> uniqueOptionIds.contains(option.id()))
+                    .count();
+            if (group.required() && selectedCount == 0) {
+                throw new BusinessException(OrderErrorCode.INVALID_PRODUCT_OPTION);
             }
-            optionsById.put(option.optionId(), option);
+            if ("SINGLE".equals(group.selectionType()) && selectedCount > 1) {
+                throw new BusinessException(OrderErrorCode.INVALID_PRODUCT_OPTION);
+            }
+
+            for (ProductOptionItemView option : group.options()) {
+                if (option.additionalPrice() == null
+                        || option.additionalPrice().signum() < 0) {
+                    throw new BusinessException(CommonErrorCode.INTERNAL_ERROR);
+                }
+                PreparedOption previous = optionsById.put(
+                        option.id(),
+                        new PreparedOption(
+                                option.id(),
+                                group.name(),
+                                option.name(),
+                                option.additionalPrice()
+                        )
+                );
+                if (previous != null) {
+                    throw new BusinessException(CommonErrorCode.INTERNAL_ERROR);
+                }
+            }
         }
 
         if (!optionsById.keySet().containsAll(uniqueOptionIds)) {
             throw new BusinessException(OrderErrorCode.INVALID_PRODUCT_OPTION);
         }
 
-        List<ProductOptionRow> selectedOptions = availableOptions.stream()
-                .filter(option -> uniqueOptionIds.contains(option.optionId()))
+        return optionIds.stream()
+                .map(optionsById::get)
                 .toList();
-        validateOptionGroups(availableOptions, selectedOptions);
-        return selectedOptions;
-    }
-
-    private void validateOptionGroups(
-            List<ProductOptionRow> availableOptions,
-            List<ProductOptionRow> selectedOptions
-    ) {
-        Map<Long, Long> selectedCountByGroup = selectedOptions.stream()
-                .collect(Collectors.groupingBy(
-                        ProductOptionRow::groupId,
-                        Collectors.counting()
-                ));
-
-        for (ProductOptionRow option : availableOptions) {
-            long selectedCount =
-                    selectedCountByGroup.getOrDefault(option.groupId(), 0L);
-            if (option.required() && selectedCount == 0) {
-                throw new BusinessException(OrderErrorCode.INVALID_PRODUCT_OPTION);
-            }
-            if ("SINGLE".equals(option.selectionType()) && selectedCount > 1) {
-                throw new BusinessException(OrderErrorCode.INVALID_PRODUCT_OPTION);
-            }
-        }
     }
 
     private Order createOrder(
@@ -234,27 +234,27 @@ public class OrderService {
     }
 
     private void saveOrderItem(long orderId, PreparedOrderItem preparedItem) {
-        ProductDetailView product = preparedItem.product();
+        ProductSalesInfo product = preparedItem.product();
         OrderItem orderItem = new OrderItem();
         orderItem.setOrderId(orderId);
-        orderItem.setProductId(product.getId());
-        orderItem.setProductName(product.getName());
-        orderItem.setProductType(product.getProductType());
+        orderItem.setProductId(product.productId());
+        orderItem.setProductName(product.productName());
+        orderItem.setProductType(product.productType());
         orderItem.setQuantity(preparedItem.quantity());
-        orderItem.setBasePrice(product.getBasePrice());
+        orderItem.setBasePrice(product.basePrice());
         orderItem.setOptionAmount(preparedItem.optionAmount());
         orderItem.setTotalAmount(preparedItem.totalAmount());
-        orderItem.setPreparationDays(product.getPreparationDays());
+        orderItem.setPreparationDays(product.preparationDays());
         orderItem.setCancellationLimitDays(0);
         requireOneRow(
                 orderMapper.insertOrderItem(orderItem),
                 OrderErrorCode.ORDER_SAVE_FAILED
         );
 
-        for (ProductOptionRow selectedOption : preparedItem.selectedOptions()) {
+        for (PreparedOption selectedOption : preparedItem.selectedOptions()) {
             OrderItemOption snapshot = new OrderItemOption();
             snapshot.setOrderItemId(orderItem.getId());
-            snapshot.setProductOptionId(selectedOption.optionId());
+            snapshot.setProductOptionId(selectedOption.id());
             snapshot.setOptionGroupName(selectedOption.groupName());
             snapshot.setOptionName(selectedOption.optionName());
             snapshot.setAdditionalPrice(selectedOption.additionalPrice());
@@ -294,11 +294,19 @@ public class OrderService {
     }
 
     private record PreparedOrderItem(
-            ProductDetailView product,
+            ProductSalesInfo product,
             int quantity,
-            List<ProductOptionRow> selectedOptions,
+            List<PreparedOption> selectedOptions,
             BigDecimal optionAmount,
             BigDecimal totalAmount
+    ) {
+    }
+
+    private record PreparedOption(
+            long id,
+            String groupName,
+            String optionName,
+            BigDecimal additionalPrice
     ) {
     }
 }
