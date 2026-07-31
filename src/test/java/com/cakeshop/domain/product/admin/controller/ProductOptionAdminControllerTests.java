@@ -152,6 +152,42 @@ class ProductOptionAdminControllerTests {
     }
 
     @Test
+    void createOptionGroup_requiredPolicyError_redirectsWithAlert()
+            throws Exception {
+        ProductOptionAdminService service =
+                org.mockito.Mockito.mock(
+                        ProductOptionAdminService.class
+                );
+        doThrow(new BusinessException(
+                ProductErrorCode.REQUIRED_OPTION_GROUP_EMPTY
+        )).when(service).createOptionGroup(
+                org.mockito.ArgumentMatchers.eq(1L),
+                any(ProductOptionGroupForm.class)
+        );
+        MockMvc mockMvc = mockMvc(service);
+
+        mockMvc.perform(
+                        post("/admin/products/1/option-groups")
+                                .param("name", "크기")
+                                .param("required", "true")
+                                .param("selectionType", "SINGLE")
+                                .param("status", "ACTIVE")
+                )
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(
+                        "/admin/products/1/options"
+                ))
+                .andExpect(flash().attribute(
+                        "errorMessage",
+                        "필수 옵션 그룹에는 하나 이상의 활성 옵션이 필요합니다."
+                ))
+                .andExpect(flash().attribute(
+                        "openCreate",
+                        true
+                ));
+    }
+
+    @Test
     void updateOptionGroup_requiredPolicyError_redirectsWithAlert()
             throws Exception {
         ProductOptionAdminService service =

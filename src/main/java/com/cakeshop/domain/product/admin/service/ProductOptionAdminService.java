@@ -66,13 +66,18 @@ public class ProductOptionAdminService {
             long productId,
             ProductOptionGroupForm form
     ) {
-        ensureProductExists(productId);
-
         if (form == null) {
             throw new BusinessException(
                     ProductErrorCode.INVALID_OPTION_GROUP
             );
         }
+
+        Product product = findProductForUpdate(productId);
+
+        validateRequiredOptionGroupCreation(
+                product,
+                form
+        );
 
         int sortOrder = groupRows(
                 productMapper.findAdminOptionRowsByProductId(
@@ -501,16 +506,39 @@ public class ProductOptionAdminService {
             ProductOptionGroupForm form,
             List<ProductOptionAdminRow> rows
     ) {
-        if (product.getStatus() != ProductStatus.ACTIVE
-                || !form.isRequired()) {
+        if (product.getStatus() != ProductStatus.ACTIVE) {
             return;
         }
 
+        ProductOptionAdminRow currentGroup = rows.getFirst();
+        boolean deactivatesCurrentRequiredGroup =
+                currentGroup.required()
+                        && currentGroup.groupStatus()
+                        == ProductOptionStatus.ACTIVE
+                        && form.getStatus()
+                        == ProductOptionStatus.INACTIVE;
         boolean hasActiveOption = rows.stream()
                 .anyMatch(this::isActiveOption);
+        boolean createsRequiredGroupWithoutActiveOption =
+                form.isRequired()
+                        && form.getStatus()
+                        == ProductOptionStatus.ACTIVE
+                        && !hasActiveOption;
 
-        if (form.getStatus() != ProductOptionStatus.ACTIVE
-                || !hasActiveOption) {
+        if (deactivatesCurrentRequiredGroup
+                || createsRequiredGroupWithoutActiveOption) {
+            throwRequiredOptionGroupEmpty();
+        }
+    }
+
+    private void validateRequiredOptionGroupCreation(
+            Product product,
+            ProductOptionGroupForm form
+    ) {
+        if (product.getStatus() == ProductStatus.ACTIVE
+                && form.isRequired()
+                && form.getStatus()
+                == ProductOptionStatus.ACTIVE) {
             throwRequiredOptionGroupEmpty();
         }
     }

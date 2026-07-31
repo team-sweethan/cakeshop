@@ -79,11 +79,21 @@ public class ProductOptionAdminController {
             return redirectToOptions(productId);
         }
 
-        long optionGroupId =
-                productOptionAdminService.createOptionGroup(
-                        productId,
-                        form
-                );
+        long optionGroupId;
+
+        try {
+            optionGroupId =
+                    productOptionAdminService.createOptionGroup(
+                            productId,
+                            form
+                    );
+        } catch (BusinessException exception) {
+            return handleRequiredOptionGroupCreationError(
+                    exception,
+                    productId,
+                    redirectAttributes
+            );
+        }
 
         redirectAttributes.addFlashAttribute(
                 "successMessage",
@@ -316,6 +326,28 @@ public class ProductOptionAdminController {
                 exception.getErrorCode().message()
         );
         openGroup(redirectAttributes, optionGroupId);
+
+        return redirectToOptions(productId);
+    }
+
+    private String handleRequiredOptionGroupCreationError(
+            BusinessException exception,
+            long productId,
+            RedirectAttributes redirectAttributes
+    ) {
+        if (exception.getErrorCode()
+                != ProductErrorCode.REQUIRED_OPTION_GROUP_EMPTY) {
+            throw exception;
+        }
+
+        redirectAttributes.addFlashAttribute(
+                "errorMessage",
+                exception.getErrorCode().message()
+        );
+        redirectAttributes.addFlashAttribute(
+                "openCreate",
+                true
+        );
 
         return redirectToOptions(productId);
     }

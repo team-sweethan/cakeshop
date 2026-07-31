@@ -92,8 +92,8 @@ class ProductOptionAdminServiceTests {
 
     @Test
     void createOptionGroup_validForm_insertsNormalizedGroup() {
-        when(productMapper.findAdminProductFormById(1L))
-                .thenReturn(new ProductForm());
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(product(ProductStatus.INACTIVE));
         doAnswer(invocation -> {
             ProductOptionGroup optionGroup =
                     invocation.getArgument(0);
@@ -126,6 +126,32 @@ class ProductOptionAdminServiceTests {
         assertThat(saved.getStatus())
                 .isEqualTo(ProductOptionStatus.ACTIVE);
         assertThat(saved.getSortOrder()).isEqualTo(1);
+    }
+
+    @Test
+    void createOptionGroup_activeProductRequiredGroup_throwsPolicyError() {
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(product(ProductStatus.ACTIVE));
+
+        assertThatThrownBy(() ->
+                productOptionAdminService.createOptionGroup(
+                        1L,
+                        optionGroupForm()
+                )
+        ).isInstanceOfSatisfying(
+                BusinessException.class,
+                exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(
+                                        ProductErrorCode
+                                                .REQUIRED_OPTION_GROUP_EMPTY
+                                )
+        );
+
+        verify(productMapper, never())
+                .insertOptionGroup(
+                        any(ProductOptionGroup.class)
+                );
     }
 
     @Test
@@ -165,6 +191,46 @@ class ProductOptionAdminServiceTests {
     @Test
     void updateOptionGroup_activeProductRequiredGroupDeactivation_throwsPolicyError() {
         ProductOptionGroupForm form = optionGroupForm();
+        form.setStatus(ProductOptionStatus.INACTIVE);
+
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(product(ProductStatus.ACTIVE));
+        when(productMapper
+                .findAdminOptionRowsByGroupIdForUpdate(
+                        1L,
+                        10L
+                ))
+                .thenReturn(List.of(
+                        optionRow(11L, "1호", 1)
+                ));
+
+        assertThatThrownBy(() ->
+                productOptionAdminService.updateOptionGroup(
+                        1L,
+                        10L,
+                        form
+                )
+        ).isInstanceOfSatisfying(
+                BusinessException.class,
+                exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(
+                                        ProductErrorCode
+                                                .REQUIRED_OPTION_GROUP_EMPTY
+                                )
+        );
+
+        verify(productMapper, never())
+                .updateOptionGroup(
+                        anyLong(),
+                        any(ProductOptionGroup.class)
+                );
+    }
+
+    @Test
+    void updateOptionGroup_activeRequiredGroupMadeOptionalAndInactive_throwsPolicyError() {
+        ProductOptionGroupForm form = optionGroupForm();
+        form.setRequired(false);
         form.setStatus(ProductOptionStatus.INACTIVE);
 
         when(productMapper.findSalesInfoByIdForUpdate(1L))
