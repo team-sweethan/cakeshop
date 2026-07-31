@@ -15,8 +15,11 @@ import com.cakeshop.domain.product.admin.dto.view.ProductOptionAdminRow;
 import com.cakeshop.domain.product.admin.dto.view.ProductOptionAdminView;
 import com.cakeshop.domain.product.admin.dto.view.ProductOptionGroupAdminView;
 import com.cakeshop.domain.product.admin.dto.view.ProductOptionManagementView;
+import com.cakeshop.domain.product.entity.Product;
 import com.cakeshop.domain.product.entity.ProductOption;
 import com.cakeshop.domain.product.entity.ProductOptionGroup;
+import com.cakeshop.domain.product.entity.ProductOptionStatus;
+import com.cakeshop.domain.product.entity.ProductStatus;
 import com.cakeshop.domain.product.error.ProductErrorCode;
 import com.cakeshop.domain.product.mapper.ProductMapper;
 import com.cakeshop.global.error.BusinessException;
@@ -100,13 +103,24 @@ public class ProductOptionAdminService {
             long optionGroupId,
             ProductOptionGroupForm form
     ) {
-        ensureOptionGroupExists(productId, optionGroupId);
-
         if (form == null) {
             throw new BusinessException(
                     ProductErrorCode.INVALID_OPTION_GROUP
             );
         }
+
+        Product product = findProductForUpdate(productId);
+        List<ProductOptionAdminRow> rows =
+                findOptionRowsForUpdate(
+                        productId,
+                        optionGroupId
+                );
+
+        validateRequiredOptionGroupUpdate(
+                product,
+                form,
+                rows
+        );
 
         ProductOptionGroup optionGroup =
                 toOptionGroup(
@@ -170,21 +184,27 @@ public class ProductOptionAdminService {
             long optionId,
             ProductOptionForm form
     ) {
-        if (!productMapper.existsProductOptionById(
-                productId,
-                optionGroupId,
-                optionId
-        )) {
-            throw new BusinessException(
-                    ProductErrorCode.OPTION_NOT_FOUND
-            );
-        }
-
         if (form == null) {
             throw new BusinessException(
                     ProductErrorCode.INVALID_OPTION
             );
         }
+
+        Product product = findProductForUpdate(productId);
+        List<ProductOptionAdminRow> rows =
+                findOptionRowsForUpdate(
+                        productId,
+                        optionGroupId
+                );
+        ProductOptionAdminRow currentOption =
+                findOptionRow(rows, optionId);
+
+        validateRequiredOptionUpdate(
+                product,
+                form,
+                rows,
+                currentOption
+        );
 
         ProductOption option =
                 toProductOption(
@@ -422,6 +442,118 @@ public class ProductOptionAdminService {
 
         throw new BusinessException(
                 ProductErrorCode.OPTION_NOT_FOUND
+        );
+    }
+
+    private Product findProductForUpdate(long productId) {
+        Product product =
+                productMapper.findSalesInfoByIdForUpdate(
+                        productId
+                );
+
+        if (product == null) {
+            throw new BusinessException(
+                    ProductErrorCode.NOT_FOUND
+            );
+        }
+
+        return product;
+    }
+
+    private List<ProductOptionAdminRow>
+            findOptionRowsForUpdate(
+                    long productId,
+                    long optionGroupId
+            ) {
+        List<ProductOptionAdminRow> rows =
+                productMapper
+                        .findAdminOptionRowsByGroupIdForUpdate(
+                                productId,
+                                optionGroupId
+                        );
+
+        if (rows.isEmpty()) {
+            throw new BusinessException(
+                    ProductErrorCode.OPTION_GROUP_NOT_FOUND
+            );
+        }
+
+        return rows;
+    }
+
+    private ProductOptionAdminRow findOptionRow(
+            List<ProductOptionAdminRow> rows,
+            long optionId
+    ) {
+        return rows.stream()
+                .filter(row -> row.optionId() != null)
+                .filter(row -> row.optionId() == optionId)
+                .findFirst()
+                .orElseThrow(() ->
+                        new BusinessException(
+                                ProductErrorCode.OPTION_NOT_FOUND
+                        )
+                );
+    }
+
+    private void validateRequiredOptionGroupUpdate(
+            Product product,
+            ProductOptionGroupForm form,
+            List<ProductOptionAdminRow> rows
+    ) {
+        if (product.getStatus() != ProductStatus.ACTIVE
+                || !form.isRequired()) {
+            return;
+        }
+
+        boolean hasActiveOption = rows.stream()
+                .anyMatch(this::isActiveOption);
+
+        if (form.getStatus() != ProductOptionStatus.ACTIVE
+                || !hasActiveOption) {
+            throwRequiredOptionGroupEmpty();
+        }
+    }
+
+    private void validateRequiredOptionUpdate(
+            Product product,
+            ProductOptionForm form,
+            List<ProductOptionAdminRow> rows,
+            ProductOptionAdminRow currentOption
+    ) {
+        ProductOptionAdminRow group = rows.getFirst();
+
+        if (product.getStatus() != ProductStatus.ACTIVE
+                || !group.required()
+                || group.groupStatus()
+                != ProductOptionStatus.ACTIVE
+                || currentOption.optionStatus()
+                != ProductOptionStatus.ACTIVE
+                || form.getStatus()
+                != ProductOptionStatus.INACTIVE) {
+            return;
+        }
+
+        long activeOptionCount = rows.stream()
+                .filter(this::isActiveOption)
+                .count();
+
+        if (activeOptionCount == 1) {
+            throwRequiredOptionGroupEmpty();
+        }
+    }
+
+    private boolean isActiveOption(
+            ProductOptionAdminRow row
+    ) {
+        return row.optionId() != null
+                && row.optionStatus()
+                == ProductOptionStatus.ACTIVE;
+    }
+
+    private void throwRequiredOptionGroupEmpty() {
+        throw new BusinessException(
+                ProductErrorCode.REQUIRED_OPTION_GROUP_EMPTY
         );
     }
 

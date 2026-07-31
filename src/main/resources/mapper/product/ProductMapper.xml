@@ -267,6 +267,33 @@
             po.id ASC
     </select>
 
+    <!-- 옵션 상태 변경 중 같은 그룹과 하위 옵션의 동시 변경을 막는 잠금 조회 -->
+    <select id="findAdminOptionRowsByGroupIdForUpdate"
+            resultType="com.cakeshop.domain.product.admin.dto.view.ProductOptionAdminRow">
+
+        SELECT
+            pog.id AS groupId,
+            pog.name AS groupName,
+            pog.required,
+            pog.selection_type AS selectionType,
+            pog.status AS groupStatus,
+            pog.sort_order AS groupSortOrder,
+            po.id AS optionId,
+            po.name AS optionName,
+            po.additional_price AS additionalPrice,
+            po.status AS optionStatus,
+            po.sort_order AS optionSortOrder
+        FROM product_option_groups pog
+        LEFT JOIN product_options po
+               ON po.option_group_id = pog.id
+        WHERE pog.product_id = #{productId}
+          AND pog.id = #{optionGroupId}
+        ORDER BY
+            po.sort_order ASC,
+            po.id ASC
+        FOR UPDATE
+    </select>
+
     <!-- 옵션 그룹의 상품 소유 관계 확인 -->
     <select id="existsOptionGroupById"
             resultType="boolean">

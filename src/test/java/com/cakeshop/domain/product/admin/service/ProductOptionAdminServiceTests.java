@@ -19,10 +19,12 @@ import com.cakeshop.domain.product.admin.dto.form.ProductOptionGroupForm;
 import com.cakeshop.domain.product.admin.dto.form.ProductOptionMoveDirection;
 import com.cakeshop.domain.product.admin.dto.view.ProductOptionAdminRow;
 import com.cakeshop.domain.product.admin.dto.view.ProductOptionManagementView;
+import com.cakeshop.domain.product.entity.Product;
 import com.cakeshop.domain.product.entity.ProductOption;
 import com.cakeshop.domain.product.entity.ProductOptionGroup;
 import com.cakeshop.domain.product.entity.ProductOptionSelectionType;
 import com.cakeshop.domain.product.entity.ProductOptionStatus;
+import com.cakeshop.domain.product.entity.ProductStatus;
 import com.cakeshop.domain.product.error.ProductErrorCode;
 import com.cakeshop.domain.product.mapper.ProductMapper;
 import com.cakeshop.global.error.BusinessException;
@@ -128,10 +130,14 @@ class ProductOptionAdminServiceTests {
 
     @Test
     void updateOptionGroup_otherProductGroup_throwsNotFound() {
-        when(productMapper.findAdminProductFormById(1L))
-                .thenReturn(new ProductForm());
-        when(productMapper.existsOptionGroupById(1L, 99L))
-                .thenReturn(false);
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(product(ProductStatus.ACTIVE));
+        when(productMapper
+                .findAdminOptionRowsByGroupIdForUpdate(
+                        1L,
+                        99L
+                ))
+                .thenReturn(List.of());
 
         assertThatThrownBy(() ->
                 productOptionAdminService.updateOptionGroup(
@@ -146,6 +152,110 @@ class ProductOptionAdminServiceTests {
                                 .isEqualTo(
                                         ProductErrorCode
                                                 .OPTION_GROUP_NOT_FOUND
+                                )
+        );
+
+        verify(productMapper, never())
+                .updateOptionGroup(
+                        anyLong(),
+                        any(ProductOptionGroup.class)
+                );
+    }
+
+    @Test
+    void updateOptionGroup_activeProductRequiredGroupDeactivation_throwsPolicyError() {
+        ProductOptionGroupForm form = optionGroupForm();
+        form.setStatus(ProductOptionStatus.INACTIVE);
+
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(product(ProductStatus.ACTIVE));
+        when(productMapper
+                .findAdminOptionRowsByGroupIdForUpdate(
+                        1L,
+                        10L
+                ))
+                .thenReturn(List.of(
+                        optionRow(11L, "1호", 1)
+                ));
+
+        assertThatThrownBy(() ->
+                productOptionAdminService.updateOptionGroup(
+                        1L,
+                        10L,
+                        form
+                )
+        ).isInstanceOfSatisfying(
+                BusinessException.class,
+                exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(
+                                        ProductErrorCode
+                                                .REQUIRED_OPTION_GROUP_EMPTY
+                                )
+        );
+
+        verify(productMapper, never())
+                .updateOptionGroup(
+                        anyLong(),
+                        any(ProductOptionGroup.class)
+                );
+    }
+
+    @Test
+    void updateOptionGroup_inactiveProductRequiredGroupDeactivation_updatesGroup() {
+        ProductOptionGroupForm form = optionGroupForm();
+        form.setStatus(ProductOptionStatus.INACTIVE);
+
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(product(ProductStatus.INACTIVE));
+        when(productMapper
+                .findAdminOptionRowsByGroupIdForUpdate(
+                        1L,
+                        10L
+                ))
+                .thenReturn(List.of(
+                        optionRow(11L, "1호", 1)
+                ));
+
+        productOptionAdminService.updateOptionGroup(
+                1L,
+                10L,
+                form
+        );
+
+        verify(productMapper)
+                .updateOptionGroup(
+                        org.mockito.ArgumentMatchers.eq(1L),
+                        any(ProductOptionGroup.class)
+                );
+    }
+
+    @Test
+    void updateOptionGroup_activeProductRequiredWithoutActiveOption_throwsPolicyError() {
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(product(ProductStatus.ACTIVE));
+        when(productMapper
+                .findAdminOptionRowsByGroupIdForUpdate(
+                        1L,
+                        10L
+                ))
+                .thenReturn(List.of(
+                        groupRow(10L, "크기", 1)
+                ));
+
+        assertThatThrownBy(() ->
+                productOptionAdminService.updateOptionGroup(
+                        1L,
+                        10L,
+                        optionGroupForm()
+                )
+        ).isInstanceOfSatisfying(
+                BusinessException.class,
+                exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(
+                                        ProductErrorCode
+                                                .REQUIRED_OPTION_GROUP_EMPTY
                                 )
         );
 
@@ -199,11 +309,16 @@ class ProductOptionAdminServiceTests {
 
     @Test
     void updateOption_otherProductOption_throwsNotFound() {
-        when(productMapper.existsProductOptionById(
-                1L,
-                10L,
-                99L
-        )).thenReturn(false);
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(product(ProductStatus.ACTIVE));
+        when(productMapper
+                .findAdminOptionRowsByGroupIdForUpdate(
+                        1L,
+                        10L
+                ))
+                .thenReturn(List.of(
+                        optionRow(11L, "1호", 1)
+                ));
 
         assertThatThrownBy(() ->
                 productOptionAdminService.updateOption(
@@ -225,6 +340,187 @@ class ProductOptionAdminServiceTests {
                 .updateProductOption(
                         anyLong(),
                         anyLong(),
+                        any(ProductOption.class)
+                );
+    }
+
+    @Test
+    void updateOption_activeProductLastRequiredOptionDeactivation_throwsPolicyError() {
+        ProductOptionForm form = optionForm();
+        form.setStatus(ProductOptionStatus.INACTIVE);
+
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(product(ProductStatus.ACTIVE));
+        when(productMapper
+                .findAdminOptionRowsByGroupIdForUpdate(
+                        1L,
+                        10L
+                ))
+                .thenReturn(List.of(
+                        optionRow(11L, "1호", 1)
+                ));
+
+        assertThatThrownBy(() ->
+                productOptionAdminService.updateOption(
+                        1L,
+                        10L,
+                        11L,
+                        form
+                )
+        ).isInstanceOfSatisfying(
+                BusinessException.class,
+                exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(
+                                        ProductErrorCode
+                                                .REQUIRED_OPTION_GROUP_EMPTY
+                                )
+        );
+
+        verify(productMapper, never())
+                .updateProductOption(
+                        anyLong(),
+                        anyLong(),
+                        any(ProductOption.class)
+                );
+    }
+
+    @Test
+    void updateOption_activeProductWithAnotherActiveOption_updatesOption() {
+        ProductOptionForm form = optionForm();
+        form.setStatus(ProductOptionStatus.INACTIVE);
+
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(product(ProductStatus.ACTIVE));
+        when(productMapper
+                .findAdminOptionRowsByGroupIdForUpdate(
+                        1L,
+                        10L
+                ))
+                .thenReturn(List.of(
+                        optionRow(11L, "1호", 1),
+                        optionRow(12L, "2호", 2)
+                ));
+
+        productOptionAdminService.updateOption(
+                1L,
+                10L,
+                11L,
+                form
+        );
+
+        verify(productMapper)
+                .updateProductOption(
+                        org.mockito.ArgumentMatchers.eq(1L),
+                        org.mockito.ArgumentMatchers.eq(10L),
+                        any(ProductOption.class)
+                );
+    }
+
+    @Test
+    void updateOption_inactiveProductLastRequiredOptionDeactivation_updatesOption() {
+        ProductOptionForm form = optionForm();
+        form.setStatus(ProductOptionStatus.INACTIVE);
+
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(product(ProductStatus.INACTIVE));
+        when(productMapper
+                .findAdminOptionRowsByGroupIdForUpdate(
+                        1L,
+                        10L
+                ))
+                .thenReturn(List.of(
+                        optionRow(11L, "1호", 1)
+                ));
+
+        productOptionAdminService.updateOption(
+                1L,
+                10L,
+                11L,
+                form
+        );
+
+        verify(productMapper)
+                .updateProductOption(
+                        org.mockito.ArgumentMatchers.eq(1L),
+                        org.mockito.ArgumentMatchers.eq(10L),
+                        any(ProductOption.class)
+                );
+    }
+
+    @Test
+    void updateOption_activeProductOptionalGroupLastOptionDeactivation_updatesOption() {
+        ProductOptionForm form = optionForm();
+        form.setStatus(ProductOptionStatus.INACTIVE);
+
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(product(ProductStatus.ACTIVE));
+        when(productMapper
+                .findAdminOptionRowsByGroupIdForUpdate(
+                        1L,
+                        10L
+                ))
+                .thenReturn(List.of(
+                        optionRow(
+                                false,
+                                ProductOptionStatus.ACTIVE,
+                                11L,
+                                "초코",
+                                ProductOptionStatus.ACTIVE,
+                                1
+                        )
+                ));
+
+        productOptionAdminService.updateOption(
+                1L,
+                10L,
+                11L,
+                form
+        );
+
+        verify(productMapper)
+                .updateProductOption(
+                        org.mockito.ArgumentMatchers.eq(1L),
+                        org.mockito.ArgumentMatchers.eq(10L),
+                        any(ProductOption.class)
+                );
+    }
+
+    @Test
+    void updateOption_alreadyInactiveOption_updatesBasicInformation() {
+        ProductOptionForm form = optionForm();
+        form.setStatus(ProductOptionStatus.INACTIVE);
+
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(product(ProductStatus.ACTIVE));
+        when(productMapper
+                .findAdminOptionRowsByGroupIdForUpdate(
+                        1L,
+                        10L
+                ))
+                .thenReturn(List.of(
+                        optionRow(
+                                true,
+                                ProductOptionStatus.ACTIVE,
+                                11L,
+                                "단종 크기",
+                                ProductOptionStatus.INACTIVE,
+                                1
+                        ),
+                        optionRow(12L, "1호", 2)
+                ));
+
+        productOptionAdminService.updateOption(
+                1L,
+                10L,
+                11L,
+                form
+        );
+
+        verify(productMapper)
+                .updateProductOption(
+                        org.mockito.ArgumentMatchers.eq(1L),
+                        org.mockito.ArgumentMatchers.eq(10L),
                         any(ProductOption.class)
                 );
     }
@@ -309,19 +605,46 @@ class ProductOptionAdminServiceTests {
             String optionName,
             int optionSortOrder
     ) {
+        return optionRow(
+                true,
+                ProductOptionStatus.ACTIVE,
+                optionId,
+                optionName,
+                ProductOptionStatus.ACTIVE,
+                optionSortOrder
+        );
+    }
+
+    private ProductOptionAdminRow optionRow(
+            boolean required,
+            ProductOptionStatus groupStatus,
+            long optionId,
+            String optionName,
+            ProductOptionStatus optionStatus,
+            int optionSortOrder
+    ) {
         return new ProductOptionAdminRow(
                 10L,
                 "크기",
-                true,
+                required,
                 ProductOptionSelectionType.SINGLE,
-                ProductOptionStatus.ACTIVE,
+                groupStatus,
                 1,
                 optionId,
                 optionName,
                 BigDecimal.ZERO,
-                ProductOptionStatus.ACTIVE,
+                optionStatus,
                 optionSortOrder
         );
+    }
+
+    private Product product(ProductStatus status) {
+        Product product = new Product();
+
+        product.setId(1L);
+        product.setStatus(status);
+
+        return product;
     }
 
     private ProductOptionAdminRow groupRow(

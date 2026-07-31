@@ -74,6 +74,12 @@ public enum ProductErrorCode implements ErrorCode {
             "PRODUCT_012",
             "다른 주문으로 재고가 변경되었습니다. 최신 정보를 확인한 후 다시 수정해 주세요.",
             409
+    ),
+
+    REQUIRED_OPTION_GROUP_EMPTY(
+            "PRODUCT_013",
+            "필수 옵션 그룹에는 하나 이상의 활성 옵션이 필요합니다.",
+            409
     );
 
     private final String code;
