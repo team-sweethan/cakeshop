@@ -124,6 +124,7 @@
         FROM payments AS payment
         WHERE payment.id = #{paymentId}
           AND payment.status = 'DONE'
+          AND #{cancelAmount} = payment.amount
     </insert>
 
     <select id="findPaymentCancellationById"

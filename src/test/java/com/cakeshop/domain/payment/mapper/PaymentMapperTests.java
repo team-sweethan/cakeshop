@@ -295,6 +295,34 @@ class PaymentMapperTests {
     }
 
     @Test
+    void insertPaymentCancellation_doesNotInsertWhenAmountDiffersFromPayment() {
+        Payment payment = insertPayment("INVALID-CANCELLATION-AMOUNT-MAPPER");
+        completePayment(payment, "INVALID-CANCELLATION-AMOUNT-MAPPER");
+        PaymentCancellation excessive =
+                newPaymentCancellation(payment.getId(), "EXCESSIVE");
+        excessive.setCancelAmount(BigDecimal.valueOf(50_000));
+        PaymentCancellation partial =
+                newPaymentCancellation(payment.getId(), "PARTIAL");
+        partial.setCancelAmount(BigDecimal.valueOf(30_000));
+
+        assertThat(paymentMapper.insertPaymentCancellation(excessive)).isZero();
+        assertThat(excessive.getId()).isNull();
+        assertThat(paymentMapper.insertPaymentCancellation(partial)).isZero();
+        assertThat(partial.getId()).isNull();
+
+        Integer savedCount = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM payment_cancellations
+                WHERE payment_id = ?
+                """,
+                Integer.class,
+                payment.getId()
+        );
+        assertThat(savedCount).isZero();
+    }
+
+    @Test
     void completeCancellationIfRequested_recordsTransactionAndTimeConditionally() {
         Payment payment = insertPayment("CANCELLATION-STATUS");
         completePayment(payment, "CANCELLATION-STATUS");
