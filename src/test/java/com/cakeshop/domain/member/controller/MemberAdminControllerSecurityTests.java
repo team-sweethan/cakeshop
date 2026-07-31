@@ -9,9 +9,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
+import com.cakeshop.domain.member.dto.view.MemberAdminDetailView;
 import com.cakeshop.domain.member.dto.view.MemberAdminListView;
+import com.cakeshop.domain.member.entity.MemberStatus;
 import com.cakeshop.domain.member.service.MemberAdminService;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
@@ -86,5 +90,42 @@ class MemberAdminControllerSecurityTests {
                         containsString("name=\"status\"")))
                 .andExpect(content().string(
                         containsString("value=\"SUSPENDED\"")));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void memberDetail_customerRole_returnsForbidden() throws Exception {
+        mockMvc.perform(get("/admin/members/1"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void memberDetail_adminRole_rendersDetail() throws Exception {
+        LocalDateTime registeredAt =
+                LocalDateTime.of(2026, 7, 31, 10, 0);
+        MemberAdminDetailView member = new MemberAdminDetailView(
+                1L,
+                "관리자 조회 회원",
+                "member",
+                "member@example.com",
+                "010-1234-5678",
+                LocalDate.of(2000, 1, 1),
+                "USER",
+                MemberStatus.ACTIVE,
+                registeredAt,
+                registeredAt,
+                null,
+                null,
+                null);
+
+        when(memberAdminService.getMemberDetail(1L))
+                .thenReturn(member);
+
+        mockMvc.perform(get("/admin/members/1"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("admin/member/detail"))
+                .andExpect(content().string(
+                        containsString("member@example.com")));
     }
 }

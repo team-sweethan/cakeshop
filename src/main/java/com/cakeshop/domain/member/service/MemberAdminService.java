@@ -4,12 +4,15 @@ import java.util.List;
 
 import com.cakeshop.domain.member.dto.form.MemberAdminListType;
 import com.cakeshop.domain.member.dto.form.MemberAdminSearchCondition;
+import com.cakeshop.domain.member.dto.view.MemberAdminDetailView;
 import com.cakeshop.domain.member.dto.view.MemberAdminListRow;
 import com.cakeshop.domain.member.dto.view.MemberAdminListView;
 import com.cakeshop.domain.member.entity.MemberStatus;
+import com.cakeshop.domain.member.error.MemberErrorCode;
 import com.cakeshop.domain.member.mapper.MemberMapper;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
+import com.cakeshop.global.error.BusinessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -71,6 +74,13 @@ public class MemberAdminService {
                 members,
                 normalizedPageRequest,
                 totalElements);
+    }
+
+    @Transactional(readOnly = true)
+    public MemberAdminDetailView getMemberDetail(Long memberId) {
+        return memberMapper.findAdminMemberDetail(memberId)
+                .orElseThrow(() ->
+                        new BusinessException(MemberErrorCode.NOT_FOUND));
     }
 
     private MemberAdminListView toListView(MemberAdminListRow row) {

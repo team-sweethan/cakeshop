@@ -69,6 +69,25 @@
          WHERE <include refid="adminMemberSearchConditions"/>
     </select>
 
+    <select id="findAdminMemberDetail"
+            resultType="com.cakeshop.domain.member.dto.view.MemberAdminDetailView">
+        SELECT id,
+               name,
+               nickname,
+               email,
+               phone,
+               birth_date,
+               role,
+               status,
+               created_at,
+               updated_at,
+               suspended_at,
+               suspended_reason,
+               withdrawn_at
+          FROM members
+         WHERE id = #{memberId}
+    </select>
+
     <!-- 인증 입력도 문자열 치환 없이 #{}로 바인딩한다. -->
     <select id="findByEmail" resultMap="memberResultMap">
         SELECT id, email, password, nickname, role, status,

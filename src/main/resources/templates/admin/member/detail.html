@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>회원 상세 | 관리자</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+    <link rel="stylesheet" th:href="@{/css/member-admin.css}">
+</head>
+<body>
+<div class="admin-layout">
+    <aside th:replace="~{fragments/admin/sidebar :: sidebar('members')}"></aside>
+    <div class="admin-main">
+        <header th:replace="~{fragments/admin/header :: header('회원 관리')}"></header>
+        <main class="admin-content">
+            <div class="member-admin-detail-header">
+                <h1 class="admin-page-title">회원 상세</h1>
+                <a class="btn btn--outline" th:href="@{/admin/members}">목록</a>
+            </div>
+
+            <section class="panel member-admin-detail-section">
+                <h2 class="member-admin-detail-title">기본 정보</h2>
+                <dl class="member-admin-detail-grid">
+                    <div class="member-admin-detail-item">
+                        <dt class="member-admin-detail-label">회원 번호</dt>
+                        <dd class="member-admin-detail-value"
+                            th:text="${member.id}">1</dd>
+                    </div>
+                    <div class="member-admin-detail-item">
+                        <dt class="member-admin-detail-label">회원 구분</dt>
+                        <dd class="member-admin-detail-value"
+                            th:text="${member.role == 'ADMIN' ? '관리자' : '일반 회원'}">
+                            일반 회원
+                        </dd>
+                    </div>
+                    <div class="member-admin-detail-item">
+                        <dt class="member-admin-detail-label">이름</dt>
+                        <dd class="member-admin-detail-value"
+                            th:text="${member.name ?: '-'}">홍길동</dd>
+                    </div>
+                    <div class="member-admin-detail-item">
+                        <dt class="member-admin-detail-label">닉네임</dt>
+                        <dd class="member-admin-detail-value"
+                            th:text="${member.nickname ?: '-'}">케이크회원</dd>
+                    </div>
+                    <div class="member-admin-detail-item">
+                        <dt class="member-admin-detail-label">이메일</dt>
+                        <dd class="member-admin-detail-value"
+                            th:text="${member.email ?: '-'}">member@example.com</dd>
+                    </div>
+                    <div class="member-admin-detail-item">
+                        <dt class="member-admin-detail-label">전화번호</dt>
+                        <dd class="member-admin-detail-value"
+                            th:text="${member.phone ?: '-'}">010-1234-5678</dd>
+                    </div>
+                    <div class="member-admin-detail-item">
+                        <dt class="member-admin-detail-label">생년월일</dt>
+                        <dd class="member-admin-detail-value"
+                            th:text="${member.birthDate == null
+                                ? '-'
+                                : #temporals.format(member.birthDate, 'yyyy.MM.dd')}">
+                            2000.01.01
+                        </dd>
+                    </div>
+                </dl>
+            </section>
+
+            <section class="panel member-admin-detail-section">
+                <h2 class="member-admin-detail-title">계정 상태</h2>
+                <dl class="member-admin-detail-grid">
+                    <div class="member-admin-detail-item">
+                        <dt class="member-admin-detail-label">상태</dt>
+                        <dd class="member-admin-detail-value">
+                            <span class="badge"
+                                  th:classappend="${member.status.name() == 'ACTIVE'}
+                                      ? ' badge--success'
+                                      : (${member.status.name() == 'SUSPENDED'}
+                                          ? ' badge--danger'
+                                          : ' badge--warning')"
+                                  th:text="${member.status.name() == 'ACTIVE'}
+                                      ? '정상'
+                                      : (${member.status.name() == 'SUSPENDED'}
+                                          ? '이용정지'
+                                          : '탈퇴')">
+                                정상
+                            </span>
+                        </dd>
+                    </div>
+                    <div class="member-admin-detail-item">
+                        <dt class="member-admin-detail-label">가입일</dt>
+                        <dd class="member-admin-detail-value"
+                            th:text="${#temporals.format(
+                                member.createdAt, 'yyyy.MM.dd HH:mm')}">
+                            2026.07.31 10:00
+                        </dd>
+                    </div>
+                    <div class="member-admin-detail-item">
+                        <dt class="member-admin-detail-label">최근 수정일</dt>
+                        <dd class="member-admin-detail-value"
+                            th:text="${#temporals.format(
+                                member.updatedAt, 'yyyy.MM.dd HH:mm')}">
+                            2026.07.31 10:00
+                        </dd>
+                    </div>
+                    <div class="member-admin-detail-item">
+                        <dt class="member-admin-detail-label">이용정지일</dt>
+                        <dd class="member-admin-detail-value"
+                            th:text="${member.suspendedAt == null
+                                ? '-'
+                                : #temporals.format(
+                                    member.suspendedAt, 'yyyy.MM.dd HH:mm')}">
+                            -
+                        </dd>
+                    </div>
+                    <div class="member-admin-detail-item">
+                        <dt class="member-admin-detail-label">이용정지 사유</dt>
+                        <dd class="member-admin-detail-value"
+                            th:text="${member.suspendedReason ?: '-'}">-</dd>
+                    </div>
+                    <div class="member-admin-detail-item">
+                        <dt class="member-admin-detail-label">탈퇴일</dt>
+                        <dd class="member-admin-detail-value"
+                            th:text="${member.withdrawnAt == null
+                                ? '-'
+                                : #temporals.format(
+                                    member.withdrawnAt, 'yyyy.MM.dd HH:mm')}">
+                            -
+                        </dd>
+                    </div>
+                </dl>
+            </section>
+        </main>
+    </div>
+</div>
+</body>
+</html>

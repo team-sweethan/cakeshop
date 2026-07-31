@@ -1,6 +1,7 @@
 package com.cakeshop.domain.member.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.never;
@@ -10,15 +11,19 @@ import static org.mockito.Mockito.when;
 import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 import com.cakeshop.domain.member.dto.form.MemberAdminListType;
 import com.cakeshop.domain.member.dto.form.MemberAdminSearchCondition;
+import com.cakeshop.domain.member.dto.view.MemberAdminDetailView;
 import com.cakeshop.domain.member.dto.view.MemberAdminListRow;
 import com.cakeshop.domain.member.dto.view.MemberAdminListView;
 import com.cakeshop.domain.member.entity.MemberStatus;
+import com.cakeshop.domain.member.error.MemberErrorCode;
 import com.cakeshop.domain.member.mapper.MemberMapper;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
+import com.cakeshop.global.error.BusinessException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -148,5 +153,42 @@ class MemberAdminServiceTests {
         memberAdminService.getMembers(condition, new PageRequest(1, 10));
 
         assertThat(condition.getStatus()).isNull();
+    }
+
+    @Test
+    void getMemberDetail_existingMember_returnsDetail() {
+        MemberAdminDetailView detail = new MemberAdminDetailView(
+                1L,
+                "관리자 조회 회원",
+                "member",
+                "member@example.com",
+                "010-1234-5678",
+                LocalDate.of(2000, 1, 1),
+                "USER",
+                MemberStatus.ACTIVE,
+                LocalDateTime.of(2026, 7, 31, 10, 0),
+                LocalDateTime.of(2026, 7, 31, 10, 0),
+                null,
+                null,
+                null);
+        when(memberMapper.findAdminMemberDetail(1L))
+                .thenReturn(Optional.of(detail));
+
+        MemberAdminDetailView result =
+                memberAdminService.getMemberDetail(1L);
+
+        assertThat(result).isSameAs(detail);
+    }
+
+    @Test
+    void getMemberDetail_nonexistentMember_throwsNotFound() {
+        when(memberMapper.findAdminMemberDetail(999L))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> memberAdminService.getMemberDetail(999L))
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(MemberErrorCode.NOT_FOUND));
     }
 }
