@@ -23,7 +23,7 @@ public class Coupon {
     private Integer issuedQuantity;             // 현재까지 발급된 쿠폰 수량
     private LocalDateTime startsAt;             // 쿠폰 발급 시작 일시
     private LocalDateTime expiresAt;            // 쿠폰 만료 일시
-    private CouponStatus status;                // 쿠폰 상태 - (Default - Active/INACTIVE/ENDED)
+    private CouponStatus status;                // 관리자가 설정하는 발급 허용 상태
     private Long createdBy;                     // 쿠폰 생성 관리자 회원
     private LocalDateTime createdAt;            // 쿠폰 생성 일시
     private LocalDateTime updatedAt;            // 쿠폰 최종 수정 일시

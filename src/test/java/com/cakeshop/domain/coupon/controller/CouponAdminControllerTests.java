@@ -18,7 +18,7 @@ import com.cakeshop.domain.coupon.dto.form.CouponCreateForm;
 import com.cakeshop.domain.coupon.dto.form.CouponSearchCondition;
 import com.cakeshop.domain.coupon.dto.form.CouponUpdateForm;
 import com.cakeshop.domain.coupon.dto.view.CouponView;
-import com.cakeshop.domain.coupon.entity.CouponStatus;
+import com.cakeshop.domain.coupon.entity.CouponDisplayStatus;
 import com.cakeshop.domain.coupon.entity.DiscountType;
 import com.cakeshop.domain.coupon.error.CouponErrorCode;
 import com.cakeshop.domain.coupon.service.CouponAdminService;
@@ -106,7 +106,7 @@ class CouponAdminControllerTests {
                 pageCaptor.getValue();
 
         assertThat(capturedCondition.getKeyword()).isEqualTo(" 여름 ");
-        assertThat(capturedCondition.getStatus()).isEqualTo(CouponStatus.ACTIVE);
+        assertThat(capturedCondition.getStatus()).isEqualTo(CouponDisplayStatus.ACTIVE);
         assertThat(capturedPageRequest.getPage()).isEqualTo(2);
         assertThat(capturedPageRequest.getSize()).isEqualTo(PageRequest.DEFAULT_SIZE);
         assertThat(capturedPageRequest.getOffset()).isEqualTo((2 - 1) * PageRequest.DEFAULT_SIZE);
