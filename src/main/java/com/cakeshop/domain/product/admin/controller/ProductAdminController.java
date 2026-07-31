@@ -7,8 +7,10 @@ import com.cakeshop.domain.product.admin.dto.view.ProductAdminListView;
 import com.cakeshop.domain.product.admin.service.ProductAdminService;
 import com.cakeshop.domain.product.entity.ProductStatus;
 import com.cakeshop.domain.product.entity.ProductType;
+import com.cakeshop.domain.product.error.ProductErrorCode;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
+import com.cakeshop.global.error.BusinessException;
 
 import jakarta.validation.Valid;
 import org.springframework.stereotype.Controller;
@@ -393,10 +395,24 @@ public class ProductAdminController {
             RedirectAttributes redirectAttributes
     ) {
         // 상품의 판매 상태를 변경한다.
-        productAdminService.changeProductStatus(
-                productId,
-                status
-        );
+        try {
+            productAdminService.changeProductStatus(
+                    productId,
+                    status
+            );
+        } catch (BusinessException exception) {
+            if (exception.getErrorCode()
+                    != ProductErrorCode.REQUIRED_OPTION_GROUP_EMPTY) {
+                throw exception;
+            }
+
+            redirectAttributes.addFlashAttribute(
+                    "errorMessage",
+                    exception.getErrorCode().message()
+            );
+
+            return "redirect:/admin/products";
+        }
 
         // 변경된 상태에 맞는 완료 메시지를 만든다.
         String successMessage =

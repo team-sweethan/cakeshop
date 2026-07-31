@@ -144,6 +144,18 @@ public interface ProductMapper {
     );
 
     /**
+     * 판매 시작 검증에 사용할 모든 옵션 그룹과 옵션을 잠금 조회한다.
+     *
+     * @param productId 판매 상태를 변경할 상품 식별자
+     * @return 비활성 항목을 포함한 옵션 조회 행
+     */
+    List<ProductOptionAdminRow>
+            findAdminOptionRowsByProductIdForUpdate(
+                    @Param("productId")
+                    long productId
+            );
+
+    /**
      * 옵션 상태 변경 판단에 사용할 그룹과 하위 옵션을 잠금 조회한다.
      *
      * <p>반드시 트랜잭션 안에서 호출하며, 상태 검증과 변경이 끝날 때까지

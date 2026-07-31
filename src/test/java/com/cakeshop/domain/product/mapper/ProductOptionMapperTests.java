@@ -186,6 +186,49 @@ class ProductOptionMapperTests {
     }
 
     @Test
+    void findAdminOptionRowsByProductIdForUpdate_returnsAllGroupsAndOptions() {
+        long requiredGroupId = insertGroup(
+                "크기",
+                ProductOptionStatus.ACTIVE,
+                1
+        );
+        long optionalGroupId = insertGroup(
+                "맛",
+                ProductOptionStatus.INACTIVE,
+                2
+        );
+
+        insertOption(
+                requiredGroupId,
+                "1호",
+                ProductOptionStatus.ACTIVE,
+                1
+        );
+        insertOption(
+                optionalGroupId,
+                "초코",
+                ProductOptionStatus.INACTIVE,
+                1
+        );
+
+        List<ProductOptionAdminRow> rows =
+                productMapper
+                        .findAdminOptionRowsByProductIdForUpdate(
+                                productId
+                        );
+
+        assertThat(rows)
+                .extracting(ProductOptionAdminRow::groupId)
+                .containsExactly(
+                        requiredGroupId,
+                        optionalGroupId
+                );
+        assertThat(rows)
+                .extracting(ProductOptionAdminRow::optionName)
+                .containsExactly("1호", "초코");
+    }
+
+    @Test
     void insertAndUpdateOptionGroup_ownedByProduct_persistsChanges() {
         ProductOptionGroup optionGroup =
                 new ProductOptionGroup();

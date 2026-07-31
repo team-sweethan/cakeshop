@@ -1,12 +1,16 @@
 package com.cakeshop.domain.product.admin.service;
 
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import com.cakeshop.domain.product.admin.dto.form.ProductAdminSearchCondition;
 import com.cakeshop.domain.product.admin.dto.form.ProductForm;
 import com.cakeshop.domain.product.admin.dto.view.ProductAdminListView;
 import com.cakeshop.domain.product.admin.dto.view.ProductCategoryOptionView;
+import com.cakeshop.domain.product.admin.dto.view.ProductOptionAdminRow;
 import com.cakeshop.domain.product.entity.Product;
+import com.cakeshop.domain.product.entity.ProductOptionStatus;
 import com.cakeshop.domain.product.entity.ProductStatus;
 import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.error.ProductErrorCode;
@@ -96,6 +100,26 @@ public class ProductAdminService {
             long productId,
             ProductStatus status
     ) {
+        Product product =
+                productMapper.findSalesInfoByIdForUpdate(
+                        productId
+                );
+
+        if (product == null) {
+            throw new BusinessException(
+                    ProductErrorCode.NOT_FOUND
+            );
+        }
+
+        if (status == ProductStatus.ACTIVE) {
+            validateRequiredOptionsForSale(
+                    productMapper
+                            .findAdminOptionRowsByProductIdForUpdate(
+                                    productId
+                            )
+            );
+        }
+
         // 상품의 판매 상태와 수정 일시를 변경한다.
         int updatedRows =
                 productMapper.updateProductStatus(
@@ -107,6 +131,38 @@ public class ProductAdminService {
         if (updatedRows == 0) {
             throw new BusinessException(
                     ProductErrorCode.NOT_FOUND
+            );
+        }
+    }
+
+    private void validateRequiredOptionsForSale(
+            List<ProductOptionAdminRow> rows
+    ) {
+        Map<Long, Boolean> activeRequiredGroups =
+                new LinkedHashMap<>();
+
+        for (ProductOptionAdminRow row : rows) {
+            if (!row.required()
+                    || row.groupStatus()
+                    != ProductOptionStatus.ACTIVE) {
+                continue;
+            }
+
+            boolean hasActiveOption =
+                    row.optionId() != null
+                            && row.optionStatus()
+                            == ProductOptionStatus.ACTIVE;
+
+            activeRequiredGroups.merge(
+                    row.groupId(),
+                    hasActiveOption,
+                    (current, added) -> current || added
+            );
+        }
+
+        if (activeRequiredGroups.containsValue(false)) {
+            throw new BusinessException(
+                    ProductErrorCode.REQUIRED_OPTION_GROUP_EMPTY
             );
         }
     }

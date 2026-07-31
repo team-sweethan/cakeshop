@@ -22,8 +22,10 @@ import com.cakeshop.domain.product.admin.dto.view.ProductCategoryOptionView;
 import com.cakeshop.domain.product.admin.service.ProductAdminService;
 import com.cakeshop.domain.product.entity.ProductStatus;
 import com.cakeshop.domain.product.entity.ProductType;
+import com.cakeshop.domain.product.error.ProductErrorCode;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
+import com.cakeshop.global.error.BusinessException;
 
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -183,6 +185,40 @@ class ProductAdminControllerTests {
                 1L,
                 ProductStatus.ACTIVE
         );
+    }
+
+    @Test
+    void startSale_requiredPolicyError_redirectsWithAlert()
+            throws Exception {
+        ProductAdminService productAdminService =
+                mock(ProductAdminService.class);
+        doThrow(new BusinessException(
+                ProductErrorCode.REQUIRED_OPTION_GROUP_EMPTY
+        )).when(productAdminService).changeProductStatus(
+                1L,
+                ProductStatus.ACTIVE
+        );
+
+        MockMvc mockMvc = MockMvcBuilders
+                .standaloneSetup(
+                        new ProductAdminController(
+                                productAdminService
+                        )
+                )
+                .build();
+
+        mockMvc.perform(
+                        post("/admin/products/{productId}/status", 1L)
+                                .param("status", "ACTIVE")
+                )
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(
+                        "/admin/products"
+                ))
+                .andExpect(flash().attribute(
+                        "errorMessage",
+                        "필수 옵션 그룹에는 하나 이상의 활성 옵션이 필요합니다."
+                ));
     }
 
     @Test
