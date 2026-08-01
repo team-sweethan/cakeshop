@@ -61,6 +61,32 @@
         ORDER BY id
     </select>
 
+    <select id="findReadyPaymentByOrderId"
+            resultType="com.cakeshop.domain.payment.entity.Payment">
+        SELECT
+            id,
+            order_id,
+            toss_order_id,
+            payment_key,
+            idempotency_key,
+            method,
+            amount,
+            status,
+            provider_status,
+            active_payment_order_id,
+            failure_code,
+            failure_message,
+            requested_at,
+            approved_at,
+            canceled_at,
+            created_at,
+            updated_at
+        FROM payments
+        WHERE order_id = #{orderId}
+          AND status = 'READY'
+        LIMIT 1
+    </select>
+
     <update id="completeIfReady">
         UPDATE payments AS payment
         INNER JOIN orders AS current_order

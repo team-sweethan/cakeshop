@@ -20,6 +20,7 @@ import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.notification.controller.NotificationController;
 import com.cakeshop.domain.order.controller.OrderController;
 import com.cakeshop.domain.payment.controller.PaymentController;
+import com.cakeshop.domain.payment.service.PaymentFacade;
 import com.cakeshop.domain.product.customer.controller.ProductController;
 import com.cakeshop.domain.product.customer.service.ProductService;
 import com.cakeshop.domain.review.controller.ReviewController;
@@ -72,7 +73,7 @@ class CustomerPageControllerTests {
                         new ProductController(mock(ProductService.class)),
                         new CartController(),
                         new OrderController(),
-                        new PaymentController(),
+                        new PaymentController(mock(PaymentFacade.class)),
                         new MyPageController(
                                 memberService,
                                 mock(SessionRegistry.class)),
