@@ -49,7 +49,7 @@ public class SecurityConfig {
                 auth.requestMatchers(
                         "/", "/login", "/signup", "/join", "/emailCheck", "/find-email",
                         "/find-email/login",
-                        "/products/**", "/cart", "/screens", "/favicon.ico",
+                        "/products/**", "/screens", "/favicon.ico",
                         "/css/**", "/js/**", "/images/**", "/uploads/**", "/error")
                         .permitAll();
                 // 로드밸런서/헬스체크가 인증 없이 호출할 수 있도록 허용 (그 외 actuator 엔드포인트는 미노출)

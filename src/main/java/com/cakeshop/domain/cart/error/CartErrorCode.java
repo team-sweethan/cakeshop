@@ -4,7 +4,13 @@ import com.cakeshop.global.error.ErrorCode;
 
 public enum CartErrorCode implements ErrorCode {
 
-    PRODUCT_NOT_ON_SALE("CART_001", "판매 중이 아닌 상품입니다.", 400);
+    PRODUCT_NOT_ON_SALE("CART_001", "판매 중이 아닌 상품입니다.", 400),
+    ITEM_NOT_FOUND("CART_002", "장바구니 상품을 찾을 수 없습니다.", 404),
+    INVALID_OPTION("CART_003", "선택할 수 없는 상품 옵션입니다.", 400),
+    REQUIRED_OPTION_MISSING("CART_004", "필수 상품 옵션을 선택해 주세요.", 400),
+    INVALID_OPTION_SELECTION("CART_005", "상품 옵션 선택 방식이 올바르지 않습니다.", 400),
+    OUT_OF_STOCK("CART_006", "상품 재고가 부족합니다.", 400),
+    UPDATE_FAILED("CART_007", "장바구니 변경에 실패했습니다.", 409);
 
     private final String code;
     private final String message;

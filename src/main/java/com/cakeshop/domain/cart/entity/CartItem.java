@@ -1,6 +1,19 @@
 package com.cakeshop.domain.cart.entity;
 
-// DB 조회 결과·도메인 상태
+import java.time.LocalDateTime;
+import lombok.Getter;
+import lombok.Setter;
+
+/** 장바구니에 저장된 상품 한 행이다. */
+@Getter
+@Setter
 public class CartItem {
-    // TODO: 필드 정의 (ERD 확정 후)
+
+    private Long id;
+    private Long cartId;
+    private Long productId;
+    private Integer quantity;
+    private String requirements;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }

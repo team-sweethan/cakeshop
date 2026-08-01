@@ -1,0 +1,113 @@
+package com.cakeshop.domain.cart.controller;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.cakeshop.domain.cart.dto.form.CartAddForm;
+import com.cakeshop.domain.cart.dto.form.CartUpdateForm;
+import com.cakeshop.domain.cart.dto.view.CartItemView;
+import com.cakeshop.domain.cart.dto.view.CartCountView;
+import com.cakeshop.domain.cart.dto.view.CartView;
+import com.cakeshop.domain.cart.dto.view.CartQuantityUpdateView;
+import com.cakeshop.domain.cart.service.CartService;
+import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
+import com.cakeshop.domain.product.entity.ProductType;
+import com.cakeshop.global.security.MemberDetails;
+import java.math.BigDecimal;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+@ExtendWith(MockitoExtension.class)
+class CartControllerTests {
+
+    @Mock
+    private CartService cartService;
+
+    @Mock
+    private Model model;
+
+    @Mock
+    private BindingResult bindingResult;
+
+    @Mock
+    private RedirectAttributes redirectAttributes;
+
+    @InjectMocks
+    private CartController cartController;
+
+    @Test
+    void cart_authenticatedMember_loadsOwnCart() {
+        MemberDetails member = memberDetails();
+        CartView cart = new CartView(
+                List.of(), 0, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+        when(cartService.getCart(1L)).thenReturn(cart);
+
+        String viewName = cartController.cart(member, model);
+
+        assertThat(viewName).isEqualTo("customer/cart/list");
+        verify(model).addAttribute("cart", cart);
+    }
+
+    @Test
+    void addItem_validForm_addsForAuthenticatedMember() {
+        MemberDetails member = memberDetails();
+        CartAddForm form = new CartAddForm();
+        form.setProductId(10L);
+        form.setQuantity(2);
+        when(bindingResult.hasErrors()).thenReturn(false);
+
+        String viewName = cartController.addItem(
+                member, form, bindingResult, redirectAttributes);
+
+        assertThat(viewName).isEqualTo("redirect:/cart");
+        verify(cartService).addItem(1L, form);
+    }
+
+    @Test
+    void updateQuantityAsync_validForm_returnsUpdatedTotals() {
+        MemberDetails member = memberDetails();
+        CartUpdateForm form = new CartUpdateForm();
+        form.setQuantity(3);
+        CartItemView item = new CartItemView(
+                30L, 10L, "cake", ProductType.GENERAL, 3, 10, true,
+                BigDecimal.valueOf(35000), BigDecimal.ZERO, BigDecimal.valueOf(105000),
+                null, List.of());
+        CartView cart = new CartView(
+                List.of(item), 3, BigDecimal.valueOf(105000),
+                BigDecimal.ZERO, BigDecimal.valueOf(105000));
+        when(cartService.getCart(1L)).thenReturn(cart);
+
+        CartQuantityUpdateView result = cartController.updateQuantityAsync(member, 30L, form);
+
+        verify(cartService).updateQuantity(1L, 30L, 3);
+        assertThat(result.itemTotal()).isEqualByComparingTo("105000");
+        assertThat(result.totalQuantity()).isEqualTo(3);
+    }
+
+    @Test
+    void count_authenticatedMember_returnsDatabaseQuantity() {
+        MemberDetails member = memberDetails();
+        when(cartService.getTotalQuantity(1L)).thenReturn(3);
+
+        CartCountView result = cartController.count(member);
+
+        assertThat(result.totalQuantity()).isEqualTo(3);
+    }
+
+    private MemberDetails memberDetails() {
+        return new MemberDetails(new MemberAuthenticationView(
+                1L,
+                "user@cakeshop.local",
+                "encoded-password",
+                "USER",
+                true));
+    }
+}

@@ -43,7 +43,7 @@ class ScreenRenderingTests {
     void publicScreensRenderWithoutAuthentication() throws Exception {
         String[] paths = {
             "/screens", "/login", "/signup", "/find-email",
-            "/products", "/products/1", "/cart"
+            "/products", "/products/1"
         };
 
         assertScreensRender(paths);
@@ -74,12 +74,20 @@ class ScreenRenderingTests {
     }
 
     @Test
+    void cart_unauthenticatedMember_redirectsToLoginEvenInPublicPreview() throws Exception {
+        mockMvc.perform(get("/cart"))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/login"));
+    }
+
+    @Test
     @WithUserDetails(
         value = "user@cakeshop.local",
         userDetailsServiceBeanName = "memberDetailsService"
     )
     void memberScreensRenderWithSeededUser() throws Exception {
         String[] paths = {
+            "/cart",
             "/orders/pickup", "/orders/custom/options", "/orders/custom/request",
             "/orders/checkout", "/orders/1/payment", "/orders/complete", "/mypage",
             "/orders/1", "/notifications", "/reviews/new", "/mypage/coupons",

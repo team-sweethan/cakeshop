@@ -380,14 +380,14 @@
             픽업 일시 선택
           </a>
 
-          <!-- 장바구니 기능은 이후 백엔드와 연결한다. -->
-          <button
-                  class="btn"
-                  type="button"
-                  data-add-product-cart
-          >
-            장바구니 담기
-          </button>
+          <form th:action="@{/cart/items}" method="post" data-server-cart-form>
+            <input type="hidden" name="productId" th:value="${product.id}">
+            <input type="hidden" name="quantity" value="1" data-server-cart-quantity>
+            <span data-server-cart-options></span>
+            <button class="btn" type="submit" data-server-cart-submit>
+              장바구니 담기
+            </button>
+          </form>
 
           <span class="note">
               픽업 일시는 장바구니에서 나중에 선택할 수 있습니다.
