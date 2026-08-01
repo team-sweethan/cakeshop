@@ -13,7 +13,7 @@ import java.util.Map;
 
 import com.cakeshop.domain.coupon.dto.form.CouponSearchCondition;
 import com.cakeshop.domain.coupon.dto.view.CouponView;
-import com.cakeshop.domain.product.admin.service.ProductAdminService;
+import com.cakeshop.domain.product.service.ProductAdminService;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,7 +33,7 @@ import com.cakeshop.domain.notification.controller.NotificationAdminController;
 import com.cakeshop.domain.order.controller.FulfillmentAdminController;
 import com.cakeshop.domain.order.controller.OrderAdminController;
 import com.cakeshop.domain.payment.controller.PaymentAdminController;
-import com.cakeshop.domain.product.admin.controller.ProductAdminController;
+import com.cakeshop.domain.product.controller.ProductAdminController;
 import com.cakeshop.domain.review.controller.ReviewAdminController;
 import com.cakeshop.domain.statistics.controller.StatisticsAdminController;
 

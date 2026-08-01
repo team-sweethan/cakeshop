@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.math.BigDecimal;
 import java.util.List;
 
-import com.cakeshop.domain.product.admin.dto.view.ProductOptionAdminRow;
-import com.cakeshop.domain.product.customer.dto.view.ProductOptionRow;
+import com.cakeshop.domain.product.dto.view.ProductOptionAdminRow;
+import com.cakeshop.domain.product.dto.view.ProductOptionRow;
 import com.cakeshop.domain.product.entity.ProductOption;
 import com.cakeshop.domain.product.entity.ProductOptionGroup;
 import com.cakeshop.domain.product.entity.ProductOptionSelectionType;

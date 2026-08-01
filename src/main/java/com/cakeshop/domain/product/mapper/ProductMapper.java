@@ -2,15 +2,15 @@ package com.cakeshop.domain.product.mapper;
 
 import java.util.List;
 
-import com.cakeshop.domain.product.admin.dto.form.ProductAdminSearchCondition;
-import com.cakeshop.domain.product.admin.dto.form.ProductForm;
-import com.cakeshop.domain.product.admin.dto.view.ProductAdminListView;
-import com.cakeshop.domain.product.admin.dto.view.ProductCategoryOptionView;
-import com.cakeshop.domain.product.admin.dto.view.ProductOptionAdminRow;
-import com.cakeshop.domain.product.customer.dto.form.ProductSearchCondition;
-import com.cakeshop.domain.product.customer.dto.view.ProductDetailView;
-import com.cakeshop.domain.product.customer.dto.view.ProductListView;
-import com.cakeshop.domain.product.customer.dto.view.ProductOptionRow;
+import com.cakeshop.domain.product.dto.form.ProductAdminSearchCondition;
+import com.cakeshop.domain.product.dto.form.ProductForm;
+import com.cakeshop.domain.product.dto.view.ProductAdminListView;
+import com.cakeshop.domain.product.dto.view.ProductCategoryOptionView;
+import com.cakeshop.domain.product.dto.view.ProductOptionAdminRow;
+import com.cakeshop.domain.product.dto.form.ProductSearchCondition;
+import com.cakeshop.domain.product.dto.view.ProductDetailView;
+import com.cakeshop.domain.product.dto.view.ProductListView;
+import com.cakeshop.domain.product.dto.view.ProductOptionRow;
 
 import com.cakeshop.domain.product.entity.Product;
 import com.cakeshop.domain.product.entity.ProductOption;
