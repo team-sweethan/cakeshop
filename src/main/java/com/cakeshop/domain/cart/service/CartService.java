@@ -223,6 +223,9 @@ public class CartService {
         } catch (BusinessException exception) {
             throw new BusinessException(CartErrorCode.PRODUCT_NOT_ON_SALE);
         }
+        if (product.productType() != ProductType.GENERAL) {
+            throw new BusinessException(CartErrorCode.CUSTOM_PRODUCT_NOT_SUPPORTED);
+        }
         validateStock(product, quantity);
         return product;
     }
@@ -321,7 +324,8 @@ public class CartService {
         boolean available = true;
         try {
             product = productQueryService.getSalesInfo(item.getProductId());
-            available = product.available()
+            available = product.productType() == ProductType.GENERAL
+                    && product.available()
                     && (product.stockQuantity() == null
                     || totalProductQuantity <= product.stockQuantity())
                     && hasCurrentOptionConfiguration(item.getProductId(), options);
@@ -382,7 +386,8 @@ public class CartService {
     ) {
         try {
             ProductSalesInfo product = productQueryService.getSalesInfo(item.getProductId());
-            return product.available()
+            return product.productType() == ProductType.GENERAL
+                    && product.available()
                     && hasCurrentOptionConfiguration(item.getProductId(), options);
         } catch (BusinessException exception) {
             return false;

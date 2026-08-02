@@ -1,5 +1,6 @@
 package com.cakeshop.customer;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -17,6 +18,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.context.support.WithUserDetails;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -89,6 +92,27 @@ class ScreenRenderingTests {
         mockMvc.perform(get("/cart"))
             .andExpect(status().is3xxRedirection())
             .andExpect(redirectedUrl("/login"));
+    }
+
+    @Test
+    void cartCount_unauthenticatedRequest_isNotSavedForLoginRedirect() throws Exception {
+        MvcResult countResult = mockMvc.perform(get("/cart/count"))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/login"))
+            .andReturn();
+
+        MockHttpSession countSession = (MockHttpSession) countResult.getRequest().getSession(false);
+        assertThat(countSession == null
+                ? null
+                : countSession.getAttribute("SPRING_SECURITY_SAVED_REQUEST"))
+            .isNull();
+
+        MvcResult pageResult = mockMvc.perform(get("/cart"))
+            .andExpect(status().is3xxRedirection())
+            .andReturn();
+        MockHttpSession pageSession = (MockHttpSession) pageResult.getRequest().getSession(false);
+        assertThat(pageSession).isNotNull();
+        assertThat(pageSession.getAttribute("SPRING_SECURITY_SAVED_REQUEST")).isNotNull();
     }
 
     @Test

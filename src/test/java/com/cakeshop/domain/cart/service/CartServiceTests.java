@@ -285,6 +285,35 @@ class CartServiceTests {
     }
 
     @Test
+    void addItem_customProduct_throwsUnsupportedProductType() {
+        CartAddForm form = form(10L, 1, List.of());
+        when(cartMapper.findCartIdByMemberIdForUpdate(1L)).thenReturn(Optional.of(20L));
+        when(productQueryService.getSalesInfo(10L)).thenReturn(customProduct());
+
+        assertThatThrownBy(() -> cartService.addItem(1L, form))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(CartErrorCode.CUSTOM_PRODUCT_NOT_SUPPORTED);
+
+        verify(productService, never()).getPublicOptionGroups(10L);
+        verify(cartMapper, never()).insertItem(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void getCart_existingCustomProduct_marksItemUnavailable() {
+        CartItem item = item(30L, 10L, 1);
+        when(cartMapper.findItemsByMemberId(1L)).thenReturn(List.of(item));
+        when(cartMapper.findOptionsByCartItemIds(List.of(30L))).thenReturn(List.of());
+        when(productQueryService.getSalesInfo(10L)).thenReturn(customProduct());
+
+        CartView cart = cartService.getCart(1L);
+
+        assertThat(cart.items().getFirst().available()).isFalse();
+        assertThat(cart.grandTotal()).isZero();
+        verify(productService, never()).getPublicOptionGroups(10L);
+    }
+
+    @Test
     void updateQuantity_otherMembersItem_throwsNotFound() {
         when(cartMapper.findCartIdByMemberIdForUpdate(1L)).thenReturn(Optional.of(20L));
         when(cartMapper.findItemByMemberIdAndItemId(1L, 99L)).thenReturn(Optional.empty());
@@ -367,6 +396,21 @@ class CartServiceTests {
     }
 
     @Test
+    void updateQuantity_customProduct_throwsUnsupportedProductType() {
+        CartItem item = item(30L, 10L, 1);
+        when(cartMapper.findCartIdByMemberIdForUpdate(1L)).thenReturn(Optional.of(20L));
+        when(cartMapper.findItemByMemberIdAndItemId(1L, 30L)).thenReturn(Optional.of(item));
+        when(productQueryService.getSalesInfo(10L)).thenReturn(customProduct());
+
+        assertThatThrownBy(() -> cartService.updateQuantity(1L, 30L, 2))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(CartErrorCode.CUSTOM_PRODUCT_NOT_SUPPORTED);
+
+        verify(cartMapper, never()).updateItemQuantity(1L, 30L, 2);
+    }
+
+    @Test
     void updateQuantity_invalidOtherConfiguration_doesNotConsumeStock() {
         CartItem target = item(30L, 10L, 3);
         CartItem invalid = item(31L, 10L, 1);
@@ -428,6 +472,17 @@ class CartServiceTests {
                 true,
                 BigDecimal.valueOf(30000),
                 stock);
+    }
+
+    private ProductSalesInfo customProduct() {
+        return new ProductSalesInfo(
+                10L,
+                "주문 제작 케이크",
+                ProductType.CUSTOM,
+                2,
+                true,
+                BigDecimal.valueOf(55000),
+                null);
     }
 
     private List<ProductOptionGroupView> requiredOptions() {

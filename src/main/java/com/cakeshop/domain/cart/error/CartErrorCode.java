@@ -10,7 +10,8 @@ public enum CartErrorCode implements ErrorCode {
     REQUIRED_OPTION_MISSING("CART_004", "필수 상품 옵션을 선택해 주세요.", 400),
     INVALID_OPTION_SELECTION("CART_005", "상품 옵션 선택 방식이 올바르지 않습니다.", 400),
     OUT_OF_STOCK("CART_006", "상품 재고가 부족합니다.", 400),
-    UPDATE_FAILED("CART_007", "장바구니 변경에 실패했습니다.", 409);
+    UPDATE_FAILED("CART_007", "장바구니 변경에 실패했습니다.", 409),
+    CUSTOM_PRODUCT_NOT_SUPPORTED("CART_008", "주문 제작 상품은 제작 옵션을 먼저 선택해 주세요.", 400);
 
     private final String code;
     private final String message;

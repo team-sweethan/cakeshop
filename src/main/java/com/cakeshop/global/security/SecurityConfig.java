@@ -14,6 +14,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.core.session.SessionRegistryImpl;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 import org.springframework.security.web.util.matcher.AndRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.security.web.session.HttpSessionEventPublisher;
@@ -37,10 +38,15 @@ public class SecurityConfig {
         RequestMatcher localPasswordRecoveryRequest = new AndRequestMatcher(
                 passwordRecoveryRequest,
                 SecurityConfig::isLoopbackRequest);
+        HttpSessionRequestCache requestCache = new HttpSessionRequestCache();
+        requestCache.setRequestMatcher(request ->
+                !"/cart/count".equals(request.getRequestURI()
+                        .substring(request.getContextPath().length())));
 
         http
             // 웹훅 경로만 CSRF 제외 — 전체 비활성화 금지
             .csrf(csrf -> csrf.ignoringRequestMatchers("/webhooks/toss"))
+            .requestCache(cache -> cache.requestCache(requestCache))
             .authorizeHttpRequests(auth -> {
                 // ① 공개 GET을 먼저 선언 (matcher 순서 = 우선순위)
                 // 이메일/SMS 인증 전 간편 재설정은 local 프로필에서도 이 PC의 요청만 허용한다.
