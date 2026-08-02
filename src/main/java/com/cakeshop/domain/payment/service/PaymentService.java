@@ -13,7 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** READY 결제 조회와 승인 후 내부 상태 확정을 담당한다. */
+/** READY 결제 조회와 승인 후 내부 결제 상태 확정을 담당한다. */
 @Service
 @RequiredArgsConstructor
 public class PaymentService {
@@ -53,7 +53,7 @@ public class PaymentService {
                 approval.approvedAt()
         ));
 
-        // OrderMapper는 같은 트랜잭션에서 방금 저장한 DONE 결제를 확인한다.
+        // 주문 상태 변경 쿼리는 같은 트랜잭션에서 DONE 결제를 확인한다.
         orderService.completeGeneralOrderAfterPayment(
                 order.orderId(),
                 approval.approvedAt()

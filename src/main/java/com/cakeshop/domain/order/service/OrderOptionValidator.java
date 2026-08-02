@@ -16,11 +16,7 @@ import com.cakeshop.global.error.CommonErrorCode;
 
 import org.springframework.stereotype.Component;
 
-/**
- * 주문 요청의 상품 옵션 선택을 검증하고 주문 스냅샷에 필요한 값을 반환한다.
- *
- * <p>상품 도메인의 공개 옵션 조회 결과만 사용하며 상품 도메인의 코드나 Mapper에 직접 의존하지 않는다.</p>
- */
+/** 상품 옵션 선택을 검증하고 주문 스냅샷에 저장할 값을 반환한다. */
 @Component
 public class OrderOptionValidator {
 

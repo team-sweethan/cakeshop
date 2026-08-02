@@ -6,7 +6,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
-/** 주문 도메인이 다른 계층과 도메인에 공개하는 업무 계약이다. */
+/** 일반 상품 주문 생성과 결제 연동을 제공하는 주문 도메인의 공개 계약이다. */
 public interface OrderService {
 
     /**

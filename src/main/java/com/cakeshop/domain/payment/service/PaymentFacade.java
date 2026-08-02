@@ -15,7 +15,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
 
-/** Toss 승인과 주문·결제 내부 완료 처리를 순서대로 조율한다. */
+/** Toss 결제 승인과 내부 결제 완료 처리를 조정한다. */
 @Service
 @RequiredArgsConstructor
 public class PaymentFacade {

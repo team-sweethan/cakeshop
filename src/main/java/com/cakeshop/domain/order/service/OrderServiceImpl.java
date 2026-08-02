@@ -31,7 +31,7 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
-/** 일반 상품 주문 생성과 결제 전후 주문 상태 처리 계약을 구현한다. */
+/** 일반 상품 주문 생성과 결제 전후의 주문 상태 변경을 구현한다. */
 @Service
 @RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
@@ -131,7 +131,7 @@ public class OrderServiceImpl implements OrderService {
         );
     }
 
-    /** 현재는 유효한 회원 식별자 형식만 확인한다. */
+    /** 회원 식별자의 기본 형식을 검증한다. */
     private void validateActiveMember(long memberId) {
         if (memberId <= 0) {
             throw new BusinessException(OrderErrorCode.MEMBER_NOT_AVAILABLE);
