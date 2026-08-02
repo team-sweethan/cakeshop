@@ -158,6 +158,23 @@ class CartServiceTests {
     }
 
     @Test
+    void getCart_inactiveOption_excludesItemFromSummaryTotals() {
+        CartItem item = item(30L, 10L, 2);
+        when(cartMapper.findItemsByMemberId(1L)).thenReturn(List.of(item));
+        when(cartMapper.findOptionsByCartItemIds(List.of(30L)))
+                .thenReturn(List.of(option(30L, 101L)));
+        when(productQueryService.getSalesInfo(10L)).thenReturn(product(10));
+        when(productService.getPublicOptionGroups(10L)).thenReturn(List.of());
+
+        CartView cart = cartService.getCart(1L);
+
+        assertThat(cart.items().getFirst().available()).isFalse();
+        assertThat(cart.baseTotal()).isZero();
+        assertThat(cart.optionTotal()).isZero();
+        assertThat(cart.grandTotal()).isZero();
+    }
+
+    @Test
     void addItem_requiredOptionMissing_throwsBusinessException() {
         CartAddForm form = form(10L, 1, List.of());
         when(productQueryService.getSalesInfo(10L)).thenReturn(product(10));
@@ -198,6 +215,51 @@ class CartServiceTests {
         inOrder.verify(cartMapper).findCartIdByMemberIdForUpdate(1L);
         inOrder.verify(cartMapper).findItemByMemberIdAndItemId(1L, 30L);
         inOrder.verify(cartMapper).updateItemQuantity(1L, 30L, 2);
+    }
+
+    @Test
+    void updateQuantity_inactiveOption_throwsInvalidOption() {
+        CartItem item = item(30L, 10L, 3);
+        when(cartMapper.findCartIdByMemberIdForUpdate(1L)).thenReturn(Optional.of(20L));
+        when(cartMapper.findItemByMemberIdAndItemId(1L, 30L)).thenReturn(Optional.of(item));
+        when(productQueryService.getSalesInfo(10L)).thenReturn(product(10));
+        when(cartMapper.findOptionsByCartItemIds(List.of(30L)))
+                .thenReturn(List.of(option(30L, 101L)));
+        when(productService.getPublicOptionGroups(10L)).thenReturn(List.of());
+
+        assertThatThrownBy(() -> cartService.updateQuantity(1L, 30L, 2))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(CartErrorCode.INVALID_OPTION);
+
+        verify(cartMapper, never()).updateItemQuantity(1L, 30L, 2);
+    }
+
+    @Test
+    void deleteSelectedItems_existingCart_locksBeforeDeleting() {
+        when(cartMapper.findCartIdByMemberIdForUpdate(1L)).thenReturn(Optional.of(20L));
+        when(cartMapper.deleteItemsByMemberIdAndItemIds(1L, List.of(30L))).thenReturn(1);
+
+        cartService.deleteSelectedItems(1L, List.of(30L));
+
+        InOrder inOrder = inOrder(cartMapper);
+        inOrder.verify(cartMapper).findCartIdByMemberIdForUpdate(1L);
+        inOrder.verify(cartMapper).deleteOptionsByMemberIdAndItemIds(1L, List.of(30L));
+        inOrder.verify(cartMapper).deleteImagesByMemberIdAndItemIds(1L, List.of(30L));
+        inOrder.verify(cartMapper).deleteItemsByMemberIdAndItemIds(1L, List.of(30L));
+    }
+
+    @Test
+    void clearCart_existingCart_locksBeforeDeleting() {
+        when(cartMapper.findCartIdByMemberIdForUpdate(1L)).thenReturn(Optional.of(20L));
+
+        cartService.clearCart(1L);
+
+        InOrder inOrder = inOrder(cartMapper);
+        inOrder.verify(cartMapper).findCartIdByMemberIdForUpdate(1L);
+        inOrder.verify(cartMapper).deleteAllOptionsByMemberId(1L);
+        inOrder.verify(cartMapper).deleteAllImagesByMemberId(1L);
+        inOrder.verify(cartMapper).deleteAllItemsByMemberId(1L);
     }
 
     private CartAddForm form(long productId, int quantity, List<Long> optionIds) {

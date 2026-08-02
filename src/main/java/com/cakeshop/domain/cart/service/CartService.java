@@ -128,6 +128,10 @@ public class CartService {
                 .orElseThrow(() -> new BusinessException(CartErrorCode.ITEM_NOT_FOUND));
         CartItem item = findOwnedItem(memberId, itemId);
         ProductSalesInfo product = getAvailableProduct(item.getProductId(), quantity);
+        List<CartItemOption> options = cartMapper.findOptionsByCartItemIds(List.of(itemId));
+        if (!hasCurrentOptionConfiguration(item.getProductId(), options)) {
+            throw new BusinessException(CartErrorCode.INVALID_OPTION);
+        }
         validateStock(product, quantity);
         if (cartMapper.updateItemQuantity(memberId, itemId, quantity) != 1) {
             throw new BusinessException(CartErrorCode.UPDATE_FAILED);
@@ -148,6 +152,8 @@ public class CartService {
             throw new BusinessException(CartErrorCode.ITEM_NOT_FOUND);
         }
 
+        cartMapper.findCartIdByMemberIdForUpdate(memberId)
+                .orElseThrow(() -> new BusinessException(CartErrorCode.ITEM_NOT_FOUND));
         cartMapper.deleteOptionsByMemberIdAndItemIds(memberId, distinctIds);
         cartMapper.deleteImagesByMemberIdAndItemIds(memberId, distinctIds);
         if (cartMapper.deleteItemsByMemberIdAndItemIds(memberId, distinctIds)
@@ -158,6 +164,9 @@ public class CartService {
 
     @Transactional
     public void clearCart(long memberId) {
+        if (cartMapper.findCartIdByMemberIdForUpdate(memberId).isEmpty()) {
+            return;
+        }
         cartMapper.deleteAllOptionsByMemberId(memberId);
         cartMapper.deleteAllImagesByMemberId(memberId);
         cartMapper.deleteAllItemsByMemberId(memberId);
@@ -275,7 +284,8 @@ public class CartService {
             product = productQueryService.getSalesInfo(item.getProductId());
             available = product.available()
                     && (product.stockQuantity() == null
-                    || item.getQuantity() <= product.stockQuantity());
+                    || item.getQuantity() <= product.stockQuantity())
+                    && hasCurrentOptionConfiguration(item.getProductId(), options);
         } catch (BusinessException exception) {
             product = new ProductSalesInfo(
                     item.getProductId(),
@@ -312,6 +322,22 @@ public class CartService {
                 unitPrice.multiply(BigDecimal.valueOf(item.getQuantity())),
                 item.getRequirements(),
                 optionViews);
+    }
+
+    private boolean hasCurrentOptionConfiguration(
+            long productId,
+            List<CartItemOption> storedOptions
+    ) {
+        try {
+            List<CartItemOption> currentOptions = validateOptions(
+                    productId,
+                    storedOptions.stream()
+                            .map(CartItemOption::getProductOptionId)
+                            .toList());
+            return sameOptionSnapshots(storedOptions, currentOptions);
+        } catch (BusinessException exception) {
+            return false;
+        }
     }
 
     private CartView emptyCart() {
