@@ -1,11 +1,13 @@
 package com.cakeshop.domain.cart.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.cakeshop.domain.cart.dto.form.CartAddForm;
+import com.cakeshop.domain.cart.dto.view.CartView;
 import com.cakeshop.domain.cart.entity.CartItem;
 import com.cakeshop.domain.cart.entity.CartItemOption;
 import com.cakeshop.domain.cart.error.CartErrorCode;
@@ -85,6 +87,47 @@ class CartServiceTests {
 
         verify(cartMapper).updateItemQuantity(1L, 30L, 5);
         verify(cartMapper, never()).insertItem(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void addItem_sameOptionIdButChangedSnapshot_insertsSeparateItem() {
+        CartAddForm form = form(10L, 2, List.of(101L));
+        CartItem existing = item(30L, 10L, 3);
+        CartItemOption oldSnapshot = option(30L, 101L);
+        oldSnapshot.setAdditionalPrice(BigDecimal.valueOf(1000));
+        when(productQueryService.getSalesInfo(10L)).thenReturn(product(10));
+        when(productService.getPublicOptionGroups(10L)).thenReturn(requiredOptions());
+        when(cartMapper.findCartIdByMemberIdForUpdate(1L)).thenReturn(Optional.of(20L));
+        when(cartMapper.findItemsByMemberId(1L)).thenReturn(List.of(existing));
+        when(cartMapper.findOptionsByCartItemIds(List.of(30L))).thenReturn(List.of(oldSnapshot));
+        when(cartMapper.insertItem(org.mockito.ArgumentMatchers.any())).thenAnswer(invocation -> {
+            CartItem item = invocation.getArgument(0);
+            item.setId(31L);
+            return 1;
+        });
+        when(cartMapper.insertItemOption(org.mockito.ArgumentMatchers.any())).thenReturn(1);
+
+        cartService.addItem(1L, form);
+
+        verify(cartMapper).insertItem(org.mockito.ArgumentMatchers.any());
+        verify(cartMapper, never()).updateItemQuantity(1L, 30L, 5);
+    }
+
+    @Test
+    void getCart_unavailableItem_excludesItemFromSummaryTotals() {
+        CartItem item = item(30L, 10L, 2);
+        when(cartMapper.findItemsByMemberId(1L)).thenReturn(List.of(item));
+        when(cartMapper.findOptionsByCartItemIds(List.of(30L)))
+                .thenReturn(List.of(option(30L, 101L)));
+        when(productQueryService.getSalesInfo(10L))
+                .thenThrow(new BusinessException(CartErrorCode.PRODUCT_NOT_ON_SALE));
+
+        CartView cart = cartService.getCart(1L);
+
+        assertThat(cart.items().getFirst().available()).isFalse();
+        assertThat(cart.baseTotal()).isZero();
+        assertThat(cart.optionTotal()).isZero();
+        assertThat(cart.grandTotal()).isZero();
     }
 
     @Test

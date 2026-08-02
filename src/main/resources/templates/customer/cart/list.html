@@ -38,6 +38,7 @@
           <article class="panel cart-item" data-cart-item
                    th:each="item : ${cart.items}"
                    th:attr="data-item-id=${item.id},
+                            data-available=${item.available},
                             data-base-price=${item.basePrice},
                             data-option-price=${item.optionPrice},
                             data-unit-price=${item.basePrice.add(item.optionPrice)}"

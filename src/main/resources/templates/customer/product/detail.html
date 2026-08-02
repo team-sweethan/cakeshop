@@ -1,5 +1,6 @@
 ﻿<!doctype html>
-<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<html lang="ko" xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -380,7 +381,8 @@
             픽업 일시 선택
           </a>
 
-          <form th:action="@{/cart/items}" method="post" data-server-cart-form>
+          <form sec:authorize="isAuthenticated()"
+                th:action="@{/cart/items}" method="post" data-server-cart-form>
             <input type="hidden" name="productId" th:value="${product.id}">
             <input type="hidden" name="quantity" value="1" data-server-cart-quantity>
             <span data-server-cart-options></span>
@@ -388,6 +390,11 @@
               장바구니 담기
             </button>
           </form>
+
+          <a sec:authorize="isAnonymous()" class="btn"
+             th:href="@{/cart/continue/{id}(id=${product.id})}">
+            로그인 후 장바구니 담기
+          </a>
 
           <span class="note">
               픽업 일시는 장바구니에서 나중에 선택할 수 있습니다.

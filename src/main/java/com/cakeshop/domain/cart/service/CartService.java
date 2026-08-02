@@ -58,9 +58,11 @@ public class CartService {
                 .toList();
 
         BigDecimal baseTotal = itemViews.stream()
+                .filter(CartItemView::available)
                 .map(item -> item.basePrice().multiply(BigDecimal.valueOf(item.quantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal optionTotal = itemViews.stream()
+                .filter(CartItemView::available)
                 .map(item -> item.optionPrice().multiply(BigDecimal.valueOf(item.quantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         int totalQuantity = itemViews.stream().mapToInt(CartItemView::quantity).sum();
@@ -88,12 +90,12 @@ public class CartService {
 
         List<CartItem> existingItems = cartMapper.findItemsByMemberId(memberId);
         Map<Long, List<CartItemOption>> optionsByItem = optionsByItem(existingItems);
-        Set<Long> selectedOptionIds = optionIds(selectedOptions);
 
         for (CartItem item : existingItems) {
             if (item.getProductId().equals(form.getProductId())
-                    && optionIds(optionsByItem.getOrDefault(item.getId(), List.of()))
-                    .equals(selectedOptionIds)) {
+                    && sameOptionSnapshots(
+                    optionsByItem.getOrDefault(item.getId(), List.of()),
+                    selectedOptions)) {
                 int mergedQuantity = item.getQuantity() + form.getQuantity();
                 validateStock(product, mergedQuantity);
                 updateQuantity(memberId, item.getId(), mergedQuantity);
@@ -240,6 +242,26 @@ public class CartService {
         return options.stream()
                 .map(CartItemOption::getProductOptionId)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private boolean sameOptionSnapshots(
+            List<CartItemOption> existingOptions,
+            List<CartItemOption> selectedOptions
+    ) {
+        if (!optionIds(existingOptions).equals(optionIds(selectedOptions))) {
+            return false;
+        }
+
+        Map<Long, CartItemOption> selectedById = selectedOptions.stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        CartItemOption::getProductOptionId,
+                        option -> option));
+        return existingOptions.stream().allMatch(existing -> {
+            CartItemOption selected = selectedById.get(existing.getProductOptionId());
+            return selected != null
+                    && java.util.Objects.equals(existing.getOptionName(), selected.getOptionName())
+                    && existing.getAdditionalPrice().compareTo(selected.getAdditionalPrice()) == 0;
+        });
     }
 
     private CartItemView toView(CartItem item, List<CartItemOption> options) {

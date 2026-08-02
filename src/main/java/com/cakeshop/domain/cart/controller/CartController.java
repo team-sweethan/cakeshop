@@ -40,6 +40,11 @@ public class CartController {
         return "customer/cart/list";
     }
 
+    @GetMapping("/continue/{productId}")
+    public String continueAfterLogin(@PathVariable long productId) {
+        return "redirect:/products/" + productId;
+    }
+
     @PostMapping("/items")
     public String addItem(
             @AuthenticationPrincipal MemberDetails member,

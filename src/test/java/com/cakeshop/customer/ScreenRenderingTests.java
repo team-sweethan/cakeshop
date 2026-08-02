@@ -81,6 +81,14 @@ class ScreenRenderingTests {
     }
 
     @Test
+    void productDetail_unauthenticatedMember_showsLoginCartLinkOnly() throws Exception {
+        mockMvc.perform(get("/products/1"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("로그인 후 장바구니 담기")))
+            .andExpect(content().string(not(containsString("data-server-cart-form"))));
+    }
+
+    @Test
     @WithUserDetails(
         value = "user@cakeshop.local",
         userDetailsServiceBeanName = "memberDetailsService"
@@ -95,6 +103,11 @@ class ScreenRenderingTests {
         };
 
         assertScreensRender(paths);
+
+        mockMvc.perform(get("/products/1"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("data-server-cart-form")))
+            .andExpect(content().string(not(containsString("로그인 후 장바구니 담기"))));
     }
 
     @Test

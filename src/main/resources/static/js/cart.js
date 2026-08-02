@@ -33,6 +33,7 @@
     let baseTotal = 0;
     let optionTotal = 0;
     document.querySelectorAll("[data-cart-item]").forEach(function (item) {
+      if (item.dataset.available !== "true") return;
       const quantity = Number(item.querySelector("[name='quantity']").value);
       totalQuantity += quantity;
       baseTotal += Number(item.dataset.basePrice) * quantity;
