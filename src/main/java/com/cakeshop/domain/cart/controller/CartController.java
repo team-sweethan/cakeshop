@@ -87,7 +87,14 @@ public class CartController {
             redirectAttributes.addFlashAttribute("errorMessage", "수량은 1개 이상이어야 합니다.");
             return "redirect:/cart";
         }
-        cartService.updateQuantity(member.getMemberId(), itemId, form.getQuantity());
+        try {
+            cartService.updateQuantity(member.getMemberId(), itemId, form.getQuantity());
+        } catch (BusinessException exception) {
+            redirectAttributes.addFlashAttribute(
+                    "errorMessage",
+                    exception.getErrorCode().message());
+            return "redirect:/cart";
+        }
         redirectAttributes.addFlashAttribute("successMessage", "수량을 변경했습니다.");
         return "redirect:/cart";
     }
@@ -115,7 +122,14 @@ public class CartController {
             @PathVariable long itemId,
             RedirectAttributes redirectAttributes
     ) {
-        cartService.deleteItem(member.getMemberId(), itemId);
+        try {
+            cartService.deleteItem(member.getMemberId(), itemId);
+        } catch (BusinessException exception) {
+            redirectAttributes.addFlashAttribute(
+                    "errorMessage",
+                    exception.getErrorCode().message());
+            return "redirect:/cart";
+        }
         redirectAttributes.addFlashAttribute("successMessage", "장바구니 상품을 삭제했습니다.");
         return "redirect:/cart";
     }
@@ -131,7 +145,14 @@ public class CartController {
             redirectAttributes.addFlashAttribute("errorMessage", "삭제할 상품을 선택해 주세요.");
             return "redirect:/cart";
         }
-        cartService.deleteSelectedItems(member.getMemberId(), form.getItemIds());
+        try {
+            cartService.deleteSelectedItems(member.getMemberId(), form.getItemIds());
+        } catch (BusinessException exception) {
+            redirectAttributes.addFlashAttribute(
+                    "errorMessage",
+                    exception.getErrorCode().message());
+            return "redirect:/cart";
+        }
         redirectAttributes.addFlashAttribute("successMessage", "선택한 상품을 삭제했습니다.");
         return "redirect:/cart";
     }
@@ -141,7 +162,14 @@ public class CartController {
             @AuthenticationPrincipal MemberDetails member,
             RedirectAttributes redirectAttributes
     ) {
-        cartService.clearCart(member.getMemberId());
+        try {
+            cartService.clearCart(member.getMemberId());
+        } catch (BusinessException exception) {
+            redirectAttributes.addFlashAttribute(
+                    "errorMessage",
+                    exception.getErrorCode().message());
+            return "redirect:/cart";
+        }
         redirectAttributes.addFlashAttribute("successMessage", "장바구니를 비웠습니다.");
         return "redirect:/cart";
     }

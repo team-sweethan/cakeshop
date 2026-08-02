@@ -136,6 +136,36 @@ class CartControllerTests {
     }
 
     @Test
+    void updateQuantity_staleCart_redirectsWithErrorMessage() {
+        MemberDetails member = memberDetails();
+        CartUpdateForm form = new CartUpdateForm();
+        form.setQuantity(2);
+        when(bindingResult.hasErrors()).thenReturn(false);
+        doThrow(new BusinessException(CartErrorCode.OUT_OF_STOCK))
+                .when(cartService).updateQuantity(1L, 30L, 2);
+
+        String viewName = cartController.updateQuantity(
+                member, 30L, form, bindingResult, redirectAttributes);
+
+        assertThat(viewName).isEqualTo("redirect:/cart");
+        verify(redirectAttributes).addFlashAttribute(
+                "errorMessage", CartErrorCode.OUT_OF_STOCK.message());
+    }
+
+    @Test
+    void deleteItem_staleCart_redirectsWithErrorMessage() {
+        MemberDetails member = memberDetails();
+        doThrow(new BusinessException(CartErrorCode.ITEM_NOT_FOUND))
+                .when(cartService).deleteItem(1L, 30L);
+
+        String viewName = cartController.deleteItem(member, 30L, redirectAttributes);
+
+        assertThat(viewName).isEqualTo("redirect:/cart");
+        verify(redirectAttributes).addFlashAttribute(
+                "errorMessage", CartErrorCode.ITEM_NOT_FOUND.message());
+    }
+
+    @Test
     void count_authenticatedMember_returnsDatabaseQuantity() {
         MemberDetails member = memberDetails();
         when(cartService.getTotalQuantity(1L)).thenReturn(3);

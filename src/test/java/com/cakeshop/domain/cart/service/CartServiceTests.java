@@ -314,6 +314,20 @@ class CartServiceTests {
     }
 
     @Test
+    void getCart_unlimitedStockExceedsMaximum_marksItemUnavailable() {
+        CartItem item = item(30L, 10L, 11);
+        when(cartMapper.findItemsByMemberId(1L)).thenReturn(List.of(item));
+        when(cartMapper.findOptionsByCartItemIds(List.of(30L))).thenReturn(List.of());
+        when(productQueryService.getSalesInfo(10L)).thenReturn(product(null));
+        when(productService.getPublicOptionGroups(10L)).thenReturn(List.of());
+
+        CartView cart = cartService.getCart(1L);
+
+        assertThat(cart.items().getFirst().available()).isFalse();
+        assertThat(cart.grandTotal()).isZero();
+    }
+
+    @Test
     void updateQuantity_otherMembersItem_throwsNotFound() {
         when(cartMapper.findCartIdByMemberIdForUpdate(1L)).thenReturn(Optional.of(20L));
         when(cartMapper.findItemByMemberIdAndItemId(1L, 99L)).thenReturn(Optional.empty());

@@ -231,13 +231,18 @@ public class CartService {
     }
 
     private void validateStock(ProductSalesInfo product, int quantity) {
-        if (quantity < 1
-                || !product.available()
-                || product.stockQuantity() != null && quantity > product.stockQuantity()
-                || product.stockQuantity() == null
-                && quantity > MAX_UNLIMITED_STOCK_QUANTITY) {
+        if (!product.available() || !isWithinStockLimit(product, quantity)) {
             throw new BusinessException(CartErrorCode.OUT_OF_STOCK);
         }
+    }
+
+    private boolean isWithinStockLimit(ProductSalesInfo product, int quantity) {
+        if (quantity < 1) {
+            return false;
+        }
+        return product.stockQuantity() == null
+                ? quantity <= MAX_UNLIMITED_STOCK_QUANTITY
+                : quantity <= product.stockQuantity();
     }
 
     private List<CartItemOption> validateOptions(long productId, List<Long> requestedIds) {
@@ -326,8 +331,7 @@ public class CartService {
             product = productQueryService.getSalesInfo(item.getProductId());
             available = product.productType() == ProductType.GENERAL
                     && product.available()
-                    && (product.stockQuantity() == null
-                    || totalProductQuantity <= product.stockQuantity())
+                    && isWithinStockLimit(product, totalProductQuantity)
                     && hasCurrentOptionConfiguration(item.getProductId(), options);
         } catch (BusinessException exception) {
             product = new ProductSalesInfo(
