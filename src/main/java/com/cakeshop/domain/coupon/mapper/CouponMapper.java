@@ -42,6 +42,4 @@ public interface CouponMapper {
     /** 관리자 명령에 따라 ACTIVE와 INACTIVE 상태를 전환한다. */
     int updateStatus( @Param("couponId") Long couponId, @Param("status") CouponStatus status );
 
-    /** 만료 시각이 지난 ACTIVE·INACTIVE 쿠폰을 ENDED로 일괄 전환한다. */
-    int endExpiredCoupons();
 }

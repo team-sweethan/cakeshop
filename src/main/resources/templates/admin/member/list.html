@@ -15,6 +15,8 @@
         <main class="admin-content">
             <h1 class="admin-page-title">회원 관리</h1>
 
+            <th:block th:replace="~{fragments/common/alert :: popup}"></th:block>
+
             <div class="member-admin-summary">
                 <nav class="member-admin-tabs" aria-label="회원 구분">
                     <a class="member-admin-tab"
@@ -98,7 +100,13 @@
                     </thead>
                     <tbody>
                     <tr th:each="member : ${pageResult.content}">
-                        <td th:text="${member.name ?: '-'}">회원 이름</td>
+                        <td>
+                            <a class="member-admin-name-link"
+                               th:href="@{/admin/members/{memberId}(memberId=${member.id})}"
+                               th:text="${member.name ?: '-'}">
+                                회원 이름
+                            </a>
+                        </td>
                         <td th:text="${member.maskedEmail}">su***@example.com</td>
                         <td th:text="${member.maskedPhone}">010-****-1234</td>
                         <td th:text="${member.maskedBirthDate}">2000.**.**</td>
@@ -113,15 +121,87 @@
                         </td>
                         <td class="member-admin-status-column"
                             th:unless="${condition.withdrawn}">
-                            <span class="badge"
-                                  th:classappend="${member.status.name() == 'ACTIVE'}
-                                      ? ' badge--success'
-                                      : ' badge--danger'"
-                                  th:text="${member.status.name() == 'ACTIVE'}
-                                      ? '정상'
-                                      : '이용정지'">
-                                정상
-                            </span>
+                            <div class="member-admin-status-actions">
+                                <span class="badge"
+                                      th:classappend="${member.status.name() == 'ACTIVE'}
+                                          ? ' badge--success'
+                                          : ' badge--danger'"
+                                      th:text="${member.status.name() == 'ACTIVE'}
+                                          ? '정상'
+                                          : '이용정지'">
+                                    정상
+                                </span>
+
+                                <button class="btn btn--danger member-admin-status-action"
+                                        type="button"
+                                        th:if="${condition.members
+                                            and member.status.name() == 'ACTIVE'}"
+                                        th:attr="data-modal-open=|member-suspend-modal-${member.id}|">
+                                    이용정지
+                                </button>
+
+                                <form method="post"
+                                      th:if="${condition.members
+                                          and member.status.name() == 'SUSPENDED'}"
+                                      th:action="@{/admin/members/{memberId}/activate(
+                                          memberId=${member.id}
+                                      )}">
+                                    <button class="btn btn--primary member-admin-status-action"
+                                            type="submit"
+                                            onclick="return confirm('이 회원의 이용정지를 해제하시겠습니까?')">
+                                        정지 해제
+                                    </button>
+                                </form>
+                            </div>
+
+                            <div class="modal"
+                                 hidden
+                                 th:if="${condition.members
+                                     and member.status.name() == 'ACTIVE'}"
+                                 th:id="|member-suspend-modal-${member.id}|">
+                                <div class="modal__dialog"
+                                     role="dialog"
+                                     aria-modal="true"
+                                     th:attr="aria-labelledby=|member-suspend-title-${member.id}|">
+                                    <h2 class="member-admin-modal-title"
+                                        th:id="|member-suspend-title-${member.id}|">
+                                        회원 이용정지
+                                    </h2>
+                                    <p class="member-admin-modal-description">
+                                        이용정지 사유를 입력해 주세요.
+                                    </p>
+
+                                    <form method="post"
+                                          th:action="@{/admin/members/{memberId}/suspend(
+                                              memberId=${member.id}
+                                          )}">
+                                        <div class="form-group">
+                                            <label th:for="|suspend-reason-${member.id}|">
+                                                이용정지 사유
+                                            </label>
+                                            <textarea class="form-control member-admin-modal-reason"
+                                                      name="reason"
+                                                      rows="4"
+                                                      required
+                                                      maxlength="500"
+                                                      placeholder="회원 이용을 정지하는 사유를 입력해 주세요."
+                                                      th:id="|suspend-reason-${member.id}|"></textarea>
+                                        </div>
+
+                                        <div class="cluster">
+                                            <button class="btn btn--danger"
+                                                    type="submit">
+                                                이용정지
+                                            </button>
+                                            <button class="btn btn--outline"
+                                                    type="button"
+                                                    data-modal-close>
+                                                취소
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
                         </td>
                     </tr>
                     <tr th:if="${pageResult.content.isEmpty()}">
@@ -161,5 +241,6 @@
         </main>
     </div>
 </div>
+<script th:src="@{/js/member-admin.js}"></script>
 </body>
 </html>

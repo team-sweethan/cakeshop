@@ -97,6 +97,121 @@ class MemberAdminMapperTests {
                 .containsExactly(email("active"));
     }
 
+    @Test
+    void findAdminMemberDetail_existingMember_returnsDetail() {
+        Long memberId = jdbcTemplate.queryForObject(
+                "SELECT id FROM members WHERE email = ?",
+                Long.class,
+                email("suspended"));
+
+        assertThat(memberMapper.findAdminMemberDetail(memberId))
+                .hasValueSatisfying(member -> {
+                    assertThat(member.id()).isEqualTo(memberId);
+                    assertThat(member.name()).isEqualTo(marker + " suspended");
+                    assertThat(member.nickname()).isEqualTo("suspended");
+                    assertThat(member.email()).isEqualTo(email("suspended"));
+                    assertThat(member.phone()).isEqualTo("010-0000-0002");
+                    assertThat(member.birthDate())
+                            .isEqualTo(LocalDate.of(2000, 2, 1));
+                    assertThat(member.role()).isEqualTo("USER");
+                    assertThat(member.status())
+                            .isEqualTo(MemberStatus.SUSPENDED);
+                    assertThat(member.createdAt())
+                            .isEqualTo(LocalDateTime.of(2026, 2, 1, 10, 0));
+                    assertThat(member.updatedAt())
+                            .isEqualTo(LocalDateTime.of(2026, 2, 1, 10, 0));
+                    assertThat(member.suspendedAt())
+                            .isEqualTo(LocalDateTime.of(2026, 2, 2, 10, 0));
+                    assertThat(member.suspendedReason())
+                            .isEqualTo("관리자 테스트 이용정지");
+                    assertThat(member.withdrawnAt()).isNull();
+                });
+    }
+
+    @Test
+    void findAdminMemberDetail_withdrawnMember_mapsWithdrawnAt() {
+        Long memberId = jdbcTemplate.queryForObject(
+                "SELECT id FROM members WHERE email = ?",
+                Long.class,
+                email("withdrawn"));
+
+        assertThat(memberMapper.findAdminMemberDetail(memberId))
+                .hasValueSatisfying(member ->
+                        assertThat(member.withdrawnAt())
+                                .isEqualTo(
+                                        LocalDateTime.of(
+                                                2026, 3, 2, 10, 0)));
+    }
+
+    @Test
+    void findAdminMemberDetail_nonexistentMember_returnsEmpty() {
+        assertThat(memberMapper.findAdminMemberDetail(Long.MAX_VALUE))
+                .isEmpty();
+    }
+
+    @Test
+    void suspendActiveUser_activeUser_updatesSuspensionInformation() {
+        Long memberId = memberId("active");
+
+        int updatedRows =
+                memberMapper.suspendActiveUser(
+                        memberId,
+                        "관리자 테스트 정지 사유");
+
+        assertThat(updatedRows).isEqualTo(1);
+        assertThat(memberMapper.findAdminMemberDetail(memberId))
+                .hasValueSatisfying(member -> {
+                    assertThat(member.status())
+                            .isEqualTo(MemberStatus.SUSPENDED);
+                    assertThat(member.suspendedAt()).isNotNull();
+                    assertThat(member.suspendedReason())
+                            .isEqualTo("관리자 테스트 정지 사유");
+                });
+    }
+
+    @Test
+    void suspendActiveUser_invalidTargets_updatesNothing() {
+        assertThat(memberMapper.suspendActiveUser(
+                memberId("suspended"),
+                "중복 정지"))
+                .isZero();
+        assertThat(memberMapper.suspendActiveUser(
+                memberId("withdrawn"),
+                "탈퇴 회원 정지"))
+                .isZero();
+        assertThat(memberMapper.suspendActiveUser(
+                memberId("admin"),
+                "관리자 정지"))
+                .isZero();
+    }
+
+    @Test
+    void activateSuspendedUser_suspendedUser_clearsSuspensionInformation() {
+        Long memberId = memberId("suspended");
+
+        int updatedRows =
+                memberMapper.activateSuspendedUser(memberId);
+
+        assertThat(updatedRows).isEqualTo(1);
+        assertThat(memberMapper.findAdminMemberDetail(memberId))
+                .hasValueSatisfying(member -> {
+                    assertThat(member.status())
+                            .isEqualTo(MemberStatus.ACTIVE);
+                    assertThat(member.suspendedAt()).isNull();
+                    assertThat(member.suspendedReason()).isNull();
+                });
+    }
+
+    @Test
+    void activateSuspendedUser_invalidTargets_updatesNothing() {
+        assertThat(memberMapper.activateSuspendedUser(memberId("active")))
+                .isZero();
+        assertThat(memberMapper.activateSuspendedUser(memberId("withdrawn")))
+                .isZero();
+        assertThat(memberMapper.activateSuspendedUser(memberId("admin")))
+                .isZero();
+    }
+
     private MemberAdminSearchCondition condition(MemberAdminListType listType) {
         MemberAdminSearchCondition condition = new MemberAdminSearchCondition();
 
@@ -104,6 +219,13 @@ class MemberAdminMapperTests {
         condition.setKeyword(marker);
 
         return condition;
+    }
+
+    private Long memberId(String account) {
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM members WHERE email = ?",
+                Long.class,
+                email(account));
     }
 
     private void insertMember(
@@ -125,11 +247,13 @@ class MemberAdminMapperTests {
                     status,
                     name,
                     birth_date,
+                    suspended_at,
+                    suspended_reason,
                     created_at,
                     updated_at,
                     withdrawn_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 email(account),
                 "encoded-password",
@@ -139,6 +263,12 @@ class MemberAdminMapperTests {
                 status.name(),
                 marker + " " + account,
                 LocalDate.of(2000, month, 1),
+                status == MemberStatus.SUSPENDED
+                        ? createdAt.plusDays(1)
+                        : null,
+                status == MemberStatus.SUSPENDED
+                        ? "관리자 테스트 이용정지"
+                        : null,
                 createdAt,
                 createdAt,
                 status == MemberStatus.WITHDRAWN

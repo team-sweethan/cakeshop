@@ -120,7 +120,9 @@
                                type="datetime-local"
                                th:field="*{startsAt}"
                                th:disabled="${formMode == 'update' && !couponForm.fullEdit}">
-                        <input type="hidden" name="startsAt" th:value="*{startsAt}" th:if="${formMode == 'update' && !couponForm.fullEdit}">
+                        <input type="hidden" name="startsAt"
+                               th:value="${#temporals.format(couponForm.startsAt, 'yyyy-MM-dd''T''HH:mm')}"
+                               th:if="${formMode == 'update' && !couponForm.fullEdit}">
 
                         <p class="field-error" th:errors="*{startsAt}"></p>
                     </div>

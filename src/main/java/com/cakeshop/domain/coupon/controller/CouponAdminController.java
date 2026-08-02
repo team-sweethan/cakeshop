@@ -213,7 +213,7 @@ public class CouponAdminController {
             RedirectAttributes redirectAttributes) {
 
         try {
-            // 만료된 쿠폰은 서비스에서 거부하므로 ENDED를 ACTIVE로 되돌릴 수 없다.
+            // 만료 쿠폰은 서비스에서 거부하므로 관리자 발급 허용 상태로 전환할 수 없다.
             couponAdminService.activateCoupon(couponId);
 
             redirectAttributes.addFlashAttribute(
