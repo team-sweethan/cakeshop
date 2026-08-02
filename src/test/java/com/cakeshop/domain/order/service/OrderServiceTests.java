@@ -8,16 +8,17 @@ import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.order.mapper.OrderMapper;
-import com.cakeshop.domain.payment.entity.Payment;
-import com.cakeshop.domain.payment.entity.PaymentStatus;
-import com.cakeshop.domain.payment.mapper.PaymentMapper;
-import com.cakeshop.domain.product.customer.dto.view.ProductOptionGroupView;
-import com.cakeshop.domain.product.customer.dto.view.ProductOptionItemView;
-import com.cakeshop.domain.product.customer.service.ProductService;
+import com.cakeshop.domain.payment.service.PaymentPreparationService;
+import com.cakeshop.domain.product.dto.view.ProductOptionGroupView;
+import com.cakeshop.domain.product.dto.view.ProductOptionItemView;
 import com.cakeshop.domain.product.dto.view.ProductSalesInfo;
 import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.error.ProductErrorCode;
 import com.cakeshop.domain.product.service.ProductQueryService;
+import com.cakeshop.domain.product.service.ProductService;
+import com.cakeshop.domain.store.dto.view.StoreView;
+import com.cakeshop.domain.store.entity.StoreHoliday;
+import com.cakeshop.domain.store.service.StoreService;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.error.CommonErrorCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,14 +32,19 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.DayOfWeek;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -55,6 +61,9 @@ class OrderServiceTests {
     );
 
     @Mock
+    private StoreService storeService;
+
+    @Mock
     private ProductQueryService productQueryService;
 
     @Mock
@@ -64,17 +73,19 @@ class OrderServiceTests {
     private OrderMapper orderMapper;
 
     @Mock
-    private PaymentMapper paymentMapper;
+    private PaymentPreparationService paymentPreparationService;
 
     private OrderService orderService;
 
     @BeforeEach
     void setUp() {
+        lenient().when(storeService.getStoreView()).thenReturn(storeView());
         orderService = new OrderService(
+                storeService,
                 productQueryService,
                 productService,
                 orderMapper,
-                paymentMapper,
+                paymentPreparationService,
                 FIXED_CLOCK
         );
     }
@@ -113,7 +124,6 @@ class OrderServiceTests {
             return 1;
         });
         when(orderMapper.insertOrderItemOption(any(OrderItemOption.class))).thenReturn(1);
-        when(paymentMapper.insertReadyPayment(any(Payment.class))).thenReturn(1);
         GeneralOrderForm form = form(1L, 2, List.of(101L));
 
         long orderId = orderService.createGeneralOrder(memberId, form);
@@ -153,28 +163,28 @@ class OrderServiceTests {
             assertThat(snapshot.getAdditionalPrice()).isEqualByComparingTo("5000");
         });
 
-        ArgumentCaptor<Payment> paymentCaptor = ArgumentCaptor.forClass(Payment.class);
-        verify(paymentMapper).insertReadyPayment(paymentCaptor.capture());
-        assertThat(paymentCaptor.getValue()).satisfies(payment -> {
-            assertThat(payment.getOrderId()).isEqualTo(100L);
-            assertThat(payment.getAmount()).isEqualByComparingTo("70000");
-            assertThat(payment.getStatus()).isEqualTo(PaymentStatus.READY);
-            assertThat(payment.getTossOrderId()).isEqualTo(order.getOrderNumber());
-            assertThat(payment.getIdempotencyKey()).startsWith("PAY-");
-        });
+        verify(paymentPreparationService).prepareReadyPayment(
+                100L,
+                order.getOrderNumber(),
+                BigDecimal.valueOf(70_000)
+        );
 
         InOrder saveOrder = inOrder(
                 productQueryService,
                 productService,
                 orderMapper,
-                paymentMapper
+                paymentPreparationService
         );
         saveOrder.verify(productQueryService).getSalesInfo(1L);
         saveOrder.verify(productService).getPublicOptionGroups(1L);
         saveOrder.verify(orderMapper).insertOrder(any(Order.class));
         saveOrder.verify(orderMapper).insertOrderItem(any(OrderItem.class));
         saveOrder.verify(orderMapper).insertOrderItemOption(any(OrderItemOption.class));
-        saveOrder.verify(paymentMapper).insertReadyPayment(any(Payment.class));
+        saveOrder.verify(paymentPreparationService).prepareReadyPayment(
+                100L,
+                order.getOrderNumber(),
+                BigDecimal.valueOf(70_000)
+        );
     }
 
     @Test
@@ -190,7 +200,7 @@ class OrderServiceTests {
 
         verify(productQueryService, never()).getSalesInfo(1L);
         verify(orderMapper, never()).insertOrder(any(Order.class));
-        verify(paymentMapper, never()).insertReadyPayment(any(Payment.class));
+        verify(paymentPreparationService, never()).prepareReadyPayment(anyLong(), any(), any());
     }
 
     @Test
@@ -212,7 +222,7 @@ class OrderServiceTests {
                 );
 
         verify(orderMapper, never()).insertOrder(any(Order.class));
-        verify(paymentMapper, never()).insertReadyPayment(any(Payment.class));
+        verify(paymentPreparationService, never()).prepareReadyPayment(anyLong(), any(), any());
     }
 
     @Test
@@ -288,6 +298,30 @@ class OrderServiceTests {
     }
 
     @Test
+    void createGeneralOrder_amountExceedsDatabaseLimit_throwsOrderAmountExceeded() {
+        when(productQueryService.getSalesInfo(1L))
+                .thenReturn(product(
+                        1L,
+                        ProductType.GENERAL,
+                        "고액 케이크",
+                        600_000_000_000L
+                ));
+        when(productService.getPublicOptionGroups(1L)).thenReturn(List.of());
+
+        assertThatThrownBy(() -> orderService.createGeneralOrder(
+                10L,
+                form(1L, 2, List.of())
+        )).isInstanceOfSatisfying(
+                BusinessException.class,
+                error -> assertThat(error.getErrorCode())
+                        .isEqualTo(OrderErrorCode.ORDER_AMOUNT_EXCEEDED)
+        );
+
+        verify(orderMapper, never()).insertOrder(any(Order.class));
+        verify(paymentPreparationService, never()).prepareReadyPayment(anyLong(), any(), any());
+    }
+
+    @Test
     void createGeneralOrder_pickupAtCurrentTime_throwsInvalidInput() {
         GeneralOrderForm form = form(1L, 1, List.of());
         form.setPickupAt(FIXED_NOW);
@@ -302,6 +336,60 @@ class OrderServiceTests {
 
         verify(productQueryService, never()).getSalesInfo(1L);
         verify(orderMapper, never()).insertOrder(any(Order.class));
+    }
+
+    @Test
+    void createGeneralOrder_unavailablePickupTime_throwsInvalidInput() {
+        GeneralOrderForm form = form(1L, 1, List.of());
+        form.setPickupAt(form.getPickupAt().plusMinutes(30));
+
+        assertThatThrownBy(() -> orderService.createGeneralOrder(10L, form))
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        error -> assertThat(error.getErrorCode())
+                                .isEqualTo(CommonErrorCode.INVALID_INPUT)
+                );
+
+        verify(productQueryService, never()).getSalesInfo(1L);
+        verify(orderMapper, never()).insertOrder(any(Order.class));
+    }
+
+    @Test
+    void createGeneralOrder_closedDay_throwsInvalidInput() {
+        GeneralOrderForm form = form(1L, 1, List.of());
+        when(storeService.getStoreView()).thenReturn(storeView(
+                Set.of(form.getPickupAt().getDayOfWeek()),
+                List.of()
+        ));
+
+        assertThatThrownBy(() -> orderService.createGeneralOrder(10L, form))
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        error -> assertThat(error.getErrorCode())
+                                .isEqualTo(CommonErrorCode.INVALID_INPUT)
+                );
+
+        verify(productQueryService, never()).getSalesInfo(1L);
+    }
+
+    @Test
+    void createGeneralOrder_storeHoliday_throwsInvalidInput() {
+        GeneralOrderForm form = form(1L, 1, List.of());
+        StoreHoliday holiday = new StoreHoliday();
+        holiday.setHolidayDate(form.getPickupAt().toLocalDate());
+        when(storeService.getStoreView()).thenReturn(storeView(
+                Set.of(),
+                List.of(holiday)
+        ));
+
+        assertThatThrownBy(() -> orderService.createGeneralOrder(10L, form))
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        error -> assertThat(error.getErrorCode())
+                                .isEqualTo(CommonErrorCode.INVALID_INPUT)
+                );
+
+        verify(productQueryService, never()).getSalesInfo(1L);
     }
 
     @Test
@@ -457,7 +545,7 @@ class OrderServiceTests {
         );
 
         verify(orderMapper, never()).insertOrder(any(Order.class));
-        verify(paymentMapper, never()).insertReadyPayment(any(Payment.class));
+        verify(paymentPreparationService, never()).prepareReadyPayment(anyLong(), any(), any());
     }
 
     private GeneralOrderForm form(
@@ -476,5 +564,33 @@ class OrderServiceTests {
         form.setQuantity(quantity);
         form.setOptionIds(optionIds);
         return form;
+    }
+
+    private StoreView storeView() {
+        return storeView(Set.of(), List.of());
+    }
+
+    private StoreView storeView(
+            Set<DayOfWeek> closedDays,
+            List<StoreHoliday> holidays
+    ) {
+        return new StoreView(
+                1L,
+                "테스트 매장",
+                null,
+                null,
+                "서울시",
+                "02-0000-0000",
+                LocalTime.of(9, 0),
+                LocalTime.of(20, 0),
+                LocalTime.of(9, 0),
+                LocalTime.of(20, 0),
+                closedDays,
+                "1층",
+                LocalTime.of(10, 0),
+                LocalTime.of(19, 0),
+                60,
+                holidays
+        );
     }
 }

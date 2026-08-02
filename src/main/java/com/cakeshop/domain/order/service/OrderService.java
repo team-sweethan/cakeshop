@@ -8,16 +8,16 @@ import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.order.mapper.OrderMapper;
-import com.cakeshop.domain.payment.entity.Payment;
-import com.cakeshop.domain.payment.entity.PaymentStatus;
-import com.cakeshop.domain.payment.mapper.PaymentMapper;
-import com.cakeshop.domain.product.customer.dto.view.ProductOptionGroupView;
-import com.cakeshop.domain.product.customer.dto.view.ProductOptionItemView;
-import com.cakeshop.domain.product.customer.service.ProductService;
+import com.cakeshop.domain.payment.service.PaymentPreparationService;
+import com.cakeshop.domain.product.dto.view.ProductOptionGroupView;
+import com.cakeshop.domain.product.dto.view.ProductOptionItemView;
 import com.cakeshop.domain.product.dto.view.ProductSalesInfo;
 import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.error.ProductErrorCode;
 import com.cakeshop.domain.product.service.ProductQueryService;
+import com.cakeshop.domain.product.service.ProductService;
+import com.cakeshop.domain.store.dto.view.StoreView;
+import com.cakeshop.domain.store.service.StoreService;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.error.CommonErrorCode;
 import org.springframework.stereotype.Service;
@@ -25,7 +25,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.DayOfWeek;
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -37,25 +40,29 @@ import java.util.UUID;
 public class OrderService {
 
     private static final BigDecimal ZERO = BigDecimal.ZERO;
+    private static final BigDecimal MAX_ORDER_AMOUNT = new BigDecimal("999999999999");
     private static final long PAYMENT_EXPIRATION_MINUTES = 10L;
 
+    private final StoreService storeService;
     private final ProductQueryService productQueryService;
     private final ProductService productService;
     private final OrderMapper orderMapper;
-    private final PaymentMapper paymentMapper;
+    private final PaymentPreparationService paymentPreparationService;
     private final Clock clock;
 
     public OrderService(
+            StoreService storeService,
             ProductQueryService productQueryService,
             ProductService productService,
             OrderMapper orderMapper,
-            PaymentMapper paymentMapper,
+            PaymentPreparationService paymentPreparationService,
             Clock clock
     ) {
+        this.storeService = storeService;
         this.productQueryService = productQueryService;
         this.productService = productService;
         this.orderMapper = orderMapper;
-        this.paymentMapper = paymentMapper;
+        this.paymentPreparationService = paymentPreparationService;
         this.clock = clock;
     }
 
@@ -79,10 +86,10 @@ public class OrderService {
 
         saveOrderItem(order.getId(), preparedItem);
 
-        Payment payment = createReadyPayment(order);
-        requireOneRow(
-                paymentMapper.insertReadyPayment(payment),
-                OrderErrorCode.PAYMENT_SAVE_FAILED
+        paymentPreparationService.prepareReadyPayment(
+                order.getId(),
+                order.getOrderNumber(),
+                order.getFinalAmount()
         );
 
         return order.getId();
@@ -98,9 +105,45 @@ public class OrderService {
             LocalDateTime pickupAt,
             LocalDateTime now
     ) {
-        if (pickupAt == null || !pickupAt.isAfter(now)) {
+        if (pickupAt == null
+                || !pickupAt.isAfter(now)
+                || !isPickupAvailable(pickupAt, storeService.getStoreView())) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
+    }
+
+    private boolean isPickupAvailable(LocalDateTime pickupAt, StoreView store) {
+        DayOfWeek dayOfWeek = pickupAt.getDayOfWeek();
+        if (store.closedDays().contains(dayOfWeek)
+                || store.holidays().stream()
+                        .anyMatch(holiday -> holiday.getHolidayDate().equals(pickupAt.toLocalDate()))) {
+            return false;
+        }
+
+        boolean weekend = dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY;
+        LocalTime businessStart = weekend ? store.weekendOpenTime() : store.weekdayOpenTime();
+        LocalTime businessEnd = weekend ? store.weekendCloseTime() : store.weekdayCloseTime();
+        LocalTime pickupTime = pickupAt.toLocalTime();
+
+        if (!isWithin(pickupTime, businessStart, businessEnd)
+                || !isWithin(pickupTime, store.pickupStartTime(), store.pickupEndTime())
+                || store.pickupIntervalMinutes() == null
+                || store.pickupIntervalMinutes() <= 0
+                || pickupTime.getSecond() != 0
+                || pickupTime.getNano() != 0) {
+            return false;
+        }
+
+        long minutesFromStart = Duration.between(store.pickupStartTime(), pickupTime).toMinutes();
+        return minutesFromStart % store.pickupIntervalMinutes() == 0;
+    }
+
+    private boolean isWithin(LocalTime value, LocalTime start, LocalTime end) {
+        return value != null
+                && start != null
+                && end != null
+                && !value.isBefore(start)
+                && !value.isAfter(end);
     }
 
     private void validateForm(GeneralOrderForm form) {
@@ -139,6 +182,9 @@ public class OrderService {
         BigDecimal totalAmount = product.basePrice()
                 .add(optionAmount)
                 .multiply(BigDecimal.valueOf(form.getQuantity()));
+        if (totalAmount.compareTo(MAX_ORDER_AMOUNT) > 0) {
+            throw new BusinessException(OrderErrorCode.ORDER_AMOUNT_EXCEEDED);
+        }
 
         return new PreparedOrderItem(
                 product,
@@ -268,16 +314,6 @@ public class OrderService {
                     OrderErrorCode.ORDER_SAVE_FAILED
             );
         }
-    }
-
-    private Payment createReadyPayment(Order order) {
-        Payment payment = new Payment();
-        payment.setOrderId(order.getId());
-        payment.setTossOrderId(order.getOrderNumber());
-        payment.setIdempotencyKey("PAY-" + compactUuid());
-        payment.setAmount(order.getFinalAmount());
-        payment.setStatus(PaymentStatus.READY);
-        return payment;
     }
 
     private void requireOneRow(int affectedRows, OrderErrorCode errorCode) {

@@ -11,7 +11,7 @@ public enum OrderErrorCode implements ErrorCode {
     INVALID_QUANTITY("ORDER_005", "상품 수량이 올바르지 않습니다.", 400),
     INVALID_PRODUCT_OPTION("ORDER_006", "상품 옵션 선택이 올바르지 않습니다.", 400),
     ORDER_SAVE_FAILED("ORDER_007", "주문 저장에 실패했습니다.", 500),
-    PAYMENT_SAVE_FAILED("ORDER_008", "결제 준비 저장에 실패했습니다.", 500);
+    ORDER_AMOUNT_EXCEEDED("ORDER_008", "주문 금액이 허용 범위를 초과했습니다.", 400);
 
     private final String code;
     private final String message;
