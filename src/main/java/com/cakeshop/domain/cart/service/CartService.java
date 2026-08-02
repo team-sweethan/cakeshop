@@ -86,6 +86,7 @@ public class CartService {
         List<CartItemOption> selectedOptions = validateOptions(
                 form.getProductId(),
                 form.getOptionIds());
+        String requirements = normalizeRequirements(form.getRequirements());
         long cartId = getOrCreateLockedCart(memberId);
 
         List<CartItem> existingItems = cartMapper.findItemsByMemberId(memberId);
@@ -93,6 +94,7 @@ public class CartService {
 
         for (CartItem item : existingItems) {
             if (item.getProductId().equals(form.getProductId())
+                    && java.util.Objects.equals(item.getRequirements(), requirements)
                     && sameOptionSnapshots(
                     optionsByItem.getOrDefault(item.getId(), List.of()),
                     selectedOptions)) {
@@ -107,7 +109,7 @@ public class CartService {
         item.setCartId(cartId);
         item.setProductId(form.getProductId());
         item.setQuantity(form.getQuantity());
-        item.setRequirements(normalizeRequirements(form.getRequirements()));
+        item.setRequirements(requirements);
         if (cartMapper.insertItem(item) != 1) {
             throw new BusinessException(CartErrorCode.UPDATE_FAILED);
         }
@@ -122,6 +124,8 @@ public class CartService {
 
     @Transactional
     public void updateQuantity(long memberId, long itemId, int quantity) {
+        cartMapper.findCartIdByMemberIdForUpdate(memberId)
+                .orElseThrow(() -> new BusinessException(CartErrorCode.ITEM_NOT_FOUND));
         CartItem item = findOwnedItem(memberId, itemId);
         ProductSalesInfo product = getAvailableProduct(item.getProductId(), quantity);
         validateStock(product, quantity);

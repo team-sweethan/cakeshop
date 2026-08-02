@@ -47,6 +47,15 @@
     });
   }
 
+  function updateAvailability(item, available) {
+    item.dataset.available = String(available);
+    item.classList.toggle("is-disabled", !available);
+    const status = item.querySelector("[data-cart-item-status]");
+    status.classList.toggle("badge--success", available);
+    status.classList.toggle("badge--danger", !available);
+    status.textContent = available ? "주문 가능" : "재고 부족 또는 판매 중지";
+  }
+
   async function saveQuantity(form) {
     if (form.dataset.saving === "true") {
       form.dataset.pending = "true";
@@ -67,6 +76,7 @@
       if (Number(item.dataset.itemId) !== cart.itemId) throw new Error("item mismatch");
       if (form.dataset.pending !== "true") {
         form.elements.quantity.value = cart.quantity;
+        updateAvailability(item, cart.available);
         item.querySelector("[data-cart-item-total]").textContent = money(cart.itemTotal);
         updateButtons(form);
         updateSummary(cart);

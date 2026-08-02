@@ -6,6 +6,7 @@ import com.cakeshop.domain.cart.dto.form.CartUpdateForm;
 import com.cakeshop.domain.cart.dto.view.CartCountView;
 import com.cakeshop.domain.cart.dto.view.CartQuantityUpdateView;
 import com.cakeshop.domain.cart.service.CartService;
+import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.security.MemberDetails;
 import jakarta.validation.Valid;
 import org.springframework.stereotype.Controller;
@@ -58,7 +59,14 @@ public class CartController {
                     "상품과 수량을 다시 확인해 주세요.");
             return "redirect:/products/" + safeProductId(form.getProductId());
         }
-        cartService.addItem(member.getMemberId(), form);
+        try {
+            cartService.addItem(member.getMemberId(), form);
+        } catch (BusinessException exception) {
+            redirectAttributes.addFlashAttribute(
+                    "errorMessage",
+                    exception.getErrorCode().message());
+            return "redirect:/products/" + form.getProductId();
+        }
         redirectAttributes.addFlashAttribute("successMessage", "장바구니에 담았습니다.");
         return "redirect:/cart";
     }

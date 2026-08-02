@@ -3,6 +3,7 @@ package com.cakeshop.domain.cart.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -26,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -114,6 +116,31 @@ class CartServiceTests {
     }
 
     @Test
+    void addItem_sameProductAndOptionsButDifferentRequirements_insertsSeparateItem() {
+        CartAddForm form = form(10L, 2, List.of(101L));
+        form.setRequirements("new message");
+        CartItem existing = item(30L, 10L, 3);
+        existing.setRequirements("old message");
+        when(productQueryService.getSalesInfo(10L)).thenReturn(product(10));
+        when(productService.getPublicOptionGroups(10L)).thenReturn(requiredOptions());
+        when(cartMapper.findCartIdByMemberIdForUpdate(1L)).thenReturn(Optional.of(20L));
+        when(cartMapper.findItemsByMemberId(1L)).thenReturn(List.of(existing));
+        when(cartMapper.findOptionsByCartItemIds(List.of(30L)))
+                .thenReturn(List.of(option(30L, 101L)));
+        when(cartMapper.insertItem(org.mockito.ArgumentMatchers.any())).thenAnswer(invocation -> {
+            CartItem item = invocation.getArgument(0);
+            item.setId(31L);
+            return 1;
+        });
+        when(cartMapper.insertItemOption(org.mockito.ArgumentMatchers.any())).thenReturn(1);
+
+        cartService.addItem(1L, form);
+
+        verify(cartMapper).insertItem(org.mockito.ArgumentMatchers.any());
+        verify(cartMapper, never()).updateItemQuantity(1L, 30L, 5);
+    }
+
+    @Test
     void getCart_unavailableItem_excludesItemFromSummaryTotals() {
         CartItem item = item(30L, 10L, 2);
         when(cartMapper.findItemsByMemberId(1L)).thenReturn(List.of(item));
@@ -146,6 +173,7 @@ class CartServiceTests {
 
     @Test
     void updateQuantity_otherMembersItem_throwsNotFound() {
+        when(cartMapper.findCartIdByMemberIdForUpdate(1L)).thenReturn(Optional.of(20L));
         when(cartMapper.findItemByMemberIdAndItemId(1L, 99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> cartService.updateQuantity(1L, 99L, 2))
@@ -154,6 +182,22 @@ class CartServiceTests {
                 .isEqualTo(CartErrorCode.ITEM_NOT_FOUND);
 
         verify(productQueryService, never()).getSalesInfo(org.mockito.ArgumentMatchers.anyLong());
+    }
+
+    @Test
+    void updateQuantity_ownedItem_locksCartBeforeReadingQuantity() {
+        CartItem item = item(30L, 10L, 3);
+        when(cartMapper.findCartIdByMemberIdForUpdate(1L)).thenReturn(Optional.of(20L));
+        when(cartMapper.findItemByMemberIdAndItemId(1L, 30L)).thenReturn(Optional.of(item));
+        when(productQueryService.getSalesInfo(10L)).thenReturn(product(10));
+        when(cartMapper.updateItemQuantity(1L, 30L, 2)).thenReturn(1);
+
+        cartService.updateQuantity(1L, 30L, 2);
+
+        InOrder inOrder = inOrder(cartMapper);
+        inOrder.verify(cartMapper).findCartIdByMemberIdForUpdate(1L);
+        inOrder.verify(cartMapper).findItemByMemberIdAndItemId(1L, 30L);
+        inOrder.verify(cartMapper).updateItemQuantity(1L, 30L, 2);
     }
 
     private CartAddForm form(long productId, int quantity, List<Long> optionIds) {

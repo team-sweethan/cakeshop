@@ -3,6 +3,7 @@ package com.cakeshop.domain.cart.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doThrow;
 
 import com.cakeshop.domain.cart.dto.form.CartAddForm;
 import com.cakeshop.domain.cart.dto.form.CartUpdateForm;
@@ -10,10 +11,12 @@ import com.cakeshop.domain.cart.dto.view.CartItemView;
 import com.cakeshop.domain.cart.dto.view.CartCountView;
 import com.cakeshop.domain.cart.dto.view.CartView;
 import com.cakeshop.domain.cart.dto.view.CartQuantityUpdateView;
+import com.cakeshop.domain.cart.error.CartErrorCode;
 import com.cakeshop.domain.cart.service.CartService;
 import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
 import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.global.security.MemberDetails;
+import com.cakeshop.global.error.BusinessException;
 import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -72,6 +75,24 @@ class CartControllerTests {
     }
 
     @Test
+    void addItem_staleProduct_redirectsToDetailWithErrorMessage() {
+        MemberDetails member = memberDetails();
+        CartAddForm form = new CartAddForm();
+        form.setProductId(10L);
+        form.setQuantity(2);
+        when(bindingResult.hasErrors()).thenReturn(false);
+        doThrow(new BusinessException(CartErrorCode.OUT_OF_STOCK))
+                .when(cartService).addItem(1L, form);
+
+        String viewName = cartController.addItem(
+                member, form, bindingResult, redirectAttributes);
+
+        assertThat(viewName).isEqualTo("redirect:/products/10");
+        verify(redirectAttributes).addFlashAttribute(
+                "errorMessage", CartErrorCode.OUT_OF_STOCK.message());
+    }
+
+    @Test
     void updateQuantityAsync_validForm_returnsUpdatedTotals() {
         MemberDetails member = memberDetails();
         CartUpdateForm form = new CartUpdateForm();
@@ -90,6 +111,7 @@ class CartControllerTests {
         verify(cartService).updateQuantity(1L, 30L, 3);
         assertThat(result.itemTotal()).isEqualByComparingTo("105000");
         assertThat(result.totalQuantity()).isEqualTo(3);
+        assertThat(result.available()).isTrue();
     }
 
     @Test
