@@ -70,6 +70,12 @@ class CartServiceTests {
         verify(cartMapper).insertItemOption(optionCaptor.capture());
         org.assertj.core.api.Assertions.assertThat(optionCaptor.getValue().getCartItemId()).isEqualTo(30L);
         org.assertj.core.api.Assertions.assertThat(optionCaptor.getValue().getOptionName()).isEqualTo("초코");
+
+        InOrder inOrder = inOrder(cartMapper, productQueryService, productService);
+        inOrder.verify(cartMapper).insertCartIfAbsent(1L);
+        inOrder.verify(cartMapper).findCartIdByMemberIdForUpdate(1L);
+        inOrder.verify(productQueryService).getSalesInfo(10L);
+        inOrder.verify(productService).getPublicOptionGroups(10L);
     }
 
     @Test
@@ -162,6 +168,27 @@ class CartServiceTests {
     }
 
     @Test
+    void addItem_invalidExistingConfiguration_doesNotConsumeStock() {
+        CartAddForm form = form(10L, 5, List.of());
+        CartItem invalid = item(30L, 10L, 1);
+        when(cartMapper.findCartIdByMemberIdForUpdate(1L)).thenReturn(Optional.of(20L));
+        when(productQueryService.getSalesInfo(10L)).thenReturn(product(5));
+        when(productService.getPublicOptionGroups(10L)).thenReturn(List.of());
+        when(cartMapper.findItemsByMemberId(1L)).thenReturn(List.of(invalid));
+        when(cartMapper.findOptionsByCartItemIds(List.of(30L)))
+                .thenReturn(List.of(option(30L, 101L)));
+        when(cartMapper.insertItem(org.mockito.ArgumentMatchers.any())).thenAnswer(invocation -> {
+            CartItem item = invocation.getArgument(0);
+            item.setId(31L);
+            return 1;
+        });
+
+        cartService.addItem(1L, form);
+
+        verify(cartMapper).insertItem(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     void getCart_unavailableItem_excludesItemFromSummaryTotals() {
         CartItem item = item(30L, 10L, 2);
         when(cartMapper.findItemsByMemberId(1L)).thenReturn(List.of(item));
@@ -210,8 +237,28 @@ class CartServiceTests {
     }
 
     @Test
+    void getCart_invalidConfiguration_doesNotMakeValidConfigurationExceedStock() {
+        CartItem valid = item(30L, 10L, 5);
+        CartItem invalid = item(31L, 10L, 1);
+        when(cartMapper.findItemsByMemberId(1L)).thenReturn(List.of(valid, invalid));
+        when(cartMapper.findOptionsByCartItemIds(List.of(30L, 31L)))
+                .thenReturn(List.of(option(31L, 101L)));
+        when(productQueryService.getSalesInfo(10L)).thenReturn(product(5));
+        when(productService.getPublicOptionGroups(10L)).thenReturn(List.of());
+
+        CartView cart = cartService.getCart(1L);
+
+        assertThat(cart.items()).extracting(item -> item.id(), item -> item.available())
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple(30L, true),
+                        org.assertj.core.groups.Tuple.tuple(31L, false));
+        assertThat(cart.grandTotal()).isEqualByComparingTo("150000");
+    }
+
+    @Test
     void addItem_requiredOptionMissing_throwsBusinessException() {
         CartAddForm form = form(10L, 1, List.of());
+        when(cartMapper.findCartIdByMemberIdForUpdate(1L)).thenReturn(Optional.of(20L));
         when(productQueryService.getSalesInfo(10L)).thenReturn(product(10));
         when(productService.getPublicOptionGroups(10L)).thenReturn(requiredOptions());
 
@@ -288,6 +335,24 @@ class CartServiceTests {
                 .isEqualTo(CartErrorCode.OUT_OF_STOCK);
 
         verify(cartMapper, never()).updateItemQuantity(1L, 30L, 2);
+    }
+
+    @Test
+    void updateQuantity_invalidOtherConfiguration_doesNotConsumeStock() {
+        CartItem target = item(30L, 10L, 3);
+        CartItem invalid = item(31L, 10L, 1);
+        when(cartMapper.findCartIdByMemberIdForUpdate(1L)).thenReturn(Optional.of(20L));
+        when(cartMapper.findItemByMemberIdAndItemId(1L, 30L)).thenReturn(Optional.of(target));
+        when(productQueryService.getSalesInfo(10L)).thenReturn(product(5));
+        when(cartMapper.findItemsByMemberId(1L)).thenReturn(List.of(target, invalid));
+        when(cartMapper.findOptionsByCartItemIds(List.of(30L, 31L)))
+                .thenReturn(List.of(option(31L, 101L)));
+        when(productService.getPublicOptionGroups(10L)).thenReturn(List.of());
+        when(cartMapper.updateItemQuantity(1L, 30L, 5)).thenReturn(1);
+
+        cartService.updateQuantity(1L, 30L, 5);
+
+        verify(cartMapper).updateItemQuantity(1L, 30L, 5);
     }
 
     @Test

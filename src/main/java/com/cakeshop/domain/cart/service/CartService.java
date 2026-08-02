@@ -51,12 +51,22 @@ public class CartService {
         }
 
         Map<Long, List<CartItemOption>> optionsByItem = optionsByItem(items);
-        Map<Long, Integer> quantityByProduct = quantityByProduct(items);
+        Set<Long> currentConfigurationItemIds = new HashSet<>();
+        for (CartItem item : items) {
+            if (hasCurrentlyOrderableConfiguration(
+                    item,
+                    optionsByItem.getOrDefault(item.getId(), List.of()))) {
+                currentConfigurationItemIds.add(item.getId());
+            }
+        }
+        Map<Long, Integer> quantityByProduct = quantityByProduct(
+                items,
+                currentConfigurationItemIds);
         List<CartItemView> itemViews = items.stream()
                 .map(item -> toView(
                         item,
                         optionsByItem.getOrDefault(item.getId(), List.of()),
-                        quantityByProduct.get(item.getProductId())))
+                        quantityByProduct.getOrDefault(item.getProductId(), 0)))
                 .toList();
 
         BigDecimal baseTotal = itemViews.stream()
@@ -84,17 +94,19 @@ public class CartService {
 
     @Transactional
     public void addItem(long memberId, CartAddForm form) {
+        long cartId = getOrCreateLockedCart(memberId);
         ProductSalesInfo product = getAvailableProduct(form.getProductId(), form.getQuantity());
         List<CartItemOption> selectedOptions = validateOptions(
                 form.getProductId(),
                 form.getOptionIds());
         String requirements = normalizeRequirements(form.getRequirements());
-        long cartId = getOrCreateLockedCart(memberId);
-
         List<CartItem> existingItems = cartMapper.findItemsByMemberId(memberId);
         Map<Long, List<CartItemOption>> optionsByItem = optionsByItem(existingItems);
         int totalProductQuantity = existingItems.stream()
                 .filter(item -> item.getProductId().equals(form.getProductId()))
+                .filter(item -> hasCurrentOptionConfiguration(
+                        item.getProductId(),
+                        optionsByItem.getOrDefault(item.getId(), List.of())))
                 .mapToInt(CartItem::getQuantity)
                 .sum() + form.getQuantity();
         validateStock(product, totalProductQuantity);
@@ -135,18 +147,23 @@ public class CartService {
                 .orElseThrow(() -> new BusinessException(CartErrorCode.ITEM_NOT_FOUND));
         CartItem item = findOwnedItem(memberId, itemId);
         ProductSalesInfo product = getAvailableProduct(item.getProductId(), quantity);
-        int totalProductQuantity = cartMapper.findItemsByMemberId(memberId).stream()
+        List<CartItem> existingItems = cartMapper.findItemsByMemberId(memberId);
+        Map<Long, List<CartItemOption>> optionsByItem = optionsByItem(existingItems);
+        if (!hasCurrentOptionConfiguration(
+                item.getProductId(),
+                optionsByItem.getOrDefault(itemId, List.of()))) {
+            throw new BusinessException(CartErrorCode.INVALID_OPTION);
+        }
+        int totalProductQuantity = existingItems.stream()
                 .filter(cartItem -> cartItem.getProductId().equals(item.getProductId()))
+                .filter(cartItem -> hasCurrentOptionConfiguration(
+                        cartItem.getProductId(),
+                        optionsByItem.getOrDefault(cartItem.getId(), List.of())))
                 .mapToInt(cartItem -> cartItem.getId().equals(itemId)
                         ? quantity
                         : cartItem.getQuantity())
                 .sum();
         validateStock(product, totalProductQuantity);
-        List<CartItemOption> options = cartMapper.findOptionsByCartItemIds(List.of(itemId));
-        if (!hasCurrentOptionConfiguration(item.getProductId(), options)) {
-            throw new BusinessException(CartErrorCode.INVALID_OPTION);
-        }
-        validateStock(product, quantity);
         if (cartMapper.updateItemQuantity(memberId, itemId, quantity) != 1) {
             throw new BusinessException(CartErrorCode.UPDATE_FAILED);
         }
@@ -342,12 +359,30 @@ public class CartService {
                 optionViews);
     }
 
-    private Map<Long, Integer> quantityByProduct(List<CartItem> items) {
+    private Map<Long, Integer> quantityByProduct(
+            List<CartItem> items,
+            Set<Long> includedItemIds
+    ) {
         Map<Long, Integer> result = new HashMap<>();
         for (CartItem item : items) {
-            result.merge(item.getProductId(), item.getQuantity(), Integer::sum);
+            if (includedItemIds.contains(item.getId())) {
+                result.merge(item.getProductId(), item.getQuantity(), Integer::sum);
+            }
         }
         return result;
+    }
+
+    private boolean hasCurrentlyOrderableConfiguration(
+            CartItem item,
+            List<CartItemOption> options
+    ) {
+        try {
+            ProductSalesInfo product = productQueryService.getSalesInfo(item.getProductId());
+            return product.available()
+                    && hasCurrentOptionConfiguration(item.getProductId(), options);
+        } catch (BusinessException exception) {
+            return false;
+        }
     }
 
     private boolean hasCurrentOptionConfiguration(
