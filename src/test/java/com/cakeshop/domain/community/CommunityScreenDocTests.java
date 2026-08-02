@@ -3,6 +3,7 @@ package com.cakeshop.domain.community;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -14,7 +15,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 
@@ -132,7 +135,7 @@ class CommunityScreenDocTests {
      * 하네스가 있다고 믿는 만큼 더 위험해진다.
      */
     @Test
-    void screenDoc_referencedTestsExist() throws IOException {
+    void screenDoc_referencedTestsExist() throws Exception {
         List<String> references = documentedTestReferences();
 
         assertThat(references)
@@ -144,9 +147,56 @@ class CommunityScreenDocTests {
             String className = reference.substring(0, separator);
             String methodName = reference.substring(separator + 1);
 
-            assertThat(readTestSource(className))
-                    .as("SCREENS.md가 가리키는 %s가 없다", reference)
-                    .contains("void " + methodName + "(");
+            assertRunnableTest(className, methodName, reference);
+        }
+    }
+
+    /**
+     * 문서가 가리키는 것이 <b>실제로 실행되는</b> 테스트인지 확인한다.
+     *
+     * <p>소스에서 {@code void 이름(} 문자열만 찾으면 {@code @Test}를 떼거나
+     * {@code @Disabled}를 붙여도 그대로 통과한다. 그러면 문서는 실행되지 않는 테스트가
+     * 화면을 지킨다고 주장하게 된다 — 하네스가 있다고 믿는 만큼 더 위험하다. 그래서
+     * 리플렉션으로 애너테이션까지 확인한다.
+     */
+    private void assertRunnableTest(String className, String methodName, String reference)
+            throws Exception {
+        Class<?> testClass = Class.forName(qualifiedNameOf(className));
+
+        assertThat(testClass.isAnnotationPresent(Disabled.class))
+                .as("%s가 속한 클래스가 @Disabled 상태다", reference)
+                .isFalse();
+
+        List<Method> methods = Stream.of(testClass.getDeclaredMethods())
+                .filter(method -> method.getName().equals(methodName))
+                .toList();
+
+        assertThat(methods).as("SCREENS.md가 가리키는 %s가 없다", reference).isNotEmpty();
+
+        assertThat(methods)
+                .as("%s가 JUnit이 실행하는 테스트가 아니다 (@Test 없음 또는 @Disabled)",
+                        reference)
+                .anyMatch(method ->
+                        (method.isAnnotationPresent(Test.class)
+                                || method.isAnnotationPresent(ParameterizedTest.class))
+                                && !method.isAnnotationPresent(Disabled.class));
+    }
+
+    /** 테스트 소스 파일을 찾아 경로에서 패키지를 되돌린다. */
+    private String qualifiedNameOf(String className) throws IOException {
+        try (Stream<Path> paths = Files.walk(TEST_SOURCE_ROOT)) {
+            Path source = paths
+                    .filter(path -> path.getFileName().toString().equals(className + ".java"))
+                    .findFirst()
+                    .orElseThrow(() ->
+                            new IllegalStateException("테스트 클래스를 찾을 수 없다: " + className));
+
+            String relative = TEST_SOURCE_ROOT.relativize(source).toString();
+
+            return relative
+                    .substring(0, relative.length() - ".java".length())
+                    .replace('\\', '.')
+                    .replace('/', '.');
         }
     }
 
@@ -189,13 +239,33 @@ class CommunityScreenDocTests {
             for (Resource resource : resources) {
                 templates.put(
                         directory + "/" + resource.getFilename(),
-                        new String(
+                        visibleMarkup(new String(
                                 resource.getInputStream().readAllBytes(),
-                                StandardCharsets.UTF_8));
+                                StandardCharsets.UTF_8)));
             }
         }
 
         return templates;
+    }
+
+    /**
+     * 화면에 실제로 나오지 않는 부분을 걷어낸다.
+     *
+     * <p>둘 다 템플릿 원문에는 있지만 사용자는 보지 못한다.
+     *
+     * <ul>
+     *   <li>HTML 주석 — 규칙을 설명하는 한국어 주석이 있어서, 남겨 두면 주석에만 있는
+     *       문구를 문서가 "화면 문구"라고 주장해도 통과한다.
+     *   <li>{@code th:text}/{@code th:utext} 요소의 본문 — 표현식이 덮어쓰는 자리 표시다.
+     *       {@code <span th:text="'좋아요 ' + ...">좋아요 0</span>}에서 표현식만
+     *       {@code '추천 '}으로 바꾸면 화면은 바뀌는데 자리 표시가 남아 검사가 통과한다.
+     * </ul>
+     */
+    private String visibleMarkup(String template) {
+        String withoutComments = template.replaceAll("(?s)<!--.*?-->", " ");
+
+        // 여는 태그(th:text 부터 '>' 까지)는 남기고 그 뒤 본문만 지운다.
+        return withoutComments.replaceAll("(?s)(th:u?text=\"[^\"]*\"[^>]*>)[^<]*", "$1");
     }
 
     private List<ScreenString> documentedStrings() throws IOException {
@@ -299,18 +369,6 @@ class CommunityScreenDocTests {
                 .exists();
 
         return Files.readAllLines(SCREEN_DOC, StandardCharsets.UTF_8);
-    }
-
-    private String readTestSource(String className) throws IOException {
-        try (Stream<Path> paths = Files.walk(TEST_SOURCE_ROOT)) {
-            Path source = paths
-                    .filter(path -> path.getFileName().toString().equals(className + ".java"))
-                    .findFirst()
-                    .orElseThrow(() ->
-                            new IllegalStateException("테스트 클래스를 찾을 수 없다: " + className));
-
-            return Files.readString(source, StandardCharsets.UTF_8);
-        }
     }
 
     private record Screen(String status, String template) {

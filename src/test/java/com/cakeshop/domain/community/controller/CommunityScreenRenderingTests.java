@@ -117,9 +117,12 @@ class CommunityScreenRenderingTests {
                 .andExpect(content().string(containsString("이전")))
                 .andExpect(content().string(containsString("다음")))
                 // 번호는 주소로 이동한다. 새로고침·뒤로가기에서 필터와 쪽이 유지되어야 한다.
-                .andExpect(content().string(containsString("page=2")))
-                .andExpect(content().string(
-                        containsString("categoryId=" + categoryId)));
+                //
+                // page=2 와 categoryId 를 따로 찾으면 안 된다. categoryId 는 상단 필터
+                // 링크에도 있어서, 쪽 링크가 필터를 잃어버려도 응답 어딘가에서는 둘 다
+                // 발견된다. 링크 하나에 함께 있는지 확인해야 회귀를 잡는다.
+                .andExpect(content().string(containsString(
+                        "/community?categoryId=" + categoryId + "&amp;page=2")));
     }
 
     /** 한 쪽에 다 들어가면 쪽 이동 블록 자체가 없어야 한다. */
