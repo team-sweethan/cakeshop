@@ -12,72 +12,54 @@
 <body data-page-title="게시글 상세">
   <header th:replace="~{fragments/common/header :: header}"></header>
   <main class="page-container page-container--narrow">
-    <div th:replace="~{fragments/customer/mock-notice :: notice}"></div>
 
     <div class="cluster cluster--between">
       <a class="btn" th:href="@{/community}">← 목록</a>
-      <div class="cluster">
-        <a class="btn" th:href="@{/community/new}">수정</a>
-        <button class="btn btn--danger" type="button" data-confirm="게시글을 삭제하시겠습니까?">삭제</button>
-      </div>
+      <!-- 수정·삭제 버튼은 조각 2에서 붙인다. -->
+    </div>
+
+    <!--
+      차단된 글은 작성자 본인만 여기까지 도달한다(DOMAIN.md 4.3).
+      작성자는 차단된 글에 아무 조치도 할 수 없으므로 사유만 전달한다.
+    -->
+    <div class="panel" th:if="${post.blocked}">
+      <strong>관리자가 차단한 게시글입니다.</strong>
+      <p class="text-muted" th:text="${post.blockedReason}">차단 사유</p>
+      <p class="note">이 글은 다른 회원에게 보이지 않습니다.</p>
     </div>
 
     <article class="section">
-      <span class="badge badge--info">후기</span>
-      <h1>딸기 생크림 케이크 재구매 후기입니다 😊</h1>
-      <p class="text-muted">단골손님 · 2025.01.15 · 조회 132</p>
+      <span class="badge badge--info" th:text="${post.categoryName}">카테고리</span>
+      <h1 th:text="${post.title}">제목</h1>
+      <p class="text-muted">
+        <span th:text="${post.authorName()}">작성자</span> ·
+        <span th:text="${#temporals.format(post.createdAt, 'yyyy.MM.dd')}">2026.01.01</span> ·
+        <span th:text="'조회 ' + ${post.viewCount}">조회 0</span>
+        <span th:if="${post.edited}" class="note">(수정됨)</span>
+      </p>
       <hr class="divider">
+
+      <!--
+        본문은 순수 텍스트다. th:utext를 쓰지 않는다(DOMAIN.md 7).
+        줄바꿈은 CSS로 살린다.
+      -->
       <div class="stack">
-        <p>지난달 처음 주문했다가 너무 맛있어서 이번에 재구매했어요. 생크림이 무겁지 않고 딸기가 정말 신선합니다.</p>
-        <p>픽업 시간도 정확했고 포장도 꼼꼼하게 해주셔서 이동 중에 하나도 안 무너졌어요. 다음엔 레터링 케이크로 주문해보려고 합니다!</p>
-        <div class="placeholder-image placeholder-image--lg">사진 첨부 영역</div>
+        <p th:text="${post.content}" style="white-space:pre-wrap">본문</p>
       </div>
-      <!-- 좋아요 버튼은 단독 data-select-group으로 눌렀을 때 활성 표시가 바뀐다. -->
-      <div class="cluster section" data-select-group>
-        <button class="btn" type="button" data-select>♡ 좋아요 24</button>
-        <span class="text-muted">댓글 3</span>
+
+      <div class="cluster section">
+        <span class="text-muted" th:text="'좋아요 ' + ${post.likeCount}">좋아요 0</span>
       </div>
     </article>
 
     <hr class="divider">
 
+    <!-- 댓글 목록·작성은 조각 3에서 붙인다. 좋아요 버튼은 조각 4다. -->
     <section class="section">
-      <h2 class="section-title">댓글 3</h2>
-      <div class="stack">
-        <article class="panel">
-          <div class="cluster cluster--between">
-            <strong>홈베이킹러</strong>
-            <span class="text-muted">2025.01.15</span>
-          </div>
-          <p>저도 딸기 생크림 완전 추천해요! 재구매 각입니다 👍</p>
-        </article>
-        <article class="panel">
-          <div class="cluster cluster--between">
-            <strong>예비신부</strong>
-            <span class="text-muted">2025.01.15</span>
-          </div>
-          <p>사진 보니까 먹고 싶네요. 혹시 사이즈는 몇 호로 하셨나요?</p>
-        </article>
-        <article class="panel">
-          <div class="cluster cluster--between">
-            <strong>단골손님</strong>
-            <span class="text-muted">2025.01.16</span>
-          </div>
-          <p>1호로 주문했어요! 둘이 먹기 딱 좋아요 😊</p>
-        </article>
+      <h2 class="section-title">댓글</h2>
+      <div class="panel panel--dashed text-muted" style="text-align:center">
+        댓글 기능은 준비 중입니다.
       </div>
-
-      <!-- data-mock-form: 제출하면 customer-mockup.js가 검증 후 data-success-url로 이동한다. -->
-      <form class="section" data-mock-form data-success-url="/community/15">
-        <div class="form-group">
-          <label class="form-label" for="comment">댓글 작성</label>
-          <textarea class="form-control form-control--textarea" id="comment" placeholder="댓글을 입력하세요" required></textarea>
-        </div>
-        <div class="cluster cluster--between">
-          <span class="note">로그인한 회원만 댓글을 작성할 수 있습니다.</span>
-          <button class="btn btn--primary" type="submit">등록</button>
-        </div>
-      </form>
     </section>
   </main>
   <footer th:replace="~{fragments/common/footer :: footer(${store})}"></footer>

@@ -22,8 +22,8 @@ docs/community/DOMAIN.md와 기존 코드를 먼저 읽고 구현 계획을 보�
 
 | # | 조각 | 상태 | 내용 |
 |---|---|---|---|
-| 0 | 준비 | 대기 | `PostStatus` enum, `CHECK` 제약 migration, 카테고리 3종 주입 migration |
-| 1 | 목록·상세 | 대기 | 카테고리 필터, 페이징, 상세 조회, 조회수 |
+| 0 | 준비 | 완료 | `PostStatus` enum, `CHECK` 제약 migration, 카테고리 3종 주입 migration |
+| 1 | 목록·상세 | 완료 | 카테고리 필터, 페이징, 상세 조회, 조회수 |
 | 2 | 작성·수정·삭제 | 대기 | 게시글 CRUD, 소유권 검증, soft delete |
 | 3 | 댓글 | 대기 | 1단계 댓글 작성·삭제, 자리 표시 |
 | 4 | 좋아요 | 대기 | POST/DELETE 분리, 멱등, `like_count` 재계산 |
@@ -42,12 +42,14 @@ docs/community/DOMAIN.md와 기존 코드를 먼저 읽고 구현 계획을 보�
 
 **검증**: 전이 규칙 단위 테스트(허용 3 / 금지 3), MariaDB Testcontainers로 CHECK 제약이 잘못된 값을 거부하는지, 카테고리 3건이 주입되는지.
 
+**완료 (2026-08-02, `4c9cdb7`)**. `PostStatus`(전이 규칙 포함), `CommentStatus`, `V20260802_113219__add_post_status_constraint.sql`(`posts`·`comments` 두 컬럼), `V20260802_113229__provision_post_categories.sql`을 추가했다. 검증은 `PostStatusTests`(6), `CommentStatusTests`(3), `CommunitySchemaTests`(6)로 고정했고 하네스 표에 H0a·H0b로 올렸다. `comments.status`도 함께 제약을 건 것은 계획보다 넓지만, 댓글 자리 표시 정책(DOMAIN.md 4.4)이 상태값에 의존하므로 같은 migration에 담았다.
+
 ### 조각 1 — 목록·상세
 
 - `CommunityMapper` + `CommunityMapper.xml`: 목록(스칼라 서브쿼리), 총 개수, 상세, 조회수 증가
 - `CommunityService`: `PageRequest`/`PageResult` 사용, 상세 조회 시 `UPDATE → SELECT` 단일 트랜잭션
 - 목록/상세 DTO 분리 (`dto/view/`)
-- `CommunityController` 뷰 바인딩, 템플릿 3종 채우기
+- `CommunityController` 뷰 바인딩, 템플릿 2종(`list`, `detail`) 채우기 — `form`은 작성 화면이라 조각 2다
 
 **검증**:
 - `./gradlew clean test`
@@ -55,6 +57,12 @@ docs/community/DOMAIN.md와 기존 코드를 먼저 읽고 구현 계획을 보�
 - **H1b** — 게시글 건수를 늘려도 실행 쿼리 수가 변하지 않는지 (목록 1 + 총 개수 1)
 - 상태별 상세 접근 규칙 (DOMAIN.md 4.3 표의 각 칸)
 - 페이징 경계: 마지막 페이지, 범위 밖 페이지, `created_at`이 동일한 글이 중복·누락되지 않는지
+
+**완료 (2026-08-02)**. `CommunityMapper`(+XML) 5개 statement, `CommunityService`, `CommunityController`, `dto/view` 3종, 템플릿 2종을 추가했다. 검증은 `CommunityMapperXmlTests`(5), `CommunityMapperTests`(20), `CommunityQueryCountTests`(2), `CommunityServiceTests`(12), `CommunityControllerTests`(8), `CommunityScreenRenderingTests`(12), `CommunitySeedTests`(2) 61건으로 고정했다. 하네스 표에 H1a·H1b·H1c·H4·H5·H6을 올렸다.
+
+`bootRun`으로 띄워 목록·상세·페이징·필터·404·조회수·이스케이프를 브라우저에서 확인했다. 그 과정에서 `seed-local.sql`이 카테고리를 지우는 문제를 발견해, 커뮤니티 전용 시드 `db/seed/seed-community.sql`을 새로 만들었다(아래 결정 로그).
+
+구현 중 DOMAIN.md에 없던 빈칸 두 개를 채우고 6.2에 반영했다: 노출되지 않는 글은 조회수를 올리지 않는다(UPDATE의 `status` 조건), 조회수 UPDATE는 `updated_at`을 명시적으로 보존한다.
 
 ### 조각 2 — 작성·수정·삭제
 
@@ -91,13 +99,20 @@ docs/community/DOMAIN.md와 기존 코드를 먼저 읽고 구현 계획을 보�
 
 조각을 진행하며 여기에 쌓는다. 빈 칸은 아직 필요가 발생하지 않은 것이다.
 
-| # | 무엇을 고정하나 | 형태 | 추가 시점 |
+| # | 무엇을 고정하나 | 형태 | 상태 |
 |---|---|---|---|
-| H1a | 목록 SQL이 스칼라 서브쿼리 형태를 유지함 | `XMLMapperBuilder`로 XML 파싱 후 SQL 문자열 검사 (선례: `OrderMapperXmlTests`) | 조각 1 (예정) |
-| H1b | 목록 조회 시 실행 쿼리 수가 게시글 수와 무관 | MyBatis `Interceptor`로 실행 statement 수 카운트 | 조각 1 (예정) |
+| H0a | 게시글·댓글의 상태 전이 규칙(DOMAIN.md 4.2, 4.4). 특히 `BLOCKED -> DELETED` 금지와 `DELETED` 종착 | `PostStatusTests`(6), `CommentStatusTests`(3) | **적용** (조각 0) |
+| H0b | `posts.status`·`comments.status`에 미정의 값이 저장되지 않음, 카테고리 3종이 활성 상태로 존재함 | `CommunitySchemaTests`(6), MariaDB Testcontainers로 CHECK 제약 검증 | **적용** (조각 0) |
+| H1a | 목록 SQL이 스칼라 서브쿼리 형태를 유지함. 정렬의 `id` tiebreaker, 노출 조건이 `status` 하나인 것도 함께 고정 | `CommunityMapperXmlTests` — `XMLMapperBuilder`로 XML 파싱 후 SQL 문자열 검사 (선례: `OrderMapperXmlTests`) | **적용** (조각 1) |
+| H1b | 목록 조회 시 실행 쿼리 수가 게시글 수와 무관 | `CommunityQueryCountTests` — MyBatis `Interceptor`로 실행 statement 수 카운트 | **적용** (조각 1) |
+| H1c | 조회수 증가가 게시글을 "수정됨"으로 만들지 않음 | `CommunityMapperTests.increaseViewCount_doesNotMarkPostAsEdited` + H1a의 SQL 형태 검사 | **적용** (조각 1) |
 | H2 | `like_count`와 실제 좋아요 수 일치 | 동시 요청 테스트 | 조각 4 (예정) |
 | H3 | Controller가 Mapper를 직접 호출하지 않음 | ArchUnit | 위반 발생 시 |
-| H4 | 템플릿에서 `th:utext` 미사용 | 정적 검사 또는 테스트 | 위반 발생 시 |
+| H4 | 본문·제목의 HTML이 이스케이프됨 (`th:utext` 미사용의 실제 결과) | `CommunityScreenRenderingTests` — 본문에 `<script>`를 넣고 렌더링 결과를 확인 | **적용** (조각 1) |
+| H5 | 커뮤니티 화면이 실제로 렌더링됨. 작성자에게만 열리는 차단 안내 화면 포함 | `CommunityScreenRenderingTests` — Thymeleaf를 실제로 돌린다. Controller 단위 테스트는 뷰 이름만 보므로 템플릿이 깨져도 통과한다 | **적용** (조각 1) |
+| H6 | 로컬 시드를 순서대로 실행하면 카테고리 참조 데이터가 남음. 커뮤니티 시드가 `parent_comment_id`를 쓰지 않는 것도 함께 | `CommunitySeedTests` — 시드 파일 내용을 직접 검사 | **적용** (조각 1) |
+
+조각을 끝낼 때 **그 조각이 추가한 하네스를 여기 올리고 조각 표의 상태를 바꾼다.** 이 문서가 정본이므로, 여기가 현실과 어긋나면 다음 작업자가 끝난 일을 다시 한다.
 
 ## 위험
 
@@ -107,6 +122,8 @@ docs/community/DOMAIN.md와 기존 코드를 먼저 읽고 구현 계획을 보�
 | R2 | 목록 쿼리를 `LEFT JOIN ... GROUP BY`로 바꿔도 결과가 같아 눈으로는 안 잡힌다. **실행 쿼리 수 측정으로는 잡히지 않는다** — GROUP BY로 바꿔도 쿼리는 여전히 1번이다. 형태 검사(H1a)가 있어야 잡힌다 | H1a로 방어 예정 (조각 1) |
 | R3 | soft delete 도입이 이 프로젝트의 첫 사례다. 다른 도메인에 선례가 없어 팀 컨벤션과 어긋날 수 있다 | 조각 1 리뷰에서 확인 |
 | R4 | `comment_count` 비정규화 컬럼이 없어 집계로 처리한다. 트래픽이 늘면 컬럼 추가로 전환 필요 | 1차에선 수용 |
+| R5 | `ScreenRenderingTests.productOptionAdminScreenRendersWithSeededAdmin`이 실패한다. 커뮤니티와 무관한 상품 도메인 화면 테스트이며 조각 1 이전(`4c9cdb7`)에서도 동일하게 재현된다. 다만 이것 때문에 `gradlew test` 전체가 빨간불이라 "조각 완료 = 전체 초록불" 조건을 커뮤니티 쪽에서 만족시킬 수 없다 | 상품 담당(시은)에게 공유 필요 (2026-08-02) |
+| R6 | `seed-local.sql`만 실행하면 `post_categories`가 비어 커뮤니티 글쓰기가 불가능하다. `seed-community.sql`을 이어서 실행해야 한다는 안내가 README에는 아직 없다 | 현규가 README 반영 여부를 직접 확인 (2026-08-02) |
 
 ## 결정 로그
 
@@ -117,3 +134,8 @@ docs/community/DOMAIN.md와 기존 코드를 먼저 읽고 구현 계획을 보�
 | 2026-08-02 | `post_categories`에 데이터를 넣는 코드가 어디에도 없다는 사실 발견. 조각 0에 카테고리 주입 migration 추가 |
 | 2026-08-02 | R1 확인 후 해소. member 도메인 테스트 3건이 전제를 고정하고 있어 커뮤니티에 중복 검증을 넣지 않기로 확정 |
 | 2026-08-02 | H1을 H1a(형태 고정)/H1b(실행 횟수)로 분리. 실행 쿼리 수 측정만으로는 `GROUP BY` 재작성을 못 잡는다는 점을 반영 |
+| 2026-08-02 | 조각 0 완료를 반영. 조각 표 상태와 하네스 표(H0a·H0b)가 실제 코드와 어긋나 있던 것을 맞추고, "조각 종료 시 하네스 표를 갱신한다"를 명시 |
+| 2026-08-02 | 조각 1의 "템플릿 3종 채우기"를 2종(`list`, `detail`)으로 정정. `form`은 작성 화면이라 저장 경로가 생기는 조각 2에 속한다 |
+| 2026-08-02 | `seed-local.sql`이 `post_categories`를 지워 로컬에서 카테고리 필터가 비고 글쓰기가 불가능해지는 문제를 발견. 처음에는 공용 시드를 고쳤다가, **공용 파일을 건드리지 않고 `db/seed/seed-community.sql`을 새로 만드는 쪽으로 바꿨다.** 커뮤니티 샘플 데이터가 어차피 필요했고, 카테고리 복구도 같은 파일에서 하면 우리 도메인 안에서 닫힌다. 대신 `seed-local.sql`만 실행한 사람에게는 문제가 그대로 남으므로 실행 순서를 시드 헤더와 `domain/community/CLAUDE.md`에 적었다. H6으로 고정 |
+| 2026-08-02 | H4를 "위반 발생 시"에서 조각 1로 앞당김. Controller 단위 테스트가 뷰 이름만 확인한다는 것을 구현 중 확인했고, 그러면 템플릿이 깨지거나 `th:utext`가 들어와도 CI가 초록불이다. 렌더링 테스트(H5)를 만드는 김에 이스케이프까지 함께 고정했다 |
+| 2026-08-02 | 조회수 규칙의 빈칸을 DOMAIN.md 6.2에 채움. (1) 노출되지 않는 글은 조회수를 올리지 않는다 — UPDATE의 `status` 조건이 담당한다. (2) 조회수 UPDATE는 `updated_at`을 명시적으로 보존한다 — `ON UPDATE CURRENT_TIMESTAMP` 때문에 조회만으로 "수정됨"이 켜지는 것을 구현 중 발견했고, H1c로 고정했다 |

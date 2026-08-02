@@ -128,6 +128,8 @@ LIMIT #{size} OFFSET #{offset}
 - 조회수는 **무조건 +1**. 중복 방지 없음(세션·이력 테이블 모두 사용하지 않음). 작성자가 새로고침해도 오르는 것을 감수한다.
 - 근거: 조회수는 참고용 표시일 뿐 정렬·순위에 쓰이지 않는다. 정확성을 위해 세션 크기나 새 테이블 쓰기 부하를 감수할 가치가 없다.
 - Service 메서드 하나 안에서 `UPDATE view_count` → `SELECT 상세` 순으로 처리하고 통째로 `@Transactional`을 건다.
+- **노출되지 않는 글(`DELETED`/`BLOCKED`)의 조회수는 올리지 않는다.** UPDATE에 `status = 'PUBLISHED'` 조건을 두어 처리한다. 상세가 404인 글의 조회수를 올릴 이유가 없고, 조건을 UPDATE 쪽에 두면 노출 판단 때문에 SELECT를 두 번 하지 않아도 된다. 차단된 글을 작성자가 열어보는 경우도 마찬가지로 올리지 않는다 — 조회수는 공개 지표인데 그 글은 아무에게도 노출되지 않는다.
+- **조회수 UPDATE는 `updated_at`을 명시적으로 보존한다**(`SET view_count = view_count + 1, updated_at = updated_at`). `posts.updated_at`은 `ON UPDATE CURRENT_TIMESTAMP(6)`이므로 그냥 두면 조회만으로 값이 바뀌고, 6.3의 "수정됨" 표시가 켜진다. 화면에는 조용히 "(수정됨)"이 붙을 뿐이라 원인을 찾기 어렵다.
 
 ### 6.3 작성·수정·삭제
 

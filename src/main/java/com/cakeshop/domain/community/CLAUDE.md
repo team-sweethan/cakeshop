@@ -11,6 +11,7 @@
 
 - `src/main/java/com/cakeshop/domain/community/**`
 - `src/main/resources/mapper/community/CommunityMapper.xml`
+- `src/main/resources/db/seed/seed-community.sql` (로컬 샘플 데이터. `seed-local.sql` 다음에 실행한다)
 - `src/main/resources/templates/customer/community/**`
 - `src/main/resources/templates/admin/community/**`
 - `src/test/java/com/cakeshop/domain/community/**`
