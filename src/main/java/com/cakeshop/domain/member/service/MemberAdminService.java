@@ -1,15 +1,20 @@
 package com.cakeshop.domain.member.service;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import com.cakeshop.domain.member.dto.form.MemberAdminListType;
 import com.cakeshop.domain.member.dto.form.MemberAdminSearchCondition;
+import com.cakeshop.domain.member.dto.view.MemberAdminDetailRow;
+import com.cakeshop.domain.member.dto.view.MemberAdminDetailView;
 import com.cakeshop.domain.member.dto.view.MemberAdminListRow;
 import com.cakeshop.domain.member.dto.view.MemberAdminListView;
 import com.cakeshop.domain.member.entity.MemberStatus;
+import com.cakeshop.domain.member.error.MemberErrorCode;
 import com.cakeshop.domain.member.mapper.MemberMapper;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
+import com.cakeshop.global.error.BusinessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -73,13 +78,94 @@ public class MemberAdminService {
                 totalElements);
     }
 
+    @Transactional(readOnly = true)
+    public MemberAdminDetailView getMemberDetail(Long memberId) {
+        MemberAdminDetailRow row =
+                memberMapper.findAdminMemberDetail(memberId)
+                .orElseThrow(() ->
+                        new BusinessException(MemberErrorCode.NOT_FOUND));
+
+        return new MemberAdminDetailView(
+                row.id(),
+                row.name(),
+                row.nickname(),
+                maskEmail(row.email()),
+                maskPhone(row.phone()),
+                maskBirthDate(row.birthDate()),
+                row.role(),
+                row.status(),
+                row.createdAt(),
+                row.updatedAt(),
+                row.suspendedAt(),
+                row.suspendedReason(),
+                row.withdrawnAt());
+    }
+
+    @Transactional
+    public String suspendMember(Long memberId, String reason) {
+        if (reason == null || reason.isBlank()) {
+            throw new BusinessException(
+                    MemberErrorCode.INVALID_SUSPENSION_REASON);
+        }
+
+        String normalizedReason = reason.trim();
+
+        if (normalizedReason.length() > 500) {
+            throw new BusinessException(
+                    MemberErrorCode.INVALID_SUSPENSION_REASON);
+        }
+
+        MemberAdminDetailRow member =
+                memberMapper.findAdminMemberDetail(memberId)
+                        .orElseThrow(() ->
+                                new BusinessException(MemberErrorCode.NOT_FOUND));
+
+        if (!"USER".equals(member.role())
+                || member.status() != MemberStatus.ACTIVE) {
+            throw new BusinessException(MemberErrorCode.INVALID_STATUS_TRANSITION);
+        }
+
+        int updatedRows =
+                memberMapper.suspendActiveUser(
+                        memberId,
+                        normalizedReason);
+
+        if (updatedRows != 1) {
+            throw new BusinessException(
+                    MemberErrorCode.INVALID_STATUS_TRANSITION);
+        }
+        return member.email();
+    }
+
+    @Transactional
+    public void activateMember(Long memberId) {
+        MemberAdminDetailRow member =
+                memberMapper.findAdminMemberDetail(memberId)
+                        .orElseThrow(() ->
+                                new BusinessException(MemberErrorCode.NOT_FOUND));
+
+        if (!"USER".equals(member.role())
+                || member.status() != MemberStatus.SUSPENDED) {
+            throw new BusinessException(
+                    MemberErrorCode.INVALID_STATUS_TRANSITION);
+        }
+
+        int updatedRows =
+                memberMapper.activateSuspendedUser(memberId);
+
+        if (updatedRows != 1) {
+            throw new BusinessException(
+                    MemberErrorCode.INVALID_STATUS_TRANSITION);
+        }
+    }
+
     private MemberAdminListView toListView(MemberAdminListRow row) {
         return new MemberAdminListView(
                 row.id(),
                 row.name(),
                 maskEmail(row.email()),
                 maskPhone(row.phone()),
-                maskBirthDate(row),
+                maskBirthDate(row.birthDate()),
                 row.status(),
                 row.createdAt(),
                 row.withdrawnAt());
@@ -123,11 +209,11 @@ public class MemberAdminService {
         return prefix + "-****-" + suffix;
     }
 
-    private String maskBirthDate(MemberAdminListRow row) {
-        if (row.birthDate() == null) {
+    private String maskBirthDate(LocalDate birthDate) {
+        if (birthDate == null) {
             return EMPTY_DISPLAY_VALUE;
         }
 
-        return row.birthDate().getYear() + ".**.**";
+        return birthDate.getYear() + ".**.**";
     }
 }

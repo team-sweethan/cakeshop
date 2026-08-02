@@ -13,7 +13,7 @@ import java.util.Map;
 
 import com.cakeshop.domain.coupon.dto.form.CouponSearchCondition;
 import com.cakeshop.domain.coupon.dto.view.CouponView;
-import com.cakeshop.domain.product.admin.service.ProductAdminService;
+import com.cakeshop.domain.product.service.ProductAdminService;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,11 +28,12 @@ import com.cakeshop.domain.coupon.controller.CouponAdminController;
 import com.cakeshop.domain.coupon.service.CouponAdminService;
 import com.cakeshop.domain.member.controller.MemberAdminController;
 import com.cakeshop.domain.member.service.MemberAdminService;
+import com.cakeshop.domain.member.service.MemberSessionService;
 import com.cakeshop.domain.notification.controller.NotificationAdminController;
 import com.cakeshop.domain.order.controller.FulfillmentAdminController;
 import com.cakeshop.domain.order.controller.OrderAdminController;
 import com.cakeshop.domain.payment.controller.PaymentAdminController;
-import com.cakeshop.domain.product.admin.controller.ProductAdminController;
+import com.cakeshop.domain.product.controller.ProductAdminController;
 import com.cakeshop.domain.review.controller.ReviewAdminController;
 import com.cakeshop.domain.statistics.controller.StatisticsAdminController;
 
@@ -59,11 +60,19 @@ class AdminPageControllerTests {
         ));
 
         mockMvc = MockMvcBuilders.standaloneSetup(
-            new StatisticsAdminController(), new ProductAdminController(Mockito.mock(ProductAdminService.class)), new OrderAdminController(),
-            new FulfillmentAdminController(), new PaymentAdminController(),
-            new MemberAdminController(Mockito.mock(MemberAdminService.class)),
-            new ReviewAdminController(), new NotificationAdminController(),
-            new CommunityAdminController(), new CouponAdminController(couponAdminService)
+                new StatisticsAdminController(),
+                new ProductAdminController(
+                        Mockito.mock(ProductAdminService.class)),
+                new OrderAdminController(),
+                new FulfillmentAdminController(),
+                new PaymentAdminController(),
+                new MemberAdminController(
+                        Mockito.mock(MemberAdminService.class),
+                        Mockito.mock(MemberSessionService.class)),
+                new ReviewAdminController(),
+                new NotificationAdminController(),
+                new CommunityAdminController(),
+                new CouponAdminController(couponAdminService)
         ).build();
 
         pages.put("/admin", "admin/dashboard");

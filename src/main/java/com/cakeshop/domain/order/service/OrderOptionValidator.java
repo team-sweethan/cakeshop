@@ -8,9 +8,9 @@ import java.util.Map;
 import java.util.Set;
 
 import com.cakeshop.domain.order.error.OrderErrorCode;
-import com.cakeshop.domain.product.customer.dto.view.ProductOptionGroupView;
-import com.cakeshop.domain.product.customer.dto.view.ProductOptionItemView;
-import com.cakeshop.domain.product.customer.service.ProductService;
+import com.cakeshop.domain.product.dto.view.ProductOptionGroupView;
+import com.cakeshop.domain.product.dto.view.ProductOptionItemView;
+import com.cakeshop.domain.product.service.ProductService;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.error.CommonErrorCode;
 

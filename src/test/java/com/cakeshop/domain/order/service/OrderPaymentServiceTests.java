@@ -9,6 +9,7 @@ import com.cakeshop.domain.order.service.OrderService.GeneralPaymentOrder;
 import com.cakeshop.domain.payment.service.PaymentPreparationService;
 import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.service.ProductQueryService;
+import com.cakeshop.domain.store.service.StoreService;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.error.CommonErrorCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,6 +36,9 @@ import static org.mockito.Mockito.when;
 class OrderPaymentServiceTests {
 
     @Mock
+    private StoreService storeService;
+
+    @Mock
     private ProductQueryService productQueryService;
 
     @Mock
@@ -51,6 +55,7 @@ class OrderPaymentServiceTests {
     @BeforeEach
     void setUp() {
         orderService = new OrderServiceImpl(
+                storeService,
                 productQueryService,
                 orderOptionValidator,
                 orderMapper,

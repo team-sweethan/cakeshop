@@ -14,6 +14,9 @@ import com.cakeshop.domain.product.dto.view.ProductSalesInfo;
 import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.error.ProductErrorCode;
 import com.cakeshop.domain.product.service.ProductQueryService;
+import com.cakeshop.domain.store.dto.view.StoreView;
+import com.cakeshop.domain.store.entity.StoreHoliday;
+import com.cakeshop.domain.store.service.StoreService;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.error.CommonErrorCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,14 +30,19 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.DayOfWeek;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -52,6 +60,9 @@ class OrderServiceTests {
     );
 
     @Mock
+    private StoreService storeService;
+
+    @Mock
     private ProductQueryService productQueryService;
 
     @Mock
@@ -67,7 +78,9 @@ class OrderServiceTests {
 
     @BeforeEach
     void setUp() {
+        lenient().when(storeService.getStoreView()).thenReturn(storeView());
         orderService = new OrderServiceImpl(
+                storeService,
                 productQueryService,
                 orderOptionValidator,
                 orderMapper,
@@ -279,6 +292,30 @@ class OrderServiceTests {
     }
 
     @Test
+    void createGeneralOrder_amountExceedsDatabaseLimit_throwsOrderAmountExceeded() {
+        when(productQueryService.getSalesInfo(1L))
+                .thenReturn(product(
+                        1L,
+                        ProductType.GENERAL,
+                        "고액 케이크",
+                        600_000_000_000L
+                ));
+        when(orderOptionValidator.validate(1L, List.of())).thenReturn(List.of());
+
+        assertThatThrownBy(() -> orderService.createGeneralOrder(
+                10L,
+                form(1L, 2, List.of())
+        )).isInstanceOfSatisfying(
+                BusinessException.class,
+                error -> assertThat(error.getErrorCode())
+                        .isEqualTo(OrderErrorCode.ORDER_AMOUNT_EXCEEDED)
+        );
+
+        verify(orderMapper, never()).insertOrder(any(Order.class));
+        verify(paymentPreparationService, never()).prepareReadyPayment(anyLong(), any(), any());
+    }
+
+    @Test
     void createGeneralOrder_pickupAtCurrentTime_throwsInvalidInput() {
         GeneralOrderForm form = form(1L, 1, List.of());
         form.setPickupAt(FIXED_NOW);
@@ -293,6 +330,60 @@ class OrderServiceTests {
 
         verify(productQueryService, never()).getSalesInfo(1L);
         verify(orderMapper, never()).insertOrder(any(Order.class));
+    }
+
+    @Test
+    void createGeneralOrder_unavailablePickupTime_throwsInvalidInput() {
+        GeneralOrderForm form = form(1L, 1, List.of());
+        form.setPickupAt(form.getPickupAt().plusMinutes(30));
+
+        assertThatThrownBy(() -> orderService.createGeneralOrder(10L, form))
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        error -> assertThat(error.getErrorCode())
+                                .isEqualTo(CommonErrorCode.INVALID_INPUT)
+                );
+
+        verify(productQueryService, never()).getSalesInfo(1L);
+        verify(orderMapper, never()).insertOrder(any(Order.class));
+    }
+
+    @Test
+    void createGeneralOrder_closedDay_throwsInvalidInput() {
+        GeneralOrderForm form = form(1L, 1, List.of());
+        when(storeService.getStoreView()).thenReturn(storeView(
+                Set.of(form.getPickupAt().getDayOfWeek()),
+                List.of()
+        ));
+
+        assertThatThrownBy(() -> orderService.createGeneralOrder(10L, form))
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        error -> assertThat(error.getErrorCode())
+                                .isEqualTo(CommonErrorCode.INVALID_INPUT)
+                );
+
+        verify(productQueryService, never()).getSalesInfo(1L);
+    }
+
+    @Test
+    void createGeneralOrder_storeHoliday_throwsInvalidInput() {
+        GeneralOrderForm form = form(1L, 1, List.of());
+        StoreHoliday holiday = new StoreHoliday();
+        holiday.setHolidayDate(form.getPickupAt().toLocalDate());
+        when(storeService.getStoreView()).thenReturn(storeView(
+                Set.of(),
+                List.of(holiday)
+        ));
+
+        assertThatThrownBy(() -> orderService.createGeneralOrder(10L, form))
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        error -> assertThat(error.getErrorCode())
+                                .isEqualTo(CommonErrorCode.INVALID_INPUT)
+                );
+
+        verify(productQueryService, never()).getSalesInfo(1L);
     }
 
     @Test
@@ -380,5 +471,33 @@ class OrderServiceTests {
         form.setQuantity(quantity);
         form.setOptionIds(optionIds);
         return form;
+    }
+
+    private StoreView storeView() {
+        return storeView(Set.of(), List.of());
+    }
+
+    private StoreView storeView(
+            Set<DayOfWeek> closedDays,
+            List<StoreHoliday> holidays
+    ) {
+        return new StoreView(
+                1L,
+                "테스트 매장",
+                null,
+                null,
+                "서울시",
+                "02-0000-0000",
+                LocalTime.of(9, 0),
+                LocalTime.of(20, 0),
+                LocalTime.of(9, 0),
+                LocalTime.of(20, 0),
+                closedDays,
+                "1층",
+                LocalTime.of(10, 0),
+                LocalTime.of(19, 0),
+                60,
+                holidays
+        );
     }
 }

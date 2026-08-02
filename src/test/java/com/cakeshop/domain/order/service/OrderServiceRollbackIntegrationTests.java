@@ -1,16 +1,16 @@
 package com.cakeshop.domain.order.service;
 
 import com.cakeshop.domain.order.dto.form.GeneralOrderForm;
-import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.error.PaymentErrorCode;
-import com.cakeshop.domain.payment.mapper.PaymentMapper;
-import com.cakeshop.domain.payment.service.PaymentPreparationServiceImpl;
-import com.cakeshop.domain.product.customer.dto.view.ProductOptionGroupView;
-import com.cakeshop.domain.product.customer.dto.view.ProductOptionItemView;
-import com.cakeshop.domain.product.customer.service.ProductService;
+import com.cakeshop.domain.payment.service.PaymentPreparationService;
+import com.cakeshop.domain.product.dto.view.ProductOptionGroupView;
+import com.cakeshop.domain.product.dto.view.ProductOptionItemView;
 import com.cakeshop.domain.product.dto.view.ProductSalesInfo;
 import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.service.ProductQueryService;
+import com.cakeshop.domain.product.service.ProductService;
+import com.cakeshop.domain.store.dto.view.StoreView;
+import com.cakeshop.domain.store.service.StoreService;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 import com.cakeshop.global.error.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,20 +26,25 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.DayOfWeek;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
 @MybatisTest
 @Import({
         OrderServiceImpl.class,
-        OrderOptionValidator.class,
-        PaymentPreparationServiceImpl.class
+        OrderOptionValidator.class
 })
 @MariaDbIntegrationTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -60,7 +65,10 @@ class OrderServiceRollbackIntegrationTests {
     private ProductService productService;
 
     @MockitoBean
-    private PaymentMapper paymentMapper;
+    private StoreService storeService;
+
+    @MockitoBean
+    private PaymentPreparationService paymentPreparationService;
 
     @MockitoBean
     private Clock clock;
@@ -86,6 +94,7 @@ class OrderServiceRollbackIntegrationTests {
         productId = insertProduct();
         productOptionId = insertProductOption();
 
+        when(storeService.getStoreView()).thenReturn(storeView());
         when(clock.instant())
                 .thenReturn(FIXED_NOW.atZone(TEST_ZONE).toInstant());
         when(clock.getZone()).thenReturn(TEST_ZONE);
@@ -111,8 +120,9 @@ class OrderServiceRollbackIntegrationTests {
                                 BigDecimal.valueOf(5_000)
                         ))
                 )));
-        when(paymentMapper.insertReadyPayment(any(Payment.class)))
-                .thenReturn(0);
+        doThrow(new BusinessException(PaymentErrorCode.PAYMENT_PREPARATION_FAILED))
+                .when(paymentPreparationService)
+                .prepareReadyPayment(anyLong(), anyString(), any(BigDecimal.class));
     }
 
     @Test
@@ -142,6 +152,27 @@ class OrderServiceRollbackIntegrationTests {
         form.setQuantity(2);
         form.setOptionIds(List.of(productOptionId));
         return form;
+    }
+
+    private StoreView storeView() {
+        return new StoreView(
+                1L,
+                "테스트 매장",
+                null,
+                null,
+                "서울시",
+                "02-0000-0000",
+                LocalTime.of(9, 0),
+                LocalTime.of(20, 0),
+                LocalTime.of(9, 0),
+                LocalTime.of(20, 0),
+                Set.<DayOfWeek>of(),
+                "1층",
+                LocalTime.of(10, 0),
+                LocalTime.of(19, 0),
+                60,
+                List.of()
+        );
     }
 
     private long countOrders() {

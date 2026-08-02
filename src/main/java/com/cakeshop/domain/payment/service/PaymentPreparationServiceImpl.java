@@ -12,7 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.UUID;
 
-/** READY 결제 생성 계약을 MyBatis 저장으로 구현한다. */
+/** 주문에 연결된 READY 결제 생성을 구현한다. */
 @Service
 @RequiredArgsConstructor
 public class PaymentPreparationServiceImpl implements PaymentPreparationService {
@@ -34,9 +34,7 @@ public class PaymentPreparationServiceImpl implements PaymentPreparationService 
         payment.setStatus(PaymentStatus.READY);
 
         if (paymentMapper.insertReadyPayment(payment) != 1) {
-            throw new BusinessException(
-                    PaymentErrorCode.PAYMENT_PREPARATION_FAILED
-            );
+            throw new BusinessException(PaymentErrorCode.PAYMENT_PREPARATION_FAILED);
         }
     }
 

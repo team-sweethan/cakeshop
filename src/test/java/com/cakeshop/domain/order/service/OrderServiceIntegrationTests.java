@@ -11,12 +11,14 @@ import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.entity.PaymentStatus;
 import com.cakeshop.domain.payment.mapper.PaymentMapper;
 import com.cakeshop.domain.payment.service.PaymentPreparationServiceImpl;
-import com.cakeshop.domain.product.customer.dto.view.ProductOptionGroupView;
-import com.cakeshop.domain.product.customer.dto.view.ProductOptionItemView;
-import com.cakeshop.domain.product.customer.service.ProductService;
+import com.cakeshop.domain.product.dto.view.ProductOptionGroupView;
+import com.cakeshop.domain.product.dto.view.ProductOptionItemView;
 import com.cakeshop.domain.product.dto.view.ProductSalesInfo;
 import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.service.ProductQueryService;
+import com.cakeshop.domain.product.service.ProductService;
+import com.cakeshop.domain.store.dto.view.StoreView;
+import com.cakeshop.domain.store.service.StoreService;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,9 +33,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.DayOfWeek;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
@@ -65,6 +70,9 @@ class OrderServiceIntegrationTests {
     private ProductService productService;
 
     @MockitoBean
+    private StoreService storeService;
+
+    @MockitoBean
     private Clock clock;
 
     private String suffix;
@@ -92,6 +100,7 @@ class OrderServiceIntegrationTests {
         productId = insertProduct();
         productOptionId = insertProductOption();
         stubProductLookup();
+        when(storeService.getStoreView()).thenReturn(storeView());
         when(clock.instant())
                 .thenReturn(FIXED_NOW.atZone(TEST_ZONE).toInstant());
         when(clock.getZone()).thenReturn(TEST_ZONE);
@@ -176,6 +185,27 @@ class OrderServiceIntegrationTests {
         form.setQuantity(2);
         form.setOptionIds(List.of(productOptionId));
         return form;
+    }
+
+    private StoreView storeView() {
+        return new StoreView(
+                1L,
+                "테스트 매장",
+                null,
+                null,
+                "서울시",
+                "02-0000-0000",
+                LocalTime.of(9, 0),
+                LocalTime.of(20, 0),
+                LocalTime.of(9, 0),
+                LocalTime.of(20, 0),
+                Set.<DayOfWeek>of(),
+                "1층",
+                LocalTime.of(10, 0),
+                LocalTime.of(19, 0),
+                60,
+                List.of()
+        );
     }
 
     private long insertMember() {

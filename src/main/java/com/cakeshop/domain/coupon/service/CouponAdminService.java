@@ -1,6 +1,7 @@
 package com.cakeshop.domain.coupon.service;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -11,6 +12,7 @@ import com.cakeshop.domain.coupon.dto.form.CouponSearchCondition;
 import com.cakeshop.domain.coupon.dto.form.CouponUpdateForm;
 import com.cakeshop.domain.coupon.dto.view.CouponView;
 import com.cakeshop.domain.coupon.entity.Coupon;
+import com.cakeshop.domain.coupon.entity.CouponDisplayStatus;
 import com.cakeshop.domain.coupon.entity.CouponStatus;
 import com.cakeshop.domain.coupon.error.CouponErrorCode;
 import com.cakeshop.domain.coupon.mapper.CouponMapper;
@@ -88,11 +90,12 @@ public class CouponAdminService {
     public CouponUpdateForm getUpdateForm(Long couponId) {
         Coupon coupon = findCoupon(couponId);
 
-        if (coupon.getStatus() == CouponStatus.ENDED) {
+        if (displayStatusOf(coupon) == CouponDisplayStatus.ENDED) {
             throw new BusinessException(CouponErrorCode.CANNOT_EDIT_ENDED_COUPON);
         }
 
         CouponUpdateForm form = CouponUpdateForm.from(coupon);
+        form.setDisplayStatus(displayStatusOf(coupon));
         // 시작 전에는 정책을 자유롭게 바꿀 수 있고, 시작 후에는 발급 조건 변경을 막는다.
         boolean isFullEdit = coupon.getStartsAt().isAfter(LocalDateTime.now());
         form.setFullEdit(isFullEdit);
@@ -132,6 +135,10 @@ public class CouponAdminService {
             throw new BusinessException(CouponErrorCode.NOT_ACTIVE);
         }
 
+        if (!coupon.getExpiresAt().isAfter(LocalDateTime.now())) {
+            throw new BusinessException(CouponErrorCode.NOT_ACTIVE);
+        }
+
         if (couponMapper.updateStatus(
                 couponId,
                 CouponStatus.INACTIVE
@@ -166,13 +173,6 @@ public class CouponAdminService {
         }
     }
 
-    /** 스케줄러가 호출하는 만료 일괄 처리이며, 실제 갱신 건수를 반환한다. */
-    @Transactional
-    public int endExpiredCoupons() {
-        // 스케줄러가 호출하는 일괄 상태 전이이며, 반환값은 갱신된 행 수다.
-        return couponMapper.endExpiredCoupons();
-    }
-
     /** 수정·상태 전환 전에 현재 DB 상태를 조회하고, 없으면 도메인 예외로 바꾼다. */
     private Coupon findCoupon(Long couponId) {
         return couponMapper.findCouponById(couponId)
@@ -186,7 +186,7 @@ public class CouponAdminService {
      * 반환값은 SQL의 전체 수정/제한 수정 분기를 결정하며, SQL도 같은 조건을 다시 확인한다.
      */
     private boolean validateUpdate(Coupon coupon, CouponUpdateForm form) {
-        if (coupon.getStatus() == CouponStatus.ENDED) {
+        if (displayStatusOf(coupon) == CouponDisplayStatus.ENDED) {
             throw new BusinessException(CouponErrorCode.CANNOT_EDIT_ENDED_COUPON);
         }
 
@@ -209,7 +209,9 @@ public class CouponAdminService {
 
         // 종료 일시는 기존 종료 일시보다 이전이면 안 되며, 동일 시각은 허용한다.
         if (form.getExpiresAt() == null || coupon.getExpiresAt() == null
-                || form.getExpiresAt().isBefore(coupon.getExpiresAt())) {
+                || form.getExpiresAt().isBefore(
+                        coupon.getExpiresAt().truncatedTo(ChronoUnit.MINUTES)
+                )) {
             throw new BusinessException(CouponErrorCode.EXPIRES_AT_EXTENSION_ONLY);
         }
 
@@ -243,8 +245,9 @@ public class CouponAdminService {
                 Math.toIntExact(form.getTotalQuantity())
         );
 
-        coupon.setStartsAt(form.getStartsAt());
-        coupon.setExpiresAt(form.getExpiresAt());
+        // 화면 정책이 분 단위이므로 저장값도 분 단위로 통일한다.
+        coupon.setStartsAt(form.getStartsAt().truncatedTo(ChronoUnit.MINUTES));
+        coupon.setExpiresAt(form.getExpiresAt().truncatedTo(ChronoUnit.MINUTES));
     }
 
     /**
@@ -257,6 +260,12 @@ public class CouponAdminService {
         CouponUpdateForm form = CouponUpdateForm.from(coupon);
         boolean isFullEdit = coupon.getStartsAt().isAfter(LocalDateTime.now());
         form.setFullEdit(isFullEdit);
+        form.setDisplayStatus(displayStatusOf(coupon));
         return form;
+    }
+
+    /** DB 상태와 시간·발급 수량을 조합한 읽기 전용 화면 상태를 계산한다. */
+    private CouponDisplayStatus displayStatusOf(Coupon coupon) {
+        return CouponDisplayStatus.from(coupon, LocalDateTime.now());
     }
 }

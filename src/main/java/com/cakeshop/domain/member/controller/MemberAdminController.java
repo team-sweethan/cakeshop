@@ -2,17 +2,24 @@ package com.cakeshop.domain.member.controller;
 
 import com.cakeshop.domain.member.dto.form.MemberAdminListType;
 import com.cakeshop.domain.member.dto.form.MemberAdminSearchCondition;
+import com.cakeshop.domain.member.dto.form.MemberSuspendForm;
+import com.cakeshop.domain.member.dto.view.MemberAdminDetailView;
 import com.cakeshop.domain.member.dto.view.MemberAdminListView;
 import com.cakeshop.domain.member.entity.MemberStatus;
 import com.cakeshop.domain.member.service.MemberAdminService;
+import com.cakeshop.domain.member.service.MemberSessionService;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
+import jakarta.validation.Valid;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
 public class MemberAdminController {
@@ -20,9 +27,13 @@ public class MemberAdminController {
     private static final int DEFAULT_MEMBER_PAGE_SIZE = 10;
 
     private final MemberAdminService memberAdminService;
+    private final MemberSessionService memberSessionService;
 
-    public MemberAdminController(MemberAdminService memberAdminService) {
+    public MemberAdminController(
+            MemberAdminService memberAdminService,
+            MemberSessionService memberSessionService) {
         this.memberAdminService = memberAdminService;
+        this.memberSessionService = memberSessionService;
     }
 
     // 관리자 회원 목록
@@ -62,6 +73,60 @@ public class MemberAdminController {
                 });
 
         return "admin/member/list";
+    }
+
+    // 관리자 회원 상세
+    @GetMapping("/admin/members/{memberId}")
+    public String memberDetail(
+            @PathVariable Long memberId,
+            Model model) {
+        MemberAdminDetailView member =
+                memberAdminService.getMemberDetail(memberId);
+
+        model.addAttribute("member", member);
+        return "admin/member/detail";
+    }
+
+    // 관리자 회원 이용정지
+    @PostMapping("/admin/members/{memberId}/suspend")
+    public String suspendMember(
+            @PathVariable Long memberId,
+            @Valid @ModelAttribute("suspendForm")
+            MemberSuspendForm form,
+            BindingResult bindingResult,
+            RedirectAttributes redirectAttributes) {
+        if (bindingResult.hasErrors()) {
+            redirectAttributes.addFlashAttribute(
+                    "errorMessage",
+                    "이용정지 사유를 확인해 주세요.");
+
+            return "redirect:/admin/members";
+        }
+
+        String email =
+                memberAdminService.suspendMember(
+                        memberId,
+                        form.getReason());
+
+        memberSessionService.expireSessionsByEmail(email);
+        redirectAttributes.addFlashAttribute(
+                "successMessage",
+                "회원 이용을 정지했습니다.");
+
+        return "redirect:/admin/members";
+    }
+
+    // 관리자 회원 이용정지 해제
+    @PostMapping("/admin/members/{memberId}/activate")
+    public String activateMember(
+            @PathVariable Long memberId,
+            RedirectAttributes redirectAttributes) {
+        memberAdminService.activateMember(memberId);
+        redirectAttributes.addFlashAttribute(
+                "successMessage",
+                "회원 이용정지를 해제했습니다.");
+
+        return "redirect:/admin/members";
     }
 
     private Integer parsePositiveInteger(String value) {

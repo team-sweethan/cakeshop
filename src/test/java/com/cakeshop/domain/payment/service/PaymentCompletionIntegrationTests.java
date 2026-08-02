@@ -14,6 +14,7 @@ import com.cakeshop.domain.payment.infra.TossPaymentClient.ApprovalResult;
 import com.cakeshop.domain.payment.mapper.PaymentMapper;
 import com.cakeshop.domain.product.service.ProductQueryService;
 import com.cakeshop.domain.product.service.ProductStockService;
+import com.cakeshop.domain.store.service.StoreService;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,6 +59,9 @@ class PaymentCompletionIntegrationTests {
 
     @MockitoBean
     private OrderOptionValidator orderOptionValidator;
+
+    @MockitoBean
+    private StoreService storeService;
 
     @MockitoBean
     private Clock clock;
