@@ -1,5 +1,6 @@
 package com.cakeshop.customer;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -17,6 +18,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.context.support.WithUserDetails;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -43,7 +46,7 @@ class ScreenRenderingTests {
     void publicScreensRenderWithoutAuthentication() throws Exception {
         String[] paths = {
             "/screens", "/login", "/signup", "/find-email",
-            "/products", "/products/1", "/cart"
+            "/products", "/products/1"
         };
 
         assertScreensRender(paths);
@@ -56,6 +59,17 @@ class ScreenRenderingTests {
             .andExpect(status().isOk())
             .andExpect(content().string(containsString("data-common-alert-popup")))
             .andExpect(content().string(containsString("window.alert(")));
+    }
+
+    @Test
+    void productScreens_errorMessage_renderCommonAlertFragment() throws Exception {
+        for (String path : new String[] {"/products", "/products/1"}) {
+            mockMvc.perform(get(path)
+                    .flashAttr("errorMessage", "장바구니 오류"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("alert alert--error")))
+                .andExpect(content().string(containsString("장바구니 오류")));
+        }
     }
 
     @Test
@@ -74,12 +88,49 @@ class ScreenRenderingTests {
     }
 
     @Test
+    void cart_unauthenticatedMember_redirectsToLoginEvenInPublicPreview() throws Exception {
+        mockMvc.perform(get("/cart"))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/login"));
+    }
+
+    @Test
+    void cartCount_unauthenticatedRequest_isNotSavedForLoginRedirect() throws Exception {
+        MvcResult countResult = mockMvc.perform(get("/cart/count"))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/login"))
+            .andReturn();
+
+        MockHttpSession countSession = (MockHttpSession) countResult.getRequest().getSession(false);
+        assertThat(countSession == null
+                ? null
+                : countSession.getAttribute("SPRING_SECURITY_SAVED_REQUEST"))
+            .isNull();
+
+        MvcResult pageResult = mockMvc.perform(get("/cart"))
+            .andExpect(status().is3xxRedirection())
+            .andReturn();
+        MockHttpSession pageSession = (MockHttpSession) pageResult.getRequest().getSession(false);
+        assertThat(pageSession).isNotNull();
+        assertThat(pageSession.getAttribute("SPRING_SECURITY_SAVED_REQUEST")).isNotNull();
+    }
+
+    @Test
+    void productDetail_unauthenticatedMember_showsLoginCartLinkOnly() throws Exception {
+        mockMvc.perform(get("/products/1"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("로그인 후 장바구니 담기")))
+            .andExpect(content().string(not(containsString("data-server-cart-form"))));
+    }
+
+    @Test
     @WithUserDetails(
         value = "user@cakeshop.local",
         userDetailsServiceBeanName = "memberDetailsService"
     )
     void memberScreensRenderWithSeededUser() throws Exception {
         String[] paths = {
+            "/cart",
             "/orders/pickup", "/orders/custom/options", "/orders/custom/request",
             "/orders/checkout", "/orders/1/payment", "/orders/complete", "/mypage",
             "/orders/1", "/notifications", "/reviews/new", "/mypage/coupons",
@@ -87,6 +138,23 @@ class ScreenRenderingTests {
         };
 
         assertScreensRender(paths);
+
+        mockMvc.perform(get("/products/1"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("data-server-cart-form")))
+            .andExpect(content().string(not(containsString("로그인 후 장바구니 담기"))));
+    }
+
+    @Test
+    @WithUserDetails(
+        value = "user@cakeshop.local",
+        userDetailsServiceBeanName = "memberDetailsService"
+    )
+    void customProductDetail_showsCustomOptionFlowWithoutServerCartForm() throws Exception {
+        mockMvc.perform(get("/products/6"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("/orders/custom/options")))
+            .andExpect(content().string(not(containsString("data-server-cart-form"))));
     }
 
     @Test

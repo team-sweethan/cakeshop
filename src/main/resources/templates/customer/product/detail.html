@@ -1,5 +1,6 @@
 ﻿<!doctype html>
-<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<html lang="ko" xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -24,6 +25,8 @@
 <header th:replace="~{fragments/common/header :: header}"></header>
 
 <main class="page-container">
+
+  <div th:replace="~{fragments/common/alert :: alert}"></div>
 
   <!-- 페이지 제목 -->
   <h1>상품 상세</h1>
@@ -369,7 +372,8 @@
         <!-- 재고가 있는 경우 -->
         <div
                 class="cluster"
-                th:if="${product.available}"
+                th:if="${product.available
+                        and product.productType.name() == 'GENERAL'}"
         >
           <!-- 픽업 일시 선택 화면 -->
           <a
@@ -380,14 +384,20 @@
             픽업 일시 선택
           </a>
 
-          <!-- 장바구니 기능은 이후 백엔드와 연결한다. -->
-          <button
-                  class="btn"
-                  type="button"
-                  data-add-product-cart
-          >
-            장바구니 담기
-          </button>
+          <form sec:authorize="isAuthenticated()"
+                th:action="@{/cart/items}" method="post" data-server-cart-form>
+            <input type="hidden" name="productId" th:value="${product.id}">
+            <input type="hidden" name="quantity" value="1" data-server-cart-quantity>
+            <span data-server-cart-options></span>
+            <button class="btn" type="submit" data-server-cart-submit>
+              장바구니 담기
+            </button>
+          </form>
+
+          <a sec:authorize="isAnonymous()" class="btn"
+             th:href="@{/cart/continue/{id}(id=${product.id})}">
+            로그인 후 장바구니 담기
+          </a>
 
           <span class="note">
               픽업 일시는 장바구니에서 나중에 선택할 수 있습니다.

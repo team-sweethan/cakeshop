@@ -9,6 +9,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import com.cakeshop.domain.cart.controller.CartController;
+import com.cakeshop.domain.cart.dto.view.CartView;
+import com.cakeshop.domain.cart.service.CartService;
 import com.cakeshop.domain.coupon.controller.CouponController;
 import com.cakeshop.domain.home.controller.HomeController;
 import com.cakeshop.domain.home.service.HomeService;
@@ -27,6 +29,8 @@ import com.cakeshop.global.security.MemberDetails;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.math.BigDecimal;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
@@ -66,11 +70,15 @@ class CustomerPageControllerTests {
                         "010-1234-5678",
                         LocalDate.of(2000, 1, 15)));
 
+        CartService cartService = mock(CartService.class);
+        when(cartService.getCart(1L)).thenReturn(new CartView(
+                List.of(), 0, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO));
+
         mockMvc = MockMvcBuilders.standaloneSetup(
                         new HomeController(mock(HomeService.class)),
                         new AuthController(memberService),
                         new ProductController(mock(ProductService.class)),
-                        new CartController(),
+                        new CartController(cartService),
                         new OrderController(),
                         new PaymentController(),
                         new MyPageController(
@@ -135,22 +143,70 @@ class CustomerPageControllerTests {
     }
 
     @Test
-    void importedCartMockupUsesSpringRoutesAndIncludesItsBehavior()
+    void cartViewUsesServerBackedSpringRoutes()
             throws IOException {
         String cartTemplate =
                 new ClassPathResource("templates/customer/cart/list.html")
+                        .getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(cartTemplate)
+                .contains("th:each=\"item : ${cart.items}\"")
+                .contains("th:action=\"@{/cart/items/{id}/quantity(id=${item.id})}\"")
+                .contains("th:action=\"@{/cart/items/delete-selected}\"")
+                .contains("th:action=\"@{/cart/items/delete-all}\"")
+                .doesNotContain("data-cart-root");
+    }
+
+    @Test
+    void customOrderViewDoesNotUseBrowserLocalCart() throws IOException {
+        String customOrderTemplate =
+                new ClassPathResource("templates/customer/order/custom-option.html")
+                        .getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(customOrderTemplate)
+                .contains("장바구니 연동 준비 중")
+                .doesNotContain("data-add-custom-cart");
+    }
+
+    @Test
+    void pickupViewUsesDedicatedInitializationMarker() throws IOException {
+        String pickupTemplate =
+                new ClassPathResource("templates/customer/order/pickup-setting.html")
                         .getContentAsString(StandardCharsets.UTF_8);
         String mockupScript =
                 new ClassPathResource("static/js/customer-mockup.js")
                         .getContentAsString(StandardCharsets.UTF_8);
 
-        assertThat(cartTemplate)
-                .contains("data-cart-root", "href=\"/products\"");
+        assertThat(pickupTemplate).contains("data-pickup-root");
         assertThat(mockupScript)
-                .contains("source: cakeProjectSample/js/cart.js")
-                .contains("location.href = \"/cart\"")
-                .contains("event.preventDefault()")
-                .doesNotContain("event.preventDefalt()")
-                .doesNotContain("/customer/");
+                .contains("document.querySelector(\"[data-pickup-root]\")")
+                .doesNotContain(
+                        "if (!document.querySelector(\"[data-add-normal-cart]\")) return;");
+    }
+
+    @Test
+    void productDetailSeparatesGeneralCartAndCustomOptionFlows() throws IOException {
+        String productDetailTemplate =
+                new ClassPathResource("templates/customer/product/detail.html")
+                        .getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(productDetailTemplate)
+                .contains("and product.productType.name() == 'GENERAL'")
+                .contains("th:href=\"@{/orders/custom/options}\"");
+    }
+
+    @Test
+    void cartAsyncUpdateRefreshesEveryAffectedItemAvailability() throws IOException {
+        String cartScript = new ClassPathResource("static/js/cart.js")
+                .getContentAsString(StandardCharsets.UTF_8);
+        String cartTemplate =
+                new ClassPathResource("templates/customer/cart/list.html")
+                        .getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(cartScript)
+                .contains("cart.itemAvailability.forEach")
+                .contains("state.available");
+        assertThat(cartTemplate)
+                .contains("item.stockQuantity != null ? item.stockQuantity : 10");
     }
 }
