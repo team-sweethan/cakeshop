@@ -91,11 +91,12 @@
                   <button class="btn" type="button" data-cart-quantity-change="-1"
                           th:disabled="${item.quantity <= 1}" aria-label="수량 감소">−</button>
                   <input class="form-control" type="number" name="quantity" min="1"
-                         th:max="${item.stockQuantity}"
+                         th:max="${item.stockQuantity != null ? item.stockQuantity : 10}"
                          th:value="${item.quantity}"
                          aria-label="수량">
                   <button class="btn" type="button" data-cart-quantity-change="1"
-                          th:disabled="${item.stockQuantity != null and item.quantity >= item.stockQuantity}"
+                          th:disabled="${item.quantity >= (item.stockQuantity != null
+                                  ? item.stockQuantity : 10)}"
                           aria-label="수량 증가">+</button>
                 </form>
                 <strong class="cart-item__price"

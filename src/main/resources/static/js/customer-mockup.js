@@ -229,7 +229,7 @@
   }
 
   function initializePickup() {
-    if (!document.querySelector("[data-add-normal-cart]")) return;
+    if (!document.querySelector("[data-pickup-root]")) return;
     const targetId = pickupTarget();
     const targetItem = targetId ? readCart().find(function (item) { return item.id === targetId; }) : null;
     const pending = targetItem || readPendingProduct();
@@ -458,7 +458,7 @@
     if (addCustom) addCustomProduct(addCustom);
     if (event.target.closest("[data-quantity-change]")) {
       updateProductDetailTotal();
-      if (document.querySelector("[data-add-normal-cart]")) updatePickupPrice();
+      if (document.querySelector("[data-pickup-root]")) updatePickupPrice();
     }
     const readAll = event.target.closest("[data-read-all]");
     if (readAll) {

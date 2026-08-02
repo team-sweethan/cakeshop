@@ -372,7 +372,8 @@
         <!-- 재고가 있는 경우 -->
         <div
                 class="cluster"
-                th:if="${product.available}"
+                th:if="${product.available
+                        and product.productType.name() == 'GENERAL'}"
         >
           <!-- 픽업 일시 선택 화면 -->
           <a

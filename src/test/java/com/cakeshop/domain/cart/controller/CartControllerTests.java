@@ -130,6 +130,9 @@ class CartControllerTests {
         assertThat(result.itemTotal()).isEqualByComparingTo("105000");
         assertThat(result.totalQuantity()).isEqualTo(3);
         assertThat(result.available()).isTrue();
+        assertThat(result.itemAvailability()).hasSize(1);
+        assertThat(result.itemAvailability().getFirst().itemId()).isEqualTo(30L);
+        assertThat(result.itemAvailability().getFirst().available()).isTrue();
     }
 
     @Test

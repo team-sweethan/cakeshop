@@ -76,7 +76,11 @@
       if (Number(item.dataset.itemId) !== cart.itemId) throw new Error("item mismatch");
       if (form.dataset.pending !== "true") {
         form.elements.quantity.value = cart.quantity;
-        updateAvailability(item, cart.available);
+        cart.itemAvailability.forEach(function (state) {
+          const affectedItem = document.querySelector(
+            '[data-cart-item][data-item-id="' + state.itemId + '"]');
+          if (affectedItem) updateAvailability(affectedItem, state.available);
+        });
         item.querySelector("[data-cart-item-total]").textContent = money(cart.itemTotal);
         updateButtons(form);
         updateSummary(cart);

@@ -167,4 +167,46 @@ class CustomerPageControllerTests {
                 .contains("장바구니 연동 준비 중")
                 .doesNotContain("data-add-custom-cart");
     }
+
+    @Test
+    void pickupViewUsesDedicatedInitializationMarker() throws IOException {
+        String pickupTemplate =
+                new ClassPathResource("templates/customer/order/pickup-setting.html")
+                        .getContentAsString(StandardCharsets.UTF_8);
+        String mockupScript =
+                new ClassPathResource("static/js/customer-mockup.js")
+                        .getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(pickupTemplate).contains("data-pickup-root");
+        assertThat(mockupScript)
+                .contains("document.querySelector(\"[data-pickup-root]\")")
+                .doesNotContain(
+                        "if (!document.querySelector(\"[data-add-normal-cart]\")) return;");
+    }
+
+    @Test
+    void productDetailSeparatesGeneralCartAndCustomOptionFlows() throws IOException {
+        String productDetailTemplate =
+                new ClassPathResource("templates/customer/product/detail.html")
+                        .getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(productDetailTemplate)
+                .contains("and product.productType.name() == 'GENERAL'")
+                .contains("th:href=\"@{/orders/custom/options}\"");
+    }
+
+    @Test
+    void cartAsyncUpdateRefreshesEveryAffectedItemAvailability() throws IOException {
+        String cartScript = new ClassPathResource("static/js/cart.js")
+                .getContentAsString(StandardCharsets.UTF_8);
+        String cartTemplate =
+                new ClassPathResource("templates/customer/cart/list.html")
+                        .getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(cartScript)
+                .contains("cart.itemAvailability.forEach")
+                .contains("state.available");
+        assertThat(cartTemplate)
+                .contains("item.stockQuantity != null ? item.stockQuantity : 10");
+    }
 }

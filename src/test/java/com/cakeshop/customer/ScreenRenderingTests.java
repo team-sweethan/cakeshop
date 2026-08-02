@@ -123,6 +123,18 @@ class ScreenRenderingTests {
 
     @Test
     @WithUserDetails(
+        value = "user@cakeshop.local",
+        userDetailsServiceBeanName = "memberDetailsService"
+    )
+    void customProductDetail_showsCustomOptionFlowWithoutServerCartForm() throws Exception {
+        mockMvc.perform(get("/products/6"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("/orders/custom/options")))
+            .andExpect(content().string(not(containsString("data-server-cart-form"))));
+    }
+
+    @Test
+    @WithUserDetails(
         value = "admin@cakeshop.local",
         userDetailsServiceBeanName = "memberDetailsService"
     )

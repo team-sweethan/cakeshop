@@ -271,6 +271,20 @@ class CartServiceTests {
     }
 
     @Test
+    void addItem_unlimitedStockExceedsMaximum_throwsOutOfStock() {
+        CartAddForm form = form(10L, 11, List.of());
+        when(cartMapper.findCartIdByMemberIdForUpdate(1L)).thenReturn(Optional.of(20L));
+        when(productQueryService.getSalesInfo(10L)).thenReturn(product(null));
+
+        assertThatThrownBy(() -> cartService.addItem(1L, form))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(CartErrorCode.OUT_OF_STOCK);
+
+        verify(cartMapper, never()).insertItem(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     void updateQuantity_otherMembersItem_throwsNotFound() {
         when(cartMapper.findCartIdByMemberIdForUpdate(1L)).thenReturn(Optional.of(20L));
         when(cartMapper.findItemByMemberIdAndItemId(1L, 99L)).thenReturn(Optional.empty());
@@ -338,6 +352,21 @@ class CartServiceTests {
     }
 
     @Test
+    void updateQuantity_unlimitedStockExceedsMaximum_throwsOutOfStock() {
+        CartItem item = item(30L, 10L, 3);
+        when(cartMapper.findCartIdByMemberIdForUpdate(1L)).thenReturn(Optional.of(20L));
+        when(cartMapper.findItemByMemberIdAndItemId(1L, 30L)).thenReturn(Optional.of(item));
+        when(productQueryService.getSalesInfo(10L)).thenReturn(product(null));
+
+        assertThatThrownBy(() -> cartService.updateQuantity(1L, 30L, 11))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(CartErrorCode.OUT_OF_STOCK);
+
+        verify(cartMapper, never()).updateItemQuantity(1L, 30L, 11);
+    }
+
+    @Test
     void updateQuantity_invalidOtherConfiguration_doesNotConsumeStock() {
         CartItem target = item(30L, 10L, 3);
         CartItem invalid = item(31L, 10L, 1);
@@ -390,7 +419,7 @@ class CartServiceTests {
         return form;
     }
 
-    private ProductSalesInfo product(int stock) {
+    private ProductSalesInfo product(Integer stock) {
         return new ProductSalesInfo(
                 10L,
                 "딸기 케이크",

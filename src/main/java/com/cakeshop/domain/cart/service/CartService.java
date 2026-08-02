@@ -29,6 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class CartService {
 
+    private static final int MAX_UNLIMITED_STOCK_QUANTITY = 10;
+
     private final CartMapper cartMapper;
     private final ProductQueryService productQueryService;
     private final ProductService productService;
@@ -228,7 +230,9 @@ public class CartService {
     private void validateStock(ProductSalesInfo product, int quantity) {
         if (quantity < 1
                 || !product.available()
-                || product.stockQuantity() != null && quantity > product.stockQuantity()) {
+                || product.stockQuantity() != null && quantity > product.stockQuantity()
+                || product.stockQuantity() == null
+                && quantity > MAX_UNLIMITED_STOCK_QUANTITY) {
             throw new BusinessException(CartErrorCode.OUT_OF_STOCK);
         }
     }
