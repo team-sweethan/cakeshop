@@ -1,6 +1,7 @@
 # Community 진행 계획
 
-> 도메인 규칙의 정본은 `docs/community/DOMAIN.md`다. 이 문서는 **작업 순서, 진행 상태, 결정 로그, 위험**만 다룬다.
+> 도메인 규칙의 정본은 `docs/community/DOMAIN.md`, 화면 구성의 정본은 `docs/community/SCREENS.md`다.
+> 이 문서는 **작업 순서, 진행 상태, 결정 로그, 위험**만 다룬다.
 > 규칙이 바뀌면 DOMAIN.md를 고치고, 여기에는 "언제 왜 바꿨는지"만 한 줄 남긴다.
 
 ## 작업 방식
@@ -58,11 +59,13 @@ docs/community/DOMAIN.md와 기존 코드를 먼저 읽고 구현 계획을 보�
 - 상태별 상세 접근 규칙 (DOMAIN.md 4.3 표의 각 칸)
 - 페이징 경계: 마지막 페이지, 범위 밖 페이지, `created_at`이 동일한 글이 중복·누락되지 않는지
 
-**완료 (2026-08-02)**. `CommunityMapper`(+XML) 5개 statement, `CommunityService`, `CommunityController`, `dto/view` 3종, 템플릿 2종을 추가했다. 검증은 `CommunityMapperXmlTests`(5), `CommunityMapperTests`(20), `CommunityQueryCountTests`(2), `CommunityServiceTests`(12), `CommunityControllerTests`(8), `CommunityScreenRenderingTests`(12), `CommunitySeedTests`(2) 61건으로 고정했다. 하네스 표에 H1a·H1b·H1c·H4·H5·H6을 올렸다.
+**완료 (2026-08-02)**. `CommunityMapper`(+XML) 5개 statement, `CommunityService`, `CommunityController`, `dto/view` 3종, 템플릿 2종을 추가했다. 검증은 `CommunityMapperXmlTests`(5), `CommunityMapperTests`(20), `CommunityQueryCountTests`(2), `CommunityServiceTests`(12), `CommunityControllerTests`(8), `CommunityScreenRenderingTests`(16), `CommunitySeedTests`(4), `CommunityScreenDocTests`(3) 70건으로 고정했다. 하네스 표에 H1a·H1b·H1c·H4·H5·H6·H7을 올렸다.
 
 `bootRun`으로 띄워 목록·상세·페이징·필터·404·조회수·이스케이프를 브라우저에서 확인했다. 그 과정에서 `seed-local.sql`이 카테고리를 지우는 문제를 발견해, 커뮤니티 전용 시드 `db/seed/seed-community.sql`을 새로 만들었다(아래 결정 로그).
 
 구현 중 DOMAIN.md에 없던 빈칸 두 개를 채우고 6.2에 반영했다: 노출되지 않는 글은 조회수를 올리지 않는다(UPDATE의 `status` 조건), 조회수 UPDATE는 `updated_at`을 명시적으로 보존한다.
+
+이후 화면 명세 `docs/community/SCREENS.md`와 H7을 추가하면서, 명세를 쓰는 과정에서 렌더링 테스트가 없던 자리 세 곳(쪽 이동 블록, 작성 화면, 작성 화면의 비로그인 차단)을 발견해 함께 고정했다.
 
 ### 조각 2 — 작성·수정·삭제
 
@@ -71,6 +74,8 @@ docs/community/DOMAIN.md와 기존 코드를 먼저 읽고 구현 계획을 보�
 - 입력 검증 (DOMAIN.md 7)
 
 **검증**: 남의 글 수정·삭제 시도 거부, `BLOCKED` 글 수정·삭제 시도 거부, 검증 실패 케이스, 공백만 입력 거부.
+
+**작성 화면(`form.html`)은 아직 목업이며 화면에 거짓이 세 개 있다.** 무엇을 고쳐야 하는지는 `SCREENS.md`의 "조각 2에서 반드시 고쳐야 할 거짓" 표에 적어 두었다. 특히 분류 선택지가 `후기/질문/자유/레시피`로 하드코딩되어 있어, DB의 활성 카테고리(`QNA/REVIEW/FREE`)와 어긋나고 **비활성인 `레시피`를 고를 수 있다.**
 
 ### 조각 3 — 댓글
 
@@ -95,6 +100,8 @@ docs/community/DOMAIN.md와 기존 코드를 먼저 읽고 구현 계획을 보�
 
 **검증**: 중복 신고 거부, 비관리자의 차단 API 접근 거부(화면 숨김이 아니라 Security), 차단 해제 후 `blocked_*`가 남아 있는지.
 
+**관리자 목업 두 화면은 도메인 규칙보다 먼저 그려졌다.** 규칙에 없는 기능이 버튼으로 존재한다 — 특히 `게시글 영구 삭제`와 댓글 `삭제`는 **DOMAIN.md에 없는 권한**이고, 관리자 조치는 차단뿐이며 `BLOCKED → DELETED`는 금지다(4.2, 6.7). 상태 어휘도 화면은 `정상`/`제재`, 문서는 `차단`으로 갈려 있다. 조각 5는 `SCREENS.md`의 "조각 5에서 정하거나 고쳐야 할 것" 표를 정리하는 일부터 시작한다.
+
 ## 하네스 (누적)
 
 조각을 진행하며 여기에 쌓는다. 빈 칸은 아직 필요가 발생하지 않은 것이다.
@@ -111,6 +118,7 @@ docs/community/DOMAIN.md와 기존 코드를 먼저 읽고 구현 계획을 보�
 | H4 | 본문·제목의 HTML이 이스케이프됨 (`th:utext` 미사용의 실제 결과) | `CommunityScreenRenderingTests` — 본문에 `<script>`를 넣고 렌더링 결과를 확인 | **적용** (조각 1) |
 | H5 | 커뮤니티 화면이 실제로 렌더링됨. 작성자에게만 열리는 차단 안내 화면 포함 | `CommunityScreenRenderingTests` — Thymeleaf를 실제로 돌린다. Controller 단위 테스트는 뷰 이름만 보므로 템플릿이 깨져도 통과한다 | **적용** (조각 1) |
 | H6 | 로컬 시드를 순서대로 실행하면 카테고리 참조 데이터가 남음. 커뮤니티 시드가 `parent_comment_id`를 쓰지 않는 것도 함께 | `CommunitySeedTests` — 시드 파일 내용을 직접 검사 | **적용** (조각 1) |
+| H7 | 화면 명세 `SCREENS.md`가 실제 화면과 어긋나지 않음. 고객·관리자 템플릿 6종 전부. 문서가 "이 테스트가 지킨다"고 적은 테스트가 실재하는지, `계획` 화면이 아직 안 만들어졌는지도 함께 | `CommunityScreenDocTests`(5) — 문서를 파싱해 템플릿 파일·문구·테스트 이름과 대조. `build.gradle`에서 `docs/`를 `test` 입력으로 등록해야 문서만 고쳐도 다시 돈다 | **적용** (조각 1) |
 
 조각을 끝낼 때 **그 조각이 추가한 하네스를 여기 올리고 조각 표의 상태를 바꾼다.** 이 문서가 정본이므로, 여기가 현실과 어긋나면 다음 작업자가 끝난 일을 다시 한다.
 
@@ -124,6 +132,7 @@ docs/community/DOMAIN.md와 기존 코드를 먼저 읽고 구현 계획을 보�
 | R4 | `comment_count` 비정규화 컬럼이 없어 집계로 처리한다. 트래픽이 늘면 컬럼 추가로 전환 필요 | 1차에선 수용 |
 | R5 | `ScreenRenderingTests.productOptionAdminScreenRendersWithSeededAdmin`이 **로컬(Windows)에서만** 실패한다. 조각 1 이전(`4c9cdb7`)에서도 동일하게 재현되며, PR #75의 CI(ubuntu)에서는 통과했다. 커뮤니티와 무관한 상품 도메인 화면 테스트이고 병합을 막지 않는다. 다만 로컬 `gradlew test`가 빨간불이라 커뮤니티 조각의 "전체 초록불" 확인은 CI로 대신해야 한다 | 환경 차이로 확인됨. 상품 담당(시은)에게 공유 (2026-08-02) |
 | R6 | `seed-local.sql`만 실행하면 `post_categories`가 비어 커뮤니티 글쓰기가 불가능하다. `seed-community.sql`을 이어서 실행해야 한다는 안내가 README에는 아직 없다 | 현규가 README 반영 여부를 직접 확인 (2026-08-02) |
+| R7 | `SCREENS.md` 검사는 **문서 → 코드 한 방향뿐이다.** 템플릿에 조건부 블록을 새로 넣고 문서에 적지 않으면 잡히지 않는다. 그런 블록은 평소 화면에 없어서 리뷰에서도 안 보인다 | 수용. 화면을 만진 조각은 SCREENS.md를 함께 고친다 (2026-08-02) |
 
 ## 결정 로그
 
@@ -138,4 +147,10 @@ docs/community/DOMAIN.md와 기존 코드를 먼저 읽고 구현 계획을 보�
 | 2026-08-02 | 조각 1의 "템플릿 3종 채우기"를 2종(`list`, `detail`)으로 정정. `form`은 작성 화면이라 저장 경로가 생기는 조각 2에 속한다 |
 | 2026-08-02 | `seed-local.sql`이 `post_categories`를 지워 로컬에서 카테고리 필터가 비고 글쓰기가 불가능해지는 문제를 발견. 처음에는 공용 시드를 고쳤다가, **공용 파일을 건드리지 않고 `db/seed/seed-community.sql`을 새로 만드는 쪽으로 바꿨다.** 커뮤니티 샘플 데이터가 어차피 필요했고, 카테고리 복구도 같은 파일에서 하면 우리 도메인 안에서 닫힌다. 대신 `seed-local.sql`만 실행한 사람에게는 문제가 그대로 남으므로 실행 순서를 시드 헤더와 `domain/community/CLAUDE.md`에 적었다. H6으로 고정 |
 | 2026-08-02 | H4를 "위반 발생 시"에서 조각 1로 앞당김. Controller 단위 테스트가 뷰 이름만 확인한다는 것을 구현 중 확인했고, 그러면 템플릿이 깨지거나 `th:utext`가 들어와도 CI가 초록불이다. 렌더링 테스트(H5)를 만드는 김에 이스케이프까지 함께 고정했다 |
+| 2026-08-02 | 화면 명세 `docs/community/SCREENS.md`를 추가. 화면마다 주소·모델·문구·조건부 노출을 적고, **`CommunityScreenDocTests`가 문서를 파싱해 템플릿과 대조**하게 했다(H7). 문서를 그냥 두면 낡고, 낡은 문서는 없는 것보다 나쁘다 — 다음 작업자가 틀린 전제로 작업하기 때문이다. 검사가 문서→코드 한 방향뿐인 한계는 R7에 적었다 |
+| 2026-08-02 | 위 명세를 쓰다가 렌더링 테스트가 없던 자리 셋을 발견해 채움: 쪽 이동 블록(글 21건 이상에서만 나타나 개발 중엔 화면에 없다), 작성 화면, 작성 화면의 비로그인 차단. 또 `form.html`의 분류 선택지가 DB 카테고리와 다르다는 것도 이때 드러나 조각 2 항목에 적었다. **"화면에 무엇이 보이는가"를 문장으로 적어 보는 것 자체가 빈 곳을 드러낸다** |
+| 2026-08-02 | `SCREENS.md`를 커뮤니티 화면 **전체 지도**로 확장. 고객 3종 + 관리자 2종 + 계획 1종(수정)과 "만들지 않는 화면"까지 담았다. 화면마다 `구현됨`/`목업`/`계획` 상태를 붙이고, 계획 화면은 **템플릿이 아직 없어야** 통과하도록 검사를 걸었다 — 만들면서 상태 표기를 지우지 않으면 빌드가 깨진다. 관리자 화면 2종은 이때까지 어떤 테스트도 열어 본 적이 없어 렌더링 테스트 3건(관리자 목록·상세·비관리자 거부)을 함께 넣었다 |
+| 2026-08-02 | 인기글은 **범위 밖으로 유지**. DOMAIN.md 2에서 이미 제외한 항목인 데다, 조회수 기준으로 만들 수 없다 — 6.2가 "조회수는 정렬·순위에 쓰이지 않는다"를 근거로 중복 방지를 빼서 새로고침만으로 순위 조작이 된다. 넣으려면 범위 변경 + 기준을 좋아요로 고정 + 조각 4 이후가 세트라는 것을 `SCREENS.md`에 적었다 |
+| 2026-08-02 | 관리자 목업이 도메인 규칙보다 먼저 그려져 **규칙에 없는 기능이 버튼으로 존재**한다는 것을 화면 지도를 그리다 발견(관리자의 게시글·댓글 삭제, `정상`/`제재` 용어, IP 표시, 첨부 이미지). 조각 5 항목으로 옮겼다 |
+| 2026-08-02 | `build.gradle`의 `test`에 `docs/`를 입력으로 등록. 등록 전에는 문서만 고쳤을 때 Gradle이 `test`를 UP-TO-DATE로 건너뛰어, 문서가 어긋나도 로컬에서 초록불이 떴다. 하네스를 만들고 나서 **그 하네스가 정말 무는지 문서를 일부러 틀리게 고쳐 확인하다가** 발견했다 |
 | 2026-08-02 | 조회수 규칙의 빈칸을 DOMAIN.md 6.2에 채움. (1) 노출되지 않는 글은 조회수를 올리지 않는다 — UPDATE의 `status` 조건이 담당한다. (2) 조회수 UPDATE는 `updated_at`을 명시적으로 보존한다 — `ON UPDATE CURRENT_TIMESTAMP` 때문에 조회만으로 "수정됨"이 켜지는 것을 구현 중 발견했고, H1c로 고정했다 |

@@ -1,0 +1,330 @@
+package com.cakeshop.domain.community;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Stream;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
+
+/**
+ * 화면 명세 문서(`docs/community/SCREENS.md`)가 실제 화면과 어긋나지 않는지 확인한다.
+ *
+ * <p>문서는 그냥 두면 낡는다. 문구를 바꾸고 문서를 안 고쳐도 아무 일도 일어나지 않기 때문이다.
+ * 그러면 다음 작업자가 문서를 믿고 잘못된 전제로 작업한다. 여기서 문서를 코드에 묶어,
+ * <b>어긋나면 빌드가 깨지게</b> 만든다.
+ *
+ * <p>검사 방향은 문서 → 코드 한쪽뿐이다. 템플릿에 새 블록을 넣고 문서에 적지 않는 것은
+ * 잡지 못한다. 그 한계는 SCREENS.md와 PLAN.md의 R7에 적어 두었다.
+ */
+class CommunityScreenDocTests {
+
+    private static final Path SCREEN_DOC = Path.of("docs", "community", "SCREENS.md");
+    private static final Path TEST_SOURCE_ROOT = Path.of("src", "test", "java");
+    private static final List<String> TEMPLATE_DIRECTORIES =
+            List.of("customer/community", "admin/community");
+    private static final String IMPLEMENTED = "구현됨";
+    private static final String MOCKUP = "목업";
+    private static final String PLANNED = "계획";
+    private static final String UNDECIDED = "미정";
+
+    /** 문서가 화면 하나를 통째로 빠뜨리면, 그 화면은 아무 규칙도 없이 방치된다. */
+    @Test
+    void screenDoc_documentsEveryCommunityTemplate() throws IOException {
+        Set<String> documented = new LinkedHashSet<>();
+
+        for (Screen screen : screens()) {
+            if (!screen.isPlanned()) {
+                documented.add(screen.template());
+            }
+        }
+
+        assertThat(documented)
+                .as("SCREENS.md의 화면 목록이 실제 템플릿 파일과 같아야 한다")
+                .containsExactlyInAnyOrderElementsOf(templates().keySet());
+    }
+
+    /**
+     * `계획` 상태로 적은 화면은 아직 템플릿이 없어야 한다.
+     *
+     * <p>만들고 나서 상태 표기를 안 지우면, 문서는 "아직 없는 화면"이라고 말하는데 실제로는
+     * 존재하는 상태가 된다. 그러면 위 목록 검사도 그 화면을 그냥 지나친다.
+     */
+    @Test
+    void screenDoc_plannedScreensHaveNoTemplateYet() throws IOException {
+        Map<String, String> templates = templates();
+        List<Screen> screens = screens();
+
+        assertThat(screens)
+                .as("화면 절을 하나도 못 읽었다면 문서 형식이 깨진 것이다")
+                .isNotEmpty();
+
+        for (Screen screen : screens) {
+            assertThat(screen.status())
+                    .as("`- 상태:`는 정해진 세 값 중 하나여야 한다 (%s)", screen.template())
+                    .isIn(IMPLEMENTED, MOCKUP, PLANNED);
+
+            if (screen.isPlanned() && !UNDECIDED.equals(screen.template())) {
+                assertThat(templates)
+                        .as("%s는 `계획`으로 적혀 있는데 템플릿이 이미 있다. 상태 표기를 고친다",
+                                screen.template())
+                        .doesNotContainKey(screen.template());
+            }
+        }
+    }
+
+    /**
+     * 아직 없는 화면의 문구를 적어 두지 못하게 막는다.
+     *
+     * <p>템플릿이 `미정`인 계획 화면은 문자열을 대조할 상대가 없다. 그런 표를 허용하면
+     * 검사에서 조용히 빠지면서 문서에는 "고정했다"고 남는다. 화면을 만들 때 `- 상태:`를
+     * 먼저 바꾸게 하는 것이 이 검사의 목적이다.
+     */
+    @Test
+    void screenDoc_plannedScreensHaveNoStringTable() throws IOException {
+        List<String> violations = new ArrayList<>();
+
+        forEachStringRow((screen, cells) -> {
+            if (screen.isPlanned()) {
+                violations.add(screen.template() + " — " + unquote(cells.get(0)));
+            }
+        });
+
+        assertThat(violations)
+                .as("`계획` 화면에는 문자열 표를 두지 않는다. 만들면서 상태를 바꾸고 표를 채운다")
+                .isEmpty();
+    }
+
+    /** 문구를 바꾸고 문서를 안 고치면 여기서 걸린다. */
+    @Test
+    void screenDoc_documentedStringsExistInTemplate() throws IOException {
+        List<ScreenString> strings = documentedStrings();
+
+        assertThat(strings)
+                .as("SCREENS.md에서 화면 문자열을 하나도 못 읽었다면 표 형식이 깨진 것이다")
+                .isNotEmpty();
+
+        Map<String, String> templates = templates();
+
+        for (ScreenString screenString : strings) {
+            assertThat(templates.get(screenString.template()))
+                    .as("%s에 `%s`가 없다. 문구를 바꿨다면 SCREENS.md도 함께 고친다",
+                            screenString.template(), screenString.value())
+                    .contains(screenString.value());
+        }
+    }
+
+    /**
+     * 문서가 "이 테스트가 지킨다"고 적은 테스트가 실재하는지 확인한다.
+     *
+     * <p>이 검사가 없으면 문서가 방어되지 않는 항목을 방어된다고 주장할 수 있다. 그러면
+     * 하네스가 있다고 믿는 만큼 더 위험해진다.
+     */
+    @Test
+    void screenDoc_referencedTestsExist() throws IOException {
+        List<String> references = documentedTestReferences();
+
+        assertThat(references)
+                .as("고정한 테스트 칸을 하나도 못 읽었다면 표 형식이 깨진 것이다")
+                .isNotEmpty();
+
+        for (String reference : references) {
+            int separator = reference.lastIndexOf('.');
+            String className = reference.substring(0, separator);
+            String methodName = reference.substring(separator + 1);
+
+            assertThat(readTestSource(className))
+                    .as("SCREENS.md가 가리키는 %s가 없다", reference)
+                    .contains("void " + methodName + "(");
+        }
+    }
+
+    /** 문서에서 화면 절을 읽는다. 각 절은 `- 상태:`와 `- 템플릿:` 줄로 자신을 밝힌다. */
+    private List<Screen> screens() throws IOException {
+        List<Screen> screens = new ArrayList<>();
+        String status = null;
+
+        for (String line : readScreenDoc()) {
+            String parsedStatus = valueOf(line, "- 상태: ");
+
+            if (parsedStatus != null) {
+                // "구현됨 (조각 1)"처럼 뒤에 근거가 붙는다.
+                status = parsedStatus.split("\\s+")[0];
+                continue;
+            }
+
+            String template = valueOf(line, "- 템플릿: ");
+
+            if (template != null) {
+                assertThat(status)
+                        .as("%s 앞에 `- 상태:` 줄이 있어야 한다", template)
+                        .isNotNull();
+
+                screens.add(new Screen(status, template));
+                status = null;
+            }
+        }
+
+        return screens;
+    }
+
+    private Map<String, String> templates() throws IOException {
+        Map<String, String> templates = new LinkedHashMap<>();
+
+        for (String directory : TEMPLATE_DIRECTORIES) {
+            Resource[] resources = new PathMatchingResourcePatternResolver()
+                    .getResources("classpath*:templates/" + directory + "/*.html");
+
+            for (Resource resource : resources) {
+                templates.put(
+                        directory + "/" + resource.getFilename(),
+                        new String(
+                                resource.getInputStream().readAllBytes(),
+                                StandardCharsets.UTF_8));
+            }
+        }
+
+        return templates;
+    }
+
+    private List<ScreenString> documentedStrings() throws IOException {
+        List<ScreenString> strings = new ArrayList<>();
+
+        forEachStringRow((screen, cells) -> {
+            if (!screen.isPlanned()) {
+                strings.add(new ScreenString(screen.template(), unquote(cells.get(0))));
+            }
+        });
+
+        return strings;
+    }
+
+    private List<String> documentedTestReferences() throws IOException {
+        List<String> references = new ArrayList<>();
+
+        forEachStringRow((screen, cells) -> {
+            String reference = unquote(cells.get(cells.size() - 1));
+
+            // "없음"은 아직 테스트로 고정하지 않았다는 정직한 표기다.
+            if (reference.contains(".")) {
+                references.add(reference);
+            }
+        });
+
+        return references;
+    }
+
+    /**
+     * 첫 열이 `문자열`인 표의 각 행을, 그 표가 속한 화면의 템플릿과 함께 넘긴다.
+     *
+     * <p>모델 표나 상태 표까지 읽으면 "PUBLISHED" 같은 값이 템플릿에 있는지 찾게 되므로
+     * 표 머리글로 구분한다.
+     */
+    private void forEachStringRow(RowConsumer consumer) throws IOException {
+        List<String> lines = readScreenDoc();
+        List<Screen> screens = screens();
+        int screenIndex = -1;
+        boolean inStringTable = false;
+
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i).trim();
+
+            if (valueOf(line, "- 템플릿: ") != null) {
+                screenIndex++;
+                continue;
+            }
+
+            if (!line.startsWith("|")) {
+                inStringTable = false;
+                continue;
+            }
+
+            if (isSeparatorRow(line)) {
+                inStringTable = i > 0 && "문자열".equals(cellsOf(lines.get(i - 1)).get(0));
+                continue;
+            }
+
+            if (inStringTable && screenIndex >= 0) {
+                consumer.accept(screens.get(screenIndex), cellsOf(line));
+            }
+        }
+    }
+
+    private String valueOf(String line, String prefix) {
+        String trimmed = line.trim();
+
+        if (!trimmed.startsWith(prefix)) {
+            return null;
+        }
+
+        return unquote(trimmed.substring(prefix.length()));
+    }
+
+    private boolean isSeparatorRow(String line) {
+        return line.chars().allMatch(c -> c == '|' || c == '-' || c == ':' || c == ' ');
+    }
+
+    private List<String> cellsOf(String row) {
+        String trimmed = row.trim();
+        String inner = trimmed.substring(1, trimmed.length() - 1);
+
+        return Stream.of(inner.split("\\|", -1)).map(String::trim).toList();
+    }
+
+    /** 표에서는 문자열을 백틱으로 감싸 공백과 기호가 잘리지 않게 한다. */
+    private String unquote(String cell) {
+        String trimmed = cell.trim();
+
+        if (trimmed.startsWith("`") && trimmed.endsWith("`") && trimmed.length() >= 2) {
+            return trimmed.substring(1, trimmed.length() - 1);
+        }
+
+        return trimmed;
+    }
+
+    private List<String> readScreenDoc() throws IOException {
+        assertThat(SCREEN_DOC)
+                .as("화면 명세가 있어야 한다. 없다면 이 테스트의 전제가 사라진 것이다")
+                .exists();
+
+        return Files.readAllLines(SCREEN_DOC, StandardCharsets.UTF_8);
+    }
+
+    private String readTestSource(String className) throws IOException {
+        try (Stream<Path> paths = Files.walk(TEST_SOURCE_ROOT)) {
+            Path source = paths
+                    .filter(path -> path.getFileName().toString().equals(className + ".java"))
+                    .findFirst()
+                    .orElseThrow(() ->
+                            new IllegalStateException("테스트 클래스를 찾을 수 없다: " + className));
+
+            return Files.readString(source, StandardCharsets.UTF_8);
+        }
+    }
+
+    private record Screen(String status, String template) {
+
+        private boolean isPlanned() {
+            return PLANNED.equals(status);
+        }
+    }
+
+    private record ScreenString(String template, String value) {
+    }
+
+    @FunctionalInterface
+    private interface RowConsumer {
+        void accept(Screen screen, List<String> cells);
+    }
+}
