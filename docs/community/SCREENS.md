@@ -8,9 +8,14 @@
 1. 여기 적힌 템플릿 목록이 `templates/{customer,admin}/community/`의 실제 파일 목록과 같은가
 2. 표의 `문자열`이 해당 템플릿에 실제로 들어 있는가 — **주석과 `th:text` 자리 표시는 걷어내고** 본다
 3. `고정한 테스트` 칸에 적은 테스트가 **JUnit이 실제로 실행하는** 테스트인가 (`@Test`가 있고 `@Disabled`가 아닌가)
-4. `계획` 상태로 적은 화면의 템플릿이 **아직 없는가**
+4. 그 테스트가 **그 문구를 실제로 확인하는가** — 메서드 본문(주석 제외)에 문구가 등장하는가
+5. `계획` 상태로 적은 화면의 템플릿이 **아직 없는가**
 
-그래서 문구를 바꾸고 문서를 안 고치면 빌드가 깨지고, 있지도 않거나 꺼져 있는 테스트를 적어도 깨지고, 계획 화면을 만들고 상태를 안 바꿔도 깨진다.
+그래서 문구를 바꾸고 문서를 안 고치면 빌드가 깨지고, 있지도 않거나 꺼져 있거나 **엉뚱한** 테스트를 적어도 깨지고, 계획 화면을 만들고 상태를 안 바꿔도 깨진다.
+
+4번이 없으면 3번만으로는 부족하다. 살아 있는 테스트를 아무렇게나 연결해도 통과하기 때문이다. 실제로 목록의 `좋아요`·`조회`가 두 문구를 전혀 assert하지 않는 테스트에 걸려 있었다. 그 상태에서는 해당 `span`에 `th:if="${false}"`를 붙여 **화면에서 사라지게 만들어도** 하네스가 전부 통과한다.
+
+`고정한 테스트` 칸에는 쉼표로 여럿을 적을 수 있고, **하나라도** 문구를 확인하면 통과다. 한 문구를 서로 다른 층위에서 받치는 경우가 있어서다 — `(수정됨)`은 렌더링 테스트가 표시 자체를, 매퍼 테스트가 그 표시를 켜는 조건을 지킨다.
 
 2번에서 걷어내는 두 가지는 **템플릿 원문에는 있지만 사용자는 보지 못하는 것**이다. HTML 주석은 규칙 설명이고, `<span th:text="'좋아요 ' + ...">좋아요 0</span>`의 `좋아요 0`은 표현식이 덮어쓰는 자리 표시다. 걷어내지 않으면 표현식을 `'추천 '`으로 바꿔 화면이 달라져도 자리 표시가 남아 검사가 통과한다.
 
@@ -168,7 +173,7 @@
 | `좋아요` | 항상 (숫자만. 누르는 버튼은 조각 4) | 없음 |
 | `댓글` | 항상 (구역 제목) | 없음 |
 | `white-space:pre-wrap` | 본문 영역. 사용자에게는 **줄바꿈이 살아난 본문**으로 보인다 | `CommunityScreenRenderingTests.communityDetail_rendersContent` |
-| `(수정됨)` | `post.edited`, 즉 `updatedAt > createdAt`일 때 | `CommunityMapperTests.increaseViewCount_doesNotMarkPostAsEdited` |
+| `(수정됨)` | `post.edited`, 즉 `updatedAt > createdAt`일 때 | `CommunityScreenRenderingTests.communityDetail_editedPost_showsEditedMark`, `CommunityMapperTests.increaseViewCount_doesNotMarkPostAsEdited` |
 | `관리자가 차단한 게시글입니다.` | `BLOCKED` + 작성자 본인일 때만 | `CommunityScreenRenderingTests.communityDetail_blockedPost_author_showsBlockedReason` |
 | `이 글은 다른 회원에게 보이지 않습니다.` | 위와 같은 조건 | `CommunityScreenRenderingTests.communityDetail_blockedPost_author_showsBlockedReason` |
 | `댓글 기능은 준비 중입니다.` | 항상 (조각 3에서 실제 댓글로 교체) | 없음 |

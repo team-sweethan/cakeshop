@@ -152,6 +152,80 @@ class CommunityScreenDocTests {
     }
 
     /**
+     * 문서가 연결한 테스트가 <b>그 문구를 실제로 확인하는지</b> 본다.
+     *
+     * <p>실행되는 테스트인지만 보면 부족하다. 살아 있는 테스트를 아무렇게나 연결해도 통과하기
+     * 때문이다. 실제로 그런 줄이 있었다 — 목록의 `좋아요`와 `조회`가
+     * {@code communityList_rendersPostRow}에 걸려 있었지만 그 메서드는 두 문구를 전혀
+     * assert하지 않았다. 그 span에 {@code th:if="${false}"}만 붙이면 문구도 테스트도 그대로라
+     * 하네스는 전부 통과하는데 사용자는 두 값을 볼 수 없다.
+     *
+     * <p>그래서 참조된 테스트 <b>본문</b>에 그 문구가 등장하는지까지 확인한다. 한 문구를 여러
+     * 테스트가 다른 층위에서 받칠 수 있으므로 <b>하나라도</b> 확인하면 통과로 본다.
+     */
+    @Test
+    void screenDoc_referencedTestsAssertTheDocumentedString() throws Exception {
+        List<DocRow> rows = documentedRows().stream()
+                .filter(row -> !row.screen().isPlanned() && !row.references().isEmpty())
+                .toList();
+
+        assertThat(rows)
+                .as("테스트가 연결된 문자열 행을 하나도 못 읽었다면 표 형식이 깨진 것이다")
+                .isNotEmpty();
+
+        for (DocRow row : rows) {
+            List<String> bodies = new ArrayList<>();
+
+            for (String reference : row.references()) {
+                bodies.add(testMethodBody(reference));
+            }
+
+            assertThat(bodies)
+                    .as("`%s`를 %s가 확인하지 않는다. 그 문구를 실제로 assert하는 줄을 넣거나,"
+                                    + " 고정하지 않았다면 `없음`으로 적는다",
+                            row.value(), row.references())
+                    .anyMatch(body -> body.contains(row.value()));
+        }
+    }
+
+    /**
+     * 참조된 테스트 메서드의 본문을 소스에서 잘라 온다.
+     *
+     * <p>클래스 전체를 보면 다른 메서드가 우연히 같은 문구를 쓰는 것만으로 통과하므로
+     * 메서드 하나로 좁힌다. 주석은 걷어낸다 — 문구를 <b>설명</b>만 하고 확인하지 않는 것이
+     * 정확히 이 검사가 막으려는 상태다.
+     */
+    private String testMethodBody(String reference) throws IOException {
+        int separator = reference.lastIndexOf('.');
+        String source = Files.readString(
+                sourceOf(reference.substring(0, separator)), StandardCharsets.UTF_8);
+        String methodName = reference.substring(separator + 1);
+
+        int start = source.indexOf(" " + methodName + "(");
+
+        assertThat(start).as("소스에서 %s를 찾지 못했다", reference).isNotNegative();
+
+        int open = source.indexOf('{', start);
+        int depth = 0;
+
+        for (int i = open; i < source.length(); i++) {
+            char c = source.charAt(i);
+
+            if (c == '{') {
+                depth++;
+            } else if (c == '}' && --depth == 0) {
+                return stripComments(source.substring(open + 1, i));
+            }
+        }
+
+        throw new IllegalStateException("메서드 본문이 닫히지 않았다: " + reference);
+    }
+
+    private String stripComments(String body) {
+        return body.replaceAll("(?s)/\\*.*?\\*/", " ").replaceAll("(?m)//.*$", " ");
+    }
+
+    /**
      * 문서가 가리키는 것이 <b>실제로 실행되는</b> 테스트인지 확인한다.
      *
      * <p>소스에서 {@code void 이름(} 문자열만 찾으면 {@code @Test}를 떼거나
@@ -184,19 +258,21 @@ class CommunityScreenDocTests {
 
     /** 테스트 소스 파일을 찾아 경로에서 패키지를 되돌린다. */
     private String qualifiedNameOf(String className) throws IOException {
+        String relative = TEST_SOURCE_ROOT.relativize(sourceOf(className)).toString();
+
+        return relative
+                .substring(0, relative.length() - ".java".length())
+                .replace('\\', '.')
+                .replace('/', '.');
+    }
+
+    private Path sourceOf(String className) throws IOException {
         try (Stream<Path> paths = Files.walk(TEST_SOURCE_ROOT)) {
-            Path source = paths
+            return paths
                     .filter(path -> path.getFileName().toString().equals(className + ".java"))
                     .findFirst()
                     .orElseThrow(() ->
                             new IllegalStateException("테스트 클래스를 찾을 수 없다: " + className));
-
-            String relative = TEST_SOURCE_ROOT.relativize(source).toString();
-
-            return relative
-                    .substring(0, relative.length() - ".java".length())
-                    .replace('\\', '.')
-                    .replace('/', '.');
         }
     }
 
@@ -283,16 +359,34 @@ class CommunityScreenDocTests {
     private List<String> documentedTestReferences() throws IOException {
         List<String> references = new ArrayList<>();
 
-        forEachStringRow((screen, cells) -> {
-            String reference = unquote(cells.get(cells.size() - 1));
-
-            // "없음"은 아직 테스트로 고정하지 않았다는 정직한 표기다.
-            if (reference.contains(".")) {
-                references.add(reference);
-            }
-        });
+        for (DocRow row : documentedRows()) {
+            references.addAll(row.references());
+        }
 
         return references;
+    }
+
+    /**
+     * 문자열 표의 각 행을 (템플릿, 문구, 고정한 테스트들)로 읽는다.
+     *
+     * <p>마지막 칸에는 테스트를 쉼표로 여러 개 적을 수 있다. 한 문구를 서로 다른 층위에서
+     * 받치는 경우가 있어서다 — 예를 들어 `(수정됨)`은 렌더링 테스트가 표시를, 매퍼 테스트가
+     * 그 표시를 켜는 조건을 지킨다.
+     */
+    private List<DocRow> documentedRows() throws IOException {
+        List<DocRow> rows = new ArrayList<>();
+
+        forEachStringRow((screen, cells) -> {
+            List<String> references = Stream.of(cells.get(cells.size() - 1).split(","))
+                    .map(this::unquote)
+                    // "없음"은 아직 테스트로 고정하지 않았다는 정직한 표기다.
+                    .filter(reference -> reference.contains("."))
+                    .toList();
+
+            rows.add(new DocRow(screen, unquote(cells.get(0)), references));
+        });
+
+        return rows;
     }
 
     /**
@@ -379,6 +473,9 @@ class CommunityScreenDocTests {
     }
 
     private record ScreenString(String template, String value) {
+    }
+
+    private record DocRow(Screen screen, String value, List<String> references) {
     }
 
     @FunctionalInterface
