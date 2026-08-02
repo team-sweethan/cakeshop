@@ -156,4 +156,15 @@ class CustomerPageControllerTests {
                 .contains("th:action=\"@{/cart/items/delete-all}\"")
                 .doesNotContain("data-cart-root");
     }
+
+    @Test
+    void customOrderViewDoesNotUseBrowserLocalCart() throws IOException {
+        String customOrderTemplate =
+                new ClassPathResource("templates/customer/order/custom-option.html")
+                        .getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(customOrderTemplate)
+                .contains("장바구니 연동 준비 중")
+                .doesNotContain("data-add-custom-cart");
+    }
 }

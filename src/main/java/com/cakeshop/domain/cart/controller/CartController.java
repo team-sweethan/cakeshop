@@ -5,6 +5,7 @@ import com.cakeshop.domain.cart.dto.form.CartDeleteSelectedForm;
 import com.cakeshop.domain.cart.dto.form.CartUpdateForm;
 import com.cakeshop.domain.cart.dto.view.CartCountView;
 import com.cakeshop.domain.cart.dto.view.CartQuantityUpdateView;
+import com.cakeshop.domain.cart.error.CartErrorCode;
 import com.cakeshop.domain.cart.service.CartService;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.security.MemberDetails;
@@ -65,6 +66,9 @@ public class CartController {
             redirectAttributes.addFlashAttribute(
                     "errorMessage",
                     exception.getErrorCode().message());
+            if (exception.getErrorCode() == CartErrorCode.PRODUCT_NOT_ON_SALE) {
+                return "redirect:/products";
+            }
             return "redirect:/products/" + form.getProductId();
         }
         redirectAttributes.addFlashAttribute("successMessage", "장바구니에 담았습니다.");

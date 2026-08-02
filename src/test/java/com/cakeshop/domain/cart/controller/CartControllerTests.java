@@ -93,6 +93,24 @@ class CartControllerTests {
     }
 
     @Test
+    void addItem_stoppedProduct_redirectsToListWithErrorMessage() {
+        MemberDetails member = memberDetails();
+        CartAddForm form = new CartAddForm();
+        form.setProductId(10L);
+        form.setQuantity(2);
+        when(bindingResult.hasErrors()).thenReturn(false);
+        doThrow(new BusinessException(CartErrorCode.PRODUCT_NOT_ON_SALE))
+                .when(cartService).addItem(1L, form);
+
+        String viewName = cartController.addItem(
+                member, form, bindingResult, redirectAttributes);
+
+        assertThat(viewName).isEqualTo("redirect:/products");
+        verify(redirectAttributes).addFlashAttribute(
+                "errorMessage", CartErrorCode.PRODUCT_NOT_ON_SALE.message());
+    }
+
+    @Test
     void updateQuantityAsync_validForm_returnsUpdatedTotals() {
         MemberDetails member = memberDetails();
         CartUpdateForm form = new CartUpdateForm();

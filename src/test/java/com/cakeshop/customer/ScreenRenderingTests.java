@@ -59,6 +59,17 @@ class ScreenRenderingTests {
     }
 
     @Test
+    void productScreens_errorMessage_renderCommonAlertFragment() throws Exception {
+        for (String path : new String[] {"/products", "/products/1"}) {
+            mockMvc.perform(get(path)
+                    .flashAttr("errorMessage", "장바구니 오류"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("alert alert--error")))
+                .andExpect(content().string(containsString("장바구니 오류")));
+        }
+    }
+
+    @Test
     void login_recoveredEmail_prefillsEmailInput() throws Exception {
         mockMvc.perform(get("/login")
                 .flashAttr("recoveredEmail", "member@example.com"))
