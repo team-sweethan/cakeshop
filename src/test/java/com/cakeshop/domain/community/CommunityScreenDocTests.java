@@ -3,6 +3,7 @@ package com.cakeshop.domain.community;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -43,9 +44,18 @@ class CommunityScreenDocTests {
     private static final String MOCKUP = "목업";
     private static final String PLANNED = "계획";
     private static final String UNDECIDED = "미정";
-    /** `not(`으로 감싼 것과 맨몸을 구분하려고 앞자락을 함께 잡는다. */
-    private static final Pattern CONTAINS_STRING =
-            Pattern.compile("(not\\(\\s*)?containsString\\(\"((?:[^\"\\\\]|\\\\.)*)\"\\)");
+    private static final String CONDITION_PACKAGE = "org.junit.jupiter.api.condition";
+    /**
+     * `not(`으로 감싼 것과 맨몸을 구분하려고 앞자락을 함께 잡는다.
+     *
+     * <p>`Matchers.not(` 처럼 한정한 호출도 잡아야 한다. 정적 import를 지우는 것만으로
+     * 부정 assertion이 긍정으로 집계되면, 문구가 <b>없다</b>고 검증하는 테스트를 문서가
+     * 방어선으로 기록하게 된다. 공백도 흘려 보낸다 — 바이트코드가 같은 수정이 검사 결과를
+     * 바꾸면 안 된다.
+     */
+    private static final Pattern CONTAINS_STRING = Pattern.compile(
+            "((?:[\\w.]+\\s*\\.\\s*)?not\\s*\\(\\s*)?"
+                    + "containsString\\s*\\(\\s*\"((?:[^\"\\\\]|\\\\.)*)\"\\s*\\)");
 
     /** 문서가 화면 하나를 통째로 빠뜨리면, 그 화면은 아무 규칙도 없이 방치된다. */
     @Test
@@ -317,14 +327,21 @@ class CommunityScreenDocTests {
      * {@code @Disabled}를 붙여도 그대로 통과한다. 그러면 문서는 실행되지 않는 테스트가
      * 화면을 지킨다고 주장하게 된다 — 하네스가 있다고 믿는 만큼 더 위험하다. 그래서
      * 리플렉션으로 애너테이션까지 확인한다.
+     *
+     * <p>{@code @Disabled}만으로는 부족하다. {@code @DisabledOnOs},
+     * {@code @DisabledIfEnvironmentVariable}, {@code @EnabledOnOs}처럼 <b>조건부로</b>
+     * 끄는 애너테이션이 붙으면 CI에서는 건너뛰는데 여기서는 통과한다. 그러면 문서가
+     * <b>CI에서 실행되지 않는 테스트</b>를 방어선으로 기록한다. 조건이 어떻게 평가될지는
+     * 환경에 달렸으므로, 이 자리에서 흉내 내지 않고 <b>전부 거절</b>한다. 화면을 무조건
+     * 지켜야 하는 검사에 환경 조건을 다는 것 자체가 문서와 어긋나는 일이다.
      */
     private void assertRunnableTest(String className, String methodName, String reference)
             throws Exception {
         Class<?> testClass = Class.forName(qualifiedNameOf(className));
 
-        assertThat(testClass.isAnnotationPresent(Disabled.class))
-                .as("%s가 속한 클래스가 @Disabled 상태다", reference)
-                .isFalse();
+        assertThat(conditionalOff(testClass.getAnnotations()))
+                .as("%s가 속한 클래스가 꺼져 있다", reference)
+                .isEmpty();
 
         List<Method> methods = Stream.of(testClass.getDeclaredMethods())
                 .filter(method -> method.getName().equals(methodName))
@@ -333,12 +350,29 @@ class CommunityScreenDocTests {
         assertThat(methods).as("SCREENS.md가 가리키는 %s가 없다", reference).isNotEmpty();
 
         assertThat(methods)
-                .as("%s가 JUnit이 실행하는 테스트가 아니다 (@Test 없음 또는 @Disabled)",
+                .as("%s가 JUnit이 실행하는 테스트가 아니다"
+                                + " (@Test 없음, 또는 @Disabled·조건부 비활성화)",
                         reference)
                 .anyMatch(method ->
                         (method.isAnnotationPresent(Test.class)
                                 || method.isAnnotationPresent(ParameterizedTest.class))
-                                && !method.isAnnotationPresent(Disabled.class));
+                                && conditionalOff(method.getAnnotations()).isEmpty());
+    }
+
+    /**
+     * 실행을 막거나 조건에 걸 수 있는 애너테이션을 골라낸다.
+     *
+     * <p>{@code @Disabled}와 {@code org.junit.jupiter.api.condition} 패키지 전부다. 이름을
+     * 하나씩 나열하면 JUnit이 새 조건을 추가할 때 조용히 구멍이 난다 — 그 구멍은 검사가
+     * 통과하는 모습으로 나타나서 눈에 띄지 않는다.
+     */
+    private List<String> conditionalOff(Annotation[] annotations) {
+        return Stream.of(annotations)
+                .map(Annotation::annotationType)
+                .filter(type -> type.equals(Disabled.class)
+                        || type.getPackageName().equals(CONDITION_PACKAGE))
+                .map(Class::getSimpleName)
+                .toList();
     }
 
     /** 테스트 소스 파일을 찾아 경로에서 패키지를 되돌린다. */
