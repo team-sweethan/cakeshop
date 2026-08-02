@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.Base64;
+import java.util.List;
 
 // 토스 승인·취소·조회 API 클라이언트 — 작업별 UUID를 Idempotency-Key로 사용
 @Component
@@ -80,8 +81,48 @@ public class TossPaymentClient {
         }
     }
 
-    public void cancel(String paymentKey, String reason, String idempotencyKey) {
-        // TODO
+    /** Toss 결제 전체 취소 API를 호출하고 내부 완료 처리에 필요한 결과를 반환한다. */
+    public CancellationResult cancel(String paymentKey, String reason, String idempotencyKey) {
+        if (authorization == null
+                || paymentKey == null
+                || paymentKey.isBlank()
+                || reason == null
+                || reason.isBlank()
+                || idempotencyKey == null
+                || idempotencyKey.isBlank()) {
+            throw new BusinessException(PaymentErrorCode.TOSS_CANCEL_FAILED);
+        }
+
+        try {
+            TossPaymentResponse response = restClient.post()
+                    .uri("/v1/payments/{paymentKey}/cancel", paymentKey)
+                    .header(HttpHeaders.AUTHORIZATION, authorization)
+                    .header(IDEMPOTENCY_KEY, idempotencyKey)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(new TossCancelRequest(reason))
+                    .retrieve()
+                    .body(TossPaymentResponse.class);
+
+            if (response == null
+                    || !"CANCELED".equals(response.status())
+                    || response.cancels() == null
+                    || response.cancels().isEmpty()) {
+                throw new BusinessException(PaymentErrorCode.TOSS_CANCEL_FAILED);
+            }
+            TossCancellationResponse cancellation = response.cancels().getLast();
+            if (cancellation.transactionKey() == null
+                    || cancellation.transactionKey().isBlank()
+                    || cancellation.canceledAt() == null) {
+                throw new BusinessException(PaymentErrorCode.TOSS_CANCEL_FAILED);
+            }
+            return new CancellationResult(
+                    response.status(),
+                    cancellation.transactionKey(),
+                    cancellation.canceledAt().toLocalDateTime()
+            );
+        } catch (RestClientException exception) {
+            throw new BusinessException(PaymentErrorCode.TOSS_CANCEL_FAILED);
+        }
     }
 
     public void find(String paymentKey) {
@@ -106,13 +147,23 @@ public class TossPaymentClient {
     ) {
     }
 
+    private record TossCancelRequest(String cancelReason) {
+    }
+
     private record TossPaymentResponse(
             String paymentKey,
             String orderId,
             String method,
             String status,
             long totalAmount,
-            OffsetDateTime approvedAt
+            OffsetDateTime approvedAt,
+            List<TossCancellationResponse> cancels
+    ) {
+    }
+
+    private record TossCancellationResponse(
+            String transactionKey,
+            OffsetDateTime canceledAt
     ) {
     }
 
@@ -123,6 +174,13 @@ public class TossPaymentClient {
             String status,
             long totalAmount,
             LocalDateTime approvedAt
+    ) {
+    }
+
+    public record CancellationResult(
+            String status,
+            String transactionKey,
+            LocalDateTime canceledAt
     ) {
     }
 }

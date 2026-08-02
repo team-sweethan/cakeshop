@@ -1,9 +1,178 @@
 package com.cakeshop.domain.payment.service;
 
+import com.cakeshop.domain.order.entity.Order;
+import com.cakeshop.domain.order.entity.OrderItem;
+import com.cakeshop.domain.order.entity.OrderStatus;
+import com.cakeshop.domain.order.entity.OrderType;
+import com.cakeshop.domain.order.mapper.OrderMapper;
+import com.cakeshop.domain.payment.entity.Payment;
+import com.cakeshop.domain.payment.entity.PaymentCancellation;
+import com.cakeshop.domain.payment.entity.PaymentCancellationStatus;
+import com.cakeshop.domain.payment.error.PaymentErrorCode;
+import com.cakeshop.domain.payment.infra.TossPaymentClient.CancellationResult;
+import com.cakeshop.domain.payment.mapper.PaymentMapper;
+import com.cakeshop.domain.product.service.ProductStockService;
+import com.cakeshop.global.error.BusinessException;
+import com.cakeshop.global.error.CommonErrorCode;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-/** 결제 취소와 환불 처리를 담당한다. */
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+
+/** 전체 결제 취소 요청과 내부 주문·결제·재고 완료 처리를 담당한다. */
 @Service
+@RequiredArgsConstructor
 public class RefundService {
-    // TODO: 결제 취소 및 환불 상태 전이 구현
+
+    private static final String CUSTOMER = "CUSTOMER";
+
+    private final OrderMapper orderMapper;
+    private final PaymentMapper paymentMapper;
+    private final ProductStockService productStockService;
+    private final Clock clock;
+
+    /** 회원 소유권과 현재 상태를 검증하고 PG 호출 전에 취소 요청을 저장한다. */
+    @Transactional
+    public RefundRequest prepareCustomerCancellation(long memberId, long orderId, String reason) {
+        if (memberId <= 0 || reason == null || reason.isBlank() || reason.length() > 500) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+        Order order = findOwnedOrder(memberId, orderId);
+        LocalDateTime now = LocalDateTime.now(clock);
+        OrderStatus expectedStatus = requireCancelableStatus(order, now);
+        Payment payment = paymentMapper.findDonePaymentByOrderId(orderId)
+                .orElseThrow(() -> new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_NOT_AVAILABLE));
+        if (payment.getPaymentKey() == null || payment.getPaymentKey().isBlank()) {
+            throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_NOT_AVAILABLE);
+        }
+
+        PaymentCancellation cancellation = new PaymentCancellation();
+        cancellation.setPaymentId(payment.getId());
+        cancellation.setIdempotencyKey("CANCEL-" + UUID.randomUUID());
+        cancellation.setCancelAmount(payment.getAmount());
+        cancellation.setCancelReason(reason.trim());
+        cancellation.setRequestType(CUSTOMER);
+        cancellation.setRequestedBy(memberId);
+        if (paymentMapper.insertPaymentCancellation(cancellation) != 1) {
+            throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_NOT_AVAILABLE);
+        }
+
+        return new RefundRequest(
+                cancellation.getId(),
+                orderId,
+                expectedStatus,
+                payment.getPaymentKey(),
+                cancellation.getIdempotencyKey(),
+                cancellation.getCancelReason(),
+                now
+        );
+    }
+
+    /** PG 취소 성공 뒤 결제·주문 상태와 실제 차감 재고 복구를 한 트랜잭션으로 완료한다. */
+    @Transactional
+    public void completeCustomerCancellation(RefundRequest request, CancellationResult result) {
+        if (request == null || result == null || !"CANCELED".equals(result.status())) {
+            throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_COMPLETE_FAILED);
+        }
+        PaymentCancellation cancellation = paymentMapper
+                .findPaymentCancellationById(request.cancellationId())
+                .orElseThrow(() -> new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_COMPLETE_FAILED));
+        if (cancellation.getStatus() != PaymentCancellationStatus.REQUESTED) {
+            throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_COMPLETE_FAILED);
+        }
+        Payment payment = paymentMapper.findPaymentById(cancellation.getPaymentId())
+                .orElseThrow(() -> new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_COMPLETE_FAILED));
+        if (!Long.valueOf(request.orderId()).equals(payment.getOrderId())) {
+            throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_COMPLETE_FAILED);
+        }
+
+        Order order = orderMapper.findOrderById(request.orderId())
+                .orElseThrow(() -> new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_COMPLETE_FAILED));
+        LocalDateTime canceledAt = result.canceledAt();
+        OrderStatus currentExpectedStatus = requireCancelableStatus(order, request.requestedAt());
+        if (currentExpectedStatus != request.expectedStatus()) {
+            throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_COMPLETE_FAILED);
+        }
+
+        requireOneRow(paymentMapper.completeCancellationIfRequested(
+                cancellation.getId(),
+                result.transactionKey(),
+                canceledAt
+        ));
+        requireOneRow(orderMapper.cancelIfCurrent(
+                order.getId(),
+                currentExpectedStatus,
+                CUSTOMER,
+                cancellation.getCancelReason(),
+                request.requestedAt()
+        ));
+        restoreDeductedStock(order, canceledAt);
+    }
+
+    @Transactional
+    public void failRequestedCancellation(long cancellationId) {
+        paymentMapper.failCancellationIfRequested(
+                cancellationId,
+                "TOSS_CANCEL_FAILED",
+                "결제 취소 요청에 실패했습니다."
+        );
+    }
+
+    private Order findOwnedOrder(long memberId, long orderId) {
+        Order order = orderMapper.findOrderByIdForUpdate(orderId)
+                .orElseThrow(() -> new BusinessException(CommonErrorCode.NOT_FOUND));
+        if (!Long.valueOf(memberId).equals(order.getMemberId())) {
+            throw new BusinessException(CommonErrorCode.NOT_FOUND);
+        }
+        return order;
+    }
+
+    private OrderStatus requireCancelableStatus(Order order, LocalDateTime canceledAt) {
+        if (order.getOrderType() == OrderType.CUSTOM && order.getStatus() == OrderStatus.UNDER_REVIEW) {
+            return OrderStatus.UNDER_REVIEW;
+        }
+        if (order.getOrderType() == OrderType.GENERAL
+                && order.getStatus() == OrderStatus.READY_FOR_PICKUP
+                && order.getPickupAt() != null
+                && canceledAt != null
+                && canceledAt.isBefore(order.getPickupAt())) {
+            return OrderStatus.READY_FOR_PICKUP;
+        }
+        throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_NOT_AVAILABLE);
+    }
+
+    private void restoreDeductedStock(Order order, LocalDateTime restoredAt) {
+        if (order.getOrderType() != OrderType.GENERAL) {
+            return;
+        }
+        List<OrderItem> items = orderMapper.findStockDeductedItemsForRestore(order.getId());
+        for (OrderItem item : items) {
+            if (item.getProductId() == null || item.getQuantity() == null || item.getQuantity() <= 0) {
+                throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_COMPLETE_FAILED);
+            }
+            productStockService.restoreStock(item.getProductId(), item.getQuantity());
+            requireOneRow(orderMapper.markStockRestoredIfDeducted(item.getId(), restoredAt));
+        }
+    }
+
+    private void requireOneRow(int affectedRows) {
+        if (affectedRows != 1) {
+            throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_COMPLETE_FAILED);
+        }
+    }
+
+    public record RefundRequest(
+            long cancellationId,
+            long orderId,
+            OrderStatus expectedStatus,
+            String paymentKey,
+            String idempotencyKey,
+            String reason,
+            LocalDateTime requestedAt
+    ) {
+    }
 }

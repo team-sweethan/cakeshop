@@ -25,6 +25,9 @@ public interface OrderService {
             LocalDateTime readyAt
     );
 
+    /** 결제 성공 때 실제 차감된 유한 재고 주문 항목을 기록한다. */
+    void recordGeneralStockDeduction(long orderItemId, LocalDateTime deductedAt);
+
     /** 결제 검증과 완료 처리에 필요한 일반 주문 정보다. */
     record GeneralPaymentOrder(
             long orderId,
@@ -35,6 +38,6 @@ public interface OrderService {
     }
 
     /** 결제 성공 시 재고를 차감할 주문 상품이다. */
-    record PaymentProduct(long productId, int quantity) {
+    record PaymentProduct(long orderItemId, long productId, int quantity) {
     }
 }

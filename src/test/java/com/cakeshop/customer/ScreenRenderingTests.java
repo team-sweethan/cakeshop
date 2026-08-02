@@ -82,7 +82,7 @@ class ScreenRenderingTests {
         String[] paths = {
             "/orders/pickup", "/orders/custom/options", "/orders/custom/request",
             "/orders/checkout", "/orders/1/payment", "/orders/complete", "/mypage",
-            "/orders/1", "/notifications", "/reviews/new", "/mypage/coupons",
+            "/orders", "/notifications", "/reviews/new", "/mypage/coupons",
             "/mypage/profile"
         };
 

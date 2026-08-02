@@ -105,7 +105,9 @@ class OrderPaymentEntitySchemaTests {
                 Map.entry("totalAmount", BigDecimal.class),
                 Map.entry("requirements", String.class),
                 Map.entry("preparationDays", Integer.class),
-                Map.entry("cancellationLimitDays", Integer.class)
+                Map.entry("cancellationLimitDays", Integer.class),
+                Map.entry("stockDeductedAt", LocalDateTime.class),
+                Map.entry("stockRestoredAt", LocalDateTime.class)
         ));
         assertFields(OrderItemOption.class, Map.ofEntries(
                 Map.entry("id", Long.class),

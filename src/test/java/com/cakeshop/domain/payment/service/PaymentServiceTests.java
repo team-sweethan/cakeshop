@@ -48,6 +48,7 @@ class PaymentServiceTests {
         GeneralPaymentOrder order = order();
         Payment payment = payment();
         ApprovalResult approval = approval();
+        when(productStockService.decreaseStock(100L, 2)).thenReturn(true);
         when(paymentMapper.completeIfReady(
                 20L,
                 "payment-key",
@@ -64,6 +65,10 @@ class PaymentServiceTests {
                 orderService
         );
         inOrder.verify(productStockService).decreaseStock(100L, 2);
+        inOrder.verify(orderService).recordGeneralStockDeduction(
+                200L,
+                approval.approvedAt()
+        );
         inOrder.verify(paymentMapper).completeIfReady(
                 20L,
                 "payment-key",
@@ -82,6 +87,7 @@ class PaymentServiceTests {
         GeneralPaymentOrder order = order();
         Payment payment = payment();
         ApprovalResult approval = approval();
+        when(productStockService.decreaseStock(100L, 2)).thenReturn(true);
         when(paymentMapper.completeIfReady(
                 20L,
                 "payment-key",
@@ -101,6 +107,7 @@ class PaymentServiceTests {
         );
 
         verify(productStockService).decreaseStock(100L, 2);
+        verify(orderService).recordGeneralStockDeduction(200L, approval.approvedAt());
         verify(orderService, never()).completeGeneralOrderAfterPayment(
                 1L,
                 approval.approvedAt()
@@ -126,7 +133,7 @@ class PaymentServiceTests {
                 1L,
                 BigDecimal.valueOf(30_000),
                 LocalDateTime.of(2026, 8, 1, 10, 10),
-                List.of(new PaymentProduct(100L, 2))
+                List.of(new PaymentProduct(200L, 100L, 2))
         );
     }
 

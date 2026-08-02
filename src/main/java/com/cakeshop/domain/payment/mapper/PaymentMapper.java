@@ -18,6 +18,12 @@ public interface PaymentMapper {
     // 한 주문에서 발생한 모든 결제 시도를 조회한다.
     List<Payment> findPaymentsByOrderId(@Param("orderId") long orderId);
 
+    // 결제 ID로 한 건을 조회한다.
+    Optional<Payment> findPaymentById(@Param("paymentId") long paymentId);
+
+    // 주문의 현재 DONE 결제를 조회한다. DB 제약에 따라 최대 한 건이다.
+    Optional<Payment> findDonePaymentByOrderId(@Param("orderId") long orderId);
+
     // 주문의 현재 READY 결제 시도를 조회한다. DB 제약에 따라 최대 한 건이다.
     Optional<Payment> findReadyPaymentByOrderId(@Param("orderId") long orderId);
 

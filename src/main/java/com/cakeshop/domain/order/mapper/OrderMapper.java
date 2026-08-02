@@ -47,6 +47,15 @@ public interface OrderMapper {
     /** 주문 식별자로 주문 기본 정보를 조회한다. */
     Optional<Order> findOrderById(@Param("orderId") long orderId);
 
+    /** 취소 준비처럼 상태 전이와 경쟁하면 안 되는 작업에서 주문 행을 잠가 조회한다. */
+    Optional<Order> findOrderByIdForUpdate(@Param("orderId") long orderId);
+
+    /** 회원이 소유한 주문을 최근 생성 순서로 조회한다. */
+    List<Order> findOrdersByMemberId(@Param("memberId") long memberId);
+
+    /** 관리자 화면에 표시할 전체 주문을 최근 생성 순서로 조회한다. */
+    List<Order> findAllOrders();
+
     /** 주문이 존재하고 지정한 회원의 소유인지 확인한다. */
     boolean existsByIdAndMemberId(@Param("orderId") long orderId, @Param("memberId") long memberId);
 
@@ -58,6 +67,21 @@ public interface OrderMapper {
 
     /** 주문제작 참고 이미지를 상품·노출 순서대로 조회한다. */
     List<OrderItemImage> findOrderItemImagesByOrderId(@Param("orderId") long orderId);
+
+    /** 결제 성공 시 실제로 차감한 주문 항목 재고를 한 번만 기록한다. */
+    int markStockDeductedIfUnset(
+            @Param("orderItemId") long orderItemId,
+            @Param("deductedAt") LocalDateTime deductedAt
+    );
+
+    /** 취소 시 복구할 차감 이력을 잠그고 조회한다. */
+    List<OrderItem> findStockDeductedItemsForRestore(@Param("orderId") long orderId);
+
+    /** 차감됐고 아직 복구되지 않은 주문 항목을 복구 완료로 한 번만 기록한다. */
+    int markStockRestoredIfDeducted(
+            @Param("orderItemId") long orderItemId,
+            @Param("restoredAt") LocalDateTime restoredAt
+    );
 
     /**
      * DONE 결제가 있는 PENDING_PAYMENT 주문제작을 UNDER_REVIEW로 변경한다.

@@ -19,6 +19,8 @@ import com.cakeshop.domain.member.controller.MyPageController;
 import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.notification.controller.NotificationController;
 import com.cakeshop.domain.order.controller.OrderController;
+import com.cakeshop.domain.order.dto.view.OrderDetailView;
+import com.cakeshop.domain.order.service.OrderQueryService;
 import com.cakeshop.domain.payment.controller.PaymentController;
 import com.cakeshop.domain.payment.service.PaymentFacade;
 import com.cakeshop.domain.product.controller.ProductController;
@@ -28,6 +30,7 @@ import com.cakeshop.global.security.MemberDetails;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
@@ -67,12 +70,17 @@ class CustomerPageControllerTests {
                         "010-1234-5678",
                         LocalDate.of(2000, 1, 15)));
 
+        OrderQueryService orderQueryService = mock(OrderQueryService.class);
+        when(orderQueryService.getMemberOrders(1L)).thenReturn(List.of());
+        when(orderQueryService.getMemberOrder(1L, 1L))
+                .thenReturn(mock(OrderDetailView.class));
+
         mockMvc = MockMvcBuilders.standaloneSetup(
                         new HomeController(mock(HomeService.class)),
                         new AuthController(memberService),
                         new ProductController(mock(ProductService.class)),
                         new CartController(),
-                        new OrderController(),
+                        new OrderController(orderQueryService),
                         new PaymentController(mock(PaymentFacade.class)),
                         new MyPageController(
                                 memberService,

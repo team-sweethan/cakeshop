@@ -39,10 +39,16 @@ public class PaymentService {
             ApprovalResult approval
     ) {
         for (PaymentProduct product : order.products()) {
-            productStockService.decreaseStock(
+            boolean stockDeducted = productStockService.decreaseStock(
                     product.productId(),
                     product.quantity()
             );
+            if (stockDeducted) {
+                orderService.recordGeneralStockDeduction(
+                        product.orderItemId(),
+                        approval.approvedAt()
+                );
+            }
         }
 
         requireOneRow(paymentMapper.completeIfReady(

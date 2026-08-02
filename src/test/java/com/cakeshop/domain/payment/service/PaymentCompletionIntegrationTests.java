@@ -70,6 +70,7 @@ class PaymentCompletionIntegrationTests {
     private long memberId;
     private long productId;
     private long orderId;
+    private long orderItemId;
 
     @Autowired
     PaymentCompletionIntegrationTests(
@@ -102,7 +103,7 @@ class PaymentCompletionIntegrationTests {
                 orderId,
                 BigDecimal.valueOf(40_000),
                 APPROVED_AT.plusMinutes(10),
-                List.of(new PaymentProduct(productId, 2))
+                List.of(new PaymentProduct(orderItemId, productId, 2))
         );
         ApprovalResult approval = new ApprovalResult(
                 "PAYMENT-KEY-" + suffix,
@@ -136,6 +137,12 @@ class PaymentCompletionIntegrationTests {
         assertThat(completedOrder.getStatus())
                 .isEqualTo(OrderStatus.READY_FOR_PICKUP);
         assertThat(completedOrder.getReadyAt()).isEqualTo(APPROVED_AT);
+        LocalDateTime stockDeductedAt = jdbcTemplate.queryForObject(
+                "SELECT stock_deducted_at FROM order_items WHERE id = ?",
+                LocalDateTime.class,
+                orderItemId
+        );
+        assertThat(stockDeductedAt).isEqualTo(APPROVED_AT);
     }
 
     private long insertMember() {
@@ -272,6 +279,11 @@ class PaymentCompletionIntegrationTests {
                 orderId,
                 productId,
                 "결제 완료 테스트 상품 " + suffix
+        );
+        orderItemId = jdbcTemplate.queryForObject(
+                "SELECT id FROM order_items WHERE order_id = ?",
+                Long.class,
+                orderId
         );
     }
 

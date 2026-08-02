@@ -200,6 +200,27 @@ class OrderMapperTests {
     }
 
     @Test
+    void markPickedUpIfReady_requestedCancellation_doesNotAdvanceOrder() {
+        Order order = newOrder();
+        order.setOrderType(OrderType.GENERAL);
+        orderMapper.insertOrder(order);
+        long paymentId = insertPayment(order.getId(), "DONE", "CANCEL-IN-PROGRESS");
+        assertThat(orderMapper.markReadyForPickupAfterPaymentIfPending(
+                order.getId(),
+                LocalDateTime.of(2026, 8, 1, 12, 1)
+        )).isEqualTo(1);
+        insertRequestedCancellation(paymentId, "PICKUP-GUARD");
+
+        assertThat(orderMapper.markPickedUpIfReady(
+                order.getId(),
+                memberId,
+                LocalDateTime.of(2026, 8, 10, 14, 5)
+        )).isZero();
+        assertThat(orderMapper.findOrderById(order.getId()).orElseThrow().getStatus())
+                .isEqualTo(OrderStatus.READY_FOR_PICKUP);
+    }
+
+    @Test
     void rejectIfUnderReview_recordsReasonTimeAndProcessorConditionally() {
         Order order = newOrder();
         orderMapper.insertOrder(order);
@@ -606,6 +627,23 @@ class OrderMapperTests {
                 """,
                 canceledAt,
                 paymentId
+        );
+    }
+
+    private void insertRequestedCancellation(long paymentId, String label) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO payment_cancellations (
+                    payment_id,
+                    idempotency_key,
+                    cancel_amount,
+                    cancel_reason,
+                    status
+                )
+                VALUES (?, ?, 40000, '고객 취소 처리 중', 'REQUESTED')
+                """,
+                paymentId,
+                "ORDER-MAPPER-CANCEL-" + label + "-" + suffix
         );
     }
 

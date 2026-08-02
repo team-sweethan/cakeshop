@@ -215,7 +215,7 @@ class PaymentFacadeTests {
                 1L,
                 BigDecimal.valueOf(30_000),
                 expiresAt,
-                List.of(new PaymentProduct(100L, 2))
+                List.of(new PaymentProduct(200L, 100L, 2))
         );
     }
 

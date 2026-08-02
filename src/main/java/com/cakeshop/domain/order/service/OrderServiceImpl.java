@@ -131,6 +131,18 @@ public class OrderServiceImpl implements OrderService {
         );
     }
 
+    @Override
+    @Transactional
+    public void recordGeneralStockDeduction(long orderItemId, LocalDateTime deductedAt) {
+        if (orderItemId <= 0 || deductedAt == null) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_ERROR);
+        }
+        requireOneRow(
+                orderMapper.markStockDeductedIfUnset(orderItemId, deductedAt),
+                OrderErrorCode.INVALID_STATUS_TRANSITION
+        );
+    }
+
     /** 회원 식별자의 기본 형식을 검증한다. */
     private void validateActiveMember(long memberId) {
         if (memberId <= 0) {
@@ -260,6 +272,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         return new PaymentProduct(
+                orderItem.getId(),
                 orderItem.getProductId(),
                 orderItem.getQuantity()
         );

@@ -10,7 +10,10 @@ public enum PaymentErrorCode implements ErrorCode {
     PAYMENT_EXPIRED("PAYMENT_004", "결제 가능 시간이 지났습니다.", 409),
     TOSS_APPROVAL_FAILED("PAYMENT_005", "결제 승인에 실패했습니다.", 502),
     PAYMENT_COMPLETE_FAILED("PAYMENT_006", "결제 완료 처리에 실패했습니다.", 500),
-    PAYMENT_PREPARATION_FAILED("PAYMENT_007", "결제 준비 저장에 실패했습니다.", 500);
+    PAYMENT_PREPARATION_FAILED("PAYMENT_007", "결제 준비 저장에 실패했습니다.", 500),
+    PAYMENT_CANCEL_NOT_AVAILABLE("PAYMENT_008", "현재 취소할 수 없는 주문입니다.", 409),
+    TOSS_CANCEL_FAILED("PAYMENT_009", "결제 취소에 실패했습니다.", 502),
+    PAYMENT_CANCEL_COMPLETE_FAILED("PAYMENT_010", "결제 취소 완료 처리에 실패했습니다.", 500);
 
     private final String code;
     private final String message;

@@ -1,22 +1,84 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>주문 내역·상세 | 케이크 쇼핑몰</title>
+  <title>주문 내역 | 케이크 쇼핑몰</title>
   <link rel="stylesheet" th:href="@{/css/app.css}">
   <link rel="stylesheet" th:href="@{/css/customer-mockup.css}">
-  <script defer th:src="@{/js/app.js}"></script>
-  <script defer th:src="@{/js/customer-mockup.js}"></script>
 </head>
-<body data-page-title="주문 내역·상세">
+<body data-page-title="주문 내역">
   <header th:replace="~{fragments/common/header :: header}"></header>
-  <main class="page-container ">
-    <div th:replace="~{fragments/customer/mock-notice :: notice}"></div>
-    <h1>주문 내역 · 상세</h1><div class="grid grid--3"><aside><h2 class="section-title">주문 목록</h2><div class="cluster section" data-select-group><button class="btn is-active" data-select type="button">전체</button><button class="btn" data-select type="button">승인 대기</button><button class="btn" data-select type="button">결제 대기</button><button class="btn" data-select type="button">제작 중</button><button class="btn" data-select type="button">픽업 준비</button><button class="btn" data-select type="button">완료</button><button class="btn" data-select type="button">취소·환불</button></div><div class="stack"><article class="panel"><div class="cluster cluster--between"><span class="text-muted">ORD-001</span><span class="badge badge--warning">승인 대기</span></div><strong>레터링 케이크</strong><p class="text-muted">01.15</p></article><article class="panel"><div class="cluster cluster--between"><span class="text-muted">ORD-002</span><span class="badge badge--info">제작 중</span></div><strong>딸기 케이크</strong><p class="text-muted">01.10</p></article><article class="panel"><div class="cluster cluster--between"><span class="text-muted">ORD-003</span><span class="badge badge--success">픽업 완료</span></div><strong>초코 케이크</strong><p class="text-muted">01.05</p></article></div></aside>
-      <section style="grid-column:span 2"><h2 class="section-title">주문 상세 - ORD-20250115-001</h2><div class="panel"><div class="data-row"><span class="data-row__label">주문번호</span><span>ORD-20250115-001</span></div><div class="data-row"><span class="data-row__label">주문 일시</span><span>2025.01.15 14:30</span></div><h3 class="section-title" style="margin-top:12px">주문 상품</h3><div class="panel cluster"><div class="placeholder-image placeholder-image--sm">상품 이미지</div><div><strong>레터링 주문 케이크</strong><p class="text-muted">크기: 2호 | 맛: 초코 | 색상: 핑크</p><p class="text-muted">레터링: Happy Birthday!</p></div></div><div class="data-row"><span class="data-row__label">픽업 일시</span><span>2025.01.20 14:00</span></div><div class="data-row"><span class="data-row__label">픽업 장소</span><span>1층 카운터</span></div><div class="data-row"><span class="data-row__label">사용 쿠폰</span><span>첫 주문 할인 쿠폰 (-5,000원)</span></div><div class="data-row"><span class="data-row__label">상품 금액</span><span>55,000원</span></div><div class="data-row"><span class="data-row__label">옵션 추가</span><span>+9,000원</span></div><div class="data-row"><span class="data-row__label">쿠폰 할인</span><span>-5,000원</span></div><div class="data-row"><span class="data-row__label">최종 결제</span><strong>59,000원</strong></div><h3 class="section-title" style="margin-top:12px">진행 단계</h3><div class="status-steps"><span class="status-step is-complete">접수</span><span class="status-step is-complete">승인</span><span class="status-step">결제 완료</span><span class="status-step">제작 중</span><span class="status-step">픽업 준비</span><span class="status-step">픽업 완료</span></div><div class="stack" style="margin-top:12px"><div class="cluster"><a class="btn btn--primary" href="/orders/1/payment">결제하기</a><span class="note">결제 대기 상태 표시</span></div><div class="cluster"><button class="btn btn--danger" type="button" data-confirm="취소를 요청하시겠습니까?">취소 요청</button><span class="note">취소 가능 상태 표시</span></div><div class="cluster"><a class="btn" href="/reviews/new">후기 작성</a><span class="note">픽업 완료 후 표시</span></div></div></div></section></div>
+  <main class="page-container">
+    <h1>주문 내역</h1>
+    <div class="grid grid--3">
+      <aside>
+        <h2 class="section-title">주문 목록</h2>
+        <p class="panel" th:if="${#lists.isEmpty(orders)}">아직 주문 내역이 없습니다.</p>
+        <div class="stack" th:unless="${#lists.isEmpty(orders)}">
+          <a class="panel" th:each="summary : ${orders}"
+             th:href="@{/orders/{id}(id=${summary.orderId})}">
+            <span class="cluster cluster--between">
+              <span class="text-muted" th:text="${summary.orderNumber}">ORD-001</span>
+              <span class="badge" th:text="${summary.statusLabel}">결제 대기</span>
+            </span>
+            <strong th:text="${summary.productName}">상품명</strong>
+            <span class="text-muted" th:if="${summary.itemCount > 1}"
+                  th:text="' 외 ' + ${summary.itemCount - 1} + '건'">외 1건</span>
+            <p class="text-muted" th:text="${#temporals.format(summary.createdAt, 'yyyy.MM.dd HH:mm')}">
+              2026.08.02 12:00
+            </p>
+          </a>
+        </div>
+      </aside>
+
+      <section style="grid-column:span 2" th:if="${order != null}">
+        <h2 class="section-title" th:text="'주문 상세 - ' + ${order.orderNumber}">주문 상세</h2>
+        <div class="panel">
+          <div class="data-row"><span class="data-row__label">주문 상태</span>
+            <strong th:text="${order.statusLabel}">결제 대기</strong></div>
+          <div class="data-row"><span class="data-row__label">주문 일시</span>
+            <span th:text="${#temporals.format(order.createdAt, 'yyyy.MM.dd HH:mm')}">2026.08.02 12:00</span></div>
+          <div class="data-row"><span class="data-row__label">픽업 일시</span>
+            <span th:text="${#temporals.format(order.pickupAt, 'yyyy.MM.dd HH:mm')}">2026.08.03 12:00</span></div>
+          <div class="data-row"><span class="data-row__label">픽업자</span>
+            <span th:text="${order.pickupName + ' / ' + order.pickupPhone}">픽업자</span></div>
+
+          <h3 class="section-title">주문 상품</h3>
+          <article class="panel" th:each="item : ${order.items}">
+            <strong th:text="${item.productName}">상품명</strong>
+            <p th:text="${item.quantity + '개 · ' + #numbers.formatInteger(item.totalAmount, 1, 'COMMA') + '원'}">
+              1개 · 30,000원
+            </p>
+            <ul th:unless="${#lists.isEmpty(item.options)}">
+              <li th:each="option : ${item.options}"
+                  th:text="${option.groupName + ': ' + option.optionName}">크기: 2호</li>
+            </ul>
+          </article>
+
+          <div class="data-row"><span class="data-row__label">상품 금액</span>
+            <span th:text="${#numbers.formatInteger(order.originalAmount, 1, 'COMMA') + '원'}">0원</span></div>
+          <div class="data-row"><span class="data-row__label">할인 금액</span>
+            <span th:text="${'-' + #numbers.formatInteger(order.discountAmount, 1, 'COMMA') + '원'}">-0원</span></div>
+          <div class="data-row"><span class="data-row__label">최종 결제</span>
+            <strong th:text="${#numbers.formatInteger(order.finalAmount, 1, 'COMMA') + '원'}">0원</strong></div>
+          <div class="cluster" th:if="${order.paymentPending}">
+            <a class="btn btn--primary" th:href="@{/orders/{id}/payment(id=${order.orderId})}">결제하기</a>
+          </div>
+          <form class="stack" th:if="${order.cancelRequestAvailable}" method="post"
+                th:action="@{/orders/{id}/cancel(id=${order.orderId})}">
+            <label for="cancel-reason">취소 사유</label>
+            <textarea class="form-control form-control--textarea" id="cancel-reason" name="reason"
+                      maxlength="500" required></textarea>
+            <button class="btn btn--danger" type="submit">주문 취소</button>
+          </form>
+        </div>
+      </section>
+      <section style="grid-column:span 2" th:if="${order == null}">
+        <div class="panel">왼쪽 목록에서 확인할 주문을 선택해 주세요.</div>
+      </section>
+    </div>
   </main>
   <footer th:replace="~{fragments/common/footer :: footer(${store})}"></footer>
 </body>
 </html>
-

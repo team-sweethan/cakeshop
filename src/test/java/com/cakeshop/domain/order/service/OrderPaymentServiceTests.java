@@ -83,6 +83,7 @@ class OrderPaymentServiceTests {
         assertThat(result.amount()).isEqualByComparingTo("30000");
         assertThat(result.products()).singleElement()
                 .satisfies(product -> {
+                    assertThat(product.orderItemId()).isEqualTo(200L);
                     assertThat(product.productId()).isEqualTo(100L);
                     assertThat(product.quantity()).isEqualTo(2);
                 });
@@ -136,6 +137,7 @@ class OrderPaymentServiceTests {
 
     private OrderItem item() {
         OrderItem item = new OrderItem();
+        item.setId(200L);
         item.setProductId(100L);
         item.setProductType(ProductType.GENERAL);
         item.setQuantity(2);
