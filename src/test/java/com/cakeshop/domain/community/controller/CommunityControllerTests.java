@@ -112,6 +112,20 @@ class CommunityControllerTests {
         assertThat(pageRequest.getOffset()).isEqualTo(20);
     }
 
+    /**
+     * 목록은 공개 화면이라 주소에 어떤 숫자든 들어올 수 있다.
+     *
+     * <p>페이지 번호가 크면 {@code (page - 1) * size}가 int를 넘어 음수 OFFSET이 되고,
+     * DB가 이를 거부해 화면이 500으로 죽는다. 범위를 넘은 페이지는 빈 목록이어야 한다.
+     */
+    @Test
+    void list_hugePage_doesNotOverflowOffset() throws Exception {
+        mockMvc.perform(get("/community").param("page", String.valueOf(Integer.MAX_VALUE)))
+                .andExpect(status().isOk());
+
+        assertThat(capturedPageRequest().getOffset()).isNotNegative();
+    }
+
     @Test
     void detail_anonymousViewer_passesNullMemberId() throws Exception {
         when(communityService.getPostDetail(15L, null)).thenReturn(post());
