@@ -141,6 +141,27 @@ class CartServiceTests {
     }
 
     @Test
+    void addItem_differentConfigurationExceedsProductStock_throwsOutOfStock() {
+        CartAddForm form = form(10L, 1, List.of(101L));
+        form.setRequirements("new message");
+        CartItem existing = item(30L, 10L, 5);
+        existing.setRequirements("old message");
+        when(productQueryService.getSalesInfo(10L)).thenReturn(product(5));
+        when(productService.getPublicOptionGroups(10L)).thenReturn(requiredOptions());
+        when(cartMapper.findCartIdByMemberIdForUpdate(1L)).thenReturn(Optional.of(20L));
+        when(cartMapper.findItemsByMemberId(1L)).thenReturn(List.of(existing));
+        when(cartMapper.findOptionsByCartItemIds(List.of(30L)))
+                .thenReturn(List.of(option(30L, 101L)));
+
+        assertThatThrownBy(() -> cartService.addItem(1L, form))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(CartErrorCode.OUT_OF_STOCK);
+
+        verify(cartMapper, never()).insertItem(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     void getCart_unavailableItem_excludesItemFromSummaryTotals() {
         CartItem item = item(30L, 10L, 2);
         when(cartMapper.findItemsByMemberId(1L)).thenReturn(List.of(item));
@@ -171,6 +192,20 @@ class CartServiceTests {
         assertThat(cart.items().getFirst().available()).isFalse();
         assertThat(cart.baseTotal()).isZero();
         assertThat(cart.optionTotal()).isZero();
+        assertThat(cart.grandTotal()).isZero();
+    }
+
+    @Test
+    void getCart_totalProductQuantityExceedsStock_marksEveryConfigurationUnavailable() {
+        CartItem first = item(30L, 10L, 3);
+        CartItem second = item(31L, 10L, 3);
+        when(cartMapper.findItemsByMemberId(1L)).thenReturn(List.of(first, second));
+        when(cartMapper.findOptionsByCartItemIds(List.of(30L, 31L))).thenReturn(List.of());
+        when(productQueryService.getSalesInfo(10L)).thenReturn(product(5));
+
+        CartView cart = cartService.getCart(1L);
+
+        assertThat(cart.items()).allMatch(item -> !item.available());
         assertThat(cart.grandTotal()).isZero();
     }
 
@@ -207,6 +242,7 @@ class CartServiceTests {
         when(cartMapper.findCartIdByMemberIdForUpdate(1L)).thenReturn(Optional.of(20L));
         when(cartMapper.findItemByMemberIdAndItemId(1L, 30L)).thenReturn(Optional.of(item));
         when(productQueryService.getSalesInfo(10L)).thenReturn(product(10));
+        when(cartMapper.findItemsByMemberId(1L)).thenReturn(List.of(item));
         when(cartMapper.updateItemQuantity(1L, 30L, 2)).thenReturn(1);
 
         cartService.updateQuantity(1L, 30L, 2);
@@ -223,6 +259,7 @@ class CartServiceTests {
         when(cartMapper.findCartIdByMemberIdForUpdate(1L)).thenReturn(Optional.of(20L));
         when(cartMapper.findItemByMemberIdAndItemId(1L, 30L)).thenReturn(Optional.of(item));
         when(productQueryService.getSalesInfo(10L)).thenReturn(product(10));
+        when(cartMapper.findItemsByMemberId(1L)).thenReturn(List.of(item));
         when(cartMapper.findOptionsByCartItemIds(List.of(30L)))
                 .thenReturn(List.of(option(30L, 101L)));
         when(productService.getPublicOptionGroups(10L)).thenReturn(List.of());
@@ -231,6 +268,24 @@ class CartServiceTests {
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(CartErrorCode.INVALID_OPTION);
+
+        verify(cartMapper, never()).updateItemQuantity(1L, 30L, 2);
+    }
+
+    @Test
+    void updateQuantity_totalProductQuantityExceedsStock_throwsOutOfStock() {
+        CartItem target = item(30L, 10L, 3);
+        CartItem otherConfiguration = item(31L, 10L, 3);
+        when(cartMapper.findCartIdByMemberIdForUpdate(1L)).thenReturn(Optional.of(20L));
+        when(cartMapper.findItemByMemberIdAndItemId(1L, 30L)).thenReturn(Optional.of(target));
+        when(productQueryService.getSalesInfo(10L)).thenReturn(product(4));
+        when(cartMapper.findItemsByMemberId(1L))
+                .thenReturn(List.of(target, otherConfiguration));
+
+        assertThatThrownBy(() -> cartService.updateQuantity(1L, 30L, 2))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(CartErrorCode.OUT_OF_STOCK);
 
         verify(cartMapper, never()).updateItemQuantity(1L, 30L, 2);
     }
