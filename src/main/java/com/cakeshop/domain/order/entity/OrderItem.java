@@ -12,7 +12,9 @@ import java.math.BigDecimal;
 public class OrderItem {
 
     private Long id;                    // 내부 주문 항목 식별자
+    //order.id
     private Long orderId;               // 주문 식별자
+    //product.id
     private Long productId;             // 주문한 원본 상품 식별자
     private String productName;         // 주문 당시 상품명 스냅샷
     private ProductType productType;    // 주문 당시 상품 유형 스냅샷

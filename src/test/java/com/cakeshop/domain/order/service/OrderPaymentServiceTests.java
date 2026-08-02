@@ -6,7 +6,7 @@ import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.order.mapper.OrderMapper;
 import com.cakeshop.domain.order.service.OrderService.GeneralPaymentOrder;
-import com.cakeshop.domain.payment.mapper.PaymentMapper;
+import com.cakeshop.domain.payment.service.PaymentPreparationService;
 import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.service.ProductQueryService;
 import com.cakeshop.global.error.BusinessException;
@@ -44,17 +44,17 @@ class OrderPaymentServiceTests {
     private OrderMapper orderMapper;
 
     @Mock
-    private PaymentMapper paymentMapper;
+    private PaymentPreparationService paymentPreparationService;
 
     private OrderService orderService;
 
     @BeforeEach
     void setUp() {
-        orderService = new OrderService(
+        orderService = new OrderServiceImpl(
                 productQueryService,
                 orderOptionValidator,
                 orderMapper,
-                paymentMapper,
+                paymentPreparationService,
                 Clock.fixed(
                         Instant.parse("2026-08-01T01:00:00Z"),
                         ZoneId.of("Asia/Seoul")

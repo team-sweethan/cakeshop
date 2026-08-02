@@ -1,9 +1,10 @@
 package com.cakeshop.domain.order.service;
 
 import com.cakeshop.domain.order.dto.form.GeneralOrderForm;
-import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.payment.entity.Payment;
+import com.cakeshop.domain.payment.error.PaymentErrorCode;
 import com.cakeshop.domain.payment.mapper.PaymentMapper;
+import com.cakeshop.domain.payment.service.PaymentPreparationServiceImpl;
 import com.cakeshop.domain.product.customer.dto.view.ProductOptionGroupView;
 import com.cakeshop.domain.product.customer.dto.view.ProductOptionItemView;
 import com.cakeshop.domain.product.customer.service.ProductService;
@@ -36,8 +37,9 @@ import static org.mockito.Mockito.when;
 
 @MybatisTest
 @Import({
-        OrderService.class,
-        OrderOptionValidator.class
+        OrderServiceImpl.class,
+        OrderOptionValidator.class,
+        PaymentPreparationServiceImpl.class
 })
 @MariaDbIntegrationTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -120,7 +122,7 @@ class OrderServiceRollbackIntegrationTests {
         ).isInstanceOfSatisfying(
                 BusinessException.class,
                 error -> assertThat(error.getErrorCode())
-                        .isEqualTo(OrderErrorCode.PAYMENT_SAVE_FAILED)
+                        .isEqualTo(PaymentErrorCode.PAYMENT_PREPARATION_FAILED)
         );
 
         assertThat(countOrders()).isZero();

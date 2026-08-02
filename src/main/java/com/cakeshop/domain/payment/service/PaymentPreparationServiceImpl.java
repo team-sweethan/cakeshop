@@ -1,0 +1,46 @@
+package com.cakeshop.domain.payment.service;
+
+import com.cakeshop.domain.payment.entity.Payment;
+import com.cakeshop.domain.payment.entity.PaymentStatus;
+import com.cakeshop.domain.payment.error.PaymentErrorCode;
+import com.cakeshop.domain.payment.mapper.PaymentMapper;
+import com.cakeshop.global.error.BusinessException;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.util.UUID;
+
+/** READY 결제 생성 계약을 MyBatis 저장으로 구현한다. */
+@Service
+@RequiredArgsConstructor
+public class PaymentPreparationServiceImpl implements PaymentPreparationService {
+
+    private final PaymentMapper paymentMapper;
+
+    @Override
+    @Transactional
+    public void prepareReadyPayment(
+            long orderId,
+            String orderNumber,
+            BigDecimal amount
+    ) {
+        Payment payment = new Payment();
+        payment.setOrderId(orderId);
+        payment.setTossOrderId(orderNumber);
+        payment.setIdempotencyKey("PAY-" + compactUuid());
+        payment.setAmount(amount);
+        payment.setStatus(PaymentStatus.READY);
+
+        if (paymentMapper.insertReadyPayment(payment) != 1) {
+            throw new BusinessException(
+                    PaymentErrorCode.PAYMENT_PREPARATION_FAILED
+            );
+        }
+    }
+
+    private String compactUuid() {
+        return UUID.randomUUID().toString().replace("-", "");
+    }
+}

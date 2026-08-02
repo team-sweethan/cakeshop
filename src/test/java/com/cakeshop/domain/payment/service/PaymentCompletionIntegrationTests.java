@@ -5,6 +5,7 @@ import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.mapper.OrderMapper;
 import com.cakeshop.domain.order.service.OrderOptionValidator;
 import com.cakeshop.domain.order.service.OrderService;
+import com.cakeshop.domain.order.service.OrderServiceImpl;
 import com.cakeshop.domain.order.service.OrderService.GeneralPaymentOrder;
 import com.cakeshop.domain.order.service.OrderService.PaymentProduct;
 import com.cakeshop.domain.payment.entity.Payment;
@@ -35,7 +36,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @MybatisTest
 @Import({
         PaymentService.class,
-        OrderService.class,
+        OrderServiceImpl.class,
+        PaymentPreparationServiceImpl.class,
         ProductStockService.class
 })
 @MariaDbIntegrationTest

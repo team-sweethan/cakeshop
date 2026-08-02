@@ -13,14 +13,14 @@ import java.util.List;
 @Setter
 public class OrderItemForm {
 
-    @NotNull
-    @Positive
-    private Long productId;
-
-    @NotNull
-    @Positive
-    private Integer quantity;
-
-    @Size(max = 20)
-    private List<@NotNull @Positive Long> optionIds = new ArrayList<>();
+//    @NotNull
+//    @Positive
+//    private Long productId;
+//
+//    @NotNull
+//    @Positive
+//    private Integer quantity;
+//
+//    @Size(max = 20)
+//    private List<@NotNull @Positive Long> optionIds = new ArrayList<>();
 }

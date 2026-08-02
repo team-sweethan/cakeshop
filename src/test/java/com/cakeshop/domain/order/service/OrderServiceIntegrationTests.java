@@ -10,6 +10,7 @@ import com.cakeshop.domain.order.mapper.OrderMapper;
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.entity.PaymentStatus;
 import com.cakeshop.domain.payment.mapper.PaymentMapper;
+import com.cakeshop.domain.payment.service.PaymentPreparationServiceImpl;
 import com.cakeshop.domain.product.customer.dto.view.ProductOptionGroupView;
 import com.cakeshop.domain.product.customer.dto.view.ProductOptionItemView;
 import com.cakeshop.domain.product.customer.service.ProductService;
@@ -39,8 +40,9 @@ import static org.mockito.Mockito.when;
 
 @MybatisTest
 @Import({
-        OrderService.class,
-        OrderOptionValidator.class
+        OrderServiceImpl.class,
+        OrderOptionValidator.class,
+        PaymentPreparationServiceImpl.class
 })
 @MariaDbIntegrationTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)

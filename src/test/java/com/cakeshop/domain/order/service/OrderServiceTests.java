@@ -9,9 +9,7 @@ import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.order.mapper.OrderMapper;
 import com.cakeshop.domain.order.service.OrderOptionValidator.ValidatedOption;
-import com.cakeshop.domain.payment.entity.Payment;
-import com.cakeshop.domain.payment.entity.PaymentStatus;
-import com.cakeshop.domain.payment.mapper.PaymentMapper;
+import com.cakeshop.domain.payment.service.PaymentPreparationService;
 import com.cakeshop.domain.product.dto.view.ProductSalesInfo;
 import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.error.ProductErrorCode;
@@ -39,6 +37,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -62,17 +61,17 @@ class OrderServiceTests {
     private OrderMapper orderMapper;
 
     @Mock
-    private PaymentMapper paymentMapper;
+    private PaymentPreparationService paymentPreparationService;
 
     private OrderService orderService;
 
     @BeforeEach
     void setUp() {
-        orderService = new OrderService(
+        orderService = new OrderServiceImpl(
                 productQueryService,
                 orderOptionValidator,
                 orderMapper,
-                paymentMapper,
+                paymentPreparationService,
                 FIXED_CLOCK
         );
     }
@@ -105,7 +104,6 @@ class OrderServiceTests {
             return 1;
         });
         when(orderMapper.insertOrderItemOption(any(OrderItemOption.class))).thenReturn(1);
-        when(paymentMapper.insertReadyPayment(any(Payment.class))).thenReturn(1);
         GeneralOrderForm form = form(1L, 2, List.of(101L));
 
         long orderId = orderService.createGeneralOrder(memberId, form);
@@ -145,21 +143,17 @@ class OrderServiceTests {
             assertThat(snapshot.getAdditionalPrice()).isEqualByComparingTo("5000");
         });
 
-        ArgumentCaptor<Payment> paymentCaptor = ArgumentCaptor.forClass(Payment.class);
-        verify(paymentMapper).insertReadyPayment(paymentCaptor.capture());
-        assertThat(paymentCaptor.getValue()).satisfies(payment -> {
-            assertThat(payment.getOrderId()).isEqualTo(100L);
-            assertThat(payment.getAmount()).isEqualByComparingTo("70000");
-            assertThat(payment.getStatus()).isEqualTo(PaymentStatus.READY);
-            assertThat(payment.getTossOrderId()).isEqualTo(order.getOrderNumber());
-            assertThat(payment.getIdempotencyKey()).startsWith("PAY-");
-        });
+        verify(paymentPreparationService).prepareReadyPayment(
+                100L,
+                order.getOrderNumber(),
+                order.getFinalAmount()
+        );
 
         InOrder saveOrder = inOrder(
                 productQueryService,
                 orderOptionValidator,
                 orderMapper,
-                paymentMapper
+                paymentPreparationService
         );
         saveOrder.verify(productQueryService).getSalesInfo(1L);
         saveOrder.verify(orderOptionValidator)
@@ -167,7 +161,11 @@ class OrderServiceTests {
         saveOrder.verify(orderMapper).insertOrder(any(Order.class));
         saveOrder.verify(orderMapper).insertOrderItem(any(OrderItem.class));
         saveOrder.verify(orderMapper).insertOrderItemOption(any(OrderItemOption.class));
-        saveOrder.verify(paymentMapper).insertReadyPayment(any(Payment.class));
+        saveOrder.verify(paymentPreparationService).prepareReadyPayment(
+                100L,
+                order.getOrderNumber(),
+                order.getFinalAmount()
+        );
     }
 
     @Test
@@ -183,7 +181,7 @@ class OrderServiceTests {
 
         verify(productQueryService, never()).getSalesInfo(1L);
         verify(orderMapper, never()).insertOrder(any(Order.class));
-        verify(paymentMapper, never()).insertReadyPayment(any(Payment.class));
+        verifyNoInteractions(paymentPreparationService);
     }
 
     @Test
@@ -205,7 +203,7 @@ class OrderServiceTests {
                 );
 
         verify(orderMapper, never()).insertOrder(any(Order.class));
-        verify(paymentMapper, never()).insertReadyPayment(any(Payment.class));
+        verifyNoInteractions(paymentPreparationService);
     }
 
     @Test
@@ -323,12 +321,12 @@ class OrderServiceTests {
         );
 
         verify(orderMapper, never()).insertOrder(any(Order.class));
-        verify(paymentMapper, never()).insertReadyPayment(any(Payment.class));
+        verifyNoInteractions(paymentPreparationService);
     }
 
     @Test
     void createGeneralOrderIsTransactional() throws NoSuchMethodException {
-        Transactional transactional = OrderService.class
+        Transactional transactional = OrderServiceImpl.class
                 .getMethod(
                         "createGeneralOrder",
                         long.class,

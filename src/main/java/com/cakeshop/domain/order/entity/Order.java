@@ -13,7 +13,8 @@ public class Order {
 
     private Long id;                // 내부 주문 식별자
     private String orderNumber;     // 고객에게 노출하는 주문번호
-    private Long memberId;          // 주문 회원 식별자
+    // member.id
+    private Long memberId;          // "주문 회원" 식별자
     private OrderType orderType;    // 주문 유형: GENERAL 또는 CUSTOM
     private String ordererName;     // 주문 당시 주문자 이름 스냅샷
     private String ordererPhone;    // 주문 당시 주문자 연락처 스냅샷
@@ -30,11 +31,14 @@ public class Order {
     private String rejectReason;            // 주문제작 반려 사유
     private LocalDateTime underReviewAt;    // 주문제작 검토 시작 시각
     private LocalDateTime rejectedAt;       // 주문제작 반려 처리 시각
-    private Long rejectedBy;                // 반려 처리 관리자 회원 식별자
+    //member.id
+    private Long rejectedBy;                // "반려 처리 관리자 회원" 식별자
     private LocalDateTime readyAt;          // 픽업 준비 완료 상태로 전환된 시각
-    private Long approvedBy;                // 주문제작 승인 처리 관리자 회원 식별자
+    //member.id
+    private Long approvedBy;                // 주문제작 "승인 처리 관리자" 회원 식별자
     private LocalDateTime pickedUpAt;       // 픽업 완료 처리 시각
-    private Long pickedUpBy;                // 픽업 완료 처리 관리자 회원 식별자
+    //member.id
+    private Long pickedUpBy;                // "픽업 완료 처리 관리자" 회원 식별자
     private LocalDateTime expiredAt;        // 결제 기한 만료 처리 시각
     private LocalDateTime canceledAt;       // 주문 취소 처리 시각
     private String cancelReason;            // 주문 취소 사유
