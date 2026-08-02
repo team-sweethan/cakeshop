@@ -13,6 +13,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Disabled;
@@ -41,6 +43,9 @@ class CommunityScreenDocTests {
     private static final String MOCKUP = "목업";
     private static final String PLANNED = "계획";
     private static final String UNDECIDED = "미정";
+    /** `not(`으로 감싼 것과 맨몸을 구분하려고 앞자락을 함께 잡는다. */
+    private static final Pattern CONTAINS_STRING =
+            Pattern.compile("(not\\(\\s*)?containsString\\(\"((?:[^\"\\\\]|\\\\.)*)\"\\)");
 
     /** 문서가 화면 하나를 통째로 빠뜨리면, 그 화면은 아무 규칙도 없이 방치된다. */
     @Test
@@ -160,8 +165,15 @@ class CommunityScreenDocTests {
      * assert하지 않았다. 그 span에 {@code th:if="${false}"}만 붙이면 문구도 테스트도 그대로라
      * 하네스는 전부 통과하는데 사용자는 두 값을 볼 수 없다.
      *
-     * <p>그래서 참조된 테스트 <b>본문</b>에 그 문구가 등장하는지까지 확인한다. 한 문구를 여러
-     * 테스트가 다른 층위에서 받칠 수 있으므로 <b>하나라도</b> 확인하면 통과로 본다.
+     * <p>그래서 참조된 테스트가 그 문구를 <b>응답에 있다고 단언하는지</b>까지 확인한다. 본문에
+     * 등장하기만 하는 것으로는 부족하다 — 입력 fixture로 쓰거나
+     * {@code not(containsString(...))}으로 <b>없다고</b> 단언해도 등장은 하기 때문이다.
+     * 그러면 화면에서 문구가 사라진 상태를 방어한다고 문서가 정반대로 주장하게 된다.
+     * 그래서 {@code containsString("...")}의 인자만 세고, {@code not(...)}으로 감싼 것은
+     * 뺀다.
+     *
+     * <p>한 문구를 여러 테스트가 다른 층위에서 받칠 수 있으므로 <b>하나라도</b> 확인하면
+     * 통과로 본다.
      */
     @Test
     void screenDoc_referencedTestsAssertTheDocumentedString() throws Exception {
@@ -174,18 +186,39 @@ class CommunityScreenDocTests {
                 .isNotEmpty();
 
         for (DocRow row : rows) {
-            List<String> bodies = new ArrayList<>();
+            List<String> asserted = new ArrayList<>();
 
             for (String reference : row.references()) {
-                bodies.add(testMethodBody(reference));
+                asserted.addAll(assertedStrings(testMethodBody(reference)));
             }
 
-            assertThat(bodies)
-                    .as("`%s`를 %s가 확인하지 않는다. 그 문구를 실제로 assert하는 줄을 넣거나,"
+            assertThat(asserted)
+                    .as("`%s`가 응답에 있다고 %s가 단언하지 않는다."
+                                    + " `containsString`으로 확인하는 줄을 넣거나,"
                                     + " 고정하지 않았다면 `없음`으로 적는다",
                             row.value(), row.references())
-                    .anyMatch(body -> body.contains(row.value()));
+                    .anyMatch(value -> value.contains(row.value()));
         }
+    }
+
+    /**
+     * 메서드 본문에서 <b>있다고 단언한</b> 문자열만 모은다.
+     *
+     * <p>{@code not(...)}으로 감싼 것은 뺀다. 정규식이 왼쪽부터 훑으므로
+     * {@code not(containsString("x"))}는 첫 그룹이 잡히고, 맨몸
+     * {@code containsString("x")}는 잡히지 않는다.
+     */
+    private List<String> assertedStrings(String body) {
+        List<String> values = new ArrayList<>();
+        Matcher matcher = CONTAINS_STRING.matcher(body);
+
+        while (matcher.find()) {
+            if (matcher.group(1) == null) {
+                values.add(matcher.group(2));
+            }
+        }
+
+        return values;
     }
 
     /**
@@ -205,24 +238,76 @@ class CommunityScreenDocTests {
 
         assertThat(start).as("소스에서 %s를 찾지 못했다", reference).isNotNegative();
 
-        int open = source.indexOf('{', start);
+        return bodyFrom(source, source.indexOf('{', start), reference);
+    }
+
+    /**
+     * 여는 중괄호에서 짝이 맞는 닫는 중괄호까지를 잘라 낸다.
+     *
+     * <p>중괄호만 세면 안 된다. 문자열·문자·텍스트 블록 안의 {@code &#123;}와 {@code &#125;}는
+     * Java 블록이 아니다. JSON이나 CSS를 담은 테스트에서 {@code "&#125;"} 하나가 본문을
+     * 실제 끝보다 <b>일찍 자르고</b>(뒤쪽 assertion이 통째로 빠진다), {@code "&#123;"}는
+     * 다음 메서드까지 본문으로 빨아들이거나 끝을 못 찾아 빌드를 세운다. 앞의 것은 조용히
+     * 검사를 비게 만들어서 더 나쁘다.
+     *
+     * <p>주석은 공백으로 바꿔 함께 걷어낸다.
+     */
+    private String bodyFrom(String source, int open, String reference) {
+        StringBuilder body = new StringBuilder();
         int depth = 0;
+        int i = open;
 
-        for (int i = open; i < source.length(); i++) {
-            char c = source.charAt(i);
+        while (i < source.length()) {
+            if (source.startsWith("//", i)) {
+                int end = source.indexOf('\n', i);
+                i = end < 0 ? source.length() : end;
+                body.append(' ');
+            } else if (source.startsWith("/*", i)) {
+                int end = source.indexOf("*/", i + 2);
+                i = end < 0 ? source.length() : end + 2;
+                body.append(' ');
+            } else if (source.startsWith("\"\"\"", i)) {
+                int end = source.indexOf("\"\"\"", i + 3);
+                int next = end < 0 ? source.length() : end + 3;
+                body.append(source, i, next);
+                i = next;
+            } else if (source.charAt(i) == '"' || source.charAt(i) == '\'') {
+                int end = endOfLiteral(source, i);
+                body.append(source, i, end);
+                i = end;
+            } else {
+                char c = source.charAt(i);
 
-            if (c == '{') {
-                depth++;
-            } else if (c == '}' && --depth == 0) {
-                return stripComments(source.substring(open + 1, i));
+                if (c == '{') {
+                    depth++;
+                } else if (c == '}' && --depth == 0) {
+                    // 첫 글자는 여는 중괄호다.
+                    return body.substring(1);
+                }
+
+                body.append(c);
+                i++;
             }
         }
 
         throw new IllegalStateException("메서드 본문이 닫히지 않았다: " + reference);
     }
 
-    private String stripComments(String body) {
-        return body.replaceAll("(?s)/\\*.*?\\*/", " ").replaceAll("(?m)//.*$", " ");
+    /** 여는 따옴표에서 닫는 따옴표 다음까지. 역슬래시 이스케이프를 건너뛴다. */
+    private int endOfLiteral(String source, int open) {
+        char quote = source.charAt(open);
+
+        for (int i = open + 1; i < source.length(); i++) {
+            char c = source.charAt(i);
+
+            if (c == '\\') {
+                i++;
+            } else if (c == quote) {
+                return i + 1;
+            }
+        }
+
+        return source.length();
     }
 
     /**
