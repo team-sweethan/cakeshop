@@ -4,6 +4,7 @@ import java.util.List;
 
 import com.cakeshop.domain.community.dto.form.CommentForm;
 import com.cakeshop.domain.community.dto.form.PostForm;
+import com.cakeshop.domain.community.dto.form.ReportForm;
 import com.cakeshop.domain.community.dto.view.CommentCountView;
 import com.cakeshop.domain.community.dto.view.CommentSectionView;
 import com.cakeshop.domain.community.dto.view.CommentView;
@@ -20,6 +21,7 @@ import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
 
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -271,6 +273,78 @@ public class CommunityService {
     @Transactional(readOnly = true)
     public boolean isLikedBy(long postId, long memberId) {
         return communityMapper.existsLike(postId, memberId);
+    }
+
+    /**
+     * 게시글을 신고한다. reporterId는 인증 정보에서 얻은 값이어야 한다.
+     *
+     * 좋아요와 정반대로 <b>멱등하지 않다.</b> 이미 신고한 글이면 성공이 아니라 에러다
+     * (DOMAIN.md 6.6) — 재신고는 "내 신고가 처리되지 않았다"는 인식의 표현이라, 조용히
+     * 성공을 돌려주면 접수됐다고 오해하지만 실제로는 아무 일도 일어나지 않는다.
+     *
+     * 중복을 두 번 막는다. 확인이 먼저이고 UNIQUE 위반이 그다음이다. 확인만 두면 같은
+     * 사람이 두 번 눌렀을 때 둘 다 "없다"를 읽고 하나가 500으로 죽고, 제약만 두면 정상
+     * 흐름의 흔한 실수까지 예외 처리에 기대게 된다. 둘 다 같은 응답으로 모은다.
+     *
+     * 게시글 행을 잠그지 않는다. 좋아요와 달리 posts 를 쓰지 않으므로 잠금을 잡을 이유가
+     * 없고, 확인과 INSERT 사이에 관리자가 차단하면 신고 한 건이 더 들어올 뿐이다 —
+     * 이미 조치된 글에 붙는 신고라 손해가 없는 쪽으로 틀린다(R14와 같은 판단).
+     */
+    @Transactional
+    public void reportPost(long postId, ReportForm form, long reporterId) {
+        requireReportablePost(postId, reporterId);
+
+        try {
+            communityMapper.insertReport(postId, reporterId, form.getReason());
+        } catch (DuplicateKeyException e) {
+            // 확인과 INSERT 사이에 같은 사람의 신고가 먼저 들어온 경우다.
+            throw new BusinessException(CommunityErrorCode.ALREADY_REPORTED);
+        }
+    }
+
+    /**
+     * 신고할 수 있는 게시글인지 확인하고 돌려준다.
+     *
+     * 신고 사유 검증이 실패해 상세를 다시 그리기 <b>전에</b> 권한부터 보려고 열어 둔다.
+     * 댓글의 getCommentablePost와 같은 이유다 — 순서가 뒤집히면 남의 삭제된 글 번호로
+     * 빈 신고를 보냈을 때 그 글의 상세가 200으로 열린다.
+     */
+    @Transactional(readOnly = true)
+    public PostDetailView getReportablePost(long postId, long memberId) {
+        return requireReportablePost(postId, memberId);
+    }
+
+    /**
+     * 이 회원이 이 글을 이미 신고했는지. 상세에서 신고 폼을 보일지 안내를 보일지 가른다.
+     *
+     * 게시글 노출 판단은 하지 않는다. isLikedBy와 같은 이유로, 이미 노출이 확인된
+     * 게시글에 대해서만 호출된다.
+     */
+    @Transactional(readOnly = true)
+    public boolean isReportedBy(long postId, long memberId) {
+        return communityMapper.existsReport(postId, memberId);
+    }
+
+    /**
+     * 신고할 수 있는 게시글인지 확인한다.
+     *
+     * 노출 판단을 통과한 뒤 자기 글을 먼저 거른다. 신고는 관리자에게 남의 글을 알리는
+     * 경로이고, 자기 글이 문제라면 지우면 된다(DOMAIN.md 6.6). 여기서 걸러 두면 뒤에
+     * 남는 것은 남의 PUBLISHED 글뿐이다 — 남의 차단·삭제된 글은 이미 404이고, 자기 차단
+     * 글은 방금 걸러졌다.
+     */
+    private PostDetailView requireReportablePost(long postId, long memberId) {
+        PostDetailView post = requireVisiblePost(postId, memberId);
+
+        if (isAuthor(post, memberId)) {
+            throw new BusinessException(CommunityErrorCode.OWN_POST_REPORT);
+        }
+
+        if (communityMapper.existsReport(postId, memberId)) {
+            throw new BusinessException(CommunityErrorCode.ALREADY_REPORTED);
+        }
+
+        return post;
     }
 
     /**

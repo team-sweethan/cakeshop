@@ -733,6 +733,80 @@ class CommunityControllerTests {
         return captor.getValue();
     }
 
+    @Test
+    void report_validForm_redirectsToDetailWithMessage() throws Exception {
+        authenticateAs(9L);
+        when(communityService.getReportablePost(15L, 9L)).thenReturn(publishedPost());
+
+        mockMvc.perform(post("/community/15/reports").param("reason", "광고입니다"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/community/15"))
+                // 신고는 화면에 흔적을 남기지 않는다. 알리지 않으면 접수됐는지 알 수 없다.
+                .andExpect(flash().attribute("successMessage", "신고를 접수했습니다."));
+
+        verify(communityService).reportPost(eq(15L), any(), eq(9L));
+    }
+
+    /** 신고자는 요청 파라미터가 아니라 인증 정보에서 온다(AGENTS.md). */
+    @Test
+    void report_usesAuthenticatedMemberAsReporter() throws Exception {
+        authenticateAs(9L);
+        when(communityService.getReportablePost(15L, 9L)).thenReturn(publishedPost());
+
+        mockMvc.perform(post("/community/15/reports")
+                        .param("reason", "광고입니다")
+                        .param("reporterId", "99"))
+                .andExpect(status().is3xxRedirection());
+
+        verify(communityService).reportPost(eq(15L), any(), eq(9L));
+    }
+
+    /** 댓글과 같다 — 검증 실패는 상세를 다시 그리고, 조회수를 올리지 않는다. */
+    @Test
+    void report_blankReason_redrawsDetailWithoutCountingAView() throws Exception {
+        authenticateAs(9L);
+        when(communityService.getReportablePost(15L, 9L)).thenReturn(publishedPost());
+
+        mockMvc.perform(post("/community/15/reports").param("reason", "   "))
+                .andExpect(status().isOk())
+                .andExpect(view().name("customer/community/detail"))
+                .andExpect(model().attributeHasFieldErrors("reportForm", "reason"))
+                .andExpect(model().attributeExists("commentSection"));
+
+        verify(communityService, never()).reportPost(anyLong(), any(), anyLong());
+        verify(communityService, never()).getPostDetail(anyLong(), any(), anyString());
+    }
+
+    /**
+     * 권한을 검증 실패보다 먼저 본다. 순서가 뒤집히면 남의 삭제된 글 번호로 빈 신고를
+     * 보냈을 때 그 글의 상세가 200으로 열린다(조각 2·3에서 같은 실수를 했다).
+     */
+    @Test
+    void report_invisiblePost_checksPermissionBeforeValidation() {
+        authenticateAs(9L);
+        when(communityService.getReportablePost(15L, 9L))
+                .thenThrow(new BusinessException(CommunityErrorCode.POST_NOT_FOUND));
+
+        assertThatThrownBy(() ->
+                mockMvc.perform(post("/community/15/reports").param("reason", "   ")))
+                .hasRootCauseInstanceOf(BusinessException.class);
+
+        verify(communityService, never()).reportPost(anyLong(), any(), anyLong());
+    }
+
+    /** 신고 요청도 펼친 댓글 수를 유지한다. 좋아요와 같은 자리, 같은 이유다. */
+    @Test
+    void report_keepsExpandedComments() throws Exception {
+        authenticateAs(9L);
+        when(communityService.getReportablePost(15L, 9L)).thenReturn(publishedPost());
+
+        mockMvc.perform(post("/community/15/reports")
+                        .param("reason", "광고입니다")
+                        .param("comments", "60"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/community/15?comments=60"));
+    }
+
     private PostDetailView publishedPost() {
         return new PostDetailView(
                 15L, 7L, 1L, "질문", "제목", "본문", "글쓴이", false,

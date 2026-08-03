@@ -1,5 +1,7 @@
 package com.cakeshop.domain.community.mapper;
 
+import com.cakeshop.domain.community.dto.view.AdminPostSort;
+
 import org.apache.ibatis.builder.xml.XMLMapperBuilder;
 import org.apache.ibatis.io.Resources;
 import org.apache.ibatis.mapping.MappedStatement;
@@ -278,8 +280,136 @@ class CommunityMapperXmlTests {
         assertThat(sql).doesNotContain("LIKE_COUNT - 1");
     }
 
+    /**
+     * 신고 INSERT가 중복을 삼키지 않는지 확인한다.
+     *
+     * <p>좋아요와 정반대다. {@code INSERT IGNORE}나 {@code ON DUPLICATE KEY UPDATE}로
+     * 바꾸면 중복 신고가 조용히 성공하는데, 신고자에게는 접수된 것으로 보이고 실제로는
+     * 아무 일도 일어나지 않는다(DOMAIN.md 6.6). 정상 흐름에서는 결과가 같아 보인다.
+     */
+    @Test
+    void insertReport_doesNotSwallowDuplicates() {
+        String sql = normalizedSql("insertReport");
+
+        assertThat(sql).doesNotContain("IGNORE");
+        assertThat(sql).doesNotContain("ON DUPLICATE KEY");
+    }
+
+    /**
+     * "이미 신고했는지"를 상태로 거르지 않는지 확인한다.
+     *
+     * <p>{@code status = 'PENDING'}을 덧붙이면 관리자가 신고를 처리한 뒤 같은 사람이 다시
+     * 신고할 수 있게 된다. 신고에는 취소도 재신고도 없다(DOMAIN.md 6.6). UNIQUE 제약은
+     * 그대로라 INSERT가 터지므로, 화면에는 "신고했습니다"가 아니라 500이 나온다.
+     */
+    @Test
+    void existsReport_ignoresReportStatus() {
+        String sql = normalizedSql("existsReport");
+
+        assertThat(sql).doesNotContain("PENDING");
+    }
+
+    /**
+     * 관리자 목록이 미처리 신고 수를 스칼라 서브쿼리로 세는지 확인한다.
+     *
+     * <p>H1a와 같은 이유다 — {@code LEFT JOIN post_reports ... GROUP BY}로 바꾸면 LIMIT이
+     * 집계 이후에 적용되어 전체를 훑는다(DOMAIN.md 6.1). 결과는 같아서 화면으로는 모른다.
+     */
+    @Test
+    void findPostsForAdmin_countsPendingReportsWithScalarSubquery() {
+        String sql = normalizedSql("findPostsForAdmin");
+
+        assertThat(sql).contains("SELECT COUNT(*) FROM POST_REPORTS");
+        assertThat(sql).doesNotContain("GROUP BY");
+        assertThat(sql).doesNotContain("JOIN POST_REPORTS");
+    }
+
+    /**
+     * 정렬 분기가 둘 다 id tiebreaker를 유지하는지 확인한다.
+     *
+     * <p>기본 분기만 보면 새 분기가 tiebreaker 없이 들어와도 통과한다. 미처리 신고 수는
+     * 0이 대부분이라 동점이 {@code created_at}보다 훨씬 잦고, tiebreaker가 없으면 페이지
+     * 경계에서 글이 사라지거나 두 번 나온다(DOMAIN.md 6.7).
+     */
+    @Test
+    void findPostsForAdmin_everySortBranchKeepsIdTiebreaker() {
+        assertThat(normalizedSql("findPostsForAdmin", Map.of("sort", AdminPostSort.LATEST)))
+                .contains("ORDER BY P.CREATED_AT DESC, P.ID DESC");
+
+        assertThat(normalizedSql("findPostsForAdmin", Map.of("sort", AdminPostSort.REPORTS)))
+                .contains("ORDER BY PENDING_REPORT_COUNT DESC, P.ID DESC");
+    }
+
+    /**
+     * 관리자 목록이 상태로 거르지 <b>않는</b> 것을 기본으로 두는지 확인한다.
+     *
+     * <p>고객 목록과 정반대다. 관리자는 삭제·차단된 글까지 본다(DOMAIN.md 4.3).
+     * 조건이 상수로 박히면 필터가 무엇을 고르든 같은 목록이 나온다.
+     */
+    @Test
+    void findPostsForAdmin_withoutStatusFilter_hasNoStatusCondition() {
+        String sql = normalizedSql("findPostsForAdmin");
+
+        assertThat(sql).doesNotContain("STATUS = 'PUBLISHED'");
+        assertThat(sql).doesNotContain("STATUS = 'BLOCKED'");
+    }
+
+    /**
+     * 차단이 전이 규칙을 SQL에서도 지키고 {@code updated_at}을 보존하는지 확인한다.
+     *
+     * <p>{@code status = 'PUBLISHED'} 조건이 빠지면 이미 차단된 글의 조치 기록이 덮이고,
+     * 작성자가 지운 글이 되살아난다(DOMAIN.md 4.2). 둘 다 화면에는 성공으로 보인다.
+     *
+     * <p>{@code updated_at} 지정이 빠지면 차단된 글마다 "(수정됨)"이 붙는다. 작성자가
+     * 고치지도 않은 글에 붙는 표시라 원인을 찾을 수 없다(6.3, 조회수·좋아요와 같은 자리).
+     */
+    @Test
+    void blockPost_requiresPublishedAndKeepsUpdatedAtUntouched() {
+        String sql = normalizedSql("blockPost");
+
+        assertThat(sql).contains("P.STATUS = 'PUBLISHED'");
+        assertThat(sql).contains("BLOCKED_AT");
+        assertThat(sql).contains("BLOCKED_BY");
+        assertThat(sql).contains("UPDATED_AT = P.UPDATED_AT");
+    }
+
+    /**
+     * 차단 해제가 blocked_* 를 지우지 않고, BLOCKED에서만 동작하는지 확인한다.
+     *
+     * <p>기록을 NULL로 되돌리면 같은 글이 두 번째로 신고됐을 때 앞선 조치를 알 수 없다
+     * (DOMAIN.md 4.2). 조건이 빠지면 지워진 글이 이 UPDATE로 되살아난다.
+     */
+    @Test
+    void unblockPost_keepsBlockRecordAndRequiresBlocked() {
+        String sql = normalizedSql("unblockPost");
+
+        assertThat(sql).contains("P.STATUS = 'BLOCKED'");
+        assertThat(sql).contains("UPDATED_AT = P.UPDATED_AT");
+        assertThat(sql).doesNotContain("BLOCKED_AT = NULL");
+        assertThat(sql).doesNotContain("BLOCKED_REASON = NULL");
+        assertThat(sql).doesNotContain("BLOCKED_BY = NULL");
+    }
+
+    /**
+     * 신고를 닫는 UPDATE가 이미 처리된 신고를 건드리지 않는지 확인한다.
+     *
+     * <p>조건이 빠지면 차단 → 해제 → 재차단 흐름에서 REJECTED였던 신고가 RESOLVED로 바뀐다.
+     * 상태는 "그때 무엇으로 조치했다"는 기록이므로 덮이면 거짓이 된다(DOMAIN.md 6.6).
+     */
+    @Test
+    void closePendingReports_touchesOnlyPendingRows() {
+        String sql = normalizedSql("closePendingReports");
+
+        assertThat(sql).contains("PR.STATUS = 'PENDING'");
+    }
+
     /** 공백을 하나로 줄이고 대문자로 바꿔 들여쓰기·줄바꿈 차이를 무시한다. */
     private String normalizedSql(String statementId) {
+        return normalizedSql(statementId, Map.of());
+    }
+
+    /** 분기가 있는 문장은 파라미터를 갈아 끼워 <b>분기마다</b> 형태를 본다. */
+    private String normalizedSql(String statementId, Map<String, Object> overrides) {
         MappedStatement statement =
                 configuration.getMappedStatement(NAMESPACE + "." + statementId);
 
@@ -292,6 +422,12 @@ class CommunityMapperXmlTests {
         parameters.put("offset", 0);
         parameters.put("limit", 20);
         parameters.put("viewerKey", "M:1");
+        parameters.put("reporterId", 1L);
+        parameters.put("reason", "사유");
+        parameters.put("adminId", 1L);
+        parameters.put("status", null);
+        parameters.put("sort", null);
+        parameters.putAll(overrides);
 
         return statement.getBoundSql(parameters)
                 .getSql()

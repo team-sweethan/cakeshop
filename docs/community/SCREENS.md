@@ -11,8 +11,8 @@
 | 상세 | `GET /community/{postId}` | 구현됨 | 1 | [screens/detail.md](screens/detail.md) |
 | 글쓰기 | `GET /community/new` | 구현됨 | 2 | [screens/new.md](screens/new.md) |
 | 수정 | `GET /community/{postId}/edit` | 구현됨 | 2 | [screens/edit.md](screens/edit.md) |
-| 관리자 목록 | `GET /admin/community` | 목업 | 5 | [screens/admin-list.md](screens/admin-list.md) |
-| 관리자 상세 | `GET /admin/community/{postId}` | 목업 | 5 | [screens/admin-detail.md](screens/admin-detail.md) |
+| 관리자 목록 | `GET /admin/community` | 구현됨 | 5 | [screens/admin-list.md](screens/admin-list.md) |
+| 관리자 상세 | `GET /admin/community/{postId}` | 구현됨 | 5 | [screens/admin-detail.md](screens/admin-detail.md) |
 
 **인기글과 조회수 정렬 옵션은 아직 이 표에 없다.** 2026-08-03에 범위 안으로 들어왔지만(DOMAIN.md 2), **인기글을 목록 화면의 영역으로 둘지 별도 화면으로 뺄지가 아직 보류**여서(DOMAIN.md 9) 명세 파일을 만들지 않았다. 별도 화면으로 정해지면 그때 `screens/`에 파일을 만들고 이 표에 줄을 더한다. 정렬 옵션은 목록 화면이 넓어지는 것이라 `screens/list.md`가 받는다.
 

@@ -57,6 +57,9 @@
 | `viewerId` | `Long` | 보고 있는 회원. 자기 댓글에만 삭제 버튼을 다는 데 쓴다. 비로그인이면 `null` |
 | `commentSection` | `CommentSectionView` | 댓글 목록과 두 개수. `canLoadMore()`, `cappedByLimit()`, `hiddenCount()`는 뷰가 계산한다 |
 | `commentForm` | `CommentForm` | 댓글 입력값. 검증 실패 시 입력을 담은 채 이 화면이 다시 그려진다 |
+| `canReport` | `boolean` | 신고 폼을 보여줄지. 로그인했고, 차단되지 않은 글이고, **작성자가 아닐 때만** 참 |
+| `alreadyReported` | `boolean` | 이미 신고했는지. 참이면 폼 대신 안내가 나온다. 물어볼 필요가 없는 상대에게는 묻지 않으므로 `canReport`가 거짓이면 언제나 거짓 |
+| `reportForm` | `ReportForm` | 신고 사유. 검증 실패 시 입력을 담은 채 이 화면이 다시 그려진다 |
 
 ## 댓글 (DOMAIN.md 4.4, 6.4)
 
@@ -89,6 +92,22 @@
 | 좋아요 개수 | 상세를 볼 수 있는 사람 전부 (비로그인 포함) |
 | `좋아요` / `좋아요 취소` 버튼 | 로그인 회원 + `PUBLISHED` 글에만. **댓글 작성 폼과 같은 조건이다** (DOMAIN.md 4.5) |
 
+## 신고 (DOMAIN.md 6.6)
+
+좋아요 아래, 댓글 구역 위에 있다. 펼쳐야 보이는 폼이고 사유가 필수다.
+
+- **남의 글에만 열린다.** 자기 글에는 이 자리가 아예 없다 — 자기 글이 문제라면 지우면 된다.
+- **좋아요와 정반대로 멱등이 아니다.** 이미 신고한 글을 다시 신고하면 성공이 아니라 에러다. 조용히 성공을 돌려주면 접수됐다고 오해하지만 실제로는 아무 일도 일어나지 않는다. 그래서 **이미 신고한 사람에게는 폼 대신 안내**를 보여 준다 — 폼을 남겨 두면 눌렀을 때 오류 화면으로 튀는데, 그건 사용자가 잘못한 것이 아니라 이미 접수된 것이다.
+- **취소가 없다.** 한 번 접수되면 되돌릴 수 없어서 폼을 접어 두고(`<details>`), 검증에 실패해 화면이 다시 그려질 때만 스스로 펼친다. 접힌 채로 돌아오면 오류 문구가 화면 밖에 남는다.
+- **접수 결과는 flash 메시지로 알린다.** 신고는 화면에 아무 흔적도 남기지 않는다 — 내역은 관리자만 본다. 알리지 않으면 접수됐는지 알 방법이 없다. 게시글 삭제와 같은 이유다.
+- **신고 요청도 `?comments=`를 실어 보낸다.** 좋아요와 같은 자리, 같은 이유다.
+
+| 무엇 | 누구에게 |
+|---|---|
+| 신고 폼 | 로그인 회원 + `PUBLISHED` 글 + **작성자가 아닌 사람** + 아직 신고하지 않은 사람 |
+| `이미 신고한 게시글입니다.` 안내 | 위 조건에서 이미 신고한 사람 |
+| 신고 내역 (누가 무엇을 신고했는지) | **아무에게도 보이지 않는다.** 관리자 화면에만 나온다 |
+
 ## 무엇이 보이는가 (DOMAIN.md 4.3)
 
 | 글 상태 | 비로그인·다른 회원 | 작성자 본인 |
@@ -116,6 +135,9 @@
 | `댓글 등록` | 로그인 회원 + `PUBLISHED` 글일 때만 | `CommunityScreenRenderingTests.communityDetail_authenticated_showsCommentForm` |
 | `등록한 댓글은 수정할 수 없습니다.` | 위와 같은 조건 (댓글에는 수정이 없다 — DOMAIN.md 6.4) | 없음 |
 | `댓글 삭제` | 그 댓글의 작성자에게만 + `PUBLISHED` 글에만 | `CommunityScreenRenderingTests.communityDetail_ownComment_showsDeleteButton`, `CommunityScreenRenderingTests.communityDetail_blockedPostAuthor_hasNoDeadCommentDeleteButton` |
+| `이 게시글 신고` | 로그인 회원 + `PUBLISHED` 글 + 작성자가 아니고 아직 신고하지 않았을 때 | `CommunityScreenRenderingTests.communityDetail_otherMember_rendersReportForm` |
+| `접수된 신고는 취소할 수 없습니다.` | 위와 같은 조건 (신고에는 취소가 없다 — DOMAIN.md 6.6) | `CommunityScreenRenderingTests.communityDetail_otherMember_rendersReportForm` |
+| `이미 신고한 게시글입니다.` | 이미 신고한 사람에게만. 폼 대신 나온다 | `CommunityScreenRenderingTests.communityDetail_alreadyReported_showsNoticeInsteadOfForm` |
 | `로그인하면 댓글을 쓸 수 있습니다.` | 비로그인 + `PUBLISHED` 글일 때만. 차단된 글에는 띄우지 않는다 | `CommunityScreenRenderingTests.communityDetail_anonymous_showsLoginPromptInsteadOfForm` |
 | `이전 댓글 더 보기` | 아직 못 보여준 댓글이 남았고 상한에 걸리지 않았을 때 | `CommunityScreenRenderingTests.communityDetail_manyComments_showsLoadMoreForOlderComments` |
 | `남은 댓글` | 위와 같은 조건 | `CommunityScreenRenderingTests.communityDetail_manyComments_showsLoadMoreForOlderComments` |
@@ -145,10 +167,4 @@
 
 ## 상세에 앞으로 붙는 것
 
-새 페이지가 생기는 게 아니라 **이 화면이 채워진다.** 조각을 진행하며 이 표의 줄을 위 문자열 표로 옮긴다.
-
-| 무엇 | 조각 | 화면에 어떻게 나타나나 | 미리 정해진 것 |
-|---|---|---|---|
-| 신고 버튼 | 5 | 본문 아래 | 중복 신고는 에러. 취소 불가 |
-
-댓글 목록·작성은 조각 3에서, 좋아요 버튼은 조각 4에서 붙었다. 위 "댓글"·"좋아요" 절을 본다.
+없다. 댓글 목록·작성은 조각 3에서, 좋아요 버튼은 조각 4에서, 신고 폼은 조각 5에서 붙었다. 위 "댓글"·"좋아요"·"신고" 절을 본다.

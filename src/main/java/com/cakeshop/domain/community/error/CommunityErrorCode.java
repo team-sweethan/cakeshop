@@ -25,7 +25,29 @@ public enum CommunityErrorCode implements ErrorCode {
      * 같은 이유로 넷을 구분하지 않는다 — 구분하면 그 자리에 댓글이 있다는 사실이 드러난다
      * (DOMAIN.md 4.3).
      */
-    COMMENT_NOT_FOUND("COMMUNITY_004", "댓글을 찾을 수 없습니다.", 404);
+    COMMENT_NOT_FOUND("COMMUNITY_004", "댓글을 찾을 수 없습니다.", 404),
+
+    /**
+     * 이미 신고한 게시글이다. 좋아요처럼 조용히 성공을 돌려주지 않는다(DOMAIN.md 6.6) —
+     * 재신고는 "내 신고가 처리되지 않았다"는 인식의 표현이라, 성공으로 답하면 접수됐다고
+     * 오해하지만 실제로는 아무 일도 일어나지 않는다.
+     */
+    ALREADY_REPORTED("COMMUNITY_005", "이미 신고한 게시글입니다.", 409),
+
+    /**
+     * 자기 글을 신고하려 했다. 신고는 관리자에게 남의 글을 알리는 경로이고, 자기 글이
+     * 문제라면 지우면 된다(DOMAIN.md 6.6).
+     */
+    OWN_POST_REPORT("COMMUNITY_006", "자기 글은 신고할 수 없습니다.", 400),
+
+    /**
+     * 관리자가 할 수 없는 상태 전이를 요청했다. 이미 차단된 글을 다시 차단하거나, 차단된
+     * 적 없는 글을 해제하거나, 작성자가 지운 글에 조치하려는 경우다(DOMAIN.md 4.2, 6.7).
+     *
+     * 고객 경로와 달리 404로 숨기지 않는다. 관리자는 모든 상태를 볼 수 있는 상대라
+     * 숨길 것이 없고, 여기서 404를 주면 화면에 보이는 글이 사라진 것처럼 보인다.
+     */
+    INVALID_POST_TRANSITION("COMMUNITY_007", "지금 상태에서 할 수 없는 조치입니다.", 400);
 
     private final String code;
     private final String message;

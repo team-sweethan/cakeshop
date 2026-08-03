@@ -2,12 +2,38 @@
 
 > 이 파일의 형식과 검사 규칙은 `docs/community/SCREENS.md`에 있다.
 
-- 상태: 목업 (조각 5에서 연결)
+- 상태: 구현됨 (조각 5)
 - 템플릿: `admin/community/detail.html`
 - 핸들러: `CommunityAdminController.detail`
 - 접근: `hasRole("ADMIN")`
 
-왼쪽에 게시글 정보·본문·댓글, 오른쪽에 신고 내역과 모더레이션 패널이 있는 2단 구성이다. **차단된 글의 본문을 관리자가 볼 수 있는 유일한 화면**이다 — 고객 경로(`/community/{id}`)에서는 관리자도 404를 받는다 (DOMAIN.md 4.3).
+왼쪽에 게시글 정보·본문·댓글, 오른쪽에 신고 내역과 모더레이션 패널이 있는 2단 구성이다. **차단된 글의 본문을 관리자가 볼 수 있는 유일한 화면이다** — 고객 경로(`/community/{id}`)에서는 관리자도 404를 받는다 (DOMAIN.md 4.3).
+
+## 관리자가 할 수 있는 일
+
+| 조치 | 주소 | 언제 보이나 |
+|---|---|---|
+| 차단 (사유 필수) | `POST /admin/community/{postId}/block` | `PUBLISHED`일 때만 |
+| 차단 해제 | `POST /admin/community/{postId}/unblock` | `BLOCKED`일 때만 |
+| 신고 기각 | `POST /admin/community/{postId}/reports/reject` | 미처리 신고가 있을 때만 |
+
+**이 셋뿐이다**(DOMAIN.md 6.7). 게시글 삭제도 댓글 삭제도 관리자 권한이 아니다 — 게시글 삭제는 작성자만(4.2의 `BLOCKED → DELETED` 금지), 댓글 삭제는 그 댓글의 작성자만 할 수 있다(6.4). 작성자가 지운 글(`DELETED`)에는 아무 버튼도 보이지 않는다. 종착 상태라 되살릴 수도 차단할 수도 없다.
+
+차단을 해제해도 `blocked_at`·`blocked_reason`·`blocked_by`와 신고 상태 `RESOLVED`는 남는다(4.2, 6.6). 그래서 "차단됐다가 풀린 글"은 상태가 `노출 중`인데 차단 기록이 함께 보인다.
+
+## 조각 5에서 정리한 것
+
+관리자 목업 두 화면은 도메인 규칙보다 먼저 그려져서, 규칙에 없는 기능이 버튼으로 존재했다. 조각 5에서 아래와 같이 정리했다.
+
+| 목업에 있던 것 | 어떻게 했나 |
+|---|---|
+| `게시글 삭제` / `게시글 영구 삭제` 버튼 | **삭제.** 관리자 조치는 차단뿐이고(6.7) `BLOCKED → DELETED`는 금지다(4.2) |
+| 댓글마다 `삭제` 버튼 | **삭제.** 댓글 삭제는 그 댓글의 작성자만 할 수 있다(6.4) |
+| 상태 어휘 `정상`/`제재` | **`노출 중`/`차단됨`/`삭제됨`으로 통일.** 화면·문서·코드가 같은 말을 쓴다(6.7) |
+| `IP` 표시 | **삭제.** `posts`에 IP 컬럼이 없고, 넣으면 개인정보를 새로 저장하게 된다 |
+| `첨부 이미지` 자리 | **삭제.** `post_images`는 1차에서 쓰지 않는다 (DOMAIN.md 2) |
+| 작성자/제목 검색, 분류 필터 | **삭제.** 관리자 목록은 상태 필터와 정렬만 받는다 (6.7) |
+| 분류 선택지 `후기/질문/자유/레시피` | **삭제.** 관리자는 글을 고치지 않으므로 분류를 고를 자리가 없다 |
 
 ## 화면 문자열
 
@@ -16,20 +42,15 @@
 | `게시글 정보` | 항상 | `CommunityScreenRenderingTests.communityAdminDetail_rendersForAdmin` |
 | `모더레이션` | 항상 (오른쪽 패널) | `CommunityScreenRenderingTests.communityAdminDetail_rendersForAdmin` |
 | `신고 내역` | 항상 | `CommunityScreenRenderingTests.communityAdminDetail_rendersForAdmin` |
-| `제재 사유` | 항상 (차단 시 필수 입력) | 없음 |
+| `접수된 신고가 없습니다.` | 신고가 하나도 없을 때만 | 없음 |
+| `미처리` | 아직 처리하지 않은 신고 줄에만 | `CommunityScreenRenderingTests.communityAdminDetail_rendersForAdmin` |
+| `처리 완료` | 차단으로 닫힌 신고 줄에만 | 없음 |
+| `기각됨` | 기각으로 닫힌 신고 줄에만 | 없음 |
+| `차단 사유` | 항상 (차단 폼의 입력, 차단 기록의 항목) | `CommunityScreenRenderingTests.communityAdminDetail_rendersForAdmin` |
+| `차단하기` | `PUBLISHED`일 때만 | 없음 |
+| `차단 해제` | `BLOCKED`일 때만 | `CommunityScreenRenderingTests.communityAdminDetail_blockedPost_showsBlockRecordAndUnblock` |
+| `신고 기각` | 미처리 신고가 있을 때만 | `CommunityScreenRenderingTests.communityAdminDetail_rendersForAdmin` |
+| `작성자가 삭제한 게시글이라 조치할 수 없습니다.` | `DELETED`일 때만 | `CommunityScreenRenderingTests.communityAdminDetail_deletedPost_hidesModerationActions` |
+| `삭제된 댓글입니다.` | 지워진 댓글 자리에만 | 없음 |
+| `아직 댓글이 없습니다.` | 댓글이 하나도 없을 때만 | 없음 |
 | `목록으로` | 항상 | 없음 |
-| `mock-notice` | 항상. 아직 목업임을 알린다 | `CommunityScreenRenderingTests.communityAdminDetail_rendersForAdmin` |
-
-## 조각 5에서 정하거나 고쳐야 할 것
-
-관리자 목업 두 화면은 **도메인 규칙보다 먼저 그려졌다.** 그래서 규칙에 없는 기능이 버튼으로 존재한다. 조각 5는 이 목록을 정리하는 일부터 시작한다.
-
-| 지금 화면 | 무엇이 문제인가 |
-|---|---|
-| `게시글 삭제` / `게시글 영구 삭제` 버튼 | **DOMAIN.md에 관리자 삭제 권한이 없다.** 관리자 조치는 차단뿐이고(6.7), `BLOCKED → DELETED`는 금지다(4.2). 권한을 새로 정하든 버튼을 없애든 결정이 필요하다. "영구 삭제"라는 말은 soft delete와도 어긋난다 |
-| 댓글마다 `삭제` 버튼 | 관리자의 댓글 삭제도 규칙에 없다. 댓글 삭제는 작성자 본인 기준이다 (6.4) |
-| 상태 어휘가 `정상`/`제재` | 도메인 용어는 `PUBLISHED`/`BLOCKED`/`DELETED`이고 문서에서는 "차단"이라 부른다. 화면·문서·코드가 서로 다른 말을 쓰고 있다. 하나로 맞춘다 |
-| `IP` 표시 | `posts`에 IP 컬럼이 없다. 넣으려면 스키마 변경이고, 개인정보라 보관 근거가 필요하다 |
-| `첨부 이미지` 자리 | `post_images`는 1차에서 쓰지 않는다 (DOMAIN.md 2) |
-| 작성자/제목 검색, 분류·상태 필터 | 관리자 목록의 필터·정렬은 **DOMAIN.md 9의 보류 항목**이다. 고객 목록에는 검색이 없다 |
-| 분류 선택지 `후기/질문/자유/레시피` | 글쓰기 화면과 같은 문제. 활성 카테고리는 셋뿐이다 |

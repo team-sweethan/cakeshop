@@ -2,11 +2,13 @@ package com.cakeshop.admin;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +26,12 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import com.cakeshop.domain.community.controller.CommunityAdminController;
+import com.cakeshop.domain.community.dto.view.AdminPostDetailView;
+import com.cakeshop.domain.community.dto.view.AdminPostListView;
+import com.cakeshop.domain.community.dto.view.CommentSectionView;
+import com.cakeshop.domain.community.entity.PostStatus;
+import com.cakeshop.domain.community.service.CommunityAdminService;
+import com.cakeshop.domain.community.service.CommunityService;
 import com.cakeshop.domain.coupon.controller.CouponAdminController;
 import com.cakeshop.domain.coupon.service.CouponAdminService;
 import com.cakeshop.domain.member.controller.MemberAdminController;
@@ -59,6 +67,24 @@ class AdminPageControllerTests {
                 0
         ));
 
+        // 커뮤니티 관리 화면은 조각 5에서 목업을 걷어내고 실제 데이터를 그린다.
+        // 이 테스트는 "주소가 그 템플릿을 가리키는가"만 보므로 빈 결과로 충분하다.
+        CommunityAdminService communityAdminService =
+                Mockito.mock(CommunityAdminService.class);
+        CommunityService communityService = Mockito.mock(CommunityService.class);
+
+        when(communityAdminService.getPosts(any(), any(), any(PageRequest.class)))
+                .thenReturn(new PageResult<AdminPostListView>(
+                        List.of(), new PageRequest(null, null), 0));
+        when(communityAdminService.getPostDetail(anyLong()))
+                .thenReturn(new AdminPostDetailView(
+                        15L, 1L, "후기", "제목", "본문", "작성자", false,
+                        PostStatus.PUBLISHED, null, null, null, 0, 0,
+                        LocalDateTime.now(), LocalDateTime.now()));
+        when(communityAdminService.getReports(anyLong())).thenReturn(List.of());
+        when(communityService.getComments(anyLong(), any()))
+                .thenReturn(new CommentSectionView(List.of(), 0, 0, 20));
+
         mockMvc = MockMvcBuilders.standaloneSetup(
                 new StatisticsAdminController(),
                 new ProductAdminController(
@@ -71,7 +97,7 @@ class AdminPageControllerTests {
                         Mockito.mock(MemberSessionService.class)),
                 new ReviewAdminController(),
                 new NotificationAdminController(),
-                new CommunityAdminController(),
+                new CommunityAdminController(communityAdminService, communityService),
                 new CouponAdminController(couponAdminService)
         ).build();
 
