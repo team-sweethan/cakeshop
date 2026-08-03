@@ -29,6 +29,9 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @RequiredArgsConstructor
 public class CouponAdminController {
 
+    private static final String LIST_ORIGIN = "LIST";
+    private static final String DETAIL_ORIGIN = "DETAIL";
+
     private final CouponAdminService couponAdminService;
 
     /**
@@ -105,7 +108,12 @@ public class CouponAdminController {
 
     /** 기존 쿠폰 값을 수정 Form으로 변환해 수정 화면에 제공한다. */
     @GetMapping("{couponId}/edit")
-    public String updateCouponForm(@PathVariable Long couponId, Model model, RedirectAttributes redirectAttributes) {
+    public String updateCouponForm(@PathVariable Long couponId,
+                                   @ModelAttribute CouponSearchCondition condition,
+                                   @RequestParam(required = false) Integer page,
+                                   @RequestParam(defaultValue = LIST_ORIGIN) String origin,
+                                   Model model,
+                                   RedirectAttributes redirectAttributes) {
         try {
             // 서비스에서 종료 쿠폰을 차단하므로, 수정 화면에는 수정 가능한 쿠폰만 진입한다.
             model.addAttribute(
@@ -114,6 +122,7 @@ public class CouponAdminController {
             );
             model.addAttribute("couponId", couponId);
             model.addAttribute("formMode", "update");
+            addUpdateNavigation(model, condition, page, origin);
 
             return "admin/coupon/form";
         } catch (BusinessException e) {
@@ -121,7 +130,7 @@ public class CouponAdminController {
                     "errorMessage",
                     e.getErrorCode().message()
             );
-            return "redirect:/admin/coupons";
+            return redirectAfterUpdate(couponId, condition, page, origin, redirectAttributes);
         }
     }
 
@@ -130,12 +139,16 @@ public class CouponAdminController {
     public String updateCoupon(@PathVariable Long couponId,
                                @Valid @ModelAttribute("couponForm") CouponUpdateForm form,
                                BindingResult bindingResult,
+                               @ModelAttribute CouponSearchCondition condition,
+                               @RequestParam(required = false) Integer page,
+                               @RequestParam(defaultValue = LIST_ORIGIN) String origin,
                                Model model,
                                RedirectAttributes redirectAttributes) {
 
         if (bindingResult.hasErrors()) {
             model.addAttribute("couponId", couponId);
             model.addAttribute("formMode", "update");
+            addUpdateNavigation(model, condition, page, origin);
             try {
                 // 요청 Form에는 fullEdit가 없으므로, DB 기준 수정 가능 범위를 다시 채운다.
                 CouponUpdateForm originalForm = couponAdminService.getUpdateForm(couponId);
@@ -169,6 +182,7 @@ public class CouponAdminController {
                 form.setFullEdit(originalForm.isFullEdit());
                 model.addAttribute("couponId", couponId);
                 model.addAttribute("formMode", "update");
+                addUpdateNavigation(model, condition, page, origin);
 
                 return "admin/coupon/form";
             }
@@ -179,13 +193,15 @@ public class CouponAdminController {
             );
         }
 
-        return "redirect:/admin/coupons";
+        return redirectAfterUpdate(couponId, condition, page, origin, redirectAttributes);
     }
 
     /** ACTIVE 쿠폰만 INACTIVE로 전환한다. */
     @PostMapping("/{couponId}/deactivate")
     public String deactivateCoupon(
             @PathVariable Long couponId,
+            @ModelAttribute CouponSearchCondition condition,
+            @RequestParam(required = false) Integer page,
             RedirectAttributes redirectAttributes) {
 
         try {
@@ -203,13 +219,15 @@ public class CouponAdminController {
             );
         }
 
-        return "redirect:/admin/coupons";
+        return redirectToList(condition, page, redirectAttributes);
     }
 
     /** INACTIVE이며 만료되지 않은 쿠폰만 ACTIVE로 되돌린다. */
     @PostMapping("/{couponId}/activate")
     public String activateCoupon(
             @PathVariable Long couponId,
+            @ModelAttribute CouponSearchCondition condition,
+            @RequestParam(required = false) Integer page,
             RedirectAttributes redirectAttributes) {
 
         try {
@@ -227,7 +245,7 @@ public class CouponAdminController {
             );
         }
 
-        return "redirect:/admin/coupons";
+        return redirectToList(condition, page, redirectAttributes);
     }
     /**
      * 쿠폰 기본 정보와 향후 발급 회원 기능의 안내를 보여 주는 읽기 전용 상세 화면이다.
@@ -249,5 +267,45 @@ public class CouponAdminController {
         model.addAttribute("page", page);
 
         return "admin/coupon/detail";
+    }
+
+    /** 수정 화면의 취소·완료 뒤 이동 경로를 제한된 진입 출처에 따라 결정한다. */
+    private String redirectAfterUpdate(Long couponId,
+                                       CouponSearchCondition condition,
+                                       Integer page,
+                                       String origin,
+                                       RedirectAttributes redirectAttributes) {
+        if (DETAIL_ORIGIN.equals(origin)) {
+            addListState(condition, page, redirectAttributes);
+            redirectAttributes.addAttribute("couponId", couponId);
+            return "redirect:/admin/coupons/{couponId}/detail";
+        }
+
+        return redirectToList(condition, page, redirectAttributes);
+    }
+
+    /** 목록 상태를 redirect query parameter로 전달해 사용자가 보던 검색 결과를 유지한다. */
+    private String redirectToList(CouponSearchCondition condition,
+                                  Integer page,
+                                  RedirectAttributes redirectAttributes) {
+        addListState(condition, page, redirectAttributes);
+        return "redirect:/admin/coupons";
+    }
+
+    private void addListState(CouponSearchCondition condition,
+                              Integer page,
+                              RedirectAttributes redirectAttributes) {
+        redirectAttributes.addAttribute("keyword", condition.getKeyword());
+        redirectAttributes.addAttribute("status", condition.getStatus());
+        redirectAttributes.addAttribute("page", page);
+    }
+
+    private void addUpdateNavigation(Model model,
+                                     CouponSearchCondition condition,
+                                     Integer page,
+                                     String origin) {
+        model.addAttribute("condition", condition);
+        model.addAttribute("page", page);
+        model.addAttribute("origin", DETAIL_ORIGIN.equals(origin) ? DETAIL_ORIGIN : LIST_ORIGIN);
     }
 }

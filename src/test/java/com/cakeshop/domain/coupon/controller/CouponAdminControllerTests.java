@@ -212,6 +212,44 @@ class CouponAdminControllerTests {
     }
 
     @Test
+    void updateFromList_keepsSearchConditionAndPage() throws Exception {
+        mockMvc.perform(post("/admin/coupons/3/edit")
+                .param("name", "수정 쿠폰")
+                .param("discountType", "PERCENTAGE")
+                .param("discountValue", "10")
+                .param("minimumOrderAmount", "10000")
+                .param("maximumDiscountAmount", "5000")
+                .param("totalQuantity", "100")
+                .param("startsAt", "2026-08-01T09:00")
+                .param("expiresAt", "2026-08-31T23:59")
+                .param("keyword", "summer")
+                .param("status", "ACTIVE")
+                .param("page", "3")
+                .param("origin", "LIST"))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/admin/coupons?keyword=summer&status=ACTIVE&page=3"));
+    }
+
+    @Test
+    void updateFromDetail_returnsToDetailWithListState() throws Exception {
+        mockMvc.perform(post("/admin/coupons/3/edit")
+                .param("name", "수정 쿠폰")
+                .param("discountType", "PERCENTAGE")
+                .param("discountValue", "10")
+                .param("minimumOrderAmount", "10000")
+                .param("maximumDiscountAmount", "5000")
+                .param("totalQuantity", "100")
+                .param("startsAt", "2026-08-01T09:00")
+                .param("expiresAt", "2026-08-31T23:59")
+                .param("keyword", "summer")
+                .param("status", "ACTIVE")
+                .param("page", "3")
+                .param("origin", "DETAIL"))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/admin/coupons/3/detail?keyword=summer&status=ACTIVE&page=3"));
+    }
+
+    @Test
     void editEndedCouponFormRedirectsWithErrorMessage() throws Exception {
         doThrow(new BusinessException(CouponErrorCode.CANNOT_EDIT_ENDED_COUPON))
             .when(couponAdminService).getUpdateForm(3L);
@@ -270,6 +308,16 @@ class CouponAdminControllerTests {
             .andExpect(flash().attribute(
                 "errorMessage", CouponErrorCode.NOT_ACTIVE.message()
             ));
+    }
+
+    @Test
+    void deactivate_keepsSearchConditionAndPage() throws Exception {
+        mockMvc.perform(post("/admin/coupons/3/deactivate")
+                .param("keyword", "summer")
+                .param("status", "ACTIVE")
+                .param("page", "3"))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/admin/coupons?keyword=summer&status=ACTIVE&page=3"));
     }
 
     @Test
