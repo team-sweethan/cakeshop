@@ -1701,11 +1701,8 @@ body > main {
 
 .product-image-actions {
     display: flex;
+    gap: var(--space-2);
     justify-content: flex-end
-}
-
-.product-image-delete-form {
-    margin-left: auto
 }
 
 /* 매장 폼: 영업/픽업 시간 입력 */

@@ -227,6 +227,15 @@
         )
     </insert>
 
+    <!-- 상품 이미지 저장 경로 수정 -->
+    <update id="updateProductImageUrl">
+
+        UPDATE product_images
+        SET image_url = #{imageUrl}
+        WHERE product_id = #{productId}
+          AND id = #{imageId}
+    </update>
+
     <!-- 상품 이미지 삭제 -->
     <delete id="deleteProductImage">
 

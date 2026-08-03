@@ -36,6 +36,9 @@ class ProductImageServiceTests {
     private static final String STORED_IMAGE_URL =
             "/uploads/product/202608/image.jpg";
 
+    private static final String REPLACEMENT_IMAGE_URL =
+            "/uploads/product/202608/replacement.png";
+
     @Mock
     private ProductMapper productMapper;
 
@@ -213,6 +216,216 @@ class ProductImageServiceTests {
     }
 
     @Test
+    void replaceImage_validFile_updatesUrlAndDeletesOldFileAfterCommit() {
+        ProductImageUploadForm form = uploadForm();
+        stubReadyToReplace(form);
+        when(productMapper.updateProductImageUrl(
+                1L,
+                10L,
+                REPLACEMENT_IMAGE_URL
+        )).thenReturn(1);
+        TransactionSynchronizationManager.initSynchronization();
+
+        productImageService.replaceImage(1L, 10L, form);
+
+        verify(productImageValidator).validate(
+                form.getImageFile()
+        );
+        verify(productMapper).updateProductImageUrl(
+                1L,
+                10L,
+                REPLACEMENT_IMAGE_URL
+        );
+        verify(productMapper, never())
+                .countProductImagesByProductId(anyLong());
+        verify(fileStorageClient, never()).delete(any());
+
+        List<TransactionSynchronization> synchronizations =
+                TransactionSynchronizationManager
+                        .getSynchronizations();
+        assertThat(synchronizations).hasSize(2);
+
+        synchronizations.forEach(
+                TransactionSynchronization::afterCommit
+        );
+        synchronizations.forEach(synchronization ->
+                synchronization.afterCompletion(
+                        TransactionSynchronization.STATUS_COMMITTED
+                )
+        );
+
+        verify(fileStorageClient).delete(STORED_IMAGE_URL);
+        verify(fileStorageClient, never()).delete(
+                REPLACEMENT_IMAGE_URL
+        );
+    }
+
+    @Test
+    void replaceImage_missingProduct_rejectsBeforeFileStorage() {
+        ProductImageUploadForm form = uploadForm();
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(null);
+
+        assertBusinessError(
+                () -> productImageService.replaceImage(
+                        1L,
+                        10L,
+                        form
+                ),
+                ProductErrorCode.NOT_FOUND
+        );
+
+        verify(productMapper, never()).findProductImageById(
+                anyLong(),
+                anyLong()
+        );
+        verify(fileStorageClient, never()).store(any(), any());
+    }
+
+    @Test
+    void replaceImage_missingOrDifferentProductImage_rejectsStorage() {
+        ProductImageUploadForm form = uploadForm();
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(new Product());
+        when(productMapper.findProductImageById(1L, 10L))
+                .thenReturn(null);
+
+        assertBusinessError(
+                () -> productImageService.replaceImage(
+                        1L,
+                        10L,
+                        form
+                ),
+                ProductErrorCode.IMAGE_NOT_FOUND
+        );
+
+        verify(fileStorageClient, never()).store(any(), any());
+        verify(productMapper, never()).updateProductImageUrl(
+                anyLong(),
+                anyLong(),
+                any()
+        );
+    }
+
+    @Test
+    void replaceImage_fileStorageFails_returnsReplaceError() {
+        ProductImageUploadForm form = uploadForm();
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(new Product());
+        when(productMapper.findProductImageById(1L, 10L))
+                .thenReturn(storedProductImage());
+        when(fileStorageClient.store(
+                form.getImageFile(),
+                "product"
+        )).thenThrow(new IllegalStateException());
+
+        assertBusinessError(
+                () -> productImageService.replaceImage(
+                        1L,
+                        10L,
+                        form
+                ),
+                ProductErrorCode.IMAGE_REPLACE_FAILED
+        );
+
+        verify(productMapper, never()).updateProductImageUrl(
+                anyLong(),
+                anyLong(),
+                any()
+        );
+    }
+
+    @Test
+    void replaceImage_databaseUpdateFails_deletesNewFileOnRollback() {
+        ProductImageUploadForm form = uploadForm();
+        stubReadyToReplace(form);
+        when(productMapper.updateProductImageUrl(
+                1L,
+                10L,
+                REPLACEMENT_IMAGE_URL
+        )).thenThrow(new IllegalStateException());
+        TransactionSynchronizationManager.initSynchronization();
+
+        assertBusinessError(
+                () -> productImageService.replaceImage(
+                        1L,
+                        10L,
+                        form
+                ),
+                ProductErrorCode.IMAGE_REPLACE_FAILED
+        );
+
+        TransactionSynchronizationManager
+                .getSynchronizations()
+                .getFirst()
+                .afterCompletion(
+                        TransactionSynchronization.STATUS_ROLLED_BACK
+                );
+
+        verify(fileStorageClient).delete(REPLACEMENT_IMAGE_URL);
+        verify(fileStorageClient, never()).delete(STORED_IMAGE_URL);
+    }
+
+    @Test
+    void replaceImage_databaseUpdatesNoRows_deletesNewFileOnRollback() {
+        ProductImageUploadForm form = uploadForm();
+        stubReadyToReplace(form);
+        when(productMapper.updateProductImageUrl(
+                1L,
+                10L,
+                REPLACEMENT_IMAGE_URL
+        )).thenReturn(0);
+        TransactionSynchronizationManager.initSynchronization();
+
+        assertBusinessError(
+                () -> productImageService.replaceImage(
+                        1L,
+                        10L,
+                        form
+                ),
+                ProductErrorCode.IMAGE_REPLACE_FAILED
+        );
+
+        TransactionSynchronizationManager
+                .getSynchronizations()
+                .getFirst()
+                .afterCompletion(
+                        TransactionSynchronization.STATUS_ROLLED_BACK
+                );
+
+        verify(fileStorageClient).delete(REPLACEMENT_IMAGE_URL);
+        verify(fileStorageClient, never()).delete(STORED_IMAGE_URL);
+    }
+
+    @Test
+    void replaceImage_transactionRollsBack_deletesNewFileOnly() {
+        ProductImageUploadForm form = uploadForm();
+        stubReadyToReplace(form);
+        when(productMapper.updateProductImageUrl(
+                1L,
+                10L,
+                REPLACEMENT_IMAGE_URL
+        )).thenReturn(1);
+        TransactionSynchronizationManager.initSynchronization();
+
+        productImageService.replaceImage(1L, 10L, form);
+
+        List<TransactionSynchronization> synchronizations =
+                TransactionSynchronizationManager
+                        .getSynchronizations();
+        assertThat(synchronizations).hasSize(2);
+
+        synchronizations.forEach(synchronization ->
+                synchronization.afterCompletion(
+                        TransactionSynchronization.STATUS_ROLLED_BACK
+                )
+        );
+
+        verify(fileStorageClient).delete(REPLACEMENT_IMAGE_URL);
+        verify(fileStorageClient, never()).delete(STORED_IMAGE_URL);
+    }
+
+    @Test
     void deleteImage_validImage_deletesFileAfterCommit() {
         ProductImage image = storedProductImage();
         when(productMapper.findSalesInfoByIdForUpdate(1L))
@@ -369,6 +582,17 @@ class ProductImageServiceTests {
                 form.getImageFile(),
                 "product"
         )).thenReturn(STORED_IMAGE_URL);
+    }
+
+    private void stubReadyToReplace(ProductImageUploadForm form) {
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(new Product());
+        when(productMapper.findProductImageById(1L, 10L))
+                .thenReturn(storedProductImage());
+        when(fileStorageClient.store(
+                form.getImageFile(),
+                "product"
+        )).thenReturn(REPLACEMENT_IMAGE_URL);
     }
 
     private ProductImageUploadForm uploadForm() {

@@ -106,6 +106,20 @@ public interface ProductMapper {
     int insertProductImage(ProductImage productImage);
 
     /**
+     * 지정한 상품에 속한 이미지의 저장 경로를 변경한다.
+     *
+     * @param productId 이미지를 소유한 상품 식별자
+     * @param imageId 변경할 상품 이미지 식별자
+     * @param imageUrl 새 이미지 웹 접근 경로
+     * @return 수정된 행 개수
+     */
+    int updateProductImageUrl(
+            @Param("productId") long productId,
+            @Param("imageId") long imageId,
+            @Param("imageUrl") String imageUrl
+    );
+
+    /**
      * 지정한 상품에 속한 이미지를 삭제한다.
      *
      * @param productId 이미지를 소유한 상품 식별자
