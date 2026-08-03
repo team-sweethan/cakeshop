@@ -41,6 +41,7 @@
 | 이름 | 타입 | 내용 |
 |---|---|---|
 | `post` | `PostDetailView` | 글 본문과 상태. `blocked`, `edited`, `authorName()`은 뷰가 계산한다 |
+| `canEdit` | `boolean` | 수정·삭제 버튼을 보여줄지. 작성자 본인이고 차단되지 않은 글일 때만 참 |
 
 ## 무엇이 보이는가 (DOMAIN.md 4.3)
 
@@ -58,6 +59,8 @@
 | 문자열 | 언제 보이나 | 고정한 테스트 |
 |---|---|---|
 | `← 목록` | 항상 | 없음 |
+| `수정` | 작성자 본인 + 차단되지 않은 글일 때만 | `CommunityScreenRenderingTests.communityDetail_author_showsEditAndDeleteButtons` |
+| `삭제` | 위와 같은 조건 | `CommunityScreenRenderingTests.communityDetail_author_showsEditAndDeleteButtons` |
 | `조회` | 항상 | `CommunityScreenRenderingTests.communityDetail_rendersContent` |
 | `좋아요` | 항상 (숫자만. 누르는 버튼은 조각 4) | 없음 |
 | `댓글` | 항상 (구역 제목) | 없음 |
@@ -72,7 +75,8 @@
 - **본문과 제목은 `th:text`로 낸다. `th:utext`를 쓰지 않는다** (DOMAIN.md 7). 바꿔도 정상 글에서는 화면이 똑같아 보이고, 누군가 `<script>`를 저장한 순간에만 드러난다. → `communityDetail_htmlInContent_isEscaped`, `communityDetail_titleWithHtml_isEscaped`
 - **줄바꿈은 `<br>` 치환이 아니라 CSS로 살린다.** 치환하려면 `th:utext`가 필요해져서 위 규칙과 충돌한다.
 - **차단 안내 블록은 평소 화면에 절대 안 나온다.** "차단된 글을 작성자가 연다"는 조건에서만 그려지므로, 표현식이 깨져도 사람 눈으로는 영원히 발견되지 않는다. 렌더링 테스트가 유일한 방어선이다.
-- **차단된 글에는 작성자도 아무 조치를 할 수 없다.** 사유만 전달하고 수정·삭제 버튼을 주지 않는다 (DOMAIN.md 4.2 — `BLOCKED → DELETED` 금지).
+- **차단된 글에는 작성자도 아무 조치를 할 수 없다.** 사유만 전달하고 수정·삭제 버튼을 주지 않는다 (DOMAIN.md 4.2 — `BLOCKED → DELETED` 금지). 버튼을 숨기는 것은 안내일 뿐이고 막는 것은 Service다 — 작성자는 이 화면에서 주소를 알게 되므로 요청만 따로 보낼 수 있다.
+- **삭제는 링크가 아니라 폼이다.** GET으로 지워지면 링크 미리보기나 크롤러가 글을 없앨 수 있다.
 - **조회수는 노출되는 글에만 오른다.** 그리고 조회수가 올라도 `(수정됨)`이 켜지면 안 된다 — `posts.updated_at`이 `ON UPDATE CURRENT_TIMESTAMP`라 SQL에서 명시적으로 보존한다 (DOMAIN.md 6.2, 6.3).
 
 ## 상세에 앞으로 붙는 것
@@ -81,7 +85,6 @@
 
 | 무엇 | 조각 | 화면에 어떻게 나타나나 | 미리 정해진 것 |
 |---|---|---|---|
-| 수정·삭제 버튼 | 2 | 상단 `← 목록` 줄 오른쪽. **작성자 본인에게만.** 차단된 글에는 작성자에게도 주지 않는다 | 삭제는 `DELETED` 전이. 확인 창을 거친다 |
 | 댓글 목록·작성 | 3 | `댓글 기능은 준비 중입니다.` 자리를 대체 | 1단계만. 삭제된 댓글은 자리 표시로 남고 개수에서 빠진다 (DOMAIN.md 4.4) |
 | 좋아요 버튼 | 4 | 지금 숫자만 있는 `좋아요 N` 자리 | POST/DELETE 분리, 둘 다 멱등. **"내가 눌렀는지" 표시 여부는 DOMAIN.md 9의 보류 항목** |
 | 신고 버튼 | 5 | 본문 아래 | 중복 신고는 에러. 취소 불가 |

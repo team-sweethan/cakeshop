@@ -15,7 +15,19 @@
 
     <div class="cluster cluster--between">
       <a class="btn" th:href="@{/community}">← 목록</a>
-      <!-- 수정·삭제 버튼은 조각 2에서 붙인다. -->
+
+      <!--
+        작성자 본인에게만, 그리고 차단되지 않은 글에만 보인다(DOMAIN.md 4.2).
+        버튼을 숨기는 것만으로는 막은 것이 아니라서 Service가 다시 검증한다.
+        삭제가 링크가 아니라 폼인 것은 GET으로 글이 지워지면 안 되기 때문이다.
+      -->
+      <div class="cluster" th:if="${canEdit}">
+        <a class="btn" th:href="@{/community/{postId}/edit(postId=${post.id})}">수정</a>
+        <form method="post" th:action="@{/community/{postId}/delete(postId=${post.id})}"
+              onsubmit="return confirm('게시글을 삭제할까요? 되돌릴 수 없습니다.');">
+          <button class="btn btn--danger" type="submit">삭제</button>
+        </form>
+      </div>
     </div>
 
     <!--

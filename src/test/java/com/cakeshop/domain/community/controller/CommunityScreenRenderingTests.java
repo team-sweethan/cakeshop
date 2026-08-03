@@ -131,6 +131,19 @@ class CommunityScreenRenderingTests {
                         "/community?categoryId=" + categoryId + "&amp;page=2")));
     }
 
+    /**
+     * 삭제 성공 메시지가 목록에 실제로 그려지는지 확인한다.
+     *
+     * <p>삭제 결과는 목록 어디에도 남지 않는다. 이 안내가 사라지면 사용자는 글이 지워졌는지
+     * 알 수 없고, 화면은 평소와 똑같아 보이므로 아무도 눈치채지 못한다.
+     */
+    @Test
+    void communityList_afterDelete_showsSuccessMessage() throws Exception {
+        mockMvc.perform(get("/community").flashAttr("successMessage", "게시글을 삭제했습니다."))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("게시글을 삭제했습니다.")));
+    }
+
     /** 한 쪽에 다 들어가면 쪽 이동 블록 자체가 없어야 한다. */
     @Test
     void communityList_singlePage_omitsPageNavigation() throws Exception {
@@ -142,18 +155,88 @@ class CommunityScreenRenderingTests {
     }
 
     /**
-     * 작성 화면은 아직 목업이다(PLAN.md 조각 2).
+     * 작성 화면의 분류 선택지가 DB의 활성 카테고리인지 확인한다.
      *
-     * <p>목업 안내가 사라지면 사용자는 저장되지 않는 폼을 진짜로 오해한다. 조각 2에서 저장
-     * 경로를 붙일 때 이 테스트가 함께 바뀌어야 한다.
+     * <p>조각 2 이전에는 `후기/질문/자유/레시피`가 화면에 적혀 있었다. 비활성 카테고리가
+     * 선택지에 남는 것은 화면만 봐서는 알 수 없다(DOMAIN.md 6.8).
+     *
+     * <p>목업 표식이 남아 있으면 안 된다. `data-mock-form`이 붙은 폼은 스크립트가 가로채
+     * 서버로 보내지 않으므로, 저장 경로를 붙여 놓고도 <b>저장된 것처럼 보이는데 안 되는</b>
+     * 화면이 된다.
      */
     @Test
-    void communityCreateForm_stillRendersMockNotice() throws Exception {
+    void communityCreateForm_rendersActiveCategoriesAndPostsToServer() throws Exception {
+        insertInactiveCategory();
+
         mockMvc.perform(get("/community/new").with(authentication(authorOf(memberId))))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("글쓰기")))
-                .andExpect(content().string(containsString("mock-notice")))
-                .andExpect(content().string(containsString("data-mock-form")));
+                .andExpect(content().string(containsString("선택하세요")))
+                .andExpect(content().string(containsString("등록")))
+                .andExpect(content().string(containsString("화면테스트")))
+                .andExpect(content().string(not(containsString("비활성분류"))))
+                .andExpect(content().string(not(containsString("mock-notice"))))
+                .andExpect(content().string(not(containsString("data-mock-form"))))
+                // 이미지 첨부는 1차 범위 밖이다. 저장할 곳이 없는 입력이 화면에 남으면
+                // 사용자는 첨부가 되는 줄 안다(SCREENS.md 만들지 않는 화면).
+                .andExpect(content().string(not(containsString("사진 첨부"))));
+    }
+
+    /** 수정 화면은 기존 값이 채워진 채로 열린다. */
+    @Test
+    void communityEditForm_author_rendersExistingValues() throws Exception {
+        long postId = insertPost(memberId, "고칠 제목", "고칠 본문", PostStatus.PUBLISHED);
+
+        mockMvc.perform(get("/community/" + postId + "/edit")
+                        .with(authentication(authorOf(memberId))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("글 수정")))
+                .andExpect(content().string(containsString("고칠 제목")))
+                .andExpect(content().string(containsString("고칠 본문")));
+    }
+
+    /**
+     * 수정·삭제 버튼은 작성자에게만 보인다.
+     *
+     * <p>남의 화면에 버튼이 뜨면 눌러 봐야 404를 받는다. 실제로 막는 것은 Service지만,
+     * 버튼이 보이는 것 자체가 "이 글에 손댈 수 있다"는 거짓말이다.
+     */
+    @Test
+    void communityDetail_author_showsEditAndDeleteButtons() throws Exception {
+        long postId = insertPost(memberId, "내 글", "본문", PostStatus.PUBLISHED);
+
+        mockMvc.perform(get("/community/" + postId).with(authentication(authorOf(memberId))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("수정")))
+                .andExpect(content().string(containsString("삭제")))
+                .andExpect(content().string(containsString("/community/" + postId + "/edit")));
+    }
+
+    @Test
+    void communityDetail_otherMember_hidesEditAndDeleteButtons() throws Exception {
+        long postId = insertPost(memberId, "남의 글", "본문", PostStatus.PUBLISHED);
+
+        mockMvc.perform(get("/community/" + postId)
+                        .with(authentication(authorOf(withdrawnMemberId))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(
+                        not(containsString("/community/" + postId + "/edit"))));
+    }
+
+    /**
+     * 차단된 글에는 작성자에게도 수정·삭제 버튼이 없다.
+     *
+     * <p>작성자는 차단된 글 본문과 사유까지 보지만 할 수 있는 일은 없다(DOMAIN.md 4.2).
+     * 이 화면은 "차단된 글을 작성자가 연다"는 드문 조건에서만 그려진다.
+     */
+    @Test
+    void communityDetail_blockedPost_author_hidesEditAndDeleteButtons() throws Exception {
+        long postId = insertPost(memberId, "차단된 글", "본문", PostStatus.BLOCKED);
+
+        mockMvc.perform(get("/community/" + postId).with(authentication(authorOf(memberId))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(
+                        not(containsString("/community/" + postId + "/edit"))));
     }
 
     /**
@@ -357,6 +440,15 @@ class CommunityScreenRenderingTests {
                 code, name);
 
         return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+    }
+
+    private void insertInactiveCategory() {
+        jdbcTemplate.update(
+                """
+                INSERT INTO post_categories (code, name, is_active, sort_order)
+                VALUES (?, '비활성분류', 0, 999)
+                """,
+                "SCREEN_INACTIVE_" + System.nanoTime());
     }
 
     private long insertMember(String email, String nickname, String status) {

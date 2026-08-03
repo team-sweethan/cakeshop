@@ -9,8 +9,8 @@
 |---|---|---|---|---|
 | 목록 | `GET /community` | 구현됨 | 1 | [screens/list.md](screens/list.md) |
 | 상세 | `GET /community/{postId}` | 구현됨 | 1 | [screens/detail.md](screens/detail.md) |
-| 글쓰기 | `GET /community/new` | 목업 | 2 | [screens/new.md](screens/new.md) |
-| 수정 | `GET /community/{postId}/edit` | 계획 | 2 | [screens/edit.md](screens/edit.md) |
+| 글쓰기 | `GET /community/new` | 구현됨 | 2 | [screens/new.md](screens/new.md) |
+| 수정 | `GET /community/{postId}/edit` | 구현됨 | 2 | [screens/edit.md](screens/edit.md) |
 | 관리자 목록 | `GET /admin/community` | 목업 | 5 | [screens/admin-list.md](screens/admin-list.md) |
 | 관리자 상세 | `GET /admin/community/{postId}` | 목업 | 5 | [screens/admin-detail.md](screens/admin-detail.md) |
 

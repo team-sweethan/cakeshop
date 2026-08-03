@@ -51,6 +51,12 @@
 | `이전` | 2쪽 이상일 때. 앞 블록이 없으면 `btn--disabled`로 남는다 | `CommunityScreenRenderingTests.communityList_multiplePages_rendersPageNavigation` |
 | `다음` | 2쪽 이상일 때. 뒤 블록이 없으면 `btn--disabled`로 남는다 | `CommunityScreenRenderingTests.communityList_multiplePages_rendersPageNavigation` |
 
+## 화면에 있지만 문자열 표에 없는 것
+
+`게시글을 삭제했습니다.` — 글을 지우고 돌아오면 상단에 뜬다. 이 문구는 **템플릿이 아니라 `CommunityController`가 가진다**(`successMessage` flash → `fragments/common/alert`). 문자열 표는 템플릿 원문과 대조하는 검사이므로(`SCREENS.md` 2번) 여기 적으면 화면이 멀쩡한데도 빌드가 깨진다. 대신 `CommunityScreenRenderingTests.communityList_afterDelete_showsSuccessMessage`가 실제 렌더링 결과로 지킨다.
+
+삭제 결과는 목록 어디에도 남지 않는다. 이 안내가 사라지면 사용자는 글이 지워졌는지 알 수 없고, 화면은 평소와 똑같아 보인다.
+
 ## 눈으로는 안 잡히는 것
 
 - **작성자 이름은 `post.authorName()`으로 낸다.** 탈퇴 회원이면 닉네임 대신 `탈퇴한 회원`이 나온다 (DOMAIN.md 8). 템플릿에서 `post.authorNickname`을 직접 쓰면 탈퇴 회원 닉네임이 그대로 노출되는데, 화면은 멀쩡해 보인다. → `communityList_withdrawnAuthor_showsPlaceholderName`

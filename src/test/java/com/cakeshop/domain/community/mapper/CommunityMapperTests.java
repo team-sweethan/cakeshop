@@ -10,6 +10,7 @@ import com.cakeshop.domain.community.dto.view.PostCategoryView;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
 import com.cakeshop.domain.community.entity.CommentStatus;
+import com.cakeshop.domain.community.entity.Post;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 
@@ -278,6 +279,136 @@ class CommunityMapperTests {
         assertThat(communityMapper.findActiveCategories())
                 .extracting(PostCategoryView::code)
                 .contains("QNA", "REVIEW", "FREE");
+    }
+
+    @Test
+    void insertPost_fillsGeneratedIdAndStoresPublished() {
+        Post post = postOf(memberId, categoryId, "새 글", "본문");
+
+        communityMapper.insertPost(post);
+
+        assertThat(post.getId()).isNotNull();
+        PostDetailView saved = communityMapper.findPostById(post.getId());
+        assertThat(saved.title()).isEqualTo("새 글");
+        // 새 글은 언제나 PUBLISHED다. 컬럼 기본값에 맡기지 않고 SQL이 명시한다.
+        assertThat(saved.status()).isEqualTo(PostStatus.PUBLISHED);
+    }
+
+    /** 새 글에는 "수정됨"이 켜져 있으면 안 된다(DOMAIN.md 6.3). */
+    @Test
+    void insertPost_newPost_isNotMarkedAsEdited() {
+        Post post = postOf(memberId, categoryId, "새 글", "본문");
+
+        communityMapper.insertPost(post);
+
+        assertThat(communityMapper.findPostById(post.getId()).isEdited()).isFalse();
+    }
+
+    @Test
+    void updatePost_author_updatesTitleContentAndCategory() {
+        long postId = insertPost("원래 제목", PostStatus.PUBLISHED, BASE_TIME);
+        Post post = editOf(postId, memberId, otherCategoryId, "고친 제목", "고친 본문");
+
+        int updated = communityMapper.updatePost(post);
+
+        assertThat(updated).isEqualTo(1);
+        PostDetailView saved = communityMapper.findPostById(postId);
+        assertThat(saved.title()).isEqualTo("고친 제목");
+        assertThat(saved.content()).isEqualTo("고친 본문");
+        assertThat(saved.categoryId()).isEqualTo(otherCategoryId);
+    }
+
+    /** 수정하면 "수정됨"이 켜져야 한다. 조회수 UPDATE와 반대로 updated_at을 보존하지 않는다. */
+    @Test
+    void updatePost_marksPostAsEdited() {
+        long postId = insertPost("원래 제목", PostStatus.PUBLISHED, BASE_TIME);
+        Post post = editOf(postId, memberId, categoryId, "고친 제목", "본문");
+
+        communityMapper.updatePost(post);
+
+        assertThat(communityMapper.findPostById(postId).isEdited()).isTrue();
+    }
+
+    /**
+     * 소유권 조건이 SQL에도 있는지 확인한다.
+     *
+     * <p>Service가 먼저 막지만, 조건을 SQL에서 지우면 그 검증 하나가 유일한 방어가 된다.
+     */
+    @Test
+    void updatePost_otherMember_updatesNothing() {
+        long postId = insertPost("원래 제목", PostStatus.PUBLISHED, BASE_TIME);
+        Post post = editOf(postId, withdrawnMemberId, categoryId, "가로챈 제목", "본문");
+
+        assertThat(communityMapper.updatePost(post)).isZero();
+        assertThat(communityMapper.findPostById(postId).title()).isEqualTo("원래 제목");
+    }
+
+    @Test
+    void updatePost_blockedPost_updatesNothing() {
+        long postId = insertPost("차단된 글", PostStatus.BLOCKED, BASE_TIME);
+        Post post = editOf(postId, memberId, categoryId, "고친 제목", "본문");
+
+        assertThat(communityMapper.updatePost(post)).isZero();
+    }
+
+    @Test
+    void deletePost_author_marksPostAsDeleted() {
+        long postId = insertPost("지울 글", PostStatus.PUBLISHED, BASE_TIME);
+
+        assertThat(communityMapper.deletePost(postId, memberId)).isEqualTo(1);
+        assertThat(communityMapper.findPostById(postId).status()).isEqualTo(PostStatus.DELETED);
+    }
+
+    /** 삭제는 행을 지우지 않는다. 댓글·좋아요·신고가 그대로 매달려 있어야 한다(DOMAIN.md 4.5). */
+    @Test
+    void deletePost_keepsChildComments() {
+        long postId = insertPost("지울 글", PostStatus.PUBLISHED, BASE_TIME);
+        insertComment(postId, CommentStatus.PUBLISHED);
+
+        communityMapper.deletePost(postId, memberId);
+
+        Long comments = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM comments WHERE post_id = ?", Long.class, postId);
+        assertThat(comments).isEqualTo(1L);
+    }
+
+    /**
+     * 차단된 글은 삭제되지 않는다.
+     *
+     * <p>{@code BLOCKED -> DELETED} 금지(DOMAIN.md 4.2). 차단된 글은 신고·조치의 증거다.
+     */
+    @Test
+    void deletePost_blockedPost_deletesNothing() {
+        long postId = insertPost("차단된 글", PostStatus.BLOCKED, BASE_TIME);
+
+        assertThat(communityMapper.deletePost(postId, memberId)).isZero();
+        assertThat(communityMapper.findPostById(postId).status()).isEqualTo(PostStatus.BLOCKED);
+    }
+
+    @Test
+    void deletePost_otherMember_deletesNothing() {
+        long postId = insertPost("남의 글", PostStatus.PUBLISHED, BASE_TIME);
+
+        assertThat(communityMapper.deletePost(postId, withdrawnMemberId)).isZero();
+        assertThat(communityMapper.findPostById(postId).status()).isEqualTo(PostStatus.PUBLISHED);
+    }
+
+    @Test
+    void existsActiveCategory_inactiveCategory_isFalse() {
+        long inactiveId = insertCategory(
+                "COMMUNITY_INACTIVE_" + System.nanoTime(), "비활성", false);
+
+        assertThat(communityMapper.existsActiveCategory(categoryId)).isTrue();
+        assertThat(communityMapper.existsActiveCategory(inactiveId)).isFalse();
+    }
+
+    private Post postOf(long authorId, long postCategoryId, String title, String content) {
+        return Post.create(authorId, postCategoryId, title, content);
+    }
+
+    private Post editOf(
+            long postId, long authorId, long postCategoryId, String title, String content) {
+        return Post.edit(postId, authorId, postCategoryId, title, content);
     }
 
     private List<PostListView> findPage(int page, int size) {
