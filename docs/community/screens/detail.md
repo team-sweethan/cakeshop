@@ -63,13 +63,15 @@
 - **최신 N건을 오래된 순으로** 보여준다. 잘라 내는 쪽이 과거여야 방금 쓴 댓글이 언제나 화면에 있다. 앞에서 자르면 댓글이 많은 글에서 자기가 쓴 댓글이 화면 밖에 남는데, 사용자에게는 등록이 안 된 것과 구분되지 않는다.
 - `이전 댓글 더 보기`는 `N`을 20씩 늘린 주소로 가는 **링크**다. JS가 없어도 동작하고, 펼친 상태가 주소에 남아 새로고침·뒤로가기에서 유지된다.
 - `N`에는 상한(200)이 있다. 주소로 들어오는 값이라 막지 않으면 `?comments=99999999` 하나로 한 게시글의 댓글을 전부 메모리에 올릴 수 있다. **상한에 막혀 못 보여주는 댓글이 남으면 링크를 감추지 않고 그 사실을 적는다** — 감추면 "댓글이 여기까지"로 보이는데 그것은 거짓이다.
-- 작성·삭제 후에는 `?comments=` 없이 상세로 돌아간다. 새 댓글은 언제나 최신 20건 안에 있으므로 펼친 상태를 유지할 이유가 없다.
+- **작성 후에는** `?comments=` 없이 상세로 돌아간다. 새 댓글은 언제나 최신 20건 안에 있으므로 접혀도 보인다.
+- **삭제 후에는 펼친 상태를 그대로 유지한다.** 작성과 다르다 — 삭제에는 성공 메시지가 없고 지운 자리의 `삭제된 댓글입니다.`가 **결과를 보여 주는 유일한 신호**인데, 20건으로 접어 버리면 최신 20건 밖의 댓글은 그 자리가 화면 밖으로 나간다. 사용자에게는 삭제가 안 된 것과 구분되지 않는다. 그래서 삭제 폼이 지금 값을 실어 보내고 리다이렉트가 되돌려 놓는다. (2026-08-04, PR #93 Codex 리뷰)
+- **검증에 실패해 화면이 다시 그려질 때도 유지한다.** 어디로 간 것이 아니라 제자리다.
 
 | 무엇 | 누구에게 |
 |---|---|
 | 댓글 목록 | 상세를 볼 수 있는 사람 전부 (비로그인 포함) |
 | 댓글 작성 폼 | 로그인 회원 + `PUBLISHED` 글에만 |
-| `댓글 삭제` 버튼 | 그 댓글의 작성자에게만. 게시글 작성자에게도 관리자에게도 없다 (DOMAIN.md 6.7) |
+| `댓글 삭제` 버튼 | 그 댓글의 작성자에게만 + `PUBLISHED` 글에만. 게시글 작성자에게도 관리자에게도 없다 (DOMAIN.md 6.7). **댓글 작성 폼과 같은 조건이다** — 삭제도 `PUBLISHED`를 요구하므로(6.4) 차단된 글에 버튼을 남기면 눌러도 403만 나오는 죽은 버튼이 된다 |
 
 ## 무엇이 보이는가 (DOMAIN.md 4.3)
 
@@ -96,7 +98,7 @@
 | `아직 댓글이 없습니다.` | 댓글이 하나도 없을 때 | `CommunityScreenRenderingTests.communityDetail_withoutComments_showsEmptyMessage` |
 | `댓글 등록` | 로그인 회원 + `PUBLISHED` 글일 때만 | `CommunityScreenRenderingTests.communityDetail_authenticated_showsCommentForm` |
 | `등록한 댓글은 수정할 수 없습니다.` | 위와 같은 조건 (댓글에는 수정이 없다 — DOMAIN.md 6.4) | 없음 |
-| `댓글 삭제` | 그 댓글의 작성자에게만 | `CommunityScreenRenderingTests.communityDetail_ownComment_showsDeleteButton` |
+| `댓글 삭제` | 그 댓글의 작성자에게만 + `PUBLISHED` 글에만 | `CommunityScreenRenderingTests.communityDetail_ownComment_showsDeleteButton`, `CommunityScreenRenderingTests.communityDetail_blockedPostAuthor_hasNoDeadCommentDeleteButton` |
 | `로그인하면 댓글을 쓸 수 있습니다.` | 비로그인 + `PUBLISHED` 글일 때만. 차단된 글에는 띄우지 않는다 | `CommunityScreenRenderingTests.communityDetail_anonymous_showsLoginPromptInsteadOfForm` |
 | `이전 댓글 더 보기` | 아직 못 보여준 댓글이 남았고 상한에 걸리지 않았을 때 | `CommunityScreenRenderingTests.communityDetail_manyComments_showsLoadMoreForOlderComments` |
 | `남은 댓글` | 위와 같은 조건 | `CommunityScreenRenderingTests.communityDetail_manyComments_showsLoadMoreForOlderComments` |

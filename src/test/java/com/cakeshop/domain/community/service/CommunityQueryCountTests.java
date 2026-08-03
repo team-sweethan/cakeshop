@@ -110,9 +110,13 @@ class CommunityQueryCountTests {
         long postId = insertPost();
 
         queryCounter.reset();
-        communityService.getPostDetail(postId, null);
+        communityService.getPostDetail(postId, null, "M:1");
 
-        // 조회수 UPDATE는 query가 아니라 update로 실행되므로 SELECT는 상세 1회뿐이다.
+        // 조회 기록(INSERT)과 조회수 UPDATE는 query가 아니라 update로 실행되므로
+        // SELECT는 상세 1회뿐이다.
+        //
+        // 중복 판단을 "이미 봤는지 SELECT로 확인" 하는 형태로 바꾸면 이 수가 늘어난다.
+        // DB의 UNIQUE가 판단하게 두면 늘지 않는다 — 그게 6.2가 제약을 쓰는 이유이기도 하다.
         assertThat(queryCounter.count()).isEqualTo(1);
     }
 

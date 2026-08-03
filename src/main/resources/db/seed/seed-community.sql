@@ -34,12 +34,14 @@
 
 DELETE FROM `post_reports`;
 DELETE FROM `post_likes`;
+DELETE FROM `post_views`;
 DELETE FROM `comments`;
 DELETE FROM `posts`;
 
 -- 재실행해도 /community/1 같은 경로가 그대로이도록 카운터를 되돌린다.
 ALTER TABLE `post_reports` AUTO_INCREMENT = 1;
 ALTER TABLE `post_likes` AUTO_INCREMENT = 1;
+ALTER TABLE `post_views` AUTO_INCREMENT = 1;
 ALTER TABLE `comments` AUTO_INCREMENT = 1;
 ALTER TABLE `posts` AUTO_INCREMENT = 1;
 
@@ -238,13 +240,62 @@ SELECT p.`id`, m.`id`, '2026-07-26 12:00:00'
 
 -- like_count 는 증분하지 않고 매번 재계산한다(DOMAIN.md 6.5).
 -- 시드도 같은 방식으로 맞춰 둔다. 값이 어긋난 채로 시작하면 조각 4에서 원인을 찾기 어렵다.
+--
+-- updated_at 을 자기 값으로 다시 지정하는 것이 핵심이다. posts.updated_at 은
+-- ON UPDATE CURRENT_TIMESTAMP(6) 이라 그냥 두면 like_count 가 바뀐 글마다 값이 갱신되고,
+-- 화면에 '(수정됨)' 이 붙는다(DOMAIN.md 6.3). 좋아요를 받은 것과 글을 고친 것은 다르다.
 UPDATE `posts` p
    SET p.`like_count` = (
         SELECT COUNT(*) FROM `post_likes` pl WHERE pl.`post_id` = p.`id`
-       );
+       ),
+       p.`updated_at` = p.`updated_at`;
 
 -- ---------------------------------------------------------------------------
--- 6. 확인
+-- 6. 조회 이력
+--
+-- posts.view_count 는 post_views 에서 파생된 캐시다(DOMAIN.md 6.2). 이력 없이 숫자만
+-- 넣어 두면 두 값이 어긋난 채로 시작하고, 그 상태에서는 중복 방지가 도는지 눈으로
+-- 확인할 수가 없다 — 이미 큰 수라 1 이 오르든 말든 티가 안 난다.
+--
+-- 그래서 위에서 넣은 view_count 만큼 가짜 조회자를 만들고, 숫자는 이력에서 다시 센다.
+-- 글마다 조회수가 다르므로 조각 7 의 조회수 정렬도 이 데이터로 확인할 수 있다.
+--
+-- viewer_key 접두사를 'S:seed-' 로 두어 실제 세션 키('S:{sessionId}')와 겹치지 않게 한다.
+-- ---------------------------------------------------------------------------
+
+INSERT INTO `post_views` (`post_id`, `viewer_key`, `viewed_on`)
+SELECT p.`id`,
+       CONCAT('S:seed-', nums.`n`),
+       '2026-07-26'
+  FROM `posts` p
+  JOIN (
+        SELECT (tens.`n` - 1) * 10 + ones.`n` AS `n`
+          FROM (
+                SELECT 1 AS `n` UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4
+                UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8
+                UNION ALL SELECT 9 UNION ALL SELECT 10
+               ) tens
+          CROSS JOIN (
+                SELECT 1 AS `n` UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4
+                UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8
+                UNION ALL SELECT 9 UNION ALL SELECT 10
+               ) ones
+       ) nums
+    ON nums.`n` <= p.`view_count`;
+
+-- 이력에서 다시 센다. 여기서도 updated_at 을 보존한다.
+UPDATE `posts` p
+   SET p.`view_count` = (
+        SELECT COUNT(*) FROM `post_views` pv WHERE pv.`post_id` = p.`id`
+       ),
+       p.`updated_at` = p.`updated_at`;
+
+-- ---------------------------------------------------------------------------
+-- 7. 확인
+--
+-- 조회수불일치 는 반드시 0 이어야 한다. 0 이 아니면 view_count 와 post_views 가
+-- 갈라진 것이고, 그 상태의 조회수는 순위에 쓸 수 없다(DOMAIN.md 6.2).
+-- 수정표시글 은 1 이다 — '한 번 수정한 글입니다' 하나뿐이어야 한다.
 -- ---------------------------------------------------------------------------
 
 SELECT (SELECT COUNT(*) FROM `post_categories` WHERE `is_active` = 1) AS `활성카테고리`,
@@ -252,4 +303,9 @@ SELECT (SELECT COUNT(*) FROM `post_categories` WHERE `is_active` = 1) AS `활성
        (SELECT COUNT(*) FROM `posts` WHERE `status` <> 'PUBLISHED')   AS `숨김게시글`,
        (SELECT COUNT(*) FROM `comments` WHERE `status` = 'PUBLISHED') AS `노출댓글`,
        (SELECT COUNT(*) FROM `comments` WHERE `status` = 'DELETED')   AS `자리표시댓글`,
-       (SELECT COUNT(*) FROM `post_likes`)                            AS `좋아요`;
+       (SELECT COUNT(*) FROM `post_likes`)                            AS `좋아요`,
+       (SELECT COUNT(*) FROM `post_views`)                            AS `조회이력`,
+       (SELECT COUNT(*) FROM `posts` p
+         WHERE p.`view_count` <> (SELECT COUNT(*) FROM `post_views` pv
+                                   WHERE pv.`post_id` = p.`id`))      AS `조회수불일치`,
+       (SELECT COUNT(*) FROM `posts` WHERE `updated_at` > `created_at`) AS `수정표시글`;

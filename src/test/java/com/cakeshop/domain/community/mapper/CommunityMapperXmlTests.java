@@ -115,8 +115,43 @@ class CommunityMapperXmlTests {
     void increaseViewCount_keepsUpdatedAtUntouched() {
         String sql = normalizedSql("increaseViewCount");
 
-        assertThat(sql).contains("UPDATED_AT = UPDATED_AT");
+        assertThat(sql).contains("UPDATED_AT = P.UPDATED_AT");
         assertThat(sql).contains("STATUS = 'PUBLISHED'");
+    }
+
+    /**
+     * 조회수 증가가 <b>스스로</b> 중복을 걸러 내는지 확인한다.
+     *
+     * <p>이 조건을 떼고 "이력을 먼저 넣어 보고 새로 들어갔으면 올린다"로 되돌리면
+     * 잠금 순서가 뒤집힌다 — 이력 INSERT가 FK 확인으로 게시글 행에 공유 잠금을 걸고,
+     * 그 뒤 이 UPDATE가 배타 잠금을 기다리면서 같은 글을 동시에 연 요청끼리 교착에 빠진다
+     * (DOMAIN.md 6.2). 실제로 그렇게 만들었다가 잡힌 문제다.
+     *
+     * <p>동시 요청이 없으면 결과가 똑같아서 단일 스레드 테스트로는 드러나지 않는다.
+     * 실제 교착은 {@code CommunityViewCountConcurrencyTests}가 잡는다.
+     */
+    @Test
+    void increaseViewCount_filtersDuplicatesItselfSoItLocksThePostFirst() {
+        String sql = normalizedSql("increaseViewCount");
+
+        assertThat(sql).contains("NOT EXISTS");
+        assertThat(sql).contains("POST_VIEWS");
+        assertThat(sql).contains("VIEWED_ON = CURRENT_DATE");
+    }
+
+    /**
+     * 이력 INSERT가 중복을 삼키지 않는지 확인한다.
+     *
+     * <p>{@code INSERT IGNORE}로 바꾸면 조회수만 오르고 이력은 없는 상태가 조용히 남는다.
+     * 그 어긋남은 화면에 숫자가 조금 큰 모습으로만 나타나서 눈으로는 찾을 수 없다.
+     */
+    @Test
+    void recordView_doesNotSwallowDuplicates() {
+        String sql = normalizedSql("recordView");
+
+        assertThat(sql).contains("INSERT INTO POST_VIEWS");
+        assertThat(sql).doesNotContain("IGNORE");
+        assertThat(sql).doesNotContain("ON DUPLICATE KEY");
     }
 
     /**
@@ -198,6 +233,7 @@ class CommunityMapperXmlTests {
         parameters.put("size", 20);
         parameters.put("offset", 0);
         parameters.put("limit", 20);
+        parameters.put("viewerKey", "M:1");
 
         return statement.getBoundSql(parameters)
                 .getSql()

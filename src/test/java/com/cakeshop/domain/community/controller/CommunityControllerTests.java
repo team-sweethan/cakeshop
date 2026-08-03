@@ -7,6 +7,7 @@ import static org.hamcrest.Matchers.hasProperty;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -40,6 +41,8 @@ import com.cakeshop.global.security.MemberDetails;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -143,14 +146,14 @@ class CommunityControllerTests {
 
     @Test
     void detail_anonymousViewer_passesNullMemberId() throws Exception {
-        when(communityService.getPostDetail(15L, null)).thenReturn(publishedPost());
+        when(communityService.getPostDetail(eq(15L), isNull(), anyString())).thenReturn(publishedPost());
 
         mockMvc.perform(get("/community/15"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("customer/community/detail"))
                 .andExpect(model().attributeExists("post"));
 
-        verify(communityService).getPostDetail(15L, null);
+        verify(communityService).getPostDetail(eq(15L), isNull(), anyString());
     }
 
     /** 소유권 판단 기준은 요청 파라미터가 아니라 인증 정보다(AGENTS.md). */
@@ -162,12 +165,44 @@ class CommunityControllerTests {
                 new UsernamePasswordAuthenticationToken(
                         principal, null, principal.getAuthorities()));
 
-        when(communityService.getPostDetail(15L, 7L)).thenReturn(publishedPost());
+        when(communityService.getPostDetail(eq(15L), eq(7L), anyString())).thenReturn(publishedPost());
 
         mockMvc.perform(get("/community/15"))
                 .andExpect(status().isOk());
 
-        verify(communityService).getPostDetail(15L, 7L);
+        verify(communityService).getPostDetail(eq(15L), eq(7L), anyString());
+    }
+
+    /**
+     * 조회자 키가 인증 정보·세션에서만 오는지 확인한다(DOMAIN.md 6.2).
+     *
+     * <p>클라이언트가 정하는 값이면 매번 다른 키를 실어 보내는 것만으로 중복 방지가
+     * 사라진다. 조회수가 순위를 정하는 이상 그건 곧 순위 조작이다.
+     */
+    @Test
+    void detail_viewerKey_comesFromAuthenticationNotFromRequest() throws Exception {
+        authenticateAs(7L);
+        when(communityService.getPostDetail(eq(15L), eq(7L), anyString()))
+                .thenReturn(publishedPost());
+
+        mockMvc.perform(get("/community/15")
+                        // 요청이 실어 보낸 키는 무시되어야 한다.
+                        .param("viewerKey", "M:99"))
+                .andExpect(status().isOk());
+
+        assertThat(capturedViewerKey()).isEqualTo("M:7");
+    }
+
+    @Test
+    void detail_anonymousViewer_usesSessionAsViewerKey() throws Exception {
+        when(communityService.getPostDetail(eq(15L), isNull(), anyString()))
+                .thenReturn(publishedPost());
+
+        mockMvc.perform(get("/community/15"))
+                .andExpect(status().isOk());
+
+        // 비로그인은 세션 id로 센다. 접두사가 회원 키와 겹치면 서로 다른 사람이 합쳐진다.
+        assertThat(capturedViewerKey()).startsWith("S:").isNotEqualTo("S:");
     }
 
     /** 상세는 숫자 경로만 받는다. SecurityConfig의 공개 규칙과 같은 범위여야 한다. */
@@ -364,7 +399,7 @@ class CommunityControllerTests {
 
     @Test
     void detail_bindsCommentSectionAndForm() throws Exception {
-        when(communityService.getPostDetail(15L, null)).thenReturn(publishedPost());
+        when(communityService.getPostDetail(eq(15L), isNull(), anyString())).thenReturn(publishedPost());
 
         mockMvc.perform(get("/community/15"))
                 .andExpect(status().isOk())
@@ -377,7 +412,7 @@ class CommunityControllerTests {
     @Test
     void detail_authenticatedViewer_canComment() throws Exception {
         authenticateAs(7L);
-        when(communityService.getPostDetail(15L, 7L)).thenReturn(publishedPost());
+        when(communityService.getPostDetail(eq(15L), eq(7L), anyString())).thenReturn(publishedPost());
 
         mockMvc.perform(get("/community/15"))
                 .andExpect(status().isOk())
@@ -388,7 +423,7 @@ class CommunityControllerTests {
     @Test
     void detail_blockedPost_author_cannotComment() throws Exception {
         authenticateAs(7L);
-        when(communityService.getPostDetail(15L, 7L)).thenReturn(blockedPost());
+        when(communityService.getPostDetail(eq(15L), eq(7L), anyString())).thenReturn(blockedPost());
 
         mockMvc.perform(get("/community/15"))
                 .andExpect(status().isOk())
@@ -398,7 +433,7 @@ class CommunityControllerTests {
     /** "더 보기"가 실어 보낸 값이 그대로 Service에 넘어가야 펼친 상태가 유지된다. */
     @Test
     void detail_commentsParameter_isPassedToService() throws Exception {
-        when(communityService.getPostDetail(15L, null)).thenReturn(publishedPost());
+        when(communityService.getPostDetail(eq(15L), isNull(), anyString())).thenReturn(publishedPost());
 
         mockMvc.perform(get("/community/15").param("comments", "40"))
                 .andExpect(status().isOk());
@@ -409,7 +444,7 @@ class CommunityControllerTests {
     /** 상세는 공개 화면이라 주소가 망가져도 오류 페이지 대신 기본 상태를 보여준다. */
     @Test
     void detail_invalidCommentsParameter_fallsBackToDefault() throws Exception {
-        when(communityService.getPostDetail(15L, null)).thenReturn(publishedPost());
+        when(communityService.getPostDetail(eq(15L), isNull(), anyString())).thenReturn(publishedPost());
 
         mockMvc.perform(get("/community/15").param("comments", "전체"))
                 .andExpect(status().isOk());
@@ -462,7 +497,7 @@ class CommunityControllerTests {
                 .andExpect(model().attributeExists("commentSection"));
 
         verify(communityService, never()).addComment(anyLong(), any(), anyLong());
-        verify(communityService, never()).getPostDetail(anyLong(), any());
+        verify(communityService, never()).getPostDetail(anyLong(), any(), anyString());
     }
 
     /**
@@ -484,6 +519,25 @@ class CommunityControllerTests {
         verify(communityService, never()).addComment(anyLong(), any(), anyLong());
     }
 
+    /**
+     * 검증에 실패해 상세를 다시 그릴 때도 펼친 상태를 잃지 않는지 확인한다.
+     *
+     * <p>등록에 실패한 사람은 어디로 간 것이 아니라 제자리다. 20건으로 접어 버리면
+     * 오류 메시지와 함께 읽고 있던 댓글까지 사라진다(screens/detail.md).
+     */
+    @Test
+    void addComment_invalidForm_keepsExpandedCommentLimit() throws Exception {
+        authenticateAs(7L);
+        when(communityService.getCommentablePost(15L, 7L)).thenReturn(publishedPost());
+
+        mockMvc.perform(post("/community/15/comments")
+                        .param("content", "   ")
+                        .param("comments", "40"))
+                .andExpect(status().isOk());
+
+        verify(communityService).getComments(15L, 40);
+    }
+
     @Test
     void deleteComment_redirectsToDetail() throws Exception {
         authenticateAs(7L);
@@ -495,12 +549,60 @@ class CommunityControllerTests {
         verify(communityService).deleteComment(15L, 8L, 7L);
     }
 
+    /**
+     * 삭제 후에도 펼친 댓글 수가 유지되는지 확인한다.
+     *
+     * <p>삭제에는 성공 메시지가 없고 지운 자리의 "삭제된 댓글입니다."가 결과를 보여 주는
+     * 유일한 신호다. 20건으로 접어 돌려보내면 <b>최신 20건 밖의 댓글은 그 자리가 화면 밖으로
+     * 나가</b> 사용자에게는 삭제가 안 된 것과 구분되지 않는다(screens/detail.md).
+     *
+     * <p>댓글이 20건 이하면 접든 말든 결과가 같아서 이 회귀는 눈으로 잡히지 않는다.
+     */
+    @Test
+    void deleteComment_keepsExpandedCommentLimit() throws Exception {
+        authenticateAs(7L);
+
+        mockMvc.perform(post("/community/15/comments/8/delete").param("comments", "60"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/community/15?comments=60"));
+    }
+
+    /**
+     * 펼친 값이 주소로 나가기 전에 정수로 다시 쓰이는지 확인한다.
+     *
+     * <p>사용자가 보낸 문자열을 그대로 이으면 리다이렉트 주소에 임의의 값이 실린다.
+     * 상한(200)과 기본값(20) 처리도 조회 경로와 같은 규칙을 쓴다.
+     */
+    @ParameterizedTest
+    @CsvSource({
+            "abc, /community/15",
+            "-1, /community/15",
+            "20, /community/15",
+            "99999999, /community/15?comments=200",
+            "'40 OR 1=1', /community/15"
+    })
+    void deleteComment_rewritesCommentLimitAsInteger(String requested, String expectedUrl)
+            throws Exception {
+        authenticateAs(7L);
+
+        mockMvc.perform(post("/community/15/comments/8/delete").param("comments", requested))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(expectedUrl));
+    }
+
     private void authenticateAs(long memberId) {
         MemberDetails principal = new MemberDetails(new MemberAuthenticationView(
                 memberId, "author@cakeshop.local", "dummy", "USER", true));
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(
                         principal, null, principal.getAuthorities()));
+    }
+
+    private String capturedViewerKey() {
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(communityService).getPostDetail(anyLong(), any(), captor.capture());
+
+        return captor.getValue();
     }
 
     private PageRequest capturedPageRequest() {

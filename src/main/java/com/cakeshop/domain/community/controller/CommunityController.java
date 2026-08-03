@@ -2,6 +2,7 @@ package com.cakeshop.domain.community.controller;
 
 import com.cakeshop.domain.community.dto.form.CommentForm;
 import com.cakeshop.domain.community.dto.form.PostForm;
+import com.cakeshop.domain.community.dto.view.CommentSectionView;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
@@ -12,6 +13,7 @@ import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.security.MemberDetails;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -81,14 +83,35 @@ public class CommunityController {
             @RequestParam(name = "comments", required = false) String comments,
             @ModelAttribute("commentForm") CommentForm commentForm,
             @AuthenticationPrincipal MemberDetails memberDetails,
+            HttpServletRequest request,
             Model model
     ) {
         // 소유권 판단 기준은 요청 파라미터가 아니라 인증 정보다(AGENTS.md).
         Long viewerId = memberDetails == null ? null : memberDetails.getMemberId();
 
-        PostDetailView post = communityService.getPostDetail(postId, viewerId);
+        PostDetailView post =
+                communityService.getPostDetail(postId, viewerId, viewerKeyOf(viewerId, request));
 
         return prepareDetail(model, post, viewerId, comments);
+    }
+
+    /**
+     * 조회수 중복 방지에 쓸 조회자 키(DOMAIN.md 6.2). 회원이면 회원 번호, 비로그인이면
+     * 세션 id다.
+     *
+     * 요청에서 받지 않는다. 클라이언트가 정하는 값이면 매번 다른 키를 보내는 것만으로
+     * 중복 방지가 사라진다.
+     *
+     * 비로그인에게 세션이 없으면 여기서 만들어진다. 상세는 공개 화면이라 세션 없이도
+     * 열리는데, 키가 없으면 셀 수가 없다. 다만 이 방어는 <b>사람의 반복 조회까지</b>다 —
+     * 쿠키를 받지 않는 클라이언트는 매 요청이 새 세션이라 그대로 뚫린다(PLAN.md R12).
+     */
+    private String viewerKeyOf(Long viewerId, HttpServletRequest request) {
+        if (viewerId != null) {
+            return "M:" + viewerId;
+        }
+
+        return "S:" + request.getSession().getId();
     }
 
     /**
@@ -100,6 +123,7 @@ public class CommunityController {
     @PostMapping("/community/{postId:\\d+}/comments")
     public String addComment(
             @PathVariable("postId") long postId,
+            @RequestParam(name = "comments", required = false) String comments,
             @Valid @ModelAttribute("commentForm") CommentForm commentForm,
             BindingResult bindingResult,
             @AuthenticationPrincipal MemberDetails memberDetails,
@@ -111,7 +135,8 @@ public class CommunityController {
 
         if (bindingResult.hasErrors()) {
             // 여기서 getPostDetail을 부르면 잘못 보낸 댓글마다 조회수가 오른다.
-            return prepareDetail(model, post, memberId, null);
+            // comments를 그대로 넘긴다 — 어디로 간 것이 아니라 제자리이므로 접으면 안 된다.
+            return prepareDetail(model, post, memberId, comments);
         }
 
         communityService.addComment(postId, commentForm, memberId);
@@ -125,16 +150,39 @@ public class CommunityController {
      *
      * 성공 메시지를 남기지 않는다. 지운 자리에 "삭제된 댓글입니다"가 그대로 보이므로
      * 결과가 화면에 이미 있다 — 목록에서 흔적 없이 사라지는 게시글 삭제와 다르다.
+     *
+     * 그래서 <b>펼친 상태를 유지한 채</b> 돌려보낸다. 자리 표시가 유일한 신호인데 20건으로
+     * 접어 버리면 최신 20건 밖의 댓글은 그 자리가 화면 밖으로 나가고, 사용자에게는 삭제가
+     * 안 된 것과 구분되지 않는다. 작성은 반대로 접어도 된다 — 새 댓글은 언제나 최신 20건
+     * 안에 있다(screens/detail.md).
      */
     @PostMapping("/community/{postId:\\d+}/comments/{commentId:\\d+}/delete")
     public String deleteComment(
             @PathVariable("postId") long postId,
             @PathVariable("commentId") long commentId,
+            @RequestParam(name = "comments", required = false) String comments,
             @AuthenticationPrincipal MemberDetails memberDetails
     ) {
         communityService.deleteComment(postId, commentId, memberDetails.getMemberId());
 
-        return "redirect:/community/" + postId;
+        return redirectToDetail(postId, comments);
+    }
+
+    /**
+     * 상세로 되돌리되 펼친 댓글 수를 유지한다.
+     *
+     * 받은 문자열을 그대로 잇지 않고 정수로 바꿔 다시 쓴다. 주소에 들어갈 값이므로
+     * 사용자가 보낸 문자열이 그대로 나가면 안 된다. 기본값이면 아예 붙이지 않는다 —
+     * 평범한 삭제에까지 주소가 길어질 이유가 없다.
+     */
+    private String redirectToDetail(long postId, String comments) {
+        int limit = CommentSectionView.clampLimit(parsePositiveInteger(comments));
+
+        if (limit == CommentSectionView.DEFAULT_LIMIT) {
+            return "redirect:/community/" + postId;
+        }
+
+        return "redirect:/community/" + postId + "?comments=" + limit;
     }
 
     /**
