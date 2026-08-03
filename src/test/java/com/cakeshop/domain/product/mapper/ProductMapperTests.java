@@ -719,6 +719,55 @@ class ProductMapperTests {
     }
 
     @Test
+    void updateProductImageUrl_matchingProduct_updatesUrlOnly() {
+        long imageId = insertProductImage(
+                "/uploads/product/before.jpg",
+                2
+        );
+
+        int updatedRows = productMapper.updateProductImageUrl(
+                optionProductId,
+                imageId,
+                "/uploads/product/after.png"
+        );
+
+        ProductImage updatedImage =
+                productMapper.findProductImageById(
+                        optionProductId,
+                        imageId
+                );
+        assertThat(updatedRows).isEqualTo(1);
+        assertThat(updatedImage).isNotNull();
+        assertThat(updatedImage.getImageUrl())
+                .isEqualTo("/uploads/product/after.png");
+        assertThat(updatedImage.getProductId())
+                .isEqualTo(optionProductId);
+        assertThat(updatedImage.getSortOrder()).isEqualTo(2);
+    }
+
+    @Test
+    void updateProductImageUrl_differentProduct_keepsOriginalUrl() {
+        long imageId = insertProductImage(
+                "/uploads/product/original.jpg",
+                0
+        );
+
+        int updatedRows = productMapper.updateProductImageUrl(
+                optionProductId + 1,
+                imageId,
+                "/uploads/product/not-applied.png"
+        );
+
+        assertThat(updatedRows).isZero();
+        assertThat(productMapper.findProductImageById(
+                optionProductId,
+                imageId
+        ).getImageUrl()).isEqualTo(
+                "/uploads/product/original.jpg"
+        );
+    }
+
+    @Test
     void deleteProductImage_matchingProduct_deletesOnlyTargetImage() {
         long targetImageId = insertProductImage(
                 "/uploads/product/delete-target.jpg",

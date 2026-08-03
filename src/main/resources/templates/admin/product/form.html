@@ -353,7 +353,21 @@
               </div>
 
               <div class="product-image-actions">
-                <form class="product-image-delete-form"
+                <button class="btn"
+                        type="submit"
+                        form="productImageUploadForm"
+                        data-product-image-replace
+                        data-confirm=
+                                "이 상품 이미지를 교체하시겠습니까?"
+                        th:formaction=
+                                "@{/admin/products/{productId}/images/{imageId}/replace(
+                                productId=${productId},
+                                imageId=${image.id}
+                                )}">
+                  교체
+                </button>
+
+                <form class="product-image-delete-action"
                       method="post"
                       data-product-image-delete
                       th:action=
@@ -380,7 +394,8 @@
           </div>
 
           <!-- 상품 기본 정보 수정 Form과 중첩하지 않는 별도 업로드 Form -->
-          <form method="post"
+          <form id="productImageUploadForm"
+                method="post"
                 enctype="multipart/form-data"
                 data-product-image-upload
                 th:action=
@@ -398,7 +413,6 @@
                      type="file"
                      accept="image/jpeg,image/png"
                      th:field="*{imageFile}"
-                     th:disabled="${productImages.size() >= 5}"
                      required>
             </div>
 

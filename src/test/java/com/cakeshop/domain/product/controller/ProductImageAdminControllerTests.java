@@ -114,6 +114,99 @@ class ProductImageAdminControllerTests {
     }
 
     @Test
+    void replaceImage_validFile_redirectsWithSuccessMessage()
+            throws Exception {
+        ProductImageService service =
+                mock(ProductImageService.class);
+        MockMvc mockMvc = mockMvc(service);
+        MockMultipartFile imageFile = imageFile();
+
+        mockMvc.perform(
+                        multipart(
+                                "/admin/products/1/images/10/replace"
+                        ).file(imageFile)
+                )
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(
+                        "/admin/products/1/edit"
+                ))
+                .andExpect(flash().attribute(
+                        "successMessage",
+                        "상품 이미지를 교체했습니다."
+                ));
+
+        ArgumentCaptor<ProductImageUploadForm> formCaptor =
+                ArgumentCaptor.forClass(
+                        ProductImageUploadForm.class
+                );
+        verify(service).replaceImage(
+                eq(1L),
+                eq(10L),
+                formCaptor.capture()
+        );
+        assertThat(formCaptor.getValue().getImageFile())
+                .isSameAs(imageFile);
+    }
+
+    @Test
+    void replaceImage_fileMissing_redirectsWithValidationMessage()
+            throws Exception {
+        ProductImageService service =
+                mock(ProductImageService.class);
+        MockMvc mockMvc = mockMvc(service);
+
+        mockMvc.perform(
+                        multipart(
+                                "/admin/products/1/images/10/replace"
+                        )
+                )
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(
+                        "/admin/products/1/edit"
+                ))
+                .andExpect(flash().attribute(
+                        "errorMessage",
+                        "교체할 상품 이미지를 선택해 주세요."
+                ));
+
+        verify(service, never()).replaceImage(
+                anyLong(),
+                anyLong(),
+                any(ProductImageUploadForm.class)
+        );
+    }
+
+    @Test
+    void replaceImage_businessError_redirectsWithPublicErrorMessage()
+            throws Exception {
+        ProductImageService service =
+                mock(ProductImageService.class);
+        doThrow(new BusinessException(
+                ProductErrorCode.INVALID_IMAGE_FILE
+        )).when(service).replaceImage(
+                anyLong(),
+                anyLong(),
+                any(ProductImageUploadForm.class)
+        );
+        MockMvc mockMvc = mockMvc(service);
+
+        mockMvc.perform(
+                        multipart(
+                                "/admin/products/1/images/10/replace"
+                        ).file(imageFile())
+                )
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(
+                        "/admin/products/1/edit"
+                ))
+                .andExpect(flash().attribute(
+                        "errorMessage",
+                        ProductErrorCode.INVALID_IMAGE_FILE
+                                .message()
+                ));
+    }
+
+    @Test
     void deleteImage_existingImage_redirectsWithSuccessMessage()
             throws Exception {
         ProductImageService service =

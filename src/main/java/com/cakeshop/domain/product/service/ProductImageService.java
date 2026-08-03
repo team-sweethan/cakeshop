@@ -16,7 +16,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
-/** 관리자 상품 이미지 등록·삭제 업무를 처리한다. */
+/** 관리자 상품 이미지 등록·교체·삭제 업무를 처리한다. */
 @Service
 public class ProductImageService {
 
@@ -123,6 +123,87 @@ public class ProductImageService {
     }
 
     /**
+     * 지정한 상품 이미지의 표시 순서는 유지하면서 저장 파일을 교체한다.
+     *
+     * <p>DB 트랜잭션이 롤백되면 새 파일을 삭제하고,
+     * 커밋된 뒤에는 기존 파일을 삭제한다.</p>
+     *
+     * @param productId 이미지를 소유한 상품 식별자
+     * @param imageId 교체할 상품 이미지 식별자
+     * @param form 이미지 교체 입력값
+     */
+    @Transactional
+    public void replaceImage(
+            long productId,
+            long imageId,
+            ProductImageUploadForm form
+    ) {
+        MultipartFile imageFile = form == null
+                ? null
+                : form.getImageFile();
+
+        productImageValidator.validate(imageFile);
+
+        Product product = productMapper.findSalesInfoByIdForUpdate(
+                productId
+        );
+
+        if (product == null) {
+            throw new BusinessException(
+                    ProductErrorCode.NOT_FOUND
+            );
+        }
+
+        ProductImage productImage =
+                productMapper.findProductImageById(
+                        productId,
+                        imageId
+                );
+
+        if (productImage == null) {
+            throw new BusinessException(
+                    ProductErrorCode.IMAGE_NOT_FOUND
+            );
+        }
+
+        String newImageUrl = storeReplacementImage(imageFile);
+        boolean rollbackCleanupRegistered = false;
+
+        try {
+            rollbackCleanupRegistered =
+                    registerRollbackCleanup(newImageUrl);
+
+            int updatedRows = productMapper.updateProductImageUrl(
+                    productId,
+                    imageId,
+                    newImageUrl
+            );
+
+            if (updatedRows != 1) {
+                throw new BusinessException(
+                        ProductErrorCode.IMAGE_REPLACE_FAILED
+                );
+            }
+
+            registerCommitFileDeletion(
+                    productImage.getImageUrl()
+            );
+        } catch (RuntimeException exception) {
+            if (!rollbackCleanupRegistered) {
+                deleteStoredFileQuietly(newImageUrl);
+            }
+
+            if (exception instanceof BusinessException) {
+                throw exception;
+            }
+
+            throw new BusinessException(
+                    ProductErrorCode.IMAGE_REPLACE_FAILED
+            );
+        }
+    }
+
+    /**
      * 지정한 상품의 이미지 정보를 삭제하고 커밋 후 저장 파일을 정리한다.
      *
      * <p>같은 상품의 이미지 등록·삭제를 직렬화하고,
@@ -195,10 +276,23 @@ public class ProductImageService {
         }
     }
 
-    private void registerRollbackCleanup(String imageUrl) {
+    private String storeReplacementImage(MultipartFile imageFile) {
+        try {
+            return fileStorageClient.store(
+                    imageFile,
+                    "product"
+            );
+        } catch (RuntimeException exception) {
+            throw new BusinessException(
+                    ProductErrorCode.IMAGE_REPLACE_FAILED
+            );
+        }
+    }
+
+    private boolean registerRollbackCleanup(String imageUrl) {
         if (!TransactionSynchronizationManager
                 .isSynchronizationActive()) {
-            return;
+            return false;
         }
 
         TransactionSynchronizationManager.registerSynchronization(
@@ -211,6 +305,8 @@ public class ProductImageService {
                     }
                 }
         );
+
+        return true;
     }
 
     private void registerCommitFileDeletion(String imageUrl) {

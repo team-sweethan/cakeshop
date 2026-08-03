@@ -251,6 +251,9 @@ class ScreenRenderingTests {
             .andExpect(content().string(not(containsString(
                 "data-product-image-delete"
             ))))
+            .andExpect(content().string(not(containsString(
+                "data-product-image-replace"
+            ))))
             .andExpect(content().string(not(matchesPattern(
                 "(?s).*<button(?=[^>]*data-image-upload-button)"
                     + "(?=[^>]*disabled)[^>]*>.*"
@@ -324,6 +327,28 @@ class ScreenRenderingTests {
                 "data-product-image-delete"
             )))
             .andExpect(content().string(containsString(
+                "data-product-image-replace"
+            )))
+            .andExpect(content().string(containsString(
+                "form=\"productImageUploadForm\""
+            )))
+            .andExpect(content().string(containsString(
+                "/admin/products/"
+                    + productId
+                    + "/images/"
+                    + firstImageId
+                    + "/replace"
+            )))
+            .andExpect(content().string(containsString(
+                "multipart/form-data"
+            )))
+            .andExpect(content().string(containsString(
+                "이 상품 이미지를 교체하시겠습니까?"
+            )))
+            .andExpect(content().string(not(containsString(
+                "교체할 이미지"
+            ))))
+            .andExpect(content().string(containsString(
                 "/admin/products/"
                     + productId
                     + "/images/"
@@ -339,7 +364,11 @@ class ScreenRenderingTests {
             .andExpect(content().string(matchesPattern(
                 "(?s).*<button(?=[^>]*data-image-upload-button)"
                     + "(?=[^>]*disabled)[^>]*>.*"
-            )));
+            )))
+            .andExpect(content().string(not(matchesPattern(
+                "(?s).*<input(?=[^>]*id=\"imageFile\")"
+                    + "(?=[^>]*disabled)[^>]*>.*"
+            ))));
     }
 
     private void assertScreensRender(String[] paths) throws Exception {
