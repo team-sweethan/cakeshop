@@ -410,7 +410,8 @@ CREATE DATABASE `cakeshop`
 | 결제 | `/orders/{id}/payment` | 목업 |
 | 마이페이지·프로필·쿠폰 | `/mypage`, `/mypage/profile`, `/mypage/coupons` | 목업 |
 | 알림·후기 | `/notifications`, `/reviews/new` | 목업 |
-| 커뮤니티 목록·상세·글쓰기 | `/community`, `/community/{id}`, `/community/new` | 목업 (별도 추가) |
+| 커뮤니티 목록·상세 | `/community`, `/community/{id}` | 실제 조회 (카테고리 필터·페이징·조회수) |
+| 커뮤니티 글쓰기 | `/community/new` | 목업 (별도 추가, 조각 2에서 연결) |
 
 프론트 저장소가 갱신되면 다음 명령으로 프론트 원본 기반 16개 목업 템플릿과 전용 CSS·JavaScript를 다시 가져온다. 메인·로그인과 별도로 추가한 커뮤니티 화면은 이 명령이 덮어쓰지 않는다.
 
