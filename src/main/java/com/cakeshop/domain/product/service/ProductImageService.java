@@ -87,13 +87,14 @@ public class ProductImageService {
 
         productImage.setProductId(productId);
         productImage.setImageUrl(imageUrl);
-        productImage.setSortOrder(
-                productMapper.findNextProductImageSortOrder(
-                        productId
-                )
-        );
 
         try {
+            productImage.setSortOrder(
+                    productMapper.findNextProductImageSortOrder(
+                            productId
+                    )
+            );
+
             int insertedRows =
                     productMapper.insertProductImage(
                             productImage

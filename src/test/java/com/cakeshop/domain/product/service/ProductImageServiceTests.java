@@ -162,6 +162,29 @@ class ProductImageServiceTests {
     }
 
     @Test
+    void uploadImage_sortOrderLookupFails_deletesStoredFile() {
+        ProductImageUploadForm form = uploadForm();
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(new Product());
+        when(productMapper.countProductImagesByProductId(1L))
+                .thenReturn(0);
+        when(fileStorageClient.store(
+                form.getImageFile(),
+                "product"
+        )).thenReturn(STORED_IMAGE_URL);
+        when(productMapper.findNextProductImageSortOrder(1L))
+                .thenThrow(new IllegalStateException());
+
+        assertBusinessError(
+                () -> productImageService.uploadImage(1L, form),
+                ProductErrorCode.IMAGE_UPLOAD_FAILED
+        );
+
+        verify(fileStorageClient).delete(STORED_IMAGE_URL);
+        verify(productMapper, never()).insertProductImage(any());
+    }
+
+    @Test
     void uploadImage_transactionRollsBack_deletesStoredFile() {
         ProductImageUploadForm form = uploadForm();
         stubReadyToStore(form);
