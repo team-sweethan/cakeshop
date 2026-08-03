@@ -56,6 +56,7 @@ DELETE FROM `products`;
 DELETE FROM `categories`;
 DELETE FROM `store_holiday`;
 DELETE FROM `social_accounts`;
+DELETE FROM `member_status_histories`;
 DELETE FROM `members`;
 
 -- DELETE 는 AUTO_INCREMENT 카운터를 되돌리지 않는다. 그대로 두면 재실행할 때마다
@@ -94,6 +95,7 @@ ALTER TABLE `products` AUTO_INCREMENT = 1;
 ALTER TABLE `categories` AUTO_INCREMENT = 1;
 ALTER TABLE `store_holiday` AUTO_INCREMENT = 1;
 ALTER TABLE `social_accounts` AUTO_INCREMENT = 1;
+ALTER TABLE `member_status_histories` AUTO_INCREMENT = 1;
 ALTER TABLE `members` AUTO_INCREMENT = 1;
 
 -- ---------------------------------------------------------------------------

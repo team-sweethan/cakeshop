@@ -13,6 +13,8 @@
     <div class="admin-main">
         <header th:replace="~{fragments/admin/header :: header('회원 관리')}"></header>
         <main class="admin-content">
+            <th:block th:replace="~{fragments/common/alert :: popup}"></th:block>
+
             <div class="member-admin-detail-header">
                 <h1 class="admin-page-title">회원 상세</h1>
                 <a class="btn btn--outline" th:href="@{/admin/members}">목록</a>
@@ -64,7 +66,21 @@
             </section>
 
             <section class="panel member-admin-detail-section">
-                <h2 class="member-admin-detail-title">계정 상태</h2>
+                <div class="member-admin-detail-section-heading">
+                    <h2 class="member-admin-detail-title">계정 상태</h2>
+                    <button class="btn btn--danger member-admin-status-action"
+                            type="button"
+                            th:if="${member.role == 'USER' and member.status.name() == 'ACTIVE'}"
+                            th:attr="data-modal-open=|member-detail-suspend-modal-${member.id}|">
+                        이용정지
+                    </button>
+                    <button class="btn btn--primary member-admin-status-action"
+                            type="button"
+                            th:if="${member.role == 'USER' and member.status.name() == 'SUSPENDED'}"
+                            th:attr="data-modal-open=|member-detail-activate-modal-${member.id}|">
+                        정지 해제
+                    </button>
+                </div>
                 <dl class="member-admin-detail-grid">
                     <div class="member-admin-detail-item">
                         <dt class="member-admin-detail-label">상태</dt>
@@ -126,9 +142,115 @@
                         </dd>
                     </div>
                 </dl>
+
+                <div class="modal" hidden
+                     th:if="${member.role == 'USER' and member.status.name() == 'ACTIVE'}"
+                     th:id="|member-detail-suspend-modal-${member.id}|">
+                    <div class="modal__dialog" role="dialog" aria-modal="true"
+                         th:attr="aria-labelledby=|member-detail-suspend-title-${member.id}|">
+                        <h2 class="member-admin-modal-title"
+                            th:id="|member-detail-suspend-title-${member.id}|">회원 이용정지</h2>
+                        <p class="member-admin-modal-description">이용정지 사유를 입력해 주세요.</p>
+                        <form method="post"
+                              th:action="@{/admin/members/{memberId}/suspend(memberId=${member.id})}">
+                            <input type="hidden" name="source" value="detail">
+                            <div class="form-group">
+                                <label th:for="|detail-suspend-reason-${member.id}|">이용정지 사유</label>
+                                <textarea class="form-control member-admin-modal-reason"
+                                          name="reason" rows="4" required maxlength="500"
+                                          placeholder="회원 이용을 정지하는 사유를 입력해 주세요."
+                                          th:id="|detail-suspend-reason-${member.id}|"></textarea>
+                            </div>
+                            <div class="cluster">
+                                <button class="btn btn--danger" type="submit">이용정지</button>
+                                <button class="btn btn--outline" type="button" data-modal-close>취소</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="modal" hidden
+                     th:if="${member.role == 'USER' and member.status.name() == 'SUSPENDED'}"
+                     th:id="|member-detail-activate-modal-${member.id}|">
+                    <div class="modal__dialog" role="dialog" aria-modal="true"
+                         th:attr="aria-labelledby=|member-detail-activate-title-${member.id}|">
+                        <h2 class="member-admin-modal-title"
+                            th:id="|member-detail-activate-title-${member.id}|">회원 이용정지 해제</h2>
+                        <p class="member-admin-modal-description">이용정지 해제 사유를 입력해 주세요.</p>
+                        <form method="post"
+                              th:action="@{/admin/members/{memberId}/activate(memberId=${member.id})}">
+                            <input type="hidden" name="source" value="detail">
+                            <div class="form-group">
+                                <label th:for="|detail-activate-reason-${member.id}|">이용정지 해제 사유</label>
+                                <textarea class="form-control member-admin-modal-reason"
+                                          name="reason" rows="4" required maxlength="500"
+                                          placeholder="회원 이용정지를 해제하는 사유를 입력해 주세요."
+                                          th:id="|detail-activate-reason-${member.id}|"></textarea>
+                            </div>
+                            <div class="cluster">
+                                <button class="btn btn--primary" type="submit">정지 해제</button>
+                                <button class="btn btn--outline" type="button" data-modal-close>취소</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel member-admin-detail-section">
+                <div class="member-admin-history-heading">
+                    <h2 class="member-admin-detail-title">이용정지 이력</h2>
+                    <span class="member-admin-history-count"
+                          th:text="|총 ${member.statusHistories.size()}건|">총 2건</span>
+                </div>
+
+                <ol class="member-admin-history-list"
+                    th:if="${!member.statusHistories.isEmpty()}">
+                    <li class="member-admin-history-item"
+                        th:each="history : ${member.statusHistories}">
+                        <div class="member-admin-history-header">
+                            <span class="member-admin-history-action"
+                                  th:classappend="${history.action.name() == 'SUSPEND'}
+                                      ? ' is-suspend'
+                                      : ' is-activate'"
+                                  th:text="${history.actionLabel()}">
+                                이용정지
+                            </span>
+                            <time class="member-admin-history-date"
+                                  th:datetime="${history.processedAt}"
+                                  th:text="${#temporals.format(
+                                      history.processedAt,
+                                      'yyyy.MM.dd HH:mm')}">
+                                2026.08.03 09:00
+                            </time>
+                        </div>
+
+                        <div class="member-admin-history-status">
+                            <span th:text="${history.beforeStatusLabel()}">정상</span>
+                            <span class="member-admin-history-arrow"
+                                  aria-hidden="true">→</span>
+                            <strong th:text="${history.afterStatusLabel()}">이용정지</strong>
+                        </div>
+
+                        <div class="member-admin-history-reason">
+                            <span>처리 사유</span>
+                            <p th:text="${history.reason}">정지 사유</p>
+                        </div>
+
+                        <div class="member-admin-history-processor">
+                            <span>처리 관리자</span>
+                            <strong th:text="${history.processorLabel()}">관리자</strong>
+                        </div>
+                    </li>
+                </ol>
+
+                <p class="member-admin-history-empty"
+                   th:if="${member.statusHistories.isEmpty()}">
+                    이용정지 변경 이력이 없습니다.
+                </p>
             </section>
         </main>
     </div>
 </div>
+<script th:src="@{/js/member-admin.js}"></script>
 </body>
 </html>

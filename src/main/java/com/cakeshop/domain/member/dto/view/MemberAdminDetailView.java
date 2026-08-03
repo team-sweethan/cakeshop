@@ -1,6 +1,7 @@
 package com.cakeshop.domain.member.dto.view;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import com.cakeshop.domain.member.entity.MemberStatus;
 
@@ -20,6 +21,7 @@ public record MemberAdminDetailView(
         LocalDateTime updatedAt,
         LocalDateTime suspendedAt,
         String suspendedReason,
-        LocalDateTime withdrawnAt
+        LocalDateTime withdrawnAt,
+        List<MemberStatusHistoryView> statusHistories
 ) {
 }

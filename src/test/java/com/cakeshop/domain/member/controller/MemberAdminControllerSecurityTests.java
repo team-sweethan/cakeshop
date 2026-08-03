@@ -4,7 +4,9 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -16,6 +18,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import com.cakeshop.domain.member.dto.view.MemberAdminDetailView;
+import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
 import com.cakeshop.domain.member.dto.view.MemberAdminListView;
 import com.cakeshop.domain.member.entity.MemberStatus;
 import com.cakeshop.domain.member.service.MemberAdminService;
@@ -23,6 +26,7 @@ import com.cakeshop.domain.member.service.MemberSessionService;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.security.SecurityConfig;
+import com.cakeshop.global.security.MemberDetails;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -31,6 +35,7 @@ import org.springframework.security.test.context.support.WithAnonymousUser;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 
 @WebMvcTest(MemberAdminController.class)
 @Import(SecurityConfig.class)
@@ -123,12 +128,16 @@ class MemberAdminControllerSecurityTests {
                 registeredAt,
                 null,
                 null,
-                null);
+                null,
+                List.of());
 
         when(memberAdminService.getMemberDetail(1L))
                 .thenReturn(member);
 
-        mockMvc.perform(get("/admin/members/1"))
+        mockMvc.perform(get("/admin/members/1")
+                        .flashAttr(
+                                "successMessage",
+                                "회원 이용을 정지했습니다."))
                 .andExpect(status().isOk())
                 .andExpect(view().name("admin/member/detail"))
                 .andExpect(content().string(
@@ -136,8 +145,10 @@ class MemberAdminControllerSecurityTests {
                 .andExpect(content().string(
                         not(containsString("member@example.com"))))
                 .andExpect(content().string(
-                        not(containsString(
-                                "/admin/members/1/suspend"))))
+                        containsString("data-common-alert-popup")))
+                .andExpect(content().string(
+                        containsString(
+                                "/admin/members/1/suspend")))
                 .andExpect(content().string(
                         not(containsString(
                                 "/admin/members/1/activate"))));
@@ -145,7 +156,7 @@ class MemberAdminControllerSecurityTests {
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void memberDetail_suspendedMember_doesNotRenderStatusActions()
+    void memberDetail_suspendedMember_rendersOnlyActivateAction()
             throws Exception {
         LocalDateTime registeredAt =
                 LocalDateTime.of(2026, 7, 31, 10, 0);
@@ -162,7 +173,8 @@ class MemberAdminControllerSecurityTests {
                 registeredAt,
                 registeredAt,
                 "정지 사유",
-                null);
+                null,
+                List.of());
 
         when(memberAdminService.getMemberDetail(2L))
                 .thenReturn(member);
@@ -170,8 +182,8 @@ class MemberAdminControllerSecurityTests {
         mockMvc.perform(get("/admin/members/2"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(
-                        not(containsString(
-                                "/admin/members/2/activate"))))
+                        containsString(
+                                "/admin/members/2/activate")))
                 .andExpect(content().string(
                         not(containsString(
                                 "/admin/members/2/suspend"))));
@@ -234,5 +246,44 @@ class MemberAdminControllerSecurityTests {
                         .with(csrf())
                         .param("reason", "정지 사유"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void suspendMember_adminRole_usesAuthenticatedAdminId() throws Exception {
+        when(memberAdminService.suspendMember(1L, "정지 사유", 99L))
+                .thenReturn("member@example.com");
+
+        mockMvc.perform(post("/admin/members/1/suspend")
+                        .with(csrf())
+                        .with(authentication(adminAuthentication()))
+                        .param("reason", "정지 사유"))
+                .andExpect(status().is3xxRedirection());
+
+        verify(memberAdminService)
+                .suspendMember(1L, "정지 사유", 99L);
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void activateMember_customerRole_returnsForbidden() throws Exception {
+        mockMvc.perform(post("/admin/members/1/activate")
+                        .with(csrf())
+                        .param("reason", "해제 사유"))
+                .andExpect(status().isForbidden());
+    }
+
+    private UsernamePasswordAuthenticationToken adminAuthentication() {
+        MemberDetails details = new MemberDetails(
+                new MemberAuthenticationView(
+                        99L,
+                        "admin@example.com",
+                        "password",
+                        "ADMIN",
+                        true));
+
+        return new UsernamePasswordAuthenticationToken(
+                details,
+                details.getPassword(),
+                details.getAuthorities());
     }
 }

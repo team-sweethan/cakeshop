@@ -11,7 +11,8 @@ public enum MemberErrorCode implements ErrorCode {
     UPDATE_FAILED("MEMBER_005", "회원 정보 수정에 실패했습니다.", 500),
     WITHDRAW_FAILED("MEMBER_006", "회원 탈퇴 처리에 실패했습니다.", 500),
     INVALID_STATUS_TRANSITION("MEMBER_007", "현재 회원 상태에서는 요청한 상태로 변경할 수 없습니다.", 400),
-    INVALID_SUSPENSION_REASON("MEMBER_008", "이용정지 사유를 확인해 주세요.", 400);
+    INVALID_STATUS_REASON("MEMBER_008", "상태 변경 사유를 확인해 주세요.", 400),
+    STATUS_HISTORY_SAVE_FAILED("MEMBER_009", "회원 상태 변경 이력 저장에 실패했습니다.", 500);
 
     private final String code;
     private final String message;

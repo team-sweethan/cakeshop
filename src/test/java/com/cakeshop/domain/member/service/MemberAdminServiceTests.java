@@ -20,14 +20,19 @@ import com.cakeshop.domain.member.dto.view.MemberAdminDetailView;
 import com.cakeshop.domain.member.dto.view.MemberAdminListRow;
 import com.cakeshop.domain.member.dto.view.MemberAdminListView;
 import com.cakeshop.domain.member.entity.MemberStatus;
+import com.cakeshop.domain.member.entity.MemberStatusAction;
+import com.cakeshop.domain.member.entity.MemberStatusHistory;
 import com.cakeshop.domain.member.error.MemberErrorCode;
 import com.cakeshop.domain.member.mapper.MemberMapper;
+import com.cakeshop.domain.member.mapper.MemberStatusHistoryMapper;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -37,8 +42,18 @@ class MemberAdminServiceTests {
     @Mock
     private MemberMapper memberMapper;
 
+    @Mock
+    private MemberStatusHistoryMapper memberStatusHistoryMapper;
+
     @InjectMocks
     private MemberAdminService memberAdminService;
+
+    @BeforeEach
+    void setUp() {
+        org.mockito.Mockito.lenient()
+                .when(memberStatusHistoryMapper.insert(any()))
+                .thenReturn(1);
+    }
 
     @Test
     void getMembers_blankKeywordAndNoResults_returnsEmptyPage() {
@@ -209,33 +224,42 @@ class MemberAdminServiceTests {
         String email =
                 memberAdminService.suspendMember(
                         1L,
-                        "  관리자 정지 사유  ");
+                        "  관리자 정지 사유  ",
+                        99L);
 
         assertThat(email).isEqualTo("member@example.com");
         verify(memberMapper).suspendActiveUser(
                 1L,
                 "관리자 정지 사유");
+        ArgumentCaptor<MemberStatusHistory>
+                historyCaptor = ArgumentCaptor.forClass(
+                        MemberStatusHistory.class);
+        verify(memberStatusHistoryMapper).insert(historyCaptor.capture());
+        assertThat(historyCaptor.getValue().getProcessedBy()).isEqualTo(99L);
+        assertThat(historyCaptor.getValue().getAction())
+                .isEqualTo(MemberStatusAction.SUSPEND);
     }
 
     @Test
     void suspendMember_invalidReason_throwsInvalidReason() {
         assertThatThrownBy(() ->
-                memberAdminService.suspendMember(1L, "   "))
+                memberAdminService.suspendMember(1L, "   ", 99L))
                 .isInstanceOfSatisfying(
                         BusinessException.class,
                         exception -> assertThat(exception.getErrorCode())
                                 .isEqualTo(
-                                        MemberErrorCode.INVALID_SUSPENSION_REASON));
+                                        MemberErrorCode.INVALID_STATUS_REASON));
 
         assertThatThrownBy(() ->
                 memberAdminService.suspendMember(
                         1L,
-                        "가".repeat(501)))
+                        "가".repeat(501),
+                        99L))
                 .isInstanceOfSatisfying(
                         BusinessException.class,
                         exception -> assertThat(exception.getErrorCode())
                                 .isEqualTo(
-                                        MemberErrorCode.INVALID_SUSPENSION_REASON));
+                                        MemberErrorCode.INVALID_STATUS_REASON));
 
         verify(memberMapper, never())
                 .findAdminMemberDetail(any());
@@ -247,7 +271,7 @@ class MemberAdminServiceTests {
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() ->
-                memberAdminService.suspendMember(999L, "정지 사유"))
+                memberAdminService.suspendMember(999L, "정지 사유", 99L))
                 .isInstanceOfSatisfying(
                         BusinessException.class,
                         exception -> assertThat(exception.getErrorCode())
@@ -264,9 +288,9 @@ class MemberAdminServiceTests {
                         memberDetailRow("USER", MemberStatus.SUSPENDED)));
 
         assertInvalidStatusTransition(() ->
-                memberAdminService.suspendMember(1L, "관리자 정지"));
+                memberAdminService.suspendMember(1L, "관리자 정지", 99L));
         assertInvalidStatusTransition(() ->
-                memberAdminService.suspendMember(2L, "중복 정지"));
+                memberAdminService.suspendMember(2L, "중복 정지", 99L));
 
         verify(memberMapper, never())
                 .suspendActiveUser(any(), any());
@@ -281,7 +305,7 @@ class MemberAdminServiceTests {
                 .thenReturn(0);
 
         assertInvalidStatusTransition(() ->
-                memberAdminService.suspendMember(1L, "정지 사유"));
+                memberAdminService.suspendMember(1L, "정지 사유", 99L));
     }
 
     @Test
@@ -292,9 +316,33 @@ class MemberAdminServiceTests {
         when(memberMapper.activateSuspendedUser(1L))
                 .thenReturn(1);
 
-        memberAdminService.activateMember(1L);
+        memberAdminService.activateMember(1L, "해제 사유", 99L);
 
         verify(memberMapper).activateSuspendedUser(1L);
+        ArgumentCaptor<MemberStatusHistory>
+                historyCaptor = ArgumentCaptor.forClass(
+                        MemberStatusHistory.class);
+        verify(memberStatusHistoryMapper).insert(historyCaptor.capture());
+        assertThat(historyCaptor.getValue().getReason()).isEqualTo("해제 사유");
+        assertThat(historyCaptor.getValue().getAction())
+                .isEqualTo(MemberStatusAction.ACTIVATE);
+    }
+
+    @Test
+    void activateMember_historyInsertFails_throwsSaveFailed() {
+        when(memberMapper.findAdminMemberDetail(1L))
+                .thenReturn(Optional.of(
+                        memberDetailRow("USER", MemberStatus.SUSPENDED)));
+        when(memberMapper.activateSuspendedUser(1L)).thenReturn(1);
+        when(memberStatusHistoryMapper.insert(any())).thenReturn(0);
+
+        assertThatThrownBy(() ->
+                memberAdminService.activateMember(1L, "해제 사유", 99L))
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(
+                                        MemberErrorCode.STATUS_HISTORY_SAVE_FAILED));
     }
 
     @Test
@@ -303,7 +351,7 @@ class MemberAdminServiceTests {
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() ->
-                memberAdminService.activateMember(999L))
+                memberAdminService.activateMember(999L, "해제 사유", 99L))
                 .isInstanceOfSatisfying(
                         BusinessException.class,
                         exception -> assertThat(exception.getErrorCode())
@@ -320,9 +368,9 @@ class MemberAdminServiceTests {
                         memberDetailRow("USER", MemberStatus.ACTIVE)));
 
         assertInvalidStatusTransition(() ->
-                memberAdminService.activateMember(1L));
+                memberAdminService.activateMember(1L, "해제 사유", 99L));
         assertInvalidStatusTransition(() ->
-                memberAdminService.activateMember(2L));
+                memberAdminService.activateMember(2L, "해제 사유", 99L));
 
         verify(memberMapper, never())
                 .activateSuspendedUser(any());
@@ -337,7 +385,7 @@ class MemberAdminServiceTests {
                 .thenReturn(0);
 
         assertInvalidStatusTransition(() ->
-                memberAdminService.activateMember(1L));
+                memberAdminService.activateMember(1L, "해제 사유", 99L));
     }
 
     private MemberAdminDetailRow memberDetailRow(
