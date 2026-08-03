@@ -41,9 +41,11 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          # M(수정) D(삭제) R(이름변경)만 잡는다. A(추가)는 정상적인 새 migration 이다.
+          # 소문자 a 는 '추가(A)를 제외한 전부'다. 막을 상태를 열거하면(MDR 등) 빠뜨린 것이
+          # 그대로 구멍이 된다. 실제로 T(파일 형식 변경, 예: SQL 을 심볼릭 링크로 교체)는
+          # MDR 에 걸리지 않는다. 규칙의 본뜻이 "추가 외에는 허용하지 않는다" 이므로 그대로 적는다.
           # 세 점(...)은 merge-base 기준이라, base 브랜치가 앞서 나가도 오탐이 없다.
-          changed=$(git diff --diff-filter=MDR --name-only "$BASE_SHA...HEAD" -- src/main/resources/db/migration)
+          changed=$(git diff --diff-filter=a --name-only "$BASE_SHA...HEAD" -- src/main/resources/db/migration)
           if [ -n "$changed" ]; then
             echo "::error::이미 머지된 migration 을 수정/삭제/이름변경했습니다. 되돌리고 새 migration 을 추가하세요 (gradlew newMigration -Pdesc=...)."
             echo "$changed" | while read -r f; do echo "::error file=$f::머지된 migration 은 수정할 수 없습니다"; done
