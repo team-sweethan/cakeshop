@@ -264,9 +264,9 @@ Service가 업무 규칙과 트랜잭션 경계를 소유한다.
 
 - ordinal 숫자 저장 [금지]. DDL 규칙은 [6절](#6-데이터베이스-규약) 참고.
 - 재고 수량(파생값), 읽음 여부(boolean), 글 종류(type/category), 다른 도메인의 status는 내 status enum으로 만들지 않는다.
-- `OrderStatus`(11개 + 전이)·`PaymentStatus`(6개)가 확정된 레퍼런스 구현이다.
+- `OrderStatus`(7개 + 전이)·`PaymentStatus`(6개)가 확정된 레퍼런스 구현이다.
 
-> 도메인별 상태값 인벤토리, 담당자별 미확정 ☐ 항목(product_options·payment_cancellations·coupons·comments·reviews·chat_rooms·NotificationType), 함정 분류표는 [status-design.md](status-design.md)를 정본으로 한다. 담당자 ☐ 항목의 확정·갱신도 그 문서에서 계속한다.
+> 도메인별 상태값 인벤토리, 담당자별 미확정 ☐ 항목(product_options·payment_cancellations·coupons·reviews·chat_rooms·NotificationType), 함정 분류표는 [status-design.md](status-design.md)를 정본으로 한다. 담당자 ☐ 항목의 확정·갱신도 그 문서에서 계속한다.
 
 ## 15. 도메인 간 연동
 

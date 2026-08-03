@@ -24,7 +24,7 @@
 - **저장값은 영문 enum 이름 하나로 통일.** 한글·숫자·코드값으로 저장하지 않는다.
 - **한글은 화면에서만.** 저장값과 라벨을 섞으면 세 표현이 서로 어긋난다(drift). 라벨 매핑은 enum이나 view가 소유한다.
 - **전이는 service에서.** DB는 값 집합만, 상태 머신은 Java가 소유한다.
-- `OrderStatus`(11개 + 전이)·`PaymentStatus`(6개)가 **이미 이 형태의 모범답안**이다. 나머지 담당자는 이 두 enum을 그대로 복제해서 자기 도메인에 적용한다.
+- `OrderStatus`(7개 + 전이)·`PaymentStatus`(6개)가 **이미 이 형태의 모범답안**이다. 나머지 담당자는 이 두 enum을 그대로 복제해서 자기 도메인에 적용한다.
 
 ### DB 컬럼 작성 규칙 (전원 합의)
 
@@ -46,8 +46,8 @@
 | `payment_cancellations.status` | 주환 | 취소 요청 | `REQUESTED / DONE / REJECTED` ? | ☐ 열림 |
 | `coupons.status` | 정후 | 발급 중 | `ACTIVE / INACTIVE / ENDED` ? | ☐ 열림 |
 | `member_coupons.status` | 정후 | 사용 가능 / 사용 완료 | `ISSUED / USED / EXPIRED` | 거의 확정 |
-| `posts.status` | 현규 | 정상 / 제재 | `ACTIVE / DELETED / BLOCKED` | 거의 확정 |
-| `comments.status` | 현규 | (표기 없음) | `ACTIVE / DELETED` ? | ☐ 열림 |
+| `posts.status` | 현규 | 정상 / 제재 | **`PostStatus` `PUBLISHED / DELETED / BLOCKED` (확정)** | ✅ 코드 확정 |
+| `comments.status` | 현규 | (표기 없음) | **`CommentStatus` `PUBLISHED / DELETED` (확정)** | ✅ 코드 확정 |
 | `post_reports.status` | 현규 | (신고 처리) | `PENDING / ACCEPTED / REJECTED` | 거의 확정 |
 | `reviews.status` | 현규 | 숨김 | `VISIBLE / HIDDEN` ? | ☐ 열림 |
 | `chat_rooms.status` | 민정 | 상담가능 / 상담중 / 미답변 | `OPEN / CLOSED` ? (아래 함정 참고) | ☐ 열림 |
@@ -157,7 +157,7 @@ READY / DONE / CANCELED / PARTIAL_CANCELED / ABORTED / EXPIRED
 |---|---|
 | 주환 | `payment_cancellations.status` 값 확정 |
 | 정후 | `coupons.status`(캠페인 상태) 값 확정 |
-| 현규 | `comments.status` / `reviews.status`(숨김) 값 확정 |
+| 현규 | `reviews.status`(숨김) 값 확정 |
 | 민정 | `chat_rooms.status` 정의 + **`NotificationType` enum 값 채우기**(현재 TODO) |
 
 > ☐ 항목을 확정하면 인벤토리의 해당 행을 "확정"으로 갱신하고, enum + DDL을 함께 커밋한다.
