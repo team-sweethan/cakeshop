@@ -41,7 +41,8 @@ public class CouponAdminController {
     @GetMapping
     public String coupons(@ModelAttribute CouponSearchCondition condition,
                           @RequestParam(required = false) Integer page,
-                          Model model) {
+                          Model model,
+                          RedirectAttributes redirectAttributes) {
 
         PageRequest pageRequest = new PageRequest(page, PageRequest.DEFAULT_SIZE);
 
@@ -49,6 +50,12 @@ public class CouponAdminController {
                 condition,
                 pageRequest
         );
+
+        // 상태 변경 등으로 마지막 페이지가 사라진 경우 빈 목록을 보여 주지 않고 마지막 유효 페이지로 이동한다.
+        int lastPage = Math.max(pageResult.getTotalPages(), 1);
+        if (pageResult.getPage() > lastPage) {
+            return redirectToList(condition, lastPage, redirectAttributes);
+        }
 
         // 목록 조회 결과와 분리해, 화면에 표시할 페이지 번호 블록만 공통 객체로 계산한다.
         PageNavigation pageNavigation =

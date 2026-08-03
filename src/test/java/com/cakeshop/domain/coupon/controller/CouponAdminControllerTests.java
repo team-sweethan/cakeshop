@@ -113,6 +113,23 @@ class CouponAdminControllerTests {
     }
 
     @Test
+    void listRequestedPageExceedsLastPage_redirectsToLastPage() throws Exception {
+        PageResult<CouponView> result = new PageResult<>(
+                List.of(),
+                new PageRequest(3, PageRequest.DEFAULT_SIZE),
+                21
+        );
+        when(couponAdminService.getCoupons(any(), any())).thenReturn(result);
+
+        mockMvc.perform(get("/admin/coupons")
+                .param("keyword", "summer")
+                .param("status", "ACTIVE")
+                .param("page", "3"))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/admin/coupons?keyword=summer&status=ACTIVE&page=2"));
+    }
+
+    @Test
     void createFormLoadsEmptyForm() throws Exception {
         mockMvc.perform(get("/admin/coupons/create"))
             .andExpect(status().isOk())
