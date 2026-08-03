@@ -46,18 +46,30 @@ public class CommunityService {
     }
 
     /**
-     * 게시글 상세를 조회하고 조회수를 올린다. viewerId는 비로그인이면 null이다.
+     * 게시글 상세를 조회하고, 오늘 처음 본 조회면 조회수를 올린다.
      *
-     * 조회수 증가와 상세 조회를 한 트랜잭션에서 처리한다(DOMAIN.md 6.2). 노출되지 않는
-     * 게시글은 Mapper의 UPDATE 조건에서 걸러지므로 조회수가 오르지 않는다.
+     * viewerId는 소유권 판단용이며 비로그인이면 null이다. viewerKey는 조회수 중복
+     * 방지용으로, 회원이면 회원 번호가 비로그인이면 세션 id가 들어간다(DOMAIN.md 6.2).
+     * 두 값 모두 요청 파라미터가 아니라 인증 정보·세션에서 와야 한다 — 클라이언트가
+     * 정하면 매번 다른 키를 보내 중복 방지를 그대로 뚫는다.
+     *
+     * 조회 기록·조회수 증가·상세 조회를 한 트랜잭션에서 처리한다. 노출되지 않는
+     * 게시글은 Mapper의 조건에서 걸러지므로 기록도 조회수도 남지 않는다.
      *
      * 노출 판단은 DOMAIN.md 4.3의 표를 그대로 따른다. 차단된 글은 작성자 본인에게만
      * 사유와 함께 보여 준다. 작성자는 차단된 글에 아무 조치도 할 수 없으므로(4.2),
      * 404까지 주면 글이 왜 사라졌는지 알 방법이 없다.
      */
     @Transactional
-    public PostDetailView getPostDetail(long postId, Long viewerId) {
-        communityMapper.increaseViewCount(postId);
+    public PostDetailView getPostDetail(long postId, Long viewerId, String viewerKey) {
+        // 오늘 처음 본 조회일 때만 숫자를 올리고 이력을 남긴다(DOMAIN.md 6.2).
+        //
+        // 순서를 뒤집지 말 것. 이력을 먼저 넣으면 FK 확인이 게시글 행에 공유 잠금을
+        // 걸고, 그 뒤 조회수 UPDATE가 배타 잠금을 기다리면서 같은 글을 동시에 연 요청끼리
+        // 교착에 빠진다. 조회수 UPDATE가 먼저 잠그고 중복까지 판단한다(CommunityMapper.xml).
+        if (communityMapper.increaseViewCount(postId, viewerKey) > 0) {
+            communityMapper.recordView(postId, viewerKey);
+        }
 
         return requireVisiblePost(postId, viewerId);
     }

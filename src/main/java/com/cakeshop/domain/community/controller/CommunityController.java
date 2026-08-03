@@ -12,6 +12,7 @@ import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.security.MemberDetails;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -81,14 +82,35 @@ public class CommunityController {
             @RequestParam(name = "comments", required = false) String comments,
             @ModelAttribute("commentForm") CommentForm commentForm,
             @AuthenticationPrincipal MemberDetails memberDetails,
+            HttpServletRequest request,
             Model model
     ) {
         // 소유권 판단 기준은 요청 파라미터가 아니라 인증 정보다(AGENTS.md).
         Long viewerId = memberDetails == null ? null : memberDetails.getMemberId();
 
-        PostDetailView post = communityService.getPostDetail(postId, viewerId);
+        PostDetailView post =
+                communityService.getPostDetail(postId, viewerId, viewerKeyOf(viewerId, request));
 
         return prepareDetail(model, post, viewerId, comments);
+    }
+
+    /**
+     * 조회수 중복 방지에 쓸 조회자 키(DOMAIN.md 6.2). 회원이면 회원 번호, 비로그인이면
+     * 세션 id다.
+     *
+     * 요청에서 받지 않는다. 클라이언트가 정하는 값이면 매번 다른 키를 보내는 것만으로
+     * 중복 방지가 사라진다.
+     *
+     * 비로그인에게 세션이 없으면 여기서 만들어진다. 상세는 공개 화면이라 세션 없이도
+     * 열리는데, 키가 없으면 셀 수가 없다. 다만 이 방어는 <b>사람의 반복 조회까지</b>다 —
+     * 쿠키를 받지 않는 클라이언트는 매 요청이 새 세션이라 그대로 뚫린다(PLAN.md R12).
+     */
+    private String viewerKeyOf(Long viewerId, HttpServletRequest request) {
+        if (viewerId != null) {
+            return "M:" + viewerId;
+        }
+
+        return "S:" + request.getSession().getId();
     }
 
     /**

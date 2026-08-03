@@ -47,6 +47,8 @@ class CommunityServiceTests {
     private static final long AUTHOR_ID = 7L;
     private static final long OTHER_MEMBER_ID = 99L;
     private static final long CATEGORY_ID = 1L;
+    /** 조회수 중복 방지 키. 회원이면 'M:{memberId}', 비로그인이면 'S:{sessionId}'다. */
+    private static final String VIEWER_KEY = "M:7";
     private static final LocalDateTime CREATED_AT = LocalDateTime.of(2026, 3, 1, 10, 0);
 
     private CommunityMapper communityMapper;
@@ -62,7 +64,7 @@ class CommunityServiceTests {
     void getPostDetail_publishedPost_anonymousViewer_returnsPost() {
         givenPost(PostStatus.PUBLISHED);
 
-        PostDetailView post = communityService.getPostDetail(POST_ID, null);
+        PostDetailView post = communityService.getPostDetail(POST_ID, null, VIEWER_KEY);
 
         assertThat(post.id()).isEqualTo(POST_ID);
     }
@@ -71,16 +73,38 @@ class CommunityServiceTests {
     void getPostDetail_publishedPost_otherMember_returnsPost() {
         givenPost(PostStatus.PUBLISHED);
 
-        assertThat(communityService.getPostDetail(POST_ID, OTHER_MEMBER_ID)).isNotNull();
+        assertThat(communityService.getPostDetail(POST_ID, OTHER_MEMBER_ID, VIEWER_KEY)).isNotNull();
     }
 
     @Test
-    void getPostDetail_publishedPost_increasesViewCount() {
+    void getPostDetail_firstViewOfTheDay_increasesViewCountAndRecordsHistory() {
         givenPost(PostStatus.PUBLISHED);
+        givenViewRecorded(true);
 
-        communityService.getPostDetail(POST_ID, null);
+        communityService.getPostDetail(POST_ID, null, VIEWER_KEY);
 
-        verify(communityMapper).increaseViewCount(POST_ID);
+        verify(communityMapper).increaseViewCount(POST_ID, VIEWER_KEY);
+        // 이력을 빠뜨리면 숫자만 오르고 근거가 없어진다. 다음 조회도 "첫 조회"가 된다.
+        verify(communityMapper).recordView(POST_ID, VIEWER_KEY);
+    }
+
+    /**
+     * 이미 오늘 센 조회면 이력을 다시 남기지 않는지 확인한다.
+     *
+     * <p>중복 판단은 조회수 UPDATE가 스스로 한다(0행이면 이미 센 조회다). Service는 그
+     * 결과를 <b>따르기만</b> 해야 한다 — 무시하고 이력을 남기면 UNIQUE 위반으로 상세
+     * 화면 전체가 죽는다. 조회수를 안 올리는 것과 이력을 안 남기는 것은 같은 판단이다.
+     *
+     * <p>숫자가 실제로 안 오르는지는 {@code CommunityViewCountTests}가 DB로 확인한다.
+     */
+    @Test
+    void getPostDetail_repeatedViewSameDay_doesNotRecordHistoryAgain() {
+        givenPost(PostStatus.PUBLISHED);
+        givenViewRecorded(false);
+
+        communityService.getPostDetail(POST_ID, null, VIEWER_KEY);
+
+        verify(communityMapper, never()).recordView(anyLong(), any());
     }
 
     @Test
@@ -88,7 +112,7 @@ class CommunityServiceTests {
         givenPost(PostStatus.DELETED);
 
         // 작성자 본인에게도 404다. DELETED는 종착 상태이고 복구 기능이 없다(4.2, 4.3).
-        assertThatThrownBy(() -> communityService.getPostDetail(POST_ID, AUTHOR_ID))
+        assertThatThrownBy(() -> communityService.getPostDetail(POST_ID, AUTHOR_ID, VIEWER_KEY))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(CommunityErrorCode.POST_NOT_FOUND);
@@ -98,7 +122,7 @@ class CommunityServiceTests {
     void getPostDetail_deletedPost_otherMember_isNotFound() {
         givenPost(PostStatus.DELETED);
 
-        assertThatThrownBy(() -> communityService.getPostDetail(POST_ID, OTHER_MEMBER_ID))
+        assertThatThrownBy(() -> communityService.getPostDetail(POST_ID, OTHER_MEMBER_ID, VIEWER_KEY))
                 .isInstanceOf(BusinessException.class);
     }
 
@@ -106,7 +130,7 @@ class CommunityServiceTests {
     void getPostDetail_blockedPost_author_returnsPostWithBlockedReason() {
         givenPost(PostStatus.BLOCKED);
 
-        PostDetailView post = communityService.getPostDetail(POST_ID, AUTHOR_ID);
+        PostDetailView post = communityService.getPostDetail(POST_ID, AUTHOR_ID, VIEWER_KEY);
 
         // 작성자는 차단된 글에 아무 조치도 할 수 없다. 사유까지 가리면 이유를 알 길이 없다(4.3).
         assertThat(post.isBlocked()).isTrue();
@@ -117,7 +141,7 @@ class CommunityServiceTests {
     void getPostDetail_blockedPost_otherMember_isNotFound() {
         givenPost(PostStatus.BLOCKED);
 
-        assertThatThrownBy(() -> communityService.getPostDetail(POST_ID, OTHER_MEMBER_ID))
+        assertThatThrownBy(() -> communityService.getPostDetail(POST_ID, OTHER_MEMBER_ID, VIEWER_KEY))
                 .isInstanceOf(BusinessException.class);
     }
 
@@ -125,7 +149,7 @@ class CommunityServiceTests {
     void getPostDetail_blockedPost_anonymousViewer_isNotFound() {
         givenPost(PostStatus.BLOCKED);
 
-        assertThatThrownBy(() -> communityService.getPostDetail(POST_ID, null))
+        assertThatThrownBy(() -> communityService.getPostDetail(POST_ID, null, VIEWER_KEY))
                 .isInstanceOf(BusinessException.class);
     }
 
@@ -133,7 +157,7 @@ class CommunityServiceTests {
     void getPostDetail_unknownPost_isNotFound() {
         when(communityMapper.findPostById(POST_ID)).thenReturn(null);
 
-        assertThatThrownBy(() -> communityService.getPostDetail(POST_ID, AUTHOR_ID))
+        assertThatThrownBy(() -> communityService.getPostDetail(POST_ID, AUTHOR_ID, VIEWER_KEY))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(CommunityErrorCode.POST_NOT_FOUND);
@@ -179,7 +203,7 @@ class CommunityServiceTests {
 
         communityService.getPosts(null, new PageRequest(1, 20));
 
-        verify(communityMapper, never()).increaseViewCount(anyLong());
+        verify(communityMapper, never()).increaseViewCount(anyLong(), any());
     }
 
     @Test
@@ -315,7 +339,7 @@ class CommunityServiceTests {
 
         communityService.getEditablePost(POST_ID, AUTHOR_ID);
 
-        verify(communityMapper, never()).increaseViewCount(anyLong());
+        verify(communityMapper, never()).increaseViewCount(anyLong(), any());
     }
 
     @Test
@@ -408,7 +432,7 @@ class CommunityServiceTests {
 
         communityService.getVisiblePost(POST_ID, AUTHOR_ID);
 
-        verify(communityMapper, never()).increaseViewCount(anyLong());
+        verify(communityMapper, never()).increaseViewCount(anyLong(), any());
     }
 
     @Test
@@ -682,6 +706,11 @@ class CommunityServiceTests {
         return captor.getValue();
     }
 
+    /** recorded=true면 오늘 처음 본 조회, false면 이미 오늘 센 조회다. */
+    private void givenViewRecorded(boolean recorded) {
+        when(communityMapper.increaseViewCount(POST_ID, VIEWER_KEY)).thenReturn(recorded ? 1 : 0);
+    }
+
     private void givenComments(CommentView... comments) {
         when(communityMapper.findRecentComments(anyLong(), anyInt()))
                 .thenReturn(List.of(comments));
@@ -748,7 +777,7 @@ class CommunityServiceTests {
 
     private BusinessException catchBusinessException(Long viewerId) {
         try {
-            communityService.getPostDetail(POST_ID, viewerId);
+            communityService.getPostDetail(POST_ID, viewerId, VIEWER_KEY);
             throw new AssertionError("BusinessException이 발생하지 않았습니다.");
         } catch (BusinessException e) {
             return e;

@@ -1,6 +1,7 @@
 package com.cakeshop.domain.community.mapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -22,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.mybatis.spring.boot.test.autoconfigure.MybatisTest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
@@ -227,23 +229,113 @@ class CommunityMapperTests {
     }
 
     @Test
-    void increaseViewCount_publishedPost_increasesByOne() {
+    void increaseViewCount_firstViewOfTheDay_countsOnce() {
         long postId = insertPost("조회수", PostStatus.PUBLISHED, BASE_TIME);
 
-        assertThat(communityMapper.increaseViewCount(postId)).isEqualTo(1);
+        assertThat(view(postId, "M:1")).isEqualTo(1);
         assertThat(viewCountOf(postId)).isEqualTo(1);
+        assertThat(communityMapper.countViews(postId)).isEqualTo(1);
     }
 
+    /**
+     * 같은 조회자의 같은 날 재조회가 세어지지 않는지 확인한다.
+     *
+     * <p>조회수가 순위를 정하는 이상 새로고침 한 번이 곧 순위 조작이다(DOMAIN.md 6.2).
+     */
+    @Test
+    void increaseViewCount_sameViewerSameDay_doesNotCountAgain() {
+        long postId = insertPost("재조회", PostStatus.PUBLISHED, BASE_TIME);
+
+        assertThat(view(postId, "M:1")).isEqualTo(1);
+        assertThat(view(postId, "M:1")).isZero();
+        assertThat(view(postId, "M:1")).isZero();
+
+        assertThat(viewCountOf(postId)).isEqualTo(1);
+        assertThat(communityMapper.countViews(postId)).isEqualTo(1);
+    }
+
+    @Test
+    void increaseViewCount_differentViewers_countEach() {
+        long postId = insertPost("여러 조회자", PostStatus.PUBLISHED, BASE_TIME);
+
+        assertThat(view(postId, "M:1")).isEqualTo(1);
+        assertThat(view(postId, "M:2")).isEqualTo(1);
+        // 비로그인 세션 키도 같은 규칙으로 센다.
+        assertThat(view(postId, "S:abc")).isEqualTo(1);
+
+        assertThat(viewCountOf(postId)).isEqualTo(3);
+        assertThat(communityMapper.countViews(postId)).isEqualTo(3);
+    }
+
+    /** 날짜가 바뀌면 다시 센다. 시간 창의 단위가 날짜 칸이기 때문이다(DOMAIN.md 6.2). */
+    @Test
+    void increaseViewCount_nextDay_countsAgain() {
+        long postId = insertPost("다음 날", PostStatus.PUBLISHED, BASE_TIME);
+        view(postId, "M:1");
+
+        // 어제 본 것으로 옮겨 두면 오늘 조회는 새 칸이 된다.
+        jdbcTemplate.update(
+                "UPDATE post_views SET viewed_on = viewed_on - INTERVAL 1 DAY WHERE post_id = ?",
+                postId);
+
+        assertThat(view(postId, "M:1")).isEqualTo(1);
+        assertThat(viewCountOf(postId)).isEqualTo(2);
+        assertThat(communityMapper.countViews(postId)).isEqualTo(2);
+    }
+
+    /**
+     * 노출되지 않는 글은 숫자도 <b>이력</b>도 남기지 않는지 확인한다.
+     *
+     * <p>조회수만 막고 기록을 남기면 이력과 숫자가 갈라진다. 그러면 나중에 이력에서
+     * 다시 셀 때 조용히 값이 늘어난다.
+     */
     @Test
     void increaseViewCount_notPublishedPost_changesNothing() {
         long deletedPostId = insertPost("삭제된 글", PostStatus.DELETED, BASE_TIME);
         long blockedPostId = insertPost("차단된 글", PostStatus.BLOCKED, BASE_TIME);
 
         // 상세가 404인 글의 조회수를 올릴 이유가 없다. UPDATE의 status 조건이 이를 막는다.
-        assertThat(communityMapper.increaseViewCount(deletedPostId)).isZero();
-        assertThat(communityMapper.increaseViewCount(blockedPostId)).isZero();
+        assertThat(view(deletedPostId, "M:1")).isZero();
+        assertThat(view(blockedPostId, "M:1")).isZero();
         assertThat(viewCountOf(deletedPostId)).isZero();
         assertThat(viewCountOf(blockedPostId)).isZero();
+        assertThat(communityMapper.countViews(deletedPostId)).isZero();
+        assertThat(communityMapper.countViews(blockedPostId)).isZero();
+    }
+
+    @Test
+    void increaseViewCount_unknownPost_changesNothing() {
+        assertThat(communityMapper.increaseViewCount(-1L, "M:1")).isZero();
+    }
+
+    /**
+     * 조회자 키가 없으면 세지 않는지 확인한다.
+     *
+     * <p>키 없이 세면 키가 없는 조회들이 전부 한 사람으로 합쳐지거나, 반대로 매번 다른
+     * 사람으로 세어져 중복 방지가 사라진다. 어느 쪽이든 조용히 일어난다.
+     */
+    @Test
+    void increaseViewCount_withoutViewerKey_changesNothing() {
+        long postId = insertPost("키 없음", PostStatus.PUBLISHED, BASE_TIME);
+
+        assertThat(communityMapper.increaseViewCount(postId, null)).isZero();
+        assertThat(viewCountOf(postId)).isZero();
+    }
+
+    /**
+     * 이력의 UNIQUE 제약이 실제로 걸려 있는지 확인한다.
+     *
+     * <p>평소에는 위 조건부 UPDATE가 중복을 걸러 내므로 이 제약이 없어도 화면은 똑같아
+     * 보인다. 제약은 그 판단이 실패했을 때의 마지막 방어선이고, 여기서 조용히 통과하면
+     * 조회수만 오르고 이력은 없는 상태가 남는다.
+     */
+    @Test
+    void recordView_duplicateOnTheSameDay_isRejectedByConstraint() {
+        long postId = insertPost("중복 기록", PostStatus.PUBLISHED, BASE_TIME);
+        communityMapper.recordView(postId, "M:1");
+
+        assertThatThrownBy(() -> communityMapper.recordView(postId, "M:1"))
+                .isInstanceOf(DuplicateKeyException.class);
     }
 
     /**
@@ -258,7 +350,7 @@ class CommunityMapperTests {
     void increaseViewCount_doesNotMarkPostAsEdited() {
         long postId = insertPost("조회만 한 글", PostStatus.PUBLISHED, BASE_TIME);
 
-        communityMapper.increaseViewCount(postId);
+        communityMapper.increaseViewCount(postId, "M:1");
 
         PostDetailView post = communityMapper.findPostById(postId);
         assertThat(post.updatedAt()).isEqualTo(post.createdAt());
@@ -618,6 +710,22 @@ class CommunityMapperTests {
 
     private List<PostListView> findPage(int page, int size) {
         return communityMapper.findPublishedPosts(categoryId, size, (page - 1) * size);
+    }
+
+    /**
+     * 상세 조회 한 번과 같은 일을 한다. 오늘 처음 본 조회면 1, 아니면 0이다.
+     *
+     * <p>두 문장은 Service가 묶어서 부른다(CommunityService.getPostDetail). 순서가 있고
+     * 조건이 붙어 있어서, 하나만 불러서는 규칙을 확인할 수 없다.
+     */
+    private int view(long postId, String viewerKey) {
+        int counted = communityMapper.increaseViewCount(postId, viewerKey);
+
+        if (counted > 0) {
+            communityMapper.recordView(postId, viewerKey);
+        }
+
+        return counted;
     }
 
     private long viewCountOf(long postId) {

@@ -7,6 +7,7 @@ import static org.hamcrest.Matchers.hasProperty;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -143,14 +144,14 @@ class CommunityControllerTests {
 
     @Test
     void detail_anonymousViewer_passesNullMemberId() throws Exception {
-        when(communityService.getPostDetail(15L, null)).thenReturn(publishedPost());
+        when(communityService.getPostDetail(eq(15L), isNull(), anyString())).thenReturn(publishedPost());
 
         mockMvc.perform(get("/community/15"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("customer/community/detail"))
                 .andExpect(model().attributeExists("post"));
 
-        verify(communityService).getPostDetail(15L, null);
+        verify(communityService).getPostDetail(eq(15L), isNull(), anyString());
     }
 
     /** 소유권 판단 기준은 요청 파라미터가 아니라 인증 정보다(AGENTS.md). */
@@ -162,12 +163,44 @@ class CommunityControllerTests {
                 new UsernamePasswordAuthenticationToken(
                         principal, null, principal.getAuthorities()));
 
-        when(communityService.getPostDetail(15L, 7L)).thenReturn(publishedPost());
+        when(communityService.getPostDetail(eq(15L), eq(7L), anyString())).thenReturn(publishedPost());
 
         mockMvc.perform(get("/community/15"))
                 .andExpect(status().isOk());
 
-        verify(communityService).getPostDetail(15L, 7L);
+        verify(communityService).getPostDetail(eq(15L), eq(7L), anyString());
+    }
+
+    /**
+     * 조회자 키가 인증 정보·세션에서만 오는지 확인한다(DOMAIN.md 6.2).
+     *
+     * <p>클라이언트가 정하는 값이면 매번 다른 키를 실어 보내는 것만으로 중복 방지가
+     * 사라진다. 조회수가 순위를 정하는 이상 그건 곧 순위 조작이다.
+     */
+    @Test
+    void detail_viewerKey_comesFromAuthenticationNotFromRequest() throws Exception {
+        authenticateAs(7L);
+        when(communityService.getPostDetail(eq(15L), eq(7L), anyString()))
+                .thenReturn(publishedPost());
+
+        mockMvc.perform(get("/community/15")
+                        // 요청이 실어 보낸 키는 무시되어야 한다.
+                        .param("viewerKey", "M:99"))
+                .andExpect(status().isOk());
+
+        assertThat(capturedViewerKey()).isEqualTo("M:7");
+    }
+
+    @Test
+    void detail_anonymousViewer_usesSessionAsViewerKey() throws Exception {
+        when(communityService.getPostDetail(eq(15L), isNull(), anyString()))
+                .thenReturn(publishedPost());
+
+        mockMvc.perform(get("/community/15"))
+                .andExpect(status().isOk());
+
+        // 비로그인은 세션 id로 센다. 접두사가 회원 키와 겹치면 서로 다른 사람이 합쳐진다.
+        assertThat(capturedViewerKey()).startsWith("S:").isNotEqualTo("S:");
     }
 
     /** 상세는 숫자 경로만 받는다. SecurityConfig의 공개 규칙과 같은 범위여야 한다. */
@@ -364,7 +397,7 @@ class CommunityControllerTests {
 
     @Test
     void detail_bindsCommentSectionAndForm() throws Exception {
-        when(communityService.getPostDetail(15L, null)).thenReturn(publishedPost());
+        when(communityService.getPostDetail(eq(15L), isNull(), anyString())).thenReturn(publishedPost());
 
         mockMvc.perform(get("/community/15"))
                 .andExpect(status().isOk())
@@ -377,7 +410,7 @@ class CommunityControllerTests {
     @Test
     void detail_authenticatedViewer_canComment() throws Exception {
         authenticateAs(7L);
-        when(communityService.getPostDetail(15L, 7L)).thenReturn(publishedPost());
+        when(communityService.getPostDetail(eq(15L), eq(7L), anyString())).thenReturn(publishedPost());
 
         mockMvc.perform(get("/community/15"))
                 .andExpect(status().isOk())
@@ -388,7 +421,7 @@ class CommunityControllerTests {
     @Test
     void detail_blockedPost_author_cannotComment() throws Exception {
         authenticateAs(7L);
-        when(communityService.getPostDetail(15L, 7L)).thenReturn(blockedPost());
+        when(communityService.getPostDetail(eq(15L), eq(7L), anyString())).thenReturn(blockedPost());
 
         mockMvc.perform(get("/community/15"))
                 .andExpect(status().isOk())
@@ -398,7 +431,7 @@ class CommunityControllerTests {
     /** "더 보기"가 실어 보낸 값이 그대로 Service에 넘어가야 펼친 상태가 유지된다. */
     @Test
     void detail_commentsParameter_isPassedToService() throws Exception {
-        when(communityService.getPostDetail(15L, null)).thenReturn(publishedPost());
+        when(communityService.getPostDetail(eq(15L), isNull(), anyString())).thenReturn(publishedPost());
 
         mockMvc.perform(get("/community/15").param("comments", "40"))
                 .andExpect(status().isOk());
@@ -409,7 +442,7 @@ class CommunityControllerTests {
     /** 상세는 공개 화면이라 주소가 망가져도 오류 페이지 대신 기본 상태를 보여준다. */
     @Test
     void detail_invalidCommentsParameter_fallsBackToDefault() throws Exception {
-        when(communityService.getPostDetail(15L, null)).thenReturn(publishedPost());
+        when(communityService.getPostDetail(eq(15L), isNull(), anyString())).thenReturn(publishedPost());
 
         mockMvc.perform(get("/community/15").param("comments", "전체"))
                 .andExpect(status().isOk());
@@ -462,7 +495,7 @@ class CommunityControllerTests {
                 .andExpect(model().attributeExists("commentSection"));
 
         verify(communityService, never()).addComment(anyLong(), any(), anyLong());
-        verify(communityService, never()).getPostDetail(anyLong(), any());
+        verify(communityService, never()).getPostDetail(anyLong(), any(), anyString());
     }
 
     /**
@@ -501,6 +534,13 @@ class CommunityControllerTests {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(
                         principal, null, principal.getAuthorities()));
+    }
+
+    private String capturedViewerKey() {
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(communityService).getPostDetail(anyLong(), any(), captor.capture());
+
+        return captor.getValue();
     }
 
     private PageRequest capturedPageRequest() {
