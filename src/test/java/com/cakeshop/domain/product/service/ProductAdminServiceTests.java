@@ -17,8 +17,10 @@ import com.cakeshop.domain.product.dto.form.ProductAdminSearchCondition;
 import com.cakeshop.domain.product.dto.form.ProductForm;
 import com.cakeshop.domain.product.dto.view.ProductAdminListView;
 import com.cakeshop.domain.product.dto.view.ProductCategoryOptionView;
+import com.cakeshop.domain.product.dto.view.ProductImageView;
 import com.cakeshop.domain.product.dto.view.ProductOptionAdminRow;
 import com.cakeshop.domain.product.entity.Product;
+import com.cakeshop.domain.product.entity.ProductImage;
 import com.cakeshop.domain.product.entity.ProductOptionSelectionType;
 import com.cakeshop.domain.product.entity.ProductOptionStatus;
 import com.cakeshop.domain.product.entity.ProductStatus;
@@ -621,6 +623,35 @@ class ProductAdminServiceTests {
                 );
     }
 
+    @Test
+    void getProductImages_mapperReturnsImages_convertsToViewsInOrder() {
+        ProductImage first = productImage(
+                10L,
+                "/uploads/product/first.jpg",
+                0
+        );
+        ProductImage second = productImage(
+                20L,
+                "/uploads/product/second.jpg",
+                1
+        );
+        when(productMapper.findProductImagesByProductId(1L))
+                .thenReturn(List.of(first, second));
+
+        List<ProductImageView> images =
+                productAdminService.getProductImages(1L);
+
+        assertThat(images)
+                .extracting(ProductImageView::imageUrl)
+                .containsExactly(
+                        "/uploads/product/first.jpg",
+                        "/uploads/product/second.jpg"
+                );
+        assertThat(images)
+                .extracting(ProductImageView::sortOrder)
+                .containsExactly(0, 1);
+    }
+
     /**
      * 상품 등록 테스트에 사용할 정상 입력값을 만든다.
      */
@@ -667,5 +698,18 @@ class ProductAdminServiceTests {
         form.setPreparationDays(0);
 
         return form;
+    }
+
+    private ProductImage productImage(
+            long id,
+            String imageUrl,
+            int sortOrder
+    ) {
+        ProductImage image = new ProductImage();
+        image.setId(id);
+        image.setProductId(1L);
+        image.setImageUrl(imageUrl);
+        image.setSortOrder(sortOrder);
+        return image;
     }
 }

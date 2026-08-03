@@ -2,6 +2,7 @@ package com.cakeshop.customer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -226,6 +227,83 @@ class ScreenRenderingTests {
             .andExpect(content().string(containsString("아래로 이동")))
             .andExpect(content().string(not(
                 containsString("name=\"sortOrder\"")
+            )));
+    }
+
+    @Test
+    @WithUserDetails(
+        value = "admin@cakeshop.local",
+        userDetailsServiceBeanName = "memberDetailsService"
+    )
+    void productEdit_imagesMissing_rendersUploadFormAndPlaceholder()
+            throws Exception {
+        mockMvc.perform(get("/admin/products/1/edit"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString(
+                "data-product-image-upload"
+            )))
+            .andExpect(content().string(containsString(
+                "등록된 상품 이미지가 없습니다."
+            )))
+            .andExpect(content().string(containsString(
+                "form=\"productInfoForm\""
+            )))
+            .andExpect(content().string(not(matchesPattern(
+                "(?s).*<button(?=[^>]*data-image-upload-button)"
+                    + "(?=[^>]*disabled)[^>]*>.*"
+            ))));
+    }
+
+    @Test
+    @Transactional
+    @WithUserDetails(
+        value = "admin@cakeshop.local",
+        userDetailsServiceBeanName = "memberDetailsService"
+    )
+    void productEdit_fiveImagesExist_rendersRepresentativeAndDisablesUpload()
+            throws Exception {
+        Long productId = jdbcTemplate.queryForObject(
+            "SELECT id FROM products WHERE name = '딸기 생크림 케이크'",
+            Long.class
+        );
+        jdbcTemplate.update(
+            """
+            INSERT INTO product_images (
+                product_id,
+                image_url,
+                sort_order
+            )
+            VALUES
+                (?, '/uploads/product/first.jpg', 0),
+                (?, '/uploads/product/second.jpg', 1),
+                (?, '/uploads/product/third.jpg', 2),
+                (?, '/uploads/product/fourth.jpg', 3),
+                (?, '/uploads/product/fifth.jpg', 4)
+            """,
+            productId,
+            productId,
+            productId,
+            productId,
+            productId
+        );
+
+        mockMvc.perform(get(
+                "/admin/products/{productId}/edit",
+                productId
+            ))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString(
+                "/uploads/product/first.jpg"
+            )))
+            .andExpect(content().string(containsString(
+                "대표 이미지"
+            )))
+            .andExpect(content().string(containsString(
+                "상품 이미지를 최대 5장까지 등록했습니다."
+            )))
+            .andExpect(content().string(matchesPattern(
+                "(?s).*<button(?=[^>]*data-image-upload-button)"
+                    + "(?=[^>]*disabled)[^>]*>.*"
             )));
     }
 

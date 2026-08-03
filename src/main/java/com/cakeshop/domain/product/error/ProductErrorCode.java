@@ -80,6 +80,30 @@ public enum ProductErrorCode implements ErrorCode {
             "PRODUCT_013",
             "필수 옵션 그룹에는 하나 이상의 활성 옵션이 필요합니다.",
             409
+    ),
+
+    INVALID_IMAGE_FILE(
+            "PRODUCT_014",
+            "JPEG 또는 PNG 이미지 파일을 선택해 주세요.",
+            400
+    ),
+
+    IMAGE_TOO_LARGE(
+            "PRODUCT_015",
+            "상품 이미지는 5MB 이하여야 합니다.",
+            400
+    ),
+
+    IMAGE_LIMIT_EXCEEDED(
+            "PRODUCT_016",
+            "상품 이미지는 최대 5장까지 등록할 수 있습니다.",
+            409
+    ),
+
+    IMAGE_UPLOAD_FAILED(
+            "PRODUCT_017",
+            "상품 이미지를 등록하지 못했습니다. 다시 시도해 주세요.",
+            500
     );
 
     private final String code;

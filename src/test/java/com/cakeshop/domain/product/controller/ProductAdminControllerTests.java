@@ -454,11 +454,15 @@ class ProductAdminControllerTests {
                 ))
                 .andExpect(model().attributeExists(
                         "categories",
-                        "productTypes"
+                        "productTypes",
+                        "productImages",
+                        "imageUploadForm"
                 ));
 
         verify(productAdminService)
                 .getProductForm(1L);
+        verify(productAdminService)
+                .getProductImages(1L);
     }
 
     @Test
@@ -568,7 +572,9 @@ class ProductAdminControllerTests {
                 ))
                 .andExpect(model().attributeExists(
                         "categories",
-                        "productTypes"
+                        "productTypes",
+                        "productImages",
+                        "imageUploadForm"
                 ));
 
         verify(productAdminService, never())
