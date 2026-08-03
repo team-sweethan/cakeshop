@@ -1676,6 +1676,38 @@ body > main {
     max-width: 720px
 }
 
+.product-image-card {
+    display: grid;
+    gap: var(--space-3);
+    grid-template-rows: auto auto auto
+}
+
+.product-image-preview {
+    display: block
+}
+
+.product-image-preview img {
+    display: block
+}
+
+.product-image-badge {
+    justify-self: start;
+    width: fit-content
+}
+
+.product-image-badge--placeholder {
+    visibility: hidden
+}
+
+.product-image-actions {
+    display: flex;
+    justify-content: flex-end
+}
+
+.product-image-delete-form {
+    margin-left: auto
+}
+
 /* 매장 폼: 영업/픽업 시간 입력 */
 .time-range {
     align-items: center;

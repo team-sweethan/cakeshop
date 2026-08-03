@@ -334,16 +334,41 @@
           <!-- 등록된 상품 이미지 -->
           <div class="grid grid--4"
                th:if="${!#lists.isEmpty(productImages)}">
-            <div th:each="image, imageStatus : ${productImages}">
-              <img class="placeholder-image"
-                   style="width:100%; object-fit:cover"
-                   th:src="${image.imageUrl}"
-                   th:alt="|상품 이미지 ${imageStatus.count}|">
-
-              <span class="badge badge--success"
-                    th:if="${imageStatus.first}">
+            <div class="product-image-card"
+                 th:each="image, imageStatus : ${productImages}">
+              <span class="badge badge--success product-image-badge"
+                    th:classappend=
+                            "${imageStatus.first
+                            ? ''
+                            : 'product-image-badge--placeholder'}"
+                    th:attr="aria-hidden=${!imageStatus.first}">
                 대표 이미지
               </span>
+
+              <div class="product-image-preview">
+                <img class="placeholder-image"
+                     style="width:100%; object-fit:cover"
+                     th:src="${image.imageUrl}"
+                     th:alt="|상품 이미지 ${imageStatus.count}|">
+              </div>
+
+              <div class="product-image-actions">
+                <form class="product-image-delete-form"
+                      method="post"
+                      data-product-image-delete
+                      th:action=
+                              "@{/admin/products/{productId}/images/{imageId}/delete(
+                              productId=${productId},
+                              imageId=${image.id}
+                              )}">
+                  <button class="btn btn--danger"
+                          type="submit"
+                          data-confirm=
+                                  "이 상품 이미지를 삭제하시겠습니까?">
+                    삭제
+                  </button>
+                </form>
+              </div>
             </div>
           </div>
 

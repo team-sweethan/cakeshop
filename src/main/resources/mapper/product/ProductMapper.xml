@@ -177,6 +177,20 @@
             pi.id ASC
     </select>
 
+    <!-- 상품 이미지 단건 조회 -->
+    <select id="findProductImageById"
+            resultType="com.cakeshop.domain.product.entity.ProductImage">
+
+        SELECT
+            pi.id,
+            pi.product_id,
+            pi.image_url,
+            pi.sort_order
+        FROM product_images pi
+        WHERE pi.product_id = #{productId}
+          AND pi.id = #{imageId}
+    </select>
+
     <!-- 상품 이미지 개수 조회 -->
     <select id="countProductImagesByProductId"
             resultType="int">
@@ -212,6 +226,14 @@
             #{sortOrder}
         )
     </insert>
+
+    <!-- 상품 이미지 삭제 -->
+    <delete id="deleteProductImage">
+
+        DELETE FROM product_images
+        WHERE product_id = #{productId}
+          AND id = #{imageId}
+    </delete>
 
     <!-- 다른 도메인에 제공할 상품 판매 정보 조회 -->
     <select id="findSalesInfoById"
