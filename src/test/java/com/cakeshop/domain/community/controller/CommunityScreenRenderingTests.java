@@ -516,6 +516,25 @@ class CommunityScreenRenderingTests {
                 .andExpect(content().string(containsString("댓글 삭제")));
     }
 
+    /**
+     * 차단된 글에서는 자기 댓글에도 삭제 버튼이 없는지 확인한다.
+     *
+     * <p>삭제도 게시글이 {@code PUBLISHED}여야 한다(DOMAIN.md 6.4). 소유권만 보고 버튼을
+     * 그리면 <b>눌러도 403만 나오는 죽은 버튼</b>이 남는데, 이 화면은 "차단된 글을 작성자가
+     * 연다"는 드문 조건에서만 그려져서 개발 중에는 마주칠 일이 없다. 댓글 폼은 이미
+     * 숨기고 있었으므로 두 조건이 갈라져 있던 자리다.
+     */
+    @Test
+    void communityDetail_blockedPostAuthor_hasNoDeadCommentDeleteButton() throws Exception {
+        long postId = insertPost(memberId, "차단된 글", "본문", PostStatus.BLOCKED);
+        insertComment(postId, memberId, "내 댓글", CommentStatus.PUBLISHED, BASE_TIME);
+
+        mockMvc.perform(get("/community/" + postId).with(authentication(authorOf(memberId))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("내 댓글")))
+                .andExpect(content().string(not(containsString("댓글 삭제"))));
+    }
+
     @Test
     void communityDetail_otherMembersComment_hidesDeleteButton() throws Exception {
         long postId = insertPost(memberId, "글", "본문", PostStatus.PUBLISHED);

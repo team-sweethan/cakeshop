@@ -41,6 +41,8 @@ import com.cakeshop.global.security.MemberDetails;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -517,6 +519,25 @@ class CommunityControllerTests {
         verify(communityService, never()).addComment(anyLong(), any(), anyLong());
     }
 
+    /**
+     * 검증에 실패해 상세를 다시 그릴 때도 펼친 상태를 잃지 않는지 확인한다.
+     *
+     * <p>등록에 실패한 사람은 어디로 간 것이 아니라 제자리다. 20건으로 접어 버리면
+     * 오류 메시지와 함께 읽고 있던 댓글까지 사라진다(screens/detail.md).
+     */
+    @Test
+    void addComment_invalidForm_keepsExpandedCommentLimit() throws Exception {
+        authenticateAs(7L);
+        when(communityService.getCommentablePost(15L, 7L)).thenReturn(publishedPost());
+
+        mockMvc.perform(post("/community/15/comments")
+                        .param("content", "   ")
+                        .param("comments", "40"))
+                .andExpect(status().isOk());
+
+        verify(communityService).getComments(15L, 40);
+    }
+
     @Test
     void deleteComment_redirectsToDetail() throws Exception {
         authenticateAs(7L);
@@ -526,6 +547,47 @@ class CommunityControllerTests {
                 .andExpect(redirectedUrl("/community/15"));
 
         verify(communityService).deleteComment(15L, 8L, 7L);
+    }
+
+    /**
+     * 삭제 후에도 펼친 댓글 수가 유지되는지 확인한다.
+     *
+     * <p>삭제에는 성공 메시지가 없고 지운 자리의 "삭제된 댓글입니다."가 결과를 보여 주는
+     * 유일한 신호다. 20건으로 접어 돌려보내면 <b>최신 20건 밖의 댓글은 그 자리가 화면 밖으로
+     * 나가</b> 사용자에게는 삭제가 안 된 것과 구분되지 않는다(screens/detail.md).
+     *
+     * <p>댓글이 20건 이하면 접든 말든 결과가 같아서 이 회귀는 눈으로 잡히지 않는다.
+     */
+    @Test
+    void deleteComment_keepsExpandedCommentLimit() throws Exception {
+        authenticateAs(7L);
+
+        mockMvc.perform(post("/community/15/comments/8/delete").param("comments", "60"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/community/15?comments=60"));
+    }
+
+    /**
+     * 펼친 값이 주소로 나가기 전에 정수로 다시 쓰이는지 확인한다.
+     *
+     * <p>사용자가 보낸 문자열을 그대로 이으면 리다이렉트 주소에 임의의 값이 실린다.
+     * 상한(200)과 기본값(20) 처리도 조회 경로와 같은 규칙을 쓴다.
+     */
+    @ParameterizedTest
+    @CsvSource({
+            "abc, /community/15",
+            "-1, /community/15",
+            "20, /community/15",
+            "99999999, /community/15?comments=200",
+            "'40 OR 1=1', /community/15"
+    })
+    void deleteComment_rewritesCommentLimitAsInteger(String requested, String expectedUrl)
+            throws Exception {
+        authenticateAs(7L);
+
+        mockMvc.perform(post("/community/15/comments/8/delete").param("comments", requested))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(expectedUrl));
     }
 
     private void authenticateAs(long memberId) {
