@@ -10,8 +10,11 @@ import com.cakeshop.domain.member.dto.view.MemberAdminDetailView;
 import com.cakeshop.domain.member.dto.view.MemberAdminListRow;
 import com.cakeshop.domain.member.dto.view.MemberAdminListView;
 import com.cakeshop.domain.member.entity.MemberStatus;
+import com.cakeshop.domain.member.entity.MemberStatusAction;
+import com.cakeshop.domain.member.entity.MemberStatusHistory;
 import com.cakeshop.domain.member.error.MemberErrorCode;
 import com.cakeshop.domain.member.mapper.MemberMapper;
+import com.cakeshop.domain.member.mapper.MemberStatusHistoryMapper;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
@@ -24,9 +27,13 @@ public class MemberAdminService {
     private static final String EMPTY_DISPLAY_VALUE = "-";
 
     private final MemberMapper memberMapper;
+    private final MemberStatusHistoryMapper memberStatusHistoryMapper;
 
-    public MemberAdminService(MemberMapper memberMapper) {
+    public MemberAdminService(
+            MemberMapper memberMapper,
+            MemberStatusHistoryMapper memberStatusHistoryMapper) {
         this.memberMapper = memberMapper;
+        this.memberStatusHistoryMapper = memberStatusHistoryMapper;
     }
 
     /**
@@ -98,22 +105,16 @@ public class MemberAdminService {
                 row.updatedAt(),
                 row.suspendedAt(),
                 row.suspendedReason(),
-                row.withdrawnAt());
+                row.withdrawnAt(),
+                memberStatusHistoryMapper.findByMemberId(memberId));
     }
 
     @Transactional
-    public String suspendMember(Long memberId, String reason) {
-        if (reason == null || reason.isBlank()) {
-            throw new BusinessException(
-                    MemberErrorCode.INVALID_SUSPENSION_REASON);
-        }
-
-        String normalizedReason = reason.trim();
-
-        if (normalizedReason.length() > 500) {
-            throw new BusinessException(
-                    MemberErrorCode.INVALID_SUSPENSION_REASON);
-        }
+    public String suspendMember(
+            Long memberId,
+            String reason,
+            Long processedBy) {
+        String normalizedReason = normalizeStatusReason(reason);
 
         MemberAdminDetailRow member =
                 memberMapper.findAdminMemberDetail(memberId)
@@ -134,11 +135,23 @@ public class MemberAdminService {
             throw new BusinessException(
                     MemberErrorCode.INVALID_STATUS_TRANSITION);
         }
+
+        insertStatusHistory(
+                memberId,
+                MemberStatusAction.SUSPEND,
+                MemberStatus.ACTIVE,
+                MemberStatus.SUSPENDED,
+                normalizedReason,
+                processedBy);
         return member.email();
     }
 
     @Transactional
-    public void activateMember(Long memberId) {
+    public void activateMember(
+            Long memberId,
+            String reason,
+            Long processedBy) {
+        String normalizedReason = normalizeStatusReason(reason);
         MemberAdminDetailRow member =
                 memberMapper.findAdminMemberDetail(memberId)
                         .orElseThrow(() ->
@@ -156,6 +169,52 @@ public class MemberAdminService {
         if (updatedRows != 1) {
             throw new BusinessException(
                     MemberErrorCode.INVALID_STATUS_TRANSITION);
+        }
+
+        insertStatusHistory(
+                memberId,
+                MemberStatusAction.ACTIVATE,
+                MemberStatus.SUSPENDED,
+                MemberStatus.ACTIVE,
+                normalizedReason,
+                processedBy);
+    }
+
+    private String normalizeStatusReason(String reason) {
+        if (reason == null || reason.isBlank()) {
+            throw new BusinessException(
+                    MemberErrorCode.INVALID_STATUS_REASON);
+        }
+
+        String normalizedReason = reason.trim();
+
+        if (normalizedReason.length() > 500) {
+            throw new BusinessException(
+                    MemberErrorCode.INVALID_STATUS_REASON);
+        }
+
+        return normalizedReason;
+    }
+
+    private void insertStatusHistory(
+            Long memberId,
+            MemberStatusAction action,
+            MemberStatus beforeStatus,
+            MemberStatus afterStatus,
+            String reason,
+            Long processedBy) {
+        MemberStatusHistory history = new MemberStatusHistory();
+
+        history.setMemberId(memberId);
+        history.setAction(action);
+        history.setBeforeStatus(beforeStatus);
+        history.setAfterStatus(afterStatus);
+        history.setReason(reason);
+        history.setProcessedBy(processedBy);
+
+        if (memberStatusHistoryMapper.insert(history) != 1) {
+            throw new BusinessException(
+                    MemberErrorCode.STATUS_HISTORY_SAVE_FAILED);
         }
     }
 

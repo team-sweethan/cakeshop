@@ -16,6 +16,13 @@
                   th:object="${couponForm}"
                   method="post">
 
+                <th:block th:if="${formMode == 'update'}">
+                    <input type="hidden" name="keyword" th:value="${condition.keyword}">
+                    <input type="hidden" name="status" th:value="${condition.status}">
+                    <input type="hidden" name="page" th:value="${page}">
+                    <input type="hidden" name="origin" th:value="${origin}">
+                </th:block>
+
                 <div class="alert alert--error" th:if="${#fields.hasAnyErrors()}">
                     <strong>입력 내용을 확인해 주세요.</strong>
                     <ul>
@@ -168,7 +175,11 @@
 
                 <div class="cluster">
                     <button class="btn btn--primary" type="submit" th:text="${formMode == 'create'} ? '등록' : '수정'">등록</button>
-                    <a class="btn" th:href="@{/admin/coupons}">취소</a>
+                    <a class="btn" th:if="${formMode == 'create'}" th:href="@{/admin/coupons}">취소</a>
+                    <a class="btn" th:if="${formMode == 'update' && origin == 'DETAIL'}"
+                       th:href="@{/admin/coupons/{couponId}/detail(couponId=${couponId}, keyword=${condition.keyword}, status=${condition.status}, page=${page})}">취소</a>
+                    <a class="btn" th:if="${formMode == 'update' && origin != 'DETAIL'}"
+                       th:href="@{/admin/coupons(keyword=${condition.keyword}, status=${condition.status}, page=${page})}">취소</a>
                 </div>
             </form>
         </main>

@@ -42,7 +42,7 @@
 </html>
 ```
 
-관리자 메뉴 키는 `dashboard`, `store`, `products`, `orders`, `fulfillment`, `payments`, `coupons`, `members`, `reviews`, `notifications`, `statistics` 중 하나를 사용한다.
+관리자 메뉴 키는 `dashboard`, `store`, `products`, `orders`, `fulfillment`, `payments`, `coupons`, `members`, `reviews`, `community`, `chat`, `notifications`, `statistics` 중 하나를 사용한다. 정본은 `fragments/admin/sidebar.html`이며, 메뉴를 추가할 때 이 목록도 함께 갱신한다.
 
 ## 공통 클래스
 

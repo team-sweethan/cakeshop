@@ -75,6 +75,29 @@ class LocalFileStorageClientTests {
     }
 
     @Test
+    void store_rejectsBlankDirectory() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "cake.jpg", "image/jpeg", "x".getBytes());
+
+        // null/공백 디렉터리가 "null/{yyyyMM}" 폴더로 새어나가면 안 된다.
+        assertThatThrownBy(() -> client.store(file, null))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> client.store(file, "  "))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void constructor_rejectsBlankSettings(@TempDir Path tempDir) {
+        assertThatThrownBy(() -> new LocalFileStorageClient("", URL_PREFIX))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new LocalFileStorageClient(tempDir.toString(), null))
+                .isInstanceOf(IllegalArgumentException.class);
+        // "/" 는 후행 슬래시 제거 후 빈 문자열이 되어 delete() 판별을 무력화한다.
+        assertThatThrownBy(() -> new LocalFileStorageClient(tempDir.toString(), "/"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void delete_ignoresPathOutsidePrefix() {
         // url-prefix 로 시작하지 않는 경로는 조용히 무시한다 (예외 없음).
         client.delete("/etc/passwd");

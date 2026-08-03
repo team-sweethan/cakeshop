@@ -12,9 +12,12 @@ import java.util.List;
 
 import com.cakeshop.domain.product.dto.form.ProductSearchCondition;
 import com.cakeshop.domain.product.dto.form.ProductSort;
+import com.cakeshop.domain.product.dto.view.ProductDetailView;
+import com.cakeshop.domain.product.dto.view.ProductImageView;
 import com.cakeshop.domain.product.dto.view.ProductListView;
 import com.cakeshop.domain.product.dto.view.ProductOptionGroupView;
 import com.cakeshop.domain.product.dto.view.ProductOptionRow;
+import com.cakeshop.domain.product.entity.ProductImage;
 import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.mapper.ProductMapper;
 import com.cakeshop.global.common.paging.PageRequest;
@@ -127,6 +130,59 @@ class ProductServiceTests {
     }
 
     @Test
+    void getPublicDetail_imagesExist_returnsImageViewsInMapperOrder() {
+        ProductDetailView detail = new ProductDetailView();
+        detail.setId(1L);
+
+        ProductImage representative = productImage(
+                10L,
+                1L,
+                "/uploads/product/representative.jpg",
+                0
+        );
+        ProductImage second = productImage(
+                20L,
+                1L,
+                "/uploads/product/second.jpg",
+                1
+        );
+
+        when(productMapper.findPublicDetailById(1L))
+                .thenReturn(detail);
+        when(productMapper.findProductImagesByProductId(1L))
+                .thenReturn(List.of(representative, second));
+
+        ProductDetailView result =
+                productService.getPublicDetail(1L);
+
+        assertThat(result.getImages())
+                .extracting(ProductImageView::imageUrl)
+                .containsExactly(
+                        "/uploads/product/representative.jpg",
+                        "/uploads/product/second.jpg"
+                );
+        assertThat(result.getImages())
+                .extracting(ProductImageView::sortOrder)
+                .containsExactly(0, 1);
+    }
+
+    @Test
+    void getPublicDetail_imagesMissing_returnsEmptyImageList() {
+        ProductDetailView detail = new ProductDetailView();
+        detail.setId(1L);
+
+        when(productMapper.findPublicDetailById(1L))
+                .thenReturn(detail);
+        when(productMapper.findProductImagesByProductId(1L))
+                .thenReturn(List.of());
+
+        ProductDetailView result =
+                productService.getPublicDetail(1L);
+
+        assertThat(result.getImages()).isEmpty();
+    }
+
+    @Test
     void optionRowsAreGroupedInQueryOrder() {
         when(productMapper.findPublicOptionRowsByProductId(1L))
                 .thenReturn(List.of(
@@ -211,5 +267,19 @@ class ProductServiceTests {
                 .isEqualByComparingTo("30000");
         assertThat(conditionCaptor.getValue().getMaxPrice())
                 .isEqualByComparingTo("80000");
+    }
+
+    private ProductImage productImage(
+            long id,
+            long productId,
+            String imageUrl,
+            int sortOrder
+    ) {
+        ProductImage image = new ProductImage();
+        image.setId(id);
+        image.setProductId(productId);
+        image.setImageUrl(imageUrl);
+        image.setSortOrder(sortOrder);
+        return image;
     }
 }

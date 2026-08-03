@@ -1,5 +1,6 @@
 ﻿<!doctype html>
-<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<html lang="ko" xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -24,6 +25,8 @@
 <header th:replace="~{fragments/common/header :: header}"></header>
 
 <main class="page-container">
+
+  <div th:replace="~{fragments/common/alert :: alert}"></div>
 
   <!-- 페이지 제목 -->
   <h1>상품 상세</h1>
@@ -57,15 +60,39 @@
                     data-base-price=${product.basePrice},
                     data-stock=${product.stockQuantity}">
 
-    <!-- 상품 이미지 테이블 연결 전까지 명확한 빈 상태를 표시한다. -->
     <div class="product-gallery">
-      <div class="placeholder-image placeholder-image--lg">
-        상품 이미지 준비 중
-      </div>
+      <!-- 표시 순서가 가장 앞선 이미지를 대표 이미지로 사용한다. -->
+      <th:block th:if="${!#lists.isEmpty(product.images)}">
+        <img class="placeholder-image placeholder-image--lg"
+             style="width:100%; object-fit:cover"
+             data-product-main-image
+             th:src="${product.images[0].imageUrl}"
+             th:alt="|${product.name} 대표 이미지|">
 
-      <p class="note" style="margin-top:8px">
-        등록된 상품 이미지가 없습니다.
-      </p>
+        <!-- 대표 이미지를 제외한 나머지 이미지를 순서대로 표시한다. -->
+        <div class="product-gallery__thumbnails grid grid--4"
+             th:if="${product.images.size() > 1}">
+          <img class="placeholder-image placeholder-image--sm"
+               style="object-fit:cover"
+               loading="lazy"
+               data-product-thumbnail
+               th:each="image, imageStatus : ${product.images}"
+               th:if="${imageStatus.index > 0}"
+               th:src="${image.imageUrl}"
+               th:alt="|${product.name} 이미지 ${imageStatus.count}|">
+        </div>
+      </th:block>
+
+      <!-- 등록된 이미지가 없으면 img 태그를 만들지 않는다. -->
+      <th:block th:if="${#lists.isEmpty(product.images)}">
+        <div class="placeholder-image placeholder-image--lg">
+          상품 이미지 준비 중
+        </div>
+
+        <p class="note" style="margin-top:8px">
+          등록된 상품 이미지가 없습니다.
+        </p>
+      </th:block>
     </div>
 
     <!-- 실제 상품 기본 정보 -->
@@ -369,7 +396,8 @@
         <!-- 재고가 있는 경우 -->
         <div
                 class="cluster"
-                th:if="${product.available}"
+                th:if="${product.available
+                        and product.productType.name() == 'GENERAL'}"
         >
           <!-- 일반 상품은 픽업 선택을 포함한 통합 주문서로 바로 이동한다. -->
           <a
@@ -389,14 +417,20 @@
             주문 제작 요청하기
           </a>
 
-          <!-- 장바구니 기능은 이후 백엔드와 연결한다. -->
-          <button
-                  class="btn"
-                  type="button"
-                  data-add-product-cart
-          >
-            장바구니 담기
-          </button>
+          <form sec:authorize="isAuthenticated()"
+                th:action="@{/cart/items}" method="post" data-server-cart-form>
+            <input type="hidden" name="productId" th:value="${product.id}">
+            <input type="hidden" name="quantity" value="1" data-server-cart-quantity>
+            <span data-server-cart-options></span>
+            <button class="btn" type="submit" data-server-cart-submit>
+              장바구니 담기
+            </button>
+          </form>
+
+          <a sec:authorize="isAnonymous()" class="btn"
+             th:href="@{/cart/continue/{id}(id=${product.id})}">
+            로그인 후 장바구니 담기
+          </a>
 
           <span class="note">
               픽업 일시는 장바구니에서 나중에 선택할 수 있습니다.

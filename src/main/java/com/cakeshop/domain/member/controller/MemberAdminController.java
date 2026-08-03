@@ -2,16 +2,19 @@ package com.cakeshop.domain.member.controller;
 
 import com.cakeshop.domain.member.dto.form.MemberAdminListType;
 import com.cakeshop.domain.member.dto.form.MemberAdminSearchCondition;
+import com.cakeshop.domain.member.dto.form.MemberActivateForm;
 import com.cakeshop.domain.member.dto.form.MemberSuspendForm;
 import com.cakeshop.domain.member.dto.view.MemberAdminDetailView;
 import com.cakeshop.domain.member.dto.view.MemberAdminListView;
 import com.cakeshop.domain.member.entity.MemberStatus;
 import com.cakeshop.domain.member.service.MemberAdminService;
 import com.cakeshop.domain.member.service.MemberSessionService;
+import com.cakeshop.global.security.MemberDetails;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import jakarta.validation.Valid;
 import org.springframework.stereotype.Controller;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -94,39 +97,64 @@ public class MemberAdminController {
             @Valid @ModelAttribute("suspendForm")
             MemberSuspendForm form,
             BindingResult bindingResult,
+            @AuthenticationPrincipal MemberDetails memberDetails,
+            @RequestParam(defaultValue = "list") String source,
             RedirectAttributes redirectAttributes) {
         if (bindingResult.hasErrors()) {
             redirectAttributes.addFlashAttribute(
                     "errorMessage",
                     "이용정지 사유를 확인해 주세요.");
 
-            return "redirect:/admin/members";
+            return statusChangeRedirect(memberId, source);
         }
 
         String email =
                 memberAdminService.suspendMember(
                         memberId,
-                        form.getReason());
+                        form.getReason(),
+                        memberDetails.getMemberId());
 
         memberSessionService.expireSessionsByEmail(email);
         redirectAttributes.addFlashAttribute(
                 "successMessage",
                 "회원 이용을 정지했습니다.");
 
-        return "redirect:/admin/members";
+        return statusChangeRedirect(memberId, source);
     }
 
     // 관리자 회원 이용정지 해제
     @PostMapping("/admin/members/{memberId}/activate")
     public String activateMember(
             @PathVariable Long memberId,
+            @Valid @ModelAttribute("activateForm")
+            MemberActivateForm form,
+            BindingResult bindingResult,
+            @AuthenticationPrincipal MemberDetails memberDetails,
+            @RequestParam(defaultValue = "list") String source,
             RedirectAttributes redirectAttributes) {
-        memberAdminService.activateMember(memberId);
+        if (bindingResult.hasErrors()) {
+            redirectAttributes.addFlashAttribute(
+                    "errorMessage",
+                    "이용정지 해제 사유를 확인해 주세요.");
+
+            return statusChangeRedirect(memberId, source);
+        }
+
+        memberAdminService.activateMember(
+                memberId,
+                form.getReason(),
+                memberDetails.getMemberId());
         redirectAttributes.addFlashAttribute(
                 "successMessage",
                 "회원 이용정지를 해제했습니다.");
 
-        return "redirect:/admin/members";
+        return statusChangeRedirect(memberId, source);
+    }
+
+    private String statusChangeRedirect(Long memberId, String source) {
+        return "detail".equals(source)
+                ? "redirect:/admin/members/" + memberId
+                : "redirect:/admin/members";
     }
 
     private Integer parsePositiveInteger(String value) {

@@ -109,8 +109,7 @@
   }
 
   function updateCartCount(items) {
-    const count = cartQuantity(items || readCart());
-    document.querySelectorAll("[data-cart-count]").forEach(function (link) { link.textContent = "장바구니 (" + count + ")"; });
+    // DB 장바구니 개수는 app.js가 /cart/count에서 조회한다.
   }
 
   function readPendingProduct() {
@@ -242,7 +241,7 @@
   }
 
   function initializePickup() {
-    if (!document.querySelector("[data-add-normal-cart]")) return;
+    if (!document.querySelector("[data-pickup-root]")) return;
     const targetId = pickupTarget();
     const targetItem = targetId ? readCart().find(function (item) { return item.id === targetId; }) : null;
     const pending = targetItem || readPendingProduct();
@@ -475,13 +474,34 @@
     if (pickupOrder) movePendingProductToCheckout(event);
     const addProduct = event.target.closest("[data-add-product-cart]");
     if (addProduct) addProductFromDetail();
+    const serverCart = event.target.closest("[data-server-cart-submit]");
+    if (serverCart) {
+      if (!validateProductOptions()) {
+        event.preventDefault();
+        return;
+      }
+      const form = serverCart.closest("[data-server-cart-form]");
+      const quantity = form && form.querySelector("[data-server-cart-quantity]");
+      const options = form && form.querySelector("[data-server-cart-options]");
+      if (quantity) quantity.value = String(productDetailQuantity());
+      if (options) {
+        options.replaceChildren();
+        selectedProductOptions().forEach(function (option) {
+          const input = document.createElement("input");
+          input.type = "hidden";
+          input.name = "optionIds";
+          input.value = option.id;
+          options.appendChild(input);
+        });
+      }
+    }
     const addNormal = event.target.closest("[data-add-normal-cart]");
     if (addNormal) addNormalProduct();
     const addCustom = event.target.closest("[data-add-custom-cart]");
     if (addCustom) addCustomProduct(addCustom);
     if (event.target.closest("[data-quantity-change]")) {
       updateProductDetailTotal();
-      if (document.querySelector("[data-add-normal-cart]")) updatePickupPrice();
+      if (document.querySelector("[data-pickup-root]")) updatePickupPrice();
     }
     const readAll = event.target.closest("[data-read-all]");
     if (readAll) {

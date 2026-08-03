@@ -23,7 +23,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.test.context.support.WithUserDetails;
 import org.springframework.test.context.jdbc.Sql;
+import org.springframework.test.context.jdbc.SqlConfig;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
@@ -37,7 +40,9 @@ import java.time.LocalDateTime;
     "app.payment.toss.client-key=test-client-key"
 })
 @MariaDbIntegrationTest
+// encoding 을 명시하지 않으면 JVM 기본 문자셋으로 읽어, 시드의 한글이 PC 에 따라 깨진다.
 @Sql(scripts = "classpath:db/seed/seed-local.sql",
+     config = @SqlConfig(encoding = "UTF-8"),
      executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS)
 class ScreenRenderingTests {
 
@@ -66,7 +71,7 @@ class ScreenRenderingTests {
     void publicScreensRenderWithoutAuthentication() throws Exception {
         String[] paths = {
             "/screens", "/login", "/signup", "/find-email",
-            "/products", "/products/1", "/cart"
+            "/products", "/products/1"
         };
 
         assertScreensRender(paths);
@@ -79,6 +84,17 @@ class ScreenRenderingTests {
             .andExpect(status().isOk())
             .andExpect(content().string(containsString("data-common-alert-popup")))
             .andExpect(content().string(containsString("window.alert(")));
+    }
+
+    @Test
+    void productScreens_errorMessage_renderCommonAlertFragment() throws Exception {
+        for (String path : new String[] {"/products", "/products/1"}) {
+            mockMvc.perform(get(path)
+                    .flashAttr("errorMessage", "장바구니 오류"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("alert alert--error")))
+                .andExpect(content().string(containsString("장바구니 오류")));
+        }
     }
 
     @Test
@@ -97,12 +113,91 @@ class ScreenRenderingTests {
     }
 
     @Test
+    void cart_unauthenticatedMember_redirectsToLoginEvenInPublicPreview() throws Exception {
+        mockMvc.perform(get("/cart"))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/login"));
+    }
+
+    @Test
+    void cartCount_unauthenticatedRequest_isNotSavedForLoginRedirect() throws Exception {
+        MvcResult countResult = mockMvc.perform(get("/cart/count"))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/login"))
+            .andReturn();
+
+        MockHttpSession countSession = (MockHttpSession) countResult.getRequest().getSession(false);
+        assertThat(countSession == null
+                ? null
+                : countSession.getAttribute("SPRING_SECURITY_SAVED_REQUEST"))
+            .isNull();
+
+        MvcResult pageResult = mockMvc.perform(get("/cart"))
+            .andExpect(status().is3xxRedirection())
+            .andReturn();
+        MockHttpSession pageSession = (MockHttpSession) pageResult.getRequest().getSession(false);
+        assertThat(pageSession).isNotNull();
+        assertThat(pageSession.getAttribute("SPRING_SECURITY_SAVED_REQUEST")).isNotNull();
+    }
+
+    @Test
+    void productDetail_unauthenticatedMember_showsLoginCartLinkOnly() throws Exception {
+        mockMvc.perform(get("/products/1"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("로그인 후 장바구니 담기")))
+            .andExpect(content().string(not(containsString("data-server-cart-form"))));
+    }
+
+    @Test
+    void productDetail_imagesMissing_rendersPlaceholderWithoutImageTag() throws Exception {
+        mockMvc.perform(get("/products/1"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("상품 이미지 준비 중")))
+            .andExpect(content().string(containsString("등록된 상품 이미지가 없습니다.")))
+            .andExpect(content().string(not(containsString("data-product-main-image"))));
+    }
+
+    @Test
+    @Transactional
+    void productDetail_imagesExist_rendersMainImageAndRemainingThumbnails() throws Exception {
+        Long productId = jdbcTemplate.queryForObject(
+            "SELECT id FROM products WHERE name = '딸기 생크림 케이크'",
+            Long.class
+        );
+        jdbcTemplate.update(
+            """
+            INSERT INTO product_images (
+                product_id,
+                image_url,
+                sort_order
+            )
+            VALUES
+                (?, '/uploads/product/main.jpg', 0),
+                (?, '/uploads/product/second.jpg', 1),
+                (?, '/uploads/product/third.jpg', 2)
+            """,
+            productId,
+            productId,
+            productId
+        );
+
+        mockMvc.perform(get("/products/{productId}", productId))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("data-product-main-image")))
+            .andExpect(content().string(containsString("/uploads/product/main.jpg")))
+            .andExpect(content().string(containsString("/uploads/product/second.jpg")))
+            .andExpect(content().string(containsString("/uploads/product/third.jpg")))
+            .andExpect(content().string(not(containsString("등록된 상품 이미지가 없습니다."))));
+    }
+
+    @Test
     @WithUserDetails(
         value = "user@cakeshop.local",
         userDetailsServiceBeanName = "memberDetailsService"
     )
     void memberScreensRenderWithSeededUser() throws Exception {
         String[] paths = {
+            "/cart", "/orders/pickup?intent=cart-edit",
             "/orders/custom/options", "/orders/custom/request",
             "/orders/checkout?productId=1&quantity=1&optionIds=1",
             "/mypage",
@@ -111,6 +206,23 @@ class ScreenRenderingTests {
         };
 
         assertScreensRender(paths);
+
+        mockMvc.perform(get("/products/1"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("data-server-cart-form")))
+            .andExpect(content().string(not(containsString("로그인 후 장바구니 담기"))));
+    }
+
+    @Test
+    @WithUserDetails(
+        value = "user@cakeshop.local",
+        userDetailsServiceBeanName = "memberDetailsService"
+    )
+    void customProductDetail_showsCustomOptionFlowWithoutServerCartForm() throws Exception {
+        mockMvc.perform(get("/products/6"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("/orders/custom/options")))
+            .andExpect(content().string(not(containsString("data-server-cart-form"))));
     }
 
     @Test

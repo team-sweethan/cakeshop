@@ -24,12 +24,19 @@ import com.cakeshop.domain.member.dto.view.MemberAdminListView;
 import com.cakeshop.domain.member.entity.MemberStatus;
 import com.cakeshop.domain.member.service.MemberAdminService;
 import com.cakeshop.domain.member.service.MemberSessionService;
+import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
+import com.cakeshop.global.security.MemberDetails;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.core.MethodParameter;
+import org.springframework.web.context.request.NativeWebRequest;
+import org.springframework.web.method.support.HandlerMethodArgumentResolver;
+import org.springframework.web.method.support.ModelAndViewContainer;
 
 class MemberAdminControllerTests {
 
@@ -148,7 +155,7 @@ class MemberAdminControllerTests {
     }
 
     @Test
-    void suspendMember_validReason_expiresSessionsAndRedirects()
+    void suspendMember_detailSource_expiresSessionsAndRedirectsToDetail()
             throws Exception {
         MemberAdminService memberAdminService =
                 mock(MemberAdminService.class);
@@ -156,24 +163,28 @@ class MemberAdminControllerTests {
                 mock(MemberSessionService.class);
         when(memberAdminService.suspendMember(
                 1L,
-                "정지 사유"))
+                "정지 사유",
+                99L))
                 .thenReturn("member@example.com");
         MockMvc mockMvc = MockMvcBuilders
                 .standaloneSetup(
                         new MemberAdminController(
                                 memberAdminService,
                                 memberSessionService))
+                .setCustomArgumentResolvers(
+                        new AdminDetailsArgumentResolver())
                 .build();
 
         mockMvc.perform(post("/admin/members/1/suspend")
-                        .param("reason", "정지 사유"))
+                        .param("reason", "정지 사유")
+                        .param("source", "detail"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/admin/members"))
+                .andExpect(redirectedUrl("/admin/members/1"))
                 .andExpect(flash().attribute(
                         "successMessage",
                         "회원 이용을 정지했습니다."));
 
-        verify(memberAdminService).suspendMember(1L, "정지 사유");
+        verify(memberAdminService).suspendMember(1L, "정지 사유", 99L);
         verify(memberSessionService)
                 .expireSessionsByEmail("member@example.com");
     }
@@ -190,6 +201,8 @@ class MemberAdminControllerTests {
                         new MemberAdminController(
                                 memberAdminService,
                                 memberSessionService))
+                .setCustomArgumentResolvers(
+                        new AdminDetailsArgumentResolver())
                 .build();
 
         mockMvc.perform(post("/admin/members/1/suspend")
@@ -201,7 +214,7 @@ class MemberAdminControllerTests {
                         "이용정지 사유를 확인해 주세요."));
 
         verify(memberAdminService, never())
-                .suspendMember(any(), any());
+                .suspendMember(any(), any(), any());
         verify(memberSessionService, never())
                 .expireSessionsByEmail(any());
     }
@@ -215,16 +228,26 @@ class MemberAdminControllerTests {
                         new MemberAdminController(
                                 memberAdminService,
                                 mock(MemberSessionService.class)))
+                .setCustomArgumentResolvers(
+                        new AdminDetailsArgumentResolver())
                 .build();
 
         mockMvc.perform(post("/admin/members/1/activate"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/admin/members"))
                 .andExpect(flash().attribute(
+                        "errorMessage",
+                        "이용정지 해제 사유를 확인해 주세요."));
+
+        mockMvc.perform(post("/admin/members/1/activate")
+                        .param("reason", "해제 사유"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/admin/members"))
+                .andExpect(flash().attribute(
                         "successMessage",
                         "회원 이용정지를 해제했습니다."));
 
-        verify(memberAdminService).activateMember(1L);
+        verify(memberAdminService).activateMember(1L, "해제 사유", 99L);
     }
 
     private MemberAdminDetailView detail() {
@@ -244,6 +267,40 @@ class MemberAdminControllerTests {
                 registeredAt,
                 null,
                 null,
-                null);
+                null,
+                List.of());
+    }
+
+    private static UsernamePasswordAuthenticationToken adminPrincipal() {
+        MemberDetails details = new MemberDetails(
+                new MemberAuthenticationView(
+                        99L,
+                        "admin@example.com",
+                        "password",
+                        "ADMIN",
+                        true));
+
+        return new UsernamePasswordAuthenticationToken(
+                details,
+                details.getPassword(),
+                details.getAuthorities());
+    }
+
+    private static class AdminDetailsArgumentResolver
+            implements HandlerMethodArgumentResolver {
+
+        @Override
+        public boolean supportsParameter(MethodParameter parameter) {
+            return parameter.getParameterType() == MemberDetails.class;
+        }
+
+        @Override
+        public Object resolveArgument(
+                MethodParameter parameter,
+                ModelAndViewContainer mavContainer,
+                NativeWebRequest webRequest,
+                org.springframework.web.bind.support.WebDataBinderFactory binderFactory) {
+            return adminPrincipal().getPrincipal();
+        }
     }
 }

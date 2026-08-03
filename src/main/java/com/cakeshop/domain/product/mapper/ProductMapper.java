@@ -13,6 +13,7 @@ import com.cakeshop.domain.product.dto.view.ProductListView;
 import com.cakeshop.domain.product.dto.view.ProductOptionRow;
 
 import com.cakeshop.domain.product.entity.Product;
+import com.cakeshop.domain.product.entity.ProductImage;
 import com.cakeshop.domain.product.entity.ProductOption;
 import com.cakeshop.domain.product.entity.ProductOptionGroup;
 import com.cakeshop.domain.product.entity.ProductStatus;
@@ -53,6 +54,19 @@ public interface ProductMapper {
      * @return 판매 중인 상품 정보, 조건에 맞는 상품이 없으면 {@code null}
      */
     ProductDetailView findPublicDetailById(
+            @Param("productId") long productId
+    );
+
+    /**
+     * 상품에 등록된 이미지를 표시 순서대로 조회한다.
+     *
+     * <p>표시 순서가 같으면 이미지 식별자 순서로 정렬해
+     * 항상 같은 결과를 반환한다.</p>
+     *
+     * @param productId 조회할 상품 식별자
+     * @return 상품 이미지 목록
+     */
+    List<ProductImage> findProductImagesByProductId(
             @Param("productId") long productId
     );
 
