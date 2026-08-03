@@ -60,15 +60,39 @@
                     data-base-price=${product.basePrice},
                     data-stock=${product.stockQuantity}">
 
-    <!-- 상품 이미지 테이블 연결 전까지 명확한 빈 상태를 표시한다. -->
     <div class="product-gallery">
-      <div class="placeholder-image placeholder-image--lg">
-        상품 이미지 준비 중
-      </div>
+      <!-- 표시 순서가 가장 앞선 이미지를 대표 이미지로 사용한다. -->
+      <th:block th:if="${!#lists.isEmpty(product.images)}">
+        <img class="placeholder-image placeholder-image--lg"
+             style="width:100%; object-fit:cover"
+             data-product-main-image
+             th:src="${product.images[0].imageUrl}"
+             th:alt="|${product.name} 대표 이미지|">
 
-      <p class="note" style="margin-top:8px">
-        등록된 상품 이미지가 없습니다.
-      </p>
+        <!-- 대표 이미지를 제외한 나머지 이미지를 순서대로 표시한다. -->
+        <div class="product-gallery__thumbnails grid grid--4"
+             th:if="${product.images.size() > 1}">
+          <img class="placeholder-image placeholder-image--sm"
+               style="object-fit:cover"
+               loading="lazy"
+               data-product-thumbnail
+               th:each="image, imageStatus : ${product.images}"
+               th:if="${imageStatus.index > 0}"
+               th:src="${image.imageUrl}"
+               th:alt="|${product.name} 이미지 ${imageStatus.count}|">
+        </div>
+      </th:block>
+
+      <!-- 등록된 이미지가 없으면 img 태그를 만들지 않는다. -->
+      <th:block th:if="${#lists.isEmpty(product.images)}">
+        <div class="placeholder-image placeholder-image--lg">
+          상품 이미지 준비 중
+        </div>
+
+        <p class="note" style="margin-top:8px">
+          등록된 상품 이미지가 없습니다.
+        </p>
+      </th:block>
     </div>
 
     <!-- 실제 상품 기본 정보 -->

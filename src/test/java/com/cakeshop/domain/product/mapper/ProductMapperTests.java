@@ -16,6 +16,7 @@ import com.cakeshop.domain.product.dto.form.ProductSort;
 import com.cakeshop.domain.product.dto.form.StockFilter;
 import com.cakeshop.domain.product.dto.view.ProductListView;
 import com.cakeshop.domain.product.entity.Product;
+import com.cakeshop.domain.product.entity.ProductImage;
 import com.cakeshop.domain.product.entity.ProductStatus;
 import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
@@ -225,6 +226,51 @@ class ProductMapperTests {
                         keyword + " C 인기 주문 제작",
                         keyword + " E 최대 가격 상품"
                 );
+    }
+
+    @Test
+    void publicList_productsWithAndWithoutImages_returnsRepresentativeOrNull() {
+        jdbcTemplate.update(
+                """
+                INSERT INTO product_images (
+                    product_id,
+                    image_url,
+                    sort_order
+                )
+                VALUES
+                    (?, '/uploads/product/later.jpg', 2),
+                    (?, '/uploads/product/representative.jpg', 1)
+                """,
+                optionProductId,
+                optionProductId
+        );
+
+        ProductSearchCondition condition = baseCondition();
+        condition.setMaxPrice(BigDecimal.valueOf(200_000));
+
+        List<ProductListView> products =
+                productMapper.findPublicProducts(
+                        condition,
+                        10,
+                        0
+                );
+
+        ProductListView productWithImages = products.stream()
+                .filter(product -> product.id() == optionProductId)
+                .findFirst()
+                .orElseThrow();
+        ProductListView productWithoutImages = products.stream()
+                .filter(product -> product.name().equals(
+                        keyword + " B 품절 상품"
+                ))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(productWithImages.thumbnailUrl())
+                .isEqualTo(
+                        "/uploads/product/representative.jpg"
+                );
+        assertThat(productWithoutImages.thumbnailUrl()).isNull();
     }
 
     @Test
@@ -538,6 +584,49 @@ class ProductMapperTests {
                 .findPublicOptionRowsByProductId(optionProductId))
                 .extracting(row -> row.optionName())
                 .containsExactly("1호", "2호");
+    }
+
+    @Test
+    void findProductImagesByProductId_imagesExist_returnsStableDisplayOrder() {
+        jdbcTemplate.update(
+                """
+                INSERT INTO product_images (
+                    product_id,
+                    image_url,
+                    sort_order
+                )
+                VALUES
+                    (?, '/uploads/product/second.jpg', 2),
+                    (?, '/uploads/product/first-b.jpg', 1),
+                    (?, '/uploads/product/first-a.jpg', 1)
+                """,
+                optionProductId,
+                optionProductId,
+                optionProductId
+        );
+
+        List<ProductImage> images =
+                productMapper.findProductImagesByProductId(
+                        optionProductId
+                );
+
+        assertThat(images)
+                .extracting(ProductImage::getImageUrl)
+                .containsExactly(
+                        "/uploads/product/first-b.jpg",
+                        "/uploads/product/first-a.jpg",
+                        "/uploads/product/second.jpg"
+                );
+        assertThat(images)
+                .extracting(ProductImage::getProductId)
+                .containsOnly(optionProductId);
+    }
+
+    @Test
+    void findProductImagesByProductId_imagesMissing_returnsEmptyList() {
+        assertThat(productMapper.findProductImagesByProductId(
+                optionProductId
+        )).isEmpty();
     }
 
     private ProductSearchCondition baseCondition() {

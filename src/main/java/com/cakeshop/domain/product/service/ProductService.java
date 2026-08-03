@@ -8,10 +8,12 @@ import java.util.Map;
 import com.cakeshop.domain.product.dto.form.ProductSearchCondition;
 import com.cakeshop.domain.product.dto.form.ProductSort;
 import com.cakeshop.domain.product.dto.view.ProductDetailView;
+import com.cakeshop.domain.product.dto.view.ProductImageView;
 import com.cakeshop.domain.product.dto.view.ProductListView;
 import com.cakeshop.domain.product.dto.view.ProductOptionGroupView;
 import com.cakeshop.domain.product.dto.view.ProductOptionItemView;
 import com.cakeshop.domain.product.dto.view.ProductOptionRow;
+import com.cakeshop.domain.product.entity.ProductImage;
 import com.cakeshop.domain.product.error.ProductErrorCode;
 import com.cakeshop.domain.product.mapper.ProductMapper;
 import com.cakeshop.global.common.paging.PageRequest;
@@ -109,7 +111,26 @@ public class ProductService {
             throw new BusinessException(ProductErrorCode.NOT_FOUND);
         }
 
+        List<ProductImageView> images =
+                productMapper.findProductImagesByProductId(
+                        productId
+                ).stream()
+                        .map(this::toProductImageView)
+                        .toList();
+
+        product.setImages(images);
+
         return product;
+    }
+
+    private ProductImageView toProductImageView(
+            ProductImage image
+    ) {
+        return new ProductImageView(
+                image.getId(),
+                image.getImageUrl(),
+                image.getSortOrder()
+        );
     }
 
     /**

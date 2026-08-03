@@ -16,12 +16,14 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.context.support.WithUserDetails;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.context.jdbc.SqlConfig;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
 // 시드는 Flyway 관리 대상이 아니라서 locations 로는 못 불러온다. 스크립트로 직접 넣는다.
@@ -35,6 +37,9 @@ class ScreenRenderingTests {
 
     @Autowired
     private WebApplicationContext context;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     private MockMvc mockMvc;
 
@@ -124,6 +129,48 @@ class ScreenRenderingTests {
             .andExpect(status().isOk())
             .andExpect(content().string(containsString("로그인 후 장바구니 담기")))
             .andExpect(content().string(not(containsString("data-server-cart-form"))));
+    }
+
+    @Test
+    void productDetail_imagesMissing_rendersPlaceholderWithoutImageTag() throws Exception {
+        mockMvc.perform(get("/products/1"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("상품 이미지 준비 중")))
+            .andExpect(content().string(containsString("등록된 상품 이미지가 없습니다.")))
+            .andExpect(content().string(not(containsString("data-product-main-image"))));
+    }
+
+    @Test
+    @Transactional
+    void productDetail_imagesExist_rendersMainImageAndRemainingThumbnails() throws Exception {
+        Long productId = jdbcTemplate.queryForObject(
+            "SELECT id FROM products WHERE name = '딸기 생크림 케이크'",
+            Long.class
+        );
+        jdbcTemplate.update(
+            """
+            INSERT INTO product_images (
+                product_id,
+                image_url,
+                sort_order
+            )
+            VALUES
+                (?, '/uploads/product/main.jpg', 0),
+                (?, '/uploads/product/second.jpg', 1),
+                (?, '/uploads/product/third.jpg', 2)
+            """,
+            productId,
+            productId,
+            productId
+        );
+
+        mockMvc.perform(get("/products/{productId}", productId))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("data-product-main-image")))
+            .andExpect(content().string(containsString("/uploads/product/main.jpg")))
+            .andExpect(content().string(containsString("/uploads/product/second.jpg")))
+            .andExpect(content().string(containsString("/uploads/product/third.jpg")))
+            .andExpect(content().string(not(containsString("등록된 상품 이미지가 없습니다."))));
     }
 
     @Test
