@@ -42,7 +42,17 @@ import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 class CommunityScreenDocTests {
 
     private static final Path SCREEN_DOC_DIRECTORY = Path.of("docs", "community", "screens");
+    private static final Path SCREEN_INDEX = Path.of("docs", "community", "SCREENS.md");
     private static final Path TEST_SOURCE_ROOT = Path.of("src", "test", "java");
+    /**
+     * 인덱스 표를 찾는 기준. 머리글이 <b>정확히</b> 이것인 표 하나만 읽는다.
+     *
+     * <p>첫 열이 `화면`인 것만 보면 "만들지 않는 화면" 표까지 걸린다. 그 표의 두 번째 열은
+     * 산문이라 주소로 읽히고, 그러면 존재하지도 않는 명세 파일을 찾게 된다.
+     */
+    private static final List<String> INDEX_HEADER = List.of("화면", "주소", "상태", "조각", "파일");
+    /** `[screens/list.md](screens/list.md)` 에서 링크가 가리키는 쪽을 꺼낸다. */
+    private static final Pattern MARKDOWN_LINK = Pattern.compile("\\[[^\\]]*\\]\\(([^)]+)\\)");
     private static final List<String> TEMPLATE_DIRECTORIES =
             List.of("customer/community", "admin/community");
     private static final String IMPLEMENTED = "구현됨";
@@ -81,6 +91,46 @@ class CommunityScreenDocTests {
         assertThat(documented)
                 .as("screens/*.md의 화면 목록이 실제 템플릿 파일과 같아야 한다")
                 .containsExactlyInAnyOrderElementsOf(templates().keySet());
+    }
+
+    /**
+     * SCREENS.md의 인덱스 표가 실제 명세 파일과 어긋나지 않는지 확인한다.
+     *
+     * <p>인덱스는 사람이 화면 목록을 훑는 유일한 자리다. 그런데 <b>같은 사실을 두 번</b>
+     * 적어 둔 곳이기도 하다 — 상태와 주소는 각 명세 파일에도 있다. 두 벌로 적힌 것은
+     * 한쪽만 고치면 조용히 갈라지고, 갈라진 인덱스는 "화면 목록"이라는 이유로 계속 읽힌다.
+     *
+     * <p>그래서 세 가지를 묶는다. 파일 목록이 양방향으로 같은가(화면을 추가하고 인덱스에
+     * 안 적는 것이 여기서 걸린다), 상태 칸이 그 파일의 `- 상태:`와 같은가, 주소 칸이 그
+     * 파일에 실제로 적혀 있는가.
+     *
+     * <p>`조각`과 `화면` 이름은 코드에 대응물이 없어 검사하지 않는다. 이 표에서 사람만
+     * 읽는 칸은 그 둘뿐이다.
+     */
+    @Test
+    void screenIndex_matchesScreenDocs() throws IOException {
+        List<IndexRow> rows = indexRows();
+
+        assertThat(rows)
+                .as("SCREENS.md의 인덱스 표를 못 읽었다면 머리글이 %s가 아닌 것이다", INDEX_HEADER)
+                .isNotEmpty();
+
+        assertThat(rows.stream().map(IndexRow::doc).toList())
+                .as("인덱스 표와 screens/ 의 파일 목록이 같아야 한다."
+                        + " 화면을 추가했다면 SCREENS.md에도 줄을 더한다")
+                .containsExactlyInAnyOrderElementsOf(screenDocs());
+
+        for (IndexRow row : rows) {
+            assertThat(row.status())
+                    .as("%s의 상태가 인덱스와 다르다. 정본은 명세 파일의 `- 상태:` 줄이다",
+                            row.doc())
+                    .isEqualTo(screenOf(row.doc()).status());
+
+            assertThat(Files.readString(row.doc(), StandardCharsets.UTF_8))
+                    .as("인덱스가 %s의 주소를 `%s`라고 적었는데 그 파일에는 없다",
+                            row.doc(), row.address())
+                    .contains(row.address());
+        }
     }
 
     /**
@@ -456,6 +506,55 @@ class CommunityScreenDocTests {
     }
 
     /**
+     * SCREENS.md에서 인덱스 표의 행을 읽는다.
+     *
+     * <p>`파일` 칸은 마크다운 링크다. 사람이 눌러 갈 수 있어야 해서 링크로 두었는데, 그러면
+     * 링크가 가리키는 곳과 검사하는 곳이 갈라질 수 있다. 그래서 표시 문구가 아니라
+     * <b>링크가 가리키는 쪽</b>을 읽는다 — 깨진 링크는 여기서 존재하지 않는 파일이 된다.
+     */
+    private List<IndexRow> indexRows() throws IOException {
+        assertThat(SCREEN_INDEX)
+                .as("화면 명세 인덱스가 있어야 한다. 없다면 이 검사의 전제가 사라진 것이다")
+                .exists();
+
+        List<String> lines = Files.readAllLines(SCREEN_INDEX, StandardCharsets.UTF_8);
+        List<IndexRow> rows = new ArrayList<>();
+        boolean inIndexTable = false;
+
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i).trim();
+
+            if (!line.startsWith("|")) {
+                inIndexTable = false;
+                continue;
+            }
+
+            if (isSeparatorRow(line)) {
+                inIndexTable = i > 0 && INDEX_HEADER.equals(cellsOf(lines.get(i - 1)));
+                continue;
+            }
+
+            if (inIndexTable) {
+                List<String> cells = cellsOf(line);
+
+                rows.add(new IndexRow(
+                        SCREEN_INDEX.getParent().resolve(linkTargetOf(cells.get(4))),
+                        unquote(cells.get(1)),
+                        unquote(cells.get(2))));
+            }
+        }
+
+        return rows;
+    }
+
+    /** 마크다운 링크에서 가리키는 쪽을. 링크가 아니면 칸 전체를 경로로 본다. */
+    private String linkTargetOf(String cell) {
+        Matcher matcher = MARKDOWN_LINK.matcher(cell.trim());
+
+        return matcher.find() ? matcher.group(1) : unquote(cell);
+    }
+
+    /**
      * 명세 파일 목록. 이름순으로 고정해, 어느 파일이 실패했는지가 실행마다 달라지지 않게 한다.
      */
     private List<Path> screenDocs() throws IOException {
@@ -634,6 +733,9 @@ class CommunityScreenDocTests {
     }
 
     private record ScreenString(String template, String value) {
+    }
+
+    private record IndexRow(Path doc, String address, String status) {
     }
 
     private record DocRow(Screen screen, String value, List<String> references) {
