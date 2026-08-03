@@ -11,14 +11,17 @@ import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.security.MemberDetails;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import java.util.Map;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.servlet.support.RequestContextUtils;
 
 /**
  * 관리자 쿠폰 목록·등록·수정·상태 전환 요청을 처리한다.
@@ -42,6 +45,7 @@ public class CouponAdminController {
     public String coupons(@ModelAttribute CouponSearchCondition condition,
                           @RequestParam(required = false) Integer page,
                           Model model,
+                          HttpServletRequest request,
                           RedirectAttributes redirectAttributes) {
 
         PageRequest pageRequest = new PageRequest(page, PageRequest.DEFAULT_SIZE);
@@ -54,6 +58,8 @@ public class CouponAdminController {
         // 상태 변경 등으로 마지막 페이지가 사라진 경우 빈 목록을 보여 주지 않고 마지막 유효 페이지로 이동한다.
         int lastPage = Math.max(pageResult.getTotalPages(), 1);
         if (pageResult.getPage() > lastPage) {
+            // POST redirect가 전달한 처리 결과를 페이지 보정 redirect 뒤에도 한 번 더 노출한다.
+            preserveFlashAttributes(request, redirectAttributes);
             return redirectToList(condition, lastPage, redirectAttributes);
         }
 
@@ -305,6 +311,15 @@ public class CouponAdminController {
         redirectAttributes.addAttribute("keyword", condition.getKeyword());
         redirectAttributes.addAttribute("status", condition.getStatus());
         redirectAttributes.addAttribute("page", page);
+    }
+
+    /** 페이지 보정 redirect가 기존 FlashMap을 소비하지 않도록 다음 요청으로 다시 전달한다. */
+    private void preserveFlashAttributes(HttpServletRequest request,
+                                         RedirectAttributes redirectAttributes) {
+        Map<String, ?> inputFlashMap = RequestContextUtils.getInputFlashMap(request);
+        if (inputFlashMap != null) {
+            inputFlashMap.forEach(redirectAttributes::addFlashAttribute);
+        }
     }
 
     private void addUpdateNavigation(Model model,

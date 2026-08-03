@@ -9,6 +9,8 @@
         <header th:replace="~{fragments/admin/header :: header('쿠폰 관리')}"></header>
 
         <main class="admin-content">
+            <div th:replace="~{fragments/common/alert :: alert}"></div>
+
             <h1 class="admin-page-title">쿠폰 상세 정보</h1>
 
             <!-- 수정 Form과 분리된 읽기 전용 영역: 화면 값은 저장 요청으로 전송하지 않는다. -->

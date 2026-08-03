@@ -130,6 +130,23 @@ class CouponAdminControllerTests {
     }
 
     @Test
+    void listRequestedPageExceedsLastPage_preservesFlashMessage() throws Exception {
+        PageResult<CouponView> result = new PageResult<>(
+                List.of(),
+                new PageRequest(3, PageRequest.DEFAULT_SIZE),
+                21
+        );
+        when(couponAdminService.getCoupons(any(), any())).thenReturn(result);
+
+        mockMvc.perform(get("/admin/coupons")
+                .param("page", "3")
+                .flashAttr("successMessage", "쿠폰을 수정했습니다."))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/admin/coupons?page=2"))
+            .andExpect(flash().attribute("successMessage", "쿠폰을 수정했습니다."));
+    }
+
+    @Test
     void createFormLoadsEmptyForm() throws Exception {
         mockMvc.perform(get("/admin/coupons/create"))
             .andExpect(status().isOk())
@@ -263,7 +280,30 @@ class CouponAdminControllerTests {
                 .param("page", "3")
                 .param("origin", "DETAIL"))
             .andExpect(status().is3xxRedirection())
-            .andExpect(redirectedUrl("/admin/coupons/3/detail?keyword=summer&status=ACTIVE&page=3"));
+            .andExpect(redirectedUrl("/admin/coupons/3/detail?keyword=summer&status=ACTIVE&page=3"))
+            .andExpect(flash().attribute("successMessage", "쿠폰을 수정했습니다."));
+    }
+
+    @Test
+    void updateFromDetailFails_redirectsWithErrorMessage() throws Exception {
+        doThrow(new BusinessException(CouponErrorCode.CANNOT_EDIT_ENDED_COUPON))
+            .when(couponAdminService).updateCoupon(org.mockito.ArgumentMatchers.eq(3L), any());
+
+        mockMvc.perform(post("/admin/coupons/3/edit")
+                .param("name", "수정 쿠폰")
+                .param("discountType", "PERCENTAGE")
+                .param("discountValue", "10")
+                .param("minimumOrderAmount", "10000")
+                .param("maximumDiscountAmount", "5000")
+                .param("totalQuantity", "100")
+                .param("startsAt", "2026-08-01T09:00")
+                .param("expiresAt", "2026-08-31T23:59")
+                .param("origin", "DETAIL"))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/admin/coupons/3/detail"))
+            .andExpect(flash().attribute(
+                "errorMessage", CouponErrorCode.CANNOT_EDIT_ENDED_COUPON.message()
+            ));
     }
 
     @Test
@@ -338,6 +378,14 @@ class CouponAdminControllerTests {
     }
 
     @Test
+    void deactivateSuccess_redirectsWithSuccessMessage() throws Exception {
+        mockMvc.perform(post("/admin/coupons/3/deactivate"))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/admin/coupons"))
+            .andExpect(flash().attribute("successMessage", "쿠폰 발급을 중지했습니다."));
+    }
+
+    @Test
     void activateFailureRedirectsWithErrorMessage() throws Exception {
         doThrow(new BusinessException(CouponErrorCode.EXPIRED_COUPON))
             .when(couponAdminService).activateCoupon(3L);
@@ -348,6 +396,14 @@ class CouponAdminControllerTests {
             .andExpect(flash().attribute(
                 "errorMessage", CouponErrorCode.EXPIRED_COUPON.message()
             ));
+    }
+
+    @Test
+    void activateSuccess_redirectsWithSuccessMessage() throws Exception {
+        mockMvc.perform(post("/admin/coupons/3/activate"))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/admin/coupons"))
+            .andExpect(flash().attribute("successMessage", "쿠폰 발급을 재개했습니다."));
     }
 
     private void authenticateAdmin(Long memberId) {
