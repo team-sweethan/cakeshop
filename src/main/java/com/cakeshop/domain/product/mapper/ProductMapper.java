@@ -70,6 +70,29 @@ public interface ProductMapper {
             @Param("productId") long productId
     );
 
+    /** 상품에 등록된 이미지 개수를 조회한다. */
+    int countProductImagesByProductId(
+            @Param("productId") long productId
+    );
+
+    /**
+     * 새 상품 이미지에 사용할 다음 표시 순서를 조회한다.
+     *
+     * @param productId 이미지를 추가할 상품 식별자
+     * @return 이미지가 없으면 0, 있으면 현재 최대 표시 순서보다 1 큰 값
+     */
+    int findNextProductImageSortOrder(
+            @Param("productId") long productId
+    );
+
+    /**
+     * 상품 이미지를 등록한다.
+     *
+     * @param productImage 등록할 상품 이미지
+     * @return 등록된 행 개수
+     */
+    int insertProductImage(ProductImage productImage);
+
     /**
      * 다른 도메인에 제공할 상품 판매 정보를 조회한다.
      *

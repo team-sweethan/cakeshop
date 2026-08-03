@@ -8,8 +8,10 @@ import com.cakeshop.domain.product.dto.form.ProductAdminSearchCondition;
 import com.cakeshop.domain.product.dto.form.ProductForm;
 import com.cakeshop.domain.product.dto.view.ProductAdminListView;
 import com.cakeshop.domain.product.dto.view.ProductCategoryOptionView;
+import com.cakeshop.domain.product.dto.view.ProductImageView;
 import com.cakeshop.domain.product.dto.view.ProductOptionAdminRow;
 import com.cakeshop.domain.product.entity.Product;
+import com.cakeshop.domain.product.entity.ProductImage;
 import com.cakeshop.domain.product.entity.ProductOptionStatus;
 import com.cakeshop.domain.product.entity.ProductStatus;
 import com.cakeshop.domain.product.entity.ProductType;
@@ -253,6 +255,26 @@ public class ProductAdminService {
         }
 
         return form;
+    }
+
+    /** 관리자 상품 수정 화면에 표시할 이미지 목록을 조회한다. */
+    @Transactional(readOnly = true)
+    public List<ProductImageView> getProductImages(long productId) {
+        return productMapper.findProductImagesByProductId(
+                productId
+        ).stream()
+                .map(this::toProductImageView)
+                .toList();
+    }
+
+    private ProductImageView toProductImageView(
+            ProductImage image
+    ) {
+        return new ProductImageView(
+                image.getId(),
+                image.getImageUrl(),
+                image.getSortOrder()
+        );
     }
 
     /**

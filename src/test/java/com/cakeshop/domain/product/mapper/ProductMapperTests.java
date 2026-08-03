@@ -629,6 +629,60 @@ class ProductMapperTests {
         )).isEmpty();
     }
 
+    @Test
+    void productImageSummary_imagesMissing_returnsZeroValues() {
+        assertThat(productMapper.countProductImagesByProductId(
+                optionProductId
+        )).isZero();
+        assertThat(productMapper.findNextProductImageSortOrder(
+                optionProductId
+        )).isZero();
+    }
+
+    @Test
+    void insertProductImage_existingImages_assignsIdAndNextDisplayOrder() {
+        jdbcTemplate.update(
+                """
+                INSERT INTO product_images (
+                    product_id,
+                    image_url,
+                    sort_order
+                )
+                VALUES
+                    (?, '/uploads/product/first.jpg', 0),
+                    (?, '/uploads/product/third.jpg', 2)
+                """,
+                optionProductId,
+                optionProductId
+        );
+
+        ProductImage image = new ProductImage();
+        image.setProductId(optionProductId);
+        image.setImageUrl("/uploads/product/fourth.jpg");
+        image.setSortOrder(
+                productMapper.findNextProductImageSortOrder(
+                        optionProductId
+                )
+        );
+
+        int insertedRows = productMapper.insertProductImage(image);
+
+        assertThat(insertedRows).isEqualTo(1);
+        assertThat(image.getId()).isPositive();
+        assertThat(image.getSortOrder()).isEqualTo(3);
+        assertThat(productMapper.countProductImagesByProductId(
+                optionProductId
+        )).isEqualTo(3);
+        assertThat(productMapper.findProductImagesByProductId(
+                optionProductId
+        )).extracting(ProductImage::getImageUrl)
+                .containsExactly(
+                        "/uploads/product/first.jpg",
+                        "/uploads/product/third.jpg",
+                        "/uploads/product/fourth.jpg"
+                );
+    }
+
     private ProductSearchCondition baseCondition() {
         ProductSearchCondition condition =
                 new ProductSearchCondition();
