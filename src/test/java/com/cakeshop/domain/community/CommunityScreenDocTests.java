@@ -83,6 +83,26 @@ class CommunityScreenDocTests {
             "((?:[\\w.]+\\s*\\.\\s*)?not\\s*\\(\\s*)?"
                     + "(?:[\\w.]+\\s*\\.\\s*)?"
                     + "containsString\\s*\\(\\s*\"((?:[^\"\\\\]|\\\\.)*)\"\\s*\\)");
+    /**
+     * AssertJ의 {@code .contains("...")}도 "있다고 단언"으로 센다.
+     *
+     * <p>{@code assertThat(html).contains("커뮤니티")}는 Hamcrest
+     * {@code containsString("커뮤니티")}와 뜻이 같은데, 표기만 다르다는 이유로 하네스가
+     * 못 알아보면 <b>화면은 멀쩡한데 문서 검사가 깨진다</b>. 그건 문서가 낡은 것이 아니라
+     * 하네스가 좁은 것이다. 검사를 무르게 하는 게 아니라 인식하는 표기를 넓힌다.
+     *
+     * <p>인자를 통째로 잡고 안에서 리터럴만 추린다. {@code contains("a", "b")}처럼 여러 개를
+     * 한 번에 쓰는 것이 AssertJ에서는 흔하기 때문이다. 괄호가 중첩된 인자는 잡지 않는다 —
+     * 그 경우는 기존처럼 못 알아보고, 통과시키는 쪽이 아니라 <b>실패하는</b> 쪽이다.
+     *
+     * <p>부정형 {@code doesNotContain(...)}은 "contains(" 꼴이 아니라서 애초에 걸리지 않는다.
+     * 여기서도 막는 것은 <b>표기</b>지 의미가 아니다.
+     */
+    private static final Pattern ASSERTJ_CONTAINS =
+            Pattern.compile("\\.\\s*contains\\s*\\(([^()]*)\\)");
+    /** 인자 목록에서 문자열 리터럴만 추린다. */
+    private static final Pattern STRING_LITERAL =
+            Pattern.compile("\"((?:[^\"\\\\]|\\\\.)*)\"");
 
     /** 문서가 화면 하나를 통째로 빠뜨리면, 그 화면은 아무 규칙도 없이 방치된다. */
     @Test
@@ -246,8 +266,8 @@ class CommunityScreenDocTests {
      * 등장하기만 하는 것으로는 부족하다 — 입력 fixture로 쓰거나
      * {@code not(containsString(...))}으로 <b>없다고</b> 단언해도 등장은 하기 때문이다.
      * 그러면 화면에서 문구가 사라진 상태를 방어한다고 문서가 정반대로 주장하게 된다.
-     * 그래서 {@code containsString("...")}의 인자만 세고, {@code not(...)}으로 감싼 것은
-     * 뺀다.
+     * 그래서 {@code containsString("...")}과 {@code .contains("...")}의 인자만 세고,
+     * {@code not(...)}으로 감싼 것은 뺀다.
      *
      * <p>한 문구를 여러 테스트가 다른 층위에서 받칠 수 있으므로 <b>하나라도</b> 확인하면
      * 통과로 본다.
@@ -271,7 +291,8 @@ class CommunityScreenDocTests {
 
             assertThat(asserted)
                     .as("`%s`가 응답에 있다고 %s가 단언하지 않는다."
-                                    + " `containsString`으로 확인하는 줄을 넣거나,"
+                                    + " `containsString(\"...\")`이나 `.contains(\"...\")`으로"
+                                    + " 확인하는 줄을 넣거나,"
                                     + " 고정하지 않았다면 `없음`으로 적는다",
                             row.value(), row.references())
                     .anyMatch(value -> value.contains(row.value()));
@@ -280,6 +301,9 @@ class CommunityScreenDocTests {
 
     /**
      * 메서드 본문에서 <b>있다고 단언한</b> 문자열만 모은다.
+     *
+     * <p>Hamcrest {@code containsString("x")}와 AssertJ {@code .contains("x")} 두 표기를
+     * 모두 센다. 같은 뜻인데 한쪽만 알아보면, 표기를 바꾼 것만으로 문서 검사가 깨진다.
      *
      * <p>{@code not(...)}으로 감싼 것은 뺀다. 정규식이 왼쪽부터 훑으므로
      * {@code not(containsString("x"))}는 첫 그룹이 잡히고, 맨몸
@@ -292,6 +316,16 @@ class CommunityScreenDocTests {
         while (matcher.find()) {
             if (matcher.group(1) == null) {
                 values.add(matcher.group(2));
+            }
+        }
+
+        Matcher assertJ = ASSERTJ_CONTAINS.matcher(body);
+
+        while (assertJ.find()) {
+            Matcher literal = STRING_LITERAL.matcher(assertJ.group(1));
+
+            while (literal.find()) {
+                values.add(literal.group(1));
             }
         }
 
