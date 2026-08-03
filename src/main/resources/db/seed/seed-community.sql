@@ -300,6 +300,8 @@ UPDATE `posts` p
 -- 기각한 신고. 상태가 하나뿐이면 목록 정렬이 '미처리만 세는지'를 눈으로 볼 수 없다.
 --
 -- 자기 글은 신고할 수 없으므로(DOMAIN.md 6.6) 신고자는 언제나 작성자가 아닌 회원이다.
+-- 시드 게시글은 대부분 user@ 가 쓴 것이라, 신고자를 회원 하나로 고정하면 조건에 걸려
+-- 한 건도 안 들어간다. 그래서 글마다 작성자가 아닌 쪽을 골라 넣는다.
 -- ---------------------------------------------------------------------------
 
 SET @pending_report_post_id := (SELECT `id` FROM `posts`
@@ -310,19 +312,22 @@ SET @rejected_report_post_id := (SELECT MIN(`id`) FROM `posts`
 SET @blocked_post_id := (SELECT MIN(`id`) FROM `posts` WHERE `status` = 'BLOCKED');
 
 INSERT INTO `post_reports` (`post_id`, `reporter_id`, `reason`, `status`, `created_at`)
-SELECT r.`post_id`, r.`reporter_id`, r.`reason`, r.`status`, '2026-07-26 15:00:00'
+SELECT r.`post_id`,
+       IF(p.`member_id` = @member_id, @admin_id, @member_id),
+       r.`reason`,
+       r.`status`,
+       '2026-07-26 15:00:00'
   FROM (
-        SELECT @pending_report_post_id  AS `post_id`, @member_id AS `reporter_id`,
+        SELECT @pending_report_post_id  AS `post_id`,
                '광고성 링크가 반복해서 올라옵니다.' AS `reason`, 'PENDING'  AS `status`
         UNION ALL
-        SELECT @rejected_report_post_id, @member_id,
+        SELECT @rejected_report_post_id,
                '내용이 마음에 들지 않습니다.',        'REJECTED'
         UNION ALL
-        SELECT @blocked_post_id,         @member_id,
+        SELECT @blocked_post_id,
                '욕설이 포함되어 있습니다.',           'RESOLVED'
        ) r
- WHERE r.`post_id` IS NOT NULL
-   AND r.`reporter_id` <> (SELECT p.`member_id` FROM `posts` p WHERE p.`id` = r.`post_id`);
+  JOIN `posts` p ON p.`id` = r.`post_id`;
 
 -- ---------------------------------------------------------------------------
 -- 8. 확인

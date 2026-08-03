@@ -31,6 +31,9 @@ DELETE FROM `chat_rooms`;
 DELETE FROM `member_coupons`;
 DELETE FROM `coupons`;
 DELETE FROM `post_reports`;
+-- post_views 는 posts 를 FK 로 참조한다(조각 6). 여기서 지우지 않으면 아래
+-- DELETE FROM posts 가 제약에 걸려 시드를 두 번째 실행할 때부터 통째로 실패한다.
+DELETE FROM `post_views`;
 DELETE FROM `post_images`;
 DELETE FROM `post_likes`;
 DELETE FROM `comments`;
@@ -70,6 +73,7 @@ ALTER TABLE `chat_rooms` AUTO_INCREMENT = 1;
 ALTER TABLE `member_coupons` AUTO_INCREMENT = 1;
 ALTER TABLE `coupons` AUTO_INCREMENT = 1;
 ALTER TABLE `post_reports` AUTO_INCREMENT = 1;
+ALTER TABLE `post_views` AUTO_INCREMENT = 1;
 ALTER TABLE `post_images` AUTO_INCREMENT = 1;
 ALTER TABLE `post_likes` AUTO_INCREMENT = 1;
 ALTER TABLE `comments` AUTO_INCREMENT = 1;
