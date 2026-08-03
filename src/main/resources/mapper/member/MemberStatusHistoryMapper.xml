@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cakeshop.domain.member.mapper.MemberStatusHistoryMapper">
+    <insert id="insert"
+            parameterType="com.cakeshop.domain.member.entity.MemberStatusHistory"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO member_status_histories (
+            member_id,
+            action,
+            before_status,
+            after_status,
+            reason,
+            processed_by
+        ) VALUES (
+            #{memberId},
+            #{action},
+            #{beforeStatus},
+            #{afterStatus},
+            #{reason},
+            #{processedBy}
+        )
+    </insert>
+
+    <select id="findByMemberId"
+            resultType="com.cakeshop.domain.member.dto.view.MemberStatusHistoryView">
+        SELECT history.id,
+               history.action,
+               history.before_status,
+               history.after_status,
+               history.reason,
+               processor.name AS processed_by_name,
+               history.processed_at
+          FROM member_status_histories history
+          LEFT JOIN members processor
+            ON processor.id = history.processed_by
+         WHERE history.member_id = #{memberId}
+         ORDER BY history.processed_at DESC, history.id DESC
+    </select>
+</mapper>
