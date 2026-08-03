@@ -535,6 +535,80 @@ class CommunityScreenRenderingTests {
                 .andExpect(content().string(not(containsString("댓글 삭제"))));
     }
 
+    /** 아직 안 누른 회원에게는 누르는 버튼이 보인다. */
+    @Test
+    void communityDetail_notLikedYet_showsLikeButton() throws Exception {
+        long postId = insertPost(memberId, "글", "본문", PostStatus.PUBLISHED);
+
+        mockMvc.perform(get("/community/" + postId).with(authentication(authorOf(memberId))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("좋아요")))
+                .andExpect(content().string(containsString("/likes")))
+                .andExpect(content().string(not(containsString("좋아요 취소"))));
+    }
+
+    /**
+     * 이미 누른 회원에게는 거두는 버튼으로 바뀌는지 확인한다.
+     *
+     * <p>양쪽이 멱등이라 <b>버튼이 안 바뀌어도 기능은 맞는다</b> — 그래서 동작 테스트로는
+     * 드러나지 않는다. 드러나는 것은 사용자가 자기가 누른 상태인지 화면에서 알 수 없을 때뿐이다.
+     */
+    @Test
+    void communityDetail_alreadyLiked_showsCancelButton() throws Exception {
+        long postId = insertPost(memberId, "글", "본문", PostStatus.PUBLISHED);
+        insertLike(postId, memberId);
+
+        mockMvc.perform(get("/community/" + postId).with(authentication(authorOf(memberId))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("좋아요 취소")))
+                .andExpect(content().string(containsString("/likes/delete")));
+    }
+
+    /**
+     * 남이 누른 좋아요가 내 버튼을 바꾸지 않는지 확인한다.
+     *
+     * <p>{@code existsLike}에서 회원 조건이 빠져도 <b>숫자는 맞고 버튼만 틀린다.</b>
+     * 좋아요가 하나라도 있는 글에서는 아무도 안 눌러도 모두에게 "좋아요 취소"가 보인다.
+     */
+    @Test
+    void communityDetail_likedByAnotherMember_stillShowsLikeButtonToMe() throws Exception {
+        long postId = insertPost(memberId, "글", "본문", PostStatus.PUBLISHED);
+        insertLike(postId, memberId);
+
+        mockMvc.perform(get("/community/" + postId)
+                        .with(authentication(authorOf(withdrawnMemberId))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("좋아요 취소"))));
+    }
+
+    /** 비로그인에게는 숫자만 있고 버튼이 없다. */
+    @Test
+    void communityDetail_anonymous_showsLikeCountWithoutButton() throws Exception {
+        long postId = insertPost(memberId, "글", "본문", PostStatus.PUBLISHED);
+
+        mockMvc.perform(get("/community/" + postId))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("좋아요 0")))
+                .andExpect(content().string(not(containsString("/likes"))));
+    }
+
+    /**
+     * 차단된 글에는 작성자에게도 좋아요 버튼이 없는지 확인한다.
+     *
+     * <p>댓글 삭제 버튼과 같은 자리다 — 남겨 두면 눌러도 403만 나오는 죽은 버튼이 되고,
+     * 이 화면은 "차단된 글을 작성자가 연다"는 드문 조건에서만 그려져 개발 중에는 마주치지
+     * 않는다(DOMAIN.md 4.5).
+     */
+    @Test
+    void communityDetail_blockedPostAuthor_hasNoDeadLikeButton() throws Exception {
+        long postId = insertPost(memberId, "차단된 글", "본문", PostStatus.BLOCKED);
+
+        mockMvc.perform(get("/community/" + postId).with(authentication(authorOf(memberId))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("좋아요 0")))
+                .andExpect(content().string(not(containsString("/likes"))));
+    }
+
     @Test
     void communityDetail_otherMembersComment_hidesDeleteButton() throws Exception {
         long postId = insertPost(memberId, "글", "본문", PostStatus.PUBLISHED);
@@ -702,6 +776,11 @@ class CommunityScreenRenderingTests {
 
     private void insertComment(long postId) {
         insertComment(postId, memberId, "댓글", CommentStatus.PUBLISHED, BASE_TIME);
+    }
+
+    private void insertLike(long postId, long likerId) {
+        jdbcTemplate.update(
+                "INSERT INTO post_likes (post_id, member_id) VALUES (?, ?)", postId, likerId);
     }
 
     private void insertComment(

@@ -10,6 +10,7 @@ import com.cakeshop.domain.community.dto.view.CommentView;
 import com.cakeshop.domain.community.dto.view.PostCategoryView;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
+import com.cakeshop.domain.community.dto.view.PostLockView;
 import com.cakeshop.domain.community.entity.Comment;
 import com.cakeshop.domain.community.entity.Post;
 import com.cakeshop.domain.community.entity.PostStatus;
@@ -223,6 +224,81 @@ public class CommunityService {
                 commentId,
                 memberId
         );
+    }
+
+    /**
+     * 좋아요를 남긴다. memberId는 인증 정보에서 얻은 값이어야 한다.
+     *
+     * 이미 눌러 둔 상태에서 다시 불러도 성공한다(DOMAIN.md 6.5). 토글이 아니라 추가와
+     * 취소가 갈려 있으므로 같은 요청이 두 번 와도 뜻이 달라지지 않는다 — 토글이면 재전송·
+     * 더블클릭이 원래 상태로 되돌려 놓고, 사용자는 눌렀는데 안 눌린 상태가 된다.
+     *
+     * 세 문장이 한 트랜잭션이고 <b>순서가 중요하다.</b> 잠금이 먼저다 — 잠그지 않고 INSERT
+     * 부터 하면 FK 확인이 게시글 행에 공유 잠금을 걸고, 뒤따르는 재계산이 배타 잠금을
+     * 기다리면서 같은 글에 동시에 좋아요를 누른 요청끼리 교착에 빠진다(CommunityMapper.xml).
+     */
+    @Transactional
+    public void addLike(long postId, long memberId) {
+        requireLikeablePost(postId, memberId);
+
+        communityMapper.insertLike(postId, memberId);
+        communityMapper.recalculateLikeCount(postId);
+    }
+
+    /**
+     * 좋아요를 거둔다. memberId는 인증 정보에서 얻은 값이어야 한다.
+     *
+     * 누른 적이 없어도 성공한다. 사용자가 원한 상태(안 눌림)가 이미 이뤄져 있으므로,
+     * 뒤로가기나 재전송에 에러 화면을 줄 이유가 없다.
+     *
+     * 잠금 순서는 addLike와 같다. 추가와 취소가 서로 다른 순서로 잠그면 둘이 섞였을 때
+     * 교착이 되므로, 두 경로가 같은 문장으로 시작한다.
+     */
+    @Transactional
+    public void removeLike(long postId, long memberId) {
+        requireLikeablePost(postId, memberId);
+
+        communityMapper.deleteLike(postId, memberId);
+        communityMapper.recalculateLikeCount(postId);
+    }
+
+    /**
+     * 이 회원이 이 글에 좋아요를 눌러 뒀는지. 상세에서 버튼 문구를 가르는 데 쓴다.
+     *
+     * 게시글 노출 판단은 하지 않는다. getComments와 같은 이유로, 이미 노출이 확인된
+     * 게시글에 대해서만 호출된다.
+     */
+    @Transactional(readOnly = true)
+    public boolean isLikedBy(long postId, long memberId) {
+        return communityMapper.existsLike(postId, memberId);
+    }
+
+    /**
+     * 좋아요를 누르거나 거둘 수 있는 게시글인지 확인하고, 그 행을 잠근다.
+     *
+     * 판단 기준은 requireCommentablePost와 같다(DOMAIN.md 4.5) — 노출 중인 글에만 허용하고,
+     * 없는 글·삭제된 글·남의 차단된 글은 404, 자기 차단된 글은 403이다. 셋을 같은 404로
+     * 묶는 이유는 403이 "그 자리에 글이 있다"는 사실을 흘리기 때문이다(4.3).
+     *
+     * 댓글과 갈리는 것은 <b>잠근 채로 읽는다</b>는 점뿐이다. 그래서 확인과 쓰기 사이에
+     * 관리자가 차단할 수 있는 창이 이 경로에는 없다(R14와 다른 자리인 이유는
+     * CommunityMapper.xml에 적었다).
+     */
+    private void requireLikeablePost(long postId, long memberId) {
+        PostLockView post = communityMapper.lockPost(postId);
+
+        if (post == null
+                || post.status() == PostStatus.DELETED
+                || (post.status() == PostStatus.BLOCKED
+                        && !Long.valueOf(memberId).equals(post.memberId()))) {
+            throw new BusinessException(CommunityErrorCode.POST_NOT_FOUND);
+        }
+
+        if (post.status() != PostStatus.PUBLISHED) {
+            // 여기 남는 비-PUBLISHED는 자기 차단 글을 보는 작성자뿐이다. 상세에서 이미
+            // 본문과 사유를 본 상대라 숨길 것이 없고, 404를 주면 왜 막혔는지 알 수 없다.
+            throw new BusinessException(CommunityErrorCode.BLOCKED_POST);
+        }
     }
 
     /**

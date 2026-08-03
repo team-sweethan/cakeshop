@@ -169,6 +169,43 @@ public class CommunityController {
     }
 
     /**
+     * 좋아요를 남기고 상세로 보낸다.
+     *
+     * 토글이 아니라 취소와 갈린 경로다(DOMAIN.md 6.5). 하나의 주소를 번갈아 누르게 만들면
+     * 재전송·더블클릭이 두 번 실행되어 원래 상태로 돌아가고, 사용자는 눌렀는데 안 눌린
+     * 상태가 된다. 갈라 두면 같은 요청이 두 번 와도 뜻이 하나다.
+     *
+     * 문서에는 DELETE 메서드로 적혀 있었으나 POST로 간다 — 이 프로젝트에는
+     * HiddenHttpMethodFilter가 없고 HTML 폼은 DELETE를 보낼 수 없다. 게시글·댓글 삭제와
+     * 같은 형태다(DOMAIN.md 6.5의 결정 로그).
+     *
+     * comments를 실어 되돌리는 것은 댓글 삭제와 같은 이유다. 좋아요는 댓글 구역 위에
+     * 있으므로, 펼쳐 놓고 좋아요를 눌렀다가 20건으로 접혀 돌아오면 읽던 자리를 잃는다.
+     */
+    @PostMapping("/community/{postId:\\d+}/likes")
+    public String addLike(
+            @PathVariable("postId") long postId,
+            @RequestParam(name = "comments", required = false) String comments,
+            @AuthenticationPrincipal MemberDetails memberDetails
+    ) {
+        communityService.addLike(postId, memberDetails.getMemberId());
+
+        return redirectToDetail(postId, comments);
+    }
+
+    /** 좋아요를 거두고 상세로 보낸다. 누른 적이 없어도 성공이다(DOMAIN.md 6.5). */
+    @PostMapping("/community/{postId:\\d+}/likes/delete")
+    public String removeLike(
+            @PathVariable("postId") long postId,
+            @RequestParam(name = "comments", required = false) String comments,
+            @AuthenticationPrincipal MemberDetails memberDetails
+    ) {
+        communityService.removeLike(postId, memberDetails.getMemberId());
+
+        return redirectToDetail(postId, comments);
+    }
+
+    /**
      * 상세로 되돌리되 펼친 댓글 수를 유지한다.
      *
      * 받은 문자열을 그대로 잇지 않고 정수로 바꿔 다시 쓴다. 주소에 들어갈 값이므로
@@ -200,9 +237,23 @@ public class CommunityController {
                 "canEdit",
                 viewerId != null && viewerId.equals(post.memberId()) && !post.isBlocked()
         );
-        // 노출되지 않는 글에는 댓글을 달 수 없다(DOMAIN.md 4.5). 여기 오는 차단된 글은
-        // 작성자 본인의 것뿐이고, 그 사람에게도 댓글 폼을 주지 않는다.
-        model.addAttribute("canComment", viewerId != null && !post.isBlocked());
+
+        // 노출되지 않는 글에는 댓글도 좋아요도 남길 수 없다(DOMAIN.md 4.5). 여기 오는
+        // 차단된 글은 작성자 본인의 것뿐이고, 그 사람에게도 열지 않는다.
+        //
+        // 4.5가 둘에 같은 규칙을 주므로 값이 하나다. 이름을 둘로 두는 것은 화면의 구역이
+        // 둘이기 때문이고, 표현식을 두 번 적으면 한쪽만 고치는 날이 온다.
+        boolean canWrite = viewerId != null && !post.isBlocked();
+        model.addAttribute("canComment", canWrite);
+        model.addAttribute("canLike", canWrite);
+
+        // 버튼 문구가 "좋아요"인지 "좋아요 취소"인지를 가른다. 누를 수 없는 상대에게는
+        // 묻지 않는다 — 비로그인 상세에서 쿼리 한 번을 아끼는 자리다.
+        model.addAttribute(
+                "likedByViewer",
+                canWrite && communityService.isLikedBy(post.id(), viewerId)
+        );
+
         model.addAttribute(
                 "commentSection",
                 communityService.getComments(post.id(), parsePositiveInteger(comments))
