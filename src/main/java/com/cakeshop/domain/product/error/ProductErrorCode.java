@@ -104,6 +104,18 @@ public enum ProductErrorCode implements ErrorCode {
             "PRODUCT_017",
             "상품 이미지를 등록하지 못했습니다. 다시 시도해 주세요.",
             500
+    ),
+
+    IMAGE_NOT_FOUND(
+            "PRODUCT_018",
+            "상품 이미지를 찾을 수 없습니다.",
+            404
+    ),
+
+    IMAGE_DELETE_FAILED(
+            "PRODUCT_019",
+            "상품 이미지를 삭제하지 못했습니다. 다시 시도해 주세요.",
+            500
     );
 
     private final String code;

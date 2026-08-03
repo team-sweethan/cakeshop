@@ -248,6 +248,9 @@ class ScreenRenderingTests {
             .andExpect(content().string(containsString(
                 "form=\"productInfoForm\""
             )))
+            .andExpect(content().string(not(containsString(
+                "data-product-image-delete"
+            ))))
             .andExpect(content().string(not(matchesPattern(
                 "(?s).*<button(?=[^>]*data-image-upload-button)"
                     + "(?=[^>]*disabled)[^>]*>.*"
@@ -286,6 +289,16 @@ class ScreenRenderingTests {
             productId,
             productId
         );
+        Long firstImageId = jdbcTemplate.queryForObject(
+            """
+            SELECT id
+            FROM product_images
+            WHERE product_id = ?
+              AND image_url = '/uploads/product/first.jpg'
+            """,
+            Long.class,
+            productId
+        );
 
         mockMvc.perform(get(
                 "/admin/products/{productId}/edit",
@@ -297,6 +310,28 @@ class ScreenRenderingTests {
             )))
             .andExpect(content().string(containsString(
                 "대표 이미지"
+            )))
+            .andExpect(content().string(containsString(
+                "product-image-card"
+            )))
+            .andExpect(content().string(containsString(
+                "product-image-badge--placeholder"
+            )))
+            .andExpect(content().string(containsString(
+                "product-image-actions"
+            )))
+            .andExpect(content().string(containsString(
+                "data-product-image-delete"
+            )))
+            .andExpect(content().string(containsString(
+                "/admin/products/"
+                    + productId
+                    + "/images/"
+                    + firstImageId
+                    + "/delete"
+            )))
+            .andExpect(content().string(containsString(
+                "이 상품 이미지를 삭제하시겠습니까?"
             )))
             .andExpect(content().string(containsString(
                 "상품 이미지를 최대 5장까지 등록했습니다."

@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
-/** 관리자 상품 이미지 업로드 요청을 처리한다. */
+/** 관리자 상품 이미지 등록·삭제 요청을 처리한다. */
 @Controller
 @RequestMapping("/admin/products/{productId}/images")
 public class ProductImageAdminController {
@@ -60,6 +60,32 @@ public class ProductImageAdminController {
         redirectAttributes.addFlashAttribute(
                 "successMessage",
                 "상품 이미지를 추가했습니다."
+        );
+
+        return redirectToEdit(productId);
+    }
+
+    /** 상품 이미지를 한 장 삭제한다. */
+    @PostMapping("/{imageId}/delete")
+    public String deleteImage(
+            @PathVariable("productId") long productId,
+            @PathVariable("imageId") long imageId,
+            RedirectAttributes redirectAttributes
+    ) {
+        try {
+            productImageService.deleteImage(productId, imageId);
+        } catch (BusinessException exception) {
+            redirectAttributes.addFlashAttribute(
+                    "errorMessage",
+                    exception.getErrorCode().message()
+            );
+
+            return redirectToEdit(productId);
+        }
+
+        redirectAttributes.addFlashAttribute(
+                "successMessage",
+                "상품 이미지를 삭제했습니다."
         );
 
         return redirectToEdit(productId);

@@ -70,6 +70,18 @@ public interface ProductMapper {
             @Param("productId") long productId
     );
 
+    /**
+     * 지정한 상품에 속한 이미지를 조회한다.
+     *
+     * @param productId 이미지를 소유한 상품 식별자
+     * @param imageId 조회할 상품 이미지 식별자
+     * @return 상품 이미지, 지정한 상품에 속하지 않으면 {@code null}
+     */
+    ProductImage findProductImageById(
+            @Param("productId") long productId,
+            @Param("imageId") long imageId
+    );
+
     /** 상품에 등록된 이미지 개수를 조회한다. */
     int countProductImagesByProductId(
             @Param("productId") long productId
@@ -92,6 +104,18 @@ public interface ProductMapper {
      * @return 등록된 행 개수
      */
     int insertProductImage(ProductImage productImage);
+
+    /**
+     * 지정한 상품에 속한 이미지를 삭제한다.
+     *
+     * @param productId 이미지를 소유한 상품 식별자
+     * @param imageId 삭제할 상품 이미지 식별자
+     * @return 삭제된 행 개수
+     */
+    int deleteProductImage(
+            @Param("productId") long productId,
+            @Param("imageId") long imageId
+    );
 
     /**
      * 다른 도메인에 제공할 상품 판매 정보를 조회한다.

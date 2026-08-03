@@ -9,6 +9,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -109,6 +110,74 @@ class ProductImageAdminControllerTests {
                         "errorMessage",
                         ProductErrorCode.INVALID_IMAGE_FILE
                                 .message()
+                ));
+    }
+
+    @Test
+    void deleteImage_existingImage_redirectsWithSuccessMessage()
+            throws Exception {
+        ProductImageService service =
+                mock(ProductImageService.class);
+        MockMvc mockMvc = mockMvc(service);
+
+        mockMvc.perform(post(
+                        "/admin/products/1/images/10/delete"
+                ))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(
+                        "/admin/products/1/edit"
+                ))
+                .andExpect(flash().attribute(
+                        "successMessage",
+                        "상품 이미지를 삭제했습니다."
+                ));
+
+        verify(service).deleteImage(1L, 10L);
+    }
+
+    @Test
+    void deleteImage_missingProduct_redirectsWithPublicErrorMessage()
+            throws Exception {
+        ProductImageService service =
+                mock(ProductImageService.class);
+        doThrow(new BusinessException(
+                ProductErrorCode.NOT_FOUND
+        )).when(service).deleteImage(1L, 10L);
+        MockMvc mockMvc = mockMvc(service);
+
+        mockMvc.perform(post(
+                        "/admin/products/1/images/10/delete"
+                ))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(
+                        "/admin/products/1/edit"
+                ))
+                .andExpect(flash().attribute(
+                        "errorMessage",
+                        ProductErrorCode.NOT_FOUND.message()
+                ));
+    }
+
+    @Test
+    void deleteImage_missingImage_redirectsWithPublicErrorMessage()
+            throws Exception {
+        ProductImageService service =
+                mock(ProductImageService.class);
+        doThrow(new BusinessException(
+                ProductErrorCode.IMAGE_NOT_FOUND
+        )).when(service).deleteImage(1L, 10L);
+        MockMvc mockMvc = mockMvc(service);
+
+        mockMvc.perform(post(
+                        "/admin/products/1/images/10/delete"
+                ))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(
+                        "/admin/products/1/edit"
+                ))
+                .andExpect(flash().attribute(
+                        "errorMessage",
+                        ProductErrorCode.IMAGE_NOT_FOUND.message()
                 ));
     }
 

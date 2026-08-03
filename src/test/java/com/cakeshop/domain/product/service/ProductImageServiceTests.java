@@ -3,6 +3,8 @@ package com.cakeshop.domain.product.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -210,6 +212,152 @@ class ProductImageServiceTests {
         verify(fileStorageClient).delete(STORED_IMAGE_URL);
     }
 
+    @Test
+    void deleteImage_validImage_deletesFileAfterCommit() {
+        ProductImage image = storedProductImage();
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(new Product());
+        when(productMapper.findProductImageById(1L, 10L))
+                .thenReturn(image);
+        when(productMapper.deleteProductImage(1L, 10L))
+                .thenReturn(1);
+        TransactionSynchronizationManager.initSynchronization();
+
+        productImageService.deleteImage(1L, 10L);
+
+        verify(productMapper).deleteProductImage(1L, 10L);
+        verify(fileStorageClient, never()).delete(any());
+
+        TransactionSynchronizationManager
+                .getSynchronizations()
+                .getFirst()
+                .afterCommit();
+
+        verify(fileStorageClient).delete(STORED_IMAGE_URL);
+    }
+
+    @Test
+    void deleteImage_missingProduct_rejectsBeforeImageLookup() {
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(null);
+
+        assertBusinessError(
+                () -> productImageService.deleteImage(1L, 10L),
+                ProductErrorCode.NOT_FOUND
+        );
+
+        verify(productMapper, never()).findProductImageById(
+                anyLong(),
+                anyLong()
+        );
+        verify(productMapper, never()).deleteProductImage(
+                anyLong(),
+                anyLong()
+        );
+        verify(fileStorageClient, never()).delete(any());
+    }
+
+    @Test
+    void deleteImage_missingOrDifferentProductImage_rejectsDeletion() {
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(new Product());
+        when(productMapper.findProductImageById(1L, 10L))
+                .thenReturn(null);
+
+        assertBusinessError(
+                () -> productImageService.deleteImage(1L, 10L),
+                ProductErrorCode.IMAGE_NOT_FOUND
+        );
+
+        verify(productMapper, never()).deleteProductImage(
+                anyLong(),
+                anyLong()
+        );
+        verify(fileStorageClient, never()).delete(any());
+    }
+
+    @Test
+    void deleteImage_databaseDeleteFails_keepsStoredFile() {
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(new Product());
+        when(productMapper.findProductImageById(1L, 10L))
+                .thenReturn(storedProductImage());
+        when(productMapper.deleteProductImage(1L, 10L))
+                .thenThrow(new IllegalStateException());
+
+        assertBusinessError(
+                () -> productImageService.deleteImage(1L, 10L),
+                ProductErrorCode.IMAGE_DELETE_FAILED
+        );
+
+        verify(fileStorageClient, never()).delete(any());
+    }
+
+    @Test
+    void deleteImage_databaseDeletesNoRows_returnsDeleteError() {
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(new Product());
+        when(productMapper.findProductImageById(1L, 10L))
+                .thenReturn(storedProductImage());
+        when(productMapper.deleteProductImage(1L, 10L))
+                .thenReturn(0);
+
+        assertBusinessError(
+                () -> productImageService.deleteImage(1L, 10L),
+                ProductErrorCode.IMAGE_DELETE_FAILED
+        );
+
+        verify(fileStorageClient, never()).delete(any());
+    }
+
+    @Test
+    void deleteImage_transactionRollsBack_keepsStoredFile() {
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(new Product());
+        when(productMapper.findProductImageById(1L, 10L))
+                .thenReturn(storedProductImage());
+        when(productMapper.deleteProductImage(1L, 10L))
+                .thenReturn(1);
+        TransactionSynchronizationManager.initSynchronization();
+
+        productImageService.deleteImage(1L, 10L);
+
+        List<TransactionSynchronization> synchronizations =
+                TransactionSynchronizationManager
+                        .getSynchronizations();
+        assertThat(synchronizations).hasSize(1);
+
+        synchronizations.getFirst().afterCompletion(
+                TransactionSynchronization.STATUS_ROLLED_BACK
+        );
+
+        verify(fileStorageClient, never()).delete(any());
+    }
+
+    @Test
+    void deleteImage_fileDeletionFails_keepsCommittedDeletion() {
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(new Product());
+        when(productMapper.findProductImageById(1L, 10L))
+                .thenReturn(storedProductImage());
+        when(productMapper.deleteProductImage(1L, 10L))
+                .thenReturn(1);
+        doThrow(new IllegalStateException())
+                .when(fileStorageClient)
+                .delete(STORED_IMAGE_URL);
+        TransactionSynchronizationManager.initSynchronization();
+
+        productImageService.deleteImage(1L, 10L);
+
+        TransactionSynchronizationManager
+                .getSynchronizations()
+                .getFirst()
+                .afterCommit();
+
+        verify(productMapper).deleteProductImage(1L, 10L);
+        verify(fileStorageClient).delete(STORED_IMAGE_URL);
+    }
+
     private void stubReadyToStore(ProductImageUploadForm form) {
         when(productMapper.findSalesInfoByIdForUpdate(1L))
                 .thenReturn(new Product());
@@ -237,6 +385,15 @@ class ProductImageServiceTests {
                 }
         ));
         return form;
+    }
+
+    private ProductImage storedProductImage() {
+        ProductImage image = new ProductImage();
+        image.setId(10L);
+        image.setProductId(1L);
+        image.setImageUrl(STORED_IMAGE_URL);
+        image.setSortOrder(0);
+        return image;
     }
 
     private void assertBusinessError(

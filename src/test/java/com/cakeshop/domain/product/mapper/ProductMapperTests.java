@@ -630,6 +630,41 @@ class ProductMapperTests {
     }
 
     @Test
+    void findProductImageById_matchingProduct_returnsImage() {
+        long imageId = insertProductImage(
+                "/uploads/product/find-image.jpg",
+                1
+        );
+
+        ProductImage image = productMapper.findProductImageById(
+                optionProductId,
+                imageId
+        );
+
+        assertThat(image).isNotNull();
+        assertThat(image.getId()).isEqualTo(imageId);
+        assertThat(image.getProductId()).isEqualTo(optionProductId);
+        assertThat(image.getImageUrl())
+                .isEqualTo("/uploads/product/find-image.jpg");
+        assertThat(image.getSortOrder()).isEqualTo(1);
+    }
+
+    @Test
+    void findProductImageById_differentProduct_returnsNull() {
+        long imageId = insertProductImage(
+                "/uploads/product/owned-image.jpg",
+                0
+        );
+
+        ProductImage image = productMapper.findProductImageById(
+                optionProductId + 1,
+                imageId
+        );
+
+        assertThat(image).isNull();
+    }
+
+    @Test
     void productImageSummary_imagesMissing_returnsZeroValues() {
         assertThat(productMapper.countProductImagesByProductId(
                 optionProductId
@@ -683,6 +718,52 @@ class ProductMapperTests {
                 );
     }
 
+    @Test
+    void deleteProductImage_matchingProduct_deletesOnlyTargetImage() {
+        long targetImageId = insertProductImage(
+                "/uploads/product/delete-target.jpg",
+                0
+        );
+        long remainingImageId = insertProductImage(
+                "/uploads/product/remain.jpg",
+                1
+        );
+
+        int deletedRows = productMapper.deleteProductImage(
+                optionProductId,
+                targetImageId
+        );
+
+        assertThat(deletedRows).isEqualTo(1);
+        assertThat(productMapper.findProductImageById(
+                optionProductId,
+                targetImageId
+        )).isNull();
+        assertThat(productMapper.findProductImageById(
+                optionProductId,
+                remainingImageId
+        )).isNotNull();
+    }
+
+    @Test
+    void deleteProductImage_differentProduct_keepsImage() {
+        long imageId = insertProductImage(
+                "/uploads/product/keep-image.jpg",
+                0
+        );
+
+        int deletedRows = productMapper.deleteProductImage(
+                optionProductId + 1,
+                imageId
+        );
+
+        assertThat(deletedRows).isZero();
+        assertThat(productMapper.findProductImageById(
+                optionProductId,
+                imageId
+        )).isNotNull();
+    }
+
     private ProductSearchCondition baseCondition() {
         ProductSearchCondition condition =
                 new ProductSearchCondition();
@@ -690,6 +771,21 @@ class ProductMapperTests {
         condition.setKeyword(keyword);
 
         return condition;
+    }
+
+    private long insertProductImage(
+            String imageUrl,
+            int sortOrder
+    ) {
+        ProductImage image = new ProductImage();
+        image.setProductId(optionProductId);
+        image.setImageUrl(imageUrl);
+        image.setSortOrder(sortOrder);
+
+        assertThat(productMapper.insertProductImage(image))
+                .isEqualTo(1);
+
+        return image.getId();
     }
 
     private void insertProduct(
