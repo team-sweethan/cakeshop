@@ -25,7 +25,7 @@
 │  ───────────────────────────────────────────────    │
 │  본문. 줄바꿈은 그대로 살아난다.                     │
 │                                                     │
-│  좋아요 3                                            │
+│  좋아요 3  [ 좋아요 ]                                │  ← 로그인 + PUBLISHED
 │  ───────────────────────────────────────────────    │
 │  댓글 2                                              │
 │  [ 이전 댓글 더 보기 ]  남은 댓글 5   ← 댓글 21건부터 │
@@ -52,6 +52,8 @@
 | `post` | `PostDetailView` | 글 본문과 상태. `blocked`, `edited`, `authorName()`은 뷰가 계산한다 |
 | `canEdit` | `boolean` | 수정·삭제 버튼을 보여줄지. 작성자 본인이고 차단되지 않은 글일 때만 참 |
 | `canComment` | `boolean` | 댓글 폼을 보여줄지. 로그인했고 차단되지 않은 글일 때만 참 |
+| `canLike` | `boolean` | 좋아요 버튼을 보여줄지. `canComment`와 **같은 값**이다 — DOMAIN.md 4.5가 댓글·좋아요에 같은 규칙을 준다. 이름이 둘인 것은 화면의 구역이 둘이기 때문이다 |
+| `likedByViewer` | `boolean` | 버튼이 `좋아요`인지 `좋아요 취소`인지. 누를 수 없는 상대에게는 묻지 않으므로 비로그인은 언제나 거짓 |
 | `viewerId` | `Long` | 보고 있는 회원. 자기 댓글에만 삭제 버튼을 다는 데 쓴다. 비로그인이면 `null` |
 | `commentSection` | `CommentSectionView` | 댓글 목록과 두 개수. `canLoadMore()`, `cappedByLimit()`, `hiddenCount()`는 뷰가 계산한다 |
 | `commentForm` | `CommentForm` | 댓글 입력값. 검증 실패 시 입력을 담은 채 이 화면이 다시 그려진다 |
@@ -73,6 +75,20 @@
 | 댓글 작성 폼 | 로그인 회원 + `PUBLISHED` 글에만 |
 | `댓글 삭제` 버튼 | 그 댓글의 작성자에게만 + `PUBLISHED` 글에만. 게시글 작성자에게도 관리자에게도 없다 (DOMAIN.md 6.7). **댓글 작성 폼과 같은 조건이다** — 삭제도 `PUBLISHED`를 요구하므로(6.4) 차단된 글에 버튼을 남기면 눌러도 403만 나오는 죽은 버튼이 된다 |
 
+## 좋아요 (DOMAIN.md 6.5)
+
+본문 바로 아래, 댓글 구역 위에 있다. 숫자는 누구에게나 보이고 버튼만 조건부다.
+
+- **버튼 하나를 번갈아 누르는 토글이 아니다.** 추가는 `POST /community/{postId}/likes`, 취소는 `POST /community/{postId}/likes/delete`로 간다. 토글이면 재전송·더블클릭이 두 번 실행되어 원래 상태로 돌아가는데, 사용자에게는 눌렀는데 안 눌린 것으로 보인다.
+- **화면에는 한 번에 버튼 하나만 있다.** `likedByViewer`가 둘을 가른다. 양쪽 다 멱등이라 둘을 함께 두어도 기능은 맞지만, 그러면 지금 내가 누른 상태인지 화면에서 알 수 없다.
+- **링크가 아니라 폼이다.** 게시글·댓글 삭제와 같은 이유 — GET으로 상태가 바뀌면 링크 미리보기나 크롤러가 좋아요를 누른다.
+- **좋아요 요청도 `?comments=`를 실어 보낸다.** 좋아요는 댓글 구역 위에 있어서, 댓글을 펼쳐 놓고 좋아요를 눌렀다가 20건으로 접혀 돌아오면 읽던 자리를 잃는다. 댓글 삭제와 같은 처리다.
+
+| 무엇 | 누구에게 |
+|---|---|
+| 좋아요 개수 | 상세를 볼 수 있는 사람 전부 (비로그인 포함) |
+| `좋아요` / `좋아요 취소` 버튼 | 로그인 회원 + `PUBLISHED` 글에만. **댓글 작성 폼과 같은 조건이다** (DOMAIN.md 4.5) |
+
 ## 무엇이 보이는가 (DOMAIN.md 4.3)
 
 | 글 상태 | 비로그인·다른 회원 | 작성자 본인 |
@@ -92,7 +108,8 @@
 | `수정` | 작성자 본인 + 차단되지 않은 글일 때만 | `CommunityScreenRenderingTests.communityDetail_author_showsEditAndDeleteButtons` |
 | `삭제` | 위와 같은 조건 | `CommunityScreenRenderingTests.communityDetail_author_showsEditAndDeleteButtons` |
 | `조회` | 항상 | `CommunityScreenRenderingTests.communityDetail_rendersContent` |
-| `좋아요` | 항상 (숫자만. 누르는 버튼은 조각 4) | 없음 |
+| `좋아요` | 숫자는 항상. 버튼은 로그인 회원 + `PUBLISHED` 글 + 아직 안 누른 상태일 때 | `CommunityScreenRenderingTests.communityDetail_notLikedYet_showsLikeButton` |
+| `좋아요 취소` | 로그인 회원 + `PUBLISHED` 글 + 이미 눌러 둔 상태일 때 | `CommunityScreenRenderingTests.communityDetail_alreadyLiked_showsCancelButton` |
 | `댓글` | 항상 (구역 제목. 개수는 삭제된 댓글을 빼고 센다) | `CommunityScreenRenderingTests.communityDetail_rendersComments` |
 | `삭제된 댓글입니다.` | 삭제된 댓글 자리. 작성자도 본문도 나오지 않는다 | `CommunityScreenRenderingTests.communityDetail_deletedComment_showsPlaceholderWithoutContent` |
 | `아직 댓글이 없습니다.` | 댓글이 하나도 없을 때 | `CommunityScreenRenderingTests.communityDetail_withoutComments_showsEmptyMessage` |
@@ -121,6 +138,10 @@
 - **삭제된 댓글의 본문은 화면까지 내려오지 않는다.** SQL이 NULL로 지운다. 템플릿에서 감추는 것만으로는 응답 본문에 남아 있고, 자리 표시 마크업을 잘못 고치면 지워진 글이 되살아난다.
 - **"더 보기"는 과거로 거슬러 올라간다.** 반대로 만들면 댓글이 많은 글에서 방금 쓴 댓글이 화면 밖에 남는다. 댓글이 20건 이하인 개발 화면에서는 어느 쪽이든 똑같아 보인다.
 - **상한에 막힌 상태는 감추지 않고 적는다.** 링크만 사라지면 "댓글이 여기까지"로 보이는데, 그 화면은 200건이 넘어야 나오므로 사람 눈으로는 영원히 발견되지 않는다.
+- **좋아요를 눌러도 `(수정됨)`이 켜지면 안 된다.** `like_count` 재계산이 `posts.updated_at`을 건드리기 때문인데, SQL에서 명시적으로 보존한다 (DOMAIN.md 6.5). 조회수와 같은 자리이고, 시드에 실제로 이 버그가 있어서 좋아요를 받은 글마다 `(수정됨)`이 붙어 있었다. → `CommunityMapperTests.recalculateLikeCount_doesNotMarkPostAsEdited`
+- **비로그인에게는 버튼이 없고 숫자만 있다.** 그리고 "내가 눌렀는지"를 **묻지도 않는다** — 버튼이 없으므로 물어볼 것이 없고, 물으면 비로그인 상세마다 쿼리가 하나 는다. → `CommunityScreenRenderingTests.communityDetail_anonymous_showsLikeCountWithoutButton`
+- **차단된 글에는 작성자에게도 좋아요 버튼이 없다.** 댓글 폼·댓글 삭제 버튼과 같은 조건이고 같은 이유다 — 남겨 두면 눌러도 403만 나오는 죽은 버튼이 된다. → `CommunityScreenRenderingTests.communityDetail_blockedPostAuthor_hasNoDeadLikeButton`
+- **같은 버튼을 두 번 눌러도 숫자가 두 번 오르지 않는다.** 양쪽이 멱등이라 그렇고, 재계산이 실제 행 수를 다시 세므로 어긋날 자리가 없다. 화면에서는 정상 동작과 구분되지 않는다.
 
 ## 상세에 앞으로 붙는 것
 
@@ -128,7 +149,6 @@
 
 | 무엇 | 조각 | 화면에 어떻게 나타나나 | 미리 정해진 것 |
 |---|---|---|---|
-| 좋아요 버튼 | 4 | 지금 숫자만 있는 `좋아요 N` 자리 | POST/DELETE 분리, 둘 다 멱등. **"내가 눌렀는지" 표시 여부는 DOMAIN.md 9의 보류 항목** |
 | 신고 버튼 | 5 | 본문 아래 | 중복 신고는 에러. 취소 불가 |
 
-댓글 목록·작성은 조각 3에서 붙었다. 위 "댓글" 절을 본다.
+댓글 목록·작성은 조각 3에서, 좋아요 버튼은 조각 4에서 붙었다. 위 "댓글"·"좋아요" 절을 본다.

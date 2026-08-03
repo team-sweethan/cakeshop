@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -20,6 +21,7 @@ import com.cakeshop.domain.community.dto.view.CommentSectionView;
 import com.cakeshop.domain.community.dto.view.CommentView;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
+import com.cakeshop.domain.community.dto.view.PostLockView;
 import com.cakeshop.domain.community.entity.Comment;
 import com.cakeshop.domain.community.entity.CommentStatus;
 import com.cakeshop.domain.community.entity.Post;
@@ -33,6 +35,7 @@ import com.cakeshop.global.error.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 
 /**
  * 상세 접근 규칙(docs/community/DOMAIN.md 4.3 표)을 칸마다 고정한다.
@@ -697,6 +700,134 @@ class CommunityServiceTests {
         form.setContent(content);
 
         return form;
+    }
+
+    /**
+     * 좋아요가 <b>잠그고 → 넣고 → 다시 센다</b>는 순서를 지키는지 확인한다.
+     *
+     * <p>순서 자체가 규칙이다(DOMAIN.md 6.5). 잠금을 뒤로 미루면 post_likes INSERT가 FK
+     * 확인으로 게시글 행에 공유 잠금을 걸고, 재계산이 배타 잠금을 기다리면서 같은 글에 동시에
+     * 좋아요를 누른 요청끼리 교착에 빠진다. 조각 6에서 맞은 것과 같은 모양이다.
+     *
+     * <p>동시 요청이 없으면 세 문장의 순서가 바뀌어도 결과가 똑같아서, 실제 교착은
+     * {@code CommunityLikeConcurrencyTests}가 잡는다. 여기서는 순서를 <b>의도</b>로 고정한다.
+     */
+    @Test
+    void addLike_publishedPost_locksThePostBeforeTouchingLikes() {
+        givenLockedPost(PostStatus.PUBLISHED);
+
+        communityService.addLike(POST_ID, OTHER_MEMBER_ID);
+
+        InOrder order = inOrder(communityMapper);
+        order.verify(communityMapper).lockPost(POST_ID);
+        order.verify(communityMapper).insertLike(POST_ID, OTHER_MEMBER_ID);
+        order.verify(communityMapper).recalculateLikeCount(POST_ID);
+    }
+
+    /** 취소도 같은 순서로 시작해야 한다. 두 경로가 다르게 잠그면 섞였을 때 교착이다. */
+    @Test
+    void removeLike_publishedPost_locksThePostBeforeTouchingLikes() {
+        givenLockedPost(PostStatus.PUBLISHED);
+
+        communityService.removeLike(POST_ID, OTHER_MEMBER_ID);
+
+        InOrder order = inOrder(communityMapper);
+        order.verify(communityMapper).lockPost(POST_ID);
+        order.verify(communityMapper).deleteLike(POST_ID, OTHER_MEMBER_ID);
+        order.verify(communityMapper).recalculateLikeCount(POST_ID);
+    }
+
+    /**
+     * 노출되지 않는 글에는 좋아요를 남길 수 없다(DOMAIN.md 4.5).
+     *
+     * <p>게시글을 지워도 자식 행은 그대로 남기 때문에, 이 검증이 없으면 삭제된 글에 요청만
+     * 따로 보내 좋아요를 누를 수 있다.
+     */
+    @Test
+    void addLike_deletedPost_isRejectedAsNotFound() {
+        givenLockedPost(PostStatus.DELETED);
+
+        assertThatThrownBy(() -> communityService.addLike(POST_ID, OTHER_MEMBER_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(CommunityErrorCode.POST_NOT_FOUND);
+    }
+
+    @Test
+    void addLike_missingPost_isRejectedAsNotFound() {
+        when(communityMapper.lockPost(POST_ID)).thenReturn(null);
+
+        assertThatThrownBy(() -> communityService.addLike(POST_ID, OTHER_MEMBER_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(CommunityErrorCode.POST_NOT_FOUND);
+    }
+
+    /** 남의 차단된 글은 404다. 403을 주면 그 자리에 글이 있다는 사실이 드러난다(4.3). */
+    @Test
+    void addLike_blockedPost_otherMember_isRejectedAsNotFound() {
+        givenLockedPost(PostStatus.BLOCKED);
+
+        assertThatThrownBy(() -> communityService.addLike(POST_ID, OTHER_MEMBER_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(CommunityErrorCode.POST_NOT_FOUND);
+    }
+
+    /**
+     * 자기 차단된 글은 403이다. 상세에서 이미 본문과 사유를 본 상대라 숨길 것이 없고,
+     * 404를 주면 왜 막혔는지 알 수 없다. 댓글과 같은 판단이다.
+     */
+    @Test
+    void addLike_blockedPost_author_isRejectedAsBlocked() {
+        givenLockedPost(PostStatus.BLOCKED);
+
+        assertThatThrownBy(() -> communityService.addLike(POST_ID, AUTHOR_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(CommunityErrorCode.BLOCKED_POST);
+    }
+
+    /**
+     * 거절된 요청이 좋아요에 손대지 않았는지 확인한다.
+     *
+     * <p>예외만 확인하면 "숫자는 이미 바꿔 놓고 그 뒤에 던지는" 구현도 통과한다.
+     */
+    @Test
+    void addLike_rejectedPost_leavesLikesUntouched() {
+        givenLockedPost(PostStatus.DELETED);
+
+        assertThatThrownBy(() -> communityService.addLike(POST_ID, OTHER_MEMBER_ID))
+                .isInstanceOf(BusinessException.class);
+
+        verify(communityMapper, never()).insertLike(anyLong(), anyLong());
+        verify(communityMapper, never()).recalculateLikeCount(anyLong());
+    }
+
+    @Test
+    void removeLike_deletedPost_isRejectedAndLeavesLikesUntouched() {
+        givenLockedPost(PostStatus.DELETED);
+
+        assertThatThrownBy(() -> communityService.removeLike(POST_ID, OTHER_MEMBER_ID))
+                .isInstanceOf(BusinessException.class);
+
+        verify(communityMapper, never()).deleteLike(anyLong(), anyLong());
+        verify(communityMapper, never()).recalculateLikeCount(anyLong());
+    }
+
+    /** 상세가 잠금 조회를 쓰지 않는지 확인한다. 읽기만 하는 화면이 게시글 행을 잠그면 안 된다. */
+    @Test
+    void getPostDetail_doesNotLockThePostRow() {
+        givenPost(PostStatus.PUBLISHED);
+
+        communityService.getPostDetail(POST_ID, AUTHOR_ID, VIEWER_KEY);
+
+        verify(communityMapper, never()).lockPost(anyLong());
+    }
+
+    private void givenLockedPost(PostStatus status) {
+        when(communityMapper.lockPost(POST_ID))
+                .thenReturn(new PostLockView(AUTHOR_ID, status));
     }
 
     private Comment capturedComment() {

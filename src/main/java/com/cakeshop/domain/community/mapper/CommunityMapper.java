@@ -7,6 +7,7 @@ import com.cakeshop.domain.community.dto.view.CommentView;
 import com.cakeshop.domain.community.dto.view.PostCategoryView;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
+import com.cakeshop.domain.community.dto.view.PostLockView;
 import com.cakeshop.domain.community.entity.Comment;
 import com.cakeshop.domain.community.entity.Post;
 
@@ -148,5 +149,54 @@ public interface CommunityMapper {
             @Param("commentId") long commentId,
             @Param("postId") long postId,
             @Param("memberId") long memberId
+    );
+
+    /**
+     * 좋아요를 바꾸기 전에 게시글 행을 잠그고 권한 판단에 필요한 값을 읽는다.
+     * 없으면 null이다.
+     *
+     * 이 호출이 좋아요 경로의 첫 문장이어야 한다. 이유는 교착이며, 자세한 근거는
+     * CommunityMapper.xml에 적어 두었다.
+     */
+    PostLockView lockPost(
+            @Param("postId") long postId
+    );
+
+    /**
+     * 좋아요를 남긴다. 이미 눌러 둔 상태면 아무 일도 하지 않는다(DOMAIN.md 6.5).
+     *
+     * <b>갱신 행 수로 아무것도 판단하지 않는다.</b> MariaDB JDBC가 CLIENT_FOUND_ROWS를 켜서
+     * 이 문장은 새로 넣었을 때와 이미 있을 때를 구분해 주지 않는다(6.2에서 겪은 것과 같다).
+     * 구분할 필요도 없다 — 뒤따르는 재계산이 실제 행 수를 다시 세기 때문이다.
+     */
+    int insertLike(
+            @Param("postId") long postId,
+            @Param("memberId") long memberId
+    );
+
+    /** 좋아요를 거둔다. 누른 적이 없으면 0행이고, 그것도 성공이다(멱등, DOMAIN.md 6.5). */
+    int deleteLike(
+            @Param("postId") long postId,
+            @Param("memberId") long memberId
+    );
+
+    /**
+     * posts.like_count를 post_likes에서 다시 센다. 증분하지 않는 이유는 DOMAIN.md 6.5에 있다.
+     *
+     * insertLike/deleteLike 다음에 같은 트랜잭션에서 부른다. 잠금은 lockPost가 이미 쥐고 있다.
+     */
+    int recalculateLikeCount(
+            @Param("postId") long postId
+    );
+
+    /** 이 회원이 이 글에 좋아요를 눌러 뒀는지. 상세 화면의 버튼 문구를 가르는 데 쓴다. */
+    boolean existsLike(
+            @Param("postId") long postId,
+            @Param("memberId") long memberId
+    );
+
+    /** 한 게시글의 좋아요 개수. like_count가 실제와 맞는지 확인하는 데 쓴다(countViews와 같다). */
+    long countLikes(
+            @Param("postId") long postId
     );
 }

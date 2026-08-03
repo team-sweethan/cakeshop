@@ -590,6 +590,128 @@ class CommunityControllerTests {
                 .andExpect(redirectedUrl(expectedUrl));
     }
 
+    /**
+     * 비로그인 상세에서 "내가 눌렀는지"를 묻지 않는지 확인한다.
+     *
+     * <p>버튼이 없으므로 물어볼 것이 없고, 물으면 공개 화면인 상세마다 쿼리가 하나 는다.
+     * 화면 결과는 어느 쪽이든 같아서 렌더링 테스트로는 드러나지 않는다.
+     */
+    @Test
+    void detail_anonymousViewer_doesNotAskWhetherLiked() throws Exception {
+        when(communityService.getPostDetail(eq(15L), isNull(), anyString()))
+                .thenReturn(publishedPost());
+
+        mockMvc.perform(get("/community/15")).andExpect(status().isOk());
+
+        verify(communityService, never()).isLikedBy(anyLong(), anyLong());
+    }
+
+    @Test
+    void detail_authenticatedViewer_asksWhetherLiked() throws Exception {
+        authenticateAs(7L);
+        when(communityService.getPostDetail(eq(15L), eq(7L), anyString()))
+                .thenReturn(publishedPost());
+        when(communityService.isLikedBy(15L, 7L)).thenReturn(true);
+
+        mockMvc.perform(get("/community/15"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("likedByViewer", true))
+                .andExpect(model().attribute("canLike", true));
+    }
+
+    /** 차단된 글을 보는 작성자에게는 좋아요를 열지 않는다. 댓글 폼과 같은 조건이다(4.5). */
+    @Test
+    void detail_blockedPostAuthor_cannotLike() throws Exception {
+        authenticateAs(7L);
+        when(communityService.getPostDetail(eq(15L), eq(7L), anyString()))
+                .thenReturn(blockedPost());
+
+        mockMvc.perform(get("/community/15"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("canLike", false))
+                .andExpect(model().attribute("likedByViewer", false));
+
+        verify(communityService, never()).isLikedBy(anyLong(), anyLong());
+    }
+
+    @Test
+    void addLike_redirectsToDetail() throws Exception {
+        authenticateAs(7L);
+
+        mockMvc.perform(post("/community/15/likes"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/community/15"));
+
+        verify(communityService).addLike(15L, 7L);
+    }
+
+    @Test
+    void removeLike_redirectsToDetail() throws Exception {
+        authenticateAs(7L);
+
+        mockMvc.perform(post("/community/15/likes/delete"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/community/15"));
+
+        verify(communityService).removeLike(15L, 7L);
+    }
+
+    /**
+     * 추가와 취소가 <b>서로 다른 주소</b>인지 확인한다.
+     *
+     * <p>하나의 주소를 번갈아 누르는 토글로 바꾸면 재전송·더블클릭이 두 번 실행되어 원래
+     * 상태로 되돌아가고, 사용자는 눌렀는데 안 눌린 상태가 된다(DOMAIN.md 6.5). 한 번씩만
+     * 눌러 보는 테스트로는 토글도 똑같이 통과하므로, 두 경로가 각자 자기 일만 하는지 본다.
+     */
+    @Test
+    void likeRoutes_areSplitSoNeitherPathTogglesTheOther() throws Exception {
+        authenticateAs(7L);
+
+        mockMvc.perform(post("/community/15/likes"));
+        verify(communityService).addLike(15L, 7L);
+        verify(communityService, never()).removeLike(anyLong(), anyLong());
+
+        mockMvc.perform(post("/community/15/likes/delete"));
+        verify(communityService).removeLike(15L, 7L);
+    }
+
+    /**
+     * 좋아요 뒤에도 펼친 댓글 수가 유지되는지 확인한다.
+     *
+     * <p>좋아요는 댓글 구역 <b>위에</b> 있다. 댓글을 펼쳐 놓고 좋아요를 눌렀다가 20건으로
+     * 접혀 돌아오면 읽던 자리를 잃는다. 댓글 삭제와 같은 처리다(screens/detail.md).
+     */
+    @ParameterizedTest
+    @CsvSource({
+            "/community/15/likes",
+            "/community/15/likes/delete"
+    })
+    void likeRoutes_keepExpandedCommentLimit(String path) throws Exception {
+        authenticateAs(7L);
+
+        mockMvc.perform(post(path).param("comments", "60"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/community/15?comments=60"));
+    }
+
+    /** 펼친 값은 주소로 나가기 전에 정수로 다시 쓰인다. 댓글 삭제와 같은 규칙이다. */
+    @ParameterizedTest
+    @CsvSource({
+            "abc, /community/15",
+            "-1, /community/15",
+            "20, /community/15",
+            "99999999, /community/15?comments=200",
+            "'40 OR 1=1', /community/15"
+    })
+    void addLike_rewritesCommentLimitAsInteger(String requested, String expectedUrl)
+            throws Exception {
+        authenticateAs(7L);
+
+        mockMvc.perform(post("/community/15/likes").param("comments", requested))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(expectedUrl));
+    }
+
     private void authenticateAs(long memberId) {
         MemberDetails principal = new MemberDetails(new MemberAuthenticationView(
                 memberId, "author@cakeshop.local", "dummy", "USER", true));

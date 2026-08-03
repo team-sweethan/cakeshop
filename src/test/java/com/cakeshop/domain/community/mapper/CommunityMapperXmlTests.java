@@ -220,6 +220,64 @@ class CommunityMapperXmlTests {
         assertThat(sql).contains("STATUS = 'PUBLISHED'");
     }
 
+    /**
+     * 좋아요 경로가 게시글 행을 <b>잠그면서</b> 읽는지, 그리고 그때 다른 테이블을 끌고
+     * 들어가지 않는지 확인한다.
+     *
+     * <p>{@code FOR UPDATE}가 빠지면 교착이다. post_likes INSERT가 FK 확인으로 게시글 행에
+     * 공유 잠금을 걸고, 뒤따르는 재계산이 같은 행의 배타 잠금을 기다린다 — 같은 글에 동시에
+     * 좋아요를 누른 요청 둘이 서로를 기다린다(DOMAIN.md 6.5). 조회수에서 겪은 것과 같은
+     * 모양이고, 동시 요청이 없으면 결과가 똑같아 단일 스레드로는 드러나지 않는다.
+     * 실제 교착은 {@code CommunityLikeConcurrencyTests}가 잡는다.
+     *
+     * <p>조인을 붙이면 반대 방향으로 틀어진다. {@code FOR UPDATE}는 조인한 테이블의 행까지
+     * 잠그므로, 카테고리를 조인해 두면 좋아요 한 번에 카테고리 행이 잠겨 <b>같은 분류의 모든
+     * 글</b>이 서로 줄을 선다. 이쪽은 교착이 아니라 조용한 직렬화라 더 찾기 어렵다.
+     */
+    @Test
+    void lockPost_locksThePostRowWithoutDraggingJoinedTables() {
+        String sql = normalizedSql("lockPost");
+
+        assertThat(sql).contains("FOR UPDATE");
+        assertThat(sql).contains("FROM POSTS");
+        assertThat(sql).doesNotContain("JOIN");
+    }
+
+    /**
+     * 좋아요 추가가 중복 키만 넘기고 나머지 실패는 그대로 터뜨리는지 확인한다.
+     *
+     * <p>{@code INSERT IGNORE}로 바꾸면 UNIQUE 위반만이 아니라 <b>FK 위반과 값 잘림까지</b>
+     * 경고로 낮춰서, 없는 게시글이나 없는 회원으로 들어온 요청이 조용히 성공한다
+     * (DOMAIN.md 6.5). 화면에는 좋아요가 눌린 것처럼 보이고 숫자만 안 오른다.
+     */
+    @Test
+    void insertLike_swallowsDuplicateKeysOnly() {
+        String sql = normalizedSql("insertLike");
+
+        assertThat(sql).contains("INSERT INTO POST_LIKES");
+        assertThat(sql).contains("ON DUPLICATE KEY");
+        assertThat(sql).doesNotContain("IGNORE");
+    }
+
+    /**
+     * 좋아요 수가 증분이 아니라 재계산이고, {@code updated_at}을 보존하는지 확인한다.
+     *
+     * <p>증분으로 바꾸면 한 번 틀어진 값이 스스로 복구되지 않는다. 화면에는 숫자가 조금 다른
+     * 모습으로만 나타나서 눈으로는 찾을 수 없다(DOMAIN.md 6.5).
+     *
+     * <p>{@code updated_at} 지정이 빠지면 좋아요를 받은 글마다 "(수정됨)"이 붙는다 —
+     * 시드에 실제로 있던 버그이고, 조회수 UPDATE와 같은 자리다(6.3).
+     */
+    @Test
+    void recalculateLikeCount_recountsAndKeepsUpdatedAtUntouched() {
+        String sql = normalizedSql("recalculateLikeCount");
+
+        assertThat(sql).contains("SELECT COUNT(*) FROM POST_LIKES");
+        assertThat(sql).contains("UPDATED_AT = P.UPDATED_AT");
+        assertThat(sql).doesNotContain("LIKE_COUNT + 1");
+        assertThat(sql).doesNotContain("LIKE_COUNT - 1");
+    }
+
     /** 공백을 하나로 줄이고 대문자로 바꿔 들여쓰기·줄바꿈 차이를 무시한다. */
     private String normalizedSql(String statementId) {
         MappedStatement statement =

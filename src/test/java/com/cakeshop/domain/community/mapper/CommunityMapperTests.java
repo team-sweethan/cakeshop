@@ -12,6 +12,7 @@ import com.cakeshop.domain.community.dto.view.CommentView;
 import com.cakeshop.domain.community.dto.view.PostCategoryView;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
+import com.cakeshop.domain.community.dto.view.PostLockView;
 import com.cakeshop.domain.community.entity.Comment;
 import com.cakeshop.domain.community.entity.CommentStatus;
 import com.cakeshop.domain.community.entity.Post;
@@ -697,6 +698,112 @@ class CommunityMapperTests {
 
         assertThat(communityMapper.deleteComment(commentId, otherPostId, memberId)).isZero();
         assertThat(communityMapper.findCommentById(commentId).isDeleted()).isFalse();
+    }
+
+    /** 잠금 조회는 권한 판단에 필요한 두 값을 돌려준다. 없는 글이면 null이다. */
+    @Test
+    void lockPost_returnsAuthorAndStatus() {
+        long blocked = insertPost("차단됨", PostStatus.BLOCKED, BASE_TIME);
+
+        PostLockView locked = communityMapper.lockPost(blocked);
+
+        assertThat(locked).isNotNull();
+        assertThat(locked.memberId()).isEqualTo(memberId);
+        assertThat(locked.status()).isEqualTo(PostStatus.BLOCKED);
+    }
+
+    @Test
+    void lockPost_missingPost_returnsNull() {
+        assertThat(communityMapper.lockPost(999_999_999L)).isNull();
+    }
+
+    /**
+     * 같은 회원이 두 번 눌러도 행이 하나인지 확인한다.
+     *
+     * <p>UNIQUE 제약이 막아 주지만, 그 위반이 <b>예외로 새어 나오지 않는</b> 것까지가 규칙이다
+     * (DOMAIN.md 6.5). 두 번째 호출이 터지면 재전송·더블클릭이 에러 화면이 된다.
+     */
+    @Test
+    void insertLike_pressedTwice_keepsSingleRowWithoutError() {
+        long postId = insertPost("좋아요 대상", PostStatus.PUBLISHED, BASE_TIME);
+
+        communityMapper.insertLike(postId, memberId);
+        communityMapper.insertLike(postId, memberId);
+
+        assertThat(communityMapper.countLikes(postId)).isEqualTo(1);
+    }
+
+    /** 누른 적 없는 좋아요를 거둬도 에러가 아니다. 사용자가 원한 상태가 이미 이뤄져 있다. */
+    @Test
+    void deleteLike_neverLiked_changesNothingAndIsNotAnError() {
+        long postId = insertPost("좋아요 대상", PostStatus.PUBLISHED, BASE_TIME);
+
+        assertThat(communityMapper.deleteLike(postId, memberId)).isZero();
+        assertThat(communityMapper.countLikes(postId)).isZero();
+    }
+
+    /**
+     * 재계산이 실제 행 수를 다시 세는지 확인한다.
+     *
+     * <p>어긋난 값에서 시작해도 한 번의 재계산으로 맞아야 한다 — 증분이 아니라 재계산을
+     * 택한 이유가 정확히 이것이다(DOMAIN.md 6.5). 증분이면 어긋난 값은 영원히 어긋난 채다.
+     */
+    @Test
+    void recalculateLikeCount_recountsFromRowsEvenWhenTheCachedValueIsWrong() {
+        long postId = insertPost("좋아요 대상", PostStatus.PUBLISHED, BASE_TIME);
+        long otherMemberId = insertMember(
+                "liker-" + System.nanoTime() + "@cakeshop.local", "다른 회원", "ACTIVE");
+
+        communityMapper.insertLike(postId, memberId);
+        communityMapper.insertLike(postId, otherMemberId);
+        // 캐시가 틀어진 상태를 만든다. 증분 구현이라면 여기서부터 영영 틀린다.
+        jdbcTemplate.update("UPDATE posts SET like_count = 99 WHERE id = ?", postId);
+
+        communityMapper.recalculateLikeCount(postId);
+
+        assertThat(likeCountOf(postId)).isEqualTo(2);
+    }
+
+    /**
+     * 좋아요가 게시글을 "수정됨"으로 만들지 않는지 확인한다(H1c의 좋아요판).
+     *
+     * <p>{@code posts.updated_at}은 ON UPDATE CURRENT_TIMESTAMP라서 재계산 UPDATE만으로도
+     * 값이 바뀐다. 그러면 좋아요를 받은 글마다 화면에 "(수정됨)"이 붙는다(DOMAIN.md 6.3).
+     * 시드에 실제로 있던 버그이고, 화면에는 조용히 표시만 붙어서 원인을 찾기 어렵다.
+     */
+    @Test
+    void recalculateLikeCount_doesNotMarkPostAsEdited() {
+        long postId = insertPost("좋아요 대상", PostStatus.PUBLISHED, BASE_TIME);
+        LocalDateTime before = updatedAtOf(postId);
+
+        communityMapper.insertLike(postId, memberId);
+        communityMapper.recalculateLikeCount(postId);
+
+        assertThat(updatedAtOf(postId)).isEqualTo(before);
+        assertThat(communityMapper.findPostById(postId).isEdited()).isFalse();
+    }
+
+    /** 눌러 뒀는지 여부는 회원마다 갈린다. 남이 누른 것이 내 버튼을 바꾸면 안 된다. */
+    @Test
+    void existsLike_isPerMember() {
+        long postId = insertPost("좋아요 대상", PostStatus.PUBLISHED, BASE_TIME);
+        long otherMemberId = insertMember(
+                "liker-" + System.nanoTime() + "@cakeshop.local", "다른 회원", "ACTIVE");
+
+        communityMapper.insertLike(postId, memberId);
+
+        assertThat(communityMapper.existsLike(postId, memberId)).isTrue();
+        assertThat(communityMapper.existsLike(postId, otherMemberId)).isFalse();
+    }
+
+    private long likeCountOf(long postId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT like_count FROM posts WHERE id = ?", Long.class, postId);
+    }
+
+    private LocalDateTime updatedAtOf(long postId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT updated_at FROM posts WHERE id = ?", LocalDateTime.class, postId);
     }
 
     private Post postOf(long authorId, long postCategoryId, String title, String content) {

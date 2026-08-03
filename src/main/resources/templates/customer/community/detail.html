@@ -59,8 +59,35 @@
         <p th:text="${post.content}" style="white-space:pre-wrap">본문</p>
       </div>
 
+      <!--
+        좋아요. 숫자는 누구에게나 보이고 버튼은 로그인 회원에게, 노출 중인 글에만 열린다
+        (DOMAIN.md 4.5). 댓글 폼과 같은 조건이다.
+
+        토글 버튼 하나가 아니라 추가와 취소가 서로 다른 주소로 간다(6.5). 하나의 주소를
+        번갈아 누르게 만들면 재전송·더블클릭이 두 번 실행되어 원래 상태로 돌아가는데,
+        사용자에게는 눌렀는데 안 눌린 것으로 보인다.
+
+        링크가 아니라 폼인 것은 글을 지우는 자리와 같은 이유다. GET으로 상태가 바뀌면
+        링크 미리보기나 크롤러가 좋아요를 누른다.
+
+        주석 문구에 화면 문자열을 그대로 쓰지 않는다. Thymeleaf는 HTML 주석을 응답에
+        그대로 내보내므로, "그 문구가 화면에 없다"를 단언하는 테스트가 주석 때문에 깨진다.
+      -->
       <div class="cluster section">
         <span class="text-muted" th:text="'좋아요 ' + ${post.likeCount}">좋아요 0</span>
+
+        <form method="post" th:if="${canLike and likedByViewer}"
+              th:action="@{/community/{postId}/likes/delete(postId=${post.id})}">
+          <!-- 좋아요는 댓글 구역 위에 있다. 펼쳐 둔 상태로 눌렀다가 접혀 돌아오면 읽던 자리를 잃는다. -->
+          <input type="hidden" name="comments" th:value="${commentSection.limit}">
+          <button class="btn" type="submit">좋아요 취소</button>
+        </form>
+
+        <form method="post" th:if="${canLike and !likedByViewer}"
+              th:action="@{/community/{postId}/likes(postId=${post.id})}">
+          <input type="hidden" name="comments" th:value="${commentSection.limit}">
+          <button class="btn btn--primary" type="submit">좋아요</button>
+        </form>
       </div>
     </article>
 
