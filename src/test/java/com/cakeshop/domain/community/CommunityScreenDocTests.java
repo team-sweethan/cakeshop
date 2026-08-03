@@ -25,18 +25,23 @@ import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 
 /**
- * 화면 명세 문서(`docs/community/SCREENS.md`)가 실제 화면과 어긋나지 않는지 확인한다.
+ * 화면 명세 문서(`docs/community/screens/*.md`)가 실제 화면과 어긋나지 않는지 확인한다.
  *
  * <p>문서는 그냥 두면 낡는다. 문구를 바꾸고 문서를 안 고쳐도 아무 일도 일어나지 않기 때문이다.
  * 그러면 다음 작업자가 문서를 믿고 잘못된 전제로 작업한다. 여기서 문서를 코드에 묶어,
  * <b>어긋나면 빌드가 깨지게</b> 만든다.
+ *
+ * <p>명세는 <b>화면 하나에 파일 하나</b>다. 그래서 문자열 표가 어느 화면 것인지는 표가 들어
+ * 있는 파일이 정한다 — 문서 안의 줄 순서에 기대지 않는다. 순서에 기대면 절 사이에 표를 하나
+ * 끼워 넣는 것만으로 검사 대상 템플릿이 옆 화면으로 밀리는데, 그 어긋남은 통과하는 모습으로
+ * 나타나서 눈에 띄지 않는다. 규약은 `docs/community/SCREENS.md`에 적어 두었다.
  *
  * <p>검사 방향은 문서 → 코드 한쪽뿐이다. 템플릿에 새 블록을 넣고 문서에 적지 않는 것은
  * 잡지 못한다. 그 한계는 SCREENS.md와 PLAN.md의 R7에 적어 두었다.
  */
 class CommunityScreenDocTests {
 
-    private static final Path SCREEN_DOC = Path.of("docs", "community", "SCREENS.md");
+    private static final Path SCREEN_DOC_DIRECTORY = Path.of("docs", "community", "screens");
     private static final Path TEST_SOURCE_ROOT = Path.of("src", "test", "java");
     private static final List<String> TEMPLATE_DIRECTORIES =
             List.of("customer/community", "admin/community");
@@ -74,7 +79,7 @@ class CommunityScreenDocTests {
         }
 
         assertThat(documented)
-                .as("SCREENS.md의 화면 목록이 실제 템플릿 파일과 같아야 한다")
+                .as("screens/*.md의 화면 목록이 실제 템플릿 파일과 같아야 한다")
                 .containsExactlyInAnyOrderElementsOf(templates().keySet());
     }
 
@@ -135,14 +140,14 @@ class CommunityScreenDocTests {
         List<ScreenString> strings = documentedStrings();
 
         assertThat(strings)
-                .as("SCREENS.md에서 화면 문자열을 하나도 못 읽었다면 표 형식이 깨진 것이다")
+                .as("screens/*.md에서 화면 문자열을 하나도 못 읽었다면 표 형식이 깨진 것이다")
                 .isNotEmpty();
 
         Map<String, String> templates = templates();
 
         for (ScreenString screenString : strings) {
             assertThat(templates.get(screenString.template()))
-                    .as("%s에 `%s`가 없다. 문구를 바꿨다면 SCREENS.md도 함께 고친다",
+                    .as("%s에 `%s`가 없다. 문구를 바꿨다면 화면 명세도 함께 고친다",
                             screenString.template(), screenString.value())
                     .contains(screenString.value());
         }
@@ -352,7 +357,7 @@ class CommunityScreenDocTests {
                 .filter(method -> method.getName().equals(methodName))
                 .toList();
 
-        assertThat(methods).as("SCREENS.md가 가리키는 %s가 없다", reference).isNotEmpty();
+        assertThat(methods).as("화면 명세가 가리키는 %s가 없다", reference).isNotEmpty();
 
         assertThat(methods)
                 .as("%s가 JUnit이 실행하는 테스트가 아니다"
@@ -400,12 +405,29 @@ class CommunityScreenDocTests {
         }
     }
 
-    /** 문서에서 화면 절을 읽는다. 각 절은 `- 상태:`와 `- 템플릿:` 줄로 자신을 밝힌다. */
     private List<Screen> screens() throws IOException {
         List<Screen> screens = new ArrayList<>();
+
+        for (Path doc : screenDocs()) {
+            screens.add(screenOf(doc));
+        }
+
+        return screens;
+    }
+
+    /**
+     * 화면 명세 파일 하나에서 화면 하나를 읽는다. 화면은 `- 상태:`와 `- 템플릿:` 줄로
+     * 자신을 밝힌다.
+     *
+     * <p>파일 하나에 화면이 <b>정확히 하나</b>여야 한다. 둘을 적으면 문자열 표를 어느 화면에
+     * 붙일지가 다시 줄 순서 문제가 되고, 하나도 없으면 그 파일은 아무것도 검사하지 않으면서
+     * 명세인 척 남는다. 둘 다 통과하는 모습으로 나타나므로 여기서 세운다.
+     */
+    private Screen screenOf(Path doc) throws IOException {
+        List<Screen> found = new ArrayList<>();
         String status = null;
 
-        for (String line : readScreenDoc()) {
+        for (String line : Files.readAllLines(doc, StandardCharsets.UTF_8)) {
             String parsedStatus = valueOf(line, "- 상태: ");
 
             if (parsedStatus != null) {
@@ -418,15 +440,39 @@ class CommunityScreenDocTests {
 
             if (template != null) {
                 assertThat(status)
-                        .as("%s 앞에 `- 상태:` 줄이 있어야 한다", template)
+                        .as("%s의 %s 앞에 `- 상태:` 줄이 있어야 한다", doc, template)
                         .isNotNull();
 
-                screens.add(new Screen(status, template));
+                found.add(new Screen(status, template));
                 status = null;
             }
         }
 
-        return screens;
+        assertThat(found)
+                .as("화면 명세 파일 하나에는 화면을 정확히 하나만 적는다 (%s)", doc)
+                .hasSize(1);
+
+        return found.get(0);
+    }
+
+    /**
+     * 명세 파일 목록. 이름순으로 고정해, 어느 파일이 실패했는지가 실행마다 달라지지 않게 한다.
+     */
+    private List<Path> screenDocs() throws IOException {
+        assertThat(SCREEN_DOC_DIRECTORY)
+                .as("화면 명세 폴더가 있어야 한다. 없다면 이 테스트의 전제가 사라진 것이다")
+                .isDirectory();
+
+        try (Stream<Path> paths = Files.list(SCREEN_DOC_DIRECTORY)) {
+            List<Path> docs = paths
+                    .filter(path -> path.getFileName().toString().endsWith(".md"))
+                    .sorted()
+                    .toList();
+
+            assertThat(docs).as("화면 명세 파일이 하나도 없다").isNotEmpty();
+
+            return docs;
+        }
     }
 
     private Map<String, String> templates() throws IOException {
@@ -523,31 +569,27 @@ class CommunityScreenDocTests {
      * 표 머리글로 구분한다.
      */
     private void forEachStringRow(RowConsumer consumer) throws IOException {
-        List<String> lines = readScreenDoc();
-        List<Screen> screens = screens();
-        int screenIndex = -1;
-        boolean inStringTable = false;
+        for (Path doc : screenDocs()) {
+            Screen screen = screenOf(doc);
+            List<String> lines = Files.readAllLines(doc, StandardCharsets.UTF_8);
+            boolean inStringTable = false;
 
-        for (int i = 0; i < lines.size(); i++) {
-            String line = lines.get(i).trim();
+            for (int i = 0; i < lines.size(); i++) {
+                String line = lines.get(i).trim();
 
-            if (valueOf(line, "- 템플릿: ") != null) {
-                screenIndex++;
-                continue;
-            }
+                if (!line.startsWith("|")) {
+                    inStringTable = false;
+                    continue;
+                }
 
-            if (!line.startsWith("|")) {
-                inStringTable = false;
-                continue;
-            }
+                if (isSeparatorRow(line)) {
+                    inStringTable = i > 0 && "문자열".equals(cellsOf(lines.get(i - 1)).get(0));
+                    continue;
+                }
 
-            if (isSeparatorRow(line)) {
-                inStringTable = i > 0 && "문자열".equals(cellsOf(lines.get(i - 1)).get(0));
-                continue;
-            }
-
-            if (inStringTable && screenIndex >= 0) {
-                consumer.accept(screens.get(screenIndex), cellsOf(line));
+                if (inStringTable) {
+                    consumer.accept(screen, cellsOf(line));
+                }
             }
         }
     }
@@ -582,14 +624,6 @@ class CommunityScreenDocTests {
         }
 
         return trimmed;
-    }
-
-    private List<String> readScreenDoc() throws IOException {
-        assertThat(SCREEN_DOC)
-                .as("화면 명세가 있어야 한다. 없다면 이 테스트의 전제가 사라진 것이다")
-                .exists();
-
-        return Files.readAllLines(SCREEN_DOC, StandardCharsets.UTF_8);
     }
 
     private record Screen(String status, String template) {
