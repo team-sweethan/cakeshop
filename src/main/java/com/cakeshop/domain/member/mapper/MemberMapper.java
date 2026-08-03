@@ -34,6 +34,9 @@ public interface MemberMapper {
 
     Optional<Member> findByEmail(@Param("email") String email);
 
+    /** 주문 등 회원 전용 기능 실행 시 현재 ACTIVE 상태인지 DB 기준으로 확인한다. */
+    boolean existsActiveMember(@Param("memberId") long memberId);
+
     List<String> findEmailsByMemberInfo(
             @Param("name") String name,
             @Param("birthDate") LocalDate birthDate,

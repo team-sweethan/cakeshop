@@ -19,6 +19,9 @@ public interface OrderService {
     /** 결제 검증과 재고 차감에 필요한 회원 소유의 일반 주문을 조회한다. */
     GeneralPaymentOrder getGeneralPaymentOrder(long memberId, long orderId);
 
+    /** 승인 결과를 내부 반영하기 전에 주문 행을 잠가 만료 처리와 직렬화한다. */
+    void lockGeneralOrderForPayment(long orderId);
+
     /** 결제가 완료된 일반 주문을 픽업 대기 상태로 변경한다. */
     void completeGeneralOrderAfterPayment(
             long orderId,

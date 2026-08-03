@@ -1,6 +1,7 @@
 package com.cakeshop.domain.order.service;
 
 import com.cakeshop.domain.order.dto.form.GeneralOrderForm;
+import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.order.entity.OrderItem;
 import com.cakeshop.domain.order.entity.OrderItemOption;
@@ -45,6 +46,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderOptionValidator orderOptionValidator;
     private final OrderMapper orderMapper;
     private final PaymentPreparationService paymentPreparationService;
+    private final MemberService memberService;
     private final Clock clock;
 
     /** 일반 상품 주문, 주문 항목 스냅샷, READY 결제를 하나의 트랜잭션으로 생성한다. */
@@ -53,6 +55,15 @@ public class OrderServiceImpl implements OrderService {
     public long createGeneralOrder(long memberId, GeneralOrderForm form) {
         validateActiveMember(memberId);
         validateForm(form);
+
+        // 브라우저 재전송이나 네트워크 재시도면 원래 주문을 그대로 돌려준다.
+        Order existingOrder = orderMapper.findOrderByMemberIdAndRequestKey(
+                memberId,
+                form.getRequestKey()
+        ).orElse(null);
+        if (existingOrder != null) {
+            return existingOrder.getId();
+        }
 
         LocalDateTime now = LocalDateTime.now(clock);
         validatePickupAt(form.getPickupAt(), now);
@@ -63,7 +74,22 @@ public class OrderServiceImpl implements OrderService {
 
         // 주문과 하위 스냅샷 중 하나라도 저장에 실패하면 전체 트랜잭션을 rollback한다.
         Order order = createOrder(memberId, form, originalAmount, now);
-        requireOneRow(orderMapper.insertOrder(order), OrderErrorCode.ORDER_SAVE_FAILED);
+        int insertedRows = orderMapper.insertOrder(order);
+        if (order.getId() == null) {
+            throw new BusinessException(OrderErrorCode.ORDER_SAVE_FAILED);
+        }
+
+        // 같은 회원·요청키의 첫 트랜잭션이 이미 완료됐다면 기존 주문 ID만 반환한다.
+        if (orderMapper.existsOrderItemByOrderId(order.getId())) {
+            Order persistedOrder = orderMapper.findOrderById(order.getId())
+                    .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_SAVE_FAILED));
+            if (Long.valueOf(memberId).equals(persistedOrder.getMemberId())
+                    && form.getRequestKey().equals(persistedOrder.getRequestKey())) {
+                return order.getId();
+            }
+            throw new BusinessException(OrderErrorCode.ORDER_SAVE_FAILED);
+        }
+        requireOneRow(insertedRows, OrderErrorCode.ORDER_SAVE_FAILED);
 
         saveOrderItem(order.getId(), preparedItem);
 
@@ -133,6 +159,17 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
+    public void lockGeneralOrderForPayment(long orderId) {
+        Order order = orderMapper.findOrderByIdForUpdate(orderId)
+                .orElseThrow(() -> new BusinessException(CommonErrorCode.NOT_FOUND));
+        if (order.getOrderType() != OrderType.GENERAL
+                || order.getStatus() != OrderStatus.PENDING_PAYMENT) {
+            throw new BusinessException(OrderErrorCode.INVALID_STATUS_TRANSITION);
+        }
+    }
+
+    @Override
+    @Transactional
     public void recordGeneralStockDeduction(long orderItemId, LocalDateTime deductedAt) {
         if (orderItemId <= 0 || deductedAt == null) {
             throw new BusinessException(CommonErrorCode.INTERNAL_ERROR);
@@ -143,9 +180,9 @@ public class OrderServiceImpl implements OrderService {
         );
     }
 
-    /** 회원 식별자의 기본 형식을 검증한다. */
+    /** 세션 값만 신뢰하지 않고 현재 ACTIVE 회원인지 DB 기준으로 검증한다. */
     private void validateActiveMember(long memberId) {
-        if (memberId <= 0) {
+        if (!memberService.isActiveMember(memberId)) {
             throw new BusinessException(OrderErrorCode.MEMBER_NOT_AVAILABLE);
         }
     }
@@ -201,6 +238,9 @@ public class OrderServiceImpl implements OrderService {
                 || isBlank(form.getOrdererPhone())
                 || isBlank(form.getPickupName())
                 || isBlank(form.getPickupPhone())) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+        if (!isUuid(form.getRequestKey())) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
         if (form.getProductId() == null) {
@@ -288,6 +328,7 @@ public class OrderServiceImpl implements OrderService {
         Order order = new Order();
         order.setOrderNumber("ORD-" + compactUuid());
         order.setMemberId(memberId);
+        order.setRequestKey(form.getRequestKey());
         order.setOrderType(OrderType.GENERAL);
         order.setOrdererName(form.getOrdererName().trim());
         order.setOrdererPhone(form.getOrdererPhone().trim());
@@ -344,6 +385,18 @@ public class OrderServiceImpl implements OrderService {
 
     private String compactUuid() {
         return UUID.randomUUID().toString().replace("-", "");
+    }
+
+    private boolean isUuid(String value) {
+        if (isBlank(value)) {
+            return false;
+        }
+        try {
+            UUID.fromString(value);
+            return true;
+        } catch (IllegalArgumentException exception) {
+            return false;
+        }
     }
 
     private boolean isBlank(String value) {

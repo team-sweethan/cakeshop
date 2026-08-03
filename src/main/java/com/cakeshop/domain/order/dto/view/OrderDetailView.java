@@ -53,7 +53,11 @@ public record OrderDetailView(
     }
 
     public boolean cancelRequestAvailable() {
-        return status == OrderStatus.UNDER_REVIEW || status == OrderStatus.READY_FOR_PICKUP;
+        return orderType == OrderType.GENERAL && status == OrderStatus.READY_FOR_PICKUP;
+    }
+
+    public boolean adminCancellationAvailable() {
+        return cancelRequestAvailable();
     }
 
     public record Item(

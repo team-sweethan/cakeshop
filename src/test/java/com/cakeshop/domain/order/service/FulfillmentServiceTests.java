@@ -5,12 +5,23 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.cakeshop.domain.order.dto.form.FulfillmentSearchCondition;
+import com.cakeshop.domain.order.dto.view.FulfillmentListView;
+import com.cakeshop.domain.order.entity.Order;
+import com.cakeshop.domain.order.entity.OrderItem;
+import com.cakeshop.domain.order.entity.OrderItemOption;
+import com.cakeshop.domain.order.entity.OrderStatus;
+import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.order.mapper.OrderMapper;
+import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.global.error.BusinessException;
+import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -55,5 +66,82 @@ class FulfillmentServiceTests {
                         error -> assertThat(error.getErrorCode())
                                 .isEqualTo(OrderErrorCode.INVALID_STATUS_TRANSITION)
                 );
+    }
+
+    @Test
+    void getFulfillments_missingCondition_usesTodayAndMapsOrderSnapshots() {
+        Order order = order(OrderStatus.READY_FOR_PICKUP);
+        OrderItem item = item();
+        OrderItemOption option = option();
+        when(orderMapper.findFulfillmentOrders(
+                LocalDate.of(2026, 8, 2).atStartOfDay(),
+                LocalDate.of(2026, 8, 3).atStartOfDay(),
+                null
+        )).thenReturn(List.of(order));
+        when(orderMapper.findOrderItemsByOrderId(10L)).thenReturn(List.of(item));
+        when(orderMapper.findOrderItemOptionsByOrderId(10L)).thenReturn(List.of(option));
+
+        FulfillmentListView result = fulfillmentService.getFulfillments(null);
+
+        assertThat(result.pickupDate()).isEqualTo(LocalDate.of(2026, 8, 2));
+        assertThat(result.selectedStatus()).isNull();
+        assertThat(result.orders()).singleElement().satisfies(view -> {
+            assertThat(view.orderNumber()).isEqualTo("ORD-10");
+            assertThat(view.statusLabel()).isEqualTo("픽업 준비");
+            assertThat(view.readyForPickup()).isTrue();
+            assertThat(view.items()).singleElement().satisfies(itemView -> {
+                assertThat(itemView.productName()).isEqualTo("딸기 케이크");
+                assertThat(itemView.optionSummary()).isEqualTo("크기: 2호");
+            });
+        });
+    }
+
+    @Test
+    void getFulfillments_unsupportedStatus_ignoresStatusFilter() {
+        FulfillmentSearchCondition condition = new FulfillmentSearchCondition();
+        condition.setPickupDate(LocalDate.of(2026, 8, 10));
+        condition.setStatus(OrderStatus.CANCELED);
+        when(orderMapper.findFulfillmentOrders(
+                LocalDate.of(2026, 8, 10).atStartOfDay(),
+                LocalDate.of(2026, 8, 11).atStartOfDay(),
+                null
+        )).thenReturn(List.of());
+
+        FulfillmentListView result = fulfillmentService.getFulfillments(condition);
+
+        assertThat(result.selectedStatus()).isNull();
+    }
+
+    private Order order(OrderStatus status) {
+        Order order = new Order();
+        order.setId(10L);
+        order.setOrderNumber("ORD-10");
+        order.setOrderType(OrderType.GENERAL);
+        order.setStatus(status);
+        order.setPickupName("수령자");
+        order.setPickupPhone("010-1111-2222");
+        order.setPickupAt(LocalDateTime.of(2026, 8, 2, 14, 0));
+        return order;
+    }
+
+    private OrderItem item() {
+        OrderItem item = new OrderItem();
+        item.setId(100L);
+        item.setOrderId(10L);
+        item.setProductName("딸기 케이크");
+        item.setProductType(ProductType.GENERAL);
+        item.setQuantity(1);
+        item.setBasePrice(BigDecimal.valueOf(30_000));
+        item.setOptionAmount(BigDecimal.valueOf(5_000));
+        item.setTotalAmount(BigDecimal.valueOf(35_000));
+        return item;
+    }
+
+    private OrderItemOption option() {
+        OrderItemOption option = new OrderItemOption();
+        option.setOrderItemId(100L);
+        option.setOptionGroupName("크기");
+        option.setOptionName("2호");
+        return option;
     }
 }

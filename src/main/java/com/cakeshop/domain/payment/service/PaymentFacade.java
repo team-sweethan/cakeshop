@@ -2,18 +2,26 @@ package com.cakeshop.domain.payment.service;
 
 import com.cakeshop.domain.order.service.OrderService;
 import com.cakeshop.domain.order.service.OrderService.GeneralPaymentOrder;
+import com.cakeshop.domain.order.dto.view.OrderDetailView;
+import com.cakeshop.domain.order.service.OrderQueryService;
 import com.cakeshop.domain.payment.dto.form.PaymentConfirmForm;
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.error.PaymentErrorCode;
 import com.cakeshop.domain.payment.infra.TossPaymentClient;
 import com.cakeshop.domain.payment.infra.TossPaymentClient.ApprovalResult;
+import com.cakeshop.domain.payment.infra.TossPaymentClient.CancellationResult;
+import com.cakeshop.domain.payment.infra.TossPaymentClient.PaymentLookupResult;
+import com.cakeshop.domain.payment.service.PaymentRecoveryService.CompensationRequest;
 import com.cakeshop.global.error.BusinessException;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 /** Toss 결제 승인과 내부 결제 완료 처리를 조정한다. */
 @Service
@@ -21,9 +29,13 @@ import java.time.LocalDateTime;
 public class PaymentFacade {
 
     private static final String TOSS_DONE = "DONE";
+    private static final String TOSS_CANCELED = "CANCELED";
+    private static final Logger log = LoggerFactory.getLogger(PaymentFacade.class);
 
     private final OrderService orderService;
+    private final OrderQueryService orderQueryService;
     private final PaymentService paymentService;
+    private final PaymentRecoveryService paymentRecoveryService;
     private final TossPaymentClient tossPaymentClient;
     private final Clock clock;
 
@@ -33,6 +45,18 @@ public class PaymentFacade {
             long orderId,
             PaymentConfirmForm form
     ) {
+        OrderDetailView ownedOrder = orderQueryService.getMemberOrder(
+                memberId,
+                orderId
+        );
+        Payment completedPayment = paymentService.findDonePayment(orderId)
+                .orElse(null);
+        if (completedPayment != null) {
+            validateCompletedRequest(ownedOrder, completedPayment, form);
+            validateCompletedProviderState(completedPayment, form);
+            return;
+        }
+
         GeneralPaymentOrder order =
                 orderService.getGeneralPaymentOrder(memberId, orderId);
         validatePaymentExpiration(order.paymentExpiresAt());
@@ -40,19 +64,256 @@ public class PaymentFacade {
         Payment payment = paymentService.getReadyPayment(orderId);
         validateRequest(order, payment, form);
 
-        ApprovalResult approval = tossPaymentClient.approve(
-                form.getPaymentKey(),
-                form.getTossOrderId(),
-                form.getAmount().longValueExact(),
-                payment.getIdempotencyKey()
-        );
+        Optional<CompensationRequest> preparedCompensation =
+                paymentRecoveryService.findPreparedCompensation(
+                        payment,
+                        form.getPaymentKey()
+                );
+        if (preparedCompensation.isPresent()) {
+            throw cancelAndCompleteCompensation(preparedCompensation.get());
+        }
+
+        ApprovalResult approval = resolveApproval(payment, form);
         validateApproval(payment, form, approval);
 
-        paymentService.completeGeneralPayment(
-                order,
-                payment,
-                approval
+        try {
+            paymentService.completeGeneralPayment(
+                    order,
+                    payment,
+                    approval
+            );
+        } catch (RuntimeException exception) {
+            Payment concurrentlyCompleted = findConcurrentlyCompleted(orderId);
+            if (concurrentlyCompleted == null) {
+                throw compensateApprovedPayment(payment, form.getPaymentKey());
+            }
+            validateCompletedRequest(
+                    ownedOrder,
+                    concurrentlyCompleted,
+                    form
+            );
+        }
+    }
+
+    /** 영속화된 미완료 보상 취소를 같은 멱등키로 다시 처리한다. */
+    public void recoverPendingCompensations(int batchSize) {
+        for (CompensationRequest request
+                : paymentRecoveryService.getPreparedCompensations(batchSize)) {
+            try {
+                executeCompensation(request);
+            } catch (RuntimeException recoveryFailure) {
+                log.warn("Pending payment compensation could not be completed.");
+            }
+        }
+    }
+
+    /** 현재 PG 상태를 먼저 대조하고, 미승인 상태일 때만 같은 멱등키로 승인한다. */
+    private ApprovalResult resolveApproval(
+            Payment payment,
+            PaymentConfirmForm form
+    ) {
+        Optional<PaymentLookupResult> current = tossPaymentClient.find(
+                form.getPaymentKey()
         );
+        if (current.isPresent()) {
+            Optional<ApprovalResult> resolved = resolveLookup(
+                    payment,
+                    form,
+                    current.get()
+            );
+            if (resolved.isPresent()) {
+                return resolved.get();
+            }
+        }
+
+        try {
+            return tossPaymentClient.approve(
+                    form.getPaymentKey(),
+                    form.getTossOrderId(),
+                    form.getAmount().longValueExact(),
+                    payment.getIdempotencyKey()
+            );
+        } catch (BusinessException approvalFailure) {
+            // timeout·연결 단절처럼 승인 결과가 불명확하면
+            // paymentKey 조회 결과를 정본으로 삼는다.
+            Optional<PaymentLookupResult> afterFailure = tossPaymentClient.find(
+                    form.getPaymentKey()
+            );
+            if (afterFailure.isEmpty()) {
+                throw approvalFailure;
+            }
+            return resolveLookup(payment, form, afterFailure.get())
+                    .orElseThrow(() -> approvalFailure);
+        }
+    }
+
+    private Optional<ApprovalResult> resolveLookup(
+            Payment payment,
+            PaymentConfirmForm form,
+            PaymentLookupResult lookup
+    ) {
+        validateLookup(payment, form, lookup);
+        if (TOSS_DONE.equals(lookup.status())) {
+            return Optional.of(lookup.toApprovalResult());
+        }
+        if (TOSS_CANCELED.equals(lookup.status())) {
+            throw reconcileCanceledPayment(payment, lookup);
+        }
+        if ("READY".equals(lookup.status())
+                || "IN_PROGRESS".equals(lookup.status())) {
+            return Optional.empty();
+        }
+        throw new BusinessException(PaymentErrorCode.TOSS_APPROVAL_FAILED);
+    }
+
+    private void validateLookup(
+            Payment payment,
+            PaymentConfirmForm form,
+            PaymentLookupResult lookup
+    ) {
+        if (lookup == null
+                || !form.getPaymentKey().equals(lookup.paymentKey())) {
+            throw new BusinessException(PaymentErrorCode.TOSS_APPROVAL_FAILED);
+        }
+        if (!payment.getTossOrderId().equals(lookup.orderId())) {
+            throw new BusinessException(PaymentErrorCode.TOSS_ORDER_ID_MISMATCH);
+        }
+        if (payment.getAmount().compareTo(
+                BigDecimal.valueOf(lookup.totalAmount())
+        ) != 0) {
+            throw new BusinessException(PaymentErrorCode.AMOUNT_MISMATCH);
+        }
+    }
+
+    private Payment findConcurrentlyCompleted(long orderId) {
+        try {
+            return paymentService.findDonePayment(orderId).orElse(null);
+        } catch (RuntimeException lookupFailure) {
+            // DB 장애로 완료 여부도 확인할 수 없으면 고객 과금보다 자동 취소를 우선한다.
+            return null;
+        }
+    }
+
+    private BusinessException compensateApprovedPayment(
+            Payment payment,
+            String paymentKey
+    ) {
+        CompensationRequest request = paymentRecoveryService.createRequest(
+                payment,
+                paymentKey
+        );
+        try {
+            paymentRecoveryService.prepareCompensation(request);
+        } catch (RuntimeException prepareFailure) {
+            // DB 장애 중에도 PG 자동 취소는 시도하고,
+            // 같은 멱등키로 다음 confirm에서 복구한다.
+            log.warn(
+                    "Payment compensation request could not be persisted before provider cancel."
+            );
+        }
+
+        return cancelAndCompleteCompensation(request);
+    }
+
+    private BusinessException cancelAndCompleteCompensation(
+            CompensationRequest request
+    ) {
+        executeCompensation(request);
+        return new BusinessException(PaymentErrorCode.PAYMENT_COMPENSATED);
+    }
+
+    private void executeCompensation(CompensationRequest request) {
+        CancellationResult result;
+        try {
+            result = tossPaymentClient.cancel(
+                    request.paymentKey(),
+                    request.reason(),
+                    request.idempotencyKey()
+            );
+        } catch (BusinessException cancelFailure) {
+            result = findCanceledResult(request.paymentKey())
+                    .orElseThrow(() -> new BusinessException(
+                            PaymentErrorCode.PAYMENT_RECOVERY_PENDING
+                    ));
+        }
+
+        try {
+            paymentRecoveryService.completeCompensation(request, result);
+        } catch (RuntimeException completionFailure) {
+            throw new BusinessException(PaymentErrorCode.PAYMENT_RECOVERY_PENDING);
+        }
+    }
+
+    private BusinessException reconcileCanceledPayment(
+            Payment payment,
+            PaymentLookupResult lookup
+    ) {
+        CancellationResult result = Optional.ofNullable(lookup.cancellation())
+                .filter(this::isCompletedCancellation)
+                .orElseThrow(() -> new BusinessException(
+                        PaymentErrorCode.PAYMENT_RECOVERY_PENDING
+                ));
+        CompensationRequest request = paymentRecoveryService.createRequest(
+                payment,
+                lookup.paymentKey()
+        );
+        try {
+            paymentRecoveryService.prepareCompensation(request);
+            paymentRecoveryService.completeCompensation(request, result);
+        } catch (RuntimeException recoveryFailure) {
+            throw new BusinessException(PaymentErrorCode.PAYMENT_RECOVERY_PENDING);
+        }
+        return new BusinessException(PaymentErrorCode.PAYMENT_COMPENSATED);
+    }
+
+    private Optional<CancellationResult> findCanceledResult(String paymentKey) {
+        return tossPaymentClient.find(paymentKey)
+                .filter(lookup -> TOSS_CANCELED.equals(lookup.status()))
+                .map(PaymentLookupResult::cancellation)
+                .filter(this::isCompletedCancellation);
+    }
+
+    private boolean isCompletedCancellation(CancellationResult result) {
+        return result != null
+                && TOSS_CANCELED.equals(result.status())
+                && result.transactionKey() != null
+                && !result.transactionKey().isBlank()
+                && result.canceledAt() != null;
+    }
+
+    private void validateCompletedRequest(
+            OrderDetailView order,
+            Payment payment,
+            PaymentConfirmForm form
+    ) {
+        if (form == null
+                || payment.getPaymentKey() == null
+                || !payment.getPaymentKey().equals(form.getPaymentKey())) {
+            throw new BusinessException(PaymentErrorCode.TOSS_APPROVAL_FAILED);
+        }
+        if (!payment.getTossOrderId().equals(form.getTossOrderId())
+                || !order.orderNumber().equals(form.getTossOrderId())) {
+            throw new BusinessException(PaymentErrorCode.TOSS_ORDER_ID_MISMATCH);
+        }
+        if (!sameAmount(order.finalAmount(), form.getAmount())
+                || !sameAmount(payment.getAmount(), form.getAmount())) {
+            throw new BusinessException(PaymentErrorCode.AMOUNT_MISMATCH);
+        }
+    }
+
+    private void validateCompletedProviderState(
+            Payment payment,
+            PaymentConfirmForm form
+    ) {
+        PaymentLookupResult lookup = tossPaymentClient.find(form.getPaymentKey())
+                .orElseThrow(() -> new BusinessException(
+                        PaymentErrorCode.PAYMENT_STATUS_LOOKUP_FAILED
+                ));
+        Optional<ApprovalResult> approval = resolveLookup(payment, form, lookup);
+        if (approval.isEmpty()) {
+            throw new BusinessException(PaymentErrorCode.PAYMENT_STATUS_LOOKUP_FAILED);
+        }
+        validateApproval(payment, form, approval.get());
     }
 
     private void validatePaymentExpiration(

@@ -1392,6 +1392,50 @@ body > main {
     transform: translateY(0)
 }
 
+.order-history-card {
+    display: block;
+    min-width: 0;
+    overflow: hidden
+}
+
+.order-history-card__header {
+    align-items: center;
+    display: flex;
+    gap: var(--space-2);
+    justify-content: space-between;
+    min-width: 0
+}
+
+.order-history-card__header .badge {
+    flex: 0 0 auto
+}
+
+.order-history-card__number {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap
+}
+
+.order-history-card__product {
+    display: block;
+    margin-top: var(--space-2);
+    overflow-wrap: anywhere
+}
+
+.order-history-card__date {
+    margin-top: var(--space-1)
+}
+
+.order-history-detail {
+    grid-column: span 2;
+    min-width: 0
+}
+
+.order-history-detail__title {
+    overflow-wrap: anywhere
+}
+
 
 /* ---------- responsive.css ---------- */
 @media (max-width: 1199px) {
@@ -1457,6 +1501,10 @@ body > main {
 
     .order-summary {
         position: static
+    }
+
+    .order-history-detail {
+        grid-column: auto
     }
 
     .cart-toolbar {
@@ -1676,6 +1724,125 @@ body > main {
     max-width: 720px
 }
 
+/* 관리자 결제 내역: 조회 화면과 향후 취소·환불 관리 화면을 분리할 수 있는 목록 레이아웃 */
+.payment-admin-header {
+    align-items: flex-end
+}
+
+.payment-admin-eyebrow {
+    color: var(--color-muted);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    margin-bottom: 4px
+}
+
+.payment-metrics {
+    margin-bottom: var(--space-4)
+}
+
+.payment-metrics .metric-card {
+    background: #fff;
+    border-top: 3px solid var(--color-dark)
+}
+
+.payment-metrics .payment-metric--done {
+    border-top-color: #15803d
+}
+
+.payment-metrics .payment-metric--canceled {
+    border-top-color: #2563eb
+}
+
+.payment-metrics .payment-metric--attention {
+    border-top-color: #dc2626
+}
+
+.payment-history-panel {
+    background: #fff;
+    border: 1px solid var(--color-border)
+}
+
+.payment-history-toolbar {
+    align-items: flex-end;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    justify-content: space-between;
+    padding: var(--space-4)
+}
+
+.payment-history-toolbar .section-title {
+    margin-bottom: 2px
+}
+
+.payment-history-table {
+    border-left: 0;
+    border-right: 0;
+    border-bottom: 0
+}
+
+.payment-history-table td {
+    vertical-align: middle
+}
+
+.payment-reference {
+    color: var(--color-muted);
+    display: block;
+    font-size: 11px;
+    margin-top: 3px;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap
+}
+
+.payment-amount {
+    font-weight: 700;
+    white-space: nowrap
+}
+
+.payment-history-empty {
+    padding: 44px 20px !important;
+    text-align: center
+}
+
+.payment-history-empty strong,
+.payment-history-empty span {
+    display: block
+}
+
+.payment-history-empty span {
+    color: var(--color-muted);
+    font-size: var(--font-xs);
+    margin-top: 4px
+}
+
+@media (max-width: 900px) {
+    .payment-metrics.grid--4 {
+        grid-template-columns: repeat(2, minmax(0, 1fr))
+    }
+
+    .payment-history-toolbar {
+        align-items: stretch;
+        flex-direction: column
+    }
+
+    .payment-history-toolbar .filter-form {
+        width: 100%
+    }
+
+    .payment-history-toolbar .form-control {
+        flex: 1
+    }
+}
+
+@media (max-width: 560px) {
+    .payment-metrics.grid--4 {
+        grid-template-columns: 1fr
+    }
+}
+
 /* 매장 폼: 영업/픽업 시간 입력 */
 .time-range {
     align-items: center;
@@ -1815,4 +1982,127 @@ body > main {
 
 .customer-footer__copyright {
     margin-top: var(--space-2)
+}
+
+/* 통합 주문서의 서버 제공 픽업 시간 선택 */
+.pickup-choice {
+    border: 0;
+    margin: 0;
+    min-width: 0;
+    padding: 0
+}
+
+[data-pickup-date] {
+    max-width: 320px
+}
+
+.pickup-choice__times {
+    margin-top: var(--space-2)
+}
+
+.pickup-choice__label {
+    width: 100%
+}
+
+.pickup-choice__input:checked + .pickup-choice__label {
+    background: var(--color-dark);
+    border-color: var(--color-dark);
+    color: #fff
+}
+
+.pickup-choice__input:focus-visible + .pickup-choice__label {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px
+}
+
+/* 관리자 제작·픽업 주문별 접이식 목록 */
+.fulfillment-list {
+    display: grid;
+    gap: var(--space-3)
+}
+
+.fulfillment-order {
+    background: var(--color-background);
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-sm)
+}
+
+.fulfillment-order__summary {
+    align-items: center;
+    cursor: pointer;
+    display: grid;
+    gap: var(--space-4);
+    grid-template-columns: minmax(0, 1fr) auto 24px;
+    list-style: none;
+    padding: var(--space-4)
+}
+
+.fulfillment-order__summary::-webkit-details-marker {
+    display: none
+}
+
+.fulfillment-order__summary::after {
+    content: "+";
+    font-size: var(--font-lg);
+    text-align: center
+}
+
+.fulfillment-order[open] > .fulfillment-order__summary::after {
+    content: "−"
+}
+
+.fulfillment-order__summary:focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px
+}
+
+.fulfillment-order__identity {
+    display: flex;
+    flex-direction: column;
+    min-width: 0
+}
+
+.fulfillment-order__meta, .fulfillment-order__actions {
+    align-items: center;
+    display: flex;
+    gap: var(--space-3)
+}
+
+.fulfillment-order__body {
+    border-top: 1px solid var(--color-border-light);
+    display: grid;
+    gap: var(--space-4);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: var(--space-4)
+}
+
+.fulfillment-order__item + .fulfillment-order__item {
+    margin-top: var(--space-2)
+}
+
+.fulfillment-order__actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end
+}
+
+@media (max-width: 720px) {
+    .fulfillment-order__summary {
+        align-items: start;
+        grid-template-columns: minmax(0, 1fr) 24px
+    }
+
+    .fulfillment-order__meta {
+        flex-wrap: wrap;
+        grid-column: 1 / -1;
+        grid-row: 2
+    }
+
+    .fulfillment-order__summary::after {
+        grid-column: 2;
+        grid-row: 1
+    }
+
+    .fulfillment-order__body {
+        grid-template-columns: 1fr
+    }
 }

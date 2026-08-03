@@ -29,6 +29,7 @@ import java.util.UUID;
 public class RefundService {
 
     private static final String CUSTOMER = "CUSTOMER";
+    private static final String ADMIN = "ADMIN";
 
     private final OrderMapper orderMapper;
     private final PaymentMapper paymentMapper;
@@ -38,13 +39,29 @@ public class RefundService {
     /** 회원 소유권과 현재 상태를 검증하고 PG 호출 전에 취소 요청을 저장한다. */
     @Transactional
     public RefundRequest prepareCustomerCancellation(long memberId, long orderId, String reason) {
-        if (memberId <= 0 || reason == null || reason.isBlank() || reason.length() > 500) {
-            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
-        }
+        validateCancellationInput(memberId, reason);
         Order order = findOwnedOrder(memberId, orderId);
+        return prepareCancellation(memberId, order, reason, CUSTOMER);
+    }
+
+    /** 인증된 관리자 식별자와 현재 상태를 검증하고 일반 상품 취소 요청을 저장한다. */
+    @Transactional
+    public RefundRequest prepareAdminCancellation(long adminMemberId, long orderId, String reason) {
+        validateCancellationInput(adminMemberId, reason);
+        Order order = orderMapper.findOrderByIdForUpdate(orderId)
+                .orElseThrow(() -> new BusinessException(CommonErrorCode.NOT_FOUND));
+        return prepareCancellation(adminMemberId, order, reason, ADMIN);
+    }
+
+    private RefundRequest prepareCancellation(
+            long requestedBy,
+            Order order,
+            String reason,
+            String canceledBy
+    ) {
         LocalDateTime now = LocalDateTime.now(clock);
-        OrderStatus expectedStatus = requireCancelableStatus(order, now);
-        Payment payment = paymentMapper.findDonePaymentByOrderId(orderId)
+        OrderStatus expectedStatus = requireGeneralCancelableStatus(order, now);
+        Payment payment = paymentMapper.findDonePaymentByOrderId(order.getId())
                 .orElseThrow(() -> new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_NOT_AVAILABLE));
         if (payment.getPaymentKey() == null || payment.getPaymentKey().isBlank()) {
             throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_NOT_AVAILABLE);
@@ -55,26 +72,27 @@ public class RefundService {
         cancellation.setIdempotencyKey("CANCEL-" + UUID.randomUUID());
         cancellation.setCancelAmount(payment.getAmount());
         cancellation.setCancelReason(reason.trim());
-        cancellation.setRequestType(CUSTOMER);
-        cancellation.setRequestedBy(memberId);
+        cancellation.setRequestType(canceledBy);
+        cancellation.setRequestedBy(requestedBy);
         if (paymentMapper.insertPaymentCancellation(cancellation) != 1) {
             throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_NOT_AVAILABLE);
         }
 
         return new RefundRequest(
                 cancellation.getId(),
-                orderId,
+                order.getId(),
                 expectedStatus,
                 payment.getPaymentKey(),
                 cancellation.getIdempotencyKey(),
                 cancellation.getCancelReason(),
+                canceledBy,
                 now
         );
     }
 
     /** PG 취소 성공 뒤 결제·주문 상태와 실제 차감 재고 복구를 한 트랜잭션으로 완료한다. */
     @Transactional
-    public void completeCustomerCancellation(RefundRequest request, CancellationResult result) {
+    public void completeCancellation(RefundRequest request, CancellationResult result) {
         if (request == null || result == null || !"CANCELED".equals(result.status())) {
             throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_COMPLETE_FAILED);
         }
@@ -93,12 +111,15 @@ public class RefundService {
         Order order = orderMapper.findOrderById(request.orderId())
                 .orElseThrow(() -> new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_COMPLETE_FAILED));
         LocalDateTime canceledAt = result.canceledAt();
-        OrderStatus currentExpectedStatus = requireCancelableStatus(order, request.requestedAt());
+        OrderStatus currentExpectedStatus = requireGeneralCancelableStatus(
+                order,
+                request.requestedAt()
+        );
         if (currentExpectedStatus != request.expectedStatus()) {
             throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_COMPLETE_FAILED);
         }
 
-        requireOneRow(paymentMapper.completeCancellationIfRequested(
+        requirePositive(paymentMapper.completeCancellationIfRequested(
                 cancellation.getId(),
                 result.transactionKey(),
                 canceledAt
@@ -106,7 +127,7 @@ public class RefundService {
         requireOneRow(orderMapper.cancelIfCurrent(
                 order.getId(),
                 currentExpectedStatus,
-                CUSTOMER,
+                request.canceledBy(),
                 cancellation.getCancelReason(),
                 request.requestedAt()
         ));
@@ -131,10 +152,7 @@ public class RefundService {
         return order;
     }
 
-    private OrderStatus requireCancelableStatus(Order order, LocalDateTime canceledAt) {
-        if (order.getOrderType() == OrderType.CUSTOM && order.getStatus() == OrderStatus.UNDER_REVIEW) {
-            return OrderStatus.UNDER_REVIEW;
-        }
+    private OrderStatus requireGeneralCancelableStatus(Order order, LocalDateTime canceledAt) {
         if (order.getOrderType() == OrderType.GENERAL
                 && order.getStatus() == OrderStatus.READY_FOR_PICKUP
                 && order.getPickupAt() != null
@@ -143,6 +161,12 @@ public class RefundService {
             return OrderStatus.READY_FOR_PICKUP;
         }
         throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_NOT_AVAILABLE);
+    }
+
+    private void validateCancellationInput(long requestedBy, String reason) {
+        if (requestedBy <= 0 || reason == null || reason.isBlank() || reason.length() > 500) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
     }
 
     private void restoreDeductedStock(Order order, LocalDateTime restoredAt) {
@@ -165,6 +189,12 @@ public class RefundService {
         }
     }
 
+    private void requirePositive(int affectedRows) {
+        if (affectedRows <= 0) {
+            throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_COMPLETE_FAILED);
+        }
+    }
+
     public record RefundRequest(
             long cancellationId,
             long orderId,
@@ -172,6 +202,7 @@ public class RefundService {
             String paymentKey,
             String idempotencyKey,
             String reason,
+            String canceledBy,
             LocalDateTime requestedAt
     ) {
     }

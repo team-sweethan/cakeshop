@@ -1,5 +1,6 @@
 package com.cakeshop.domain.order.service;
 
+import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.order.dto.form.GeneralOrderForm;
 import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.order.entity.OrderItem;
@@ -39,6 +40,7 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
@@ -75,6 +77,9 @@ class OrderServiceIntegrationTests {
     @MockitoBean
     private Clock clock;
 
+    @MockitoBean
+    private MemberService memberService;
+
     private String suffix;
     private long memberId;
     private long productId;
@@ -97,6 +102,7 @@ class OrderServiceIntegrationTests {
     void setUp() {
         suffix = Long.toString(System.nanoTime());
         memberId = insertMember();
+        when(memberService.isActiveMember(memberId)).thenReturn(true);
         productId = insertProduct();
         productOptionId = insertProductOption();
         stubProductLookup();
@@ -148,6 +154,24 @@ class OrderServiceIntegrationTests {
         assertThat(payment.getIdempotencyKey()).startsWith("PAY-");
     }
 
+    @Test
+    void createGeneralOrder_sameRequestKey_returnsSameOrderWithoutDuplicates() {
+        GeneralOrderForm form = createForm();
+
+        long firstOrderId = orderService.createGeneralOrder(memberId, form);
+        long secondOrderId = orderService.createGeneralOrder(memberId, form);
+
+        assertThat(secondOrderId).isEqualTo(firstOrderId);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM orders WHERE member_id = ? AND request_key = ?",
+                Long.class,
+                memberId,
+                form.getRequestKey()
+        )).isEqualTo(1L);
+        assertThat(orderMapper.findOrderItemsByOrderId(firstOrderId)).hasSize(1);
+        assertThat(paymentMapper.findPaymentsByOrderId(firstOrderId)).hasSize(1);
+    }
+
     private void stubProductLookup() {
         ProductSalesInfo product = new ProductSalesInfo(
                 productId,
@@ -175,6 +199,7 @@ class OrderServiceIntegrationTests {
 
     private GeneralOrderForm createForm() {
         GeneralOrderForm form = new GeneralOrderForm();
+        form.setRequestKey(UUID.randomUUID().toString());
         form.setOrdererName("주문자");
         form.setOrdererPhone("010-1111-2222");
         form.setPickupName("수령자");

@@ -59,6 +59,12 @@ public class MemberService {
         return memberMapper.findByEmail(email).isPresent();
     }
 
+    /** 로그인 뒤 상태가 바뀐 세션도 차단할 수 있도록 현재 회원 상태를 DB에서 확인한다. */
+    @Transactional(readOnly = true)
+    public boolean isActiveMember(long memberId) {
+        return memberId > 0 && memberMapper.existsActiveMember(memberId);
+    }
+
     @Transactional(readOnly = true)
     public EmailRecoveryResult findEmails(String name, LocalDate birthDate, String phone) {
         String normalizedName = name.trim();

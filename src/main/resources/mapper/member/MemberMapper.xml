@@ -118,6 +118,15 @@
          WHERE email = #{email}
     </select>
 
+    <select id="existsActiveMember" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+              FROM members
+             WHERE id = #{memberId}
+               AND status = 'ACTIVE'
+        )
+    </select>
+
     <select id="findEmailsByMemberInfo" resultType="string">
         SELECT email
           FROM members

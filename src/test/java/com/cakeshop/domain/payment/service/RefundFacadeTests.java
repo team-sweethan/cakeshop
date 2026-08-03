@@ -40,7 +40,7 @@ class RefundFacadeTests {
 
         refundFacade.cancelCustomerOrder(3L, 10L, "단순 변심");
 
-        verify(refundService).completeCustomerCancellation(request, result);
+        verify(refundService).completeCancellation(request, result);
     }
 
     @Test
@@ -56,14 +56,34 @@ class RefundFacadeTests {
         verify(refundService).failRequestedCancellation(30L);
     }
 
+    @Test
+    void cancelAdminOrder_tossSuccess_completesWithAdminRequest() {
+        RefundRequest request = request("ADMIN", "매장 사정");
+        CancellationResult result = new CancellationResult(
+                "CANCELED", "transaction-key", request.requestedAt().plusSeconds(1));
+        when(refundService.prepareAdminCancellation(7L, 10L, "매장 사정"))
+                .thenReturn(request);
+        when(tossPaymentClient.cancel("payment-key", "매장 사정", "idempotency-key"))
+                .thenReturn(result);
+
+        refundFacade.cancelAdminOrder(7L, 10L, "매장 사정");
+
+        verify(refundService).completeCancellation(request, result);
+    }
+
     private RefundRequest request() {
+        return request("CUSTOMER", "단순 변심");
+    }
+
+    private RefundRequest request(String canceledBy, String reason) {
         return new RefundRequest(
                 30L,
                 10L,
                 OrderStatus.READY_FOR_PICKUP,
                 "payment-key",
                 "idempotency-key",
-                "단순 변심",
+                reason,
+                canceledBy,
                 LocalDateTime.of(2026, 8, 2, 15, 0)
         );
     }

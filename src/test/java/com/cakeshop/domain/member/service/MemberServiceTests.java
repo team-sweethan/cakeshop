@@ -43,6 +43,17 @@ class MemberServiceTests {
     private MemberService memberService;
 
     @Test
+    void isActiveMember_checksCurrentDatabaseStatus() {
+        when(memberMapper.existsActiveMember(10L)).thenReturn(true);
+
+        assertThat(memberService.isActiveMember(10L)).isTrue();
+        assertThat(memberService.isActiveMember(0L)).isFalse();
+
+        verify(memberMapper).existsActiveMember(10L);
+        verify(memberMapper, never()).existsActiveMember(0L);
+    }
+
+    @Test
     void join_duplicateEmail_throwsMemberBusinessException() {
         SignupForm form = new SignupForm();
         form.setEmail("member@cakeshop.local");

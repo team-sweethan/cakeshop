@@ -91,7 +91,52 @@ class RefundServiceTests {
         assertThat(result.expectedStatus()).isEqualTo(OrderStatus.READY_FOR_PICKUP);
         assertThat(result.paymentKey()).isEqualTo("payment-key");
         assertThat(result.reason()).isEqualTo("단순 변심");
+        assertThat(result.canceledBy()).isEqualTo("CUSTOMER");
         assertThat(result.requestedAt()).isEqualTo(NOW);
+    }
+
+    @Test
+    void prepareCustomerCancellation_customOrder_isNotSupportedInGeneralMvp() {
+        Order order = order(3L);
+        order.setOrderType(OrderType.CUSTOM);
+        order.setStatus(OrderStatus.UNDER_REVIEW);
+        when(orderMapper.findOrderByIdForUpdate(10L)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() ->
+                refundService.prepareCustomerCancellation(3L, 10L, "단순 변심")
+        ).isInstanceOfSatisfying(
+                BusinessException.class,
+                error -> assertThat(error.getErrorCode())
+                        .isEqualTo(PaymentErrorCode.PAYMENT_CANCEL_NOT_AVAILABLE)
+        );
+
+        verify(paymentMapper, never()).findDonePaymentByOrderId(10L);
+    }
+
+    @Test
+    void prepareAdminCancellation_generalBeforePickup_recordsAdminRequest() {
+        Order order = order(3L);
+        Payment payment = payment();
+        when(orderMapper.findOrderByIdForUpdate(10L)).thenReturn(Optional.of(order));
+        when(paymentMapper.findDonePaymentByOrderId(10L)).thenReturn(Optional.of(payment));
+        when(paymentMapper.insertPaymentCancellation(any(PaymentCancellation.class)))
+                .thenAnswer(invocation -> {
+                    PaymentCancellation saved = invocation.getArgument(0);
+                    assertThat(saved.getRequestType()).isEqualTo("ADMIN");
+                    assertThat(saved.getRequestedBy()).isEqualTo(7L);
+                    saved.setId(31L);
+                    return 1;
+                });
+
+        RefundRequest result = refundService.prepareAdminCancellation(
+                7L,
+                10L,
+                " 매장 사정 "
+        );
+
+        assertThat(result.cancellationId()).isEqualTo(31L);
+        assertThat(result.reason()).isEqualTo("매장 사정");
+        assertThat(result.canceledBy()).isEqualTo("ADMIN");
     }
 
     @Test
@@ -111,7 +156,7 @@ class RefundServiceTests {
     }
 
     @Test
-    void completeCustomerCancellation_deductedStock_restoresExactlyOnceAndCompletesStates() {
+    void completeCancellation_customer_restoresStockAndCompletesStates() {
         RefundRequest request = request();
         CancellationResult result = new CancellationResult("CANCELED", "transaction-key", NOW.plusSeconds(2));
         PaymentCancellation cancellation = cancellation();
@@ -128,25 +173,62 @@ class RefundServiceTests {
         when(orderMapper.findStockDeductedItemsForRestore(10L)).thenReturn(List.of(item));
         when(orderMapper.markStockRestoredIfDeducted(100L, NOW.plusSeconds(2))).thenReturn(1);
 
-        refundService.completeCustomerCancellation(request, result);
+        refundService.completeCancellation(request, result);
 
         verify(productStockService).restoreStock(1L, 2);
         verify(orderMapper).markStockRestoredIfDeducted(100L, NOW.plusSeconds(2));
     }
 
     @Test
-    void completeCustomerCancellation_alreadyCompleted_doesNotRestoreStockAgain() {
+    void completeCancellation_alreadyCompleted_doesNotRestoreStockAgain() {
         PaymentCancellation cancellation = cancellation();
         cancellation.setStatus(PaymentCancellationStatus.DONE);
         when(paymentMapper.findPaymentCancellationById(30L)).thenReturn(Optional.of(cancellation));
 
-        assertThatThrownBy(() -> refundService.completeCustomerCancellation(
+        assertThatThrownBy(() -> refundService.completeCancellation(
                 request(),
                 new CancellationResult("CANCELED", "transaction-key", NOW.plusSeconds(2))
         )).isInstanceOf(BusinessException.class);
 
         verify(productStockService, never()).restoreStock(1L, 2);
         verify(orderMapper, never()).findStockDeductedItemsForRestore(10L);
+    }
+
+    @Test
+    void completeCancellation_admin_recordsAdminActor() {
+        RefundRequest request = request("ADMIN");
+        CancellationResult result = new CancellationResult(
+                "CANCELED",
+                "transaction-key",
+                NOW.plusSeconds(2)
+        );
+        when(paymentMapper.findPaymentCancellationById(30L))
+                .thenReturn(Optional.of(cancellation()));
+        when(paymentMapper.findPaymentById(20L)).thenReturn(Optional.of(payment()));
+        when(orderMapper.findOrderById(10L)).thenReturn(Optional.of(order(3L)));
+        when(paymentMapper.completeCancellationIfRequested(
+                30L,
+                "transaction-key",
+                NOW.plusSeconds(2)
+        )).thenReturn(1);
+        when(orderMapper.cancelIfCurrent(
+                10L,
+                OrderStatus.READY_FOR_PICKUP,
+                "ADMIN",
+                "단순 변심",
+                NOW
+        )).thenReturn(1);
+        when(orderMapper.findStockDeductedItemsForRestore(10L)).thenReturn(List.of());
+
+        refundService.completeCancellation(request, result);
+
+        verify(orderMapper).cancelIfCurrent(
+                10L,
+                OrderStatus.READY_FOR_PICKUP,
+                "ADMIN",
+                "단순 변심",
+                NOW
+        );
     }
 
     private Order order(long memberId) {
@@ -189,6 +271,10 @@ class RefundServiceTests {
     }
 
     private RefundRequest request() {
+        return request("CUSTOMER");
+    }
+
+    private RefundRequest request(String canceledBy) {
         return new RefundRequest(
                 30L,
                 10L,
@@ -196,6 +282,7 @@ class RefundServiceTests {
                 "payment-key",
                 "idempotency-key",
                 "단순 변심",
+                canceledBy,
                 NOW
         );
     }

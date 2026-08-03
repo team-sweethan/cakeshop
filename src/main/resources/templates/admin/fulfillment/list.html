@@ -1,4 +1,102 @@
-<!doctype html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>제작·픽업 관리 | 관리자</title><link rel="stylesheet" th:href="@{/css/app.css}"></head><body>
-<div class="admin-layout"><aside th:replace="~{fragments/admin/sidebar :: sidebar('fulfillment')}"></aside><div class="admin-main"><header th:replace="~{fragments/admin/header :: header('제작·픽업 관리')}"></header><main class="admin-content">
-<div th:replace="~{fragments/admin/mock-notice :: notice}"></div><h1 class="admin-page-title">제작·픽업 관리</h1><div class="admin-toolbar"><input class="form-control" aria-label="날짜 선택" type="date" value="2025-01-20"><div class="cluster" data-select-group><button class="btn is-active" data-select type="button">전체</button><button class="btn" data-select type="button">제작 대기</button><button class="btn" data-select type="button">제작 중</button><button class="btn" data-select type="button">픽업 준비</button><button class="btn" data-select type="button">픽업 완료</button></div></div>
-<div class="stack"><section class="panel"><h2 class="section-title">픽업 시간: 10:00 ~ 11:00</h2><div class="table-wrap"><table class="data-table"><thead><tr><th>주문번호</th><th>상품명</th><th>제작 옵션</th><th>현재 상태</th><th>상태 변경</th></tr></thead><tbody><tr><td>ORD-004</td><td>딸기 케이크</td><td>기본</td><td><span class="badge badge--success" data-status-badge>픽업 준비</span></td><td><div class="cluster"><button class="btn" type="button" data-set-status="제작 시작">제작 시작</button><button class="btn" type="button" data-set-status="픽업 준비">픽업 준비</button><button class="btn btn--primary" type="button" data-set-status="픽업 완료">픽업 완료</button></div></td></tr></tbody></table></div></section><section class="panel"><h2 class="section-title">픽업 시간: 14:00 ~ 15:00</h2><div class="table-wrap"><table class="data-table"><thead><tr><th>주문번호</th><th>상품명</th><th>제작 옵션</th><th>현재 상태</th><th>상태 변경</th></tr></thead><tbody><tr><td>ORD-001</td><td>레터링 케이크</td><td>2호 | 초코 | 핑크 | Happy Birthday!</td><td><span class="badge badge--info" data-status-badge>제작 중</span></td><td><div class="cluster"><button class="btn" type="button" data-set-status="제작 시작">제작 시작</button><button class="btn" type="button" data-set-status="픽업 준비">픽업 준비</button><button class="btn btn--primary" type="button" data-set-status="픽업 완료">픽업 완료</button></div></td></tr><tr><td>ORD-006</td><td>생일 케이크</td><td>3호 | 바닐라 | 화이트</td><td><span class="badge badge--warning" data-status-badge>제작 대기</span></td><td><div class="cluster"><button class="btn" type="button" data-set-status="제작 시작">제작 시작</button><button class="btn" type="button" data-set-status="픽업 준비">픽업 준비</button><button class="btn btn--primary" type="button" data-set-status="픽업 완료">픽업 완료</button></div></td></tr></tbody></table></div></section><section class="panel"><h2 class="section-title">픽업 시간: 16:00 ~ 17:00</h2><div class="table-wrap"><table class="data-table"><thead><tr><th>주문번호</th><th>상품명</th><th>제작 옵션</th><th>현재 상태</th><th>상태 변경</th></tr></thead><tbody><tr><td>ORD-005</td><td>마카롱 케이크</td><td>기본</td><td><span class="badge badge--success" data-status-badge>픽업 준비</span></td><td><div class="cluster"><button class="btn" type="button" data-set-status="제작 시작">제작 시작</button><button class="btn" type="button" data-set-status="픽업 준비">픽업 준비</button><button class="btn btn--primary" type="button" data-set-status="픽업 완료">픽업 완료</button></div></td></tr></tbody></table></div></section></div></main></div></div></body></html>
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>제작·픽업 관리 | 관리자</title>
+  <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<div class="admin-layout">
+  <aside th:replace="~{fragments/admin/sidebar :: sidebar('fulfillment')}"></aside>
+  <div class="admin-main">
+    <header th:replace="~{fragments/admin/header :: header('제작·픽업 관리')}"></header>
+    <main class="admin-content">
+      <div th:replace="~{fragments/common/alert :: alert}"></div>
+      <h1 class="admin-page-title">제작·픽업 관리</h1>
+
+      <form class="admin-toolbar" method="get" th:action="@{/admin/fulfillment}">
+        <input class="form-control" id="pickupDate" name="pickupDate" type="date"
+               aria-label="픽업 날짜"
+               th:value="${fulfillment.pickupDate}">
+        <select class="form-control" id="status" name="status" aria-label="주문 상태">
+          <option value="" th:selected="${fulfillment.selectedStatus == null}">전체 상태</option>
+          <option value="UNDER_REVIEW"
+                  th:selected="${fulfillment.selectedStatus != null
+                      and fulfillment.selectedStatus.name() == 'UNDER_REVIEW'}">승인 대기</option>
+          <option value="READY_FOR_PICKUP"
+                  th:selected="${fulfillment.selectedStatus != null
+                      and fulfillment.selectedStatus.name() == 'READY_FOR_PICKUP'}">픽업 준비</option>
+          <option value="PICKED_UP"
+                  th:selected="${fulfillment.selectedStatus != null
+                      and fulfillment.selectedStatus.name() == 'PICKED_UP'}">픽업 완료</option>
+        </select>
+        <button class="btn btn--primary" type="submit">조회</button>
+      </form>
+
+      <div class="panel empty-state"
+           th:if="${#lists.isEmpty(fulfillment.orders)}">
+        선택한 날짜에 제작·픽업 주문이 없습니다.
+      </div>
+
+      <div class="fulfillment-list"
+           th:unless="${#lists.isEmpty(fulfillment.orders)}">
+        <details class="fulfillment-order"
+                 th:each="order : ${fulfillment.orders}"
+                 th:id="|fulfillment-order-${order.orderId}|"
+                 th:attr="data-order-id=${order.orderId}">
+          <summary class="fulfillment-order__summary">
+            <span class="fulfillment-order__identity">
+              <strong th:text="${order.pickupName}">픽업자 이름</strong>
+              <span class="text-muted"
+                    th:text="|${order.orderNumber} · 주문 ID #${order.orderId}|">
+                ORD-001 · 주문 ID #1
+              </span>
+            </span>
+            <span class="fulfillment-order__meta">
+              <strong th:text="${#temporals.format(order.pickupAt, 'HH:mm')}">14:00</strong>
+              <span th:text="${order.orderTypeLabel}">일반 상품</span>
+              <span class="badge" th:classappend="${order.statusClass}"
+                    th:text="${order.statusLabel}">픽업 준비</span>
+            </span>
+          </summary>
+
+          <div class="fulfillment-order__body">
+            <div class="fulfillment-order__section">
+              <h2 class="section-title">픽업자 연락처</h2>
+              <strong th:text="${order.pickupName}">픽업자</strong>
+              <p class="text-muted" th:text="${order.pickupPhone}">010-0000-0000</p>
+            </div>
+
+            <div class="fulfillment-order__section">
+              <h2 class="section-title">상품·옵션</h2>
+              <div class="fulfillment-order__item" th:each="item : ${order.items}">
+                <strong th:text="${item.productName + ' × ' + item.quantity}">상품명 × 1</strong>
+                <p class="text-muted" th:text="${item.optionSummary}">기본</p>
+              </div>
+              <span th:if="${#lists.isEmpty(order.items)}">주문 상품 없음</span>
+            </div>
+
+            <div class="fulfillment-order__actions">
+              <a class="btn"
+                 th:href="@{/admin/orders/{id}(id=${order.orderId})}">주문 상세</a>
+              <form th:if="${order.readyForPickup}" method="post"
+                    th:action="@{/admin/fulfillment/{id}/pickup(id=${order.orderId})}">
+                <input type="hidden" name="pickupDate" th:value="${fulfillment.pickupDate}">
+                <input type="hidden" name="status"
+                       th:if="${fulfillment.selectedStatus != null}"
+                       th:value="${fulfillment.selectedStatus}">
+                <button class="btn btn--primary" type="submit"
+                        data-confirm="픽업 완료 처리 후에는 되돌릴 수 없습니다. 처리하시겠습니까?">
+                  픽업 완료 처리
+                </button>
+              </form>
+            </div>
+          </div>
+        </details>
+      </div>
+    </main>
+  </div>
+</div>
+</body>
+</html>

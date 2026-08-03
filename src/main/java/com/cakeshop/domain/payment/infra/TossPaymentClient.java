@@ -2,18 +2,24 @@ package com.cakeshop.domain.payment.infra;
 
 import com.cakeshop.domain.payment.error.PaymentErrorCode;
 import com.cakeshop.global.error.BusinessException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.Base64;
 import java.util.List;
+import java.util.Optional;
 
 // 토스 승인·취소·조회 API 클라이언트 — 작업별 UUID를 Idempotency-Key로 사용
 @Component
@@ -24,11 +30,26 @@ public class TossPaymentClient {
     private final RestClient restClient;
     private final String authorization;
 
+    @Autowired
     public TossPaymentClient(
             @Value("${app.payment.toss.base-url}") String baseUrl,
-            @Value("${app.payment.toss.secret-key:}") String secretKey
+            @Value("${app.payment.toss.secret-key:}") String secretKey,
+            @Value("${app.payment.toss.connect-timeout:3s}") Duration connectTimeout,
+            @Value("${app.payment.toss.read-timeout:5s}") Duration readTimeout
     ) {
-        this.restClient = RestClient.builder().baseUrl(baseUrl).build();
+        SimpleClientHttpRequestFactory requestFactory =
+                new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(requirePositive(connectTimeout));
+        requestFactory.setReadTimeout(requirePositive(readTimeout));
+        this.restClient = RestClient.builder()
+                .baseUrl(baseUrl)
+                .requestFactory(requestFactory)
+                .build();
+        this.authorization = createAuthorization(secretKey);
+    }
+
+    TossPaymentClient(RestClient restClient, String secretKey) {
+        this.restClient = restClient;
         this.authorization = createAuthorization(secretKey);
     }
 
@@ -125,8 +146,63 @@ public class TossPaymentClient {
         }
     }
 
-    public void find(String paymentKey) {
-        // TODO: 상태 대조용 결제 조회
+    /** paymentKey로 Toss의 현재 결제 상태를 조회한다. */
+    public Optional<PaymentLookupResult> find(String paymentKey) {
+        if (authorization == null || paymentKey == null || paymentKey.isBlank()) {
+            throw new BusinessException(PaymentErrorCode.PAYMENT_STATUS_LOOKUP_FAILED);
+        }
+
+        try {
+            TossPaymentResponse response = restClient.get()
+                    .uri("/v1/payments/{paymentKey}", paymentKey)
+                    .header(HttpHeaders.AUTHORIZATION, authorization)
+                    .retrieve()
+                    .body(TossPaymentResponse.class);
+            if (response == null) {
+                throw new BusinessException(PaymentErrorCode.PAYMENT_STATUS_LOOKUP_FAILED);
+            }
+            return Optional.of(toLookupResult(response));
+        } catch (RestClientResponseException exception) {
+            if (exception.getStatusCode() == HttpStatus.NOT_FOUND) {
+                return Optional.empty();
+            }
+            throw new BusinessException(PaymentErrorCode.PAYMENT_STATUS_LOOKUP_FAILED);
+        } catch (RestClientException exception) {
+            throw new BusinessException(PaymentErrorCode.PAYMENT_STATUS_LOOKUP_FAILED);
+        }
+    }
+
+    private PaymentLookupResult toLookupResult(TossPaymentResponse response) {
+        CancellationResult cancellation = null;
+        if (response.cancels() != null && !response.cancels().isEmpty()) {
+            TossCancellationResponse lastCancellation = response.cancels().getLast();
+            if (lastCancellation.canceledAt() != null) {
+                cancellation = new CancellationResult(
+                        response.status(),
+                        lastCancellation.transactionKey(),
+                        lastCancellation.canceledAt().toLocalDateTime()
+                );
+            }
+        }
+
+        return new PaymentLookupResult(
+                response.paymentKey(),
+                response.orderId(),
+                response.method(),
+                response.status(),
+                response.totalAmount(),
+                response.approvedAt() == null
+                        ? null
+                        : response.approvedAt().toLocalDateTime(),
+                cancellation
+        );
+    }
+
+    private Duration requirePositive(Duration timeout) {
+        if (timeout == null || timeout.isZero() || timeout.isNegative()) {
+            throw new IllegalStateException("Toss payment timeout must be positive.");
+        }
+        return timeout;
     }
 
     private String createAuthorization(String secretKey) {
@@ -182,5 +258,27 @@ public class TossPaymentClient {
             String transactionKey,
             LocalDateTime canceledAt
     ) {
+    }
+
+    public record PaymentLookupResult(
+            String paymentKey,
+            String orderId,
+            String method,
+            String status,
+            long totalAmount,
+            LocalDateTime approvedAt,
+            CancellationResult cancellation
+    ) {
+
+        public ApprovalResult toApprovalResult() {
+            return new ApprovalResult(
+                    paymentKey,
+                    orderId,
+                    method,
+                    status,
+                    totalAmount,
+                    approvedAt
+            );
+        }
     }
 }

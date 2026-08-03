@@ -16,7 +16,24 @@ public class RefundFacade {
     private final TossPaymentClient tossPaymentClient;
 
     public void cancelCustomerOrder(long memberId, long orderId, String reason) {
-        RefundRequest request = refundService.prepareCustomerCancellation(memberId, orderId, reason);
+        RefundRequest request = refundService.prepareCustomerCancellation(
+                memberId,
+                orderId,
+                reason
+        );
+        cancel(request);
+    }
+
+    public void cancelAdminOrder(long adminMemberId, long orderId, String reason) {
+        RefundRequest request = refundService.prepareAdminCancellation(
+                adminMemberId,
+                orderId,
+                reason
+        );
+        cancel(request);
+    }
+
+    private void cancel(RefundRequest request) {
         CancellationResult result;
         try {
             result = tossPaymentClient.cancel(
@@ -29,6 +46,6 @@ public class RefundFacade {
             throw exception;
         }
         // PG 성공 뒤 내부 확정이 실패하면 REQUESTED를 유지해 같은 멱등 키로 재처리할 수 있다.
-        refundService.completeCustomerCancellation(request, result);
+        refundService.completeCancellation(request, result);
     }
 }

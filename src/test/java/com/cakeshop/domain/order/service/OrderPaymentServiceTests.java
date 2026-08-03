@@ -1,5 +1,6 @@
 package com.cakeshop.domain.order.service;
 
+import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.order.entity.OrderItem;
 import com.cakeshop.domain.order.entity.OrderStatus;
@@ -29,6 +30,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -50,16 +52,21 @@ class OrderPaymentServiceTests {
     @Mock
     private PaymentPreparationService paymentPreparationService;
 
+    @Mock
+    private MemberService memberService;
+
     private OrderService orderService;
 
     @BeforeEach
     void setUp() {
+        lenient().when(memberService.isActiveMember(10L)).thenReturn(true);
         orderService = new OrderServiceImpl(
                 storeService,
                 productQueryService,
                 orderOptionValidator,
                 orderMapper,
                 paymentPreparationService,
+                memberService,
                 Clock.fixed(
                         Instant.parse("2026-08-01T01:00:00Z"),
                         ZoneId.of("Asia/Seoul")
@@ -120,6 +127,27 @@ class OrderPaymentServiceTests {
                 1L,
                 approvedAt
         );
+    }
+
+    @Test
+    void lockGeneralOrderForPayment_pendingGeneralOrder_locksOrderRow() {
+        when(orderMapper.findOrderByIdForUpdate(1L))
+                .thenReturn(Optional.of(order(10L)));
+
+        orderService.lockGeneralOrderForPayment(1L);
+
+        verify(orderMapper).findOrderByIdForUpdate(1L);
+    }
+
+    @Test
+    void lockGeneralOrderForPayment_expiredOrder_rejectsCompletion() {
+        Order expired = order(10L);
+        expired.setStatus(OrderStatus.EXPIRED);
+        when(orderMapper.findOrderByIdForUpdate(1L))
+                .thenReturn(Optional.of(expired));
+
+        assertThatThrownBy(() -> orderService.lockGeneralOrderForPayment(1L))
+                .isInstanceOf(BusinessException.class);
     }
 
     private Order order(long memberId) {

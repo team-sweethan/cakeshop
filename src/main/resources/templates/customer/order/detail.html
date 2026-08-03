@@ -16,24 +16,29 @@
         <h2 class="section-title">주문 목록</h2>
         <p class="panel" th:if="${#lists.isEmpty(orders)}">아직 주문 내역이 없습니다.</p>
         <div class="stack" th:unless="${#lists.isEmpty(orders)}">
-          <a class="panel" th:each="summary : ${orders}"
+          <a class="panel order-history-card" th:each="summary : ${orders}"
              th:href="@{/orders/{id}(id=${summary.orderId})}">
-            <span class="cluster cluster--between">
-              <span class="text-muted" th:text="${summary.orderNumber}">ORD-001</span>
+            <span class="order-history-card__header">
+              <span class="text-muted order-history-card__number"
+                    th:text="${summary.orderNumber}"
+                    th:title="${summary.orderNumber}">ORD-001</span>
               <span class="badge" th:text="${summary.statusLabel}">결제 대기</span>
             </span>
-            <strong th:text="${summary.productName}">상품명</strong>
+            <strong class="order-history-card__product"
+                    th:text="${summary.productName}">상품명</strong>
             <span class="text-muted" th:if="${summary.itemCount > 1}"
                   th:text="' 외 ' + ${summary.itemCount - 1} + '건'">외 1건</span>
-            <p class="text-muted" th:text="${#temporals.format(summary.createdAt, 'yyyy.MM.dd HH:mm')}">
+            <p class="text-muted order-history-card__date"
+               th:text="${#temporals.format(summary.createdAt, 'yyyy.MM.dd HH:mm')}">
               2026.08.02 12:00
             </p>
           </a>
         </div>
       </aside>
 
-      <section style="grid-column:span 2" th:if="${order != null}">
-        <h2 class="section-title" th:text="'주문 상세 - ' + ${order.orderNumber}">주문 상세</h2>
+      <section class="order-history-detail" th:if="${order != null}">
+        <h2 class="section-title order-history-detail__title"
+            th:text="'주문 상세 - ' + ${order.orderNumber}">주문 상세</h2>
         <div class="panel">
           <div class="data-row"><span class="data-row__label">주문 상태</span>
             <strong th:text="${order.statusLabel}">결제 대기</strong></div>
@@ -71,10 +76,11 @@
             <textarea class="form-control form-control--textarea" id="cancel-reason" name="reason"
                       maxlength="500" required></textarea>
             <button class="btn btn--danger" type="submit">주문 취소</button>
+            <p class="note">일반 상품은 픽업 예정 시각 전까지 전액 취소할 수 있습니다.</p>
           </form>
         </div>
       </section>
-      <section style="grid-column:span 2" th:if="${order == null}">
+      <section class="order-history-detail" th:if="${order == null}">
         <div class="panel">왼쪽 목록에서 확인할 주문을 선택해 주세요.</div>
       </section>
     </div>

@@ -1,6 +1,7 @@
 package com.cakeshop.domain.order.service;
 
 import com.cakeshop.domain.order.dto.form.GeneralOrderForm;
+import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.order.entity.OrderItem;
 import com.cakeshop.domain.order.entity.OrderItemOption;
@@ -35,7 +36,9 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -74,17 +77,22 @@ class OrderServiceTests {
     @Mock
     private PaymentPreparationService paymentPreparationService;
 
+    @Mock
+    private MemberService memberService;
+
     private OrderService orderService;
 
     @BeforeEach
     void setUp() {
         lenient().when(storeService.getStoreView()).thenReturn(storeView());
+        lenient().when(memberService.isActiveMember(anyLong())).thenReturn(true);
         orderService = new OrderServiceImpl(
                 storeService,
                 productQueryService,
                 orderOptionValidator,
                 orderMapper,
                 paymentPreparationService,
+                memberService,
                 FIXED_CLOCK
         );
     }
@@ -183,6 +191,7 @@ class OrderServiceTests {
 
     @Test
     void createGeneralOrderRejectsInvalidMemberIdBeforeProductLookup() {
+        when(memberService.isActiveMember(0L)).thenReturn(false);
         assertThatThrownBy(() -> orderService.createGeneralOrder(
                 0L,
                 form(1L, 1, List.of())
@@ -195,6 +204,40 @@ class OrderServiceTests {
         verify(productQueryService, never()).getSalesInfo(1L);
         verify(orderMapper, never()).insertOrder(any(Order.class));
         verifyNoInteractions(paymentPreparationService);
+    }
+
+    @Test
+    void createGeneralOrder_sameRequestKey_returnsExistingOrderWithoutDuplicateWrites() {
+        GeneralOrderForm form = form(1L, 1, List.of());
+        Order existingOrder = new Order();
+        existingOrder.setId(77L);
+        when(orderMapper.findOrderByMemberIdAndRequestKey(
+                10L,
+                form.getRequestKey()
+        )).thenReturn(Optional.of(existingOrder));
+
+        assertThat(orderService.createGeneralOrder(10L, form)).isEqualTo(77L);
+
+        verify(productQueryService, never()).getSalesInfo(anyLong());
+        verify(orderMapper, never()).insertOrder(any(Order.class));
+        verifyNoInteractions(paymentPreparationService);
+    }
+
+    @Test
+    void createGeneralOrder_inactiveMember_rejectsBeforeProductLookup() {
+        when(memberService.isActiveMember(10L)).thenReturn(false);
+
+        assertThatThrownBy(() -> orderService.createGeneralOrder(
+                10L,
+                form(1L, 1, List.of())
+        )).isInstanceOfSatisfying(
+                BusinessException.class,
+                error -> assertThat(error.getErrorCode())
+                        .isEqualTo(OrderErrorCode.MEMBER_NOT_AVAILABLE)
+        );
+
+        verify(productQueryService, never()).getSalesInfo(anyLong());
+        verify(orderMapper, never()).insertOrder(any(Order.class));
     }
 
     @Test
@@ -461,6 +504,7 @@ class OrderServiceTests {
             List<Long> optionIds
     ) {
         GeneralOrderForm form = new GeneralOrderForm();
+        form.setRequestKey(UUID.randomUUID().toString());
         form.setOrdererName(" 주문자 ");
         form.setOrdererPhone(" 010-1111-2222 ");
         form.setPickupName(" 수령자 ");

@@ -49,6 +49,19 @@ class MemberMapperTests {
     }
 
     @Test
+    void existsActiveMember_returnsTrueOnlyForCurrentActiveMember() {
+        Long activeId = insertMember(uniqueEmail("active-check"), MemberStatus.ACTIVE);
+        Long withdrawnId = insertMember(
+                uniqueEmail("withdrawn-check"),
+                MemberStatus.WITHDRAWN
+        );
+
+        assertThat(memberMapper.existsActiveMember(activeId)).isTrue();
+        assertThat(memberMapper.existsActiveMember(withdrawnId)).isFalse();
+        assertThat(memberMapper.existsActiveMember(Long.MAX_VALUE)).isFalse();
+    }
+
+    @Test
     void findEmailsByMemberInfo_matchingMembers_returnsOnlyActiveEmails() {
         String firstEmail = uniqueEmail("recovery-first");
         String secondEmail = uniqueEmail("recovery-second");

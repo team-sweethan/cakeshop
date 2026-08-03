@@ -11,8 +11,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
-import com.cakeshop.domain.order.service.FulfillmentService;
 import com.cakeshop.domain.order.service.OrderAdminService;
+import com.cakeshop.domain.payment.service.RefundFacade;
 import com.cakeshop.global.security.MemberDetails;
 import com.cakeshop.global.security.SecurityConfig;
 import java.util.List;
@@ -37,7 +37,7 @@ class OrderAdminControllerSecurityTests {
     private OrderAdminService orderAdminService;
 
     @MockitoBean
-    private FulfillmentService fulfillmentService;
+    private RefundFacade refundFacade;
 
     @Test
     @WithAnonymousUser
@@ -65,14 +65,7 @@ class OrderAdminControllerSecurityTests {
     }
 
     @Test
-    @WithMockUser(roles = "ADMIN")
-    void markPickedUp_missingCsrf_isForbidden() throws Exception {
-        mockMvc.perform(post("/admin/orders/10/pickup"))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    void markPickedUp_adminWithCsrf_recordsAuthenticatedAdmin() throws Exception {
+    void legacyOrderPickupRoute_adminCannotProcessPickup() throws Exception {
         MemberDetails admin = adminDetails();
         UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                 admin,
@@ -83,10 +76,43 @@ class OrderAdminControllerSecurityTests {
         mockMvc.perform(post("/admin/orders/10/pickup")
                         .with(authentication(auth))
                         .with(csrf()))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void cancel_missingCsrf_isForbidden() throws Exception {
+        mockMvc.perform(post("/admin/orders/10/cancel")
+                        .param("reason", "매장 사정"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void cancel_customerIsForbidden() throws Exception {
+        mockMvc.perform(post("/admin/orders/10/cancel")
+                        .with(csrf())
+                        .param("reason", "악의적 요청"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void cancel_adminWithCsrf_recordsAuthenticatedAdmin() throws Exception {
+        MemberDetails admin = adminDetails();
+        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+                admin,
+                null,
+                admin.getAuthorities()
+        );
+
+        mockMvc.perform(post("/admin/orders/10/cancel")
+                        .with(authentication(auth))
+                        .with(csrf())
+                        .param("reason", "매장 사정"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/admin/orders/10"));
 
-        verify(fulfillmentService).markPickedUp(10L, 7L);
+        verify(refundFacade).cancelAdminOrder(7L, 10L, "매장 사정");
     }
 
     private MemberDetails adminDetails() {

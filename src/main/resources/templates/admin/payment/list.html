@@ -1,8 +1,144 @@
-<!doctype html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>결제·환불 관리 | 관리자</title><link rel="stylesheet" th:href="@{/css/app.css}"></head><body>
-<div class="admin-layout"><aside th:replace="~{fragments/admin/sidebar :: sidebar('payments')}"></aside><div class="admin-main"><header th:replace="~{fragments/admin/header :: header('결제·환불 관리')}"></header><main class="admin-content">
-<div th:replace="~{fragments/admin/mock-notice :: notice}"></div><h1 class="admin-page-title">결제·환불 관리</h1><div class="cluster section" data-select-group><button class="btn is-active" data-select type="button">전체</button><button class="btn" data-select type="button">결제 완료</button><button class="btn" data-select type="button">취소 요청</button><button class="btn" data-select type="button">환불 처리 중</button><button class="btn" data-select type="button">환불 완료</button></div>
-<div class="table-wrap section"><table class="data-table"><thead><tr><th>결제번호</th><th>주문번호</th><th>회원</th><th>결제 수단</th><th>금액</th><th>상태</th><th>결제 일시</th><th>관리</th></tr></thead><tbody>
-<tr><td>PAY-001</td><td>ORD-002</td><td>이영희</td><td>카카오페이</td><td>35,000원</td><td><span class="badge badge--success">결제 완료</span></td><td>01.10 14:30</td><td><button class="btn" type="button">상세</button></td></tr>
-<tr><td>PAY-002</td><td>ORD-003</td><td>박민수</td><td>신용카드</td><td>40,000원</td><td><span class="badge badge--warning">취소 요청</span></td><td>01.05 11:00</td><td><button class="btn" type="button">상세</button></td></tr>
-<tr><td>PAY-003</td><td>ORD-001</td><td>홍길동</td><td>네이버페이</td><td>64,000원</td><td><span class="badge badge--warning">결제 대기</span></td><td>01.15 14:30</td><td><button class="btn" type="button">상세</button></td></tr>
-</tbody></table></div><section><h2 class="section-title">취소·환불 요청 처리</h2><div class="panel"><div class="grid grid--2"><div><div class="data-row"><span class="data-row__label">결제번호</span><span>PAY-002</span></div><div class="data-row"><span class="data-row__label">주문번호</span><span>ORD-003</span></div><div class="data-row"><span class="data-row__label">회원</span><span>박민수 (park@example.com)</span></div><div class="data-row"><span class="data-row__label">결제 금액</span><span>40,000원</span></div><div class="data-row"><span class="data-row__label">취소 사유</span><span>개인 사정으로 픽업 불가</span></div></div><div><div class="data-row"><span class="data-row__label">취소 요청일</span><span>2025.01.08 10:00</span></div><div class="data-row"><span class="data-row__label">픽업일</span><span>2025.01.10 15:00</span></div><div class="data-row"><span class="data-row__label">환불 정책</span><span>픽업 2일 전: 50% 환불</span></div><div class="data-row"><span class="data-row__label">환불 예상액</span><strong>20,000원</strong></div></div></div><div class="cluster" style="margin-top:12px"><button class="btn btn--primary" type="button" data-confirm="20,000원을 환불 처리하시겠습니까?">환불 처리</button><button class="btn btn--danger" type="button" data-confirm="취소 요청을 거절하시겠습니까?">취소 거절</button></div></div></section></main></div></div></body></html>
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>결제 내역 | 관리자</title>
+  <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<div class="admin-layout">
+  <aside th:replace="~{fragments/admin/sidebar :: sidebar('payments')}"></aside>
+  <div class="admin-main">
+    <header th:replace="~{fragments/admin/header :: header('결제 내역')}"></header>
+    <main class="admin-content">
+      <div class="admin-content__header payment-admin-header">
+        <div>
+          <p class="payment-admin-eyebrow">PAYMENT HISTORY</p>
+          <h1 class="admin-page-title">결제 내역</h1>
+          <p class="note">
+            실제 결제 승인·취소 결과를 조회합니다. 취소 요청은 자동 처리 결과만 표시됩니다.
+          </p>
+        </div>
+      </div>
+
+      <section class="grid grid--4 payment-metrics" aria-label="결제 상태 요약">
+        <article class="metric-card">
+          <p>전체 결제</p>
+          <strong th:text="|${paymentList.summary.totalCount}건|">0건</strong>
+        </article>
+        <article class="metric-card payment-metric--done">
+          <p>결제 완료</p>
+          <strong th:text="|${paymentList.summary.doneCount}건|">0건</strong>
+        </article>
+        <article class="metric-card payment-metric--canceled">
+          <p>취소 완료</p>
+          <strong th:text="|${paymentList.summary.canceledCount}건|">0건</strong>
+        </article>
+        <article class="metric-card payment-metric--attention">
+          <p>확인 필요</p>
+          <strong th:text="|${paymentList.summary.attentionCount}건|">0건</strong>
+        </article>
+      </section>
+
+      <section class="payment-history-panel">
+        <div class="payment-history-toolbar">
+          <div>
+            <h2 class="section-title">결제 기록</h2>
+            <p class="note" th:text="|조회 결과 ${#lists.size(paymentList.payments)}건|">
+              조회 결과 0건
+            </p>
+          </div>
+
+          <form class="filter-form" method="get" th:action="@{/admin/payments}"
+                th:object="${condition}">
+            <select id="payment-status" class="form-control" th:field="*{status}"
+                    aria-label="결제 상태">
+              <option value="">전체 상태</option>
+              <option value="READY">결제 대기</option>
+              <option value="DONE">결제 완료</option>
+              <option value="CANCELED">취소 완료</option>
+              <option value="PARTIAL_CANCELED">부분 취소</option>
+              <option value="ABORTED">결제 중단</option>
+              <option value="EXPIRED">결제 만료</option>
+            </select>
+            <button class="btn btn--primary" type="submit">조회</button>
+            <a class="btn" th:href="@{/admin/payments}">초기화</a>
+          </form>
+        </div>
+
+        <div class="table-wrap payment-history-table">
+          <table class="data-table">
+            <thead>
+            <tr>
+              <th>결제번호</th>
+              <th>주문</th>
+              <th>주문자</th>
+              <th>결제수단</th>
+              <th>금액</th>
+              <th>결제 상태</th>
+              <th>취소 처리</th>
+              <th>처리 일시</th>
+              <th>관리</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:if="${#lists.isEmpty(paymentList.payments)}">
+              <td class="payment-history-empty" colspan="9">
+                <strong>표시할 결제 내역이 없습니다.</strong>
+                <span>결제가 생성되면 이 화면에 자동으로 표시됩니다.</span>
+              </td>
+            </tr>
+            <tr th:each="payment : ${paymentList.payments}"
+                th:attr="data-payment-id=${payment.paymentId}">
+              <td>
+                <strong th:text="${payment.paymentNumber}">PAY-000001</strong>
+                <small class="payment-reference" th:text="${payment.tossOrderId}">
+                  Toss 주문번호
+                </small>
+              </td>
+              <td>
+                <strong th:text="${payment.orderNumber}">ORD-001</strong>
+                <small class="payment-reference" th:text="${payment.orderTypeLabel}">
+                  일반 상품
+                </small>
+              </td>
+              <td th:text="${payment.ordererName}">주문자</td>
+              <td th:text="${payment.methodLabel}">카드</td>
+              <td class="payment-amount"
+                  th:text="|${#numbers.formatInteger(payment.amount, 0, 'COMMA')}원|">
+                0원
+              </td>
+              <td>
+                <span class="badge" th:classappend="${payment.statusClass}"
+                      th:text="${payment.statusLabel}">결제 완료</span>
+              </td>
+              <td>
+                <span th:if="${payment.cancellationStatus == null}" class="text-muted">-</span>
+                <span th:if="${payment.cancellationStatus != null}">
+                  <span class="badge" th:classappend="${payment.cancellationStatusClass}"
+                        th:text="${payment.cancellationStatusLabel}">취소 완료</span>
+                  <small class="payment-reference"
+                         th:text="${payment.cancellationSourceLabel}">고객 요청</small>
+                </span>
+              </td>
+              <td th:text="${payment.processedAt == null
+                    ? '-'
+                    : #temporals.format(payment.processedAt, 'yyyy.MM.dd HH:mm')}">
+                2026.08.03 14:30
+              </td>
+              <td>
+                <a class="btn" th:href="@{/admin/orders/{id}(id=${payment.orderId})}">
+                  주문 상세
+                </a>
+              </td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+</body>
+</html>

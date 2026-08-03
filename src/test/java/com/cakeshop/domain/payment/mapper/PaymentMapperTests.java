@@ -4,6 +4,7 @@ import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.entity.PaymentCancellation;
 import com.cakeshop.domain.payment.entity.PaymentCancellationStatus;
 import com.cakeshop.domain.payment.entity.PaymentStatus;
+import com.cakeshop.domain.payment.dto.view.PaymentAdminListRow;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -78,6 +79,35 @@ class PaymentMapperTests {
         assertThat(payments)
                 .extracting(Payment::getActivePaymentOrderId)
                 .containsExactly(orderId);
+    }
+
+    @Test
+    void findPaymentsForAdmin_filtersStatusAndIncludesLatestCancellation() {
+        Payment payment = insertPayment("ADMIN-LIST");
+        completePayment(payment, "ADMIN-LIST");
+        PaymentCancellation cancellation =
+                newPaymentCancellation(payment.getId(), "ADMIN-LIST");
+        assertThat(paymentMapper.insertPaymentCancellation(cancellation)).isEqualTo(1);
+
+        assertThat(paymentMapper.findPaymentsForAdmin(PaymentStatus.READY)).isEmpty();
+        assertThat(paymentMapper.findPaymentsForAdmin(PaymentStatus.DONE))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.paymentId()).isEqualTo(payment.getId());
+                    assertThat(row.orderId()).isEqualTo(orderId);
+                    assertThat(row.orderNumber()).startsWith("PAYMENT-MAPPER-");
+                    assertThat(row.ordererName()).isEqualTo("주문자");
+                    assertThat(row.status()).isEqualTo(PaymentStatus.DONE);
+                    assertThat(row.cancellationStatus())
+                            .isEqualTo(PaymentCancellationStatus.REQUESTED);
+                    assertThat(row.cancellationRequestType()).isEqualTo("CUSTOMER_CANCEL");
+                });
+
+        var summary = paymentMapper.summarizePaymentsForAdmin();
+        assertThat(summary.totalCount()).isEqualTo(1);
+        assertThat(summary.doneCount()).isEqualTo(1);
+        assertThat(summary.canceledCount()).isZero();
+        assertThat(summary.attentionCount()).isEqualTo(1);
     }
 
     // 한 주문에서 READY 결제는 UNIQUE 제약에 따라 한 건만 허용되는지 확인한다.

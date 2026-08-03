@@ -39,6 +39,11 @@ app:
     public-preview: false
   member:
     simple-password-reset-enabled: false
+  order:
+    expiration:
+      fixed-delay-ms: ${ORDER_EXPIRATION_FIXED_DELAY_MS:60000}
+      initial-delay-ms: ${ORDER_EXPIRATION_INITIAL_DELAY_MS:60000}
+      batch-size: ${ORDER_EXPIRATION_BATCH_SIZE:100}
   file:
     # 업로드 파일을 저장할 로컬 외부 디렉토리 (프로젝트 밖). .env 의 FILE_UPLOAD_DIR 로 지정.
     upload-dir: ${FILE_UPLOAD_DIR:${user.home}/cakeshop-uploads}
@@ -47,8 +52,15 @@ app:
   payment:
     toss:
       base-url: https://api.tosspayments.com
-      # 시크릿 키는 로컬 .env 또는 배포 환경변수로만 주입하며 저장소에 커밋하지 않는다.
+      # API 키는 로컬 .env 또는 배포 환경변수로만 주입하며 저장소에 커밋하지 않는다.
+      client-key: ${TOSS_CLIENT_KEY:}
       secret-key: ${TOSS_SECRET_KEY:}
+      connect-timeout: ${TOSS_CONNECT_TIMEOUT:3s}
+      read-timeout: ${TOSS_READ_TIMEOUT:5s}
+    recovery:
+      fixed-delay: ${PAYMENT_RECOVERY_FIXED_DELAY:60s}
+      initial-delay: ${PAYMENT_RECOVERY_INITIAL_DELAY:60s}
+      batch-size: ${PAYMENT_RECOVERY_BATCH_SIZE:50}
 
 ---
 # 기본 개발 환경: 각 PC에 직접 설치한 MariaDB

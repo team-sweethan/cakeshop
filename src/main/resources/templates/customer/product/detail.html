@@ -371,13 +371,22 @@
                 class="cluster"
                 th:if="${product.available}"
         >
-          <!-- 픽업 일시 선택 화면 -->
+          <!-- 일반 상품은 픽업 선택을 포함한 통합 주문서로 바로 이동한다. -->
           <a
                   class="btn btn--primary"
-                  th:href="@{/orders/pickup(intent='order')}"
-                  data-prepare-product
+                  th:if="${product.productType.name() == 'GENERAL'}"
+                  th:href="@{/orders/checkout}"
+                  data-order-checkout
           >
-            픽업 일시 선택
+            주문서 작성하기
+          </a>
+
+          <a
+                  class="btn btn--primary"
+                  th:if="${product.productType.name() == 'CUSTOM'}"
+                  th:href="@{/orders/custom/options}"
+          >
+            주문 제작 요청하기
           </a>
 
           <!-- 장바구니 기능은 이후 백엔드와 연결한다. -->

@@ -30,6 +30,9 @@ public interface OrderMapper {
      */
     int insertOrderItem(OrderItem orderItem);
 
+    /** 이미 저장된 주문 항목이 있는지 확인해 중복 주문 요청을 판별한다. */
+    boolean existsOrderItemByOrderId(@Param("orderId") long orderId);
+
     /**
      * 주문 상품에 선택된 옵션 스냅샷 한 건을 저장한다.
      *
@@ -47,6 +50,12 @@ public interface OrderMapper {
     /** 주문 식별자로 주문 기본 정보를 조회한다. */
     Optional<Order> findOrderById(@Param("orderId") long orderId);
 
+    /** 회원별 주문 생성 멱등키로 이미 생성된 주문을 조회한다. */
+    Optional<Order> findOrderByMemberIdAndRequestKey(
+            @Param("memberId") long memberId,
+            @Param("requestKey") String requestKey
+    );
+
     /** 취소 준비처럼 상태 전이와 경쟁하면 안 되는 작업에서 주문 행을 잠가 조회한다. */
     Optional<Order> findOrderByIdForUpdate(@Param("orderId") long orderId);
 
@@ -55,6 +64,19 @@ public interface OrderMapper {
 
     /** 관리자 화면에 표시할 전체 주문을 최근 생성 순서로 조회한다. */
     List<Order> findAllOrders();
+
+    /** 지정한 픽업일의 제작·픽업 대상 주문을 픽업 시각 순서로 조회한다. */
+    List<Order> findFulfillmentOrders(
+            @Param("pickupStart") LocalDateTime pickupStart,
+            @Param("pickupEnd") LocalDateTime pickupEnd,
+            @Param("status") OrderStatus status
+    );
+
+    /** 기준 시각까지 결제되지 않은 PENDING_PAYMENT 주문 식별자를 오래된 순으로 조회한다. */
+    List<Long> findOverduePendingOrderIds(
+            @Param("now") LocalDateTime now,
+            @Param("limit") int limit
+    );
 
     /** 주문이 존재하고 지정한 회원의 소유인지 확인한다. */
     boolean existsByIdAndMemberId(@Param("orderId") long orderId, @Param("memberId") long memberId);
@@ -137,6 +159,13 @@ public interface OrderMapper {
             @Param("pickedUpAt") LocalDateTime pickedUpAt
     );
 
+    /** 승인 뒤 내부 처리 실패로 PG 취소된 주문을 시스템 취소 상태로 변경한다. */
+    int cancelAfterPaymentCompensation(
+            @Param("orderId") long orderId,
+            @Param("canceledAt") LocalDateTime canceledAt,
+            @Param("cancelReason") String cancelReason
+    );
+
     /**
      * PENDING_PAYMENT 주문과 연결된 READY 결제를 함께 EXPIRED로 변경한다.
      *
@@ -152,8 +181,7 @@ public interface OrderMapper {
     /**
      * 결제가 CANCELED이고 취소 가능한 현재 상태가 일치하는 주문을 CANCELED로 변경한다.
      *
-     * <p>주문제작은 UNDER_REVIEW, 일반 주문은 픽업 예정 시각 전의
-     * READY_FOR_PICKUP 상태에서만 변경한다.</p>
+     * <p>일반 주문은 픽업 예정 시각 전의 READY_FOR_PICKUP 상태에서만 변경한다.</p>
      *
      * @return 상태를 변경했으면 1, 조건이 맞지 않으면 0
      */

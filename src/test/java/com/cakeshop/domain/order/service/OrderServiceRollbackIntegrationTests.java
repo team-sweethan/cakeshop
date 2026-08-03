@@ -1,5 +1,6 @@
 package com.cakeshop.domain.order.service;
 
+import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.order.dto.form.GeneralOrderForm;
 import com.cakeshop.domain.payment.error.PaymentErrorCode;
 import com.cakeshop.domain.payment.service.PaymentPreparationService;
@@ -32,6 +33,7 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -73,6 +75,9 @@ class OrderServiceRollbackIntegrationTests {
     @MockitoBean
     private Clock clock;
 
+    @MockitoBean
+    private MemberService memberService;
+
     private String suffix;
     private long memberId;
     private long productId;
@@ -91,6 +96,7 @@ class OrderServiceRollbackIntegrationTests {
     void setUp() {
         suffix = Long.toString(System.nanoTime());
         memberId = insertMember();
+        when(memberService.isActiveMember(memberId)).thenReturn(true);
         productId = insertProduct();
         productOptionId = insertProductOption();
 
@@ -142,6 +148,7 @@ class OrderServiceRollbackIntegrationTests {
 
     private GeneralOrderForm createForm() {
         GeneralOrderForm form = new GeneralOrderForm();
+        form.setRequestKey(UUID.randomUUID().toString());
         form.setOrdererName("주문자");
         form.setOrdererPhone("010-1111-2222");
         form.setPickupName("수령자");

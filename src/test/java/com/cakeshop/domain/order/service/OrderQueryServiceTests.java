@@ -103,6 +103,22 @@ class OrderQueryServiceTests {
         });
     }
 
+    @Test
+    void getMemberOrder_customOrder_doesNotExposeGeneralCancellation() {
+        Order order = order(10L, 3L);
+        order.setOrderType(OrderType.CUSTOM);
+        order.setStatus(OrderStatus.UNDER_REVIEW);
+        when(orderMapper.findOrderById(10L)).thenReturn(Optional.of(order));
+        when(orderMapper.findOrderItemsByOrderId(10L)).thenReturn(List.of());
+        when(orderMapper.findOrderItemOptionsByOrderId(10L)).thenReturn(List.of());
+        when(orderMapper.findOrderItemImagesByOrderId(10L)).thenReturn(List.of());
+
+        OrderDetailView result = orderQueryService.getMemberOrder(3L, 10L);
+
+        assertThat(result.cancelRequestAvailable()).isFalse();
+        assertThat(result.adminCancellationAvailable()).isFalse();
+    }
+
     private Order order(long orderId, long memberId) {
         Order order = new Order();
         order.setId(orderId);

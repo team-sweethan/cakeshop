@@ -1,16 +1,22 @@
 package com.cakeshop.domain.payment.service;
 
 import com.cakeshop.domain.order.entity.Order;
+import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.mapper.OrderMapper;
 import com.cakeshop.domain.order.service.OrderOptionValidator;
+import com.cakeshop.domain.order.service.OrderPaymentRecoveryService;
 import com.cakeshop.domain.order.service.OrderService;
 import com.cakeshop.domain.order.service.OrderServiceImpl;
 import com.cakeshop.domain.order.service.OrderService.GeneralPaymentOrder;
 import com.cakeshop.domain.order.service.OrderService.PaymentProduct;
 import com.cakeshop.domain.payment.entity.Payment;
+import com.cakeshop.domain.payment.entity.PaymentCancellation;
+import com.cakeshop.domain.payment.entity.PaymentCancellationStatus;
 import com.cakeshop.domain.payment.entity.PaymentStatus;
 import com.cakeshop.domain.payment.infra.TossPaymentClient.ApprovalResult;
+import com.cakeshop.domain.payment.infra.TossPaymentClient.CancellationResult;
+import com.cakeshop.domain.payment.service.PaymentRecoveryService.CompensationRequest;
 import com.cakeshop.domain.payment.mapper.PaymentMapper;
 import com.cakeshop.domain.product.service.ProductQueryService;
 import com.cakeshop.domain.product.service.ProductStockService;
@@ -37,6 +43,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @MybatisTest
 @Import({
         PaymentService.class,
+        PaymentRecoveryService.class,
+        OrderPaymentRecoveryService.class,
         OrderServiceImpl.class,
         PaymentPreparationServiceImpl.class,
         ProductStockService.class
@@ -50,6 +58,7 @@ class PaymentCompletionIntegrationTests {
             LocalDateTime.of(2026, 8, 1, 12, 0);
 
     private final PaymentService paymentService;
+    private final PaymentRecoveryService paymentRecoveryService;
     private final PaymentMapper paymentMapper;
     private final OrderMapper orderMapper;
     private final JdbcTemplate jdbcTemplate;
@@ -66,6 +75,9 @@ class PaymentCompletionIntegrationTests {
     @MockitoBean
     private Clock clock;
 
+    @MockitoBean
+    private MemberService memberService;
+
     private String suffix;
     private long memberId;
     private long productId;
@@ -75,11 +87,13 @@ class PaymentCompletionIntegrationTests {
     @Autowired
     PaymentCompletionIntegrationTests(
             PaymentService paymentService,
+            PaymentRecoveryService paymentRecoveryService,
             PaymentMapper paymentMapper,
             OrderMapper orderMapper,
             JdbcTemplate jdbcTemplate
     ) {
         this.paymentService = paymentService;
+        this.paymentRecoveryService = paymentRecoveryService;
         this.paymentMapper = paymentMapper;
         this.orderMapper = orderMapper;
         this.jdbcTemplate = jdbcTemplate;
@@ -143,6 +157,119 @@ class PaymentCompletionIntegrationTests {
                 orderItemId
         );
         assertThat(stockDeductedAt).isEqualTo(APPROVED_AT);
+    }
+
+    @Test
+    void completeCompensation_donePayment_cancelsOrderAndRestoresStockIdempotently() {
+        Payment readyPayment = paymentService.getReadyPayment(orderId);
+        GeneralPaymentOrder order = new GeneralPaymentOrder(
+                orderId,
+                BigDecimal.valueOf(40_000),
+                APPROVED_AT.plusMinutes(10),
+                List.of(new PaymentProduct(orderItemId, productId, 2))
+        );
+        ApprovalResult approval = new ApprovalResult(
+                "PAYMENT-KEY-" + suffix,
+                readyPayment.getTossOrderId(),
+                "CARD",
+                "DONE",
+                40_000,
+                APPROVED_AT
+        );
+        paymentService.completeGeneralPayment(order, readyPayment, approval);
+        Payment donePayment = paymentMapper.findDonePaymentByOrderId(orderId)
+                .orElseThrow();
+        CompensationRequest request = paymentRecoveryService.createRequest(
+                donePayment,
+                approval.paymentKey()
+        );
+        CancellationResult cancellation = new CancellationResult(
+                "CANCELED",
+                "COMPENSATION-TRANSACTION-" + suffix,
+                APPROVED_AT.plusMinutes(1)
+        );
+
+        paymentRecoveryService.prepareCompensation(request);
+        paymentRecoveryService.prepareCompensation(request);
+        PaymentCancellation requestedCancellation = paymentMapper
+                .findPaymentCancellationByIdempotencyKey(request.idempotencyKey())
+                .orElseThrow();
+        assertThat(requestedCancellation.getStatus())
+                .isEqualTo(PaymentCancellationStatus.REQUESTED);
+        assertThat(requestedCancellation.getRequestType())
+                .isEqualTo("SYSTEM_COMPENSATION");
+        assertThat(paymentMapper.findPaymentById(donePayment.getId()).orElseThrow().getStatus())
+                .isEqualTo(PaymentStatus.DONE);
+        paymentRecoveryService.completeCompensation(request, cancellation);
+        paymentRecoveryService.completeCompensation(request, cancellation);
+
+        Payment canceledPayment = paymentMapper.findPaymentsByOrderId(orderId)
+                .getFirst();
+        assertThat(canceledPayment.getStatus()).isEqualTo(PaymentStatus.CANCELED);
+        assertThat(canceledPayment.getPaymentKey()).isEqualTo(approval.paymentKey());
+        assertThat(canceledPayment.getFailureCode())
+                .isEqualTo("INTERNAL_COMPLETION_FAILED");
+        Order canceledOrder = orderMapper.findOrderById(orderId).orElseThrow();
+        assertThat(canceledOrder.getStatus()).isEqualTo(OrderStatus.CANCELED);
+        assertThat(canceledOrder.getCanceledBy()).isEqualTo("SYSTEM");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT stock_quantity FROM products WHERE id = ?",
+                Integer.class,
+                productId
+        )).isEqualTo(5);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT stock_restored_at FROM order_items WHERE id = ?",
+                LocalDateTime.class,
+                orderItemId
+        )).isEqualTo(cancellation.canceledAt());
+
+        PaymentCancellation savedCancellation = paymentMapper
+                .findPaymentCancellationByIdempotencyKey(request.idempotencyKey())
+                .orElseThrow();
+        assertThat(savedCancellation.getStatus())
+                .isEqualTo(PaymentCancellationStatus.DONE);
+        assertThat(savedCancellation.getTransactionKey())
+                .isEqualTo(cancellation.transactionKey());
+    }
+
+    @Test
+    void completeCompensation_readyPayment_cancelsPendingOrderWithoutStockChange() {
+        Payment readyPayment = paymentService.getReadyPayment(orderId);
+        String paymentKey = "PAYMENT-KEY-" + suffix;
+        CompensationRequest request = paymentRecoveryService.createRequest(
+                readyPayment,
+                paymentKey
+        );
+        CancellationResult cancellation = new CancellationResult(
+                "CANCELED",
+                "READY-COMPENSATION-" + suffix,
+                APPROVED_AT.plusMinutes(1)
+        );
+
+        paymentRecoveryService.prepareCompensation(request);
+        assertThat(paymentRecoveryService.getPreparedCompensations(10))
+                .containsExactly(request);
+        assertThat(paymentMapper.findPaymentById(readyPayment.getId())
+                .orElseThrow()
+                .getPaymentKey()).isEqualTo(paymentKey);
+        paymentRecoveryService.completeCompensation(request, cancellation);
+
+        Payment canceledPayment = paymentMapper.findPaymentsByOrderId(orderId)
+                .getFirst();
+        assertThat(canceledPayment.getStatus()).isEqualTo(PaymentStatus.CANCELED);
+        assertThat(canceledPayment.getPaymentKey()).isEqualTo(paymentKey);
+        assertThat(orderMapper.findOrderById(orderId).orElseThrow().getStatus())
+                .isEqualTo(OrderStatus.CANCELED);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT stock_quantity FROM products WHERE id = ?",
+                Integer.class,
+                productId
+        )).isEqualTo(5);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT stock_deducted_at FROM order_items WHERE id = ?",
+                LocalDateTime.class,
+                orderItemId
+        )).isNull();
     }
 
     private long insertMember() {

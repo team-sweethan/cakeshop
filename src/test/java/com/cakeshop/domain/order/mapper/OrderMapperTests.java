@@ -108,6 +108,89 @@ class OrderMapperTests {
     }
 
     @Test
+    void findFulfillmentOrders_filtersPickupDateAndStatusAndSortsByPickupTime() {
+        Order laterReady = newOrder();
+        laterReady.setOrderNumber("FULFILLMENT-LATER-" + suffix);
+        laterReady.setStatus(OrderStatus.READY_FOR_PICKUP);
+        laterReady.setPickupAt(LocalDateTime.of(2026, 8, 10, 16, 0));
+        orderMapper.insertOrder(laterReady);
+
+        Order earlierPickedUp = newOrder();
+        earlierPickedUp.setOrderNumber("FULFILLMENT-EARLIER-" + suffix);
+        earlierPickedUp.setStatus(OrderStatus.PICKED_UP);
+        earlierPickedUp.setPickupAt(LocalDateTime.of(2026, 8, 10, 10, 0));
+        orderMapper.insertOrder(earlierPickedUp);
+
+        Order pending = newOrder();
+        pending.setOrderNumber("FULFILLMENT-PENDING-" + suffix);
+        pending.setPickupAt(LocalDateTime.of(2026, 8, 10, 12, 0));
+        orderMapper.insertOrder(pending);
+
+        Order anotherDate = newOrder();
+        anotherDate.setOrderNumber("FULFILLMENT-ANOTHER-DATE-" + suffix);
+        anotherDate.setStatus(OrderStatus.READY_FOR_PICKUP);
+        anotherDate.setPickupAt(LocalDateTime.of(2026, 8, 11, 9, 0));
+        orderMapper.insertOrder(anotherDate);
+
+        LocalDateTime pickupStart = LocalDateTime.of(2026, 8, 10, 0, 0);
+        LocalDateTime pickupEnd = LocalDateTime.of(2026, 8, 11, 0, 0);
+
+        assertThat(orderMapper.findFulfillmentOrders(pickupStart, pickupEnd, null))
+                .extracting(Order::getId)
+                .containsExactly(earlierPickedUp.getId(), laterReady.getId());
+        assertThat(orderMapper.findFulfillmentOrders(
+                pickupStart,
+                pickupEnd,
+                OrderStatus.READY_FOR_PICKUP
+        )).extracting(Order::getId)
+                .containsExactly(laterReady.getId());
+    }
+
+    @Test
+    void findOverduePendingOrderIds_returnsOnlyExpiredPendingOrdersInOrder() {
+        LocalDateTime now = LocalDateTime.of(2026, 8, 1, 12, 0);
+        Order oldest = newOrder();
+        oldest.setOrderNumber("OVERDUE-OLDEST-" + suffix);
+        oldest.setPaymentExpiresAt(now.minusMinutes(2));
+        orderMapper.insertOrder(oldest);
+
+        Order newest = newOrder();
+        newest.setOrderNumber("OVERDUE-NEWEST-" + suffix);
+        newest.setPaymentExpiresAt(now.minusMinutes(1));
+        orderMapper.insertOrder(newest);
+
+        Order future = newOrder();
+        future.setOrderNumber("OVERDUE-FUTURE-" + suffix);
+        future.setPaymentExpiresAt(now.plusMinutes(1));
+        orderMapper.insertOrder(future);
+
+        oldest.setStatus(OrderStatus.EXPIRED);
+        jdbcTemplate.update("UPDATE orders SET status = 'EXPIRED' WHERE id = ?", oldest.getId());
+
+        assertThat(orderMapper.findOverduePendingOrderIds(now, 10))
+                .containsExactly(newest.getId());
+        assertThat(orderMapper.findOverduePendingOrderIds(now, 0)).isEmpty();
+    }
+
+    @Test
+    void insertOrder_sameMemberRequestKey_returnsExistingOrderId() {
+        String requestKey = java.util.UUID.randomUUID().toString();
+        Order first = newOrder();
+        first.setRequestKey(requestKey);
+        orderMapper.insertOrder(first);
+
+        Order duplicate = newOrder();
+        duplicate.setOrderNumber("DUPLICATE-REQUEST-" + suffix);
+        duplicate.setRequestKey(requestKey);
+
+        orderMapper.insertOrder(duplicate);
+
+        assertThat(duplicate.getId()).isEqualTo(first.getId());
+        assertThat(orderMapper.findOrderByMemberIdAndRequestKey(memberId, requestKey))
+                .hasValueSatisfying(order -> assertThat(order.getId()).isEqualTo(first.getId()));
+    }
+
+    @Test
     void approveIfUnderReview_recordsStatusTimeAndProcessorConditionally() {
         Order order = newOrder();
         orderMapper.insertOrder(order);
@@ -290,7 +373,7 @@ class OrderMapperTests {
     }
 
     @Test
-    void cancelIfCurrent_recordsActorReasonAndTimeOnlyFromCancelableStatus() {
+    void cancelIfCurrent_customOrder_isNotSupportedInGeneralMvp() {
         Order order = newOrder();
         orderMapper.insertOrder(order);
         LocalDateTime underReviewAt =
@@ -326,14 +409,14 @@ class OrderMapperTests {
                 "CUSTOMER",
                 "단순 변심",
                 canceledAt
-        )).isEqualTo(1);
+        )).isZero();
 
-        Order canceled = orderMapper.findOrderById(order.getId())
+        Order underReview = orderMapper.findOrderById(order.getId())
                 .orElseThrow();
-        assertThat(canceled.getStatus()).isEqualTo(OrderStatus.CANCELED);
-        assertThat(canceled.getCanceledBy()).isEqualTo("CUSTOMER");
-        assertThat(canceled.getCancelReason()).isEqualTo("단순 변심");
-        assertThat(canceled.getCanceledAt()).isEqualTo(canceledAt);
+        assertThat(underReview.getStatus()).isEqualTo(OrderStatus.UNDER_REVIEW);
+        assertThat(underReview.getCanceledBy()).isNull();
+        assertThat(underReview.getCancelReason()).isNull();
+        assertThat(underReview.getCanceledAt()).isNull();
     }
 
     @Test

@@ -64,6 +64,7 @@ class PaymentServiceTests {
                 paymentMapper,
                 orderService
         );
+        inOrder.verify(orderService).lockGeneralOrderForPayment(1L);
         inOrder.verify(productStockService).decreaseStock(100L, 2);
         inOrder.verify(orderService).recordGeneralStockDeduction(
                 200L,
@@ -107,6 +108,7 @@ class PaymentServiceTests {
         );
 
         verify(productStockService).decreaseStock(100L, 2);
+        verify(orderService).lockGeneralOrderForPayment(1L);
         verify(orderService).recordGeneralStockDeduction(200L, approval.approvedAt());
         verify(orderService, never()).completeGeneralOrderAfterPayment(
                 1L,
