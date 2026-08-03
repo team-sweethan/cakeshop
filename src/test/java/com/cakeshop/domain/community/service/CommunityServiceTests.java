@@ -3,6 +3,7 @@ package com.cakeshop.domain.community.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -12,9 +13,15 @@ import static org.mockito.Mockito.when;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.cakeshop.domain.community.dto.form.CommentForm;
 import com.cakeshop.domain.community.dto.form.PostForm;
+import com.cakeshop.domain.community.dto.view.CommentCountView;
+import com.cakeshop.domain.community.dto.view.CommentSectionView;
+import com.cakeshop.domain.community.dto.view.CommentView;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
+import com.cakeshop.domain.community.entity.Comment;
+import com.cakeshop.domain.community.entity.CommentStatus;
 import com.cakeshop.domain.community.entity.Post;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
@@ -36,6 +43,7 @@ import org.mockito.ArgumentCaptor;
 class CommunityServiceTests {
 
     private static final long POST_ID = 42L;
+    private static final long COMMENT_ID = 314L;
     private static final long AUTHOR_ID = 7L;
     private static final long OTHER_MEMBER_ID = 99L;
     private static final long CATEGORY_ID = 1L;
@@ -391,6 +399,317 @@ class CommunityServiceTests {
         assertThatThrownBy(() -> communityService.updatePost(
                 POST_ID, formOf(CATEGORY_ID, "제목", "본문"), AUTHOR_ID))
                 .isInstanceOf(BusinessException.class);
+    }
+
+    /** 상세를 다시 그리는 것은 조회가 아니다. 조회수가 오르면 안 된다. */
+    @Test
+    void getVisiblePost_doesNotIncreaseViewCount() {
+        givenPost(PostStatus.PUBLISHED);
+
+        communityService.getVisiblePost(POST_ID, AUTHOR_ID);
+
+        verify(communityMapper, never()).increaseViewCount(anyLong());
+    }
+
+    @Test
+    void getVisiblePost_deletedPost_isNotFound() {
+        givenPost(PostStatus.DELETED);
+
+        assertThatThrownBy(() -> communityService.getVisiblePost(POST_ID, AUTHOR_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(CommunityErrorCode.POST_NOT_FOUND);
+    }
+
+    /**
+     * SQL이 최신순으로 잘라 온 것을 화면 순서로 뒤집는지 확인한다.
+     *
+     * <p>잘라 내는 쪽은 과거여야 방금 쓴 댓글이 화면에 남고, 읽는 순서는 오래된 순이어야
+     * 대화가 이어진다(DOMAIN.md 6.4). 뒤집기를 빠뜨리면 댓글이 거꾸로 읽히는데,
+     * 댓글이 한두 개인 개발 화면에서는 드러나지 않는다.
+     */
+    @Test
+    void getComments_returnsCommentsOldestFirst() {
+        givenComments(
+                commentOf(3L, CommentStatus.PUBLISHED),
+                commentOf(2L, CommentStatus.PUBLISHED),
+                commentOf(1L, CommentStatus.PUBLISHED));
+
+        CommentSectionView section = communityService.getComments(POST_ID, null);
+
+        assertThat(section.comments()).extracting(CommentView::id)
+                .containsExactly(1L, 2L, 3L);
+    }
+
+    @Test
+    void getComments_withoutRequestedLimit_usesDefault() {
+        givenComments();
+
+        communityService.getComments(POST_ID, null);
+
+        verify(communityMapper)
+                .findRecentComments(POST_ID, CommentSectionView.DEFAULT_LIMIT);
+    }
+
+    /**
+     * 주소로 들어온 limit이 상한에 걸리는지 확인한다.
+     *
+     * <p>{@code ?comments=99999999} 하나로 한 게시글의 댓글을 전부 메모리에 올릴 수 있다.
+     * 막지 않으면 화면이 느려지는 정도가 아니라 요청 하나가 서버를 세운다.
+     */
+    @Test
+    void getComments_hugeRequestedLimit_isCappedAtMax() {
+        givenComments();
+
+        communityService.getComments(POST_ID, Integer.MAX_VALUE);
+
+        verify(communityMapper).findRecentComments(POST_ID, CommentSectionView.MAX_LIMIT);
+    }
+
+    /** 기본값보다 작은 값으로 줄이는 방향은 허용하지 않는다. */
+    @Test
+    void getComments_tinyRequestedLimit_fallsBackToDefault() {
+        givenComments();
+
+        communityService.getComments(POST_ID, 1);
+
+        verify(communityMapper)
+                .findRecentComments(POST_ID, CommentSectionView.DEFAULT_LIMIT);
+    }
+
+    /**
+     * 두 개수를 따로 다루는지 확인한다.
+     *
+     * <p>화면의 "댓글 N"에는 자리 표시가 들어가면 안 되고, "더 보기"가 남았는지 판단할
+     * 때는 자리 표시도 세야 한다(DOMAIN.md 4.4).
+     */
+    @Test
+    void getComments_countsPlaceholdersForLoadMoreButNotForDisplayedCount() {
+        when(communityMapper.findRecentComments(anyLong(), anyInt()))
+                .thenReturn(List.of(commentOf(1L, CommentStatus.DELETED)));
+        when(communityMapper.countComments(POST_ID)).thenReturn(new CommentCountView(5L, 3L));
+
+        CommentSectionView section = communityService.getComments(POST_ID, null);
+
+        assertThat(section.publishedCount()).isEqualTo(3L);
+        assertThat(section.hasMore()).isTrue();
+        assertThat(section.hiddenCount()).isEqualTo(4L);
+    }
+
+    @Test
+    void addComment_savesContentWithAuthenticatedAuthor() {
+        givenPost(PostStatus.PUBLISHED);
+
+        communityService.addComment(POST_ID, commentFormOf("댓글 본문"), AUTHOR_ID);
+
+        Comment saved = capturedComment();
+        assertThat(saved.getPostId()).isEqualTo(POST_ID);
+        // 작성자는 요청이 아니라 인증 정보에서 온다(AGENTS.md).
+        assertThat(saved.getMemberId()).isEqualTo(AUTHOR_ID);
+        assertThat(saved.getContent()).isEqualTo("댓글 본문");
+    }
+
+    /**
+     * 삭제된 게시글에는 댓글을 달 수 없다.
+     *
+     * <p>게시글을 soft delete해도 댓글 행은 그대로 남는다(DOMAIN.md 4.5). 이 검증이 없으면
+     * 화면 없이 요청만 보내 삭제된 글에 댓글을 달 수 있고, 그 댓글은 어디에도 보이지 않는다.
+     */
+    @Test
+    void addComment_deletedPost_isNotFound() {
+        givenPost(PostStatus.DELETED);
+
+        assertThatThrownBy(
+                () -> communityService.addComment(POST_ID, commentFormOf("댓글"), AUTHOR_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(CommunityErrorCode.POST_NOT_FOUND);
+
+        verify(communityMapper, never()).insertComment(any());
+    }
+
+    /** 차단된 글에는 작성자도 댓글을 달 수 없다. 상세는 보이지만 손댈 수는 없다(4.2, 4.5). */
+    @Test
+    void addComment_blockedPost_author_isRejectedAsBlocked() {
+        givenPost(PostStatus.BLOCKED);
+
+        assertThatThrownBy(
+                () -> communityService.addComment(POST_ID, commentFormOf("댓글"), AUTHOR_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(CommunityErrorCode.BLOCKED_POST);
+
+        verify(communityMapper, never()).insertComment(any());
+    }
+
+    /** 남의 차단된 글은 존재 자체를 알리지 않는다. 403이 아니라 404다. */
+    @Test
+    void addComment_blockedPost_otherMember_isNotFound() {
+        givenPost(PostStatus.BLOCKED);
+
+        assertThatThrownBy(
+                () -> communityService.addComment(POST_ID, commentFormOf("댓글"), OTHER_MEMBER_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(CommunityErrorCode.POST_NOT_FOUND);
+    }
+
+    @Test
+    void deleteComment_author_softDeletesComment() {
+        givenPost(PostStatus.PUBLISHED);
+        givenComment(AUTHOR_ID, CommentStatus.PUBLISHED);
+        when(communityMapper.deleteComment(COMMENT_ID, POST_ID, AUTHOR_ID)).thenReturn(1);
+
+        communityService.deleteComment(POST_ID, COMMENT_ID, AUTHOR_ID);
+
+        verify(communityMapper).deleteComment(COMMENT_ID, POST_ID, AUTHOR_ID);
+    }
+
+    /**
+     * 남의 댓글은 지울 수 없다.
+     *
+     * <p>게시글 작성자에게도 관리자에게도 남의 댓글을 지울 권한은 없다. 관리자의 조치는
+     * 게시글 차단뿐이다(DOMAIN.md 6.7).
+     */
+    @Test
+    void deleteComment_otherMember_isNotFound() {
+        givenPost(PostStatus.PUBLISHED);
+        givenComment(OTHER_MEMBER_ID, CommentStatus.PUBLISHED);
+
+        assertThatThrownBy(
+                () -> communityService.deleteComment(POST_ID, COMMENT_ID, AUTHOR_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(CommunityErrorCode.COMMENT_NOT_FOUND);
+
+        verify(communityMapper, never()).deleteComment(anyLong(), anyLong(), anyLong());
+    }
+
+    @Test
+    void deleteComment_alreadyDeletedComment_isNotFound() {
+        givenPost(PostStatus.PUBLISHED);
+        givenComment(AUTHOR_ID, CommentStatus.DELETED);
+
+        assertThatThrownBy(
+                () -> communityService.deleteComment(POST_ID, COMMENT_ID, AUTHOR_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(CommunityErrorCode.COMMENT_NOT_FOUND);
+
+        verify(communityMapper, never()).deleteComment(anyLong(), anyLong(), anyLong());
+    }
+
+    /**
+     * 다른 글에 달린 댓글을 이 글의 주소로 지울 수 없는지 확인한다.
+     *
+     * <p>댓글 번호만 맞으면 아무 글의 주소로나 삭제 요청을 만들 수 있으면 안 된다.
+     * 화면에는 그 댓글이 없으므로 눈으로는 드러나지 않는다.
+     */
+    @Test
+    void deleteComment_commentOfAnotherPost_isNotFound() {
+        givenPost(PostStatus.PUBLISHED);
+        when(communityMapper.findCommentById(COMMENT_ID))
+                .thenReturn(commentOf(COMMENT_ID, 999L, AUTHOR_ID, CommentStatus.PUBLISHED));
+
+        assertThatThrownBy(
+                () -> communityService.deleteComment(POST_ID, COMMENT_ID, AUTHOR_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(CommunityErrorCode.COMMENT_NOT_FOUND);
+
+        verify(communityMapper, never()).deleteComment(anyLong(), anyLong(), anyLong());
+    }
+
+    /**
+     * 검증과 UPDATE 사이에 상태가 바뀌어 아무 행도 안 바뀌면 성공으로 넘기지 않는다.
+     * 게시글 삭제와 같은 이유다 — 조건이 걸러 낸 순간이 성공으로 보이면 안 된다.
+     */
+    @Test
+    void deleteComment_whenNothingWasDeleted_doesNotReportSuccess() {
+        givenPost(PostStatus.PUBLISHED);
+        givenComment(AUTHOR_ID, CommentStatus.PUBLISHED);
+        when(communityMapper.deleteComment(COMMENT_ID, POST_ID, AUTHOR_ID)).thenReturn(0);
+
+        assertThatThrownBy(
+                () -> communityService.deleteComment(POST_ID, COMMENT_ID, AUTHOR_ID))
+                .isInstanceOf(BusinessException.class);
+    }
+
+    /** 그 사이 관리자가 글을 차단했다면 지금 상태에 맞는 403이어야 한다. */
+    @Test
+    void deleteComment_whenPostBecameBlocked_isRejectedAsBlocked() {
+        givenPost(PostStatus.PUBLISHED);
+        givenComment(AUTHOR_ID, CommentStatus.PUBLISHED);
+        when(communityMapper.deleteComment(COMMENT_ID, POST_ID, AUTHOR_ID))
+                .thenAnswer(invocation -> {
+                    givenPost(PostStatus.BLOCKED);
+                    return 0;
+                });
+
+        assertThatThrownBy(
+                () -> communityService.deleteComment(POST_ID, COMMENT_ID, AUTHOR_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(CommunityErrorCode.BLOCKED_POST);
+    }
+
+    /**
+     * 공백만 입력한 댓글이 저장되지 않는지 확인한다.
+     *
+     * <p>게시글과 같은 규칙이다(DOMAIN.md 7). 폼이 값을 다듬어 두므로 빈 문자열이 되고,
+     * {@code @NotBlank}가 컨트롤러 앞단에서 걸러 Service까지 오지 않는다. 이 테스트는
+     * <b>다듬는 쪽</b>을 고정한다.
+     */
+    @Test
+    void commentForm_trimsContentAndPreservesInnerLineBreaks() {
+        CommentForm form = commentFormOf("  첫 줄\n둘째 줄  ");
+
+        assertThat(form.getContent()).isEqualTo("첫 줄\n둘째 줄");
+        assertThat(commentFormOf("   ").getContent()).isEmpty();
+    }
+
+    private CommentForm commentFormOf(String content) {
+        CommentForm form = new CommentForm();
+        form.setContent(content);
+
+        return form;
+    }
+
+    private Comment capturedComment() {
+        ArgumentCaptor<Comment> captor = ArgumentCaptor.forClass(Comment.class);
+        verify(communityMapper).insertComment(captor.capture());
+
+        return captor.getValue();
+    }
+
+    private void givenComments(CommentView... comments) {
+        when(communityMapper.findRecentComments(anyLong(), anyInt()))
+                .thenReturn(List.of(comments));
+        when(communityMapper.countComments(POST_ID))
+                .thenReturn(new CommentCountView(comments.length, comments.length));
+    }
+
+    private void givenComment(long authorId, CommentStatus status) {
+        when(communityMapper.findCommentById(COMMENT_ID))
+                .thenReturn(commentOf(COMMENT_ID, POST_ID, authorId, status));
+    }
+
+    private CommentView commentOf(long commentId, CommentStatus status) {
+        return commentOf(commentId, POST_ID, AUTHOR_ID, status);
+    }
+
+    private CommentView commentOf(
+            long commentId, long postId, long authorId, CommentStatus status) {
+        return new CommentView(
+                commentId,
+                postId,
+                authorId,
+                "글쓴이",
+                false,
+                status == CommentStatus.DELETED ? null : "댓글 본문",
+                status,
+                CREATED_AT
+        );
     }
 
     private PostForm formOf(Long categoryId, String title, String content) {

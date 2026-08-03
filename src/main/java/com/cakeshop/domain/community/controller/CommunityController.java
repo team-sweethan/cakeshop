@@ -1,5 +1,6 @@
 package com.cakeshop.domain.community.controller;
 
+import com.cakeshop.domain.community.dto.form.CommentForm;
 import com.cakeshop.domain.community.dto.form.PostForm;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
@@ -35,15 +36,8 @@ public class CommunityController {
     }
 
     /**
-     * 커뮤니티 목록 화면을 반환한다.
-     *
-     * <p>페이지 크기는 20 고정이며 사용자가 바꿀 수 없다(DOMAIN.md 6.1). 그래서 size
-     * 파라미터를 받지 않는다.
-     *
-     * @param categoryId 카테고리 필터 요청값
-     * @param page 요청 페이지 번호
-     * @param model 목록과 페이지 정보를 전달할 모델
-     * @return 커뮤니티 목록 템플릿 경로
+     * 커뮤니티 목록 화면. 페이지 크기는 20 고정이며 사용자가 바꿀 수 없어서(DOMAIN.md 6.1)
+     * size 파라미터를 받지 않는다.
      */
     @GetMapping("/community")
     public String list(
@@ -75,19 +69,17 @@ public class CommunityController {
     }
 
     /**
-     * 게시글 상세 화면을 반환한다.
+     * 게시글 상세 화면. 비로그인도 열 수 있어서 memberDetails가 null일 수 있다.
+     * 경로는 SecurityConfig의 /community/{id:\\d+} 공개 규칙에 맞춰 숫자 식별자만 받는다.
      *
-     * <p>상세 경로는 SecurityConfig의 {@code /community/{id:\\d+}} 공개 규칙에 맞춰
-     * 숫자 식별자만 받는다.
-     *
-     * @param postId 조회할 게시글 식별자
-     * @param memberDetails 인증된 사용자. 비로그인이면 {@code null}
-     * @param model 게시글 정보를 전달할 모델
-     * @return 게시글 상세 템플릿 경로
+     * comments는 "더 보기"가 실어 보내는 값으로, 댓글을 몇 건까지 보여줄지다. 주소에 담아
+     * 두면 새로고침·뒤로가기에서 펼친 상태가 유지되고 JS 없이도 동작한다.
      */
     @GetMapping("/community/{postId:\\d+}")
     public String detail(
             @PathVariable("postId") long postId,
+            @RequestParam(name = "comments", required = false) String comments,
+            @ModelAttribute("commentForm") CommentForm commentForm,
             @AuthenticationPrincipal MemberDetails memberDetails,
             Model model
     ) {
@@ -96,38 +88,88 @@ public class CommunityController {
 
         PostDetailView post = communityService.getPostDetail(postId, viewerId);
 
+        return prepareDetail(model, post, viewerId, comments);
+    }
+
+    /**
+     * 댓글을 저장하고 상세로 보낸다. 검증에 실패하면 입력을 유지한 채 상세를 다시 그린다.
+     *
+     * 게시글 상태를 검증 실패보다 먼저 본다. 순서가 뒤집히면 삭제된 글 번호로 빈 댓글을
+     * 보냈을 때 그 글의 상세가 200으로 열린다(조각 2의 수정 화면과 같은 실수다).
+     */
+    @PostMapping("/community/{postId:\\d+}/comments")
+    public String addComment(
+            @PathVariable("postId") long postId,
+            @Valid @ModelAttribute("commentForm") CommentForm commentForm,
+            BindingResult bindingResult,
+            @AuthenticationPrincipal MemberDetails memberDetails,
+            Model model
+    ) {
+        long memberId = memberDetails.getMemberId();
+
+        PostDetailView post = communityService.getCommentablePost(postId, memberId);
+
+        if (bindingResult.hasErrors()) {
+            // 여기서 getPostDetail을 부르면 잘못 보낸 댓글마다 조회수가 오른다.
+            return prepareDetail(model, post, memberId, null);
+        }
+
+        communityService.addComment(postId, commentForm, memberId);
+
+        return "redirect:/community/" + postId;
+    }
+
+    /**
+     * 댓글을 삭제하고 상세로 보낸다.
+     * GET이 아니라 POST인 것은 게시글 삭제와 같은 이유다.
+     *
+     * 성공 메시지를 남기지 않는다. 지운 자리에 "삭제된 댓글입니다"가 그대로 보이므로
+     * 결과가 화면에 이미 있다 — 목록에서 흔적 없이 사라지는 게시글 삭제와 다르다.
+     */
+    @PostMapping("/community/{postId:\\d+}/comments/{commentId:\\d+}/delete")
+    public String deleteComment(
+            @PathVariable("postId") long postId,
+            @PathVariable("commentId") long commentId,
+            @AuthenticationPrincipal MemberDetails memberDetails
+    ) {
+        communityService.deleteComment(postId, commentId, memberDetails.getMemberId());
+
+        return "redirect:/community/" + postId;
+    }
+
+    /**
+     * 상세 화면에 필요한 모델을 채운다. comments는 "더 보기"가 보낸 값이며 없으면 null이다.
+     *
+     * canEdit·canComment는 안내일 뿐이고 실제로 막는 것은 Service다. 작성자는 이 화면에서
+     * 주소를 알게 되므로 버튼 없이 요청만 따로 보낼 수 있다.
+     */
+    private String prepareDetail(
+            Model model, PostDetailView post, Long viewerId, String comments) {
         model.addAttribute("post", post);
+        model.addAttribute("viewerId", viewerId);
         // 차단된 글은 작성자 본인만 여기까지 오지만 고칠 수도 지울 수도 없다(DOMAIN.md 4.2).
-        // 버튼을 숨기는 것은 안내일 뿐이고, 실제로 막는 것은 Service다.
         model.addAttribute(
                 "canEdit",
                 viewerId != null && viewerId.equals(post.memberId()) && !post.isBlocked()
+        );
+        // 노출되지 않는 글에는 댓글을 달 수 없다(DOMAIN.md 4.5). 여기 오는 차단된 글은
+        // 작성자 본인의 것뿐이고, 그 사람에게도 댓글 폼을 주지 않는다.
+        model.addAttribute("canComment", viewerId != null && !post.isBlocked());
+        model.addAttribute(
+                "commentSection",
+                communityService.getComments(post.id(), parsePositiveInteger(comments))
         );
 
         return "customer/community/detail";
     }
 
-    /**
-     * 글쓰기 화면을 반환한다.
-     *
-     * @param form 빈 입력 폼
-     * @param model 카테고리 선택지를 전달할 모델
-     * @return 글쓰기 템플릿 경로
-     */
+    /** 글쓰기 화면. */
     @GetMapping("/community/new")
     public String createForm(@ModelAttribute("form") PostForm form, Model model) {
         return prepareForm(model, null);
     }
 
-    /**
-     * 게시글을 저장하고 상세로 보낸다.
-     *
-     * @param form 입력 폼
-     * @param bindingResult 입력 검증 결과
-     * @param memberDetails 인증된 사용자
-     * @param model 카테고리 선택지를 전달할 모델
-     * @return 저장 성공 시 상세로 리다이렉트, 검증 실패 시 글쓰기 화면
-     */
+    /** 게시글을 저장하고 상세로 보낸다. 검증에 실패하면 입력을 유지한 채 글쓰기 화면을 다시 그린다. */
     @PostMapping("/community")
     public String create(
             @Valid @ModelAttribute("form") PostForm form,
@@ -151,16 +193,10 @@ public class CommunityController {
     }
 
     /**
-     * 수정 화면을 반환한다.
+     * 수정 화면. 폼에 기존 값을 채워 넣는다.
      *
-     * <p>작성 화면과 같은 템플릿을 쓴다(선례: {@code ProductAdminController}). 수정 항목이
-     * 작성 항목과 같아서 폼 마크업을 두 벌로 두면 한쪽만 고치는 일이 생긴다.
-     *
-     * @param postId 수정할 게시글 식별자
-     * @param form 입력 폼. 기존 값으로 채워 넣는다
-     * @param memberDetails 인증된 사용자
-     * @param model 카테고리 선택지와 대상 식별자를 전달할 모델
-     * @return 글쓰기·수정 템플릿 경로
+     * 작성 화면과 같은 템플릿을 쓴다(선례: ProductAdminController). 수정 항목이 작성
+     * 항목과 같아서 폼 마크업을 두 벌로 두면 한쪽만 고치는 일이 생긴다.
      */
     @GetMapping("/community/{postId:\\d+}/edit")
     public String editForm(
@@ -179,16 +215,7 @@ public class CommunityController {
         return prepareForm(model, postId);
     }
 
-    /**
-     * 게시글을 수정하고 상세로 보낸다.
-     *
-     * @param postId 수정할 게시글 식별자
-     * @param form 입력 폼
-     * @param bindingResult 입력 검증 결과
-     * @param memberDetails 인증된 사용자
-     * @param model 카테고리 선택지와 대상 식별자를 전달할 모델
-     * @return 수정 성공 시 상세로 리다이렉트, 검증 실패 시 수정 화면
-     */
+    /** 게시글을 수정하고 상세로 보낸다. 검증에 실패하면 입력을 유지한 채 수정 화면을 다시 그린다. */
     @PostMapping("/community/{postId:\\d+}/edit")
     public String edit(
             @PathVariable("postId") long postId,
@@ -217,13 +244,7 @@ public class CommunityController {
 
     /**
      * 게시글을 삭제하고 목록으로 보낸다.
-     *
-     * <p>GET이 아니라 POST다. 링크 미리보기나 크롤러가 눌러서 글이 지워지면 안 된다.
-     *
-     * @param postId 삭제할 게시글 식별자
-     * @param memberDetails 인증된 사용자
-     * @param redirectAttributes 성공 메시지를 담을 flash 속성
-     * @return 목록으로 리다이렉트
+     * GET이 아니라 POST다. 링크 미리보기나 크롤러가 눌러서 글이 지워지면 안 된다.
      */
     @PostMapping("/community/{postId:\\d+}/delete")
     public String delete(
@@ -241,20 +262,14 @@ public class CommunityController {
 
     /**
      * 분류 선택 오류면 폼으로 되돌리고, 그 밖의 업무 예외는 그대로 올린다.
+     * postId는 작성이면 null이다.
      *
-     * <p>글을 쓰는 동안 관리자가 그 분류를 비활성으로 바꾸면 저장이 거절된다. 이때 예외를
-     * 그대로 흘리면 GlobalExceptionHandler가 공통 4xx 화면을 그리고 <b>쓰던 제목과 본문이
-     * 사라진다.</b> 분류는 화면에서 다시 고르면 되는 입력 오류이므로 해당 필드에 붙여
+     * 글을 쓰는 동안 관리자가 그 분류를 비활성으로 바꾸면 저장이 거절된다. 이때 예외를
+     * 그대로 흘리면 GlobalExceptionHandler가 공통 4xx 화면을 그리고 쓰던 제목과 본문이
+     * 사라진다. 분류는 화면에서 다시 고르면 되는 입력 오류이므로 해당 필드에 붙여
      * 돌려준다(conventions.md 9).
      *
-     * <p>소유권·상태 오류(404·403)는 화면에서 고칠 수 없으므로 여기서 삼키지 않는다.
-     *
-     * @param e 발생한 업무 예외
-     * @param bindingResult 오류를 붙일 검증 결과
-     * @param model 화면 모델
-     * @param postId 수정 대상 식별자. 작성이면 {@code null}
-     * @return 입력을 유지한 작성·수정 화면
-     * @throws BusinessException 분류 오류가 아닌 경우 그대로 다시 던진다
+     * 소유권·상태 오류(404·403)는 화면에서 고칠 수 없으므로 여기서 삼키지 않는다.
      */
     private String rejectCategoryOrRethrow(
             BusinessException e, BindingResult bindingResult, Model model, Long postId) {
@@ -269,14 +284,10 @@ public class CommunityController {
     }
 
     /**
-     * 작성·수정 화면에 공통으로 필요한 모델을 채운다.
+     * 작성·수정 화면에 공통으로 필요한 모델을 채운다. postId는 작성 화면이면 null이다.
      *
-     * <p>분류 선택지는 목록 필터와 같은 활성 카테고리를 쓴다. 화면에 직접 적어 두면
+     * 분류 선택지는 목록 필터와 같은 활성 카테고리를 쓴다. 화면에 직접 적어 두면
      * 비활성 카테고리가 선택지에 남는다(DOMAIN.md 6.8).
-     *
-     * @param model 화면 모델
-     * @param postId 수정 대상 식별자. 작성 화면이면 {@code null}
-     * @return 글쓰기·수정 템플릿 경로
      */
     private String prepareForm(Model model, Long postId) {
         model.addAttribute("categories", communityService.getActiveCategories());
@@ -285,12 +296,7 @@ public class CommunityController {
         return "customer/community/form";
     }
 
-    /**
-     * 페이지 번호 문자열을 1 이상의 정수로 변환한다.
-     *
-     * @param value 요청으로 전달된 문자열
-     * @return 1 이상의 정수, 변환할 수 없으면 {@code null}
-     */
+    /** 페이지 번호 문자열을 1 이상의 정수로 변환한다. 변환할 수 없으면 null이다. */
     private Integer parsePositiveInteger(String value) {
         Long parsed = parsePositiveLong(value);
 
@@ -301,12 +307,7 @@ public class CommunityController {
         return parsed.intValue();
     }
 
-    /**
-     * 식별자 문자열을 1 이상의 정수로 변환한다.
-     *
-     * @param value 요청으로 전달된 문자열
-     * @return 1 이상의 정수, 변환할 수 없으면 {@code null}
-     */
+    /** 식별자 문자열을 1 이상의 정수로 변환한다. 변환할 수 없으면 null이다. */
     private Long parsePositiveLong(String value) {
         if (value == null || value.isBlank()) {
             return null;

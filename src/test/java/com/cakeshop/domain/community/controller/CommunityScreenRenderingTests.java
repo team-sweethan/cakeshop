@@ -1,5 +1,6 @@
 package com.cakeshop.domain.community.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -10,7 +11,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
+import com.cakeshop.domain.community.dto.view.CommentSectionView;
+import com.cakeshop.domain.community.entity.CommentStatus;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
 import com.cakeshop.global.common.paging.PageRequest;
@@ -383,6 +388,204 @@ class CommunityScreenRenderingTests {
     }
 
     /**
+     * 댓글이 오래된 순으로 그려지고 삭제된 것은 개수에서 빠지는지 확인한다.
+     *
+     * <p>개수와 순서 둘 다 화면에서만 드러난다. 개수가 자리 표시를 세면 "댓글 3"인데 두 개만
+     * 보이고, 순서가 뒤집히면 대화가 거꾸로 읽힌다(DOMAIN.md 4.4, 6.4).
+     */
+    @Test
+    void communityDetail_rendersComments() throws Exception {
+        long postId = insertPost(memberId, "댓글 있는 글", "본문", PostStatus.PUBLISHED);
+        insertComment(postId, memberId, "먼저 쓴 댓글", CommentStatus.PUBLISHED, BASE_TIME);
+        insertComment(postId, memberId, "나중에 쓴 댓글",
+                CommentStatus.PUBLISHED, BASE_TIME.plusMinutes(1));
+        insertComment(postId, memberId, "지워진 댓글",
+                CommentStatus.DELETED, BASE_TIME.plusMinutes(2));
+
+        String html = mockMvc.perform(get("/community/" + postId))
+                .andExpect(status().isOk())
+                // 자리 표시는 개수에 넣지 않는다.
+                .andExpect(content().string(containsString("댓글 2")))
+                .andExpect(content().string(containsString("먼저 쓴 댓글")))
+                .andExpect(content().string(containsString("나중에 쓴 댓글")))
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html.indexOf("먼저 쓴 댓글")).isLessThan(html.indexOf("나중에 쓴 댓글"));
+    }
+
+    /**
+     * 삭제된 댓글이 자리 표시로 남고 본문은 사라지는지 확인한다.
+     *
+     * <p>지운 사람이 지우기를 원한 것이 바로 그 본문이다. SQL이 NULL로 지우므로 화면까지
+     * 내려가지 않는다(DOMAIN.md 4.4).
+     *
+     * <p>댓글 작성자를 게시글 작성자와 다른 회원으로 둔다. 같은 회원이면 글쓴이 이름이
+     * 본문 위에 이미 나와 있어서, 자리 표시가 이름을 흘려도 이 검사가 통과한다.
+     */
+    @Test
+    void communityDetail_deletedComment_showsPlaceholderWithoutContent() throws Exception {
+        long postId = insertPost(memberId, "글", "본문", PostStatus.PUBLISHED);
+        long commenterId = insertMember(
+                "commenter-" + System.nanoTime() + "@cakeshop.local", "댓글쓴사람", "ACTIVE");
+        insertComment(postId, commenterId, "지워진 본문", CommentStatus.DELETED, BASE_TIME);
+
+        mockMvc.perform(get("/community/" + postId))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("삭제된 댓글입니다.")))
+                .andExpect(content().string(not(containsString("지워진 본문"))))
+                // 작성자도 내보내지 않는다. 자리만 남긴다.
+                .andExpect(content().string(not(containsString("댓글쓴사람"))));
+    }
+
+    @Test
+    void communityDetail_withoutComments_showsEmptyMessage() throws Exception {
+        long postId = insertPost(memberId, "댓글 없는 글", "본문", PostStatus.PUBLISHED);
+
+        mockMvc.perform(get("/community/" + postId))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("아직 댓글이 없습니다.")));
+    }
+
+    /** 댓글 본문의 HTML도 그대로 실행되면 안 된다. 게시글 본문과 같은 규칙이다(DOMAIN.md 7). */
+    @Test
+    void communityDetail_htmlInComment_isEscaped() throws Exception {
+        String attack = "<script>alert('comment')</script>";
+        long postId = insertPost(memberId, "글", "본문", PostStatus.PUBLISHED);
+        insertComment(postId, memberId, attack, CommentStatus.PUBLISHED, BASE_TIME);
+
+        mockMvc.perform(get("/community/" + postId))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString(attack))))
+                .andExpect(content().string(containsString("&lt;script&gt;")));
+    }
+
+    @Test
+    void communityDetail_authenticated_showsCommentForm() throws Exception {
+        long postId = insertPost(memberId, "글", "본문", PostStatus.PUBLISHED);
+
+        mockMvc.perform(get("/community/" + postId)
+                        .with(authentication(authorOf(withdrawnMemberId))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("댓글 등록")))
+                .andExpect(content().string(
+                        containsString("/community/" + postId + "/comments")));
+    }
+
+    /**
+     * 비로그인에게는 댓글 폼 대신 안내가 보이는지 확인한다.
+     *
+     * <p>폼을 열어 두면 다 쓰고 나서 로그인으로 튕긴다. 조각 2에서 글쓰기 화면에 대해
+     * 같은 판단을 했다.
+     */
+    @Test
+    void communityDetail_anonymous_showsLoginPromptInsteadOfForm() throws Exception {
+        long postId = insertPost(memberId, "글", "본문", PostStatus.PUBLISHED);
+
+        mockMvc.perform(get("/community/" + postId))
+                .andExpect(status().isOk())
+                .andExpect(content().string(
+                        containsString("로그인하면 댓글을 쓸 수 있습니다.")))
+                .andExpect(content().string(not(containsString("댓글 등록"))));
+    }
+
+    /**
+     * 차단된 글에는 작성자에게도 댓글 폼이 없는지 확인한다.
+     *
+     * <p>안내도 띄우지 않는다. 로그인해도 댓글을 달 수 없으므로 "로그인하면 쓸 수 있다"는
+     * 거짓이 된다. 이 화면은 "차단된 글을 작성자가 연다"는 드문 조건에서만 그려진다.
+     */
+    @Test
+    void communityDetail_blockedPost_author_hidesCommentForm() throws Exception {
+        long postId = insertPost(memberId, "차단된 글", "본문", PostStatus.BLOCKED);
+
+        mockMvc.perform(get("/community/" + postId).with(authentication(authorOf(memberId))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("댓글 등록"))))
+                .andExpect(content().string(
+                        not(containsString("로그인하면 댓글을 쓸 수 있습니다."))));
+    }
+
+    /** 삭제 버튼은 자기 댓글에만 보인다. 남의 화면에 뜨면 눌러 봐야 404다. */
+    @Test
+    void communityDetail_ownComment_showsDeleteButton() throws Exception {
+        long postId = insertPost(memberId, "글", "본문", PostStatus.PUBLISHED);
+        insertComment(postId, memberId, "내 댓글", CommentStatus.PUBLISHED, BASE_TIME);
+
+        mockMvc.perform(get("/community/" + postId).with(authentication(authorOf(memberId))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("댓글 삭제")));
+    }
+
+    @Test
+    void communityDetail_otherMembersComment_hidesDeleteButton() throws Exception {
+        long postId = insertPost(memberId, "글", "본문", PostStatus.PUBLISHED);
+        insertComment(postId, memberId, "남의 댓글", CommentStatus.PUBLISHED, BASE_TIME);
+
+        mockMvc.perform(get("/community/" + postId)
+                        .with(authentication(authorOf(withdrawnMemberId))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("댓글 삭제"))));
+    }
+
+    /**
+     * "더 보기"가 실제로 그려지고 과거를 펼치는지 확인한다.
+     *
+     * <p>이 블록은 댓글이 한 화면 분량을 넘어야만 나타난다. 개발 중에는 댓글이 몇 건뿐이라
+     * 화면에 아예 없고, 표현식이 깨져도 눈에 띄지 않는다.
+     *
+     * <p>잘라 내는 쪽이 과거인 것도 함께 본다. 가장 오래된 댓글은 처음에 안 보이고 가장
+     * 최근 댓글은 보여야 한다 — 반대가 되면 방금 쓴 댓글이 화면 밖에 남는다.
+     */
+    @Test
+    void communityDetail_manyComments_showsLoadMoreForOlderComments() throws Exception {
+        long postId = insertPost(memberId, "댓글 많은 글", "본문", PostStatus.PUBLISHED);
+
+        for (int i = 0; i < CommentSectionView.DEFAULT_LIMIT + 1; i++) {
+            insertComment(postId, memberId, "댓글 " + i,
+                    CommentStatus.PUBLISHED, BASE_TIME.plusMinutes(i));
+        }
+
+        int nextLimit = CommentSectionView.DEFAULT_LIMIT + CommentSectionView.STEP;
+
+        mockMvc.perform(get("/community/" + postId))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("이전 댓글 더 보기")))
+                .andExpect(content().string(containsString("남은 댓글 1")))
+                .andExpect(content().string(containsString(
+                        "/community/" + postId + "?comments=" + nextLimit)))
+                // 가장 오래된 것이 잘리고 가장 최근 것은 남는다.
+                .andExpect(content().string(not(containsString(">댓글 0<"))))
+                .andExpect(content().string(containsString(
+                        "댓글 " + CommentSectionView.DEFAULT_LIMIT)));
+
+        // 더 보기를 따라가면 잘렸던 댓글이 나타난다.
+        mockMvc.perform(get("/community/" + postId).param("comments", String.valueOf(nextLimit)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(">댓글 0<")))
+                .andExpect(content().string(not(containsString("이전 댓글 더 보기"))));
+    }
+
+    /**
+     * 상한에 막혀 못 보여주는 댓글이 있으면 화면이 그 사실을 말하는지 확인한다.
+     *
+     * <p>링크를 조용히 감추면 "댓글이 여기까지"로 보이는데 그것은 거짓이다. 이 상태는
+     * 댓글이 {@code MAX_LIMIT}을 넘어야만 나오므로 사람 눈으로는 영원히 발견되지 않는다.
+     */
+    @Test
+    void communityDetail_beyondMaxComments_saysSoInsteadOfHidingSilently() throws Exception {
+        long postId = insertPost(memberId, "댓글 아주 많은 글", "본문", PostStatus.PUBLISHED);
+
+        insertComments(postId, CommentSectionView.MAX_LIMIT + 1);
+
+        mockMvc.perform(get("/community/" + postId)
+                        .param("comments", String.valueOf(CommentSectionView.MAX_LIMIT)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(
+                        containsString("오래된 댓글 일부는 표시하지 않습니다.")))
+                .andExpect(content().string(not(containsString("이전 댓글 더 보기"))));
+    }
+
+    /**
      * 관리자 커뮤니티 화면은 아직 하드코딩 목업이다(SCREENS.md 관리자 목록).
      *
      * <p>목업이라도 렌더링은 되어야 한다. 컨트롤러가 뷰 이름만 반환하므로, 지금까지 이 두
@@ -479,11 +682,44 @@ class CommunityScreenRenderingTests {
     }
 
     private void insertComment(long postId) {
+        insertComment(postId, memberId, "댓글", CommentStatus.PUBLISHED, BASE_TIME);
+    }
+
+    private void insertComment(
+            long postId,
+            long authorId,
+            String content,
+            CommentStatus status,
+            LocalDateTime createdAt
+    ) {
         jdbcTemplate.update(
                 """
-                INSERT INTO comments (post_id, member_id, content, status)
-                VALUES (?, ?, '댓글', 'PUBLISHED')
+                INSERT INTO comments (
+                    post_id, member_id, content, status, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                postId, memberId);
+                postId, authorId, content, status.name(), createdAt, createdAt);
+    }
+
+    /** 상한 검사에는 댓글이 수백 건 필요하다. 한 번에 넣어 왕복을 줄인다. */
+    private void insertComments(long postId, int count) {
+        List<Object[]> rows = new ArrayList<>();
+
+        for (int i = 0; i < count; i++) {
+            rows.add(new Object[]{
+                    postId, memberId, "댓글 " + i, CommentStatus.PUBLISHED.name(),
+                    BASE_TIME.plusMinutes(i), BASE_TIME.plusMinutes(i)
+            });
+        }
+
+        jdbcTemplate.batchUpdate(
+                """
+                INSERT INTO comments (
+                    post_id, member_id, content, status, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                rows);
     }
 }
