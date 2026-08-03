@@ -45,4 +45,11 @@ SELECT id,
        NULL,
        COALESCE(suspended_at, updated_at, created_at, CURRENT_TIMESTAMP(6))
   FROM members
- WHERE status = 'SUSPENDED';
+ WHERE status = 'SUSPENDED'
+    OR (
+        status = 'WITHDRAWN'
+        AND (
+            suspended_at IS NOT NULL
+            OR NULLIF(TRIM(suspended_reason), '') IS NOT NULL
+        )
+    );
