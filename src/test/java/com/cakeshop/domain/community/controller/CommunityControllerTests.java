@@ -3,12 +3,17 @@ package com.cakeshop.domain.community.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
@@ -128,7 +133,7 @@ class CommunityControllerTests {
 
     @Test
     void detail_anonymousViewer_passesNullMemberId() throws Exception {
-        when(communityService.getPostDetail(15L, null)).thenReturn(post());
+        when(communityService.getPostDetail(15L, null)).thenReturn(publishedPost());
 
         mockMvc.perform(get("/community/15"))
                 .andExpect(status().isOk())
@@ -147,7 +152,7 @@ class CommunityControllerTests {
                 new UsernamePasswordAuthenticationToken(
                         principal, null, principal.getAuthorities()));
 
-        when(communityService.getPostDetail(15L, 7L)).thenReturn(post());
+        when(communityService.getPostDetail(15L, 7L)).thenReturn(publishedPost());
 
         mockMvc.perform(get("/community/15"))
                 .andExpect(status().isOk());
@@ -163,13 +168,129 @@ class CommunityControllerTests {
                 .andExpect(view().name("customer/community/form"));
     }
 
+    @Test
+    void create_validForm_redirectsToCreatedPost() throws Exception {
+        authenticateAs(7L);
+        when(communityService.createPost(any(), eq(7L))).thenReturn(42L);
+
+        mockMvc.perform(post("/community")
+                        .param("categoryId", "1")
+                        .param("title", "제목")
+                        .param("content", "본문"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/community/42"));
+    }
+
+    /** 작성자는 요청 파라미터가 아니라 인증 정보에서 온다(AGENTS.md). */
+    @Test
+    void create_usesAuthenticatedMemberAsAuthor() throws Exception {
+        authenticateAs(7L);
+        when(communityService.createPost(any(), eq(7L))).thenReturn(42L);
+
+        mockMvc.perform(post("/community")
+                        .param("categoryId", "1")
+                        .param("title", "제목")
+                        .param("content", "본문")
+                        // 남의 회원 번호를 실어 보내도 무시되어야 한다.
+                        .param("memberId", "99"))
+                .andExpect(status().is3xxRedirection());
+
+        verify(communityService).createPost(any(), eq(7L));
+    }
+
+    /**
+     * 검증 실패는 입력을 되돌려 준다.
+     *
+     * <p>리다이렉트로 처리하면 사용자가 쓰던 글이 사라진다. 긴 글일수록 손해가 크다.
+     */
+    @Test
+    void create_blankTitle_returnsFormWithCategories() throws Exception {
+        authenticateAs(7L);
+
+        mockMvc.perform(post("/community")
+                        .param("categoryId", "1")
+                        .param("title", "   ")
+                        .param("content", "본문"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("customer/community/form"))
+                .andExpect(model().attributeHasFieldErrors("form", "title"))
+                .andExpect(model().attributeExists("categories"));
+
+        verify(communityService, never()).createPost(any(), anyLong());
+    }
+
+    @Test
+    void editForm_bindsExistingValues() throws Exception {
+        authenticateAs(7L);
+        when(communityService.getEditablePost(15L, 7L)).thenReturn(publishedPost());
+
+        mockMvc.perform(get("/community/15/edit"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("customer/community/form"))
+                // 이 값이 있어야 폼이 작성이 아니라 수정으로 전송된다.
+                .andExpect(model().attribute("editingPostId", 15L))
+                .andExpect(model().attributeExists("categories"));
+    }
+
+    @Test
+    void edit_validForm_redirectsToDetail() throws Exception {
+        authenticateAs(7L);
+
+        mockMvc.perform(post("/community/15/edit")
+                        .param("categoryId", "1")
+                        .param("title", "고친 제목")
+                        .param("content", "고친 본문"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/community/15"));
+
+        verify(communityService).updatePost(eq(15L), any(), eq(7L));
+    }
+
+    @Test
+    void edit_blankContent_returnsFormKeepingEditTarget() throws Exception {
+        authenticateAs(7L);
+
+        mockMvc.perform(post("/community/15/edit")
+                        .param("categoryId", "1")
+                        .param("title", "제목")
+                        .param("content", "   "))
+                .andExpect(status().isOk())
+                .andExpect(view().name("customer/community/form"))
+                .andExpect(model().attributeHasFieldErrors("form", "content"))
+                // 여기서 대상이 빠지면 재전송이 작성으로 나가 글이 하나 더 생긴다.
+                .andExpect(model().attribute("editingPostId", 15L));
+
+        verify(communityService, never()).updatePost(anyLong(), any(), anyLong());
+    }
+
+    @Test
+    void delete_redirectsToList() throws Exception {
+        authenticateAs(7L);
+
+        mockMvc.perform(post("/community/15/delete"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/community"))
+                // 삭제 결과는 목록에 남지 않는다. 알리지 않으면 지워졌는지 알 수 없다.
+                .andExpect(flash().attribute("successMessage", "게시글을 삭제했습니다."));
+
+        verify(communityService).deletePost(15L, 7L);
+    }
+
+    private void authenticateAs(long memberId) {
+        MemberDetails principal = new MemberDetails(new MemberAuthenticationView(
+                memberId, "author@cakeshop.local", "dummy", "USER", true));
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        principal, null, principal.getAuthorities()));
+    }
+
     private PageRequest capturedPageRequest() {
         ArgumentCaptor<PageRequest> captor = ArgumentCaptor.forClass(PageRequest.class);
         verify(communityService).getPosts(any(), captor.capture());
         return captor.getValue();
     }
 
-    private PostDetailView post() {
+    private PostDetailView publishedPost() {
         return new PostDetailView(
                 15L, 7L, 1L, "질문", "제목", "본문", "글쓴이", false,
                 PostStatus.PUBLISHED, null, 10L, 2L, CREATED_AT, CREATED_AT);

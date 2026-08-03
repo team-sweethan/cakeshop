@@ -1,5 +1,7 @@
 package com.cakeshop.domain.community.controller;
 
+import com.cakeshop.domain.community.dto.form.PostForm;
+import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
 import com.cakeshop.domain.community.service.CommunityService;
 import com.cakeshop.global.common.paging.PageNavigation;
@@ -7,14 +9,20 @@ import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.security.MemberDetails;
 
+import jakarta.validation.Valid;
+
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
-// /community 목록·상세·작성 (GET은 공개). 작성 화면은 아직 목업이며 조각 2에서 연결한다.
+// /community 목록·상세·작성·수정·삭제. 목록과 상세 GET만 공개다(DOMAIN.md 5).
 @Controller
 public class CommunityController {
 
@@ -77,20 +85,157 @@ public class CommunityController {
      */
     @GetMapping("/community/{postId:\\d+}")
     public String detail(
-            @PathVariable long postId,
+            @PathVariable("postId") long postId,
             @AuthenticationPrincipal MemberDetails memberDetails,
             Model model
     ) {
         // 소유권 판단 기준은 요청 파라미터가 아니라 인증 정보다(AGENTS.md).
         Long viewerId = memberDetails == null ? null : memberDetails.getMemberId();
 
-        model.addAttribute("post", communityService.getPostDetail(postId, viewerId));
+        PostDetailView post = communityService.getPostDetail(postId, viewerId);
+
+        model.addAttribute("post", post);
+        // 차단된 글은 작성자 본인만 여기까지 오지만 고칠 수도 지울 수도 없다(DOMAIN.md 4.2).
+        // 버튼을 숨기는 것은 안내일 뿐이고, 실제로 막는 것은 Service다.
+        model.addAttribute(
+                "canEdit",
+                viewerId != null && viewerId.equals(post.memberId()) && !post.isBlocked()
+        );
 
         return "customer/community/detail";
     }
 
+    /**
+     * 글쓰기 화면을 반환한다.
+     *
+     * @param form 빈 입력 폼
+     * @param model 카테고리 선택지를 전달할 모델
+     * @return 글쓰기 템플릿 경로
+     */
     @GetMapping("/community/new")
-    public String createForm() {
+    public String createForm(@ModelAttribute("form") PostForm form, Model model) {
+        return prepareForm(model, null);
+    }
+
+    /**
+     * 게시글을 저장하고 상세로 보낸다.
+     *
+     * @param form 입력 폼
+     * @param bindingResult 입력 검증 결과
+     * @param memberDetails 인증된 사용자
+     * @param model 카테고리 선택지를 전달할 모델
+     * @return 저장 성공 시 상세로 리다이렉트, 검증 실패 시 글쓰기 화면
+     */
+    @PostMapping("/community")
+    public String create(
+            @Valid @ModelAttribute("form") PostForm form,
+            BindingResult bindingResult,
+            @AuthenticationPrincipal MemberDetails memberDetails,
+            Model model
+    ) {
+        if (bindingResult.hasErrors()) {
+            return prepareForm(model, null);
+        }
+
+        long postId = communityService.createPost(form, memberDetails.getMemberId());
+
+        return "redirect:/community/" + postId;
+    }
+
+    /**
+     * 수정 화면을 반환한다.
+     *
+     * <p>작성 화면과 같은 템플릿을 쓴다(선례: {@code ProductAdminController}). 수정 항목이
+     * 작성 항목과 같아서 폼 마크업을 두 벌로 두면 한쪽만 고치는 일이 생긴다.
+     *
+     * @param postId 수정할 게시글 식별자
+     * @param form 입력 폼. 기존 값으로 채워 넣는다
+     * @param memberDetails 인증된 사용자
+     * @param model 카테고리 선택지와 대상 식별자를 전달할 모델
+     * @return 글쓰기·수정 템플릿 경로
+     */
+    @GetMapping("/community/{postId:\\d+}/edit")
+    public String editForm(
+            @PathVariable("postId") long postId,
+            @ModelAttribute("form") PostForm form,
+            @AuthenticationPrincipal MemberDetails memberDetails,
+            Model model
+    ) {
+        PostDetailView post =
+                communityService.getEditablePost(postId, memberDetails.getMemberId());
+
+        form.setCategoryId(post.categoryId());
+        form.setTitle(post.title());
+        form.setContent(post.content());
+
+        return prepareForm(model, postId);
+    }
+
+    /**
+     * 게시글을 수정하고 상세로 보낸다.
+     *
+     * @param postId 수정할 게시글 식별자
+     * @param form 입력 폼
+     * @param bindingResult 입력 검증 결과
+     * @param memberDetails 인증된 사용자
+     * @param model 카테고리 선택지와 대상 식별자를 전달할 모델
+     * @return 수정 성공 시 상세로 리다이렉트, 검증 실패 시 수정 화면
+     */
+    @PostMapping("/community/{postId:\\d+}/edit")
+    public String edit(
+            @PathVariable("postId") long postId,
+            @Valid @ModelAttribute("form") PostForm form,
+            BindingResult bindingResult,
+            @AuthenticationPrincipal MemberDetails memberDetails,
+            Model model
+    ) {
+        if (bindingResult.hasErrors()) {
+            return prepareForm(model, postId);
+        }
+
+        communityService.updatePost(postId, form, memberDetails.getMemberId());
+
+        return "redirect:/community/" + postId;
+    }
+
+    /**
+     * 게시글을 삭제하고 목록으로 보낸다.
+     *
+     * <p>GET이 아니라 POST다. 링크 미리보기나 크롤러가 눌러서 글이 지워지면 안 된다.
+     *
+     * @param postId 삭제할 게시글 식별자
+     * @param memberDetails 인증된 사용자
+     * @param redirectAttributes 성공 메시지를 담을 flash 속성
+     * @return 목록으로 리다이렉트
+     */
+    @PostMapping("/community/{postId:\\d+}/delete")
+    public String delete(
+            @PathVariable("postId") long postId,
+            @AuthenticationPrincipal MemberDetails memberDetails,
+            RedirectAttributes redirectAttributes
+    ) {
+        communityService.deletePost(postId, memberDetails.getMemberId());
+
+        // 삭제 결과는 목록에 남지 않는다. 알리지 않으면 지워졌는지 알 수 없다.
+        redirectAttributes.addFlashAttribute("successMessage", "게시글을 삭제했습니다.");
+
+        return "redirect:/community";
+    }
+
+    /**
+     * 작성·수정 화면에 공통으로 필요한 모델을 채운다.
+     *
+     * <p>분류 선택지는 목록 필터와 같은 활성 카테고리를 쓴다. 화면에 직접 적어 두면
+     * 비활성 카테고리가 선택지에 남는다(DOMAIN.md 6.8).
+     *
+     * @param model 화면 모델
+     * @param postId 수정 대상 식별자. 작성 화면이면 {@code null}
+     * @return 글쓰기·수정 템플릿 경로
+     */
+    private String prepareForm(Model model, Long postId) {
+        model.addAttribute("categories", communityService.getActiveCategories());
+        model.addAttribute("editingPostId", postId);
+
         return "customer/community/form";
     }
 

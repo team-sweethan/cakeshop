@@ -135,4 +135,68 @@
         WHERE pc.is_active = 1
         ORDER BY pc.sort_order, pc.id
     </select>
+
+    <!--
+        선택지에 없는 카테고리로 글이 들어오는 것을 막는다(DOMAIN.md 6.8).
+        화면의 select만 믿을 수 없으므로 저장 직전에 Service가 이걸 확인한다.
+    -->
+    <select id="existsActiveCategory" resultType="boolean">
+
+        SELECT EXISTS (
+        SELECT 1
+        FROM post_categories pc
+        WHERE pc.id = #{categoryId}
+        AND pc.is_active = 1
+        )
+    </select>
+
+    <!--
+        게시글 작성.
+
+        status는 컬럼 기본값에 맡기지 않고 명시한다. 새 글은 언제나 PUBLISHED이고,
+        기본값은 스키마를 열어 봐야 알 수 있다.
+        view_count·like_count·blocked_* 는 쓰기 경로가 건드리지 않으므로 넣지 않는다.
+    -->
+    <insert id="insertPost" useGeneratedKeys="true" keyProperty="id">
+
+        INSERT INTO posts (member_id, category_id, title, content, status)
+        VALUES (#{memberId}, #{categoryId}, #{title}, #{content}, 'PUBLISHED')
+    </insert>
+
+    <!--
+        게시글 수정. 제목·본문·카테고리만 바꾼다(DOMAIN.md 6.3).
+
+        member_id·status 조건은 Service 검증과 중복이지만 지운다면 실수다. 검증과 UPDATE
+        사이에 관리자가 차단하면 조건 없는 UPDATE는 차단된 글을 고쳐 버린다 —
+        BLOCKED 글에 작성자가 할 수 있는 일은 없다(4.2).
+
+        updated_at은 건드리지 않는다. 여기서는 ON UPDATE CURRENT_TIMESTAMP(6)의 자동 갱신이
+        바로 "수정됨" 표시의 근거다(6.3). 조회수 UPDATE가 그 값을 보존하는 것과 반대다.
+    -->
+    <update id="updatePost">
+
+        UPDATE posts
+        SET category_id = #{categoryId},
+        title = #{title},
+        content = #{content}
+        WHERE id = #{id}
+        AND member_id = #{memberId}
+        AND status = 'PUBLISHED'
+    </update>
+
+    <!--
+        게시글 삭제는 soft delete다(DOMAIN.md 4.2). 행을 지우지 않는다 —
+        댓글·좋아요·신고가 FK로 매달려 있고, 그 자식들은 그대로 남긴다(4.5).
+
+        status = 'PUBLISHED' 조건이 BLOCKED -> DELETED 금지를 SQL 쪽에서도 지킨다.
+        차단된 글은 신고·조치의 증거라서 작성자가 지워 없앨 수 없어야 한다.
+    -->
+    <update id="deletePost">
+
+        UPDATE posts
+        SET status = 'DELETED'
+        WHERE id = #{postId}
+        AND member_id = #{memberId}
+        AND status = 'PUBLISHED'
+    </update>
 </mapper>

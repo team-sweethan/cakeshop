@@ -13,6 +13,9 @@
   <header th:replace="~{fragments/common/header :: header}"></header>
   <main class="page-container">
 
+    <!-- 삭제처럼 결과가 이 화면에 남지 않는 동작의 성공 메시지를 받는다(conventions.md 9). -->
+    <div th:replace="~{fragments/common/alert :: alert}"></div>
+
     <div class="cluster cluster--between">
       <h1>커뮤니티</h1>
       <a class="btn btn--primary" th:href="@{/community/new}">글쓰기</a>
