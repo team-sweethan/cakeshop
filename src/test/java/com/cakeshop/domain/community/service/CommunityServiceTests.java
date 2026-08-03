@@ -229,6 +229,7 @@ class CommunityServiceTests {
     void updatePost_author_updatesPost() {
         givenPost(PostStatus.PUBLISHED);
         givenActiveCategory();
+        when(communityMapper.updatePost(any())).thenReturn(1);
 
         communityService.updatePost(POST_ID, formOf(CATEGORY_ID, "고친 제목", "고친 본문"), AUTHOR_ID);
 
@@ -312,6 +313,7 @@ class CommunityServiceTests {
     @Test
     void deletePost_author_softDeletesPost() {
         givenPost(PostStatus.PUBLISHED);
+        when(communityMapper.deletePost(POST_ID, AUTHOR_ID)).thenReturn(1);
 
         communityService.deletePost(POST_ID, AUTHOR_ID);
 
@@ -346,6 +348,49 @@ class CommunityServiceTests {
                 .isEqualTo(CommunityErrorCode.BLOCKED_POST);
 
         verify(communityMapper, never()).deletePost(anyLong(), anyLong());
+    }
+
+    /**
+     * 검증과 UPDATE 사이에 상태가 바뀌어 아무 행도 안 바뀌면 성공으로 넘기지 않는다.
+     *
+     * <p>SQL의 소유권·상태 조건은 바로 이 순간을 막으라고 둔 것인데, 갱신 행 수를 버리면
+     * <b>조건이 걸러 낸 순간이 성공으로 보인다.</b> 관리자가 그 찰나에 글을 차단하면
+     * 아무것도 안 바뀌었는데 화면은 "삭제했습니다"라고 말한다.
+     */
+    @Test
+    void deletePost_whenNothingWasDeleted_doesNotReportSuccess() {
+        givenPost(PostStatus.PUBLISHED);
+        // 검증은 통과했지만 그 사이 상태가 바뀌어 조건부 DELETE가 0행을 반환한 상황이다.
+        when(communityMapper.deletePost(POST_ID, AUTHOR_ID)).thenReturn(0);
+
+        assertThatThrownBy(() -> communityService.deletePost(POST_ID, AUTHOR_ID))
+                .isInstanceOf(BusinessException.class);
+    }
+
+    /** 그 사이 관리자가 차단했다면 지금 상태에 맞는 403이어야 한다. */
+    @Test
+    void deletePost_whenPostBecameBlocked_isRejectedAsBlocked() {
+        givenPost(PostStatus.PUBLISHED);
+        when(communityMapper.deletePost(POST_ID, AUTHOR_ID)).thenAnswer(invocation -> {
+            givenPost(PostStatus.BLOCKED);
+            return 0;
+        });
+
+        assertThatThrownBy(() -> communityService.deletePost(POST_ID, AUTHOR_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(CommunityErrorCode.BLOCKED_POST);
+    }
+
+    @Test
+    void updatePost_whenNothingWasUpdated_doesNotReportSuccess() {
+        givenPost(PostStatus.PUBLISHED);
+        givenActiveCategory();
+        when(communityMapper.updatePost(any())).thenReturn(0);
+
+        assertThatThrownBy(() -> communityService.updatePost(
+                POST_ID, formOf(CATEGORY_ID, "제목", "본문"), AUTHOR_ID))
+                .isInstanceOf(BusinessException.class);
     }
 
     private PostForm formOf(Long categoryId, String title, String content) {

@@ -96,7 +96,7 @@ H7은 리뷰를 거치며 다섯 번 강해졌다.
 
 **완료 (2026-08-03)**. `CommunityMapper` +4 statement(`insertPost`·`updatePost`·`deletePost`·`existsActiveCategory`), `Post` 엔티티(쓰기 경로 필드만), `dto/form/PostForm`, `CommunityService` 3개 메서드 + `getEditablePost`, `CommunityController` 5개 핸들러, `form.html` 전면 교체(작성·수정 공용), `detail.html` 수정·삭제 버튼. migration은 없다 — `posts`에 필요한 컬럼이 V0에 전부 있다.
 
-검증은 `CommunityMapperTests`(+11), `CommunityServiceTests`(+15), `CommunityControllerTests`(+7), `CommunityScreenRenderingTests`(+5)로 고정했다. 하네스 표에 H2a·H2b를 올렸다.
+검증은 `CommunityMapperTests`(+11), `CommunityServiceTests`(+15), `CommunityControllerTests`(+7), `CommunityScreenRenderingTests`(+5)로 고정했다. 하네스 표에 H2a·H2b·H2d를 올렸다.
 
 목업이던 `form.html`의 거짓 다섯 개를 걷어냈다(`screens/new.md`의 "이 화면에 없는 것"). 분류 선택지는 `categories` 모델로, `data-mock-form`과 목업 안내는 삭제, 사진 첨부 입력 삭제, 본문 `maxlength=5000` 추가. `SecurityConfig`의 `publicPreview` 목록에서 `/community/new`도 뺐다 — 저장 경로가 생긴 화면을 비로그인에게 열어 두면 폼을 다 채우고 등록에서야 튕긴다.
 
@@ -139,6 +139,7 @@ H7은 리뷰를 거치며 다섯 번 강해졌다.
 | H1b | 목록 조회 시 실행 쿼리 수가 게시글 수와 무관 | `CommunityQueryCountTests` — MyBatis `Interceptor`로 실행 statement 수 카운트 | **적용** (조각 1) |
 | H1c | 조회수 증가가 게시글을 "수정됨"으로 만들지 않음 | `CommunityMapperTests.increaseViewCount_doesNotMarkPostAsEdited` + H1a의 SQL 형태 검사 | **적용** (조각 1) |
 | H2a | 소유권·상태 조건이 **SQL에도** 있음. 남의 글·차단된 글은 UPDATE가 0행이다 | `CommunityMapperTests` — `updatePost`/`deletePost`에 남의 회원 번호와 `BLOCKED` 글을 넣고 갱신 행 수와 실제 값을 함께 본다 | **적용** (조각 2) |
+| H2d | 조건부 UPDATE·DELETE가 0행이면 성공으로 넘어가지 않음. 검증 통과 후 상태가 바뀐 순간을 잡는다 | `CommunityServiceTests` — 갱신 행 수 0을 돌려주게 하고, 그 사이 `BLOCKED`가 되면 403이 나오는지까지 본다 | **적용** (조각 2) |
 | H2b | 차단된 글에 작성자가 아무 조치도 못 함. 수정·삭제 모두 403이고 Mapper까지 내려가지 않음 | `CommunityServiceTests` — 버튼 숨김이 아니라 Service 거절을 본다. 화면 쪽은 `CommunityScreenRenderingTests.communityDetail_blockedPost_author_hidesEditAndDeleteButtons` | **적용** (조각 2) |
 | H2c | `like_count`와 실제 좋아요 수 일치 | 동시 요청 테스트 | 조각 4 (예정) |
 | H3 | Controller가 Mapper를 직접 호출하지 않음 | ArchUnit | 위반 발생 시 |
@@ -183,6 +184,7 @@ H7은 리뷰를 거치며 다섯 번 강해졌다.
 | 2026-08-02 | 인기글은 **범위 밖으로 유지**. DOMAIN.md 2에서 이미 제외한 항목인 데다, 조회수 기준으로 만들 수 없다 — 6.2가 "조회수는 정렬·순위에 쓰이지 않는다"를 근거로 중복 방지를 빼서 새로고침만으로 순위 조작이 된다. 넣으려면 범위 변경 + 기준을 좋아요로 고정 + 조각 4 이후가 세트라는 것을 `SCREENS.md`에 적었다 |
 | 2026-08-02 | 관리자 목업이 도메인 규칙보다 먼저 그려져 **규칙에 없는 기능이 버튼으로 존재**한다는 것을 화면 지도를 그리다 발견(관리자의 게시글·댓글 삭제, `정상`/`제재` 용어, IP 표시, 첨부 이미지). 조각 5 항목으로 옮겼다 |
 | 2026-08-02 | `build.gradle`의 `test`에 `docs/`를 입력으로 등록. 등록 전에는 문서만 고쳤을 때 Gradle이 `test`를 UP-TO-DATE로 건너뛰어, 문서가 어긋나도 로컬에서 초록불이 떴다. 하네스를 만들고 나서 **그 하네스가 정말 무는지 문서를 일부러 틀리게 고쳐 확인하다가** 발견했다 |
+| 2026-08-03 | PR #87 Codex 리뷰 P2 3건 전부 수용. (1) **조건부 UPDATE·DELETE의 갱신 행 수를 버리고 있었다.** SQL의 소유권·상태 조건은 검증과 UPDATE 사이의 변화를 막으라고 둔 것인데, 결과를 안 보면 **그 조건이 걸러 낸 순간이 성공으로 보인다** — 관리자가 그 찰나에 차단하면 아무것도 안 바뀌었는데 화면은 "삭제했습니다"라고 말한다. 0행이면 지금 상태를 다시 읽어 403/404를 낸다. (2) **수정 POST에서 검증 실패가 권한 확인보다 먼저 실행됐다.** 남의 글 번호로 빈 본문을 보내면 소유권도 상태도 안 보고 수정 화면이 200으로 열렸다. (3) **비활성 카테고리 오류가 공통 4xx 화면으로 튀어 쓰던 글이 사라졌다.** 분류는 화면에서 다시 고르면 되는 입력 오류라 `BindingResult`에 붙여 폼으로 되돌린다(conventions.md 9). 소유권·상태 오류는 삼키지 않고 그대로 올린다 |
 | 2026-08-03 | `screens/edit.md`의 보류 3건 결정. (1) **수정 화면은 작성 화면과 같은 템플릿을 쓴다** — 수정 항목이 작성 항목과 같고(6.3) 선례도 공용이다(`ProductAdminController`, `CouponAdminController`). 갈리는 것은 `editingPostId` 모델 하나뿐이다. (2) 차단된 글의 수정·삭제는 Service에서 막는다. (3) 카테고리 변경은 허용하되 활성 카테고리로만 |
 | 2026-08-03 | **차단된 글에 대한 작성자의 수정·삭제만 404가 아니라 403(`BLOCKED_POST`)으로 응답한다.** 4.3의 404 규칙은 "글의 존재를 흘리지 않기 위한" 것인데, 이 상대는 상세에서 이미 본문과 차단 사유까지 본 작성자다. 숨길 것이 없고, 404를 주면 왜 막혔는지 알 수 없다. 남의 글·`DELETED`는 그대로 404다 |
 | 2026-08-03 | `SecurityConfig`의 `publicPreview` 목록에서 `/community/new`를 뺐다. 커뮤니티 밖 공용 설정이지만, 저장 경로가 생긴 화면이 목업 예외에 남아 있으면 비로그인이 폼을 다 채우고 등록에서야 로그인으로 튕긴다 |

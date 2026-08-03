@@ -150,7 +150,7 @@ public class CommunityService {
                 form.getContent()
         );
 
-        communityMapper.updatePost(post);
+        requireApplied(communityMapper.updatePost(post), postId, editorId);
     }
 
     /**
@@ -166,7 +166,35 @@ public class CommunityService {
     public void deletePost(long postId, long editorId) {
         requireEditablePost(postId, editorId);
 
-        communityMapper.deletePost(postId, editorId);
+        requireApplied(communityMapper.deletePost(postId, editorId), postId, editorId);
+    }
+
+    /**
+     * 조건부 UPDATE가 실제로 한 행을 바꿨는지 확인한다.
+     *
+     * <p>SQL의 소유권·상태 조건은 검증과 UPDATE 사이의 변화를 막으라고 둔 것이다. 그런데
+     * 갱신 행 수를 버리면 <b>그 조건이 걸러 낸 순간이 성공으로 보인다</b> — 관리자가 그
+     * 찰나에 글을 차단하면 아무것도 바뀌지 않았는데 화면은 "삭제했습니다"라고 말한다.
+     *
+     * <p>0행이면 지금 상태를 다시 읽어 그에 맞는 응답을 낸다. 차단됐으면 403, 그 사이
+     * 지워졌거나 소유자가 아니면 404다 — 처음 진입할 때와 같은 규칙이다.
+     *
+     * @param affectedRows 실행 결과 갱신된 행 수
+     * @param postId 대상 게시글 식별자
+     * @param editorId 요청한 회원 식별자
+     * @throws BusinessException 갱신된 행이 없는 경우
+     */
+    private void requireApplied(int affectedRows, long postId, long editorId) {
+        if (affectedRows > 0) {
+            return;
+        }
+
+        // 지금 상태 기준으로 알맞은 예외를 던진다.
+        requireEditablePost(postId, editorId);
+
+        // 여기까지 왔다면 조건은 맞는데 행이 안 바뀐 것이다. 원인을 모르는 채
+        // 성공으로 넘기지 않는다.
+        throw new BusinessException(CommunityErrorCode.POST_NOT_FOUND);
     }
 
     /**

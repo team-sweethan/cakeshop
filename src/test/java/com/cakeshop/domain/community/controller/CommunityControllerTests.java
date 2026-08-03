@@ -1,10 +1,14 @@
 package com.cakeshop.domain.community.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasProperty;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -24,7 +28,9 @@ import com.cakeshop.domain.community.dto.view.PostCategoryView;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
 import com.cakeshop.domain.community.entity.PostStatus;
+import com.cakeshop.domain.community.error.CommunityErrorCode;
 import com.cakeshop.domain.community.service.CommunityService;
+import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
@@ -274,6 +280,82 @@ class CommunityControllerTests {
                 .andExpect(flash().attribute("successMessage", "게시글을 삭제했습니다."));
 
         verify(communityService).deletePost(15L, 7L);
+    }
+
+    /**
+     * 검증 실패보다 권한을 먼저 본다.
+     *
+     * <p>순서가 뒤집히면 남의 글 번호로 빈 본문을 보냈을 때 소유권도 상태도 확인하지 않은
+     * 채 수정 화면이 200으로 열린다. 유효한 값을 보내야 그제서야 404가 나므로, 그 전까지는
+     * 자기 글인 것처럼 보인다.
+     */
+    @Test
+    void edit_invalidForm_checksPermissionBeforeValidation() throws Exception {
+        authenticateAs(7L);
+        doThrow(new BusinessException(CommunityErrorCode.POST_NOT_FOUND))
+                .when(communityService).getEditablePost(15L, 7L);
+
+        assertThatThrownBy(() -> mockMvc.perform(post("/community/15/edit")
+                        .param("categoryId", "1")
+                        .param("title", "제목")
+                        .param("content", "   ")))
+                .hasRootCauseInstanceOf(BusinessException.class);
+
+        verify(communityService, never()).updatePost(anyLong(), any(), anyLong());
+    }
+
+    /**
+     * 글을 쓰는 동안 분류가 비활성으로 바뀌면 입력을 잃지 않는다.
+     *
+     * <p>예외를 그대로 흘리면 공통 4xx 화면이 뜨고 쓰던 제목과 본문이 사라진다. 분류는
+     * 화면에서 다시 고르면 되는 입력 오류다(conventions.md 9).
+     */
+    @Test
+    void create_categoryDeactivatedWhileWriting_returnsFormWithFieldError() throws Exception {
+        authenticateAs(7L);
+        when(communityService.createPost(any(), eq(7L)))
+                .thenThrow(new BusinessException(CommunityErrorCode.CATEGORY_NOT_FOUND));
+
+        mockMvc.perform(post("/community")
+                        .param("categoryId", "1")
+                        .param("title", "쓰던 제목")
+                        .param("content", "쓰던 본문"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("customer/community/form"))
+                .andExpect(model().attributeHasFieldErrors("form", "categoryId"))
+                // 쓰던 입력이 그대로 돌아와야 한다.
+                .andExpect(model().attribute("form",
+                        hasProperty("title", equalTo("쓰던 제목"))))
+                .andExpect(model().attributeExists("categories"));
+    }
+
+    @Test
+    void edit_categoryDeactivatedWhileWriting_returnsFormKeepingEditTarget() throws Exception {
+        authenticateAs(7L);
+        doThrow(new BusinessException(CommunityErrorCode.CATEGORY_NOT_FOUND))
+                .when(communityService).updatePost(eq(15L), any(), eq(7L));
+
+        mockMvc.perform(post("/community/15/edit")
+                        .param("categoryId", "1")
+                        .param("title", "제목")
+                        .param("content", "본문"))
+                .andExpect(status().isOk())
+                .andExpect(model().attributeHasFieldErrors("form", "categoryId"))
+                .andExpect(model().attribute("editingPostId", 15L));
+    }
+
+    /** 소유권·상태 오류는 화면에서 고칠 수 없다. 폼으로 삼키지 않는다. */
+    @Test
+    void create_nonCategoryBusinessError_isNotSwallowedIntoForm() throws Exception {
+        authenticateAs(7L);
+        when(communityService.createPost(any(), eq(7L)))
+                .thenThrow(new BusinessException(CommunityErrorCode.POST_NOT_FOUND));
+
+        assertThatThrownBy(() -> mockMvc.perform(post("/community")
+                        .param("categoryId", "1")
+                        .param("title", "제목")
+                        .param("content", "본문")))
+                .hasRootCauseInstanceOf(BusinessException.class);
     }
 
     private void authenticateAs(long memberId) {

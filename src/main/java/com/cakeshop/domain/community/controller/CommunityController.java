@@ -3,7 +3,9 @@ package com.cakeshop.domain.community.controller;
 import com.cakeshop.domain.community.dto.form.PostForm;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
+import com.cakeshop.domain.community.error.CommunityErrorCode;
 import com.cakeshop.domain.community.service.CommunityService;
+import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.common.paging.PageNavigation;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
@@ -137,7 +139,13 @@ public class CommunityController {
             return prepareForm(model, null);
         }
 
-        long postId = communityService.createPost(form, memberDetails.getMemberId());
+        long postId;
+
+        try {
+            postId = communityService.createPost(form, memberDetails.getMemberId());
+        } catch (BusinessException e) {
+            return rejectCategoryOrRethrow(e, bindingResult, model, null);
+        }
 
         return "redirect:/community/" + postId;
     }
@@ -189,11 +197,20 @@ public class CommunityController {
             @AuthenticationPrincipal MemberDetails memberDetails,
             Model model
     ) {
+        // 권한을 검증 실패보다 먼저 본다. 순서가 뒤집히면 남의 글 번호로 빈 본문을 보냈을 때
+        // 소유권도 상태도 확인하지 않은 채 수정 화면이 200으로 열린다. 유효한 값을 보내야
+        // 그제서야 404가 나는 화면은, 열려 있는 동안 자기 글인 것처럼 보인다.
+        communityService.getEditablePost(postId, memberDetails.getMemberId());
+
         if (bindingResult.hasErrors()) {
             return prepareForm(model, postId);
         }
 
-        communityService.updatePost(postId, form, memberDetails.getMemberId());
+        try {
+            communityService.updatePost(postId, form, memberDetails.getMemberId());
+        } catch (BusinessException e) {
+            return rejectCategoryOrRethrow(e, bindingResult, model, postId);
+        }
 
         return "redirect:/community/" + postId;
     }
@@ -220,6 +237,35 @@ public class CommunityController {
         redirectAttributes.addFlashAttribute("successMessage", "게시글을 삭제했습니다.");
 
         return "redirect:/community";
+    }
+
+    /**
+     * 분류 선택 오류면 폼으로 되돌리고, 그 밖의 업무 예외는 그대로 올린다.
+     *
+     * <p>글을 쓰는 동안 관리자가 그 분류를 비활성으로 바꾸면 저장이 거절된다. 이때 예외를
+     * 그대로 흘리면 GlobalExceptionHandler가 공통 4xx 화면을 그리고 <b>쓰던 제목과 본문이
+     * 사라진다.</b> 분류는 화면에서 다시 고르면 되는 입력 오류이므로 해당 필드에 붙여
+     * 돌려준다(conventions.md 9).
+     *
+     * <p>소유권·상태 오류(404·403)는 화면에서 고칠 수 없으므로 여기서 삼키지 않는다.
+     *
+     * @param e 발생한 업무 예외
+     * @param bindingResult 오류를 붙일 검증 결과
+     * @param model 화면 모델
+     * @param postId 수정 대상 식별자. 작성이면 {@code null}
+     * @return 입력을 유지한 작성·수정 화면
+     * @throws BusinessException 분류 오류가 아닌 경우 그대로 다시 던진다
+     */
+    private String rejectCategoryOrRethrow(
+            BusinessException e, BindingResult bindingResult, Model model, Long postId) {
+        if (e.getErrorCode() != CommunityErrorCode.CATEGORY_NOT_FOUND) {
+            throw e;
+        }
+
+        bindingResult.rejectValue(
+                "categoryId", "categoryNotFound", e.getErrorCode().message());
+
+        return prepareForm(model, postId);
     }
 
     /**
