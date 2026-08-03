@@ -48,13 +48,18 @@ class CommunityScreenDocTests {
     /**
      * `not(`으로 감싼 것과 맨몸을 구분하려고 앞자락을 함께 잡는다.
      *
-     * <p>`Matchers.not(` 처럼 한정한 호출도 잡아야 한다. 정적 import를 지우는 것만으로
-     * 부정 assertion이 긍정으로 집계되면, 문구가 <b>없다</b>고 검증하는 테스트를 문서가
-     * 방어선으로 기록하게 된다. 공백도 흘려 보낸다 — 바이트코드가 같은 수정이 검사 결과를
-     * 바꾸면 안 된다.
+     * <p>{@code Matchers.not(}처럼 한정한 호출도, 안쪽을 한정한
+     * {@code Matchers.not(Matchers.containsString(...))}도 잡아야 한다. 정적 import를
+     * 지우는 것만으로 부정 assertion이 긍정으로 집계되면, 문구가 <b>없다</b>고 검증하는
+     * 테스트를 문서가 방어선으로 기록하게 된다. 공백도 흘려 보낸다 — 바이트코드가 같은
+     * 수정이 검사 결과를 바꾸면 안 된다.
+     *
+     * <p>여기서 막는 것은 <b>표기법</b>이지 의미가 아니다. 이 검사가 어디까지 보증하는지는
+     * SCREENS.md에 적어 두었다.
      */
     private static final Pattern CONTAINS_STRING = Pattern.compile(
             "((?:[\\w.]+\\s*\\.\\s*)?not\\s*\\(\\s*)?"
+                    + "(?:[\\w.]+\\s*\\.\\s*)?"
                     + "containsString\\s*\\(\\s*\"((?:[^\"\\\\]|\\\\.)*)\"\\s*\\)");
 
     /** 문서가 화면 하나를 통째로 빠뜨리면, 그 화면은 아무 규칙도 없이 방치된다. */
@@ -460,7 +465,10 @@ class CommunityScreenDocTests {
         String withoutComments = template.replaceAll("(?s)<!--.*?-->", " ");
 
         // 여는 태그(th:text 부터 '>' 까지)는 남기고 그 뒤 본문만 지운다.
-        return withoutComments.replaceAll("(?s)(th:u?text=\"[^\"]*\"[^>]*>)[^<]*", "$1");
+        // 속성값은 큰따옴표와 작은따옴표 둘 다 쓸 수 있다. 한쪽만 보면
+        // th:text='|추천 ${...}|' 로 바꾸면서 자리 표시를 남기는 것을 놓친다.
+        return withoutComments.replaceAll(
+                "(?s)(th:u?text=(?:\"[^\"]*\"|'[^']*')[^>]*>)[^<]*", "$1");
     }
 
     private List<ScreenString> documentedStrings() throws IOException {
