@@ -44,6 +44,11 @@ dependencies {
 // 컴파일하는 PC 에 따라 문자열이 깨진다.
 tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
 
+// 실행 시점도 마찬가지다. 테스트 JVM 의 기본 문자셋을 그냥 두면 @Sql 시드나
+// 파일로 읽는 리소스의 한글이 Windows 에서 MS949 로 해석돼 깨진다.
+tasks.withType(Test).configureEach { defaultCharacterEncoding = 'UTF-8' }
+tasks.withType(JavaExec).configureEach { defaultCharacterEncoding = 'UTF-8' }
+
 tasks.named('test') {
     useJUnitPlatform()
 
