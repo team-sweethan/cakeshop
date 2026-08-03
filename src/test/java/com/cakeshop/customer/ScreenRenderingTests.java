@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.context.support.WithUserDetails;
 import org.springframework.test.context.jdbc.Sql;
+import org.springframework.test.context.jdbc.SqlConfig;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.mock.web.MockHttpSession;
@@ -26,7 +27,9 @@ import org.springframework.web.context.WebApplicationContext;
 // 시드는 Flyway 관리 대상이 아니라서 locations 로는 못 불러온다. 스크립트로 직접 넣는다.
 @SpringBootTest(properties = "app.mockup.public-preview=true")
 @MariaDbIntegrationTest
+// encoding 을 명시하지 않으면 JVM 기본 문자셋으로 읽어, 시드의 한글이 PC 에 따라 깨진다.
 @Sql(scripts = "classpath:db/seed/seed-local.sql",
+     config = @SqlConfig(encoding = "UTF-8"),
      executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS)
 class ScreenRenderingTests {
 
