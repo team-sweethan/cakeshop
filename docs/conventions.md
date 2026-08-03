@@ -167,14 +167,20 @@ Entity는 DB 한 행을 표현하는 MyBatis용 POJO다.
 - Entity를 Controller의 입력 객체로 쓰거나 Model에 담아 Thymeleaf에 직접 전달하지 않는다.
 - 비밀번호 해시 등 민감한 필드를 가진 Entity는 웹 계층에 노출하지 않는다.
 - 공통 BaseEntity 상속은 사용하지 않는다. 시간 필드는 필요한 Entity에 `LocalDateTime`으로 직접 선언한다.
-- getter/setter는 Lombok `@Getter @Setter`로 생성한다.
+- 접근자를 손으로 작성하지 않는다. Lombok `@Getter` / `@Setter`로 생성한다.
+- **setter는 필요한 자리에만 연다. [권장]** 판단 기준은 취향이 아니라 **MyBatis가 이 객체에 값을 넣는지 여부**다.
+
+### 7-1. setter를 어디까지 열 것인가
+
+| Entity의 쓰임 | setter | 이유 |
+|---|---|---|
+| **조회 결과로 매핑된다** (`resultType`·`resultMap`의 대상) | 클래스 단위 `@Setter` | MyBatis 자동 매핑이 setter로 값을 채운다. 없으면 조회가 조용히 빈 객체를 돌려준다 |
+| **쓰기 전용 파라미터다** (INSERT·UPDATE에만 쓴다) | 생성 키를 받는 `id`에만 | SQL은 `#{title}`처럼 **읽기만** 한다. 나머지 setter는 아무도 쓰지 않으면서 "이 객체는 바뀔 수 있다"고 말한다 |
+
+쓰기 전용 Entity는 필드를 `final`로 잠그고 **이름 붙은 정적 팩터리**로 만든다. 생성자를 공개하지 않는 이유는 캡슐화 취향이 아니라, 작성과 수정처럼 **인자 타입이 거의 같은 두 용도**가 생기기 때문이다. 생성자를 열면 순서를 헷갈려도 컴파일되고, 식별자가 작성자 자리로 들어간 채 UPDATE가 나간다. 이름이 붙어 있으면 그 실수를 부를 자리가 없다.
 
 ```java
-import java.time.LocalDateTime;
-
-import lombok.Getter;
-import lombok.Setter;
-
+// 조회 결과로 매핑되는 Entity — 클래스 단위 @Setter
 @Getter
 @Setter
 public class Member {
@@ -183,6 +189,32 @@ public class Member {
     private LocalDateTime createdAt;
 }
 ```
+
+```java
+// 쓰기 전용 Entity — id에만 setter, 나머지는 final
+@Getter
+public class Post {
+
+    @Setter                     // useGeneratedKeys가 INSERT 후 채우는 자리
+    private Long id;
+
+    private final Long memberId;
+    private final String title;
+
+    private Post(Long id, Long memberId, String title) { ... }
+
+    public static Post create(Long memberId, String title) {
+        return new Post(null, memberId, title);
+    }
+
+    public static Post edit(Long id, Long memberId, String title) {
+        return new Post(id, memberId, title);
+    }
+}
+```
+
+- `@Data`는 여전히 [금지]다. 필요한 `@Getter`, `@Setter`만 쓴다.
+- **이 규칙 때문에 기존 Entity를 일괄 수정하지 않는다** ([20절](#20-기존-코드-적용-방식)). 대부분은 조회 결과로 매핑되므로 지금 형태가 맞고, 나머지도 해당 도메인을 손볼 때 함께 정리한다.
 
 ## 8. DTO 규칙
 
