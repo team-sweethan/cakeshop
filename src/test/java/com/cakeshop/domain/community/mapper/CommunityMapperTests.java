@@ -6,9 +6,12 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.cakeshop.domain.community.dto.view.CommentCountView;
+import com.cakeshop.domain.community.dto.view.CommentView;
 import com.cakeshop.domain.community.dto.view.PostCategoryView;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
+import com.cakeshop.domain.community.entity.Comment;
 import com.cakeshop.domain.community.entity.CommentStatus;
 import com.cakeshop.domain.community.entity.Post;
 import com.cakeshop.domain.community.entity.PostStatus;
@@ -402,6 +405,208 @@ class CommunityMapperTests {
         assertThat(communityMapper.existsActiveCategory(inactiveId)).isFalse();
     }
 
+    @Test
+    void findRecentComments_returnsNewestFirstWithinLimit() {
+        long postId = insertPost("댓글 있는 글", PostStatus.PUBLISHED, BASE_TIME);
+        insertComment(postId, "첫 번째", CommentStatus.PUBLISHED, BASE_TIME);
+        insertComment(postId, "두 번째", CommentStatus.PUBLISHED, BASE_TIME.plusMinutes(1));
+        insertComment(postId, "세 번째", CommentStatus.PUBLISHED, BASE_TIME.plusMinutes(2));
+
+        // 잘라 내는 쪽이 과거여야 방금 쓴 댓글이 화면에 남는다(DOMAIN.md 6.4).
+        assertThat(communityMapper.findRecentComments(postId, 2))
+                .extracting(CommentView::content)
+                .containsExactly("세 번째", "두 번째");
+    }
+
+    /**
+     * limit 경계에서 순서가 흔들리지 않는지 확인한다.
+     *
+     * <p>작성 시각이 같은 댓글이 있으면 id tiebreaker 없이는 DB가 매 쿼리마다 다른 순서를
+     * 돌려줄 수 있다. 그러면 "더 보기"를 눌렀을 때 어떤 댓글이 사라지거나 두 번 나온다.
+     */
+    @Test
+    void findRecentComments_sameCreatedAt_ordersByIdDescending() {
+        long postId = insertPost("동시 댓글", PostStatus.PUBLISHED, BASE_TIME);
+        long first = insertComment(postId, "첫 번째", CommentStatus.PUBLISHED, BASE_TIME);
+        long second = insertComment(postId, "두 번째", CommentStatus.PUBLISHED, BASE_TIME);
+        long third = insertComment(postId, "세 번째", CommentStatus.PUBLISHED, BASE_TIME);
+
+        assertThat(communityMapper.findRecentComments(postId, 20))
+                .extracting(CommentView::id)
+                .containsExactly(third, second, first);
+    }
+
+    /**
+     * 삭제된 댓글이 목록에 남되 본문은 오지 않는지 확인한다.
+     *
+     * <p>자리 표시로 남기는 것은 DOMAIN.md 4.4다. 본문을 NULL로 지우는 것은 그 자리에
+     * 쓰지 않는 값이기 때문이다 — 내려보내지 않으면 템플릿을 잘못 고쳐도 지워진 댓글이
+     * 되살아나지 않는다.
+     */
+    @Test
+    void findRecentComments_deletedComment_staysWithoutContent() {
+        long postId = insertPost("삭제 댓글", PostStatus.PUBLISHED, BASE_TIME);
+        insertComment(postId, "지워진 본문", CommentStatus.DELETED, BASE_TIME);
+
+        CommentView comment = communityMapper.findRecentComments(postId, 20).getFirst();
+
+        assertThat(comment.isDeleted()).isTrue();
+        assertThat(comment.content()).isNull();
+    }
+
+    @Test
+    void findRecentComments_otherPostComments_areExcluded() {
+        long postId = insertPost("이 글", PostStatus.PUBLISHED, BASE_TIME);
+        long otherPostId = insertPost("다른 글", PostStatus.PUBLISHED, BASE_TIME);
+        insertComment(postId, "이 글의 댓글", CommentStatus.PUBLISHED, BASE_TIME);
+        insertComment(otherPostId, "다른 글의 댓글", CommentStatus.PUBLISHED, BASE_TIME);
+
+        assertThat(communityMapper.findRecentComments(postId, 20))
+                .extracting(CommentView::content)
+                .containsExactly("이 글의 댓글");
+    }
+
+    /** 탈퇴 회원의 댓글도 지우지 않고 표시명만 가린다(DOMAIN.md 8). */
+    @Test
+    void findRecentComments_withdrawnAuthor_showsPlaceholderName() {
+        long postId = insertPost("탈퇴 회원 댓글", PostStatus.PUBLISHED, BASE_TIME);
+        insertComment(postId, withdrawnMemberId, "댓글", CommentStatus.PUBLISHED, BASE_TIME);
+
+        CommentView comment = communityMapper.findRecentComments(postId, 20).getFirst();
+
+        assertThat(comment.authorWithdrawn()).isTrue();
+        assertThat(comment.authorName()).isEqualTo("탈퇴한 회원");
+    }
+
+    /**
+     * 두 개수가 서로 다른 것을 센다.
+     *
+     * <p>자리 표시를 포함한 행 수는 "더 보기"가 남았는지 판단하고, 노출 중인 수는 화면의
+     * "댓글 N"이다. 하나로 합치면 둘 중 하나가 반드시 틀린다(DOMAIN.md 4.4).
+     */
+    @Test
+    void countComments_countsPlaceholderRowsAndPublishedSeparately() {
+        long postId = insertPost("댓글 개수", PostStatus.PUBLISHED, BASE_TIME);
+        insertComment(postId, CommentStatus.PUBLISHED);
+        insertComment(postId, CommentStatus.PUBLISHED);
+        insertComment(postId, CommentStatus.DELETED);
+
+        CommentCountView counts = communityMapper.countComments(postId);
+
+        assertThat(counts.rowCount()).isEqualTo(3);
+        assertThat(counts.publishedCount()).isEqualTo(2);
+    }
+
+    /** 댓글이 하나도 없으면 SUM이 NULL이라 COALESCE가 없으면 매핑에서 터진다. */
+    @Test
+    void countComments_postWithoutComments_isZero() {
+        long postId = insertPost("댓글 없는 글", PostStatus.PUBLISHED, BASE_TIME);
+
+        CommentCountView counts = communityMapper.countComments(postId);
+
+        assertThat(counts.rowCount()).isZero();
+        assertThat(counts.publishedCount()).isZero();
+    }
+
+    @Test
+    void findCommentById_deletedComment_isStillReturnedWithoutContent() {
+        long postId = insertPost("글", PostStatus.PUBLISHED, BASE_TIME);
+        long commentId = insertComment(postId, "지워진 본문", CommentStatus.DELETED, BASE_TIME);
+
+        CommentView comment = communityMapper.findCommentById(commentId);
+
+        // 상태로 걸러 버리면 없는 댓글과 지워진 댓글을 Service가 구분할 수 없다.
+        assertThat(comment).isNotNull();
+        assertThat(comment.isDeleted()).isTrue();
+        assertThat(comment.content()).isNull();
+    }
+
+    @Test
+    void findCommentById_unknownId_returnsNull() {
+        assertThat(communityMapper.findCommentById(-1L)).isNull();
+    }
+
+    @Test
+    void insertComment_fillsGeneratedIdAndStoresPublished() {
+        long postId = insertPost("글", PostStatus.PUBLISHED, BASE_TIME);
+        Comment comment = Comment.create(postId, memberId, "새 댓글");
+
+        communityMapper.insertComment(comment);
+
+        assertThat(comment.getId()).isNotNull();
+        CommentView saved = communityMapper.findCommentById(comment.getId());
+        assertThat(saved.content()).isEqualTo("새 댓글");
+        assertThat(saved.status()).isEqualTo(CommentStatus.PUBLISHED);
+    }
+
+    /**
+     * 1차에 대댓글은 없다(DOMAIN.md 6.4).
+     *
+     * <p>컬럼은 V0에 있고 NULL을 허용하므로, INSERT에 끼어들어도 아무 오류 없이 저장된다.
+     * 값이 들어간 뒤에는 화면에 나올 방법이 없는 데이터가 되고, 2차 대댓글 작업 때 "언제
+     * 들어간 값인지" 모르는 행으로 남는다.
+     */
+    @Test
+    void insertComment_leavesParentCommentIdNull() {
+        long postId = insertPost("글", PostStatus.PUBLISHED, BASE_TIME);
+        Comment comment = Comment.create(postId, memberId, "새 댓글");
+
+        communityMapper.insertComment(comment);
+
+        Long parents = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM comments WHERE id = ? AND parent_comment_id IS NOT NULL",
+                Long.class, comment.getId());
+        assertThat(parents).isZero();
+    }
+
+    @Test
+    void deleteComment_author_marksCommentAsDeleted() {
+        long postId = insertPost("글", PostStatus.PUBLISHED, BASE_TIME);
+        long commentId = insertComment(postId, "지울 댓글", CommentStatus.PUBLISHED, BASE_TIME);
+
+        assertThat(communityMapper.deleteComment(commentId, postId, memberId)).isEqualTo(1);
+        assertThat(communityMapper.findCommentById(commentId).isDeleted()).isTrue();
+    }
+
+    /**
+     * 소유권 조건이 SQL에도 있는지 확인한다.
+     *
+     * <p>Service가 먼저 막지만, 조건을 SQL에서 지우면 그 검증 하나가 유일한 방어가 된다.
+     */
+    @Test
+    void deleteComment_otherMember_deletesNothing() {
+        long postId = insertPost("글", PostStatus.PUBLISHED, BASE_TIME);
+        long commentId = insertComment(postId, "남의 댓글", CommentStatus.PUBLISHED, BASE_TIME);
+
+        assertThat(communityMapper.deleteComment(commentId, postId, withdrawnMemberId)).isZero();
+        assertThat(communityMapper.findCommentById(commentId).isDeleted()).isFalse();
+    }
+
+    /** 이미 지운 댓글을 다시 지우는 것이 성공으로 보이면 안 된다. */
+    @Test
+    void deleteComment_alreadyDeletedComment_deletesNothing() {
+        long postId = insertPost("글", PostStatus.PUBLISHED, BASE_TIME);
+        long commentId = insertComment(postId, "지운 댓글", CommentStatus.DELETED, BASE_TIME);
+
+        assertThat(communityMapper.deleteComment(commentId, postId, memberId)).isZero();
+    }
+
+    /**
+     * 다른 글의 주소로는 지울 수 없는지 확인한다.
+     *
+     * <p>post_id 조건이 없으면 댓글 번호만 맞으면 아무 글의 주소로나 삭제 요청을 만들 수
+     * 있다. 화면에는 그 댓글이 없으므로 눈으로는 드러나지 않는다.
+     */
+    @Test
+    void deleteComment_wrongPostId_deletesNothing() {
+        long postId = insertPost("이 글", PostStatus.PUBLISHED, BASE_TIME);
+        long otherPostId = insertPost("다른 글", PostStatus.PUBLISHED, BASE_TIME);
+        long commentId = insertComment(postId, "내 댓글", CommentStatus.PUBLISHED, BASE_TIME);
+
+        assertThat(communityMapper.deleteComment(commentId, otherPostId, memberId)).isZero();
+        assertThat(communityMapper.findCommentById(commentId).isDeleted()).isFalse();
+    }
+
     private Post postOf(long authorId, long postCategoryId, String title, String content) {
         return Post.create(authorId, postCategoryId, title, content);
     }
@@ -475,11 +680,30 @@ class CommunityMapperTests {
     }
 
     private void insertComment(long postId, CommentStatus status) {
+        insertComment(postId, "댓글", status, BASE_TIME);
+    }
+
+    private long insertComment(
+            long postId, String content, CommentStatus status, LocalDateTime createdAt) {
+        return insertComment(postId, memberId, content, status, createdAt);
+    }
+
+    private long insertComment(
+            long postId,
+            long authorId,
+            String content,
+            CommentStatus status,
+            LocalDateTime createdAt
+    ) {
         jdbcTemplate.update(
                 """
-                INSERT INTO comments (post_id, member_id, content, status)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO comments (
+                    post_id, member_id, content, status, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                postId, memberId, "댓글", status.name());
+                postId, authorId, content, status.name(), createdAt, createdAt);
+
+        return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
     }
 }

@@ -105,8 +105,13 @@
     <!--
         조회수 증가.
 
-        중복 방지는 하지 않는다(DOMAIN.md 6.2). 다만 노출되지 않는 글은 상세가 404이므로
-        조회수도 올리지 않는다 — status 조건이 그 역할을 한다.
+        아직 중복 방지가 없다. 새로고침도, 댓글 "더 보기" 클릭도 그대로 +1이다.
+        이건 의도한 정책이 아니라 남은 일이다 — 2026-08-03에 조회수를 정렬·순위에
+        쓰기로 하면서 DOMAIN.md 6.2가 바뀌었고, post_views 이력 테이블로 같은 사람의
+        같은 날 재조회를 걸러 내는 것이 조각 6이다(PLAN.md R13).
+        그때까지 이 값은 순위에 쓸 수 없다.
+
+        노출되지 않는 글의 조회수를 올리지 않는 것은 그대로다 — status 조건이 그 역할을 한다.
 
         updated_at을 자기 값으로 다시 지정하는 것은 실수가 아니다. posts.updated_at은
         ON UPDATE CURRENT_TIMESTAMP(6)이라 이 UPDATE만으로도 값이 바뀌고, 그러면
@@ -196,6 +201,122 @@
         UPDATE posts
         SET status = 'DELETED'
         WHERE id = #{postId}
+        AND member_id = #{memberId}
+        AND status = 'PUBLISHED'
+    </update>
+
+    <!--
+        댓글 목록.
+
+        최신순으로 limit건을 자르고 Service가 뒤집는다. 화면에는 오래된 순으로 나가지만
+        잘라 내는 쪽은 과거여야 한다 — 앞에서 자르면 댓글이 많은 글에서 방금 쓴 댓글이
+        화면 밖에 남고, 사용자에게는 등록이 안 된 것과 구분되지 않는다(DOMAIN.md 6.4).
+
+        삭제된 댓글도 함께 돌려준다. 지우지 않고 자리 표시로 남기기 때문이다(4.4).
+        다만 본문은 NULL로 지운다. 자리 표시에는 쓰지 않는 값이라 화면까지 내려보낼 이유가
+        없고, 내려보내지 않으면 템플릿을 잘못 고쳐도 지워진 댓글이 되살아나지 않는다.
+
+        id tiebreaker는 목록과 같은 이유다. created_at이 같은 댓글이 있으면 limit 경계에서
+        순서가 흔들려, "더 보기"를 눌렀을 때 어떤 댓글이 사라지거나 두 번 나온다.
+
+        SELECT 컬럼 순서는 CommentView의 컴포넌트 순서와 맞춘다.
+    -->
+    <select id="findRecentComments"
+            resultType="com.cakeshop.domain.community.dto.view.CommentView">
+
+        SELECT
+        c.id,
+        c.post_id,
+        c.member_id,
+        m.nickname AS author_nickname,
+        (m.status = 'WITHDRAWN') AS author_withdrawn,
+        CASE WHEN c.status = 'PUBLISHED' THEN c.content END AS content,
+        c.status,
+        c.created_at
+
+        FROM comments c
+        JOIN members m ON m.id = c.member_id
+
+        WHERE c.post_id = #{postId}
+
+        ORDER BY c.created_at DESC, c.id DESC
+        LIMIT #{limit}
+    </select>
+
+    <!--
+        댓글 수를 두 가지로 센다(CommentCountView 참고).
+
+        자리 표시를 포함한 전체 행 수는 "더 보기"가 남았는지 판단하는 데 쓰고,
+        노출 중인 수는 화면의 "댓글 N"이다(DOMAIN.md 4.4).
+
+        SUM은 행이 하나도 없으면 NULL이라 COALESCE로 0을 만든다. record의 컴포넌트가
+        long이므로 NULL이 그대로 오면 매핑에서 터진다.
+    -->
+    <select id="countComments"
+            resultType="com.cakeshop.domain.community.dto.view.CommentCountView">
+
+        SELECT
+        COUNT(*) AS row_count,
+        COALESCE(SUM(c.status = 'PUBLISHED'), 0) AS published_count
+
+        FROM comments c
+        WHERE c.post_id = #{postId}
+    </select>
+
+    <!--
+        댓글 하나 조회. 상태로 거르지 않는다 — 이미 지워진 댓글과 없는 댓글을 Service가
+        구분할 수 있어야 조건부 UPDATE가 0행일 때 낼 응답을 정할 수 있다.
+
+        본문을 NULL로 지우는 것은 목록과 같다. 이 조회는 권한 판단에만 쓰고 본문은 보지
+        않으므로, 두 자리에서 규칙이 갈리지 않게 맞춰 둔다.
+    -->
+    <select id="findCommentById"
+            resultType="com.cakeshop.domain.community.dto.view.CommentView">
+
+        SELECT
+        c.id,
+        c.post_id,
+        c.member_id,
+        m.nickname AS author_nickname,
+        (m.status = 'WITHDRAWN') AS author_withdrawn,
+        CASE WHEN c.status = 'PUBLISHED' THEN c.content END AS content,
+        c.status,
+        c.created_at
+
+        FROM comments c
+        JOIN members m ON m.id = c.member_id
+
+        WHERE c.id = #{commentId}
+    </select>
+
+    <!--
+        댓글 작성.
+
+        status는 컬럼 기본값에 맡기지 않고 명시한다. 게시글과 같은 이유다.
+        parent_comment_id는 넣지 않는다 — 1차에 대댓글은 없고, 값을 넣는 코드가 없으면
+        값도 들어갈 수 없다(DOMAIN.md 6.4).
+    -->
+    <insert id="insertComment" useGeneratedKeys="true" keyProperty="id">
+
+        INSERT INTO comments (post_id, member_id, content, status)
+        VALUES (#{postId}, #{memberId}, #{content}, 'PUBLISHED')
+    </insert>
+
+    <!--
+        댓글 삭제도 soft delete다(DOMAIN.md 4.4). 행을 지우지 않는다 —
+        지워진 자리에 "삭제된 댓글입니다"를 남겨야 하고, 2차 대댓글에서는 그 자리가
+        자식 댓글이 매달릴 곳이 된다.
+
+        post_id 조건은 주소 위조를 막는다. 댓글 번호만 맞으면 다른 글의 주소로 지울 수
+        있으면 안 된다. status 조건은 이미 지워진 댓글을 다시 지운 것이 성공으로 보이지
+        않게 한다.
+    -->
+    <update id="deleteComment">
+
+        UPDATE comments
+        SET status = 'DELETED'
+        WHERE id = #{commentId}
+        AND post_id = #{postId}
         AND member_id = #{memberId}
         AND status = 'PUBLISHED'
     </update>

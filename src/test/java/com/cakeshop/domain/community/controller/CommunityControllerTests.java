@@ -24,6 +24,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.cakeshop.domain.community.dto.view.CommentSectionView;
 import com.cakeshop.domain.community.dto.view.PostCategoryView;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
@@ -61,6 +62,9 @@ class CommunityControllerTests {
                 .thenReturn(new PageResult<>(List.of(), new PageRequest(1, 20), 0));
         when(communityService.getActiveCategories())
                 .thenReturn(List.of(new PostCategoryView(1L, "QNA", "질문")));
+        when(communityService.getComments(anyLong(), any()))
+                .thenReturn(new CommentSectionView(
+                        List.of(), 0, 0, CommentSectionView.DEFAULT_LIMIT));
 
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new CommunityController(communityService))
@@ -358,6 +362,139 @@ class CommunityControllerTests {
                 .hasRootCauseInstanceOf(BusinessException.class);
     }
 
+    @Test
+    void detail_bindsCommentSectionAndForm() throws Exception {
+        when(communityService.getPostDetail(15L, null)).thenReturn(publishedPost());
+
+        mockMvc.perform(get("/community/15"))
+                .andExpect(status().isOk())
+                .andExpect(model().attributeExists("commentSection"))
+                .andExpect(model().attributeExists("commentForm"))
+                // 비로그인에게는 댓글 폼을 주지 않는다(DOMAIN.md 5).
+                .andExpect(model().attribute("canComment", false));
+    }
+
+    @Test
+    void detail_authenticatedViewer_canComment() throws Exception {
+        authenticateAs(7L);
+        when(communityService.getPostDetail(15L, 7L)).thenReturn(publishedPost());
+
+        mockMvc.perform(get("/community/15"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("canComment", true));
+    }
+
+    /** 차단된 글은 작성자만 열지만 댓글은 달 수 없다(DOMAIN.md 4.5). */
+    @Test
+    void detail_blockedPost_author_cannotComment() throws Exception {
+        authenticateAs(7L);
+        when(communityService.getPostDetail(15L, 7L)).thenReturn(blockedPost());
+
+        mockMvc.perform(get("/community/15"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("canComment", false));
+    }
+
+    /** "더 보기"가 실어 보낸 값이 그대로 Service에 넘어가야 펼친 상태가 유지된다. */
+    @Test
+    void detail_commentsParameter_isPassedToService() throws Exception {
+        when(communityService.getPostDetail(15L, null)).thenReturn(publishedPost());
+
+        mockMvc.perform(get("/community/15").param("comments", "40"))
+                .andExpect(status().isOk());
+
+        verify(communityService).getComments(15L, 40);
+    }
+
+    /** 상세는 공개 화면이라 주소가 망가져도 오류 페이지 대신 기본 상태를 보여준다. */
+    @Test
+    void detail_invalidCommentsParameter_fallsBackToDefault() throws Exception {
+        when(communityService.getPostDetail(15L, null)).thenReturn(publishedPost());
+
+        mockMvc.perform(get("/community/15").param("comments", "전체"))
+                .andExpect(status().isOk());
+
+        verify(communityService).getComments(15L, null);
+    }
+
+    @Test
+    void addComment_validForm_redirectsToDetail() throws Exception {
+        authenticateAs(7L);
+        when(communityService.getCommentablePost(15L, 7L)).thenReturn(publishedPost());
+
+        mockMvc.perform(post("/community/15/comments").param("content", "댓글 본문"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/community/15"));
+
+        verify(communityService).addComment(eq(15L), any(), eq(7L));
+    }
+
+    /** 작성자는 요청 파라미터가 아니라 인증 정보에서 온다(AGENTS.md). */
+    @Test
+    void addComment_usesAuthenticatedMemberAsAuthor() throws Exception {
+        authenticateAs(7L);
+        when(communityService.getCommentablePost(15L, 7L)).thenReturn(publishedPost());
+
+        mockMvc.perform(post("/community/15/comments")
+                        .param("content", "댓글 본문")
+                        // 남의 회원 번호를 실어 보내도 무시되어야 한다.
+                        .param("memberId", "99"))
+                .andExpect(status().is3xxRedirection());
+
+        verify(communityService).addComment(eq(15L), any(), eq(7L));
+    }
+
+    /**
+     * 검증 실패는 리다이렉트하지 않고 상세를 다시 그린다(conventions.md 9).
+     *
+     * <p>여기서 {@code getPostDetail}을 부르면 잘못 보낸 댓글마다 조회수가 오른다.
+     * 상세를 다시 그리는 것은 조회가 아니다.
+     */
+    @Test
+    void addComment_blankContent_redrawsDetailWithoutCountingAView() throws Exception {
+        authenticateAs(7L);
+        when(communityService.getCommentablePost(15L, 7L)).thenReturn(publishedPost());
+
+        mockMvc.perform(post("/community/15/comments").param("content", "   "))
+                .andExpect(status().isOk())
+                .andExpect(view().name("customer/community/detail"))
+                .andExpect(model().attributeHasFieldErrors("commentForm", "content"))
+                .andExpect(model().attributeExists("commentSection"));
+
+        verify(communityService, never()).addComment(anyLong(), any(), anyLong());
+        verify(communityService, never()).getPostDetail(anyLong(), any());
+    }
+
+    /**
+     * 검증 실패보다 게시글 상태를 먼저 본다.
+     *
+     * <p>순서가 뒤집히면 삭제된 글 번호로 빈 댓글을 보냈을 때 상태도 확인하지 않은 채
+     * 그 글의 상세가 200으로 열린다(조각 2의 수정 화면과 같은 실수다).
+     */
+    @Test
+    void addComment_invalidForm_checksPostStateBeforeValidation() throws Exception {
+        authenticateAs(7L);
+        when(communityService.getCommentablePost(15L, 7L))
+                .thenThrow(new BusinessException(CommunityErrorCode.POST_NOT_FOUND));
+
+        assertThatThrownBy(() -> mockMvc.perform(
+                        post("/community/15/comments").param("content", "   ")))
+                .hasRootCauseInstanceOf(BusinessException.class);
+
+        verify(communityService, never()).addComment(anyLong(), any(), anyLong());
+    }
+
+    @Test
+    void deleteComment_redirectsToDetail() throws Exception {
+        authenticateAs(7L);
+
+        mockMvc.perform(post("/community/15/comments/8/delete"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/community/15"));
+
+        verify(communityService).deleteComment(15L, 8L, 7L);
+    }
+
     private void authenticateAs(long memberId) {
         MemberDetails principal = new MemberDetails(new MemberAuthenticationView(
                 memberId, "author@cakeshop.local", "dummy", "USER", true));
@@ -376,5 +513,11 @@ class CommunityControllerTests {
         return new PostDetailView(
                 15L, 7L, 1L, "질문", "제목", "본문", "글쓴이", false,
                 PostStatus.PUBLISHED, null, 10L, 2L, CREATED_AT, CREATED_AT);
+    }
+
+    private PostDetailView blockedPost() {
+        return new PostDetailView(
+                15L, 7L, 1L, "질문", "제목", "본문", "글쓴이", false,
+                PostStatus.BLOCKED, "광고성 게시물", 10L, 2L, CREATED_AT, CREATED_AT);
     }
 }

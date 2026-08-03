@@ -17,7 +17,8 @@
 --
 -- 확인용 경로 (id 는 재실행해도 그대로다)
 --   /community              목록 2페이지, 카테고리 필터, 탈퇴 회원 표시
---   /community/34           본문 HTML 이스케이프와 줄바꿈, 댓글 수(삭제 댓글 제외)
+--   /community/33           댓글 25건 — "이전 댓글 더 보기", 오래된 순 정렬, (수정됨) 표시
+--   /community/34           본문 HTML 이스케이프와 줄바꿈, 댓글 수(삭제 댓글 제외), 자리 표시
 --   /community/35           차단된 글 — 비로그인은 404, 작성자(user@cakeshop.local)는 사유 표시
 --   /community/36           삭제된 글 — 작성자에게도 404
 --
@@ -189,10 +190,36 @@ VALUES (@escaped_post_id, @member_id, '첫 번째 댓글입니다.', 'PUBLISHED'
         '2026-07-26 10:00:00', '2026-07-26 10:00:00'),
        (@escaped_post_id, @admin_id, '두 번째 댓글입니다.', 'PUBLISHED',
         '2026-07-26 10:01:00', '2026-07-26 10:01:00'),
-       (@escaped_post_id, @member_id, '삭제된 댓글입니다.', 'DELETED',
+       (@escaped_post_id, @member_id, '지워진 댓글의 본문입니다.', 'DELETED',
         '2026-07-26 10:02:00', '2026-07-26 10:02:00'),
        (@withdrawn_post_id, @admin_id, '탈퇴 회원 글에 달린 댓글입니다.', 'PUBLISHED',
         '2026-07-26 10:03:00', '2026-07-26 10:03:00');
+
+-- "이전 댓글 더 보기"는 댓글이 한 화면 분량(20건)을 넘어야 나타난다(DOMAIN.md 6.4).
+-- 넘는 글이 하나도 없으면 그 블록을 로컬에서 볼 방법이 없다. 25건을 넣어 두면
+-- 처음 화면에 최신 20건이 오래된 순으로 보이고, 더 보기를 눌러 과거로 갈 수 있다.
+--
+-- 가장 오래된 '더보기 확인용 댓글 01' 은 처음에는 보이지 않아야 한다. 보인다면
+-- 자르는 방향이 뒤집힌 것이다.
+SET @many_comment_post_id := (SELECT `id` FROM `posts`
+                               WHERE `title` = '한 번 수정한 글입니다');
+
+INSERT INTO `comments` (`post_id`, `member_id`, `content`, `status`, `created_at`, `updated_at`)
+SELECT @many_comment_post_id,
+       CASE WHEN seq % 2 = 0 THEN @admin_id ELSE @member_id END,
+       CONCAT('더보기 확인용 댓글 ', LPAD(seq, 2, '0')),
+       'PUBLISHED',
+       DATE_ADD('2026-07-26 13:00:00', INTERVAL seq MINUTE),
+       DATE_ADD('2026-07-26 13:00:00', INTERVAL seq MINUTE)
+  FROM (
+        SELECT 1 AS seq UNION ALL SELECT 2  UNION ALL SELECT 3  UNION ALL SELECT 4
+        UNION ALL SELECT 5  UNION ALL SELECT 6  UNION ALL SELECT 7  UNION ALL SELECT 8
+        UNION ALL SELECT 9  UNION ALL SELECT 10 UNION ALL SELECT 11 UNION ALL SELECT 12
+        UNION ALL SELECT 13 UNION ALL SELECT 14 UNION ALL SELECT 15 UNION ALL SELECT 16
+        UNION ALL SELECT 17 UNION ALL SELECT 18 UNION ALL SELECT 19 UNION ALL SELECT 20
+        UNION ALL SELECT 21 UNION ALL SELECT 22 UNION ALL SELECT 23 UNION ALL SELECT 24
+        UNION ALL SELECT 25
+       ) comment_seqs;
 
 -- ---------------------------------------------------------------------------
 -- 5. 좋아요
@@ -224,4 +251,5 @@ SELECT (SELECT COUNT(*) FROM `post_categories` WHERE `is_active` = 1) AS `활성
        (SELECT COUNT(*) FROM `posts` WHERE `status` = 'PUBLISHED')    AS `노출게시글`,
        (SELECT COUNT(*) FROM `posts` WHERE `status` <> 'PUBLISHED')   AS `숨김게시글`,
        (SELECT COUNT(*) FROM `comments` WHERE `status` = 'PUBLISHED') AS `노출댓글`,
+       (SELECT COUNT(*) FROM `comments` WHERE `status` = 'DELETED')   AS `자리표시댓글`,
        (SELECT COUNT(*) FROM `post_likes`)                            AS `좋아요`;
