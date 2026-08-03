@@ -53,6 +53,13 @@ class CommunityScreenDocTests {
     private static final List<String> INDEX_HEADER = List.of("화면", "주소", "상태", "조각", "파일");
     /** `[screens/list.md](screens/list.md)` 에서 링크가 가리키는 쪽을 꺼낸다. */
     private static final Pattern MARKDOWN_LINK = Pattern.compile("\\[[^\\]]*\\]\\(([^)]+)\\)");
+    /**
+     * 명세 파일 제목(`# 목록 — &#96;GET /community&#96;`)에서 주소를 꺼낸다.
+     *
+     * <p>제목 줄의 <b>맨 끝</b> 백틱 묶음만 본다. 화면 이름에 백틱이 들어가도 주소가 밀리지
+     * 않는다.
+     */
+    private static final Pattern HEADING_ADDRESS = Pattern.compile("^#\\s+.*`([^`]+)`\\s*$");
     private static final List<String> TEMPLATE_DIRECTORIES =
             List.of("customer/community", "admin/community");
     private static final String IMPLEMENTED = "구현됨";
@@ -126,10 +133,10 @@ class CommunityScreenDocTests {
                             row.doc())
                     .isEqualTo(screenOf(row.doc()).status());
 
-            assertThat(Files.readString(row.doc(), StandardCharsets.UTF_8))
-                    .as("인덱스가 %s의 주소를 `%s`라고 적었는데 그 파일에는 없다",
+            assertThat(headingAddressOf(row.doc()))
+                    .as("인덱스가 %s의 주소를 `%s`라고 적었는데 그 파일의 제목은 다르다",
                             row.doc(), row.address())
-                    .contains(row.address());
+                    .isEqualTo(row.address());
         }
     }
 
@@ -545,6 +552,33 @@ class CommunityScreenDocTests {
         }
 
         return rows;
+    }
+
+    /**
+     * 명세 파일의 제목 줄에서 주소를 읽는다.
+     *
+     * <p>파일 전체에 인덱스의 주소 문자열이 <b>들어 있는지</b>만 보면 약하다. 제목을 새 경로로
+     * 바꿔도 산문이나 예시에 옛 `GET /...`이 한 번 남아 있으면 통과하고, 인덱스는 낡은 주소를
+     * 계속 보여 준다. 검사가 지키려는 것은 "인덱스의 주소가 이 화면의 주소와 같다"이므로
+     * 제목에서 뽑아 <b>같은지</b>를 본다.
+     */
+    private String headingAddressOf(Path doc) throws IOException {
+        for (String line : Files.readAllLines(doc, StandardCharsets.UTF_8)) {
+            if (!line.startsWith("#")) {
+                continue;
+            }
+
+            Matcher matcher = HEADING_ADDRESS.matcher(line.trim());
+
+            assertThat(matcher.matches())
+                    .as("%s의 제목은 `# 화면 이름 — `GET /주소`` 꼴이어야 한다: %s",
+                            doc, line)
+                    .isTrue();
+
+            return matcher.group(1);
+        }
+
+        throw new IllegalStateException("제목 줄이 없다: " + doc);
     }
 
     /** 마크다운 링크에서 가리키는 쪽을. 링크가 아니면 칸 전체를 경로로 본다. */
