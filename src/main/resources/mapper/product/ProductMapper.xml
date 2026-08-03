@@ -75,12 +75,15 @@
         p.stock_quantity,
         p.average_rating,
         p.review_count,
-
-        <!--
-            현재 DB에 product_images 테이블이 없으므로
-            대표 이미지 URL은 null로 반환한다.
-        -->
-        NULL AS thumbnail_url
+        (
+            SELECT pi.image_url
+            FROM product_images pi
+            WHERE pi.product_id = p.id
+            ORDER BY
+                pi.sort_order ASC,
+                pi.id ASC
+            LIMIT 1
+        ) AS thumbnail_url
 
         FROM products p
 
@@ -156,6 +159,22 @@
                             ON c.id = p.category_id
         WHERE p.id = #{productId}
           AND p.status = 'ACTIVE'
+    </select>
+
+    <!-- 상품 이미지 조회 -->
+    <select id="findProductImagesByProductId"
+            resultType="com.cakeshop.domain.product.entity.ProductImage">
+
+        SELECT
+            pi.id,
+            pi.product_id,
+            pi.image_url,
+            pi.sort_order
+        FROM product_images pi
+        WHERE pi.product_id = #{productId}
+        ORDER BY
+            pi.sort_order ASC,
+            pi.id ASC
     </select>
 
     <!-- 다른 도메인에 제공할 상품 판매 정보 조회 -->

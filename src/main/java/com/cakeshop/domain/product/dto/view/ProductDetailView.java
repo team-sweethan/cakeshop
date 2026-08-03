@@ -1,6 +1,7 @@
 package com.cakeshop.domain.product.dto.view;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 import com.cakeshop.domain.product.entity.ProductType;
 
@@ -57,6 +58,9 @@ public class ProductDetailView {
 
     /** 상품에 작성된 후기의 총개수. */
     private Integer reviewCount;
+
+    /** 표시 순서대로 정렬된 상품 이미지 목록. */
+    private List<ProductImageView> images = List.of();
 
     /**
      * 재고 수량 제한 없이 주문할 수 있는 상품인지 확인한다.
