@@ -26,7 +26,9 @@ CREATE TABLE member_status_histories (
         FOREIGN KEY (processed_by) REFERENCES members (id),
     INDEX idx_member_status_histories_member_processed
         (member_id, processed_at DESC, id DESC)
-);
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO member_status_histories (
     member_id,
