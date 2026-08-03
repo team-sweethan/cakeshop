@@ -64,6 +64,20 @@ class MemberStatusHistoryMapperTests {
                 .startsWith("history-admin-");
     }
 
+    @Test
+    void memberStatusHistories_schema_usesUtf8mb4Collation() {
+        String tableCollation = jdbcTemplate.queryForObject(
+                """
+                SELECT table_collation
+                  FROM information_schema.tables
+                 WHERE table_schema = DATABASE()
+                   AND table_name = 'member_status_histories'
+                """,
+                String.class);
+
+        assertThat(tableCollation).isEqualTo("utf8mb4_unicode_ci");
+    }
+
     private void insertHistory(
             MemberStatusAction action,
             MemberStatus beforeStatus,

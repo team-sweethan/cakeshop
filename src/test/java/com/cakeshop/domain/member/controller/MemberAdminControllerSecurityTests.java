@@ -134,13 +134,18 @@ class MemberAdminControllerSecurityTests {
         when(memberAdminService.getMemberDetail(1L))
                 .thenReturn(member);
 
-        mockMvc.perform(get("/admin/members/1"))
+        mockMvc.perform(get("/admin/members/1")
+                        .flashAttr(
+                                "successMessage",
+                                "회원 이용을 정지했습니다."))
                 .andExpect(status().isOk())
                 .andExpect(view().name("admin/member/detail"))
                 .andExpect(content().string(
                         containsString("me***@example.com")))
                 .andExpect(content().string(
                         not(containsString("member@example.com"))))
+                .andExpect(content().string(
+                        containsString("data-common-alert-popup")))
                 .andExpect(content().string(
                         containsString(
                                 "/admin/members/1/suspend")))
