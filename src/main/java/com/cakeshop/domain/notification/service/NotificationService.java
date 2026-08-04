@@ -29,12 +29,14 @@ public class NotificationService {
             return;
         }
 
-        // 알림 내용 만들기
+        // 알림 제목, 내용 만들기
         String title = request.getType().getDefaultTitle();
         String content = request.getType().formatContent(request.getArgs());
 
+        // 알림 발송 범위 결정
         DeliveryScope scope = request.getDeliveryScope() != null ? request.getDeliveryScope() : DeliveryScope.WEB_ONLY;
 
+        // 이벤트 키 결정
         String eventKey = request.getEventKey() != null ? request.getEventKey() : "EVENT_" + java.util.UUID.randomUUID().toString().substring(0, 8);
 
         // 알림 만들기
@@ -61,11 +63,11 @@ public class NotificationService {
         // 알림 DB 저장하기
         notificationMapper.save(notification);
 
-        // 카카오 알림톡 / SMS 외부 발송 연동 (DeliveryScope가 WEB_AND_SMS인 경우)
+        // 알림톡 / SMS 외부 발송 연동 (DeliveryScope가 WEB_AND_SMS인 경우)
         if (scope == DeliveryScope.WEB_AND_SMS) {
             if (request.getReceiverId() != null) {
                 String receiverPhone = notificationMapper.findReceiverPhone(request.getReceiverId());
-                if (receiverPhone != null && !receiverPhone.trim().isEmpty()) {
+                if (receiverPhone != null && !receiverPhone.trim().isEmpty()) { // 공백을 제외한 문자열이 빈 값이 아닌지 확인
                     solapiKakaoAlimtalkClient.sendAlimtalk(
                         notification.getId(),
                         receiverPhone,
