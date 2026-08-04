@@ -1,5 +1,6 @@
 package com.cakeshop.domain.notification.dto.view;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.LocalDateTime;
 import com.cakeshop.domain.notification.entity.NotificationType;
 import lombok.AllArgsConstructor;
@@ -18,6 +19,8 @@ public class NotificationResponse {
     private NotificationType type;
     private String title;
     private String content;
+
+    @JsonProperty("isRead")
     private boolean isRead;
     private LocalDateTime createdAt;
     private Long orderId;

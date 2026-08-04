@@ -48,29 +48,40 @@
               return;
             }
 
+            function escapeHtml(str) {
+              if (!str) return "";
+              return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+            }
+
             // 받아온 알림 데이터 배열을 돌며 HTML 태그 조립하기
             let html = "";
             data.forEach(item => {
               // 안 읽은 알림인 경우 스타일 클래스(is-unread) 및 점 표시(notification-dot) 추가
-              const unreadClass = !item.isRead ? " is-unread" : "";
-              const unreadDot = !item.isRead ? '<span class="notification-dot" aria-hidden="true"></span>' : "";
+              const isRead = item.isRead !== undefined ? item.isRead : item.read;
+              const unreadClass = !isRead ? " is-unread" : "";
+              const unreadDot = !isRead ? '<span class="notification-dot" aria-hidden="true"></span>' : "";
               
               // 날짜 포맷 변환 (YYYY-MM-DD HH:mm 형태로 자르기)
               const formattedDate = item.createdAt ? item.createdAt.replace("T", " ").substring(0, 16) : "";
 
               // 상세 링크 버튼 생성 (targetUrl이 있는 경우)
               const detailBtn = item.targetUrl 
-                ? `<a class="btn" href="${item.targetUrl}">상세</a>` 
+                ? `<a class="btn" href="${escapeHtml(item.targetUrl)}">상세</a>` 
                 : "";
 
-              // 개별 알림 HTML 조립
+              // 개별 알림 HTML 조립 (XSS 방지 이스케이프 적용)
               html += `
                 <article class="notification-item${unreadClass}" data-id="${item.id}">
                   <div class="cluster" style="align-items:flex-start">
                     ${unreadDot}
                     <div>
-                      <span class="badge">${item.title || '알림'}</span>
-                      <p>${item.content || ''}</p>
+                      <span class="badge">${escapeHtml(item.title || '알림')}</span>
+                      <p>${escapeHtml(item.content || '')}</p>
                       <time class="text-muted">${formattedDate}</time>
                     </div>
                   </div>

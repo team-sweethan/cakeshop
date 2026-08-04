@@ -13,6 +13,10 @@ import com.cakeshop.domain.notification.dto.form.NotificationRequest;
 import com.cakeshop.domain.notification.entity.DeliveryScope;
 import com.cakeshop.domain.notification.entity.Notification;
 
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
 @Service
 @RequiredArgsConstructor
 public class NotificationService {
@@ -60,20 +64,28 @@ public class NotificationService {
             .createdAt(LocalDateTime.now())
             .build();
 
-        // 알림 DB 저장하기
-        notificationMapper.save(notification);
+        // 알림 DB 저장하기 (동시 요청으로 인한 중복 키 예외 멱등 처리)
+        try {
+            notificationMapper.save(notification);
+        } catch (DuplicateKeyException e) {
+            // 동일 eventKey 중복 알림은 멱등하게 무시
+            return;
+        }
 
-        // 알림톡 / SMS 외부 발송 연동 (DeliveryScope가 WEB_AND_SMS인 경우)
-        if (scope == DeliveryScope.WEB_AND_SMS) {
-            if (request.getReceiverId() != null) {
-                String receiverPhone = notificationMapper.findReceiverPhone(request.getReceiverId());
-                if (receiverPhone != null && !receiverPhone.trim().isEmpty()) { // 공백을 제외한 문자열이 빈 값이 아닌지 확인
-                    solapiKakaoAlimtalkClient.sendAlimtalk(
-                        notification.getId(),
-                        receiverPhone,
-                        title,
-                        content
-                    );
+        // 알림톡 / SMS 외부 발송 연동 (DB 트랜잭션 커밋 완료 후 안전하게 발송)
+        if (scope == DeliveryScope.WEB_AND_SMS && request.getReceiverId() != null) {
+            String receiverPhone = notificationMapper.findReceiverPhone(request.getReceiverId());
+            if (receiverPhone != null && !receiverPhone.trim().isEmpty()) {
+                Long notificationId = notification.getId();
+                if (TransactionSynchronizationManager.isActualTransactionActive()) {
+                    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            solapiKakaoAlimtalkClient.sendAlimtalk(notificationId, receiverPhone, title, content);
+                        }
+                    });
+                } else {
+                    solapiKakaoAlimtalkClient.sendAlimtalk(notificationId, receiverPhone, title, content);
                 }
             }
         }

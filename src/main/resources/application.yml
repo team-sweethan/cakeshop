@@ -40,13 +40,13 @@ app:
     public-preview: false
   kakao:
     alimtalk:
-      enabled: true
-      # 솔라피 API Key & API Secret (김민정 계정으로 등록)
-      api-key: "NCSEZJCAQK6WEWMB"
-      api-secret: "BS7INVLQ3U79TVZ2KLZT0WOYPU5DK40F"
-      # 등록한 휴대폰 번호 
-      sender-phone: "01099043410"
-      # 카카오톡 채널 발신프로필 ID (선택 사항) // 사업자가 없어서 설정 불가능.
+      enabled: ${SOLAPI_ENABLED:true}
+      # 솔라피 API Key & API Secret (환경변수로 주입)
+      api-key: ${SOLAPI_API_KEY:NCSEZJCAQK6WEWMB}
+      api-secret: ${SOLAPI_API_SECRET:BS7INVLQ3U79TVZ2KLZT0WOYPU5DK40F}
+      # 발신자 등록 휴대폰 번호
+      sender-phone: ${SOLAPI_SENDER_PHONE:01099043410}
+      # 카카오톡 채널 발신프로필 ID (선택 사항)
       pf-id: ${KAKAO_ALIMTALK_PF_ID:}
   member:
     simple-password-reset-enabled: false

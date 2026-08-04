@@ -81,12 +81,20 @@ public class SolapiKakaoAlimtalkClient {
             && apiSecret != null && !apiSecret.trim().isEmpty();
     }
 
+    private String maskPhone(String phone) {
+        if (phone == null || phone.length() < 7) return "***";
+        if (phone.length() == 11) {
+            return phone.substring(0, 3) + "-****-" + phone.substring(7);
+        }
+        return phone.substring(0, 3) + "-***-" + phone.substring(phone.length() - 4);
+    }
+
     /**
      * [1] 솔라피 REST API 호출 - 실제 스마트폰으로 SMS/LMS 문자 전송
      */
     private void sendRealSms(Long notificationId, String recipient, String sender, String title, String content, LocalDateTime now) {
         try {
-            log.info("▶ [Solapi SMS API] 실제 문자 전송 시작 - 수신자: {}, 제목: {}", recipient, title);
+            log.info("▶ [Solapi SMS API] 실제 문자 전송 시작 - 수신자: {}, 제목: {}", maskPhone(recipient), title);
 
             // 1. 요청 헤더 설정 (JSON 타입 및 HMAC 암호화 인증 헤더)
             HttpHeaders headers = new HttpHeaders();
@@ -133,9 +141,8 @@ public class SolapiKakaoAlimtalkClient {
         
         log.info("================================================================================");
         log.info("[SMS 가상 발송 모드 (Mock Mode)]");
-        log.info(" 수신자 전화번호 : {}", recipient);
+        log.info(" 수신자 전화번호 : {}", maskPhone(recipient));
         log.info(" 알림 제목       : {}", title);
-        log.info(" 알림 내용       : {}", content);
         log.info(" 메시지 ID       : {}", mockProviderMsgId);
         log.info("================================================================================");
 
