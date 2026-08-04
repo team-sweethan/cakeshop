@@ -902,6 +902,10 @@ h2.section-title {
     border-color: var(--color-dark)
 }
 
+.product-detail__actions {
+    margin-top: var(--space-3)
+}
+
 .product-gallery__thumbnails .placeholder-image {
     width: 100%
 }
