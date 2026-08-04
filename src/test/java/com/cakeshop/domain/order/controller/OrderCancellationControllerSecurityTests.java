@@ -1,6 +1,7 @@
 package com.cakeshop.domain.order.controller;
 
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -47,6 +48,17 @@ class OrderCancellationControllerSecurityTests {
                 .andExpect(redirectedUrl("/orders/10"));
 
         verify(refundFacade).cancelCustomerOrder(3L, 10L, "단순 변심");
+    }
+
+    @Test
+    void cancel_reasonOver200_isBadRequest() throws Exception {
+        mockMvc.perform(post("/orders/10/cancel")
+                        .with(authentication(memberAuthentication()))
+                        .with(csrf())
+                        .param("reason", "가".repeat(201)))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(refundFacade);
     }
 
     private UsernamePasswordAuthenticationToken memberAuthentication() {

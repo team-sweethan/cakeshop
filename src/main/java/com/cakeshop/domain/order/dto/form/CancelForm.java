@@ -10,6 +10,6 @@ import lombok.Setter;
 public class CancelForm {
 
     @NotBlank
-    @Size(max = 500)
+    @Size(max = 200)
     private String reason;
 }

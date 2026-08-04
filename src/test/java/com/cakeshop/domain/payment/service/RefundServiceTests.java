@@ -183,6 +183,21 @@ class RefundServiceTests {
     }
 
     @Test
+    void prepareCustomerCancellation_reasonOver200_returnsInvalidInput() {
+        assertThatThrownBy(() -> refundService.prepareCustomerCancellation(
+                3L,
+                10L,
+                "가".repeat(201)
+        )).isInstanceOfSatisfying(
+                BusinessException.class,
+                error -> assertThat(error.getErrorCode())
+                        .isEqualTo(CommonErrorCode.INVALID_INPUT)
+        );
+
+        verify(orderMapper, never()).findOrderByIdForUpdate(10L);
+    }
+
+    @Test
     void completeCancellation_customer_restoresStockAndCompletesStates() {
         RefundRequest request = request();
         CancellationResult result = new CancellationResult("CANCELED", "transaction-key", NOW.plusSeconds(2));

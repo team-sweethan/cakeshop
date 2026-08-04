@@ -210,7 +210,7 @@ public class RefundService {
     }
 
     private void validateCancellationInput(long requestedBy, String reason) {
-        if (requestedBy <= 0 || reason == null || reason.isBlank() || reason.length() > 500) {
+        if (requestedBy <= 0 || reason == null || reason.isBlank() || reason.length() > 200) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
     }
