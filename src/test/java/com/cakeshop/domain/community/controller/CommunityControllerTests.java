@@ -174,6 +174,37 @@ class CommunityControllerTests {
     }
 
     /**
+     * 댓글 "더 보기" 요청이 조회수를 올리지 않는지 확인한다(DOMAIN.md 6.2, PR #98 Codex 리뷰).
+     *
+     * <p>10분 창만으로는 막히지 않는다 — 상세를 10분 넘게 읽다가 누르면 창이 이미 닫혀
+     * 그대로 +1이 된다. 창 안에서만 확인하는 테스트는 이 경계를 통째로 놓치고, 통과한다.
+     * 그래서 창의 폭이 아니라 <b>경로가 갈리는지</b>를 본다.
+     */
+    @Test
+    void detail_loadingMoreComments_doesNotCountAsView() throws Exception {
+        when(communityService.getVisiblePost(eq(15L), isNull())).thenReturn(publishedPost());
+
+        mockMvc.perform(get("/community/15").param("comments", "40"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("customer/community/detail"));
+
+        verify(communityService).getVisiblePost(eq(15L), isNull());
+        verify(communityService, never()).getPostDetail(anyLong(), any(), anyString());
+    }
+
+    /** 반대쪽. 평범한 진입은 그대로 세어야 한다 — 위 테스트만 있으면 아무도 안 세도 통과한다. */
+    @Test
+    void detail_directEntry_stillCountsAsView() throws Exception {
+        when(communityService.getPostDetail(eq(15L), isNull(), anyString()))
+                .thenReturn(publishedPost());
+
+        mockMvc.perform(get("/community/15")).andExpect(status().isOk());
+
+        verify(communityService).getPostDetail(eq(15L), isNull(), anyString());
+        verify(communityService, never()).getVisiblePost(anyLong(), any());
+    }
+
+    /**
      * 조회자 키가 인증 정보·세션에서만 오는지 확인한다(DOMAIN.md 6.2).
      *
      * <p>클라이언트가 정하는 값이면 매번 다른 키를 실어 보내는 것만으로 중복 방지가
@@ -433,7 +464,8 @@ class CommunityControllerTests {
     /** "더 보기"가 실어 보낸 값이 그대로 Service에 넘어가야 펼친 상태가 유지된다. */
     @Test
     void detail_commentsParameter_isPassedToService() throws Exception {
-        when(communityService.getPostDetail(eq(15L), isNull(), anyString())).thenReturn(publishedPost());
+        // comments가 있는 요청은 조회수를 올리지 않는 경로로 간다.
+        when(communityService.getVisiblePost(eq(15L), isNull())).thenReturn(publishedPost());
 
         mockMvc.perform(get("/community/15").param("comments", "40"))
                 .andExpect(status().isOk());
@@ -444,7 +476,8 @@ class CommunityControllerTests {
     /** 상세는 공개 화면이라 주소가 망가져도 오류 페이지 대신 기본 상태를 보여준다. */
     @Test
     void detail_invalidCommentsParameter_fallsBackToDefault() throws Exception {
-        when(communityService.getPostDetail(eq(15L), isNull(), anyString())).thenReturn(publishedPost());
+        // 값이 망가져도 comments가 붙은 요청은 더 보기다. 조회수는 여기서도 올리지 않는다.
+        when(communityService.getVisiblePost(eq(15L), isNull())).thenReturn(publishedPost());
 
         mockMvc.perform(get("/community/15").param("comments", "전체"))
                 .andExpect(status().isOk());
