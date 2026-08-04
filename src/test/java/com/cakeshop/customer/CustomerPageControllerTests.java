@@ -86,7 +86,7 @@ class CustomerPageControllerTests {
                         new MyPageController(
                                 memberService,
                                 mock(SessionRegistry.class)),
-                        new NotificationUserController(mock(NotificationService.class), mock(StoreService.class)),
+                        new NotificationUserController(),
                         new CouponController(),
                         new ReviewController())
                 .setCustomArgumentResolvers(

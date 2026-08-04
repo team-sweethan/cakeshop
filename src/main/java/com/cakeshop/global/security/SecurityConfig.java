@@ -43,6 +43,7 @@ public class SecurityConfig {
                 !"/cart/count".equals(request.getRequestURI()
                         .substring(request.getContextPath().length())));
 
+        http
             // 웹훅 및 알림 REST API 경로 CSRF 제외 — 전체 비활성화 금지
             .csrf(csrf -> csrf.ignoringRequestMatchers("/webhooks/toss", "/api/notifications/**"))
             .requestCache(cache -> cache.requestCache(requestCache))
