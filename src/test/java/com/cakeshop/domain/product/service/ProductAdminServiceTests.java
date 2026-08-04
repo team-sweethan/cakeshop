@@ -37,12 +37,16 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
 
 @ExtendWith(MockitoExtension.class)
 class ProductAdminServiceTests {
 
     @Mock
     private ProductMapper productMapper;
+
+    @Mock
+    private ProductImageService productImageService;
 
     @InjectMocks
     private ProductAdminService productAdminService;
@@ -317,6 +321,36 @@ class ProductAdminServiceTests {
                 .isZero();
         assertThat(savedProduct.getStatus())
                 .isEqualTo(ProductStatus.INACTIVE);
+        verify(productImageService).uploadImages(
+                10L,
+                form.getImageFiles()
+        );
+    }
+
+    @Test
+    void createProductWithImagesDelegatesImagesInSelectionOrder() {
+        ProductForm form = validProductForm();
+        MockMultipartFile representative = imageFile(
+                "representative.png"
+        );
+        MockMultipartFile detail = imageFile("detail.png");
+        form.setImageFiles(List.of(representative, detail));
+
+        when(productMapper.existsActiveCategoryById(1L))
+                .thenReturn(true);
+        when(productMapper.insertProduct(any(Product.class)))
+                .thenAnswer(invocation -> {
+                    Product product = invocation.getArgument(0);
+                    product.setId(10L);
+                    return 1;
+                });
+
+        productAdminService.createProduct(form);
+
+        verify(productImageService).uploadImages(
+                10L,
+                List.of(representative, detail)
+        );
     }
 
     @Test
@@ -712,5 +746,23 @@ class ProductAdminServiceTests {
         image.setImageUrl(imageUrl);
         image.setSortOrder(sortOrder);
         return image;
+    }
+
+    private MockMultipartFile imageFile(String filename) {
+        return new MockMultipartFile(
+                "imageFiles",
+                filename,
+                "image/png",
+                new byte[] {
+                        (byte) 0x89,
+                        0x50,
+                        0x4E,
+                        0x47,
+                        0x0D,
+                        0x0A,
+                        0x1A,
+                        0x0A
+                }
+        );
     }
 }

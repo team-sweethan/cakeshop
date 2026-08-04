@@ -12,12 +12,15 @@
 
   <!-- 공통 및 고객 화면 스타일 -->
   <link rel="stylesheet"
-        th:href="@{/css/app.css(v='product-images-square')}">
+        th:href="@{/css/app.css(v='product-detail-actions')}">
   <link rel="stylesheet" th:href="@{/css/customer-mockup.css}">
 
   <!-- 공통 및 고객 화면 스크립트 -->
   <script defer th:src="@{/js/app.js}"></script>
   <script defer th:src="@{/js/customer-mockup.js}"></script>
+  <script defer
+          th:src="@{/js/product-gallery.js(v='product-gallery-navigation')}">
+  </script>
 </head>
 
 <body data-page-title="상품 상세">
@@ -64,21 +67,45 @@
     <div class="product-gallery">
       <!-- 표시 순서가 가장 앞선 이미지를 대표 이미지로 사용한다. -->
       <th:block th:if="${!#lists.isEmpty(product.images)}">
-        <img class="placeholder-image placeholder-image--lg product-gallery__main-image"
-             data-product-main-image
-             th:src="${product.images[0].imageUrl}"
-             th:alt="|${product.name} 대표 이미지|">
+        <div class="product-gallery__main">
+          <button class="product-gallery__nav product-gallery__nav--previous"
+                  type="button"
+                  data-product-gallery-previous
+                  th:if="${product.images.size() > 1}"
+                  aria-label="이전 상품 이미지">
+            &lt;
+          </button>
+
+          <img class="placeholder-image placeholder-image--lg product-gallery__main-image"
+               data-product-main-image
+               th:src="${product.images[0].imageUrl}"
+               th:alt="|${product.name} 대표 이미지|">
+
+          <button class="product-gallery__nav product-gallery__nav--next"
+                  type="button"
+                  data-product-gallery-next
+                  th:if="${product.images.size() > 1}"
+                  aria-label="다음 상품 이미지">
+            &gt;
+          </button>
+        </div>
 
         <!-- 대표 이미지를 제외한 나머지 이미지를 순서대로 표시한다. -->
         <div class="product-gallery__thumbnails grid grid--4"
              th:if="${product.images.size() > 1}">
-          <img class="placeholder-image placeholder-image--sm product-gallery__thumbnail"
-               loading="lazy"
-               data-product-thumbnail
-               th:each="image, imageStatus : ${product.images}"
-               th:if="${imageStatus.index > 0}"
-               th:src="${image.imageUrl}"
-               th:alt="|${product.name} 이미지 ${imageStatus.count}|">
+          <button class="product-gallery__thumbnail-button"
+                  type="button"
+                  data-product-thumbnail
+                  th:each="image, imageStatus : ${product.images}"
+                  th:if="${imageStatus.index > 0}"
+                  th:attr="data-image-url=${image.imageUrl},
+                           data-image-alt=|${product.name} 이미지 ${imageStatus.count}|"
+                  th:aria-label="|${product.name} 이미지 ${imageStatus.count} 크게 보기|">
+            <img class="placeholder-image placeholder-image--sm product-gallery__thumbnail"
+                 loading="lazy"
+                 th:src="${image.imageUrl}"
+                 th:alt="|${product.name} 이미지 ${imageStatus.count}|">
+          </button>
         </div>
       </th:block>
 
@@ -390,7 +417,7 @@
       </div>
 
       <!-- 주문 및 장바구니 버튼 -->
-      <div class="stack">
+      <div class="stack product-detail__actions">
 
         <!-- 재고가 있는 경우 -->
         <div

@@ -28,9 +28,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class ProductAdminService {
 
     private final ProductMapper productMapper;
+    private final ProductImageService productImageService;
 
-    public ProductAdminService(ProductMapper productMapper) {
+    public ProductAdminService(
+            ProductMapper productMapper,
+            ProductImageService productImageService
+    ) {
         this.productMapper = productMapper;
+        this.productImageService = productImageService;
     }
 
     /**
@@ -228,6 +233,12 @@ public class ProductAdminService {
 
         // 상품을 등록하고 자동 생성된 상품 ID를 Product에 저장한다.
         productMapper.insertProduct(product);
+
+        // 등록 요청에 포함된 이미지를 같은 트랜잭션에서 순서대로 저장한다.
+        productImageService.uploadImages(
+                product.getId(),
+                form.getImageFiles()
+        );
 
         return product.getId();
     }

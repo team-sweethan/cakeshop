@@ -1,5 +1,7 @@
 package com.cakeshop.domain.product.service;
 
+import java.util.List;
+
 import com.cakeshop.domain.product.dto.form.ProductImageUploadForm;
 import com.cakeshop.domain.product.entity.Product;
 import com.cakeshop.domain.product.entity.ProductImage;
@@ -60,6 +62,37 @@ public class ProductImageService {
                 : form.getImageFile();
 
         productImageValidator.validate(imageFile);
+
+        return uploadValidatedImage(productId, imageFile);
+    }
+
+    /** 상품 등록 요청에 포함된 이미지를 선택 순서대로 저장한다. */
+    @Transactional
+    public void uploadImages(
+            long productId,
+            List<MultipartFile> imageFiles
+    ) {
+        List<MultipartFile> files = imageFiles == null
+                ? List.of()
+                : imageFiles.stream()
+                        .filter(file -> file != null && !file.isEmpty())
+                        .toList();
+
+        if (files.size() > MAX_IMAGES_PER_PRODUCT) {
+            throw new BusinessException(
+                    ProductErrorCode.IMAGE_LIMIT_EXCEEDED
+            );
+        }
+
+        // 파일 저장 전에 전체 파일을 검증해 일부 이미지만 남는 상황을 막는다.
+        files.forEach(productImageValidator::validate);
+        files.forEach(file -> uploadValidatedImage(productId, file));
+    }
+
+    private long uploadValidatedImage(
+            long productId,
+            MultipartFile imageFile
+    ) {
 
         Product product = productMapper.findSalesInfoByIdForUpdate(
                 productId
