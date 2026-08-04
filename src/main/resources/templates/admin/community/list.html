@@ -12,68 +12,146 @@
   <div class="admin-main">
     <header th:replace="~{fragments/admin/header :: header('커뮤니티 관리')}"></header>
     <main class="admin-content">
-      <div th:replace="~{fragments/admin/mock-notice :: notice}"></div>
+
+      <div th:replace="~{fragments/common/alert :: alert}"></div>
+
       <h1 class="admin-page-title">커뮤니티 관리</h1>
 
-      <form class="admin-toolbar" method="get" th:action="@{/admin/community}">
-        <input class="form-control" name="writer" aria-label="작성자 검색" placeholder="작성자 검색">
-        <input class="form-control" name="title" aria-label="제목 검색" placeholder="제목 검색">
-        <select class="form-control" name="category" aria-label="분류">
-          <option>분류 전체</option><option>후기</option><option>질문</option><option>자유</option><option>레시피</option>
-        </select>
-        <select class="form-control" name="status" aria-label="상태">
-          <option>상태 전체</option><option>정상</option><option>제재</option>
-        </select>
-        <button class="btn" type="submit">검색</button>
-      </form>
+      <!--
+        상태 필터와 정렬만 받는다(DOMAIN.md 6.7). 작성자·제목 검색은 넣지 않았다 —
+        관리자가 하는 일은 신고된 글을 찾아 조치하는 것이고, 그 동선은 정렬이 해결한다.
+
+        필터는 주소로 표현해 새로고침·뒤로가기에서도 유지된다. 고객 목록과 같은 방식이다.
+        모르는 값이 들어와도 오류가 아니라 기본값으로 떨어진다.
+      -->
+      <div class="cluster section">
+        <a class="btn"
+           th:classappend="${selectedStatus == null} ? ' is-active'"
+           th:href="@{/admin/community(sort=${selectedSort})}">상태 전체</a>
+
+        <a class="btn"
+           th:classappend="${selectedStatus?.name() == 'PUBLISHED'} ? ' is-active'"
+           th:href="@{/admin/community(status='PUBLISHED', sort=${selectedSort})}">노출 중</a>
+
+        <a class="btn"
+           th:classappend="${selectedStatus?.name() == 'BLOCKED'} ? ' is-active'"
+           th:href="@{/admin/community(status='BLOCKED', sort=${selectedSort})}">차단됨</a>
+
+        <a class="btn"
+           th:classappend="${selectedStatus?.name() == 'DELETED'} ? ' is-active'"
+           th:href="@{/admin/community(status='DELETED', sort=${selectedSort})}">삭제됨</a>
+      </div>
+
+      <div class="cluster section">
+        <a class="btn"
+           th:classappend="${selectedSort.name() == 'LATEST'} ? ' is-active'"
+           th:href="@{/admin/community(status=${selectedStatus}, sort='LATEST')}">최신순</a>
+
+        <a class="btn"
+           th:classappend="${selectedSort.name() == 'REPORTS'} ? ' is-active'"
+           th:href="@{/admin/community(status=${selectedStatus}, sort='REPORTS')}">신고 많은 순</a>
+      </div>
 
       <div class="table-wrap">
         <table class="data-table">
           <thead>
-            <tr><th>번호</th><th>분류</th><th>제목</th><th>작성자</th><th>작성일</th><th>상태</th><th>관리</th></tr>
+            <tr><th>번호</th><th>분류</th><th>제목</th><th>작성자</th><th>작성일</th><th>미처리 신고</th><th>상태</th><th>관리</th></tr>
           </thead>
           <tbody>
-            <tr>
-              <td>15</td><td>후기</td>
-              <td><a th:href="@{/community/15}">딸기 생크림 케이크 재구매 후기입니다</a></td>
-              <td>단골손님</td><td>2026.07.21</td>
-              <td><span class="badge badge--success" data-status-badge>정상</span></td>
-              <td><div class="cluster"><a class="btn" th:href="@{/admin/community/15}">상세보기</a>
-                  <button class="btn btn--danger" type="button" data-set-status="제재" data-status-class="badge badge--danger" data-confirm="게시글을 제재하시겠습니까?" data-alt-label="제재 해제" data-alt-set-status="정상" data-alt-status-class="badge badge--success" data-alt-confirm="제재를 해제하시겠습니까?" data-alt-class="btn">제재</button>
-                  <button class="btn btn--danger" type="button" data-confirm="게시글을 삭제하시겠습니까?">삭제</button></div></td>
-            </tr>
-            <tr>
-              <td>14</td><td>질문</td>
-              <td><a th:href="@{/community/14}">레터링 케이크 문구는 몇 자까지 가능한가요?</a></td>
-              <td>예비신부</td><td>2026.07.20</td>
-              <td><span class="badge badge--success" data-status-badge>정상</span></td>
-              <td><div class="cluster"><a class="btn" th:href="@{/admin/community/14}">상세보기</a>
-                  <button class="btn btn--danger" type="button" data-set-status="제재" data-status-class="badge badge--danger" data-confirm="게시글을 제재하시겠습니까?" data-alt-label="제재 해제" data-alt-set-status="정상" data-alt-status-class="badge badge--success" data-alt-confirm="제재를 해제하시겠습니까?" data-alt-class="btn">제재</button>
-                  <button class="btn btn--danger" type="button" data-confirm="게시글을 삭제하시겠습니까?">삭제</button></div></td>
-            </tr>
-            <tr>
-              <td>13</td><td>레시피</td>
-              <td><a th:href="@{/community/13}">집에서 따라 하는 기본 시트 만들기</a></td>
-              <td>홈베이킹러</td><td>2026.07.19</td>
-              <td><span class="badge badge--success" data-status-badge>정상</span></td>
-              <td><div class="cluster"><a class="btn" th:href="@{/admin/community/13}">상세보기</a>
-                  <button class="btn btn--danger" type="button" data-set-status="제재" data-status-class="badge badge--danger" data-confirm="게시글을 제재하시겠습니까?" data-alt-label="제재 해제" data-alt-set-status="정상" data-alt-status-class="badge badge--success" data-alt-confirm="제재를 해제하시겠습니까?" data-alt-class="btn">제재</button>
-                  <button class="btn btn--danger" type="button" data-confirm="게시글을 삭제하시겠습니까?">삭제</button></div></td>
-            </tr>
-            <tr style="opacity:.6">
-              <td>9</td><td>자유</td>
-              <td><span class="note">외부 링크 도배 게시글</span></td>
-              <td>탈퇴회원</td><td>2026.07.16</td>
-              <td><span class="badge badge--danger" data-status-badge>제재</span></td>
-              <td><div class="cluster"><a class="btn" th:href="@{/admin/community/9}">상세보기</a>
-                  <button class="btn" type="button" data-set-status="정상" data-status-class="badge badge--success" data-confirm="제재를 해제하시겠습니까?" data-alt-label="제재" data-alt-set-status="제재" data-alt-status-class="badge badge--danger" data-alt-confirm="게시글을 제재하시겠습니까?" data-alt-class="btn btn--danger">제재 해제</button>
-                  <button class="btn btn--danger" type="button" data-confirm="게시글을 삭제하시겠습니까?">삭제</button></div></td>
+            <!--
+              차단·해제 버튼은 여기 두지 않는다. 차단에는 사유가 필수인데(DOMAIN.md 4.3)
+              목록에는 사유를 입력할 자리가 없다. 조치는 상세에서 한다.
+            -->
+            <tr th:each="post : ${pageResult.content}">
+              <td th:text="${post.id}">0</td>
+              <td th:text="${post.categoryName}">분류</td>
+              <td>
+                <!-- 본문·제목은 순수 텍스트다. th:utext를 쓰지 않는다(DOMAIN.md 7). -->
+                <a th:href="@{/admin/community/{postId}(postId=${post.id})}"
+                   th:text="${post.title}">제목</a>
+              </td>
+              <td th:text="${post.authorName()}">작성자</td>
+              <td th:text="${#temporals.format(post.createdAt, 'yyyy.MM.dd')}">2026.01.01</td>
+              <td>
+                <span th:if="${post.hasPendingReports()}" class="badge badge--danger"
+                      th:text="${post.pendingReportCount}">0</span>
+                <span th:unless="${post.hasPendingReports()}" class="text-muted">-</span>
+              </td>
+              <td>
+                <!--
+                  상태 어휘는 문서와 같은 말을 쓴다(DOMAIN.md 6.7). 목업의 정상/제재는
+                  버렸다 — 화면·문서·코드가 서로 다른 말을 쓰면 같은 상태를 두고 다른
+                  것을 가리키고 있는지 알 수 없다.
+                -->
+                <span th:if="${post.status.name() == 'PUBLISHED'}"
+                      class="badge badge--success">노출 중</span>
+                <span th:if="${post.status.name() == 'BLOCKED'}"
+                      class="badge badge--danger">차단됨</span>
+                <span th:if="${post.status.name() == 'DELETED'}"
+                      class="badge">삭제됨</span>
+              </td>
+              <td>
+                <a class="btn" th:href="@{/admin/community/{postId}(postId=${post.id})}">상세보기</a>
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <p class="note">제재된 게시글은 고객 화면에서 열람이 차단됩니다.</p>
+      <!--
+        빈 목록은 평소 화면에 없어서 표현식이 깨져도 눈에 띄지 않는다. 조건부 블록은
+        렌더링 테스트로 고정한다(SCREENS.md).
+      -->
+      <div class="panel panel--dashed text-muted"
+           th:if="${pageResult.content.isEmpty()}"
+           style="text-align:center">
+        조건에 맞는 게시글이 없습니다.
+      </div>
+
+      <nav th:if="${pageResult.totalPages > 1}"
+           class="cluster section"
+           aria-label="페이지 이동"
+           style="justify-content:center">
+
+        <a class="btn"
+           th:if="${pageNavigation.hasPreviousBlock}"
+           th:href="@{/admin/community(
+               status=${selectedStatus},
+               sort=${selectedSort},
+               page=${pageNavigation.previousPage}
+           )}">
+          이전
+        </a>
+
+        <span class="btn btn--disabled" th:unless="${pageNavigation.hasPreviousBlock}">이전</span>
+
+        <a class="btn"
+           th:each="pageNumber :
+               ${#numbers.sequence(pageNavigation.startPage, pageNavigation.endPage)}"
+           th:text="${pageNumber}"
+           th:classappend="${pageNumber == pageResult.page} ? ' is-active'"
+           th:href="@{/admin/community(
+               status=${selectedStatus},
+               sort=${selectedSort},
+               page=${pageNumber}
+           )}">
+          1
+        </a>
+
+        <a class="btn"
+           th:if="${pageNavigation.hasNextBlock}"
+           th:href="@{/admin/community(
+               status=${selectedStatus},
+               sort=${selectedSort},
+               page=${pageNavigation.nextPage}
+           )}">
+          다음
+        </a>
+
+        <span class="btn btn--disabled" th:unless="${pageNavigation.hasNextBlock}">다음</span>
+      </nav>
+
+      <p class="note">차단된 게시글은 고객 화면에서 열람이 차단됩니다.</p>
     </main>
   </div>
 </div>

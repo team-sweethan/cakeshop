@@ -31,6 +31,12 @@
     </div>
 
     <!--
+      신고 접수처럼 화면에 흔적이 남지 않는 조치의 결과를 알린다. 신고 내역은 관리자만
+      보므로(DOMAIN.md 6.6), 알리지 않으면 접수됐는지 알 방법이 없다.
+    -->
+    <div th:replace="~{fragments/common/alert :: alert}"></div>
+
+    <!--
       차단된 글은 작성자 본인만 여기까지 도달한다(DOMAIN.md 4.3).
       작성자는 차단된 글에 아무 조치도 할 수 없으므로 사유만 전달한다.
     -->
@@ -89,13 +95,54 @@
           <button class="btn btn--primary" type="submit">좋아요</button>
         </form>
       </div>
+
+      <!--
+        신고. 남의 글에만, 로그인 회원에게만 열린다(DOMAIN.md 6.6). 자기 글이 문제라면
+        지우면 되므로 작성자에게는 이 자리가 아예 없다.
+
+        좋아요와 정반대로 <b>취소가 없다.</b> 한 번 접수되면 되돌릴 수 없으므로 폼을 펼쳐야
+        보이게 두고, 사유를 필수로 받는다. 관리자가 읽고 판단할 근거가 그 문장뿐이다.
+
+        검증에 실패해 화면이 다시 그려지면 스스로 펼친다. 접힌 채로 돌아오면 사용자에게는
+        아무 일도 일어나지 않은 것처럼 보이고, 오류 문구가 화면 밖에 남는다.
+      -->
+      <details class="section" th:if="${canReport and !alreadyReported}"
+               th:object="${reportForm}"
+               th:attr="open=${#fields.hasErrors('reason')} ? 'open' : null">
+        <summary>이 게시글 신고</summary>
+
+        <form method="post"
+              th:action="@{/community/{postId}/reports(postId=${post.id})}">
+          <!-- 신고 폼도 댓글 구역 위에 있다. 좋아요와 같은 이유로 펼친 상태를 실어 보낸다. -->
+          <input type="hidden" name="comments" th:value="${commentSection.limit}">
+          <div class="form-group">
+            <label class="form-label" for="reportReason">신고 사유</label>
+            <!-- maxlength는 서버 검증(DOMAIN.md 7)과 같은 500자다. -->
+            <textarea class="form-control form-control--textarea" id="reportReason"
+                      th:field="*{reason}" style="min-height:96px"
+                      placeholder="신고 사유를 입력하세요" maxlength="500" required></textarea>
+            <p class="field-error" th:errors="*{reason}"></p>
+          </div>
+          <div class="cluster cluster--between">
+            <span class="text-muted">접수된 신고는 취소할 수 없습니다.</span>
+            <button class="btn btn--danger" type="submit">신고 접수</button>
+          </div>
+        </form>
+      </details>
+
+      <!--
+        이미 신고한 사람에게는 폼 대신 이 안내가 보인다. 폼을 그대로 두면 다시 눌렀을 때
+        오류 화면으로 튀는데, 그건 사용자가 잘못한 것이 아니라 이미 접수된 것이다.
+      -->
+      <p class="note" th:if="${alreadyReported}">
+        이미 신고한 게시글입니다.
+      </p>
     </article>
 
     <hr class="divider">
 
     <!--
       댓글. 최신 20건을 오래된 순으로 보여주고, 더 있으면 "더 보기"로 과거를 펼친다.
-      좋아요 버튼은 조각 4, 신고 버튼은 조각 5다.
 
       구역 제목의 개수는 노출 중인 댓글만 센다. 삭제된 댓글은 자리 표시로 남지만
       개수에는 들어가지 않는다(DOMAIN.md 4.4).

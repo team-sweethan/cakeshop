@@ -291,7 +291,46 @@ UPDATE `posts` p
        p.`updated_at` = p.`updated_at`;
 
 -- ---------------------------------------------------------------------------
--- 7. 확인
+-- 7. 신고
+--
+-- 관리자 화면은 신고가 하나도 없으면 전부 빈 상태로만 보인다 — '신고 많은 순' 정렬도,
+-- '미처리' 배지도, '신고 기각' 버튼도 나타나지 않아서 로컬에서 확인할 방법이 없다.
+--
+-- 세 가지 상태를 모두 깔아 둔다. 미처리 신고가 있는 글, 차단하면서 처리한 신고,
+-- 기각한 신고. 상태가 하나뿐이면 목록 정렬이 '미처리만 세는지'를 눈으로 볼 수 없다.
+--
+-- 자기 글은 신고할 수 없으므로(DOMAIN.md 6.6) 신고자는 언제나 작성자가 아닌 회원이다.
+-- 시드 게시글은 대부분 user@ 가 쓴 것이라, 신고자를 회원 하나로 고정하면 조건에 걸려
+-- 한 건도 안 들어간다. 그래서 글마다 작성자가 아닌 쪽을 골라 넣는다.
+-- ---------------------------------------------------------------------------
+
+SET @pending_report_post_id := (SELECT `id` FROM `posts`
+                                 WHERE `title` = '한 번 수정한 글입니다');
+SET @rejected_report_post_id := (SELECT MIN(`id`) FROM `posts`
+                                  WHERE `status` = 'PUBLISHED'
+                                    AND `id` <> @pending_report_post_id);
+SET @blocked_post_id := (SELECT MIN(`id`) FROM `posts` WHERE `status` = 'BLOCKED');
+
+INSERT INTO `post_reports` (`post_id`, `reporter_id`, `reason`, `status`, `created_at`)
+SELECT r.`post_id`,
+       IF(p.`member_id` = @member_id, @admin_id, @member_id),
+       r.`reason`,
+       r.`status`,
+       '2026-07-26 15:00:00'
+  FROM (
+        SELECT @pending_report_post_id  AS `post_id`,
+               '광고성 링크가 반복해서 올라옵니다.' AS `reason`, 'PENDING'  AS `status`
+        UNION ALL
+        SELECT @rejected_report_post_id,
+               '내용이 마음에 들지 않습니다.',        'REJECTED'
+        UNION ALL
+        SELECT @blocked_post_id,
+               '욕설이 포함되어 있습니다.',           'RESOLVED'
+       ) r
+  JOIN `posts` p ON p.`id` = r.`post_id`;
+
+-- ---------------------------------------------------------------------------
+-- 8. 확인
 --
 -- 조회수불일치 는 반드시 0 이어야 한다. 0 이 아니면 view_count 와 post_views 가
 -- 갈라진 것이고, 그 상태의 조회수는 순위에 쓸 수 없다(DOMAIN.md 6.2).
@@ -305,6 +344,8 @@ SELECT (SELECT COUNT(*) FROM `post_categories` WHERE `is_active` = 1) AS `활성
        (SELECT COUNT(*) FROM `comments` WHERE `status` = 'DELETED')   AS `자리표시댓글`,
        (SELECT COUNT(*) FROM `post_likes`)                            AS `좋아요`,
        (SELECT COUNT(*) FROM `post_views`)                            AS `조회이력`,
+       (SELECT COUNT(*) FROM `post_reports` WHERE `status` = 'PENDING') AS `미처리신고`,
+       (SELECT COUNT(*) FROM `post_reports` WHERE `status` <> 'PENDING') AS `처리된신고`,
        (SELECT COUNT(*) FROM `posts` p
          WHERE p.`view_count` <> (SELECT COUNT(*) FROM `post_views` pv
                                    WHERE pv.`post_id` = p.`id`))      AS `조회수불일치`,

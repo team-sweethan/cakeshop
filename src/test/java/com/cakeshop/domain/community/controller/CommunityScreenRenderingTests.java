@@ -5,7 +5,9 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -679,36 +681,223 @@ class CommunityScreenRenderingTests {
     }
 
     /**
-     * 관리자 커뮤니티 화면은 아직 하드코딩 목업이다(SCREENS.md 관리자 목록).
+     * 신고 폼은 남의 글에만, 로그인 회원에게만 열린다(DOMAIN.md 6.6).
      *
-     * <p>목업이라도 렌더링은 되어야 한다. 컨트롤러가 뷰 이름만 반환하므로, 지금까지 이 두
-     * 화면은 어떤 테스트도 열어 본 적이 없었다.
+     * <p>펼쳐야 보이는 블록이라 표현식이 깨져도 평소 화면에서는 눈에 띄지 않는다.
+     */
+    @Test
+    void communityDetail_otherMember_rendersReportForm() throws Exception {
+        long postId = insertPost(memberId, "신고 대상 글", "본문", PostStatus.PUBLISHED);
+        long otherId = insertMember(
+                "reporter-" + System.nanoTime() + "@cakeshop.local", "신고자", "ACTIVE");
+
+        mockMvc.perform(get("/community/" + postId).with(authentication(authorOf(otherId))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("이 게시글 신고")))
+                .andExpect(content().string(containsString("접수된 신고는 취소할 수 없습니다.")));
+    }
+
+    /** 자기 글에는 신고 자리가 없다. 자기 글이 문제라면 지우면 된다(DOMAIN.md 6.6). */
+    @Test
+    void communityDetail_author_hidesReportForm() throws Exception {
+        long postId = insertPost(memberId, "내 글", "본문", PostStatus.PUBLISHED);
+
+        mockMvc.perform(get("/community/" + postId).with(authentication(authorOf(memberId))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("이 게시글 신고"))));
+    }
+
+    /**
+     * 이미 신고한 사람에게는 폼 대신 안내가 보인다.
+     *
+     * <p>폼을 그대로 두면 다시 눌렀을 때 오류 화면으로 튀는데, 그건 사용자가 잘못한 것이
+     * 아니라 이미 접수된 것이다. 신고에는 취소가 없어서 이 상태는 되돌아가지 않는다.
+     */
+    @Test
+    void communityDetail_alreadyReported_showsNoticeInsteadOfForm() throws Exception {
+        long postId = insertPost(memberId, "이미 신고한 글", "본문", PostStatus.PUBLISHED);
+        long reporterId = insertMember(
+                "reported-" + System.nanoTime() + "@cakeshop.local", "신고자", "ACTIVE");
+        insertReport(postId, reporterId, "PENDING");
+
+        mockMvc.perform(get("/community/" + postId).with(authentication(authorOf(reporterId))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("이미 신고한 게시글입니다.")))
+                .andExpect(content().string(not(containsString("이 게시글 신고"))));
+    }
+
+    /**
+     * 관리자 목록은 조각 5에서 목업을 걷어내고 실제 데이터를 그린다.
+     *
+     * <p>상태 어휘가 문서와 같은 말인지도 함께 본다. 화면만 `정상`/`제재`로 남으면 같은
+     * 상태를 두고 화면·문서·코드가 다른 것을 가리키게 된다(DOMAIN.md 6.7).
      */
     @Test
     void communityAdminList_rendersForAdmin() throws Exception {
+        insertPost(memberId, "관리자 목록에 보일 글", "본문", PostStatus.PUBLISHED);
+
         mockMvc.perform(get("/admin/community").with(authentication(admin())))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("커뮤니티 관리")))
-                .andExpect(content().string(containsString("mock-notice")))
+                .andExpect(content().string(containsString("관리자 목록에 보일 글")))
+                .andExpect(content().string(containsString("노출 중")))
+                .andExpect(content().string(containsString("신고 많은 순")))
                 .andExpect(content().string(
-                        containsString("제재된 게시글은 고객 화면에서 열람이 차단됩니다.")));
+                        containsString("차단된 게시글은 고객 화면에서 열람이 차단됩니다.")))
+                // 목업이 남긴 규칙 밖 어휘와 기능이 되살아나지 않는지 함께 본다.
+                .andExpect(content().string(not(containsString("mock-notice"))))
+                .andExpect(content().string(not(containsString("작성자 검색"))));
+    }
+
+    /** 조건에 맞는 글이 없는 목록. 평소 화면에 없어서 표현식이 깨져도 드러나지 않는다. */
+    @Test
+    void communityAdminList_withoutPosts_rendersEmptyMessage() throws Exception {
+        mockMvc.perform(get("/admin/community")
+                        .param("status", "DELETED")
+                        .with(authentication(admin())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("조건에 맞는 게시글이 없습니다.")));
     }
 
     @Test
     void communityAdminDetail_rendersForAdmin() throws Exception {
-        mockMvc.perform(get("/admin/community/15").with(authentication(admin())))
+        long postId = insertPost(memberId, "관리자 상세 글", "본문입니다", PostStatus.PUBLISHED);
+        long reporterId = insertMember(
+                "admin-report-" + System.nanoTime() + "@cakeshop.local", "신고자", "ACTIVE");
+        insertReport(postId, reporterId, "PENDING");
+
+        mockMvc.perform(get("/admin/community/" + postId).with(authentication(admin())))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("게시글 정보")))
                 .andExpect(content().string(containsString("모더레이션")))
                 .andExpect(content().string(containsString("신고 내역")))
-                .andExpect(content().string(containsString("mock-notice")));
+                .andExpect(content().string(containsString("차단 사유")))
+                .andExpect(content().string(containsString("미처리")))
+                .andExpect(content().string(containsString("신고 기각")))
+                // 규칙에 없는 조치가 되살아나지 않는지 본다(DOMAIN.md 6.7).
+                .andExpect(content().string(not(containsString("게시글 영구 삭제"))))
+                .andExpect(content().string(not(containsString("mock-notice"))));
     }
 
-    /** 관리자 화면은 관리자만 연다(DOMAIN.md 5). 목업이라고 열려 있으면 안 된다. */
+    /**
+     * 차단된 글의 관리자 상세. 본문을 볼 수 있는 유일한 화면이고(DOMAIN.md 4.3),
+     * 차단 기록과 해제 버튼이 함께 나온다.
+     */
+    @Test
+    void communityAdminDetail_blockedPost_showsBlockRecordAndUnblock() throws Exception {
+        long postId = insertPost(memberId, "차단된 글", "차단된 본문", PostStatus.BLOCKED);
+        // blocked_by는 members FK다. 차단한 관리자가 실제로 있어야 한다.
+        long adminId = insertMember(
+                "blocker-" + System.nanoTime() + "@cakeshop.local", "차단관리자", "ACTIVE");
+        jdbcTemplate.update(
+                """
+                UPDATE posts
+                SET blocked_at = ?, blocked_reason = ?, blocked_by = ?
+                WHERE id = ?
+                """,
+                BASE_TIME, "광고성 게시물", adminId, postId);
+
+        mockMvc.perform(get("/admin/community/" + postId).with(authentication(admin())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("차단됨")))
+                .andExpect(content().string(containsString("광고성 게시물")))
+                .andExpect(content().string(containsString("차단 해제")))
+                // 차단된 글의 본문은 여기서만 보인다.
+                .andExpect(content().string(containsString("차단된 본문")))
+                // 이미 차단된 글에 차단 버튼을 남기면 눌러도 400만 나오는 죽은 버튼이 된다.
+                .andExpect(content().string(not(containsString("차단하기"))));
+    }
+
+    /**
+     * 작성자가 지운 글에는 아무 조치도 할 수 없다(DOMAIN.md 4.2의 DELETED 종착).
+     * 조건부 안내라 평소 화면에 없다.
+     */
+    @Test
+    void communityAdminDetail_deletedPost_hidesModerationActions() throws Exception {
+        long postId = insertPost(memberId, "지워진 글", "본문", PostStatus.DELETED);
+        // 글이 노출 중일 때 접수된 신고는 작성자가 지워도 PENDING으로 남는다(DOMAIN.md 4.5).
+        long reporterId = insertMember(
+                "deleted-report-" + System.nanoTime() + "@cakeshop.local", "신고자", "ACTIVE");
+        insertReport(postId, reporterId, "PENDING");
+
+        mockMvc.perform(get("/admin/community/" + postId).with(authentication(admin())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("삭제됨")))
+                .andExpect(content().string(
+                        containsString("작성자가 삭제한 게시글이라 조치할 수 없습니다.")))
+                .andExpect(content().string(not(containsString("차단하기"))))
+                .andExpect(content().string(not(containsString("차단 해제"))))
+                // 미처리 신고가 남아 있어도 기각 버튼은 없다. 하나만 조건에 걸면
+                // "조치할 수 없습니다" 안내와 기각 버튼이 나란히 보인다(PR #96 Codex 리뷰).
+                .andExpect(content().string(not(containsString("신고 기각"))));
+    }
+
+    /**
+     * 작성자가 지운 글에는 기각도 막힌다. 버튼을 감추는 것은 안내일 뿐이고 막는 것은
+     * Service다 — 관리자는 이 화면에서 주소를 알게 되므로 요청만 따로 보낼 수 있다.
+     */
+    @Test
+    void communityAdminRejectReports_deletedPost_isRejectedAndLeavesReportPending()
+            throws Exception {
+        long postId = insertPost(memberId, "지워진 글", "본문", PostStatus.DELETED);
+        long reporterId = insertMember(
+                "deleted-reject-" + System.nanoTime() + "@cakeshop.local", "신고자", "ACTIVE");
+        insertReport(postId, reporterId, "PENDING");
+
+        mockMvc.perform(post("/admin/community/" + postId + "/reports/reject")
+                        .with(csrf())
+                        .with(authentication(admin())))
+                .andExpect(status().isBadRequest());
+
+        // 신고는 PENDING 그대로다. 지운 글의 신고를 자동으로 닫지 않는다(DOMAIN.md 4.5).
+        assertThat(reportStatusOf(postId)).isEqualTo("PENDING");
+    }
+
+    private String reportStatusOf(long postId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT status FROM post_reports WHERE post_id = ?", String.class, postId);
+    }
+
+    /** 관리자 화면은 관리자만 연다(DOMAIN.md 5). */
     @Test
     void communityAdmin_normalMember_isRejected() throws Exception {
         mockMvc.perform(get("/admin/community").with(authentication(authorOf(memberId))))
                 .andExpect(status().isForbidden());
+    }
+
+    /**
+     * 차단은 화면을 감추는 것이 아니라 Security가 막는다(DOMAIN.md 5).
+     *
+     * <p>일반 회원에게 버튼이 안 보이는 것은 안내일 뿐이다. 주소는 이 문서에 적혀 있고
+     * 요청은 따로 만들 수 있으므로, 막는 자리는 언제나 Security와 Service다.
+     */
+    @Test
+    void communityAdminBlock_normalMember_isRejected() throws Exception {
+        long postId = insertPost(memberId, "차단 시도 대상", "본문", PostStatus.PUBLISHED);
+
+        mockMvc.perform(post("/admin/community/" + postId + "/block")
+                        .param("reason", "마음에 안 듦")
+                        .with(csrf())
+                        .with(authentication(authorOf(memberId))))
+                .andExpect(status().isForbidden());
+
+        // 요청이 정말 아무것도 바꾸지 않았는지까지 본다. 403이 나도 조치가 끝난 뒤라면
+        // 막은 것이 아니다.
+        assertThat(statusOf(postId)).isEqualTo(PostStatus.PUBLISHED.name());
+    }
+
+    /** 신고 기각도 같다. 관리자 조치 경로는 전부 Security 뒤에 있어야 한다. */
+    @Test
+    void communityAdminRejectReports_anonymous_isRedirectedToLogin() throws Exception {
+        long postId = insertPost(memberId, "기각 시도 대상", "본문", PostStatus.PUBLISHED);
+
+        mockMvc.perform(post("/admin/community/" + postId + "/reports/reject").with(csrf()))
+                .andExpect(status().is3xxRedirection());
+    }
+
+    private String statusOf(long postId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT status FROM posts WHERE id = ?", String.class, postId);
     }
 
     private Authentication authorOf(long id) {
@@ -776,6 +965,15 @@ class CommunityScreenRenderingTests {
 
     private void insertComment(long postId) {
         insertComment(postId, memberId, "댓글", CommentStatus.PUBLISHED, BASE_TIME);
+    }
+
+    private void insertReport(long postId, long reporterId, String status) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO post_reports (post_id, reporter_id, reason, status, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                postId, reporterId, "광고성 게시물입니다", status, BASE_TIME);
     }
 
     private void insertLike(long postId, long likerId) {

@@ -7,16 +7,21 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.cakeshop.domain.community.dto.view.AdminPostDetailView;
+import com.cakeshop.domain.community.dto.view.AdminPostListView;
+import com.cakeshop.domain.community.dto.view.AdminPostSort;
 import com.cakeshop.domain.community.dto.view.CommentCountView;
 import com.cakeshop.domain.community.dto.view.CommentView;
 import com.cakeshop.domain.community.dto.view.PostCategoryView;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
 import com.cakeshop.domain.community.dto.view.PostLockView;
+import com.cakeshop.domain.community.dto.view.ReportView;
 import com.cakeshop.domain.community.entity.Comment;
 import com.cakeshop.domain.community.entity.CommentStatus;
 import com.cakeshop.domain.community.entity.Post;
 import com.cakeshop.domain.community.entity.PostStatus;
+import com.cakeshop.domain.community.entity.ReportStatus;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -838,6 +843,225 @@ class CommunityMapperTests {
     private long viewCountOf(long postId) {
         return jdbcTemplate.queryForObject(
                 "SELECT view_count FROM posts WHERE id = ?", Long.class, postId);
+    }
+
+    /** 같은 사람이 같은 글을 두 번 신고하면 UNIQUE 위반이다. 삼키지 않는다(DOMAIN.md 6.6). */
+    @Test
+    void insertReport_duplicateReporter_isRejectedByUniqueConstraint() {
+        long postId = insertPost("신고 대상", PostStatus.PUBLISHED, BASE_TIME);
+        long reporterId = insertReporter("dup");
+
+        communityMapper.insertReport(postId, reporterId, "광고입니다");
+
+        assertThatThrownBy(() -> communityMapper.insertReport(postId, reporterId, "또 신고"))
+                .isInstanceOf(DuplicateKeyException.class);
+    }
+
+    /**
+     * 이미 신고했는지가 처리 상태와 무관한지 확인한다.
+     *
+     * <p>처리된 신고를 "없음"으로 보면 재신고가 열리는데, UNIQUE 제약은 그대로라 화면에는
+     * 신고 성공이 아니라 500이 나온다(DOMAIN.md 6.6).
+     */
+    @Test
+    void existsReport_afterReportIsClosed_staysTrue() {
+        long postId = insertPost("신고 대상", PostStatus.PUBLISHED, BASE_TIME);
+        long reporterId = insertReporter("closed");
+
+        communityMapper.insertReport(postId, reporterId, "광고입니다");
+        communityMapper.closePendingReports(postId, ReportStatus.RESOLVED);
+
+        assertThat(communityMapper.existsReport(postId, reporterId)).isTrue();
+    }
+
+    /** 차단은 상태·시각·사유·조치자를 함께 남긴다(DOMAIN.md 6.7). */
+    @Test
+    void blockPost_publishedPost_recordsWhoBlockedItAndWhy() {
+        long postId = insertPost("차단 대상", PostStatus.PUBLISHED, BASE_TIME);
+        long adminId = insertReporter("admin");
+
+        assertThat(communityMapper.blockPost(postId, "광고성 게시물", adminId)).isEqualTo(1);
+
+        PostDetailView post = communityMapper.findPostById(postId);
+        assertThat(post.status()).isEqualTo(PostStatus.BLOCKED);
+        assertThat(post.blockedReason()).isEqualTo("광고성 게시물");
+        assertThat(blockedBy(postId)).isEqualTo(adminId);
+    }
+
+    /**
+     * 차단이 게시글을 "수정됨"으로 만들지 않는지 확인한다.
+     *
+     * <p>조회수·좋아요와 같은 자리다. updated_at 보존이 빠지면 차단된 글마다 작성자에게
+     * "(수정됨)"이 붙는데, 작성자는 고친 적이 없어서 원인을 찾을 수 없다(DOMAIN.md 6.3).
+     */
+    @Test
+    void blockPost_doesNotMarkPostAsEdited() {
+        long postId = insertPost("차단 대상", PostStatus.PUBLISHED, BASE_TIME);
+        long adminId = insertReporter("edit-admin");
+
+        communityMapper.blockPost(postId, "사유", adminId);
+
+        assertThat(communityMapper.findPostById(postId).isEdited()).isFalse();
+    }
+
+    /** 이미 차단된 글에 다시 걸면 0행이다. 원래 조치 기록이 덮이지 않는다(DOMAIN.md 4.2). */
+    @Test
+    void blockPost_alreadyBlockedPost_changesNothing() {
+        long postId = insertPost("이미 차단", PostStatus.PUBLISHED, BASE_TIME);
+        long firstAdminId = insertReporter("first-admin");
+        long secondAdminId = insertReporter("second-admin");
+
+        communityMapper.blockPost(postId, "첫 번째 사유", firstAdminId);
+
+        assertThat(communityMapper.blockPost(postId, "두 번째 사유", secondAdminId)).isZero();
+        assertThat(communityMapper.findPostById(postId).blockedReason())
+                .isEqualTo("첫 번째 사유");
+        assertThat(blockedBy(postId)).isEqualTo(firstAdminId);
+    }
+
+    /** 작성자가 지운 글은 차단할 수 없다. 차단되면 지운 글이 되살아난다(DOMAIN.md 4.2). */
+    @Test
+    void blockPost_deletedPost_changesNothing() {
+        long postId = insertPost("지워진 글", PostStatus.DELETED, BASE_TIME);
+        long adminId = insertReporter("deleted-admin");
+
+        assertThat(communityMapper.blockPost(postId, "사유", adminId)).isZero();
+        assertThat(communityMapper.findPostById(postId).status()).isEqualTo(PostStatus.DELETED);
+    }
+
+    /** 해제는 상태만 되돌리고 차단 기록은 남긴다(DOMAIN.md 4.2). */
+    @Test
+    void unblockPost_keepsBlockRecord() {
+        long postId = insertPost("해제 대상", PostStatus.PUBLISHED, BASE_TIME);
+        long adminId = insertReporter("unblock-admin");
+
+        communityMapper.blockPost(postId, "광고성 게시물", adminId);
+
+        assertThat(communityMapper.unblockPost(postId)).isEqualTo(1);
+
+        PostDetailView post = communityMapper.findPostById(postId);
+        assertThat(post.status()).isEqualTo(PostStatus.PUBLISHED);
+        assertThat(post.blockedReason()).isEqualTo("광고성 게시물");
+        assertThat(blockedBy(postId)).isEqualTo(adminId);
+    }
+
+    /** 차단된 적 없는 글에는 해제할 것이 없다. 지워진 글이 되살아나지도 않는다. */
+    @Test
+    void unblockPost_nonBlockedPost_changesNothing() {
+        long publishedId = insertPost("노출 중", PostStatus.PUBLISHED, BASE_TIME);
+        long deletedId = insertPost("지워진 글", PostStatus.DELETED, BASE_TIME);
+
+        assertThat(communityMapper.unblockPost(publishedId)).isZero();
+        assertThat(communityMapper.unblockPost(deletedId)).isZero();
+        assertThat(communityMapper.findPostById(deletedId).status())
+                .isEqualTo(PostStatus.DELETED);
+    }
+
+    /** 신고를 닫을 때 이미 닫힌 신고는 건드리지 않는다(DOMAIN.md 6.6). */
+    @Test
+    void closePendingReports_leavesAlreadyClosedReportsUntouched() {
+        long postId = insertPost("신고 여럿", PostStatus.PUBLISHED, BASE_TIME);
+        long firstReporterId = insertReporter("r1");
+        long secondReporterId = insertReporter("r2");
+
+        communityMapper.insertReport(postId, firstReporterId, "광고입니다");
+        communityMapper.closePendingReports(postId, ReportStatus.REJECTED);
+
+        communityMapper.insertReport(postId, secondReporterId, "욕설입니다");
+
+        assertThat(communityMapper.closePendingReports(postId, ReportStatus.RESOLVED))
+                .isEqualTo(1);
+        assertThat(communityMapper.countPendingReports(postId)).isZero();
+        assertThat(communityMapper.findReportsByPost(postId))
+                .extracting(ReportView::status)
+                .containsExactlyInAnyOrder(ReportStatus.REJECTED, ReportStatus.RESOLVED);
+    }
+
+    /** 관리자 목록은 상태로 거르지 않는 것이 기본이다(DOMAIN.md 4.3). */
+    @Test
+    void findPostsForAdmin_withoutFilter_includesEveryStatus() {
+        insertPost("노출", PostStatus.PUBLISHED, BASE_TIME);
+        insertPost("차단", PostStatus.BLOCKED, BASE_TIME);
+        insertPost("삭제", PostStatus.DELETED, BASE_TIME);
+
+        assertThat(adminPosts(null, AdminPostSort.LATEST))
+                .extracting(AdminPostListView::title)
+                .contains("노출", "차단", "삭제");
+    }
+
+    @Test
+    void findPostsForAdmin_withStatusFilter_returnsOnlyThatStatus() {
+        insertPost("노출", PostStatus.PUBLISHED, BASE_TIME);
+        insertPost("차단", PostStatus.BLOCKED, BASE_TIME);
+
+        assertThat(adminPosts(PostStatus.BLOCKED, AdminPostSort.LATEST))
+                .extracting(AdminPostListView::title)
+                .containsExactly("차단");
+    }
+
+    /**
+     * 신고 많은 순 정렬이 <b>미처리</b> 신고만 세는지 확인한다.
+     *
+     * <p>처리된 신고까지 세면 이미 조치한 글이 목록 맨 위에 영원히 남아, 진짜 처리할 글을
+     * 가린다. 신고 수가 같아 보여서 화면으로는 구분되지 않는다.
+     */
+    @Test
+    void findPostsForAdmin_sortedByReports_countsOnlyPendingOnes() {
+        long pendingPostId = insertPost("미처리 신고 1건", PostStatus.PUBLISHED, BASE_TIME);
+        long closedPostId = insertPost("처리된 신고 2건", PostStatus.PUBLISHED, BASE_TIME);
+
+        communityMapper.insertReport(pendingPostId, insertReporter("p1"), "광고입니다");
+        communityMapper.insertReport(closedPostId, insertReporter("c1"), "광고입니다");
+        communityMapper.insertReport(closedPostId, insertReporter("c2"), "욕설입니다");
+        communityMapper.closePendingReports(closedPostId, ReportStatus.RESOLVED);
+
+        List<AdminPostListView> posts = adminPosts(null, AdminPostSort.REPORTS);
+
+        assertThat(posts).first()
+                .extracting(AdminPostListView::title)
+                .isEqualTo("미처리 신고 1건");
+        assertThat(posts).filteredOn(post -> post.id() == closedPostId)
+                .first()
+                .extracting(AdminPostListView::pendingReportCount)
+                .isEqualTo(0L);
+    }
+
+    /** 관리자 상세는 차단 기록까지 함께 읽는다. 차단된 적 없어도 행이 사라지지 않는다. */
+    @Test
+    void findPostByIdForAdmin_readsBlockRecordAndSurvivesWithoutIt() {
+        long neverBlockedId = insertPost("차단된 적 없음", PostStatus.PUBLISHED, BASE_TIME);
+        long blockedId = insertPost("차단됨", PostStatus.PUBLISHED, BASE_TIME);
+        long adminId = insertReporter("detail-admin");
+
+        communityMapper.blockPost(blockedId, "광고성 게시물", adminId);
+
+        AdminPostDetailView neverBlocked = communityMapper.findPostByIdForAdmin(neverBlockedId);
+        assertThat(neverBlocked).isNotNull();
+        assertThat(neverBlocked.hasBlockRecord()).isFalse();
+        assertThat(neverBlocked.blockedByNickname()).isNull();
+
+        AdminPostDetailView blocked = communityMapper.findPostByIdForAdmin(blockedId);
+        assertThat(blocked.hasBlockRecord()).isTrue();
+        assertThat(blocked.blockedReason()).isEqualTo("광고성 게시물");
+        assertThat(blocked.blockedByNickname()).isNotNull();
+    }
+
+    /** 이 테스트 카테고리의 글만 본다. 다른 테스트가 남긴 글과 섞이지 않게 한다. */
+    private List<AdminPostListView> adminPosts(PostStatus status, AdminPostSort sort) {
+        return communityMapper.findPostsForAdmin(status, sort, 100, 0).stream()
+                .filter(post -> "커뮤니티 테스트".equals(post.categoryName()))
+                .toList();
+    }
+
+    private long blockedBy(long postId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT blocked_by FROM posts WHERE id = ?", Long.class, postId);
+    }
+
+    private long insertReporter(String tag) {
+        return insertMember(
+                "reporter-" + tag + "-" + System.nanoTime() + "@cakeshop.local",
+                "신고자", "ACTIVE");
     }
 
     private long insertCategory(String code, String name, boolean active) {

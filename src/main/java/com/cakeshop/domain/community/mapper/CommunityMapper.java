@@ -2,14 +2,20 @@ package com.cakeshop.domain.community.mapper;
 
 import java.util.List;
 
+import com.cakeshop.domain.community.dto.view.AdminPostDetailView;
+import com.cakeshop.domain.community.dto.view.AdminPostListView;
+import com.cakeshop.domain.community.dto.view.AdminPostSort;
 import com.cakeshop.domain.community.dto.view.CommentCountView;
 import com.cakeshop.domain.community.dto.view.CommentView;
 import com.cakeshop.domain.community.dto.view.PostCategoryView;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
 import com.cakeshop.domain.community.dto.view.PostLockView;
+import com.cakeshop.domain.community.dto.view.ReportView;
 import com.cakeshop.domain.community.entity.Comment;
 import com.cakeshop.domain.community.entity.Post;
+import com.cakeshop.domain.community.entity.PostStatus;
+import com.cakeshop.domain.community.entity.ReportStatus;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -198,5 +204,97 @@ public interface CommunityMapper {
     /** 한 게시글의 좋아요 개수. like_count가 실제와 맞는지 확인하는 데 쓴다(countViews와 같다). */
     long countLikes(
             @Param("postId") long postId
+    );
+
+    /**
+     * 신고를 접수한다. 이미 신고한 글이면 UNIQUE 위반으로 실패한다.
+     *
+     * 좋아요와 달리 중복을 삼키지 않는다(DOMAIN.md 6.6). 조용히 성공을 돌려주면 신고자는
+     * 접수됐다고 오해하는데 실제로는 아무 일도 일어나지 않는다. Service가 이 실패를
+     * ALREADY_REPORTED로 바꾼다.
+     */
+    int insertReport(
+            @Param("postId") long postId,
+            @Param("reporterId") long reporterId,
+            @Param("reason") String reason
+    );
+
+    /** 이 회원이 이 글을 이미 신고했는지. 중복 신고를 INSERT 전에 걸러내는 데 쓴다. */
+    boolean existsReport(
+            @Param("postId") long postId,
+            @Param("reporterId") long reporterId
+    );
+
+    /**
+     * 관리자 상세에 실을 신고 내역. 최신순이며 상태로 거르지 않는다 —
+     * 처리된 신고도 "무엇을 보고 조치했는지"의 기록이라 남겨서 보여 준다.
+     */
+    List<ReportView> findReportsByPost(
+            @Param("postId") long postId
+    );
+
+    /** 한 게시글의 미처리 신고 수. 조치 여부를 판단하고 하네스가 확인하는 데 쓴다. */
+    long countPendingReports(
+            @Param("postId") long postId
+    );
+
+    /**
+     * 관리자 목록. status가 null이면 모든 상태를 돌려준다.
+     *
+     * 고객 목록과 달리 상태로 거르지 않는 것이 기본이다. 관리자는 삭제·차단된 글까지
+     * 본다(DOMAIN.md 4.3).
+     */
+    List<AdminPostListView> findPostsForAdmin(
+            @Param("status") PostStatus status,
+            @Param("sort") AdminPostSort sort,
+            @Param("size") int size,
+            @Param("offset") int offset
+    );
+
+    /** 관리자 목록의 전체 개수. 필터 조건은 findPostsForAdmin과 같은 조각을 공유한다. */
+    long countPostsForAdmin(
+            @Param("status") PostStatus status
+    );
+
+    /**
+     * 관리자 상세. 상태로 거르지 않으며 차단 기록까지 함께 읽는다.
+     * 없으면 null이다.
+     */
+    AdminPostDetailView findPostByIdForAdmin(
+            @Param("postId") long postId
+    );
+
+    /**
+     * 노출 중인 게시글을 차단한다. 대상이 없거나 PUBLISHED가 아니면 0행이다.
+     *
+     * status 조건이 전이 규칙을 SQL 쪽에서도 지킨다(DOMAIN.md 4.2) — 이미 차단된 글을
+     * 다시 차단하면 차단 시각과 사유가 덮여 원래 조치 기록이 사라지고, 작성자가 지운 글은
+     * 되살아난다.
+     */
+    int blockPost(
+            @Param("postId") long postId,
+            @Param("reason") String reason,
+            @Param("adminId") long adminId
+    );
+
+    /**
+     * 차단된 게시글을 다시 노출한다. 대상이 없거나 BLOCKED가 아니면 0행이다.
+     *
+     * blocked_at·blocked_reason·blocked_by를 NULL로 되돌리지 않는다(DOMAIN.md 4.2).
+     * "과거에 차단된 적이 있다"는 관리자에게 유용한 이력이고, 노출은 status가 정한다.
+     */
+    int unblockPost(
+            @Param("postId") long postId
+    );
+
+    /**
+     * 이 게시글의 미처리 신고를 한꺼번에 닫는다. 이미 처리된 신고는 건드리지 않는다.
+     *
+     * 조치의 단위가 게시글이라 신고도 게시글 단위로 닫는다(DOMAIN.md 6.6). 차단이면
+     * RESOLVED, 기각이면 REJECTED가 들어온다. 값은 enum이라 문자열이 새로 만들어지지 않는다.
+     */
+    int closePendingReports(
+            @Param("postId") long postId,
+            @Param("status") ReportStatus status
     );
 }

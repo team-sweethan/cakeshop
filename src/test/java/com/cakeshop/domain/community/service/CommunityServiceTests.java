@@ -16,6 +16,7 @@ import java.util.List;
 
 import com.cakeshop.domain.community.dto.form.CommentForm;
 import com.cakeshop.domain.community.dto.form.PostForm;
+import com.cakeshop.domain.community.dto.form.ReportForm;
 import com.cakeshop.domain.community.dto.view.CommentCountView;
 import com.cakeshop.domain.community.dto.view.CommentSectionView;
 import com.cakeshop.domain.community.dto.view.CommentView;
@@ -36,6 +37,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
+import org.springframework.dao.DuplicateKeyException;
 
 /**
  * 상세 접근 규칙(docs/community/DOMAIN.md 4.3 표)을 칸마다 고정한다.
@@ -897,6 +899,107 @@ class CommunityServiceTests {
         verify(communityMapper).insertPost(captor.capture());
 
         return captor.getValue();
+    }
+
+    /**
+     * 신고가 실제로 접수되는지 확인한다. 사유는 폼에서 다듬어진 그대로 내려간다.
+     */
+    @Test
+    void reportPost_publishedPostOfOther_insertsReport() {
+        givenPost(PostStatus.PUBLISHED);
+
+        communityService.reportPost(POST_ID, reportFormOf("광고입니다"), OTHER_MEMBER_ID);
+
+        verify(communityMapper).insertReport(POST_ID, OTHER_MEMBER_ID, "광고입니다");
+    }
+
+    /**
+     * 중복 신고는 성공이 아니라 에러다(DOMAIN.md 6.6).
+     *
+     * <p>좋아요와 정반대인 자리다. 조용히 성공을 돌려주면 신고자는 접수됐다고 오해하는데
+     * 실제로는 아무 일도 일어나지 않는다 — 재신고는 "내 신고가 처리되지 않았다"는 표현이다.
+     */
+    @Test
+    void reportPost_alreadyReported_isRejected() {
+        givenPost(PostStatus.PUBLISHED);
+        when(communityMapper.existsReport(POST_ID, OTHER_MEMBER_ID)).thenReturn(true);
+
+        assertThatThrownBy(() ->
+                communityService.reportPost(POST_ID, reportFormOf("또 신고"), OTHER_MEMBER_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(CommunityErrorCode.ALREADY_REPORTED);
+
+        verify(communityMapper, never()).insertReport(anyLong(), anyLong(), any());
+    }
+
+    /**
+     * 확인과 INSERT 사이에 같은 사람의 신고가 먼저 들어온 경우도 같은 응답이어야 한다.
+     *
+     * <p>확인만 두면 이 경합이 500으로 나가고, 사용자에게는 신고가 접수됐는지 아닌지조차
+     * 알 수 없는 화면이 된다. UNIQUE 제약이 실제로 막아 주므로 응답만 맞춰 준다.
+     */
+    @Test
+    void reportPost_duplicateKeyRace_isReportedAsAlreadyReported() {
+        givenPost(PostStatus.PUBLISHED);
+        when(communityMapper.insertReport(POST_ID, OTHER_MEMBER_ID, "광고입니다"))
+                .thenThrow(new DuplicateKeyException("uk_post_reports_post_reporter"));
+
+        assertThatThrownBy(() ->
+                communityService.reportPost(POST_ID, reportFormOf("광고입니다"), OTHER_MEMBER_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(CommunityErrorCode.ALREADY_REPORTED);
+    }
+
+    /** 자기 글은 신고할 수 없다. 자기 글이 문제라면 지우면 된다(DOMAIN.md 6.6). */
+    @Test
+    void reportPost_ownPost_isRejected() {
+        givenPost(PostStatus.PUBLISHED);
+
+        assertThatThrownBy(() ->
+                communityService.reportPost(POST_ID, reportFormOf("내 글"), AUTHOR_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(CommunityErrorCode.OWN_POST_REPORT);
+
+        verify(communityMapper, never()).insertReport(anyLong(), anyLong(), any());
+    }
+
+    /**
+     * 노출되지 않는 글은 신고할 수 없다(DOMAIN.md 4.5). 게시글을 지워도 신고 행은 남으므로,
+     * 이 검증이 없으면 삭제된 글에 요청만 따로 보내 신고를 쌓을 수 있다.
+     */
+    @Test
+    void reportPost_deletedPost_isRejectedAsNotFound() {
+        givenPost(PostStatus.DELETED);
+
+        assertThatThrownBy(() ->
+                communityService.reportPost(POST_ID, reportFormOf("사유"), OTHER_MEMBER_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(CommunityErrorCode.POST_NOT_FOUND);
+
+        verify(communityMapper, never()).insertReport(anyLong(), anyLong(), any());
+    }
+
+    /** 남의 차단된 글은 404다. 403을 주면 그 자리에 글이 있다는 사실이 드러난다(4.3). */
+    @Test
+    void reportPost_blockedPost_otherMember_isRejectedAsNotFound() {
+        givenPost(PostStatus.BLOCKED);
+
+        assertThatThrownBy(() ->
+                communityService.reportPost(POST_ID, reportFormOf("사유"), OTHER_MEMBER_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(CommunityErrorCode.POST_NOT_FOUND);
+    }
+
+    private ReportForm reportFormOf(String reason) {
+        ReportForm form = new ReportForm();
+        form.setReason(reason);
+
+        return form;
     }
 
     private Post capturedUpdate() {

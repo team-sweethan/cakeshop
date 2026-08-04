@@ -2,6 +2,7 @@ package com.cakeshop.domain.community.controller;
 
 import com.cakeshop.domain.community.dto.form.CommentForm;
 import com.cakeshop.domain.community.dto.form.PostForm;
+import com.cakeshop.domain.community.dto.form.ReportForm;
 import com.cakeshop.domain.community.dto.view.CommentSectionView;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
@@ -82,6 +83,7 @@ public class CommunityController {
             @PathVariable("postId") long postId,
             @RequestParam(name = "comments", required = false) String comments,
             @ModelAttribute("commentForm") CommentForm commentForm,
+            @ModelAttribute("reportForm") ReportForm reportForm,
             @AuthenticationPrincipal MemberDetails memberDetails,
             HttpServletRequest request,
             Model model
@@ -126,6 +128,9 @@ public class CommunityController {
             @RequestParam(name = "comments", required = false) String comments,
             @Valid @ModelAttribute("commentForm") CommentForm commentForm,
             BindingResult bindingResult,
+            // 상세를 다시 그릴 때 신고 폼도 함께 필요하다. BindingResult 바로 뒤에 두는 것은
+            // 검증 대상과 그 결과 사이에 다른 인자가 끼면 Spring이 짝을 잃기 때문이다.
+            @ModelAttribute("reportForm") ReportForm reportForm,
             @AuthenticationPrincipal MemberDetails memberDetails,
             Model model
     ) {
@@ -193,6 +198,45 @@ public class CommunityController {
         return redirectToDetail(postId, comments);
     }
 
+    /**
+     * 게시글을 신고하고 상세로 보낸다. 검증에 실패하면 입력을 유지한 채 상세를 다시 그린다.
+     *
+     * 댓글과 같은 형태이지만 <b>결과 처리가 반대</b>다. 중복 신고는 폼으로 되돌리지 않고
+     * 에러로 올린다(DOMAIN.md 6.6) — 다시 입력해서 될 일이 아니라 이미 접수된 상태이고,
+     * 조용히 성공을 돌려주면 접수됐다고 오해하지만 아무 일도 일어나지 않는다.
+     *
+     * 게시글 상태를 검증 실패보다 먼저 본다. 댓글 작성과 같은 이유다.
+     */
+    @PostMapping("/community/{postId:\\d+}/reports")
+    public String report(
+            @PathVariable("postId") long postId,
+            @RequestParam(name = "comments", required = false) String comments,
+            @Valid @ModelAttribute("reportForm") ReportForm reportForm,
+            BindingResult bindingResult,
+            // 상세를 다시 그릴 때 댓글 폼도 함께 필요하다(addComment의 반대편이다).
+            @ModelAttribute("commentForm") CommentForm commentForm,
+            @AuthenticationPrincipal MemberDetails memberDetails,
+            Model model,
+            RedirectAttributes redirectAttributes
+    ) {
+        long memberId = memberDetails.getMemberId();
+
+        PostDetailView post = communityService.getReportablePost(postId, memberId);
+
+        if (bindingResult.hasErrors()) {
+            // 댓글과 같다 — 여기서 getPostDetail을 부르면 잘못 보낸 신고마다 조회수가 오른다.
+            return prepareDetail(model, post, memberId, comments);
+        }
+
+        communityService.reportPost(postId, reportForm, memberId);
+
+        // 신고는 화면에 아무 흔적도 남기지 않는다. 신고 내역은 관리자만 보므로(6.6),
+        // 알리지 않으면 접수됐는지 알 수 없다. 게시글 삭제와 같은 이유의 flash다.
+        redirectAttributes.addFlashAttribute("successMessage", "신고를 접수했습니다.");
+
+        return redirectToDetail(postId, comments);
+    }
+
     /** 좋아요를 거두고 상세로 보낸다. 누른 적이 없어도 성공이다(DOMAIN.md 6.5). */
     @PostMapping("/community/{postId:\\d+}/likes/delete")
     public String removeLike(
@@ -252,6 +296,20 @@ public class CommunityController {
         model.addAttribute(
                 "likedByViewer",
                 canWrite && communityService.isLikedBy(post.id(), viewerId)
+        );
+
+        // 신고는 남의 글에만 할 수 있다(DOMAIN.md 6.6). 자기 글이 문제라면 지우면 되고,
+        // 노출되지 않는 글은 애초에 신고할 이유가 없다.
+        boolean canReport =
+                viewerId != null && !viewerId.equals(post.memberId()) && !post.isBlocked();
+        model.addAttribute("canReport", canReport);
+
+        // 이미 신고했으면 폼 대신 안내를 보여 준다. 취소가 없으므로(6.6) 이 값은 한 번
+        // 참이 되면 되돌아가지 않는다. 좋아요와 같이, 물어볼 필요가 없는 상대에게는 묻지
+        // 않는다 — 비로그인 상세에서 쿼리 하나를 아끼는 자리다.
+        model.addAttribute(
+                "alreadyReported",
+                canReport && communityService.isReportedBy(post.id(), viewerId)
         );
 
         model.addAttribute(
