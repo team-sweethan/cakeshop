@@ -50,8 +50,8 @@ public interface CommunityMapper {
     );
 
     /**
-     * 이 조회자가 최근 10분 안에 보지 않았을 때만 조회수를 1 증가시킨다.
-     * 올렸으면 1, 창 안에서 이미 센 조회이거나 노출 중이 아니면 0이다.
+     * 오늘 이 조회자의 첫 조회일 때만 조회수를 1 증가시킨다.
+     * 올렸으면 1, 이미 오늘 센 조회이거나 노출 중이 아니면 0이다.
      *
      * 이 문장이 게시글 행을 먼저 잠그고 중복까지 판단한다. 순서가 중요하다 —
      * 자세한 이유는 CommunityMapper.xml에 적어 두었다(교착 상태).
@@ -66,11 +66,9 @@ public interface CommunityMapper {
     /**
      * 조회 이력을 남긴다. increaseViewCount가 1을 돌려줬을 때만 부른다.
      *
-     * 조회 시각은 넘기지 않는다. created_at의 기본값으로 DB 시계가 잡고, 그 값이 곧
-     * 다음 조회의 창 판단 기준이 된다(DOMAIN.md 6.2).
-     *
-     * 중복을 막는 것은 이 문장이 아니라 increaseViewCount가 먼저 거는 배타 잠금이다.
-     * post_views에는 UNIQUE가 없으므로 여기서 순서를 바꾸면 아무것도 막히지 않는다.
+     * 중복이면 UNIQUE 위반으로 실패한다. 삼키지 않는 것이 중요하다 — 실패하면 같은
+     * 트랜잭션의 조회수 증가까지 함께 되돌아가므로, 숫자가 이력보다 앞서는 상태가
+     * 생기지 않는다(DOMAIN.md 6.2).
      */
     int recordView(
             @Param("postId") long postId,

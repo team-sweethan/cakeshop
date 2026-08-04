@@ -261,16 +261,12 @@ UPDATE `posts` p
 -- 글마다 조회수가 다르므로 조각 7 의 조회수 정렬도 이 데이터로 확인할 수 있다.
 --
 -- viewer_key 접두사를 'S:seed-' 로 두어 실제 세션 키('S:{sessionId}')와 겹치지 않게 한다.
---
--- created_at 을 기본값(지금) 에 맡기지 않고 과거로 박아 둔다. 중복 방지 창이 이제 이
--- 컬럼을 보기 때문에(DOMAIN.md 6.2), 기본값으로 두면 시드 직후 10분 동안 'S:seed-*' 로
--- 들어온 조회가 창에 걸린다 — 로컬에서 조회수를 확인하려는 그 시간대다.
 -- ---------------------------------------------------------------------------
 
-INSERT INTO `post_views` (`post_id`, `viewer_key`, `created_at`)
+INSERT INTO `post_views` (`post_id`, `viewer_key`, `viewed_on`)
 SELECT p.`id`,
        CONCAT('S:seed-', nums.`n`),
-       '2026-07-26 12:00:00'
+       '2026-07-26'
   FROM `posts` p
   JOIN (
         SELECT (tens.`n` - 1) * 10 + ones.`n` AS `n`

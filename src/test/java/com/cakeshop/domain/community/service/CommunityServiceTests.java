@@ -82,7 +82,7 @@ class CommunityServiceTests {
     }
 
     @Test
-    void getPostDetail_countedView_increasesViewCountAndRecordsHistory() {
+    void getPostDetail_firstViewOfTheDay_increasesViewCountAndRecordsHistory() {
         givenPost(PostStatus.PUBLISHED);
         givenViewRecorded(true);
 
@@ -94,21 +94,16 @@ class CommunityServiceTests {
     }
 
     /**
-     * 창 안에서 이미 센 조회면 이력을 다시 남기지 않는지 확인한다.
+     * 이미 오늘 센 조회면 이력을 다시 남기지 않는지 확인한다.
      *
      * <p>중복 판단은 조회수 UPDATE가 스스로 한다(0행이면 이미 센 조회다). Service는 그
-     * 결과를 <b>따르기만</b> 해야 한다. 조회수를 안 올리는 것과 이력을 안 남기는 것은
-     * 같은 판단이다.
-     *
-     * <p>무시하고 이력을 남겨도 이제는 <b>아무 일도 일어나지 않는다</b> — 10분 창으로
-     * 바꾸면서 {@code post_views}의 UNIQUE를 지웠기 때문이다(DOMAIN.md 6.2). 예전에는
-     * 제약 위반으로 상세 화면이 죽어서 즉시 드러났지만, 지금은 이력만 조용히 늘고
-     * {@code view_count}가 그보다 뒤처진다. 이 검사가 그만큼 더 중요해졌다.
+     * 결과를 <b>따르기만</b> 해야 한다 — 무시하고 이력을 남기면 UNIQUE 위반으로 상세
+     * 화면 전체가 죽는다. 조회수를 안 올리는 것과 이력을 안 남기는 것은 같은 판단이다.
      *
      * <p>숫자가 실제로 안 오르는지는 {@code CommunityViewCountTests}가 DB로 확인한다.
      */
     @Test
-    void getPostDetail_viewWithinWindow_doesNotRecordHistoryAgain() {
+    void getPostDetail_repeatedViewSameDay_doesNotRecordHistoryAgain() {
         givenPost(PostStatus.PUBLISHED);
         givenViewRecorded(false);
 
@@ -844,7 +839,7 @@ class CommunityServiceTests {
         return captor.getValue();
     }
 
-    /** recorded=true면 창 밖의 조회, false면 창 안에서 이미 센 조회다. */
+    /** recorded=true면 오늘 처음 본 조회, false면 이미 오늘 센 조회다. */
     private void givenViewRecorded(boolean recorded) {
         when(communityMapper.increaseViewCount(POST_ID, VIEWER_KEY)).thenReturn(recorded ? 1 : 0);
     }

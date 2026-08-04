@@ -49,7 +49,7 @@ public class CommunityService {
     }
 
     /**
-     * 게시글 상세를 조회하고, 최근 10분 안에 보지 않은 조회면 조회수를 올린다.
+     * 게시글 상세를 조회하고, 오늘 처음 본 조회면 조회수를 올린다.
      *
      * viewerId는 소유권 판단용이며 비로그인이면 null이다. viewerKey는 조회수 중복
      * 방지용으로, 회원이면 회원 번호가 비로그인이면 세션 id가 들어간다(DOMAIN.md 6.2).
@@ -65,7 +65,7 @@ public class CommunityService {
      */
     @Transactional
     public PostDetailView getPostDetail(long postId, Long viewerId, String viewerKey) {
-        // 창 밖의 조회일 때만 숫자를 올리고 이력을 남긴다(DOMAIN.md 6.2).
+        // 오늘 처음 본 조회일 때만 숫자를 올리고 이력을 남긴다(DOMAIN.md 6.2).
         //
         // 순서를 뒤집지 말 것. 이력을 먼저 넣으면 FK 확인이 게시글 행에 공유 잠금을
         // 걸고, 그 뒤 조회수 UPDATE가 배타 잠금을 기다리면서 같은 글을 동시에 연 요청끼리

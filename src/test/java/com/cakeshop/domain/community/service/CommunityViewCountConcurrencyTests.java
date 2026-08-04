@@ -28,13 +28,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
  *
  * <p>이 설계의 핵심이 여기 있다. "이미 봤는가"를 애플리케이션이 판단하면 동시 요청 두 개가
  * 그 판단을 <b>함께</b> 통과할 수 있고, 그러면 둘 다 조회수를 올린다. 판단을
- * {@code increaseViewCount} 안에 두어 게시글 행의 배타 잠금을 쥔 채로 평가해야 하나만
- * 살아남는다(docs/community/DOMAIN.md 6.2).
- *
- * <p><b>이 클래스가 유일한 방어선이다.</b> 창이 날짜 칸이던 시절에는
- * {@code uk_post_views_post_viewer_date}가 마지막으로 한 번 더 걸렀지만, 굴러가는 10분
- * 창은 UNIQUE로 표현할 수 없어 제약을 지웠다(V20260804_102934). 잠금 순서가 깨져도
- * 이제 DB는 아무 말도 하지 않는다 — 여기서 잡지 못하면 조회수가 조용히 부푼다.
+ * {@code uk_post_views_post_viewer_date}에 맡겨야 하나만 살아남는다
+ * (docs/community/DOMAIN.md 6.2).
  *
  * <p>단일 스레드 테스트로는 절대 드러나지 않는 종류의 어긋남이고, 화면에는 숫자가 조금
  * 큰 모습으로만 나타나서 눈으로도 찾을 수 없다.
@@ -137,36 +132,6 @@ class CommunityViewCountConcurrencyTests {
 
         assertThat(viewCount()).isEqualTo(THREADS);
         assertThat(viewCount()).isEqualTo(communityMapper.countViews(postId));
-    }
-
-    /**
-     * 창을 벗어난 뒤의 동시 재조회가 <b>정확히 한 번만</b> 더 세어지는지 확인한다.
-     *
-     * <p>위의 두 테스트는 창을 한 번도 넘지 않으므로, 창 조건을 통째로 지워도(즉 같은
-     * 조회자를 영영 한 번만 세도) 그대로 통과한다. 창이 열린 <b>직후</b>가 이 설계에서
-     * 가장 위험한 순간이다 — 그 순간 8개 요청이 모두 "10분 전 이력밖에 없다"를 함께
-     * 읽으면 조회수가 한 번에 8 오른다. 날짜 칸 시절에는 UNIQUE가 그것까지 막았지만
-     * 지금은 게시글 행의 배타 잠금뿐이다.
-     */
-    @Test
-    void getPostDetail_concurrentViewsAfterWindow_countOnlyOnceMore() throws Exception {
-        runConcurrently(() -> communityService.getPostDetail(postId, null, "S:racer"));
-        ageViews(11);
-
-        runConcurrently(() -> communityService.getPostDetail(postId, null, "S:racer"));
-
-        assertThat(viewCount())
-                .as("창이 열린 순간에도 동시 요청은 한 번만 세어야 한다")
-                .isEqualTo(2);
-        assertThat(viewCount()).isEqualTo(communityMapper.countViews(postId));
-    }
-
-    /** 시계를 기다릴 수 없으므로 이력을 과거로 민다. 창 판단이 DB의 {@code NOW(6)}를 쓴다. */
-    private void ageViews(int minutes) {
-        jdbcTemplate.update(
-                "UPDATE post_views SET created_at = created_at - INTERVAL ? MINUTE"
-                        + " WHERE post_id = ?",
-                minutes, postId);
     }
 
     private void runConcurrently(Runnable action) throws Exception {

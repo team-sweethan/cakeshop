@@ -153,10 +153,6 @@ class CommunityMapperXmlTests {
      *
      * <p>동시 요청이 없으면 결과가 똑같아서 단일 스레드 테스트로는 드러나지 않는다.
      * 실제 교착은 {@code CommunityViewCountConcurrencyTests}가 잡는다.
-     *
-     * <p>창의 기준이 {@code NOW(6)}, 즉 <b>DB 시계</b>인 것도 함께 본다. 파라미터로 받은
-     * 시각과 비교하도록 바꾸면 서버가 여러 대일 때 "최근 10분"의 뜻이 서버마다 갈리고,
-     * 시계가 앞선 서버는 남이 방금 센 조회를 다시 센다. 단일 서버 로컬에서는 드러나지 않는다.
      */
     @Test
     void increaseViewCount_filtersDuplicatesItselfSoItLocksThePostFirst() {
@@ -164,7 +160,7 @@ class CommunityMapperXmlTests {
 
         assertThat(sql).contains("NOT EXISTS");
         assertThat(sql).contains("POST_VIEWS");
-        assertThat(sql).contains("CREATED_AT > NOW(6) - INTERVAL 10 MINUTE");
+        assertThat(sql).contains("VIEWED_ON = CURRENT_DATE");
     }
 
     /**

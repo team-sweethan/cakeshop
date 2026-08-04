@@ -2,4 +2,130 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.cakeshop.domain.notification.mapper.NotificationMapper">
     <!-- 사용자 입력은 #{} 만 사용 (${} 금지) -->
+    
+    <!--알림 DB에 저장-->
+    <insert id="save" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO notifications (
+            receiver_id, 
+            actor_id, 
+            order_id, 
+            chat_room_id, 
+            chat_message_id,
+            post_id, 
+            comment_id, 
+            review_id, 
+            review_reply_id, 
+            user_coupon_id, 
+            notification_type,
+            title, 
+            content, 
+            delivery_scope, 
+            is_read, 
+            read_at, 
+            event_key, 
+            created_at
+        )
+        VALUES (
+            #{receiverId}, 
+            #{actorId}, 
+            #{orderId}, 
+            #{chatRoomId}, 
+            #{chatMessageId},
+            #{postId}, 
+            #{commentId}, 
+            #{reviewId}, 
+            #{reviewReplyId}, 
+            #{userCouponId}, 
+            #{notificationType},
+            #{title}, 
+            #{content}, 
+            #{deliveryScope}, 
+            #{isRead}, 
+            #{readAt}, 
+            #{eventKey}, 
+            #{createdAt})
+    </insert>
+
+    <!-- 특정 회원 알림 목록 조회-->
+    <select id="findUserNotificationList" resultType="NotificationResponse">
+        SELECT 
+            id,
+            notification_type AS type,
+            title,
+            content,
+            is_read AS isRead,
+            created_at AS createdAt,
+            order_id AS orderId,
+            chat_room_id AS chatRoomId,
+            post_id AS postId,
+            review_id AS reviewId,
+            user_coupon_id AS userCouponId
+        FROM notifications
+        WHERE receiver_id = #{receiverId}
+        ORDER BY created_at desc
+        LIMIT #{size}
+        OFFSET #{offset}
+    </select>
+    
+    <!--특정 회원 알림 1건 읽음 처리-->
+    <update id="markAsRead">
+        UPDATE notifications
+        SET is_read = true, read_at = NOW()
+        WHERE id=#{id} AND receiver_id=#{receiverId}
+    </update>
+
+    <!--특정 회원 알림 전체 읽음 처리-->
+    <update id="markAllAsRead">
+        UPDATE notifications
+        SET is_read = true, read_at = NOW()
+        WHERE receiver_id = #{receiverId} AND is_read = false
+    </update>
+    
+    <!--특정 회원의 안 읽은 알림 개수 조회-->
+    <select id="countUnreadNotifications" resultType="int">
+        SELECT count(*) 
+        FROM notifications 
+        WHERE receiver_id = #{receiverId} AND is_read = false
+    </select>
+    
+    <!--중복 event_key 존재 여부-->
+    <select id="existsByReceiverIdAndEventKey" resultType="boolean">
+        SELECT EXISTS (
+            SELECT true 
+            FROM notifications
+            WHERE receiver_id = #{receiverId} AND event_key = #{eventKey} LIMIT 1
+        )
+    </select>
+
+    <!-- 수신 회원 전화번호 조회 (알림 문자 발송용) -->
+    <select id="findReceiverPhone" resultType="string">
+        SELECT phone FROM members 
+        WHERE id = #{receiverId}
+    </select>
+
+    <!--알림 문자 DB에 저장하기-->
+    <!-- insert 끝나고 만들어진 pk 자바로 되돌림, pk를 id 변수에 채워 넣기 -->
+    <insert id="saveDelivery" parameterType="NotificationDelivery" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO notification_deliveries (
+            notification_id,
+            recipient,
+            template_code,
+            provider_message_id,
+            status,
+            failure_reason,
+            delivered_at,
+            created_at,
+            updated_at
+        )
+        VALUES (
+            #{notificationId},
+            #{recipient},
+            #{templateCode},
+            #{providerMessageId},
+            #{status},
+            #{failureReason},
+            #{deliveredAt},
+            #{createdAt},
+            #{updatedAt})
+    </insert>
 </mapper>

@@ -39,6 +39,16 @@ app:
     public-preview: false
   member:
     simple-password-reset-enabled: false
+  kakao:
+    alimtalk:
+      enabled: false
+      # 솔라피 API Key & API Secret (김민정 계정으로 등록)
+      api-key: "NCSEZJCAQK6WEWMB"
+      api-secret: "BS7INVLQ3U79TVZ2KLZT0WOYPU5DK40F"
+      # 등록한 휴대폰 번호 
+      sender-phone: "01099043410"
+      # 카카오톡 채널 발신프로필 ID (선택 사항) // 사업자가 없어서 설정 불가능.
+      pf-id: ${KAKAO_ALIMTALK_PF_ID:}
   file:
     # 업로드 파일을 저장할 로컬 외부 디렉토리 (프로젝트 밖). .env 의 FILE_UPLOAD_DIR 로 지정.
     upload-dir: ${FILE_UPLOAD_DIR:${user.home}/cakeshop-uploads}

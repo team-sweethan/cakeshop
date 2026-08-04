@@ -77,15 +77,6 @@ public class CommunityController {
      *
      * comments는 "더 보기"가 실어 보내는 값으로, 댓글을 몇 건까지 보여줄지다. 주소에 담아
      * 두면 새로고침·뒤로가기에서 펼친 상태가 유지되고 JS 없이도 동작한다.
-     *
-     * <p><b>이 값이 있으면 조회수를 올리지 않는다</b>(DOMAIN.md 6.2). 댓글을 더 펼치는 것은
-     * 이미 보고 있는 글 안에서의 이동이지 새로운 조회가 아니다. 10분 창만으로는 막히지
-     * 않는다 — 상세를 10분 넘게 읽다가 `더 보기`를 누르면 창이 이미 닫혀 그대로 +1이
-     * 되고, 댓글이 많은 글일수록 자기 탐색으로 순위 신호가 부푼다.
-     *
-     * <p>대가는 {@code ?comments=}가 붙은 주소로 **처음** 들어온 조회를 세지 않는 것이다.
-     * 공유·북마크로만 생기는 경우이고, 조회수가 부푸는 쪽이 아니라 덜 세는 쪽으로
-     * 틀린다(PLAN.md R12가 지키려는 방향과 같다).
      */
     @GetMapping("/community/{postId:\\d+}")
     public String detail(
@@ -100,11 +91,8 @@ public class CommunityController {
         // 소유권 판단 기준은 요청 파라미터가 아니라 인증 정보다(AGENTS.md).
         Long viewerId = memberDetails == null ? null : memberDetails.getMemberId();
 
-        // 댓글 더 보기는 조회가 아니다. 조각 3에서 갈라 둔 두 메서드가 여기서도 갈린다.
-        // 댓글 더 보기는 조회가 아니다. 조각 3에서 갈라 둔 두 메서드가 여기서도 갈린다.
-        PostDetailView post = comments == null
-                ? communityService.getPostDetail(postId, viewerId, viewerKeyOf(viewerId, request))
-                : communityService.getVisiblePost(postId, viewerId);
+        PostDetailView post =
+                communityService.getPostDetail(postId, viewerId, viewerKeyOf(viewerId, request));
 
         return prepareDetail(model, post, viewerId, comments);
     }

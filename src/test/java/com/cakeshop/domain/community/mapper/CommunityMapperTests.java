@@ -1,7 +1,6 @@
 package com.cakeshop.domain.community.mapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.LocalDateTime;
@@ -244,7 +243,7 @@ class CommunityMapperTests {
     }
 
     @Test
-    void increaseViewCount_firstView_countsOnce() {
+    void increaseViewCount_firstViewOfTheDay_countsOnce() {
         long postId = insertPost("조회수", PostStatus.PUBLISHED, BASE_TIME);
 
         assertThat(view(postId, "M:1")).isEqualTo(1);
@@ -253,12 +252,12 @@ class CommunityMapperTests {
     }
 
     /**
-     * 같은 조회자의 연속 재조회가 세어지지 않는지 확인한다.
+     * 같은 조회자의 같은 날 재조회가 세어지지 않는지 확인한다.
      *
      * <p>조회수가 순위를 정하는 이상 새로고침 한 번이 곧 순위 조작이다(DOMAIN.md 6.2).
      */
     @Test
-    void increaseViewCount_sameViewerWithinWindow_doesNotCountAgain() {
+    void increaseViewCount_sameViewerSameDay_doesNotCountAgain() {
         long postId = insertPost("재조회", PostStatus.PUBLISHED, BASE_TIME);
 
         assertThat(view(postId, "M:1")).isEqualTo(1);
@@ -282,41 +281,20 @@ class CommunityMapperTests {
         assertThat(communityMapper.countViews(postId)).isEqualTo(3);
     }
 
-    /**
-     * 창을 벗어나면 다시 세는지 확인한다.
-     *
-     * <p>이것이 없으면 "무조건 0"으로 만들어도 위 테스트가 통과한다. 중복을 막는 것과
-     * 조회를 영영 잃는 것은 다르다.
-     */
+    /** 날짜가 바뀌면 다시 센다. 시간 창의 단위가 날짜 칸이기 때문이다(DOMAIN.md 6.2). */
     @Test
-    void increaseViewCount_afterWindow_countsAgain() {
-        long postId = insertPost("창 밖", PostStatus.PUBLISHED, BASE_TIME);
+    void increaseViewCount_nextDay_countsAgain() {
+        long postId = insertPost("다음 날", PostStatus.PUBLISHED, BASE_TIME);
         view(postId, "M:1");
 
-        ageLastView(postId, 11);
+        // 어제 본 것으로 옮겨 두면 오늘 조회는 새 칸이 된다.
+        jdbcTemplate.update(
+                "UPDATE post_views SET viewed_on = viewed_on - INTERVAL 1 DAY WHERE post_id = ?",
+                postId);
 
         assertThat(view(postId, "M:1")).isEqualTo(1);
         assertThat(viewCountOf(postId)).isEqualTo(2);
         assertThat(communityMapper.countViews(postId)).isEqualTo(2);
-    }
-
-    /**
-     * 창의 경계가 실제로 10분인지 확인한다(DOMAIN.md 6.2).
-     *
-     * <p>위 테스트만 있으면 창이 1분이어도, 하루여도 똑같이 통과한다 — 11분 전 조회는
-     * 어느 쪽에서도 창 밖이기 때문이다. 값이 조용히 틀어지는 것을 잡으려면 <b>안쪽</b>도
-     * 함께 봐야 한다. 창이 좁아지면 조회수가 부풀고, 넓어지면 숫자가 멈춘 것처럼 보인다.
-     */
-    @Test
-    void increaseViewCount_justInsideWindow_doesNotCountAgain() {
-        long postId = insertPost("창 안", PostStatus.PUBLISHED, BASE_TIME);
-        view(postId, "M:1");
-
-        ageLastView(postId, 9);
-
-        assertThat(view(postId, "M:1")).isZero();
-        assertThat(viewCountOf(postId)).isEqualTo(1);
-        assertThat(communityMapper.countViews(postId)).isEqualTo(1);
     }
 
     /**
@@ -359,25 +337,19 @@ class CommunityMapperTests {
     }
 
     /**
-     * 이력에 UNIQUE가 <b>없는</b> 것이 의도임을 고정한다.
+     * 이력의 UNIQUE 제약이 실제로 걸려 있는지 확인한다.
      *
-     * <p>굴러가는 창은 제약으로 표현할 수 없어 {@code uk_post_views_post_viewer_date}를
-     * 지웠다(V20260804_102934). 이 테스트는 실패 가능성이 아니라 <b>되돌아올 위험</b>을
-     * 막는다 — 나중에 누군가 "중복이 걱정되니 UNIQUE를 다시 걸자"고 하면, 조회자가 한
-     * 게시글을 두 번째로 열어보는 순간부터 이 INSERT가 예외를 던져 상세가 500이 된다.
-     * 그 순간은 시드 직후 로컬 확인에서는 나오지 않고 며칠 뒤 운영에서 나온다.
-     *
-     * <p>중복을 실제로 막는 것은 이 제약이 아니라 {@code increaseViewCount}가 먼저 거는
-     * 배타 잠금이며, 그쪽은 {@code CommunityViewCountConcurrencyTests}가 지킨다(H14).
+     * <p>평소에는 위 조건부 UPDATE가 중복을 걸러 내므로 이 제약이 없어도 화면은 똑같아
+     * 보인다. 제약은 그 판단이 실패했을 때의 마지막 방어선이고, 여기서 조용히 통과하면
+     * 조회수만 오르고 이력은 없는 상태가 남는다.
      */
     @Test
-    void recordView_sameViewerTwice_isAllowedByTheSchema() {
+    void recordView_duplicateOnTheSameDay_isRejectedByConstraint() {
         long postId = insertPost("중복 기록", PostStatus.PUBLISHED, BASE_TIME);
         communityMapper.recordView(postId, "M:1");
 
-        assertThatCode(() -> communityMapper.recordView(postId, "M:1"))
-                .doesNotThrowAnyException();
-        assertThat(communityMapper.countViews(postId)).isEqualTo(2);
+        assertThatThrownBy(() -> communityMapper.recordView(postId, "M:1"))
+                .isInstanceOf(DuplicateKeyException.class);
     }
 
     /**
@@ -861,7 +833,7 @@ class CommunityMapperTests {
     }
 
     /**
-     * 상세 조회 한 번과 같은 일을 한다. 창 밖의 조회면 1, 창 안이면 0이다.
+     * 상세 조회 한 번과 같은 일을 한다. 오늘 처음 본 조회면 1, 아니면 0이다.
      *
      * <p>두 문장은 Service가 묶어서 부른다(CommunityService.getPostDetail). 순서가 있고
      * 조건이 붙어 있어서, 하나만 불러서는 규칙을 확인할 수 없다.
@@ -879,19 +851,6 @@ class CommunityMapperTests {
     private long viewCountOf(long postId) {
         return jdbcTemplate.queryForObject(
                 "SELECT view_count FROM posts WHERE id = ?", Long.class, postId);
-    }
-
-    /**
-     * 이 게시글의 조회 이력을 {@code minutes}분 전으로 민다.
-     *
-     * <p>창 판단이 DB의 {@code NOW(6)}를 쓰므로 테스트가 시각을 주입할 자리가 없다.
-     * 시계를 기다리는 대신 이력을 과거로 옮긴다 — 실제로 10분을 기다리는 테스트는 쓸 수 없다.
-     */
-    private void ageLastView(long postId, int minutes) {
-        jdbcTemplate.update(
-                "UPDATE post_views SET created_at = created_at - INTERVAL ? MINUTE"
-                        + " WHERE post_id = ?",
-                minutes, postId);
     }
 
     /** 같은 사람이 같은 글을 두 번 신고하면 UNIQUE 위반이다. 삼키지 않는다(DOMAIN.md 6.6). */

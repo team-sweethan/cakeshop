@@ -1,4 +1,4 @@
-﻿/* source: cakeProjectSample/js/common.js */
+/* source: cakeProjectSample/js/common.js */
 (function () {
   "use strict";
   function markNavigation() {
@@ -462,9 +462,13 @@
     }
     const readAll = event.target.closest("[data-read-all]");
     if (readAll) {
-      document.querySelectorAll(".notification-item").forEach(function (item) { item.classList.remove("is-unread"); const dot = item.querySelector(".notification-dot"); if (dot) dot.remove(); });
-      readAll.textContent = "모두 읽음";
-      readAll.disabled = true;
+      fetch('/api/notifications/read-all', { method: 'PATCH' })
+        .then(function() {
+          document.querySelectorAll(".notification-item").forEach(function (item) { item.classList.remove("is-unread"); const dot = item.querySelector(".notification-dot"); if (dot) dot.remove(); });
+          readAll.textContent = "모두 읽음";
+          readAll.disabled = true;
+          if (typeof updateNotificationUnreadCount === 'function') updateNotificationUnreadCount();
+        });
     }
     const coupon = event.target.closest("[data-coupon-select]");
     if (coupon) {

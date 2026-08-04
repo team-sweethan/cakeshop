@@ -104,8 +104,7 @@ class ProductAdminServiceTests {
                                 27,
                                 10,
                                 0
-                        ),
-                        null
+                        )
                 );
 
         PageRequest pageRequest =
