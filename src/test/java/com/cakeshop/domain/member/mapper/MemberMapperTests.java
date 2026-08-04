@@ -86,6 +86,57 @@ class MemberMapperTests {
     }
 
     @Test
+    void findPasswordRecoveryMember_matchingActiveMember_returnsCanonicalMember() {
+        String email = uniqueEmail("password-recovery");
+        Long memberId = insertMember(email, MemberStatus.ACTIVE);
+        LocalDate birthDate = LocalDate.of(2000, 1, 15);
+        jdbcTemplate.update(
+                "UPDATE members SET birth_date = ?, phone = ? WHERE id = ?",
+                birthDate,
+                "010-1234-5678",
+                memberId);
+
+        assertThat(memberMapper.findPasswordRecoveryMember(
+                email,
+                "매퍼 테스트",
+                birthDate,
+                "01012345678"))
+                .hasValueSatisfying(member -> {
+                    assertThat(member.getId()).isEqualTo(memberId);
+                    assertThat(member.getEmail()).isEqualTo(email);
+                });
+    }
+
+    @Test
+    void findPasswordRecoveryMember_withdrawnOrPasswordlessMember_returnsEmpty() {
+        LocalDate birthDate = LocalDate.of(2000, 1, 15);
+        String withdrawnEmail = uniqueEmail("password-recovery-withdrawn");
+        Long withdrawnId = insertMember(withdrawnEmail, MemberStatus.WITHDRAWN);
+        String passwordlessEmail = uniqueEmail("password-recovery-oauth");
+        Long passwordlessId = insertMember(passwordlessEmail, MemberStatus.ACTIVE);
+        jdbcTemplate.update(
+                "UPDATE members SET birth_date = ?, phone = ? WHERE id IN (?, ?)",
+                birthDate,
+                "010-1234-5678",
+                withdrawnId,
+                passwordlessId);
+        jdbcTemplate.update(
+                "UPDATE members SET password = NULL WHERE id = ?",
+                passwordlessId);
+
+        assertThat(memberMapper.findPasswordRecoveryMember(
+                withdrawnEmail,
+                "매퍼 테스트",
+                birthDate,
+                "01012345678")).isEmpty();
+        assertThat(memberMapper.findPasswordRecoveryMember(
+                passwordlessEmail,
+                "매퍼 테스트",
+                birthDate,
+                "01012345678")).isEmpty();
+    }
+
+    @Test
     void withdrawById_activeMember_updatesStatusAndTimestamps() {
         String email = uniqueEmail("withdraw");
         Long memberId = insertMember(email, MemberStatus.ACTIVE);
@@ -165,6 +216,51 @@ class MemberMapperTests {
         assertThat(updatedMember.getPhone()).isEqualTo("010-9876-5432");
         assertThat(updatedMember.getBirthDate()).isEqualTo(birthDate);
         assertThat(updatedMember.getUpdatedAt()).isAfter(UPDATED_AT);
+    }
+
+    @Test
+    void updatePasswordForActiveMember_activeMember_updatesPassword() {
+        String email = uniqueEmail("password-reset");
+        Long memberId = insertMember(email, MemberStatus.ACTIVE);
+
+        int updatedRows =
+                memberMapper.updatePasswordForActiveMember(memberId, "new-encoded-password");
+
+        assertThat(updatedRows).isEqualTo(1);
+        assertThat(memberMapper.findByEmail(email).orElseThrow().getPassword())
+                .isEqualTo("new-encoded-password");
+    }
+
+    @Test
+    void findActivePasswordForUpdate_activeMember_returnsCurrentPassword() {
+        Long memberId = insertMember(
+                uniqueEmail("current-password"),
+                MemberStatus.ACTIVE);
+
+        assertThat(memberMapper.findActivePasswordForUpdate(memberId))
+                .contains("encoded-password");
+    }
+
+    @Test
+    void findActivePasswordForUpdate_withdrawnMember_returnsEmpty() {
+        Long memberId = insertMember(
+                uniqueEmail("current-password-withdrawn"),
+                MemberStatus.WITHDRAWN);
+
+        assertThat(memberMapper.findActivePasswordForUpdate(memberId)).isEmpty();
+    }
+
+    @Test
+    void updatePasswordForActiveMember_withdrawnMember_doesNotUpdatePassword() {
+        String email = uniqueEmail("password-reset-withdrawn");
+        Long memberId = insertMember(email, MemberStatus.WITHDRAWN);
+
+        int updatedRows =
+                memberMapper.updatePasswordForActiveMember(memberId, "new-encoded-password");
+
+        assertThat(updatedRows).isZero();
+        assertThat(memberMapper.findByEmail(email).orElseThrow().getPassword())
+                .isEqualTo("encoded-password");
     }
 
     @Test

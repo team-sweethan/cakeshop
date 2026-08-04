@@ -1,6 +1,6 @@
 package com.cakeshop.domain.coupon.dto.form;
 
-import com.cakeshop.domain.coupon.entity.CouponStatus;
+import com.cakeshop.domain.coupon.entity.CouponDisplayStatus;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -9,7 +9,7 @@ import lombok.Setter;
 public class CouponSearchCondition {
 
     private String keyword;
-    private CouponStatus status;
+    private CouponDisplayStatus status;
 
     public String normalizedKeyword() {
         // 공백만 입력한 검색은 검색 조건이 없는 것과 동일하게 처리한다.

@@ -1,12 +1,175 @@
 package com.cakeshop.domain.member.controller;
 
+import com.cakeshop.domain.member.dto.form.MemberAdminListType;
+import com.cakeshop.domain.member.dto.form.MemberAdminSearchCondition;
+import com.cakeshop.domain.member.dto.form.MemberActivateForm;
+import com.cakeshop.domain.member.dto.form.MemberSuspendForm;
+import com.cakeshop.domain.member.dto.view.MemberAdminDetailView;
+import com.cakeshop.domain.member.dto.view.MemberAdminListView;
+import com.cakeshop.domain.member.entity.MemberStatus;
+import com.cakeshop.domain.member.service.MemberAdminService;
+import com.cakeshop.domain.member.service.MemberSessionService;
+import com.cakeshop.global.security.MemberDetails;
+import com.cakeshop.global.common.paging.PageRequest;
+import com.cakeshop.global.common.paging.PageResult;
+import jakarta.validation.Valid;
 import org.springframework.stereotype.Controller;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
-// /admin/members
 @Controller
 public class MemberAdminController {
 
+    private static final int DEFAULT_MEMBER_PAGE_SIZE = 10;
+
+    private final MemberAdminService memberAdminService;
+    private final MemberSessionService memberSessionService;
+
+    public MemberAdminController(
+            MemberAdminService memberAdminService,
+            MemberSessionService memberSessionService) {
+        this.memberAdminService = memberAdminService;
+        this.memberSessionService = memberSessionService;
+    }
+
+    // 관리자 회원 목록
     @GetMapping("/admin/members")
-    public String members() { return "admin/member/list"; }
+    public String members(
+            @ModelAttribute("condition")
+            MemberAdminSearchCondition condition,
+            BindingResult bindingResult,
+            @RequestParam(required = false) String tab,
+            @RequestParam(required = false) String page,
+            @RequestParam(required = false) String size,
+            Model model) {
+        condition.setListType(MemberAdminListType.from(tab));
+
+        if (bindingResult.hasFieldErrors("status")) {
+            condition.setStatus(null);
+        }
+
+        Integer requestedPage = parsePositiveInteger(page);
+        Integer requestedSize = parsePositiveInteger(size);
+        int memberPageSize =
+                requestedSize == null
+                        ? DEFAULT_MEMBER_PAGE_SIZE
+                        : requestedSize;
+
+        PageResult<MemberAdminListView> pageResult =
+                memberAdminService.getMembers(
+                        condition,
+                        new PageRequest(requestedPage, memberPageSize));
+
+        model.addAttribute("pageResult", pageResult);
+        model.addAttribute(
+                "memberStatuses",
+                new MemberStatus[] {
+                    MemberStatus.ACTIVE,
+                    MemberStatus.SUSPENDED
+                });
+
+        return "admin/member/list";
+    }
+
+    // 관리자 회원 상세
+    @GetMapping("/admin/members/{memberId}")
+    public String memberDetail(
+            @PathVariable Long memberId,
+            Model model) {
+        MemberAdminDetailView member =
+                memberAdminService.getMemberDetail(memberId);
+
+        model.addAttribute("member", member);
+        return "admin/member/detail";
+    }
+
+    // 관리자 회원 이용정지
+    @PostMapping("/admin/members/{memberId}/suspend")
+    public String suspendMember(
+            @PathVariable Long memberId,
+            @Valid @ModelAttribute("suspendForm")
+            MemberSuspendForm form,
+            BindingResult bindingResult,
+            @AuthenticationPrincipal MemberDetails memberDetails,
+            @RequestParam(defaultValue = "list") String source,
+            RedirectAttributes redirectAttributes) {
+        if (bindingResult.hasErrors()) {
+            redirectAttributes.addFlashAttribute(
+                    "errorMessage",
+                    "이용정지 사유를 확인해 주세요.");
+
+            return statusChangeRedirect(memberId, source);
+        }
+
+        String email =
+                memberAdminService.suspendMember(
+                        memberId,
+                        form.getReason(),
+                        memberDetails.getMemberId());
+
+        memberSessionService.expireSessionsByEmail(email);
+        redirectAttributes.addFlashAttribute(
+                "successMessage",
+                "회원 이용을 정지했습니다.");
+
+        return statusChangeRedirect(memberId, source);
+    }
+
+    // 관리자 회원 이용정지 해제
+    @PostMapping("/admin/members/{memberId}/activate")
+    public String activateMember(
+            @PathVariable Long memberId,
+            @Valid @ModelAttribute("activateForm")
+            MemberActivateForm form,
+            BindingResult bindingResult,
+            @AuthenticationPrincipal MemberDetails memberDetails,
+            @RequestParam(defaultValue = "list") String source,
+            RedirectAttributes redirectAttributes) {
+        if (bindingResult.hasErrors()) {
+            redirectAttributes.addFlashAttribute(
+                    "errorMessage",
+                    "이용정지 해제 사유를 확인해 주세요.");
+
+            return statusChangeRedirect(memberId, source);
+        }
+
+        memberAdminService.activateMember(
+                memberId,
+                form.getReason(),
+                memberDetails.getMemberId());
+        redirectAttributes.addFlashAttribute(
+                "successMessage",
+                "회원 이용정지를 해제했습니다.");
+
+        return statusChangeRedirect(memberId, source);
+    }
+
+    private String statusChangeRedirect(Long memberId, String source) {
+        return "detail".equals(source)
+                ? "redirect:/admin/members/" + memberId
+                : "redirect:/admin/members";
+    }
+
+    private Integer parsePositiveInteger(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+
+        try {
+            int parsed = Integer.parseInt(value);
+
+            return parsed > 0
+                    ? parsed
+                    : null;
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
 }

@@ -12,7 +12,8 @@ spring:
     multipart:
       # 매장·상품 등의 이미지 업로드 상한. 기본값(1MB)은 사진에 너무 작다.
       max-file-size: 5MB
-      max-request-size: 10MB
+      # 상품 이미지 5장과 multipart 부가 데이터를 한 요청으로 받을 수 있게 여유를 둔다.
+      max-request-size: 30MB
   flyway:
     enabled: true
     locations: classpath:db/migration
@@ -47,6 +48,8 @@ app:
       sender-phone: "01099043410"
       # 카카오톡 채널 발신프로필 ID (선택 사항) // 사업자가 없어서 설정 불가능.
       pf-id: ${KAKAO_ALIMTALK_PF_ID:}
+  member:
+    simple-password-reset-enabled: false
   file:
     # 업로드 파일을 저장할 로컬 외부 디렉토리 (프로젝트 밖). .env 의 FILE_UPLOAD_DIR 로 지정.
     upload-dir: ${FILE_UPLOAD_DIR:${user.home}/cakeshop-uploads}
@@ -70,6 +73,9 @@ app:
   mockup:
     # 화면 선이관 기간에만 조회 화면을 로그인 없이 확인한다. rds에서는 false다.
     public-preview: true
+  member:
+    # 이메일/SMS 인증을 연결하기 전 로컬 기능 확인용 간편 재설정이다.
+    simple-password-reset-enabled: true
 
 ---
 # 공용 AWS RDS: 프로젝트 루트의 .env에서 접속 정보를 읽는다.
@@ -86,3 +92,6 @@ spring:
     # 애플리케이션 기동으로 공용 RDS 스키마가 변경되지 않도록 차단한다.
     # RDS 스키마 변경은 검토·승인된 별도 반영 절차로만 수행한다.
     enabled: false
+app:
+  member:
+    simple-password-reset-enabled: false

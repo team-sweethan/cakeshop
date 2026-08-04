@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -27,8 +28,16 @@ public class LocalFileStorageClient implements FileStorageClient {
     public LocalFileStorageClient(
             @Value("${app.file.upload-dir}") String uploadDir,
             @Value("${app.file.url-prefix}") String urlPrefix) {
+        if (!StringUtils.hasText(uploadDir)) {
+            throw new IllegalArgumentException("app.file.upload-dir 설정이 비어 있습니다.");
+        }
+        String prefix = stripTrailingSlash(urlPrefix);
+        // 빈 접두어는 delete() 의 경로 판별을 무력화하므로 기동 시점에 막는다.
+        if (!StringUtils.hasText(prefix)) {
+            throw new IllegalArgumentException("app.file.url-prefix 설정이 비어 있습니다.");
+        }
         this.baseDir = Path.of(uploadDir).toAbsolutePath().normalize();
-        this.urlPrefix = stripTrailingSlash(urlPrefix);
+        this.urlPrefix = prefix;
     }
 
     // 저장 경로 규칙: /{도메인}/{yyyyMM}/{uuid}.{ext}
@@ -37,14 +46,22 @@ public class LocalFileStorageClient implements FileStorageClient {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("저장할 파일이 비어 있습니다.");
         }
-        String relativeDir = directory + "/" + LocalDate.now().format(MONTH);
+        // null/빈 값이 그대로 이어붙어 "null/202608" 같은 폴더가 생기는 것을 막는다.
+        if (!StringUtils.hasText(directory)) {
+            throw new IllegalArgumentException("저장 디렉터리가 비어 있습니다.");
+        }
+        String relativeDir = stripTrailingSlash(directory.trim()) + "/" + LocalDate.now().format(MONTH);
         String filename = UUID.randomUUID() + extension(file.getOriginalFilename());
         Path targetDir = baseDir.resolve(relativeDir).normalize();
         // directory 에 '..' 등이 섞여 baseDir 밖으로 나가는 것을 차단한다.
         if (!targetDir.startsWith(baseDir)) {
             throw new IllegalArgumentException("허용되지 않은 저장 경로입니다: " + directory);
         }
-        Path target = targetDir.resolve(filename);
+        Path target = targetDir.resolve(filename).normalize();
+        // 파일명까지 합쳐진 최종 경로도 baseDir 안에 있는지 다시 확인한다.
+        if (!target.startsWith(baseDir)) {
+            throw new IllegalArgumentException("허용되지 않은 저장 경로입니다: " + directory);
+        }
         try {
             Files.createDirectories(targetDir);
             file.transferTo(target);
@@ -74,10 +91,14 @@ public class LocalFileStorageClient implements FileStorageClient {
 
     private String extension(String originalFilename) {
         String ext = StringUtils.getFilenameExtension(originalFilename);
-        return StringUtils.hasText(ext) ? "." + ext.toLowerCase() : "";
+        // 터키어 로케일 등에서 I -> ı 로 변환되는 것을 막기 위해 Locale.ROOT 를 명시한다.
+        return StringUtils.hasText(ext) ? "." + ext.toLowerCase(Locale.ROOT) : "";
     }
 
     private String stripTrailingSlash(String value) {
+        if (value == null) {
+            return null;
+        }
         return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
     }
 }

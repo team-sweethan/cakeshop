@@ -16,6 +16,8 @@ public class PaymentCancellation {
     private String idempotencyKey;
     private BigDecimal cancelAmount;
     private String cancelReason;
+    private String requestType;
+    private Long requestedBy;
     private PaymentCancellationStatus status;
     private Long activeRequestedPaymentId;
     private String transactionKey;

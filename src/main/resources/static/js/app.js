@@ -1,19 +1,24 @@
-function updateMockCartCount(items) {
-  let cartItems = items;
-  if (!Array.isArray(cartItems)) {
-    try {
-      cartItems = JSON.parse(localStorage.getItem("cakeShopCart") || "[]");
-    } catch (error) {
-      cartItems = [];
-    }
-  }
-
-  const count = Array.isArray(cartItems)
-    ? cartItems.reduce((sum, item) => sum + Math.max(0, Number(item && item.quantity) || 0), 0)
-    : 0;
+function updateCartCount(count) {
+  const normalizedCount = Math.max(0, Number(count) || 0);
   document.querySelectorAll("[data-cart-count]").forEach((element) => {
-    element.textContent = `장바구니 (${count})`;
+    element.textContent = normalizedCount > 0
+      ? `장바구니 (${normalizedCount})`
+      : "장바구니";
   });
+}
+
+async function loadCartCount() {
+  if (!document.querySelector("[data-cart-count]")) return;
+  try {
+    const response = await fetch("/cart/count", {
+      headers: { Accept: "application/json" }
+    });
+    if (!response.ok) return;
+    const cart = await response.json();
+    updateCartCount(cart.totalQuantity);
+  } catch (error) {
+    // 헤더 보조 정보 조회 실패는 현재 화면 사용을 막지 않는다.
+  }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -21,13 +26,10 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll("[data-current-year]").forEach((element) => {
     element.textContent = currentYear;
   });
-  updateMockCartCount();
+  loadCartCount();
 });
 
-document.addEventListener("cart:updated", (event) => updateMockCartCount(event.detail));
-window.addEventListener("storage", (event) => {
-  if (event.key === "cakeShopCart") updateMockCartCount();
-});
+document.addEventListener("cart:updated", (event) => updateCartCount(event.detail));
 
 // 안 읽은 알림 개수 DB API 호출 및 뱃지 업데이트
 async function updateNotificationUnreadCount() {

@@ -19,7 +19,7 @@
             failure_code,
             failure_message
         )
-        VALUES (
+        SELECT
             #{orderId},
             #{tossOrderId},
             #{paymentKey},
@@ -30,7 +30,10 @@
             #{providerStatus},
             #{failureCode},
             #{failureMessage}
-        )
+        FROM orders AS current_order
+        WHERE current_order.id = #{orderId}
+          AND current_order.status = 'PENDING_PAYMENT'
+          AND current_order.final_amount = #{amount}
     </insert>
 
     <select id="findPaymentsByOrderId"
@@ -45,7 +48,7 @@
             amount,
             status,
             provider_status,
-            active_paid_order_id,
+            active_payment_order_id,
             failure_code,
             failure_message,
             requested_at,
@@ -58,10 +61,126 @@
         ORDER BY id
     </select>
 
-    <update id="updateStatusIfCurrent">
+    <update id="completeIfReady">
+        UPDATE payments AS payment
+        INNER JOIN orders AS current_order
+            ON current_order.id = payment.order_id
+        SET payment.status = 'DONE',
+            payment.payment_key = #{paymentKey},
+            payment.method = #{method},
+            payment.provider_status = #{providerStatus},
+            payment.approved_at = #{approvedAt},
+            payment.failure_code = NULL,
+            payment.failure_message = NULL
+        WHERE payment.id = #{paymentId}
+          AND payment.status = 'READY'
+          AND current_order.status = 'PENDING_PAYMENT'
+    </update>
+
+    <update id="abortIfReady">
         UPDATE payments
-        SET status = #{nextStatus}
+        SET status = 'ABORTED',
+            provider_status = #{providerStatus},
+            failure_code = #{failureCode},
+            failure_message = #{failureMessage}
         WHERE id = #{paymentId}
-          AND status = #{expectedStatus}
+          AND status = 'READY'
+    </update>
+
+    <update id="expireIfReady">
+        UPDATE payments
+        SET status = 'EXPIRED',
+            provider_status = #{providerStatus},
+            failure_code = #{failureCode},
+            failure_message = #{failureMessage}
+        WHERE id = #{paymentId}
+          AND status = 'READY'
+    </update>
+
+    <update id="cancelIfDone">
+        UPDATE payments
+        SET status = 'CANCELED',
+            provider_status = #{providerStatus},
+            canceled_at = #{canceledAt}
+        WHERE id = #{paymentId}
+          AND status = 'DONE'
+    </update>
+
+    <insert id="insertPaymentCancellation"
+            parameterType="com.cakeshop.domain.payment.entity.PaymentCancellation"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO payment_cancellations (
+            payment_id,
+            idempotency_key,
+            cancel_amount,
+            cancel_reason,
+            request_type,
+            requested_by,
+            status
+        )
+        SELECT
+            payment.id,
+            #{idempotencyKey},
+            #{cancelAmount},
+            #{cancelReason},
+            #{requestType},
+            #{requestedBy},
+            'REQUESTED'
+        FROM payments AS payment
+        WHERE payment.id = #{paymentId}
+          AND payment.status = 'DONE'
+          AND #{cancelAmount} = payment.amount
+    </insert>
+
+    <select id="findPaymentCancellationById"
+            resultType="com.cakeshop.domain.payment.entity.PaymentCancellation">
+        SELECT
+            id,
+            payment_id,
+            idempotency_key,
+            cancel_amount,
+            cancel_reason,
+            request_type,
+            requested_by,
+            status,
+            active_requested_payment_id,
+            transaction_key,
+            failure_code,
+            failure_message,
+            requested_at,
+            canceled_at,
+            created_at,
+            updated_at
+        FROM payment_cancellations
+        WHERE id = #{cancellationId}
+    </select>
+
+    <update id="completeCancellationIfRequested">
+        UPDATE payment_cancellations AS cancellation
+        INNER JOIN payments AS payment
+            ON payment.id = cancellation.payment_id
+        SET cancellation.status = 'DONE',
+            cancellation.transaction_key = #{transactionKey},
+            cancellation.canceled_at = #{canceledAt},
+            cancellation.failure_code = NULL,
+            cancellation.failure_message = NULL,
+            payment.status = 'CANCELED',
+            payment.provider_status = 'CANCELED',
+            payment.canceled_at = #{canceledAt},
+            payment.failure_code = NULL,
+            payment.failure_message = NULL
+        WHERE cancellation.id = #{cancellationId}
+          AND cancellation.status = 'REQUESTED'
+          AND payment.status = 'DONE'
+    </update>
+
+    <update id="failCancellationIfRequested">
+        UPDATE payment_cancellations
+        SET status = 'FAILED',
+            failure_code = #{failureCode},
+            failure_message = #{failureMessage}
+        WHERE id = #{cancellationId}
+          AND status = 'REQUESTED'
     </update>
 </mapper>

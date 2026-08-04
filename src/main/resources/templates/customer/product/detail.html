@@ -1,5 +1,6 @@
 ﻿<!doctype html>
-<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<html lang="ko" xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,12 +11,16 @@
   </title>
 
   <!-- 공통 및 고객 화면 스타일 -->
-  <link rel="stylesheet" th:href="@{/css/app.css}">
+  <link rel="stylesheet"
+        th:href="@{/css/app.css(v='product-detail-actions')}">
   <link rel="stylesheet" th:href="@{/css/customer-mockup.css}">
 
   <!-- 공통 및 고객 화면 스크립트 -->
   <script defer th:src="@{/js/app.js}"></script>
   <script defer th:src="@{/js/customer-mockup.js}"></script>
+  <script defer
+          th:src="@{/js/product-gallery.js(v='product-gallery-navigation')}">
+  </script>
 </head>
 
 <body data-page-title="상품 상세">
@@ -24,6 +29,8 @@
 <header th:replace="~{fragments/common/header :: header}"></header>
 
 <main class="page-container">
+
+  <div th:replace="~{fragments/common/alert :: alert}"></div>
 
   <!-- 페이지 제목 -->
   <h1>상품 상세</h1>
@@ -57,15 +64,61 @@
                     data-base-price=${product.basePrice},
                     data-stock=${product.stockQuantity}">
 
-    <!-- 상품 이미지 테이블 연결 전까지 명확한 빈 상태를 표시한다. -->
     <div class="product-gallery">
-      <div class="placeholder-image placeholder-image--lg">
-        상품 이미지 준비 중
-      </div>
+      <!-- 표시 순서가 가장 앞선 이미지를 대표 이미지로 사용한다. -->
+      <th:block th:if="${!#lists.isEmpty(product.images)}">
+        <div class="product-gallery__main">
+          <button class="product-gallery__nav product-gallery__nav--previous"
+                  type="button"
+                  data-product-gallery-previous
+                  th:if="${product.images.size() > 1}"
+                  aria-label="이전 상품 이미지">
+            &lt;
+          </button>
 
-      <p class="note" style="margin-top:8px">
-        등록된 상품 이미지가 없습니다.
-      </p>
+          <img class="placeholder-image placeholder-image--lg product-gallery__main-image"
+               data-product-main-image
+               th:src="${product.images[0].imageUrl}"
+               th:alt="|${product.name} 대표 이미지|">
+
+          <button class="product-gallery__nav product-gallery__nav--next"
+                  type="button"
+                  data-product-gallery-next
+                  th:if="${product.images.size() > 1}"
+                  aria-label="다음 상품 이미지">
+            &gt;
+          </button>
+        </div>
+
+        <!-- 대표 이미지를 제외한 나머지 이미지를 순서대로 표시한다. -->
+        <div class="product-gallery__thumbnails grid grid--4"
+             th:if="${product.images.size() > 1}">
+          <button class="product-gallery__thumbnail-button"
+                  type="button"
+                  data-product-thumbnail
+                  th:each="image, imageStatus : ${product.images}"
+                  th:if="${imageStatus.index > 0}"
+                  th:attr="data-image-url=${image.imageUrl},
+                           data-image-alt=|${product.name} 이미지 ${imageStatus.count}|"
+                  th:aria-label="|${product.name} 이미지 ${imageStatus.count} 크게 보기|">
+            <img class="placeholder-image placeholder-image--sm product-gallery__thumbnail"
+                 loading="lazy"
+                 th:src="${image.imageUrl}"
+                 th:alt="|${product.name} 이미지 ${imageStatus.count}|">
+          </button>
+        </div>
+      </th:block>
+
+      <!-- 등록된 이미지가 없으면 img 태그를 만들지 않는다. -->
+      <th:block th:if="${#lists.isEmpty(product.images)}">
+        <div class="placeholder-image placeholder-image--lg product-gallery__main-image">
+          상품 이미지 준비 중
+        </div>
+
+        <p class="note" style="margin-top:8px">
+          등록된 상품 이미지가 없습니다.
+        </p>
+      </th:block>
     </div>
 
     <!-- 실제 상품 기본 정보 -->
@@ -160,37 +213,32 @@
             픽업 가능일
           </span>
 
-        <!-- 준비 기간이 0일인 상품 -->
-        <span th:if="${product.preparationDays == 0}">
+        <!-- 일반 상품 -->
+        <span th:if="${product.productType.name() == 'GENERAL'}">
             당일부터 픽업 가능
           </span>
 
-        <!-- 준비 기간이 1일 이상인 상품 -->
+        <!-- 주문 제작 상품 -->
         <span
-                th:if="${product.preparationDays > 0}"
-                th:text="|주문일로부터 ${product.preparationDays}일 후 픽업 가능|"
+                th:if="${product.productType.name() == 'CUSTOM'}"
+                th:text="|관리자 승인일로부터 ${product.preparationDays}일 후 픽업 가능|"
         >
-            주문일로부터 2일 후 픽업 가능
+            관리자 승인일로부터 2일 후 픽업 가능
           </span>
       </div>
 
-      <!-- 주문 취소 제한 기간 -->
+      <!-- 상품 유형별 취소 가능 기간 -->
       <div class="data-row">
           <span class="data-row__label">
             취소 가능 기간
           </span>
 
-        <!-- 제한 일수가 0인 상품 -->
-        <span th:if="${product.cancellationLimitDays == 0}">
-            픽업 전까지 취소 가능
+        <span th:if="${product.productType.name() == 'GENERAL'}">
+            픽업 예정 시각 전까지 취소 가능
           </span>
 
-        <!-- 제한 일수가 1일 이상인 상품 -->
-        <span
-                th:if="${product.cancellationLimitDays > 0}"
-                th:text="|픽업일 ${product.cancellationLimitDays}일 전까지 취소 가능|"
-        >
-            픽업일 2일 전까지 취소 가능
+        <span th:if="${product.productType.name() == 'CUSTOM'}">
+            관리자 승인 전까지 취소 가능
           </span>
       </div>
 
@@ -369,12 +417,13 @@
       </div>
 
       <!-- 주문 및 장바구니 버튼 -->
-      <div class="stack">
+      <div class="stack product-detail__actions">
 
         <!-- 재고가 있는 경우 -->
         <div
                 class="cluster"
-                th:if="${product.available}"
+                th:if="${product.available
+                        and product.productType.name() == 'GENERAL'}"
         >
           <!-- 픽업 일시 선택 화면 -->
           <a
@@ -385,14 +434,20 @@
             픽업 일시 선택
           </a>
 
-          <!-- 장바구니 기능은 이후 백엔드와 연결한다. -->
-          <button
-                  class="btn"
-                  type="button"
-                  data-add-product-cart
-          >
-            장바구니 담기
-          </button>
+          <form sec:authorize="isAuthenticated()"
+                th:action="@{/cart/items}" method="post" data-server-cart-form>
+            <input type="hidden" name="productId" th:value="${product.id}">
+            <input type="hidden" name="quantity" value="1" data-server-cart-quantity>
+            <span data-server-cart-options></span>
+            <button class="btn" type="submit" data-server-cart-submit>
+              장바구니 담기
+            </button>
+          </form>
+
+          <a sec:authorize="isAnonymous()" class="btn"
+             th:href="@{/cart/continue/{id}(id=${product.id})}">
+            로그인 후 장바구니 담기
+          </a>
 
           <span class="note">
               픽업 일시는 장바구니에서 나중에 선택할 수 있습니다.

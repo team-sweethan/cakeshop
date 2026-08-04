@@ -8,6 +8,7 @@
   <link rel="stylesheet" th:href="@{/css/customer-mockup.css}">
   <script defer th:src="@{/js/app.js}"></script>
   <script defer th:src="@{/js/customer-mockup.js}"></script>
+  <script defer th:src="@{/js/member-birth-date.js}"></script>
 </head>
 <body>
 <header th:replace="~{fragments/common/header :: header}"></header>
@@ -25,8 +26,23 @@
       </div>
 
       <div class="form-group">
-        <label class="form-label" for="recovery-birth-date">생년월일</label>
-        <input class="form-control" id="recovery-birth-date" th:field="*{birthDate}" type="date" required>
+        <label class="form-label" for="email-recovery-birth-date">생년월일</label>
+        <div data-birth-date-picker>
+          <input class="form-control" id="email-recovery-birth-date" type="date"
+                 th:field="*{birthDate}" data-birth-date-value required>
+          <div class="birth-date-selects">
+          <select class="form-control" id="email-recovery-birth-year" aria-label="태어난 연도"
+                  data-birth-year required>
+            <option value="">연도</option>
+          </select>
+          <select class="form-control" aria-label="태어난 달" data-birth-month required>
+            <option value="">월</option>
+          </select>
+          <select class="form-control" aria-label="태어난 일" data-birth-day required>
+            <option value="">일</option>
+          </select>
+          </div>
+        </div>
         <p class="form-error" th:if="${#fields.hasErrors('birthDate')}" th:errors="*{birthDate}"></p>
       </div>
 

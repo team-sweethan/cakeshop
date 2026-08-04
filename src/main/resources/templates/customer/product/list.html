@@ -7,7 +7,8 @@
 
   <title>상품 목록 | 케이크 쇼핑몰</title>
 
-  <link rel="stylesheet" th:href="@{/css/app.css}">
+  <link rel="stylesheet"
+        th:href="@{/css/app.css(v='product-image-square')}">
   <link rel="stylesheet"
         th:href="@{/css/customer-mockup.css}">
 
@@ -23,6 +24,8 @@
 <main class="page-container">
   <div th:replace="~{fragments/customer/mock-notice :: notice}">
   </div>
+
+  <div th:replace="~{fragments/common/alert :: alert}"></div>
 
   <h1>상품 목록</h1>
 
@@ -153,17 +156,6 @@
           </div>
         </div>
 
-        <!-- 당일 픽업 -->
-        <label class="choice form-group">
-          <input type="checkbox"
-                 name="sameDay"
-                 value="true"
-                 onchange="this.form.requestSubmit()"
-                 th:checked="${condition.sameDay}">
-
-          당일 픽업 가능 상품만
-        </label>
-
         <div class="stack">
           <button class="btn btn--primary btn--block"
                   type="submit">
@@ -203,7 +195,7 @@
         </div>
 
         <!-- 조회된 상품 카드 -->
-        <div class="grid grid--3 product-grid"
+        <div class="grid grid--4 product-grid"
              th:if="${!pageResult.content.isEmpty()}">
 
           <a class="product-card"
@@ -213,14 +205,14 @@
                )}">
 
             <!-- 대표 이미지가 있는 경우 -->
-            <img class="placeholder-image"
+            <img class="placeholder-image product-card__image"
                  th:if="${product.thumbnailUrl != null
                            and !product.thumbnailUrl.isBlank()}"
                  th:src="${product.thumbnailUrl}"
                  th:alt="${product.name}">
 
             <!-- 대표 이미지가 없는 경우 -->
-            <div class="placeholder-image"
+            <div class="placeholder-image product-card__image"
                  th:unless="${product.thumbnailUrl != null
                                and !product.thumbnailUrl.isBlank()}">
               상품 이미지 준비 중
@@ -247,12 +239,6 @@
                 <span class="badge"
                       th:text="${product.productType.displayName}">
                     상품 유형
-                  </span>
-
-                <!-- 당일 픽업 -->
-                <span class="badge badge--info"
-                      th:if="${product.sameDayPickup}">
-                    당일 픽업
                   </span>
 
                 <!-- 품절 -->
@@ -301,7 +287,6 @@
                    minPrice=${condition.minPrice},
                    maxPrice=${condition.maxPrice},
                    stock=${condition.stock},
-                   sameDay=${condition.sameDay},
                    sort=${condition.sort},
                    page=${pageResult.page - 1},
                    size=${pageResult.size}
@@ -327,7 +312,6 @@
                    minPrice=${condition.minPrice},
                    maxPrice=${condition.maxPrice},
                    stock=${condition.stock},
-                   sameDay=${condition.sameDay},
                    sort=${condition.sort},
                    page=${pageNumber},
                    size=${pageResult.size}
@@ -344,7 +328,6 @@
                    minPrice=${condition.minPrice},
                    maxPrice=${condition.maxPrice},
                    stock=${condition.stock},
-                   sameDay=${condition.sameDay},
                    sort=${condition.sort},
                    page=${pageResult.page + 1},
                    size=${pageResult.size}

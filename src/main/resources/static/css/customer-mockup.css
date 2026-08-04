@@ -57,3 +57,11 @@ body{display:flex;flex-direction:column;min-height:100vh}body>main{flex:1 0 auto
 /* source: cakeProjectSample/css/responsive.css */
 @media (max-width:1199px){.grid--4{grid-template-columns:repeat(2,minmax(0,1fr))}.customer-header__inner{align-items:flex-start;gap:10px}.customer-header__left{align-items:flex-start;flex-direction:column;gap:8px}.customer-header__nav{flex-wrap:wrap}.grid--3.stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:767px){.page-container{width:min(calc(100% - 24px),var(--content-width));padding:12px 0}.grid--2,.grid--3,.grid--4,.layout-sidebar,.layout-main-aside,.cart-layout,.chat-layout{grid-template-columns:1fr}.product-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.customer-header__inner{flex-direction:column;padding:10px 12px}.customer-header__left,.customer-header__actions{width:100%}.customer-header__nav{gap:8px 14px}.customer-header__actions{justify-content:flex-end;overflow-x:auto}.filter-panel{margin-bottom:12px}.order-summary{position:static}.cart-toolbar{align-items:flex-start;gap:8px}.cart-item{grid-template-columns:auto 72px minmax(0,1fr)}.cart-item__image{min-width:72px;width:72px}.admin-layout{display:block}.admin-sidebar{border-bottom:1px solid var(--color-border);border-right:0;width:100%}.admin-sidebar__nav{display:flex;overflow-x:auto;white-space:nowrap}.admin-sidebar__link{flex:0 0 auto}.admin-content{padding:12px}.admin-header{align-items:flex-start;gap:8px}.data-row{grid-template-columns:96px minmax(0,1fr)}.screen-list{grid-template-columns:1fr}}
+
+/* DB 장바구니 수량 조절기 */
+.cart-item [data-cart-quantity-form]{display:inline-grid;grid-template-columns:34px 56px 34px;gap:6px;align-items:center}
+.cart-item [data-cart-quantity-form] .btn{width:34px;height:34px;min-height:34px;padding:0;font-size:14px}
+.cart-item [data-cart-quantity-form] .form-control{width:56px;height:34px;min-height:34px;padding:0 4px;text-align:center;font-size:13px;font-weight:600}
+.cart-item [data-cart-quantity-form] input[type="number"]{-moz-appearance:textfield}
+.cart-item [data-cart-quantity-form] input[type="number"]::-webkit-inner-spin-button,
+.cart-item [data-cart-quantity-form] input[type="number"]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}

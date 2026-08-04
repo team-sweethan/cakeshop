@@ -12,72 +12,107 @@
 <body data-page-title="커뮤니티">
   <header th:replace="~{fragments/common/header :: header}"></header>
   <main class="page-container">
-    <div th:replace="~{fragments/customer/mock-notice :: notice}"></div>
+
+    <!-- 삭제처럼 결과가 이 화면에 남지 않는 동작의 성공 메시지를 받는다(conventions.md 9). -->
+    <div th:replace="~{fragments/common/alert :: alert}"></div>
 
     <div class="cluster cluster--between">
       <h1>커뮤니티</h1>
       <a class="btn btn--primary" th:href="@{/community/new}">글쓰기</a>
     </div>
 
-    <div class="cluster section" data-select-group>
-      <button class="btn is-active" data-select type="button">전체</button>
-      <button class="btn" data-select type="button">후기</button>
-      <button class="btn" data-select type="button">질문</button>
-      <button class="btn" data-select type="button">자유</button>
-      <button class="btn" data-select type="button">레시피</button>
+    <!--
+      카테고리 필터. 선택지는 활성 카테고리만 노출한다(DOMAIN.md 6.8).
+      필터는 주소로 표현해 새로고침·뒤로가기에서도 유지된다.
+    -->
+    <div class="cluster section">
+      <a class="btn"
+         th:classappend="${selectedCategoryId == null} ? ' is-active'"
+         th:href="@{/community}">전체</a>
+
+      <a class="btn"
+         th:each="category : ${categories}"
+         th:text="${category.name}"
+         th:classappend="${selectedCategoryId != null
+                           and selectedCategoryId == category.id} ? ' is-active'"
+         th:href="@{/community(categoryId=${category.id})}">카테고리</a>
     </div>
 
     <div class="stack">
-      <article class="panel">
+      <article class="panel" th:each="post : ${pageResult.content}">
         <div class="cluster cluster--between">
-          <div class="cluster"><span class="badge badge--info">후기</span><a th:href="@{/community/15}"><strong>딸기 생크림 케이크 재구매 후기입니다 😊</strong></a></div>
-          <span class="text-muted">좋아요 24</span>
+          <div class="cluster">
+            <span class="badge badge--info" th:text="${post.categoryName}">카테고리</span>
+            <a th:href="@{/community/{postId}(postId=${post.id})}">
+              <strong th:text="${post.title}">제목</strong>
+            </a>
+          </div>
+          <span class="text-muted" th:text="'좋아요 ' + ${post.likeCount}">좋아요 0</span>
         </div>
-        <p class="text-muted">단골손님 · 2026.07.21 · 댓글 8</p>
+        <p class="text-muted">
+          <span th:text="${post.authorName()}">작성자</span> ·
+          <span th:text="${#temporals.format(post.createdAt, 'yyyy.MM.dd')}">2026.01.01</span> ·
+          <span th:text="'댓글 ' + ${post.commentCount}">댓글 0</span> ·
+          <span th:text="'조회 ' + ${post.viewCount}">조회 0</span>
+        </p>
       </article>
-      <article class="panel">
-        <div class="cluster cluster--between">
-          <div class="cluster"><span class="badge">질문</span><a th:href="@{/community/14}"><strong>레터링 케이크 문구는 몇 자까지 가능한가요?</strong></a></div>
-          <span class="text-muted">좋아요 5</span>
-        </div>
-        <p class="text-muted">예비신부 · 2026.07.20 · 댓글 3</p>
-      </article>
-      <article class="panel">
-        <div class="cluster cluster--between">
-          <div class="cluster"><span class="badge badge--success">레시피</span><a th:href="@{/community/13}"><strong>집에서 따라 하는 기본 시트 만들기</strong></a></div>
-          <span class="text-muted">좋아요 41</span>
-        </div>
-        <p class="text-muted">홈베이킹러 · 2026.07.19 · 댓글 12</p>
-      </article>
-      <article class="panel">
-        <div class="cluster cluster--between">
-          <div class="cluster"><span class="badge">자유</span><a th:href="@{/community/12}"><strong>오늘 픽업한 당일 케이크 너무 예뻐요</strong></a></div>
-          <span class="text-muted">좋아요 18</span>
-        </div>
-        <p class="text-muted">케이크덕후 · 2026.07.19 · 댓글 6</p>
-      </article>
-      <article class="panel">
-        <div class="cluster cluster--between">
-          <div class="cluster"><span class="badge badge--info">후기</span><a th:href="@{/community/11}"><strong>아이 생일 주문 제작 케이크 후기 (사진 있어요)</strong></a></div>
-          <span class="text-muted">좋아요 33</span>
-        </div>
-        <p class="text-muted">두아이맘 · 2026.07.18 · 댓글 9</p>
-      </article>
-      <article class="panel">
-        <div class="cluster cluster--between">
-          <div class="cluster"><span class="badge">질문</span><a th:href="@{/community/10}"><strong>픽업 시간 변경도 가능한가요?</strong></a></div>
-          <span class="text-muted">좋아요 1</span>
-        </div>
-        <p class="text-muted">회사원A · 2026.07.17 · 댓글 2</p>
-      </article>
+
+      <div class="panel panel--dashed text-muted"
+           th:if="${pageResult.content.isEmpty()}"
+           style="text-align:center">
+        아직 등록된 글이 없습니다.
+      </div>
     </div>
 
-    <nav class="cluster section" style="justify-content:center" aria-label="페이지 이동">
-      <button class="btn" type="button">이전</button>
-      <button class="btn is-active" type="button">1</button>
-      <button class="btn" type="button">2</button>
-      <button class="btn" type="button">3</button>
-      <button class="btn" type="button">다음</button>
+    <nav th:if="${pageResult.totalPages > 1}"
+         class="cluster section"
+         aria-label="페이지 이동"
+         style="justify-content:center">
+
+      <!-- 이전/다음은 한 페이지씩이 아니라 현재 번호 블록 단위로 이동한다. -->
+      <a class="btn"
+         th:if="${pageNavigation.hasPreviousBlock}"
+         th:href="@{/community(
+             categoryId=${selectedCategoryId},
+             page=${pageNavigation.previousPage}
+         )}">
+        이전
+      </a>
+
+      <span class="btn btn--disabled"
+            th:unless="${pageNavigation.hasPreviousBlock}">
+        이전
+      </span>
+
+      <!-- startPage부터 endPage까지만 렌더링해 전체 페이지 번호 노출을 막는다. -->
+      <a class="btn"
+         th:each="pageNumber :
+             ${#numbers.sequence(
+                 pageNavigation.startPage,
+                 pageNavigation.endPage
+             )}"
+         th:text="${pageNumber}"
+         th:classappend="${pageNumber == pageResult.page} ? ' is-active'"
+         th:href="@{/community(
+             categoryId=${selectedCategoryId},
+             page=${pageNumber}
+         )}">
+        1
+      </a>
+
+      <a class="btn"
+         th:if="${pageNavigation.hasNextBlock}"
+         th:href="@{/community(
+             categoryId=${selectedCategoryId},
+             page=${pageNavigation.nextPage}
+         )}">
+        다음
+      </a>
+
+      <span class="btn btn--disabled"
+            th:unless="${pageNavigation.hasNextBlock}">
+        다음
+      </span>
     </nav>
   </main>
   <footer th:replace="~{fragments/common/footer :: footer(${store})}"></footer>
