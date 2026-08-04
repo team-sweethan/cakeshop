@@ -16,6 +16,7 @@ import com.cakeshop.domain.product.entity.ProductType;
  * @param stockQuantity 현재 재고 수량
  * @param status 판매 상태
  * @param createdAt 상품 등록 일시
+ * @param thumbnailUrl 대표 이미지 URL
  */
 public record ProductAdminListView(
         Long id,
@@ -24,7 +25,8 @@ public record ProductAdminListView(
         BigDecimal basePrice,
         Integer stockQuantity,
         ProductStatus status,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        String thumbnailUrl
 ) {
 
     /**

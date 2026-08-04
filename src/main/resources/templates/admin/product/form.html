@@ -15,7 +15,7 @@
   </title>
 
   <link rel="stylesheet"
-        th:href="@{/css/app.css}">
+        th:href="@{/css/app.css(v='admin-product-image-square')}">
 
   <script defer
           th:src="@{/js/product-admin-form.js}">
@@ -347,7 +347,6 @@
 
               <div class="product-image-preview">
                 <img class="placeholder-image"
-                     style="width:100%; object-fit:cover"
                      th:src="${image.imageUrl}"
                      th:alt="|상품 이미지 ${imageStatus.count}|">
               </div>

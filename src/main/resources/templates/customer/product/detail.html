@@ -11,7 +11,8 @@
   </title>
 
   <!-- 공통 및 고객 화면 스타일 -->
-  <link rel="stylesheet" th:href="@{/css/app.css}">
+  <link rel="stylesheet"
+        th:href="@{/css/app.css(v='product-images-square')}">
   <link rel="stylesheet" th:href="@{/css/customer-mockup.css}">
 
   <!-- 공통 및 고객 화면 스크립트 -->
@@ -63,8 +64,7 @@
     <div class="product-gallery">
       <!-- 표시 순서가 가장 앞선 이미지를 대표 이미지로 사용한다. -->
       <th:block th:if="${!#lists.isEmpty(product.images)}">
-        <img class="placeholder-image placeholder-image--lg"
-             style="width:100%; object-fit:cover"
+        <img class="placeholder-image placeholder-image--lg product-gallery__main-image"
              data-product-main-image
              th:src="${product.images[0].imageUrl}"
              th:alt="|${product.name} 대표 이미지|">
@@ -72,8 +72,7 @@
         <!-- 대표 이미지를 제외한 나머지 이미지를 순서대로 표시한다. -->
         <div class="product-gallery__thumbnails grid grid--4"
              th:if="${product.images.size() > 1}">
-          <img class="placeholder-image placeholder-image--sm"
-               style="object-fit:cover"
+          <img class="placeholder-image placeholder-image--sm product-gallery__thumbnail"
                loading="lazy"
                data-product-thumbnail
                th:each="image, imageStatus : ${product.images}"
@@ -85,7 +84,7 @@
 
       <!-- 등록된 이미지가 없으면 img 태그를 만들지 않는다. -->
       <th:block th:if="${#lists.isEmpty(product.images)}">
-        <div class="placeholder-image placeholder-image--lg">
+        <div class="placeholder-image placeholder-image--lg product-gallery__main-image">
           상품 이미지 준비 중
         </div>
 
