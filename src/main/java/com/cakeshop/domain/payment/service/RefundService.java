@@ -1,9 +1,11 @@
 package com.cakeshop.domain.payment.service;
 
+import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.order.entity.OrderItem;
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.entity.OrderType;
+import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.order.mapper.OrderMapper;
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.entity.PaymentCancellation;
@@ -34,12 +36,14 @@ public class RefundService {
     private final OrderMapper orderMapper;
     private final PaymentMapper paymentMapper;
     private final ProductStockService productStockService;
+    private final MemberService memberService;
     private final Clock clock;
 
     /** 회원 소유권과 현재 상태를 검증하고 PG 호출 전에 취소 요청을 저장한다. */
     @Transactional
     public RefundRequest prepareCustomerCancellation(long memberId, long orderId, String reason) {
         validateCancellationInput(memberId, reason);
+        validateActiveMember(memberId);
         Order order = findOwnedOrder(memberId, orderId);
         return prepareCancellation(memberId, order, reason, CUSTOMER);
     }
@@ -212,6 +216,12 @@ public class RefundService {
     private void validateCancellationInput(long requestedBy, String reason) {
         if (requestedBy <= 0 || reason == null || reason.isBlank() || reason.length() > 200) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+    }
+
+    private void validateActiveMember(long memberId) {
+        if (!memberService.isActiveMember(memberId)) {
+            throw new BusinessException(OrderErrorCode.MEMBER_NOT_AVAILABLE);
         }
     }
 

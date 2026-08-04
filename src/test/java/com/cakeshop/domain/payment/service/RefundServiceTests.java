@@ -2,7 +2,9 @@ package com.cakeshop.domain.payment.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -11,7 +13,9 @@ import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.order.entity.OrderItem;
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.entity.OrderType;
+import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.order.mapper.OrderMapper;
+import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.entity.PaymentCancellation;
 import com.cakeshop.domain.payment.entity.PaymentCancellationStatus;
@@ -53,11 +57,38 @@ class RefundServiceTests {
     @Mock
     private ProductStockService productStockService;
 
+    @Mock
+    private MemberService memberService;
+
     private RefundService refundService;
 
     @BeforeEach
     void setUp() {
-        refundService = new RefundService(orderMapper, paymentMapper, productStockService, CLOCK);
+        refundService = new RefundService(
+                orderMapper,
+                paymentMapper,
+                productStockService,
+                memberService,
+                CLOCK
+        );
+        lenient().when(memberService.isActiveMember(anyLong())).thenReturn(true);
+    }
+
+    @Test
+    void prepareCustomerCancellation_inactiveMember_returnsMemberNotAvailable() {
+        when(memberService.isActiveMember(3L)).thenReturn(false);
+
+        assertThatThrownBy(() -> refundService.prepareCustomerCancellation(
+                3L,
+                10L,
+                "단순 변심"
+        )).isInstanceOfSatisfying(
+                BusinessException.class,
+                error -> assertThat(error.getErrorCode())
+                        .isEqualTo(OrderErrorCode.MEMBER_NOT_AVAILABLE)
+        );
+
+        verify(orderMapper, never()).findOrderByIdForUpdate(10L);
     }
 
     @Test
@@ -164,6 +195,7 @@ class RefundServiceTests {
         assertThat(result.cancellationId()).isEqualTo(31L);
         assertThat(result.reason()).isEqualTo("매장 사정");
         assertThat(result.canceledBy()).isEqualTo("ADMIN");
+        verify(memberService, never()).isActiveMember(7L);
     }
 
     @Test
