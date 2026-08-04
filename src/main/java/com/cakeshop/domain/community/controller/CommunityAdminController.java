@@ -87,14 +87,20 @@ public class CommunityAdminController {
      *
      * 댓글도 함께 보여 주지만 손댈 수는 없다. 댓글 삭제 권한은 그 댓글의 작성자에게만
      * 있다(6.4).
+     *
+     * <b>{@code ?comments=}를 고객 상세와 똑같이 받는다.</b> 관리자에게는 대체 경로가 없기
+     * 때문이다 — 차단되거나 삭제된 글은 고객 화면에서 열리지 않으므로, 여기서 잘린 댓글은
+     * 어디서도 볼 수 없다.
      */
     @GetMapping("/admin/community/{postId:\\d+}")
     public String detail(
             @PathVariable("postId") long postId,
+            @RequestParam(required = false) String comments,
             @ModelAttribute("blockForm") BlockForm blockForm,
             Model model
     ) {
-        return prepareDetail(model, communityAdminService.getPostDetail(postId));
+        return prepareDetail(
+                model, communityAdminService.getPostDetail(postId), parsePositiveInteger(comments));
     }
 
     /**
@@ -114,7 +120,9 @@ public class CommunityAdminController {
             RedirectAttributes redirectAttributes
     ) {
         if (bindingResult.hasErrors()) {
-            return prepareDetail(model, communityAdminService.getPostDetail(postId));
+            // 폼이 되돌아오는 자리라 펼친 댓글 수는 넘어오지 않는다. 기본값으로 접힌다 —
+            // 여기서 관리자가 보려던 것은 댓글이 아니라 비어 있는 차단 사유다.
+            return prepareDetail(model, communityAdminService.getPostDetail(postId), null);
         }
 
         communityAdminService.blockPost(
@@ -165,14 +173,15 @@ public class CommunityAdminController {
      * 댓글은 고객 화면과 같은 Service를 쓴다. 관리자용으로 따로 만들면 자리 표시나 개수
      * 규칙(DOMAIN.md 4.4)이 두 벌이 되어 한쪽만 고치는 날이 온다.
      */
-    private String prepareDetail(Model model, AdminPostDetailView post) {
+    private String prepareDetail(
+            Model model, AdminPostDetailView post, Integer commentLimit) {
         List<ReportView> reports = communityAdminService.getReports(post.id());
 
         model.addAttribute("post", post);
         model.addAttribute("reports", reports);
         // 이미 읽어 온 목록에서 센다. 같은 수를 DB에 다시 묻는 쿼리를 늘리지 않는다.
         model.addAttribute("pendingReportCount", reports.stream().filter(ReportView::isPending).count());
-        model.addAttribute("commentSection", communityService.getComments(post.id(), null));
+        model.addAttribute("commentSection", communityService.getComments(post.id(), commentLimit));
 
         return "admin/community/detail";
     }

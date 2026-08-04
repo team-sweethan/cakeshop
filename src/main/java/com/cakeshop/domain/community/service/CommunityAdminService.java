@@ -136,10 +136,21 @@ public class CommunityAdminService {
      *
      * 닫을 신고가 하나도 없으면 성공으로 넘기지 않는다. 화면에는 "기각했습니다"라고
      * 나오는데 아무 일도 일어나지 않은 상태다.
+     *
+     * <b>게시글을 쓰지 않는데도 행을 먼저 잠근다.</b> 상태를 읽고 신고를 닫기까지의 사이에
+     * 작성자가 글을 지우면, 지워진 글에 REJECTED가 남아 바로 위에서 막으려던 상태가 그대로
+     * 만들어진다. 잠금 비용은 차단·해제와 같고(같은 행, 같은 순서), 세 조치가 한 규칙으로
+     * 묶여 다음 사람이 여기만 예외인 이유를 찾지 않아도 된다(H17).
      */
     @Transactional
     public void rejectReports(long postId) {
-        if (getPostDetail(postId).isDeleted()) {
+        PostLockView post = communityMapper.lockPost(postId);
+
+        if (post == null) {
+            throw new BusinessException(CommunityErrorCode.POST_NOT_FOUND);
+        }
+
+        if (post.status() == PostStatus.DELETED) {
             throw new BusinessException(CommunityErrorCode.INVALID_POST_TRANSITION);
         }
 

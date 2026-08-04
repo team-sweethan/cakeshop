@@ -9,7 +9,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.cakeshop.domain.community.dto.view.AdminPostDetailView;
 import com.cakeshop.domain.community.dto.view.PostLockView;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.entity.ReportStatus;
@@ -151,12 +150,15 @@ class CommunityAdminServiceTests {
     /** 기각은 게시글을 건드리지 않는다. "차단하지 않기로 했다"도 조치다(DOMAIN.md 6.6). */
     @Test
     void rejectReports_pendingReports_closesThemWithoutTouchingPost() {
-        givenAdminPost();
+        givenLockedPost(PostStatus.PUBLISHED);
         when(communityMapper.closePendingReports(POST_ID, ReportStatus.REJECTED)).thenReturn(2);
 
         communityAdminService.rejectReports(POST_ID);
 
-        verify(communityMapper).closePendingReports(POST_ID, ReportStatus.REJECTED);
+        // 잠금이 먼저다. 차단·해제와 같은 행이라 순서가 어긋나면 교착이다(H17).
+        InOrder order = inOrder(communityMapper);
+        order.verify(communityMapper).lockPost(POST_ID);
+        order.verify(communityMapper).closePendingReports(POST_ID, ReportStatus.REJECTED);
         verify(communityMapper, never()).blockPost(anyLong(), any(), anyLong());
         verify(communityMapper, never()).unblockPost(anyLong());
     }
@@ -171,7 +173,7 @@ class CommunityAdminServiceTests {
      */
     @Test
     void rejectReports_deletedPost_isRejected() {
-        givenAdminPost(PostStatus.DELETED);
+        givenLockedPost(PostStatus.DELETED);
 
         assertThatThrownBy(() -> communityAdminService.rejectReports(POST_ID))
                 .isInstanceOf(BusinessException.class)
@@ -190,7 +192,7 @@ class CommunityAdminServiceTests {
      */
     @Test
     void rejectReports_blockedPost_isAllowed() {
-        givenAdminPost(PostStatus.BLOCKED);
+        givenLockedPost(PostStatus.BLOCKED);
         when(communityMapper.closePendingReports(POST_ID, ReportStatus.REJECTED)).thenReturn(1);
 
         communityAdminService.rejectReports(POST_ID);
@@ -206,13 +208,26 @@ class CommunityAdminServiceTests {
      */
     @Test
     void rejectReports_withoutPendingReports_isRejected() {
-        givenAdminPost();
+        givenLockedPost(PostStatus.PUBLISHED);
         when(communityMapper.closePendingReports(POST_ID, ReportStatus.REJECTED)).thenReturn(0);
 
         assertThatThrownBy(() -> communityAdminService.rejectReports(POST_ID))
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(CommunityErrorCode.INVALID_POST_TRANSITION);
+    }
+
+    /** 없는 글에는 404다. 차단·해제와 같은 판단이고, 같은 잠금 조회에서 갈린다. */
+    @Test
+    void rejectReports_missingPost_isRejectedAsNotFound() {
+        when(communityMapper.lockPost(POST_ID)).thenReturn(null);
+
+        assertThatThrownBy(() -> communityAdminService.rejectReports(POST_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(CommunityErrorCode.POST_NOT_FOUND);
+
+        verify(communityMapper, never()).closePendingReports(anyLong(), any());
     }
 
     /**
@@ -234,14 +249,4 @@ class CommunityAdminServiceTests {
                 .thenReturn(new PostLockView(AUTHOR_ID, status));
     }
 
-    private void givenAdminPost() {
-        givenAdminPost(PostStatus.PUBLISHED);
-    }
-
-    private void givenAdminPost(PostStatus status) {
-        when(communityMapper.findPostByIdForAdmin(POST_ID))
-                .thenReturn(new AdminPostDetailView(
-                        POST_ID, AUTHOR_ID, "질문", "제목", "본문", "글쓴이", false,
-                        status, null, null, null, 0, 0, null, null));
-    }
 }

@@ -82,6 +82,34 @@
                    style="text-align:center">
                 아직 댓글이 없습니다.
               </div>
+
+              <!--
+                고객 상세와 같은 더 보기다. 여기에 없으면 안 되는 이유는 관리자에게 대체
+                경로가 없다는 것이다 — 차단되거나 삭제된 글은 고객 화면에서 열리지 않으므로,
+                잘린 댓글을 볼 수 있는 다른 주소가 존재하지 않는다.
+
+                이 블록은 댓글이 한 번에 보여주는 수를 넘어야만 나타난다. 개발 중에는 댓글이
+                몇 건뿐이라 화면에 아예 없고, 표현식이 깨져도 눈에 띄지 않는다.
+              -->
+              <div class="cluster" th:if="${commentSection.canLoadMore()}">
+                <a class="btn"
+                   th:href="@{/admin/community/{postId}(
+                       postId=${post.id},
+                       comments=${commentSection.nextLimit()}
+                   )}">
+                  이전 댓글 더 보기
+                </a>
+                <span class="text-muted"
+                      th:text="'남은 댓글 ' + ${commentSection.hiddenCount()}">남은 댓글 0</span>
+              </div>
+
+              <!--
+                상한에 막혀 더 못 보여주는 상태. 링크를 조용히 감추지 않고 사실을 적는다 —
+                감추면 "댓글이 여기까지"로 보이는데 그것은 거짓이다(CommentSectionView 참고).
+              -->
+              <p class="note" th:if="${commentSection.cappedByLimit()}">
+                오래된 댓글 일부는 표시하지 않습니다.
+              </p>
             </div>
           </section>
         </div>
