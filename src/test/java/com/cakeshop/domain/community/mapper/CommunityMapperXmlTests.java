@@ -27,8 +27,17 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class CommunityMapperXmlTests {
 
-    private static final String RESOURCE = "mapper/community/CommunityMapper.xml";
-    private static final String NAMESPACE = CommunityMapper.class.getName();
+    /**
+     * 고객·관리자 매퍼를 <b>한 Configuration에</b> 함께 파싱한다.
+     *
+     * <p>파일이 갈렸어도 검사는 갈라 두지 않는다. 여기서 고정하는 것 대부분이 두 파일에
+     * 걸친 규칙이기 때문이다 — 조회수·좋아요·차단이 같은 {@code posts} 행의
+     * {@code updated_at}을 보존해야 하고, 스칼라 서브쿼리 규칙도 고객 목록과 관리자 목록
+     * 양쪽에 걸린다. 파일마다 클래스를 나누면 그 짝이 눈에서 사라진다.
+     */
+    private static final Map<String, Class<?>> MAPPERS = Map.of(
+            "mapper/community/CommunityMapper.xml", CommunityMapper.class,
+            "mapper/community/CommunityAdminMapper.xml", CommunityAdminMapper.class);
 
     private Configuration configuration;
 
@@ -36,29 +45,42 @@ class CommunityMapperXmlTests {
     void parseMapperXml() throws Exception {
         configuration = new Configuration();
 
-        try (InputStream inputStream = Resources.getResourceAsStream(RESOURCE)) {
-            new XMLMapperBuilder(
-                    inputStream,
-                    configuration,
-                    RESOURCE,
-                    configuration.getSqlFragments()
-            ).parse();
+        for (String resource : MAPPERS.keySet()) {
+            try (InputStream inputStream = Resources.getResourceAsStream(resource)) {
+                new XMLMapperBuilder(
+                        inputStream,
+                        configuration,
+                        resource,
+                        configuration.getSqlFragments()
+                ).parse();
+            }
         }
     }
 
-    /** Mapper 인터페이스와 XML의 연결 누락을 잡는 안전장치 (선례: OrderMapperXmlTests). */
+    /**
+     * Mapper 인터페이스와 XML의 연결 누락을 잡는 안전장치 (선례: OrderMapperXmlTests).
+     *
+     * <p>매퍼마다 확인한다. 한쪽만 보면 <b>문장을 옮기다 흘린 것</b>이 드러나지 않는다 —
+     * 인터페이스에서 지운 메서드의 SQL이 옛 파일에 남아 있어도, 그 XML을 안 보면 통과한다.
+     */
     @Test
-    void mapperInterfaceAndXmlStatementsStaySynchronized() {
-        Set<String> interfaceMethods = Arrays.stream(CommunityMapper.class.getDeclaredMethods())
-                .map(Method::getName)
-                .collect(Collectors.toSet());
+    void mapperInterfacesAndXmlStatementsStaySynchronized() {
+        for (Class<?> mapper : MAPPERS.values()) {
+            Set<String> interfaceMethods = Arrays.stream(mapper.getDeclaredMethods())
+                    .map(Method::getName)
+                    .collect(Collectors.toSet());
 
-        Set<String> xmlStatements = configuration.getMappedStatementNames().stream()
-                .filter(name -> name.startsWith(NAMESPACE + "."))
-                .map(name -> name.substring(NAMESPACE.length() + 1))
-                .collect(Collectors.toSet());
+            String namespace = mapper.getName();
 
-        assertThat(xmlStatements).containsExactlyInAnyOrderElementsOf(interfaceMethods);
+            Set<String> xmlStatements = configuration.getMappedStatementNames().stream()
+                    .filter(name -> name.startsWith(namespace + "."))
+                    .map(name -> name.substring(namespace.length() + 1))
+                    .collect(Collectors.toSet());
+
+            assertThat(xmlStatements)
+                    .as(mapper.getSimpleName())
+                    .containsExactlyInAnyOrderElementsOf(interfaceMethods);
+        }
     }
 
     /**
@@ -410,8 +432,7 @@ class CommunityMapperXmlTests {
 
     /** 분기가 있는 문장은 파라미터를 갈아 끼워 <b>분기마다</b> 형태를 본다. */
     private String normalizedSql(String statementId, Map<String, Object> overrides) {
-        MappedStatement statement =
-                configuration.getMappedStatement(NAMESPACE + "." + statementId);
+        MappedStatement statement = statementOf(statementId);
 
         Map<String, Object> parameters = new HashMap<>();
         parameters.put("categoryId", null);
@@ -433,5 +454,21 @@ class CommunityMapperXmlTests {
                 .getSql()
                 .replaceAll("\\s+", " ")
                 .toUpperCase();
+    }
+
+    /**
+     * 어느 매퍼의 문장인지 이름으로 찾는다. 호출부는 파일이 갈린 것을 몰라도 된다 —
+     * 검사가 확인하는 것은 SQL의 형태이지 어느 파일에 적혀 있느냐가 아니다.
+     */
+    private MappedStatement statementOf(String statementId) {
+        for (Class<?> mapper : MAPPERS.values()) {
+            String name = mapper.getName() + "." + statementId;
+
+            if (configuration.hasStatement(name)) {
+                return configuration.getMappedStatement(name);
+            }
+        }
+
+        throw new IllegalArgumentException("어느 커뮤니티 매퍼에도 없는 문장이다: " + statementId);
     }
 }

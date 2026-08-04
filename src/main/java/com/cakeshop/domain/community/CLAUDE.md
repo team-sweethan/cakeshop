@@ -15,7 +15,7 @@
 ## 이 도메인의 파일 범위
 
 - `src/main/java/com/cakeshop/domain/community/**`
-- `src/main/resources/mapper/community/CommunityMapper.xml`
+- `src/main/resources/mapper/community/*.xml` (고객 `CommunityMapper.xml`, 관리자 `CommunityAdminMapper.xml`)
 - `src/main/resources/db/seed/seed-community.sql` (로컬 샘플 데이터. `seed-local.sql` 다음에 실행한다)
 - `src/main/resources/templates/customer/community/**`
 - `src/main/resources/templates/admin/community/**`
@@ -51,6 +51,7 @@ DOMAIN.md 9절의 **보류 항목**은 아직 결정되지 않은 것이다. 임
 - **차단된 글에는 작성자도 수정·삭제를 할 수 없다.** 상세에서 버튼을 숨기는 것만으로는 막은 것이 아니다 — 작성자는 그 화면에서 주소를 알게 되므로 요청만 따로 보낼 수 있다. 여기만 404가 아니라 403인 이유는 상대가 글의 존재를 이미 아는 작성자이기 때문이다. (4.2, 4.3)
 - **댓글·좋아요·신고는 대상 게시글이 `PUBLISHED`인지 Service에서 검증한다.** 게시글 soft delete 시 자식 데이터는 그대로 남기 때문이다. (4.5) **이 검증에 남는 경합 창을 부모 행 잠금으로 막지 않는다** — 권한 판단이지 불변식이 아니고, 댓글 쓰기마다 게시글 행을 잠그면 조회수 UPDATE와 같은 행에서 경합한다. 이미 검토하고 수용한 결정이다. (R14)
 - **관리자가 할 수 있는 일은 차단·해제·신고 기각뿐이다.** (6.7) 게시글 삭제는 작성자만(4.2의 `BLOCKED → DELETED` 금지), 댓글 삭제는 그 댓글의 작성자만 할 수 있다(6.4). 관리자 화면에 그런 버튼을 만들지 않는다 — 목업에 있던 것은 규칙보다 먼저 그려진 것이라 조각 5에서 걷어냈다.
+- **매퍼는 고객(`CommunityMapper`)과 관리자(`CommunityAdminMapper`)로만 갈린다.** 기능 동사(조회수·좋아요·신고)로 더 쪼개지 않는다 — 그 문장들은 전부 같은 `posts` 행을 만지고, 갈라 놓으면 잠금 순서를 한자리에서 따질 수 없다. **`lockPost`는 관리자 쪽에도 복제하지 않는다.** 잠금 문장이 둘이 되는 순간 "어느 쪽이 먼저인가"가 갈리고, 그 답이 어긋나면 교착이다(H15·H17). `CommunityAdminService`가 고객 매퍼를 함께 주입받는 것은 그래서다.
 - **차단·해제·신고 기각 모두 `lockPost`로 게시글 행을 먼저 잠근다.** (H17) 기각은 `posts`에 쓰지 않지만, 상태를 읽고 신고를 닫는 사이에 작성자가 글을 지우면 지워진 글에 `REJECTED`가 남는다 — 막으려던 상태가 그대로 만들어진다. 조회수·좋아요와 같은 행이라 잠금 순서가 어긋나면 교착이다. `posts` 행에 쓰는 경로를 새로 만들 때마다 이 순서를 따진다.
 - **차단·해제도 `updated_at`을 보존한다.** 그냥 두면 차단된 글마다 작성자에게 `(수정됨)`이 붙는데, 작성자는 고친 적이 없어서 원인을 찾을 수 없다. 조회수·좋아요와 같은 자리다. (6.3)
 - **신고는 상태 전이가 게시글 단위다.** 차단하면 그 글의 `PENDING` 신고가 전부 `RESOLVED`, 기각하면 전부 `REJECTED`가 된다. **차단을 해제해도 신고 상태는 되돌리지 않는다** — `blocked_*` 보존과 같은 이유로 "그때 조치했다"는 기록이다. (6.6)

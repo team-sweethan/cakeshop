@@ -10,6 +10,7 @@ import com.cakeshop.domain.community.dto.view.ReportView;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.entity.ReportStatus;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
+import com.cakeshop.domain.community.mapper.CommunityAdminMapper;
 import com.cakeshop.domain.community.mapper.CommunityMapper;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
@@ -33,9 +34,21 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class CommunityAdminService {
 
+    private final CommunityAdminMapper communityAdminMapper;
+
+    /**
+     * lockPost 하나 때문에 고객 매퍼를 함께 받는다.
+     *
+     * 관리자 전용 잠금 문장을 따로 만들지 않는다. 차단·해제·기각은 조회수·좋아요와 같은
+     * posts 행을 잠그므로, 문장이 둘이 되면 잠금 순서도 두 벌이 되고 어긋나는 날이
+     * 교착이다(H15·H17).
+     */
     private final CommunityMapper communityMapper;
 
-    public CommunityAdminService(CommunityMapper communityMapper) {
+    public CommunityAdminService(
+            CommunityAdminMapper communityAdminMapper, CommunityMapper communityMapper) {
+
+        this.communityAdminMapper = communityAdminMapper;
         this.communityMapper = communityMapper;
     }
 
@@ -48,14 +61,14 @@ public class CommunityAdminService {
     public PageResult<AdminPostListView> getPosts(
             PostStatus status, AdminPostSort sort, PageRequest pageRequest) {
 
-        List<AdminPostListView> posts = communityMapper.findPostsForAdmin(
+        List<AdminPostListView> posts = communityAdminMapper.findPostsForAdmin(
                 status,
                 sort,
                 pageRequest.getSize(),
                 pageRequest.getOffset()
         );
 
-        long totalElements = communityMapper.countPostsForAdmin(status);
+        long totalElements = communityAdminMapper.countPostsForAdmin(status);
 
         return new PageResult<>(posts, pageRequest, totalElements);
     }
@@ -69,7 +82,7 @@ public class CommunityAdminService {
      */
     @Transactional(readOnly = true)
     public AdminPostDetailView getPostDetail(long postId) {
-        AdminPostDetailView post = communityMapper.findPostByIdForAdmin(postId);
+        AdminPostDetailView post = communityAdminMapper.findPostByIdForAdmin(postId);
 
         if (post == null) {
             throw new BusinessException(CommunityErrorCode.POST_NOT_FOUND);
@@ -81,7 +94,7 @@ public class CommunityAdminService {
     /** 관리자 상세에 실을 신고 내역. 처리된 신고도 함께 나온다. */
     @Transactional(readOnly = true)
     public List<ReportView> getReports(long postId) {
-        return communityMapper.findReportsByPost(postId);
+        return communityAdminMapper.findReportsByPost(postId);
     }
 
     /**
@@ -99,11 +112,11 @@ public class CommunityAdminService {
     public void blockPost(long postId, String reason, long adminId) {
         requireTransition(postId, PostStatus.BLOCKED);
 
-        requireApplied(communityMapper.blockPost(postId, reason, adminId));
+        requireApplied(communityAdminMapper.blockPost(postId, reason, adminId));
 
         // 이 글에 대한 판단이 끝났으므로 대기 중이던 신고를 함께 닫는다. 남은 신고가
         // 없어도 정상이다 — 관리자가 신고 없이 직접 발견해 차단할 수도 있다.
-        communityMapper.closePendingReports(postId, ReportStatus.RESOLVED);
+        communityAdminMapper.closePendingReports(postId, ReportStatus.RESOLVED);
     }
 
     /**
@@ -117,7 +130,7 @@ public class CommunityAdminService {
     public void unblockPost(long postId) {
         requireTransition(postId, PostStatus.PUBLISHED);
 
-        requireApplied(communityMapper.unblockPost(postId));
+        requireApplied(communityAdminMapper.unblockPost(postId));
     }
 
     /**
@@ -154,7 +167,7 @@ public class CommunityAdminService {
             throw new BusinessException(CommunityErrorCode.INVALID_POST_TRANSITION);
         }
 
-        if (communityMapper.closePendingReports(postId, ReportStatus.REJECTED) == 0) {
+        if (communityAdminMapper.closePendingReports(postId, ReportStatus.REJECTED) == 0) {
             throw new BusinessException(CommunityErrorCode.INVALID_POST_TRANSITION);
         }
     }
