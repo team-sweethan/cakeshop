@@ -340,6 +340,14 @@
          WHERE status = 'PENDING_PAYMENT'
            AND payment_expires_at IS NOT NULL
            AND payment_expires_at &lt;= #{now}
+           AND NOT EXISTS (
+               SELECT 1
+                 FROM payments AS candidate_payment
+                 INNER JOIN payment_cancellations AS compensation
+                    ON compensation.active_requested_payment_id = candidate_payment.id
+                   AND compensation.request_type = 'SYSTEM_COMPENSATION'
+                WHERE candidate_payment.order_id = orders.id
+           )
          ORDER BY payment_expires_at, id
          LIMIT #{limit}
     </select>
@@ -570,6 +578,12 @@
         WHERE current_order.id = #{orderId}
           AND current_order.status = 'PENDING_PAYMENT'
           AND (payment.id IS NULL OR payment.status = 'READY')
+          AND NOT EXISTS (
+              SELECT 1
+                FROM payment_cancellations AS compensation
+               WHERE compensation.active_requested_payment_id = payment.id
+                 AND compensation.request_type = 'SYSTEM_COMPENSATION'
+          )
     </update>
 
     <update id="cancelIfCurrent">

@@ -373,6 +373,33 @@ class OrderMapperTests {
     }
 
     @Test
+    void expiration_requestedSystemCompensation_keepsOrderAndPaymentPending() {
+        Order order = newOrder();
+        orderMapper.insertOrder(order);
+        long paymentId = insertPayment(
+                order.getId(),
+                "READY",
+                "COMPENSATION-NOT-EXPIRED"
+        );
+        insertRequestedSystemCompensation(paymentId);
+        LocalDateTime expiredAt = LocalDateTime.of(2026, 8, 1, 12, 11);
+
+        assertThat(orderMapper.findOverduePendingOrderIds(expiredAt, 10))
+                .doesNotContain(order.getId());
+        assertThat(orderMapper.expireIfPendingPayment(
+                order.getId(),
+                expiredAt
+        )).isZero();
+
+        Order pendingOrder = orderMapper.findOrderById(order.getId())
+                .orElseThrow();
+        assertThat(pendingOrder.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        assertThat(pendingOrder.getExpiredAt()).isNull();
+        assertThat(findPaymentStatus(paymentId)).isEqualTo("READY");
+        assertThat(findCancellationStatus(paymentId)).isEqualTo("REQUESTED");
+    }
+
+    @Test
     void cancelIfCurrent_customOrder_isNotSupportedInGeneralMvp() {
         Order order = newOrder();
         orderMapper.insertOrder(order);
@@ -730,6 +757,25 @@ class OrderMapperTests {
         );
     }
 
+    private void insertRequestedSystemCompensation(long paymentId) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO payment_cancellations (
+                    payment_id,
+                    idempotency_key,
+                    cancel_amount,
+                    cancel_reason,
+                    request_type,
+                    status
+                )
+                VALUES (?, ?, 40000, '내부 주문 처리 실패',
+                        'SYSTEM_COMPENSATION', 'REQUESTED')
+                """,
+                paymentId,
+                "COMPENSATE-" + paymentId
+        );
+    }
+
     private String findPaymentStatus(long paymentId) {
         return jdbcTemplate.queryForObject(
                 "SELECT status FROM payments WHERE id = ?",
@@ -741,6 +787,14 @@ class OrderMapperTests {
     private String findPaymentFailureCode(long paymentId) {
         return jdbcTemplate.queryForObject(
                 "SELECT failure_code FROM payments WHERE id = ?",
+                String.class,
+                paymentId
+        );
+    }
+
+    private String findCancellationStatus(long paymentId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT status FROM payment_cancellations WHERE payment_id = ?",
                 String.class,
                 paymentId
         );
