@@ -48,6 +48,9 @@ class CommunityQueryCountTests {
     /** 목록 조회 한 번에 실행되어야 하는 쿼리 수. 목록 1 + 총 개수 1. */
     private static final int EXPECTED_QUERY_COUNT = 2;
 
+    /** 댓글 구역 한 번에 실행되어야 하는 쿼리 수. 댓글 목록 1 + 개수 1. */
+    private static final int EXPECTED_COMMENT_QUERY_COUNT = 2;
+
     @Autowired
     private CommunityService communityService;
 
@@ -107,10 +110,51 @@ class CommunityQueryCountTests {
         long postId = insertPost();
 
         queryCounter.reset();
-        communityService.getPostDetail(postId, null);
+        communityService.getPostDetail(postId, null, "M:1");
 
-        // 조회수 UPDATE는 query가 아니라 update로 실행되므로 SELECT는 상세 1회뿐이다.
+        // 조회 기록(INSERT)과 조회수 UPDATE는 query가 아니라 update로 실행되므로
+        // SELECT는 상세 1회뿐이다.
+        //
+        // 중복 판단을 "이미 봤는지 SELECT로 확인" 하는 형태로 바꾸면 이 수가 늘어난다.
+        // DB의 UNIQUE가 판단하게 두면 늘지 않는다 — 그게 6.2가 제약을 쓰는 이유이기도 하다.
         assertThat(queryCounter.count()).isEqualTo(1);
+    }
+
+    /**
+     * 댓글 구역이 댓글 수와 무관하게 정해진 횟수의 쿼리만 실행하는지 확인한다.
+     *
+     * <p>목록 1회 + 개수 1회, 합쳐서 2회다. 개수를 "전체 행"과 "노출 중"으로 따로 세느라
+     * 쿼리를 하나 더 날리거나, 작성자를 댓글마다 조회하는 형태(N+1)로 바뀌는 것을 잡는다.
+     * 둘 다 화면 결과가 같아서 눈으로는 드러나지 않는다.
+     */
+    @Test
+    void getComments_queryCount_doesNotGrowWithCommentCount() {
+        long postId = insertPost();
+        insertComments(postId, 3);
+
+        queryCounter.reset();
+        communityService.getComments(postId, null);
+        int withFewComments = queryCounter.count();
+
+        insertComments(postId, 20);
+
+        queryCounter.reset();
+        communityService.getComments(postId, null);
+        int withManyComments = queryCounter.count();
+
+        assertThat(withFewComments).isEqualTo(EXPECTED_COMMENT_QUERY_COUNT);
+        assertThat(withManyComments).isEqualTo(EXPECTED_COMMENT_QUERY_COUNT);
+    }
+
+    private void insertComments(long postId, int count) {
+        for (int i = 0; i < count; i++) {
+            jdbcTemplate.update(
+                    """
+                    INSERT INTO comments (post_id, member_id, content, status)
+                    VALUES (?, ?, '댓글', 'PUBLISHED')
+                    """,
+                    postId, memberId);
+        }
     }
 
     private void insertPosts(int postCount, int commentsPerPost) {

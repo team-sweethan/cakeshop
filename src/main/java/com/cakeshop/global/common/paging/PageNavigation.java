@@ -2,7 +2,7 @@ package com.cakeshop.global.common.paging;
 
 /**
  * 목록 화면의 페이지 번호 블록과 이전·다음 블록 이동 정보를 표현한다.
- * 데이터 조회 범위는 {@link PageRequest}, 화면에 표시할 번호 범위는 이 객체가 담당한다.
+ * 데이터 조회 범위는 PageRequest, 화면에 표시할 번호 범위는 이 객체가 담당한다.
  */
 public record PageNavigation(
         int startPage,
@@ -20,7 +20,6 @@ public record PageNavigation(
             int currentPage,
             int totalPages
     ) {
-        // 공통 기본값을 사용하는 간단한 생성 경로다.
         return of(
                 currentPage,
                 totalPages,

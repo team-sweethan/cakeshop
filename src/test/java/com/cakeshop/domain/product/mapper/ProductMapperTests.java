@@ -629,6 +629,190 @@ class ProductMapperTests {
         )).isEmpty();
     }
 
+    @Test
+    void findProductImageById_matchingProduct_returnsImage() {
+        long imageId = insertProductImage(
+                "/uploads/product/find-image.jpg",
+                1
+        );
+
+        ProductImage image = productMapper.findProductImageById(
+                optionProductId,
+                imageId
+        );
+
+        assertThat(image).isNotNull();
+        assertThat(image.getId()).isEqualTo(imageId);
+        assertThat(image.getProductId()).isEqualTo(optionProductId);
+        assertThat(image.getImageUrl())
+                .isEqualTo("/uploads/product/find-image.jpg");
+        assertThat(image.getSortOrder()).isEqualTo(1);
+    }
+
+    @Test
+    void findProductImageById_differentProduct_returnsNull() {
+        long imageId = insertProductImage(
+                "/uploads/product/owned-image.jpg",
+                0
+        );
+
+        ProductImage image = productMapper.findProductImageById(
+                optionProductId + 1,
+                imageId
+        );
+
+        assertThat(image).isNull();
+    }
+
+    @Test
+    void productImageSummary_imagesMissing_returnsZeroValues() {
+        assertThat(productMapper.countProductImagesByProductId(
+                optionProductId
+        )).isZero();
+        assertThat(productMapper.findNextProductImageSortOrder(
+                optionProductId
+        )).isZero();
+    }
+
+    @Test
+    void insertProductImage_existingImages_assignsIdAndNextDisplayOrder() {
+        jdbcTemplate.update(
+                """
+                INSERT INTO product_images (
+                    product_id,
+                    image_url,
+                    sort_order
+                )
+                VALUES
+                    (?, '/uploads/product/first.jpg', 0),
+                    (?, '/uploads/product/third.jpg', 2)
+                """,
+                optionProductId,
+                optionProductId
+        );
+
+        ProductImage image = new ProductImage();
+        image.setProductId(optionProductId);
+        image.setImageUrl("/uploads/product/fourth.jpg");
+        image.setSortOrder(
+                productMapper.findNextProductImageSortOrder(
+                        optionProductId
+                )
+        );
+
+        int insertedRows = productMapper.insertProductImage(image);
+
+        assertThat(insertedRows).isEqualTo(1);
+        assertThat(image.getId()).isPositive();
+        assertThat(image.getSortOrder()).isEqualTo(3);
+        assertThat(productMapper.countProductImagesByProductId(
+                optionProductId
+        )).isEqualTo(3);
+        assertThat(productMapper.findProductImagesByProductId(
+                optionProductId
+        )).extracting(ProductImage::getImageUrl)
+                .containsExactly(
+                        "/uploads/product/first.jpg",
+                        "/uploads/product/third.jpg",
+                        "/uploads/product/fourth.jpg"
+                );
+    }
+
+    @Test
+    void updateProductImageUrl_matchingProduct_updatesUrlOnly() {
+        long imageId = insertProductImage(
+                "/uploads/product/before.jpg",
+                2
+        );
+
+        int updatedRows = productMapper.updateProductImageUrl(
+                optionProductId,
+                imageId,
+                "/uploads/product/after.png"
+        );
+
+        ProductImage updatedImage =
+                productMapper.findProductImageById(
+                        optionProductId,
+                        imageId
+                );
+        assertThat(updatedRows).isEqualTo(1);
+        assertThat(updatedImage).isNotNull();
+        assertThat(updatedImage.getImageUrl())
+                .isEqualTo("/uploads/product/after.png");
+        assertThat(updatedImage.getProductId())
+                .isEqualTo(optionProductId);
+        assertThat(updatedImage.getSortOrder()).isEqualTo(2);
+    }
+
+    @Test
+    void updateProductImageUrl_differentProduct_keepsOriginalUrl() {
+        long imageId = insertProductImage(
+                "/uploads/product/original.jpg",
+                0
+        );
+
+        int updatedRows = productMapper.updateProductImageUrl(
+                optionProductId + 1,
+                imageId,
+                "/uploads/product/not-applied.png"
+        );
+
+        assertThat(updatedRows).isZero();
+        assertThat(productMapper.findProductImageById(
+                optionProductId,
+                imageId
+        ).getImageUrl()).isEqualTo(
+                "/uploads/product/original.jpg"
+        );
+    }
+
+    @Test
+    void deleteProductImage_matchingProduct_deletesOnlyTargetImage() {
+        long targetImageId = insertProductImage(
+                "/uploads/product/delete-target.jpg",
+                0
+        );
+        long remainingImageId = insertProductImage(
+                "/uploads/product/remain.jpg",
+                1
+        );
+
+        int deletedRows = productMapper.deleteProductImage(
+                optionProductId,
+                targetImageId
+        );
+
+        assertThat(deletedRows).isEqualTo(1);
+        assertThat(productMapper.findProductImageById(
+                optionProductId,
+                targetImageId
+        )).isNull();
+        assertThat(productMapper.findProductImageById(
+                optionProductId,
+                remainingImageId
+        )).isNotNull();
+    }
+
+    @Test
+    void deleteProductImage_differentProduct_keepsImage() {
+        long imageId = insertProductImage(
+                "/uploads/product/keep-image.jpg",
+                0
+        );
+
+        int deletedRows = productMapper.deleteProductImage(
+                optionProductId + 1,
+                imageId
+        );
+
+        assertThat(deletedRows).isZero();
+        assertThat(productMapper.findProductImageById(
+                optionProductId,
+                imageId
+        )).isNotNull();
+    }
+
     private ProductSearchCondition baseCondition() {
         ProductSearchCondition condition =
                 new ProductSearchCondition();
@@ -636,6 +820,21 @@ class ProductMapperTests {
         condition.setKeyword(keyword);
 
         return condition;
+    }
+
+    private long insertProductImage(
+            String imageUrl,
+            int sortOrder
+    ) {
+        ProductImage image = new ProductImage();
+        image.setProductId(optionProductId);
+        image.setImageUrl(imageUrl);
+        image.setSortOrder(sortOrder);
+
+        assertThat(productMapper.insertProductImage(image))
+                .isEqualTo(1);
+
+        return image.getId();
     }
 
     private void insertProduct(

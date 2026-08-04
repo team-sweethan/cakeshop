@@ -71,6 +71,67 @@ public interface ProductMapper {
     );
 
     /**
+     * 지정한 상품에 속한 이미지를 조회한다.
+     *
+     * @param productId 이미지를 소유한 상품 식별자
+     * @param imageId 조회할 상품 이미지 식별자
+     * @return 상품 이미지, 지정한 상품에 속하지 않으면 {@code null}
+     */
+    ProductImage findProductImageById(
+            @Param("productId") long productId,
+            @Param("imageId") long imageId
+    );
+
+    /** 상품에 등록된 이미지 개수를 조회한다. */
+    int countProductImagesByProductId(
+            @Param("productId") long productId
+    );
+
+    /**
+     * 새 상품 이미지에 사용할 다음 표시 순서를 조회한다.
+     *
+     * @param productId 이미지를 추가할 상품 식별자
+     * @return 이미지가 없으면 0, 있으면 현재 최대 표시 순서보다 1 큰 값
+     */
+    int findNextProductImageSortOrder(
+            @Param("productId") long productId
+    );
+
+    /**
+     * 상품 이미지를 등록한다.
+     *
+     * @param productImage 등록할 상품 이미지
+     * @return 등록된 행 개수
+     */
+    int insertProductImage(ProductImage productImage);
+
+    /**
+     * 지정한 상품에 속한 이미지의 저장 경로를 변경한다.
+     *
+     * @param productId 이미지를 소유한 상품 식별자
+     * @param imageId 변경할 상품 이미지 식별자
+     * @param imageUrl 새 이미지 웹 접근 경로
+     * @return 수정된 행 개수
+     */
+    int updateProductImageUrl(
+            @Param("productId") long productId,
+            @Param("imageId") long imageId,
+            @Param("imageUrl") String imageUrl
+    );
+
+    /**
+     * 지정한 상품에 속한 이미지를 삭제한다.
+     *
+     * @param productId 이미지를 소유한 상품 식별자
+     * @param imageId 삭제할 상품 이미지 식별자
+     * @return 삭제된 행 개수
+     */
+    int deleteProductImage(
+            @Param("productId") long productId,
+            @Param("imageId") long imageId
+    );
+
+    /**
      * 다른 도메인에 제공할 상품 판매 정보를 조회한다.
      *
      * <p>상품 존재 여부와 판매 상태를 Service에서 구분할 수 있도록

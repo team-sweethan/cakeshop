@@ -177,6 +177,73 @@
             pi.id ASC
     </select>
 
+    <!-- 상품 이미지 단건 조회 -->
+    <select id="findProductImageById"
+            resultType="com.cakeshop.domain.product.entity.ProductImage">
+
+        SELECT
+            pi.id,
+            pi.product_id,
+            pi.image_url,
+            pi.sort_order
+        FROM product_images pi
+        WHERE pi.product_id = #{productId}
+          AND pi.id = #{imageId}
+    </select>
+
+    <!-- 상품 이미지 개수 조회 -->
+    <select id="countProductImagesByProductId"
+            resultType="int">
+
+        SELECT COUNT(*)
+        FROM product_images pi
+        WHERE pi.product_id = #{productId}
+    </select>
+
+    <!-- 다음 상품 이미지 표시 순서 조회 -->
+    <select id="findNextProductImageSortOrder"
+            resultType="int">
+
+        SELECT COALESCE(MAX(pi.sort_order), -1) + 1
+        FROM product_images pi
+        WHERE pi.product_id = #{productId}
+    </select>
+
+    <!-- 상품 이미지 등록 -->
+    <insert id="insertProductImage"
+            parameterType="com.cakeshop.domain.product.entity.ProductImage"
+            useGeneratedKeys="true"
+            keyProperty="id">
+
+        INSERT INTO product_images (
+            product_id,
+            image_url,
+            sort_order
+        )
+        VALUES (
+            #{productId},
+            #{imageUrl},
+            #{sortOrder}
+        )
+    </insert>
+
+    <!-- 상품 이미지 저장 경로 수정 -->
+    <update id="updateProductImageUrl">
+
+        UPDATE product_images
+        SET image_url = #{imageUrl}
+        WHERE product_id = #{productId}
+          AND id = #{imageId}
+    </update>
+
+    <!-- 상품 이미지 삭제 -->
+    <delete id="deleteProductImage">
+
+        DELETE FROM product_images
+        WHERE product_id = #{productId}
+          AND id = #{imageId}
+    </delete>
+
     <!-- 다른 도메인에 제공할 상품 판매 정보 조회 -->
     <select id="findSalesInfoById"
             resultType="com.cakeshop.domain.product.entity.Product">

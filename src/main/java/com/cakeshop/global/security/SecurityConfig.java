@@ -66,10 +66,12 @@ public class SecurityConfig {
                 if (publicPreview) {
                     // local 프로필에서만 고객 목업 흐름을 로그인 없이 확인한다.
                     // 관리자 화면은 preview에서도 열지 않는다 — 아래 /admin/** 규칙에 따라 관리자 로그인이 필요하다.
+                    // /community/new는 목업이 아니게 되면서 뺐다. 저장 경로가 생긴 화면을 비로그인에게
+                    // 열어 두면 폼을 다 채우고 등록에서야 로그인으로 튕긴다.
                     auth.requestMatchers(
                             HttpMethod.GET,
                             "/orders/**", "/notifications",
-                            "/reviews/**", "/community/new", "/chat")
+                            "/reviews/**", "/chat")
                             .permitAll();
                 }
 

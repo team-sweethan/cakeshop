@@ -2,6 +2,7 @@ package com.cakeshop.customer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -545,6 +546,147 @@ class ScreenRenderingTests {
                 "/admin/orders/" + orderId + "/cancel"
             )))
             .andExpect(content().string(containsString("name=\"_csrf\"")));
+    }
+
+    @Test
+    @WithUserDetails(
+        value = "admin@cakeshop.local",
+        userDetailsServiceBeanName = "memberDetailsService"
+    )
+    void productEdit_imagesMissing_rendersUploadFormAndPlaceholder()
+            throws Exception {
+        mockMvc.perform(get("/admin/products/1/edit"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString(
+                "data-product-image-upload"
+            )))
+            .andExpect(content().string(containsString(
+                "등록된 상품 이미지가 없습니다."
+            )))
+            .andExpect(content().string(containsString(
+                "form=\"productInfoForm\""
+            )))
+            .andExpect(content().string(not(containsString(
+                "data-product-image-delete"
+            ))))
+            .andExpect(content().string(not(containsString(
+                "data-product-image-replace"
+            ))))
+            .andExpect(content().string(not(matchesPattern(
+                "(?s).*<button(?=[^>]*data-image-upload-button)"
+                    + "(?=[^>]*disabled)[^>]*>.*"
+            ))));
+    }
+
+    @Test
+    @Transactional
+    @WithUserDetails(
+        value = "admin@cakeshop.local",
+        userDetailsServiceBeanName = "memberDetailsService"
+    )
+    void productEdit_fiveImagesExist_rendersRepresentativeAndDisablesUpload()
+            throws Exception {
+        Long productId = jdbcTemplate.queryForObject(
+            "SELECT id FROM products WHERE name = '딸기 생크림 케이크'",
+            Long.class
+        );
+        jdbcTemplate.update(
+            """
+            INSERT INTO product_images (
+                product_id,
+                image_url,
+                sort_order
+            )
+            VALUES
+                (?, '/uploads/product/first.jpg', 0),
+                (?, '/uploads/product/second.jpg', 1),
+                (?, '/uploads/product/third.jpg', 2),
+                (?, '/uploads/product/fourth.jpg', 3),
+                (?, '/uploads/product/fifth.jpg', 4)
+            """,
+            productId,
+            productId,
+            productId,
+            productId,
+            productId
+        );
+        Long firstImageId = jdbcTemplate.queryForObject(
+            """
+            SELECT id
+            FROM product_images
+            WHERE product_id = ?
+              AND image_url = '/uploads/product/first.jpg'
+            """,
+            Long.class,
+            productId
+        );
+
+        mockMvc.perform(get(
+                "/admin/products/{productId}/edit",
+                productId
+            ))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString(
+                "/uploads/product/first.jpg"
+            )))
+            .andExpect(content().string(containsString(
+                "대표 이미지"
+            )))
+            .andExpect(content().string(containsString(
+                "product-image-card"
+            )))
+            .andExpect(content().string(containsString(
+                "product-image-badge--placeholder"
+            )))
+            .andExpect(content().string(containsString(
+                "product-image-actions"
+            )))
+            .andExpect(content().string(containsString(
+                "data-product-image-delete"
+            )))
+            .andExpect(content().string(containsString(
+                "data-product-image-replace"
+            )))
+            .andExpect(content().string(containsString(
+                "form=\"productImageUploadForm\""
+            )))
+            .andExpect(content().string(containsString(
+                "/admin/products/"
+                    + productId
+                    + "/images/"
+                    + firstImageId
+                    + "/replace"
+            )))
+            .andExpect(content().string(containsString(
+                "multipart/form-data"
+            )))
+            .andExpect(content().string(containsString(
+                "이 상품 이미지를 교체하시겠습니까?"
+            )))
+            .andExpect(content().string(not(containsString(
+                "교체할 이미지"
+            ))))
+            .andExpect(content().string(containsString(
+                "/admin/products/"
+                    + productId
+                    + "/images/"
+                    + firstImageId
+                    + "/delete"
+            )))
+            .andExpect(content().string(containsString(
+                "이 상품 이미지를 삭제하시겠습니까?"
+            )))
+            .andExpect(content().string(containsString(
+                "상품 이미지를 최대 5장까지 등록했습니다."
+            )))
+            .andExpect(content().string(matchesPattern(
+                "(?s).*<button(?=[^>]*data-image-upload-button)"
+                    + "(?=[^>]*disabled)[^>]*>.*"
+            )))
+            .andExpect(content().string(not(matchesPattern(
+                "(?s).*<input(?=[^>]*id=\"imageFile\")"
+                    + "(?=[^>]*disabled)[^>]*>.*"
+            ))));
     }
 
     private void assertScreensRender(String[] paths) throws Exception {

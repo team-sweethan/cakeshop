@@ -60,7 +60,8 @@
           수정:
           POST /admin/products/{productId}
       -->
-      <form class="admin-form"
+      <form id="productInfoForm"
+            class="admin-form"
             method="post"
             th:action="${formAction}"
             th:object="${productForm}">
@@ -316,24 +317,138 @@
           </div>
         </section>
 
-        <!-- 저장 버튼 -->
-        <div class="cluster">
-          <button class="btn btn--primary"
-                  type="submit"
-                  th:disabled="${categories.isEmpty()}"
-                  th:text=
-                          "${editMode
-                          ? '상품 수정'
-                          : '상품 등록'}">
-            상품 등록
-          </button>
-
-          <a class="btn"
-             th:href="@{/admin/products}">
-            목록으로
-          </a>
-        </div>
       </form>
+
+      <!-- 상품이 생성된 뒤에만 이미지 업로드를 제공한다. -->
+      <section class="section admin-form" th:if="${editMode}">
+        <h2 class="section-title">
+          상품 이미지
+        </h2>
+
+        <div class="panel form-stack">
+          <p class="form-help">
+            JPEG·PNG 이미지를 최대 5장까지 등록할 수 있습니다.
+            파일당 최대 크기는 5MB입니다.
+          </p>
+
+          <!-- 등록된 상품 이미지 -->
+          <div class="grid grid--4"
+               th:if="${!#lists.isEmpty(productImages)}">
+            <div class="product-image-card"
+                 th:each="image, imageStatus : ${productImages}">
+              <span class="badge badge--success product-image-badge"
+                    th:classappend=
+                            "${imageStatus.first
+                            ? ''
+                            : 'product-image-badge--placeholder'}"
+                    th:attr="aria-hidden=${!imageStatus.first}">
+                대표 이미지
+              </span>
+
+              <div class="product-image-preview">
+                <img class="placeholder-image"
+                     style="width:100%; object-fit:cover"
+                     th:src="${image.imageUrl}"
+                     th:alt="|상품 이미지 ${imageStatus.count}|">
+              </div>
+
+              <div class="product-image-actions">
+                <button class="btn"
+                        type="submit"
+                        form="productImageUploadForm"
+                        data-product-image-replace
+                        data-confirm=
+                                "이 상품 이미지를 교체하시겠습니까?"
+                        th:formaction=
+                                "@{/admin/products/{productId}/images/{imageId}/replace(
+                                productId=${productId},
+                                imageId=${image.id}
+                                )}">
+                  교체
+                </button>
+
+                <form class="product-image-delete-action"
+                      method="post"
+                      data-product-image-delete
+                      th:action=
+                              "@{/admin/products/{productId}/images/{imageId}/delete(
+                              productId=${productId},
+                              imageId=${image.id}
+                              )}">
+                  <button class="btn btn--danger"
+                          type="submit"
+                          data-confirm=
+                                  "이 상품 이미지를 삭제하시겠습니까?">
+                    삭제
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <!-- 등록된 이미지가 없는 상품 -->
+          <div class="placeholder-image"
+               data-product-image-placeholder
+               th:if="${#lists.isEmpty(productImages)}">
+            등록된 상품 이미지가 없습니다.
+          </div>
+
+          <!-- 상품 기본 정보 수정 Form과 중첩하지 않는 별도 업로드 Form -->
+          <form id="productImageUploadForm"
+                method="post"
+                enctype="multipart/form-data"
+                data-product-image-upload
+                th:action=
+                        "@{/admin/products/{productId}/images(
+                        productId=${productId}
+                        )}"
+                th:object="${imageUploadForm}">
+            <div class="form-group">
+              <label for="imageFile">
+                이미지 파일
+              </label>
+
+              <input id="imageFile"
+                     class="form-control"
+                     type="file"
+                     accept="image/jpeg,image/png"
+                     th:field="*{imageFile}"
+                     required>
+            </div>
+
+            <button class="btn btn--primary"
+                    type="submit"
+                    data-image-upload-button
+                    th:disabled="${productImages.size() >= 5}">
+              이미지 추가
+            </button>
+
+            <p class="form-help"
+               th:if="${productImages.size() >= 5}">
+              상품 이미지를 최대 5장까지 등록했습니다.
+            </p>
+          </form>
+        </div>
+      </section>
+
+      <!-- 기본 정보 Form과 이미지 Form 아래에 화면의 최종 동작을 배치한다. -->
+      <div class="cluster admin-form">
+        <button class="btn btn--primary"
+                type="submit"
+                form="productInfoForm"
+                th:disabled="${categories.isEmpty()}"
+                th:text=
+                        "${editMode
+                        ? '상품 수정'
+                        : '상품 등록'}">
+          상품 등록
+        </button>
+
+        <a class="btn"
+           th:href="@{/admin/products}">
+          목록으로
+        </a>
+      </div>
 
     </main>
   </div>

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.cakeshop.domain.community.entity.CommentStatus;
 import com.cakeshop.domain.community.entity.PostStatus;
+import com.cakeshop.domain.community.entity.ReportStatus;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -21,6 +22,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * <p>하나는 상태 컬럼의 CHECK 제약이고, 다른 하나는 게시글 작성에 필요한 카테고리 참조
  * 데이터다. 둘 다 docs/community/DOMAIN.md의 결정을 DB에 못 박은 것이므로, 규칙이 코드에서만
  * 지켜지고 DB에서는 뚫리는 상황을 여기서 잡는다.
+ *
+ * <p>조각 5에서 post_reports.status 제약이 같은 이유로 합류했다.
  */
 @MybatisTest
 @MariaDbIntegrationTest
@@ -98,6 +101,33 @@ class CommunitySchemaTests {
         assertThat(inserted).isEqualTo(CommentStatus.values().length);
     }
 
+    @Test
+    void postReports_undefinedStatus_isRejectedByCheckConstraint() {
+        Long memberId = insertMember("report-status@cakeshop.local");
+        Long categoryId = findCategoryId("QNA");
+        Long postId = insertPost(memberId, categoryId, PostStatus.PUBLISHED.name());
+
+        assertThatThrownBy(() -> insertReport(postId, memberId, "CLOSED"))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void postReports_definedStatuses_areAccepted() {
+        Long categoryId = findCategoryId("QNA");
+        Long authorId = insertMember("report-author@cakeshop.local");
+        Long postId = insertPost(authorId, categoryId, PostStatus.PUBLISHED.name());
+
+        // UNIQUE(post_id, reporter_id)라 상태마다 신고자가 달라야 한다.
+        for (ReportStatus status : ReportStatus.values()) {
+            Long reporterId = insertMember("report-" + status.name() + "@cakeshop.local");
+            insertReport(postId, reporterId, status.name());
+        }
+
+        Integer inserted = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM post_reports WHERE post_id = ?", Integer.class, postId);
+        assertThat(inserted).isEqualTo(ReportStatus.values().length);
+    }
+
     private Long findCategoryId(String code) {
         return jdbcTemplate.queryForObject(
                 "SELECT id FROM post_categories WHERE code = ?", Long.class, code);
@@ -125,6 +155,17 @@ class CommunitySchemaTests {
                 VALUES (?, ?, ?, ?, ?)
                 """,
                 memberId, categoryId, "제목", "본문", status);
+
+        return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+    }
+
+    private Long insertReport(Long postId, Long reporterId, String status) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO post_reports (post_id, reporter_id, reason, status)
+                VALUES (?, ?, ?, ?)
+                """,
+                postId, reporterId, "신고 사유", status);
 
         return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
     }

@@ -3,6 +3,7 @@ package com.cakeshop.domain.product.controller;
 import com.cakeshop.domain.product.dto.form.AdminStockFilter;
 import com.cakeshop.domain.product.dto.form.ProductAdminSearchCondition;
 import com.cakeshop.domain.product.dto.form.ProductForm;
+import com.cakeshop.domain.product.dto.form.ProductImageUploadForm;
 import com.cakeshop.domain.product.dto.view.ProductAdminListView;
 import com.cakeshop.domain.product.service.ProductAdminService;
 import com.cakeshop.domain.product.entity.ProductStatus;
@@ -264,6 +265,20 @@ public class ProductAdminController {
         return "redirect:/admin/products";
     }
 
+    private void addProductImageModel(
+            long productId,
+            Model model
+    ) {
+        model.addAttribute(
+                "productImages",
+                productAdminService.getProductImages(productId)
+        );
+        model.addAttribute(
+                "imageUploadForm",
+                new ProductImageUploadForm()
+        );
+    }
+
     /**
      * 관리자 상품 수정 화면을 반환한다.
      *
@@ -309,6 +324,7 @@ public class ProductAdminController {
         );
 
         addProductFormOptions(model);
+        addProductImageModel(productId, model);
 
         return "admin/product/form";
     }
@@ -356,6 +372,7 @@ public class ProductAdminController {
             );
 
             addProductFormOptions(model);
+            addProductImageModel(productId, model);
 
             return "admin/product/form";
         }

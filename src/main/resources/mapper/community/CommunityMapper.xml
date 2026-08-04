@@ -102,25 +102,78 @@
         WHERE p.id = #{postId}
     </select>
 
+    <!-- view_count가 이력과 맞는지 확인할 때 쓴다. 정본은 언제나 post_views다. -->
+    <select id="countViews" resultType="long">
+
+        SELECT COUNT(*)
+        FROM post_views pv
+        WHERE pv.post_id = #{postId}
+    </select>
+
     <!--
-        조회수 증가.
+        조회수 증가. 오늘 이 조회자의 첫 조회일 때만 오른다(DOMAIN.md 6.2).
 
-        중복 방지는 하지 않는다(DOMAIN.md 6.2). 다만 노출되지 않는 글은 상세가 404이므로
-        조회수도 올리지 않는다 — status 조건이 그 역할을 한다.
+        ▸ 왜 이 문장이 먼저이고, 왜 중복 판단까지 여기서 하는가 — 교착 상태 때문이다.
 
-        updated_at을 자기 값으로 다시 지정하는 것은 실수가 아니다. posts.updated_at은
-        ON UPDATE CURRENT_TIMESTAMP(6)이라 이 UPDATE만으로도 값이 바뀌고, 그러면
-        "updated_at != created_at이면 수정됨"(DOMAIN.md 6.3) 표시가 조회만으로 켜진다.
-        MariaDB는 해당 컬럼을 명시적으로 지정하면 자동 갱신을 적용하지 않는다.
+        자연스러운 순서는 "이력을 먼저 넣고, 새로 넣었으면 숫자를 올린다"이다. 그런데
+        post_views 에 INSERT 하면 FK 확인 때문에 부모인 posts 행에 공유 잠금(S)이 걸린다.
+        그 다음 이 UPDATE 가 같은 행의 배타 잠금(X)을 달라고 한다. 같은 글을 동시에 연
+        요청 둘이 서로 S 를 쥔 채 상대의 X 를 기다리면 그대로 교착이다.
+
+        인기 있는 글일수록 동시 조회가 많아 더 잘 터진다. 단일 스레드 테스트로는 절대
+        드러나지 않고, 실제로 CommunityViewCountConcurrencyTests 를 만들고 나서야 잡혔다.
+
+        그래서 순서를 뒤집어 X 를 먼저 잡는다. 같은 글의 조회 요청들은 이 UPDATE 에서
+        줄을 서고, 잠금을 쥔 뒤에 NOT EXISTS 를 확인하므로 앞 요청이 남긴 이력을 반드시
+        본다. 이력 INSERT 는 이미 X 를 쥔 상태에서 하므로 잠금이 뒤집히지 않는다.
+
+        ▸ 왜 갱신 행 수를 믿을 수 있는가
+
+        MariaDB JDBC 드라이버는 CLIENT_FOUND_ROWS 를 켜서 갱신 행 수가 '바뀐 행'이 아니라
+        '찾은 행'을 뜻한다. 그래서 "값이 그대로면 0" 에 기대는 방식(ON DUPLICATE KEY
+        UPDATE 등)은 여기서 언제나 1 을 돌려줘 조회수가 그대로 부푼다. 이 문장은 조건이
+        안 맞으면 애초에 행을 찾지 못하므로 0 이 정확하다.
+
+        ▸ updated_at
+
+        자기 값으로 다시 지정하는 것은 실수가 아니다. posts.updated_at 은
+        ON UPDATE CURRENT_TIMESTAMP(6) 이라 이 UPDATE 만으로도 값이 바뀌고, 그러면
+        "updated_at != created_at 이면 수정됨"(DOMAIN.md 6.3) 표시가 조회만으로 켜진다.
+        MariaDB 는 해당 컬럼을 명시적으로 지정하면 자동 갱신을 적용하지 않는다.
     -->
     <update id="increaseViewCount">
 
-        UPDATE posts
-        SET view_count = view_count + 1,
-        updated_at = updated_at
-        WHERE id = #{postId}
-        AND status = 'PUBLISHED'
+        UPDATE posts p
+        SET p.view_count = p.view_count + 1,
+        p.updated_at = p.updated_at
+        WHERE p.id = #{postId}
+        AND p.status = 'PUBLISHED'
+        AND #{viewerKey} IS NOT NULL
+        AND NOT EXISTS (
+        SELECT 1
+        FROM post_views pv
+        WHERE pv.post_id = p.id
+        AND pv.viewer_key = #{viewerKey}
+        AND pv.viewed_on = CURRENT_DATE
+        )
     </update>
+
+    <!--
+        조회 이력. increaseViewCount 가 1 을 돌려줬을 때만 부른다.
+
+        IGNORE 를 붙이지 않는다. 여기서 UNIQUE 위반이 나는 것은 위의 잠금 순서가 깨졌다는
+        뜻이고, 삼키면 조회수만 오르고 이력은 없는 상태가 남는다. 그러면 view_count 가
+        post_views 보다 앞서는데, 그 어긋남은 화면에 숫자가 조금 큰 모습으로만 나타나서
+        눈으로는 찾을 수 없다. 실패하면 같은 트랜잭션의 조회수 증가까지 함께 되돌아간다.
+
+        날짜는 애플리케이션이 아니라 DB 의 CURRENT_DATE 로 잡는다. 서버가 여러 대여도
+        시계가 하나여야 "같은 날" 의 뜻이 갈리지 않는다.
+    -->
+    <insert id="recordView">
+
+        INSERT INTO post_views (post_id, viewer_key, viewed_on)
+        VALUES (#{postId}, #{viewerKey}, CURRENT_DATE)
+    </insert>
 
     <!-- 필터·글쓰기 선택지로 노출할 카테고리. 비활성은 제외한다(DOMAIN.md 6.8). -->
     <select id="findActiveCategories"
@@ -135,4 +188,531 @@
         WHERE pc.is_active = 1
         ORDER BY pc.sort_order, pc.id
     </select>
+
+    <!--
+        선택지에 없는 카테고리로 글이 들어오는 것을 막는다(DOMAIN.md 6.8).
+        화면의 select만 믿을 수 없으므로 저장 직전에 Service가 이걸 확인한다.
+    -->
+    <select id="existsActiveCategory" resultType="boolean">
+
+        SELECT EXISTS (
+        SELECT 1
+        FROM post_categories pc
+        WHERE pc.id = #{categoryId}
+        AND pc.is_active = 1
+        )
+    </select>
+
+    <!--
+        게시글 작성.
+
+        status는 컬럼 기본값에 맡기지 않고 명시한다. 새 글은 언제나 PUBLISHED이고,
+        기본값은 스키마를 열어 봐야 알 수 있다.
+        view_count·like_count·blocked_* 는 쓰기 경로가 건드리지 않으므로 넣지 않는다.
+    -->
+    <insert id="insertPost" useGeneratedKeys="true" keyProperty="id">
+
+        INSERT INTO posts (member_id, category_id, title, content, status)
+        VALUES (#{memberId}, #{categoryId}, #{title}, #{content}, 'PUBLISHED')
+    </insert>
+
+    <!--
+        게시글 수정. 제목·본문·카테고리만 바꾼다(DOMAIN.md 6.3).
+
+        member_id·status 조건은 Service 검증과 중복이지만 지운다면 실수다. 검증과 UPDATE
+        사이에 관리자가 차단하면 조건 없는 UPDATE는 차단된 글을 고쳐 버린다 —
+        BLOCKED 글에 작성자가 할 수 있는 일은 없다(4.2).
+
+        updated_at은 건드리지 않는다. 여기서는 ON UPDATE CURRENT_TIMESTAMP(6)의 자동 갱신이
+        바로 "수정됨" 표시의 근거다(6.3). 조회수 UPDATE가 그 값을 보존하는 것과 반대다.
+    -->
+    <update id="updatePost">
+
+        UPDATE posts
+        SET category_id = #{categoryId},
+        title = #{title},
+        content = #{content}
+        WHERE id = #{id}
+        AND member_id = #{memberId}
+        AND status = 'PUBLISHED'
+    </update>
+
+    <!--
+        게시글 삭제는 soft delete다(DOMAIN.md 4.2). 행을 지우지 않는다 —
+        댓글·좋아요·신고가 FK로 매달려 있고, 그 자식들은 그대로 남긴다(4.5).
+
+        status = 'PUBLISHED' 조건이 BLOCKED -> DELETED 금지를 SQL 쪽에서도 지킨다.
+        차단된 글은 신고·조치의 증거라서 작성자가 지워 없앨 수 없어야 한다.
+    -->
+    <update id="deletePost">
+
+        UPDATE posts
+        SET status = 'DELETED'
+        WHERE id = #{postId}
+        AND member_id = #{memberId}
+        AND status = 'PUBLISHED'
+    </update>
+
+    <!--
+        댓글 목록.
+
+        최신순으로 limit건을 자르고 Service가 뒤집는다. 화면에는 오래된 순으로 나가지만
+        잘라 내는 쪽은 과거여야 한다 — 앞에서 자르면 댓글이 많은 글에서 방금 쓴 댓글이
+        화면 밖에 남고, 사용자에게는 등록이 안 된 것과 구분되지 않는다(DOMAIN.md 6.4).
+
+        삭제된 댓글도 함께 돌려준다. 지우지 않고 자리 표시로 남기기 때문이다(4.4).
+        다만 본문은 NULL로 지운다. 자리 표시에는 쓰지 않는 값이라 화면까지 내려보낼 이유가
+        없고, 내려보내지 않으면 템플릿을 잘못 고쳐도 지워진 댓글이 되살아나지 않는다.
+
+        id tiebreaker는 목록과 같은 이유다. created_at이 같은 댓글이 있으면 limit 경계에서
+        순서가 흔들려, "더 보기"를 눌렀을 때 어떤 댓글이 사라지거나 두 번 나온다.
+
+        SELECT 컬럼 순서는 CommentView의 컴포넌트 순서와 맞춘다.
+    -->
+    <select id="findRecentComments"
+            resultType="com.cakeshop.domain.community.dto.view.CommentView">
+
+        SELECT
+        c.id,
+        c.post_id,
+        c.member_id,
+        m.nickname AS author_nickname,
+        (m.status = 'WITHDRAWN') AS author_withdrawn,
+        CASE WHEN c.status = 'PUBLISHED' THEN c.content END AS content,
+        c.status,
+        c.created_at
+
+        FROM comments c
+        JOIN members m ON m.id = c.member_id
+
+        WHERE c.post_id = #{postId}
+
+        ORDER BY c.created_at DESC, c.id DESC
+        LIMIT #{limit}
+    </select>
+
+    <!--
+        댓글 수를 두 가지로 센다(CommentCountView 참고).
+
+        자리 표시를 포함한 전체 행 수는 "더 보기"가 남았는지 판단하는 데 쓰고,
+        노출 중인 수는 화면의 "댓글 N"이다(DOMAIN.md 4.4).
+
+        SUM은 행이 하나도 없으면 NULL이라 COALESCE로 0을 만든다. record의 컴포넌트가
+        long이므로 NULL이 그대로 오면 매핑에서 터진다.
+    -->
+    <select id="countComments"
+            resultType="com.cakeshop.domain.community.dto.view.CommentCountView">
+
+        SELECT
+        COUNT(*) AS row_count,
+        COALESCE(SUM(c.status = 'PUBLISHED'), 0) AS published_count
+
+        FROM comments c
+        WHERE c.post_id = #{postId}
+    </select>
+
+    <!--
+        댓글 하나 조회. 상태로 거르지 않는다 — 이미 지워진 댓글과 없는 댓글을 Service가
+        구분할 수 있어야 조건부 UPDATE가 0행일 때 낼 응답을 정할 수 있다.
+
+        본문을 NULL로 지우는 것은 목록과 같다. 이 조회는 권한 판단에만 쓰고 본문은 보지
+        않으므로, 두 자리에서 규칙이 갈리지 않게 맞춰 둔다.
+    -->
+    <select id="findCommentById"
+            resultType="com.cakeshop.domain.community.dto.view.CommentView">
+
+        SELECT
+        c.id,
+        c.post_id,
+        c.member_id,
+        m.nickname AS author_nickname,
+        (m.status = 'WITHDRAWN') AS author_withdrawn,
+        CASE WHEN c.status = 'PUBLISHED' THEN c.content END AS content,
+        c.status,
+        c.created_at
+
+        FROM comments c
+        JOIN members m ON m.id = c.member_id
+
+        WHERE c.id = #{commentId}
+    </select>
+
+    <!--
+        댓글 작성.
+
+        status는 컬럼 기본값에 맡기지 않고 명시한다. 게시글과 같은 이유다.
+        parent_comment_id는 넣지 않는다 — 1차에 대댓글은 없고, 값을 넣는 코드가 없으면
+        값도 들어갈 수 없다(DOMAIN.md 6.4).
+    -->
+    <insert id="insertComment" useGeneratedKeys="true" keyProperty="id">
+
+        INSERT INTO comments (post_id, member_id, content, status)
+        VALUES (#{postId}, #{memberId}, #{content}, 'PUBLISHED')
+    </insert>
+
+    <!--
+        댓글 삭제도 soft delete다(DOMAIN.md 4.4). 행을 지우지 않는다 —
+        지워진 자리에 "삭제된 댓글입니다"를 남겨야 하고, 2차 대댓글에서는 그 자리가
+        자식 댓글이 매달릴 곳이 된다.
+
+        post_id 조건은 주소 위조를 막는다. 댓글 번호만 맞으면 다른 글의 주소로 지울 수
+        있으면 안 된다. status 조건은 이미 지워진 댓글을 다시 지운 것이 성공으로 보이지
+        않게 한다.
+    -->
+    <update id="deleteComment">
+
+        UPDATE comments
+        SET status = 'DELETED'
+        WHERE id = #{commentId}
+        AND post_id = #{postId}
+        AND member_id = #{memberId}
+        AND status = 'PUBLISHED'
+    </update>
+
+    <!--
+        좋아요를 바꾸기 전에 게시글 행을 잠근다. 좋아요 경로의 첫 문장이어야 한다.
+
+        ▸ 왜 잠그는가 — 조각 6에서 맞은 교착이 여기서 그대로 재현되기 때문이다.
+
+        post_likes 에 INSERT 하면 FK 확인이 부모인 posts 행에 공유 잠금(S)을 건다.
+        그 다음 like_count 재계산 UPDATE 가 같은 행의 배타 잠금(X)을 달라고 한다. 같은 글에
+        동시에 좋아요를 누른 요청 둘이 서로 S 를 쥔 채 상대의 X 를 기다리면 그대로 교착이다.
+        increaseViewCount 주석에 적힌 것과 같은 모양이다.
+
+        조회수 때는 순서를 뒤집어 해결했지만 여기서는 뒤집을 수 없다. 재계산은 INSERT
+        이후여야 방금 넣은 행을 센다. 그래서 X 를 먼저 잡는다 — 같은 글의 좋아요 요청들은
+        이 SELECT 에서 줄을 서고, 뒤따르는 INSERT 의 FK 확인은 이미 자기가 쥔 잠금이라
+        기다리지 않는다. 잠금을 잡는 순서가 요청마다 같아지므로 서로를 기다릴 수 없다.
+
+        ▸ 왜 posts 만 읽는가
+
+        FOR UPDATE 는 조인한 테이블의 행까지 잠근다. findPostById 처럼 post_categories 와
+        members 를 조인해 두면 좋아요 한 번에 카테고리 행이 잠기고, 같은 분류의 모든 글이
+        서로 줄을 서게 된다. 필요한 것은 이 글의 상태와 작성자뿐이다.
+
+        ▸ 덤
+
+        상태를 잠근 채로 읽으므로 이 경로에는 R14 의 경합 창이 없다. 확인과 쓰기 사이에
+        관리자가 차단할 수 없다. 댓글에서 이 잠금을 마다한 이유는 "막는 값이 싸지 않다"
+        였는데, 좋아요는 like_count 때문에 어차피 같은 행에 X 를 잡아야 해서 값이 0 이다.
+    -->
+    <select id="lockPost"
+            resultType="com.cakeshop.domain.community.dto.view.PostLockView">
+
+        SELECT
+        p.member_id,
+        p.status
+
+        FROM posts p
+        WHERE p.id = #{postId}
+        FOR UPDATE
+    </select>
+
+    <!--
+        좋아요 추가. 이미 눌러 둔 상태에서 다시 눌러도 성공이다(DOMAIN.md 6.5).
+        토글이 아니라 추가/취소가 갈려 있으므로, 같은 요청이 두 번 와도 뜻이 달라지지 않는다.
+
+        INSERT IGNORE 를 쓰지 않는다. IGNORE 는 UNIQUE 위반만이 아니라 FK 위반과 값 잘림까지
+        경고로 낮춰서, 없는 게시글이나 없는 회원으로 들어온 요청이 조용히 성공한다.
+        ON DUPLICATE KEY UPDATE 는 중복 키만 넘긴다.
+
+        갱신 행 수는 보지 않는다. CLIENT_FOUND_ROWS 때문에 새로 넣은 것과 이미 있던 것을
+        구분해 주지 않고(6.2에서 겪었다), 구분할 이유도 없다 — 뒤따르는 재계산이 실제 행 수를
+        다시 센다. 이 순서가 "숫자가 이력보다 앞서는 상태"를 아예 만들 수 없게 한다.
+    -->
+    <insert id="insertLike">
+
+        INSERT INTO post_likes (post_id, member_id)
+        VALUES (#{postId}, #{memberId})
+        ON DUPLICATE KEY UPDATE post_id = post_id
+    </insert>
+
+    <!--
+        좋아요 취소. 누른 적이 없으면 0행이고 그것도 성공이다(멱등).
+
+        여기서 0행을 에러로 바꾸면 뒤로가기나 재전송이 에러 화면이 된다 — 사용자가 원한
+        상태(안 눌림)는 이미 이뤄져 있다. 게시글·댓글 삭제가 0행을 에러로 보는 것과 반대인데,
+        그쪽은 조건이 걸러 낸 순간을 성공으로 보이지 않게 하려는 것이고 여기는 조건이 없다.
+    -->
+    <delete id="deleteLike">
+
+        DELETE FROM post_likes
+        WHERE post_id = #{postId}
+        AND member_id = #{memberId}
+    </delete>
+
+    <!--
+        like_count 재계산(DOMAIN.md 6.5). 증분하지 않는다 — 한 번 틀어지면 스스로 복구되지
+        않고, 앞으로 이 값을 건드릴 경로(삭제·차단·탈퇴)가 늘 때마다 "여기서도 조정해야 하나"를
+        판단해야 한다. 재계산은 그 판단 자체가 없다.
+        uk_post_likes_post_member 의 선두 컬럼이 post_id 라 인덱스 범위 스캔으로 끝난다.
+
+        updated_at 을 자기 값으로 다시 지정하는 것은 실수가 아니다. posts.updated_at 은
+        ON UPDATE CURRENT_TIMESTAMP(6) 이라 그냥 두면 좋아요를 받은 글마다 값이 갱신되고
+        화면에 "(수정됨)" 이 붙는다(DOMAIN.md 6.3). 좋아요를 받은 것과 글을 고친 것은 다르다.
+        조회수 UPDATE 와 같은 처리이고, 시드에서 실제로 이 버그가 있었다.
+    -->
+    <update id="recalculateLikeCount">
+
+        UPDATE posts p
+        SET p.like_count = (
+        SELECT COUNT(*)
+        FROM post_likes pl
+        WHERE pl.post_id = p.id
+        ),
+        p.updated_at = p.updated_at
+        WHERE p.id = #{postId}
+    </update>
+
+    <!--
+        이 회원이 이 글에 좋아요를 눌러 뒀는지. 상세에서 버튼 문구를 가르는 데만 쓴다.
+        로그인한 요청에서만 부른다 — 비로그인에게는 버튼이 없어서 물어볼 것이 없다.
+    -->
+    <select id="existsLike" resultType="boolean">
+
+        SELECT EXISTS (
+        SELECT 1
+        FROM post_likes pl
+        WHERE pl.post_id = #{postId}
+        AND pl.member_id = #{memberId}
+        )
+    </select>
+
+    <!-- like_count 가 실제와 맞는지 확인할 때 쓴다. 정본은 언제나 post_likes 다. -->
+    <select id="countLikes" resultType="long">
+
+        SELECT COUNT(*)
+        FROM post_likes pl
+        WHERE pl.post_id = #{postId}
+    </select>
+
+    <!--
+        신고 접수(DOMAIN.md 6.6).
+
+        IGNORE 도 ON DUPLICATE KEY UPDATE 도 쓰지 않는다. 좋아요와 정반대인데, 그쪽은
+        "이미 눌러 둔 상태"가 사용자가 원한 결과라서 멱등이 맞고, 신고는 중복이 곧
+        "내 신고가 처리되지 않았다"는 뜻이라 성공으로 답하면 거짓말이 된다.
+        UNIQUE 위반은 그대로 올라가고 Service 가 ALREADY_REPORTED 로 바꾼다.
+
+        status 는 컬럼 기본값에 맡기지 않고 명시한다. 새 신고는 언제나 PENDING 이고,
+        기본값은 스키마를 열어 봐야 알 수 있다(게시글·댓글과 같은 처리).
+    -->
+    <!-- 생성된 식별자는 쓰이지 않는다. 신고 후 돌아가는 곳은 신고가 아니라 그 게시글이다. -->
+    <insert id="insertReport">
+
+        INSERT INTO post_reports (post_id, reporter_id, reason, status)
+        VALUES (#{postId}, #{reporterId}, #{reason}, 'PENDING')
+    </insert>
+
+    <!--
+        이미 신고했는지. 상태로 거르지 않는다 — 처리된 신고도 "이미 신고함"이다.
+        신고에는 취소가 없으므로(6.6) 한 번 남으면 영원히 참이고, 그것이 UNIQUE 제약과
+        같은 뜻이어야 한다. status = 'PENDING' 을 덧붙이면 처리된 뒤 재신고가 열린다.
+    -->
+    <select id="existsReport" resultType="boolean">
+
+        SELECT EXISTS (
+        SELECT 1
+        FROM post_reports pr
+        WHERE pr.post_id = #{postId}
+        AND pr.reporter_id = #{reporterId}
+        )
+    </select>
+
+    <!--
+        관리자 상세의 신고 내역. 처리된 신고도 함께 돌려준다.
+
+        SELECT 컬럼 순서는 ReportView 의 컴포넌트 순서와 맞춘다.
+    -->
+    <select id="findReportsByPost"
+            resultType="com.cakeshop.domain.community.dto.view.ReportView">
+
+        SELECT
+        pr.id,
+        m.nickname AS reporter_nickname,
+        (m.status = 'WITHDRAWN') AS reporter_withdrawn,
+        pr.reason,
+        pr.status,
+        pr.created_at
+
+        FROM post_reports pr
+        JOIN members m ON m.id = pr.reporter_id
+
+        WHERE pr.post_id = #{postId}
+
+        ORDER BY pr.created_at DESC, pr.id DESC
+    </select>
+
+    <!-- 미처리 신고 수. 목록 정렬이 세는 값과 같은 뜻이어야 한다. -->
+    <select id="countPendingReports" resultType="long">
+
+        SELECT COUNT(*)
+        FROM post_reports pr
+        WHERE pr.post_id = #{postId}
+        AND pr.status = 'PENDING'
+    </select>
+
+    <!--
+        관리자 목록과 전체 개수가 공유하는 조건.
+
+        고객 목록과 달리 기본이 "거르지 않음"이다. 관리자는 삭제·차단된 글까지 본다
+        (DOMAIN.md 4.3). status 는 화면의 필터에서 오고, 값이 없으면 전체다.
+    -->
+    <sql id="adminPostConditions">
+        <where>
+            <if test="status != null">
+                p.status = #{status}
+            </if>
+        </where>
+    </sql>
+
+    <!--
+        관리자 목록(DOMAIN.md 6.7).
+
+        미처리 신고 수는 고객 목록의 댓글 수와 같은 이유로 스칼라 서브쿼리다 — LEFT JOIN
+        ... GROUP BY 로 바꾸면 LIMIT 이 집계 이후에 적용되어 전체를 훑는다(6.1). 이 형태는
+        CommunityMapperXmlTests 가 고정한다.
+
+        정렬은 <choose> 로 갈린다. 주소에서 온 문자열을 ${} 로 이으면 그대로 쿼리가
+        되므로, 허용값을 AdminPostSort 로 좁히고 분기는 SQL 에 적어 둔다(AGENTS.md).
+
+        id tiebreaker 는 어느 분기에도 붙인다. 신고 수는 0 이 대부분이라 동점이 created_at
+        보다 훨씬 잦고, tiebreaker 가 없으면 페이지 경계에서 글이 사라지거나 두 번 나온다.
+
+        SELECT 컬럼 순서는 AdminPostListView 의 컴포넌트 순서와 맞춘다.
+    -->
+    <select id="findPostsForAdmin"
+            resultType="com.cakeshop.domain.community.dto.view.AdminPostListView">
+
+        SELECT
+        p.id,
+        pc.name AS category_name,
+        p.title,
+        m.nickname AS author_nickname,
+        (m.status = 'WITHDRAWN') AS author_withdrawn,
+        p.status,
+        (SELECT COUNT(*)
+        FROM post_reports pr
+        WHERE pr.post_id = p.id
+        AND pr.status = 'PENDING') AS pending_report_count,
+        p.created_at
+
+        FROM posts p
+        JOIN post_categories pc ON pc.id = p.category_id
+        JOIN members m ON m.id = p.member_id
+
+        <include refid="adminPostConditions"/>
+
+        <choose>
+            <when test="sort != null and sort.name() == 'REPORTS'">
+                ORDER BY pending_report_count DESC, p.id DESC
+            </when>
+            <otherwise>
+                ORDER BY p.created_at DESC, p.id DESC
+            </otherwise>
+        </choose>
+
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <!-- 관리자 목록의 전체 개수. 표시 항목이 필요 없으므로 조인하지 않는다. -->
+    <select id="countPostsForAdmin" resultType="long">
+
+        SELECT COUNT(*)
+        FROM posts p
+
+        <include refid="adminPostConditions"/>
+    </select>
+
+    <!--
+        관리자 상세(DOMAIN.md 4.3). 상태로 거르지 않으며 차단 기록까지 읽는다.
+        blocked_by 는 차단된 적이 없으면 NULL 이라 LEFT JOIN 이다 — INNER 로 두면
+        차단된 적 없는 글이 통째로 사라진다.
+
+        SELECT 컬럼 순서는 AdminPostDetailView 의 컴포넌트 순서와 맞춘다.
+    -->
+    <select id="findPostByIdForAdmin"
+            resultType="com.cakeshop.domain.community.dto.view.AdminPostDetailView">
+
+        SELECT
+        p.id,
+        p.member_id,
+        pc.name AS category_name,
+        p.title,
+        p.content,
+        m.nickname AS author_nickname,
+        (m.status = 'WITHDRAWN') AS author_withdrawn,
+        p.status,
+        p.blocked_reason,
+        p.blocked_at,
+        b.nickname AS blocked_by_nickname,
+        p.view_count,
+        p.like_count,
+        p.created_at,
+        p.updated_at
+
+        FROM posts p
+        JOIN post_categories pc ON pc.id = p.category_id
+        JOIN members m ON m.id = p.member_id
+        LEFT JOIN members b ON b.id = p.blocked_by
+
+        WHERE p.id = #{postId}
+    </select>
+
+    <!--
+        게시글 차단(DOMAIN.md 6.7). status·blocked_at·blocked_reason·blocked_by 를 함께 쓴다.
+
+        status = 'PUBLISHED' 조건이 전이 규칙을 SQL 쪽에서도 지킨다(4.2). 이미 차단된 글에
+        다시 걸면 원래 조치의 시각과 사유가 덮여 사라지고, 작성자가 지운 글에 걸면
+        DELETED -> BLOCKED 가 되어 지운 글이 되살아난다. 둘 다 화면에는 성공으로 보인다.
+
+        updated_at 을 자기 값으로 다시 지정하는 것은 조회수·좋아요와 같은 이유다.
+        그냥 두면 ON UPDATE CURRENT_TIMESTAMP(6) 이 값을 갱신해서, 작성자가 고치지도 않은
+        글에 "(수정됨)" 이 붙는다(6.3). 차단은 관리자의 조치이지 작성자의 수정이 아니다.
+    -->
+    <update id="blockPost">
+
+        UPDATE posts p
+        SET p.status = 'BLOCKED',
+        p.blocked_at = CURRENT_TIMESTAMP(6),
+        p.blocked_reason = #{reason},
+        p.blocked_by = #{adminId},
+        p.updated_at = p.updated_at
+        WHERE p.id = #{postId}
+        AND p.status = 'PUBLISHED'
+    </update>
+
+    <!--
+        차단 해제(DOMAIN.md 4.2). status 만 되돌리고 blocked_* 는 그대로 둔다 —
+        "과거에 차단된 적이 있다"는 관리자에게 유용한 이력이고, 노출은 status 가 정한다.
+        지우면 같은 글이 두 번째로 신고됐을 때 앞선 조치를 알 수 없다.
+
+        status = 'BLOCKED' 조건은 차단된 적 없는 글이나 지워진 글이 이 UPDATE 로
+        PUBLISHED 가 되는 것을 막는다(DELETED -> PUBLISHED 금지).
+        updated_at 보존은 차단과 같은 이유다.
+    -->
+    <update id="unblockPost">
+
+        UPDATE posts p
+        SET p.status = 'PUBLISHED',
+        p.updated_at = p.updated_at
+        WHERE p.id = #{postId}
+        AND p.status = 'BLOCKED'
+    </update>
+
+    <!--
+        미처리 신고를 게시글 단위로 닫는다(DOMAIN.md 6.6). 차단이면 RESOLVED,
+        기각이면 REJECTED 가 들어온다.
+
+        status = 'PENDING' 조건이 전이 규칙을 SQL 쪽에서도 지킨다. 이미 닫힌 신고를 다시
+        건드리면 첫 조치가 무엇이었는지가 덮이고, 차단 -> 해제 -> 재차단 같은 흐름에서
+        REJECTED 였던 신고가 RESOLVED 로 바뀌어 기록이 거짓이 된다.
+    -->
+    <update id="closePendingReports">
+
+        UPDATE post_reports pr
+        SET pr.status = #{status}
+        WHERE pr.post_id = #{postId}
+        AND pr.status = 'PENDING'
+    </update>
 </mapper>
