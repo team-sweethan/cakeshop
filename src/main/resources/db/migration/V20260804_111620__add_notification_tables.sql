@@ -6,23 +6,23 @@
 -- * 로컬 샘플 데이터는 여기 넣지 않는다. db/seed/seed-local.sql 을 쓴다.
 -- * 서로 의존하는 DDL 은 파일을 나누지 말고 이 파일에 함께 담는다.
 
--- 기존 V0 notifications 스키마에 필요한 신규 컬럼 보충
+-- notifications 테이블 신규 컬럼 보충
 ALTER TABLE `notifications`
-    ADD COLUMN IF NOT EXISTS `actor_id`          BIGINT NULL COMMENT '발생 회원/관리자 ID (members.id)' AFTER `receiver_id`,
-    ADD COLUMN IF NOT EXISTS `chat_room_id`      BIGINT NULL COMMENT '관련 채팅방 ID' AFTER `order_id`,
-    ADD COLUMN IF NOT EXISTS `post_id`           BIGINT NULL COMMENT '관련 게시글 ID' AFTER `chat_message_id`,
-    ADD COLUMN IF NOT EXISTS `comment_id`        BIGINT NULL COMMENT '관련 댓글/대댓글 ID' AFTER `post_id`,
-    ADD COLUMN IF NOT EXISTS `review_id`         BIGINT NULL COMMENT '관련 리뷰 ID' AFTER `comment_id`,
-    ADD COLUMN IF NOT EXISTS `review_reply_id`   BIGINT NULL COMMENT '관련 사장님 리뷰 답글 ID' AFTER `review_id`,
-    ADD COLUMN IF NOT EXISTS `user_coupon_id`    BIGINT NULL COMMENT '발급된 회원 쿠폰 ID' AFTER `review_reply_id`,
-    ADD COLUMN IF NOT EXISTS `delivery_scope`    VARCHAR(30) NOT NULL DEFAULT 'WEB_ONLY' COMMENT '발송 범위 (WEB_ONLY, WEB_AND_SMS)' AFTER `content`,
-    ADD COLUMN IF NOT EXISTS `event_key`         VARCHAR(100) NULL COMMENT '동일 이벤트 중복 알림 방지 키' AFTER `target_url`;
+    ADD COLUMN `actor_id`          BIGINT NULL COMMENT '발생 회원/관리자 ID (members.id)' AFTER `receiver_id`,
+    ADD COLUMN `chat_room_id`      BIGINT NULL COMMENT '관련 채팅방 ID' AFTER `order_id`,
+    ADD COLUMN `post_id`           BIGINT NULL COMMENT '관련 게시글 ID' AFTER `chat_message_id`,
+    ADD COLUMN `comment_id`        BIGINT NULL COMMENT '관련 댓글/대댓글 ID' AFTER `post_id`,
+    ADD COLUMN `review_id`         BIGINT NULL COMMENT '관련 리뷰 ID' AFTER `comment_id`,
+    ADD COLUMN `review_reply_id`   BIGINT NULL COMMENT '관련 사장님 리뷰 답글 ID' AFTER `review_id`,
+    ADD COLUMN `user_coupon_id`    BIGINT NULL COMMENT '발급된 회원 쿠폰 ID' AFTER `review_reply_id`,
+    ADD COLUMN `delivery_scope`    VARCHAR(30) NOT NULL DEFAULT 'WEB_ONLY' COMMENT '발송 범위 (WEB_ONLY, WEB_AND_SMS)' AFTER `content`,
+    ADD COLUMN `event_key`         VARCHAR(100) NULL COMMENT '동일 이벤트 중복 알림 방지 키' AFTER `target_url`;
 
--- 인덱스 추가 (이미 존재하지 않는 경우)
-CREATE INDEX IF NOT EXISTS `idx_notifications_receiver_created` ON `notifications` (`receiver_id`, `created_at` DESC);
-CREATE INDEX IF NOT EXISTS `idx_notifications_receiver_read`    ON `notifications` (`receiver_id`, `is_read`, `created_at` DESC);
+-- notifications 테이블 인덱스 추가
+CREATE INDEX `idx_notifications_receiver_created` ON `notifications` (`receiver_id`, `created_at` DESC);
+CREATE INDEX `idx_notifications_receiver_read`    ON `notifications` (`receiver_id`, `is_read`, `created_at` DESC);
 
--- notification_deliveries 테이블 보강
+-- notification_deliveries 테이블 신규 컬럼 보충
 ALTER TABLE `notification_deliveries`
-    ADD COLUMN IF NOT EXISTS `failure_reason` TEXT NULL COMMENT '발송 실패 사유' AFTER `status`,
-    ADD COLUMN IF NOT EXISTS `updated_at`     DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '이력 수정 시간' AFTER `created_at`;
+    ADD COLUMN `failure_reason` TEXT NULL COMMENT '발송 실패 사유' AFTER `status`,
+    ADD COLUMN `updated_at`     DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '이력 수정 시간' AFTER `created_at`;
