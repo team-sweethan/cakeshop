@@ -43,7 +43,7 @@ DOMAIN.md 9절의 **보류 항목**은 아직 결정되지 않은 것이다. 임
 - **노출 여부는 `posts.status`만으로 판단한다.** `blocked_at IS NULL` 조건을 추가하지 않는다. (4.1)
 - **`like_count`는 증분하지 않고 매번 재계산한다.** (6.5) **`view_count`는 반대로 증분한다** — `post_views`가 `post_likes`의 수십 배로 쌓여 조회마다 `COUNT(*)`를 도는 비용이 다르기 때문이다. 두 값이 왜 다른 방식인지는 6.2에 적혀 있다.
 - **조회수는 정렬·순위의 근거 데이터다. 참고용 표시가 아니다.** (2026-08-03 정책 변경, 2절·6.1·6.2) 그래서 같은 사람이 같은 글을 **10분** 안에 여러 번 열어도 한 번만 오른다.
-- **중복을 막는 것은 `post_views`의 UNIQUE가 아니라 조회수 UPDATE가 게시글 행에 먼저 거는 배타 잠금이다.** 굴러가는 10분 창은 제약으로 표현할 수 없어 `uk_post_views_post_viewer_date`를 지웠다(2026-08-04). **UNIQUE를 다시 걸지 않는다** — 같은 조회자가 같은 글을 두 번째로 여는 순간 `recordView`가 예외를 던져 상세가 500이 된다. 창 판단은 `NOT EXISTS ... created_at > NOW(6) - INTERVAL 10 MINUTE`이고 기준은 **DB 시계**다. (6.2, H13·H18)
+- **중복을 막는 것은 `post_views`의 UNIQUE가 아니라 조회수 UPDATE가 게시글 행에 먼저 거는 배타 잠금이다.** 굴러가는 10분 창은 제약으로 표현할 수 없어 `uk_post_views_post_viewer_date`를 지웠다(2026-08-04). **UNIQUE를 다시 걸지 않는다** — 같은 조회자가 같은 글을 두 번째로 여는 순간 `recordView`가 예외를 던져 상세가 500이 된다. 창 판단은 `NOT EXISTS ... created_at > NOW(6) - INTERVAL 10 MINUTE`이고 기준은 **DB 시계**다. (6.2, H13·H19)
 - **조회수 UPDATE가 먼저고 이력 INSERT가 나중이다. 순서를 뒤집지 않는다.** 이력을 먼저 넣으면 FK 확인이 게시글 행에 공유 잠금을 걸고, 뒤따르는 조회수 UPDATE가 배타 잠금을 기다리면서 **같은 글을 동시에 연 요청끼리 교착에 빠진다.** 동시 요청이 없으면 결과가 똑같아 단일 스레드 테스트로는 드러나지 않는다. (6.2, H13)
 - **갱신 행 수는 '바뀐 행'이 아니라 '찾은 행'이다.** MariaDB JDBC가 `CLIENT_FOUND_ROWS`를 켠다. "값이 그대로면 0"에 기대는 방식(`ON DUPLICATE KEY UPDATE` 등)은 언제나 1을 돌려주므로 중복 판단에 쓸 수 없다. (6.2)
 - **`view_count`는 `post_views`에서 파생된 캐시다.** 증분으로 갱신하는 대신 두 값의 일치를 하네스가 지킨다. 어긋나면 이력에서 재계산해 복구한다. **UNIQUE를 지운 뒤로 `CommunityViewCountConcurrencyTests`가 잠금 순서의 유일한 방어선이다.** (6.2, H14)
