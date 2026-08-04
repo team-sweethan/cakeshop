@@ -1,6 +1,9 @@
 package com.cakeshop.domain.payment.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -8,9 +11,11 @@ import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.payment.error.PaymentErrorCode;
 import com.cakeshop.domain.payment.infra.TossPaymentClient;
 import com.cakeshop.domain.payment.infra.TossPaymentClient.CancellationResult;
+import com.cakeshop.domain.payment.infra.TossPaymentClient.PaymentLookupResult;
 import com.cakeshop.domain.payment.service.RefundService.RefundRequest;
 import com.cakeshop.global.error.BusinessException;
 import java.time.LocalDateTime;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -44,16 +49,52 @@ class RefundFacadeTests {
     }
 
     @Test
-    void cancelCustomerOrder_tossFailure_marksRequestFailed() {
+    void cancelCustomerOrder_tossAndLookupFailure_keepsRequestRequested() {
         RefundRequest request = request();
         when(refundService.prepareCustomerCancellation(3L, 10L, "단순 변심")).thenReturn(request);
         when(tossPaymentClient.cancel("payment-key", "단순 변심", "idempotency-key"))
                 .thenThrow(new BusinessException(PaymentErrorCode.TOSS_CANCEL_FAILED));
+        when(tossPaymentClient.find("payment-key"))
+                .thenThrow(new BusinessException(PaymentErrorCode.PAYMENT_STATUS_LOOKUP_FAILED));
 
         assertThatThrownBy(() -> refundFacade.cancelCustomerOrder(3L, 10L, "단순 변심"))
-                .isInstanceOf(BusinessException.class);
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(PaymentErrorCode.PAYMENT_RECOVERY_PENDING)
+                );
 
-        verify(refundService).failRequestedCancellation(30L);
+        verify(refundService, never()).failRequestedCancellation(30L);
+        verify(refundService, never()).completeCancellation(any(), any());
+    }
+
+    @Test
+    void cancelCustomerOrder_tossFailureButLookupCanceled_completesCancellation() {
+        RefundRequest request = request();
+        CancellationResult cancellation = new CancellationResult(
+                "CANCELED",
+                "lookup-transaction-key",
+                request.requestedAt().plusSeconds(1)
+        );
+        PaymentLookupResult lookup = new PaymentLookupResult(
+                "payment-key",
+                "toss-order-id",
+                "CARD",
+                "CANCELED",
+                40_000,
+                request.requestedAt().minusDays(1),
+                cancellation
+        );
+        when(refundService.prepareCustomerCancellation(3L, 10L, "단순 변심"))
+                .thenReturn(request);
+        when(tossPaymentClient.cancel("payment-key", "단순 변심", "idempotency-key"))
+                .thenThrow(new BusinessException(PaymentErrorCode.TOSS_CANCEL_FAILED));
+        when(tossPaymentClient.find("payment-key")).thenReturn(Optional.of(lookup));
+
+        refundFacade.cancelCustomerOrder(3L, 10L, "단순 변심");
+
+        verify(refundService).completeCancellation(request, cancellation);
+        verify(refundService, never()).failRequestedCancellation(30L);
     }
 
     @Test
