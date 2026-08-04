@@ -37,32 +37,45 @@
 -- 과 '조회한 시각' 이 같다. 같은 값을 담는 컬럼을 하나 더 두면 언젠가 둘이 어긋난다.
 -- DB 의 CURRENT_TIMESTAMP(6) 로 잡히는 것도 그대로다 — 서버가 여러 대여도 시계는 하나다.
 
--- ▸ 세 문장의 순서가 규칙이다
+-- ▸ 왜 viewed_on 을 여기서 지우지 않는가 (expand-contract)
+--
+-- 이 migration 은 **확장(expand) 단계만** 한다. viewed_on 은 지우지 않고 NULL 허용으로
+-- 만 바꾸며, 컬럼 삭제(contract) 는 구버전이 모두 내려간 뒤 별도 migration 이 한다.
+--
+-- 한 파일에서 다 하면 배포 순서가 어느 쪽이든 상세 요청이 500 이 된다. migration 을
+-- 먼저 적용하면 구버전 CommunityMapper 의 viewed_on 조회·INSERT 가 Unknown column 으로
+-- 죽고, 새 애플리케이션을 먼저 올리면 아직 NOT NULL 인 viewed_on 을 생략한 recordView
+-- 가 죽는다. NULL 허용으로 두면 **양쪽 코드가 같은 스키마에서 함께 동작한다** — 구버전은
+-- 날짜를 넣고, 신버전은 넣지 않는다.
+--
+-- 되돌리는 경우: 신버전이 남긴 행은 viewed_on 이 NULL 이라 구버전의 날짜 창 판단
+-- (viewed_on = CURRENT_DATE) 에 걸리지 않는다. 그 구간의 재조회는 다시 세어진다. 되돌린
+-- 뒤 잠깐 조회수가 더 오르는 것뿐이라 손해가 없는 쪽으로 틀린다.
+--
+-- ▸ 세 작업의 순서가 규칙이고, 그래서 한 문장이다
 --
 -- (1) 새 인덱스를 **먼저** 만든다. fk_post_views_post 가 post_id 로 시작하는 인덱스를
 --     요구하는데, 지금 그것을 제공하는 유일한 인덱스가 지우려는 UNIQUE 다. 순서를
---     뒤집으면 "Cannot drop index: needed in a foreign key constraint" 로 migration 이
---     통째로 실패한다. 새 인덱스도 선두가 post_id 라 그 역할을 그대로 물려받는다.
+--     뒤집으면 "Cannot drop index: needed in a foreign key constraint" 로 실패한다.
+--     새 인덱스도 선두가 post_id 라 그 역할을 그대로 물려받는다.
 --
--- (2) UNIQUE 를 **명시적으로** 지운다. 이 문장을 빼고 viewed_on 만 DROP 하면 MariaDB 는
---     인덱스를 함께 지우는 것이 아니라 그 컬럼만 빼고 UNIQUE (post_id, viewer_key) 를
---     남긴다. 그러면 한 사람이 한 글을 **영원히 한 번만** 볼 수 있게 되고, 두 번째
---     조회부터 recordView 가 예외를 던져 상세 페이지가 500 이 된다. 조용히 망가지는
---     쪽이라 (1) 보다 위험하다 — (1) 은 적어도 migration 이 실패하며 알려 준다.
+-- (2) UNIQUE 를 **명시적으로** 지운다. 이 작업을 빼고 나중에 viewed_on 만 DROP 하면
+--     MariaDB 는 인덱스를 함께 지우는 것이 아니라 그 컬럼만 빼고
+--     UNIQUE (post_id, viewer_key) 를 남긴다. 그러면 한 사람이 한 글을 **영원히 한 번만**
+--     볼 수 있게 되고, 두 번째 조회부터 recordView 가 예외를 던져 상세가 500 이 된다.
+--     조용히 망가지는 쪽이라 (1) 보다 위험하다 — (1) 은 적어도 실패하며 알려 준다.
 --
--- (3) 컬럼을 지운다.
-
--- (1) 창 판단(NOT EXISTS) 이 탈 인덱스. 선두가 post_id 라 한 게시글의 이력 조회도 탄다.
+-- (3) viewed_on 을 NULL 허용으로 바꾼다.
+--
+-- **셋을 한 ALTER TABLE 로 묶는 것이 이 파일의 규칙이다.** MariaDB 의 DDL 은 트랜잭션이
+-- 아니라서, 문장을 나누면 Flyway 가 통째로 롤백해 주지 않는다. (1) 이 커밋된 뒤 (2) 가
+-- 잠금 시간 초과로 실패하면 DB 에는 새 인덱스만 남고 버전은 기록되지 않아, 재시도가
+-- 매번 "Duplicate key name" 으로 죽는다 — 손으로 인덱스를 지우기 전에는 복구되지 않는다.
+-- 한 문장이면 부분 적용 자체가 없어 재실행이 언제나 안전하다.
 ALTER TABLE `post_views`
-    ADD INDEX `ix_post_views_post_viewer_created` (`post_id`, `viewer_key`, `created_at`);
-
--- (2)
-ALTER TABLE `post_views`
-    DROP INDEX `uk_post_views_post_viewer_date`;
-
--- (3)
-ALTER TABLE `post_views`
-    DROP COLUMN `viewed_on`;
+    ADD INDEX `ix_post_views_post_viewer_created` (`post_id`, `viewer_key`, `created_at`),
+    DROP INDEX `uk_post_views_post_viewer_date`,
+    MODIFY COLUMN `viewed_on` DATE NULL COMMENT '날짜 창 시절의 잔재. 신버전은 채우지 않는다. contract 단계에서 삭제한다';
 
 -- view_count 는 손대지 않는다.
 --
