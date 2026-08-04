@@ -2,17 +2,18 @@ package com.cakeshop.domain.product.mapper;
 
 import java.util.List;
 
-import com.cakeshop.domain.product.admin.dto.form.ProductAdminSearchCondition;
-import com.cakeshop.domain.product.admin.dto.form.ProductForm;
-import com.cakeshop.domain.product.admin.dto.view.ProductAdminListView;
-import com.cakeshop.domain.product.admin.dto.view.ProductCategoryOptionView;
-import com.cakeshop.domain.product.admin.dto.view.ProductOptionAdminRow;
-import com.cakeshop.domain.product.customer.dto.form.ProductSearchCondition;
-import com.cakeshop.domain.product.customer.dto.view.ProductDetailView;
-import com.cakeshop.domain.product.customer.dto.view.ProductListView;
-import com.cakeshop.domain.product.customer.dto.view.ProductOptionRow;
+import com.cakeshop.domain.product.dto.form.ProductAdminSearchCondition;
+import com.cakeshop.domain.product.dto.form.ProductForm;
+import com.cakeshop.domain.product.dto.view.ProductAdminListView;
+import com.cakeshop.domain.product.dto.view.ProductCategoryOptionView;
+import com.cakeshop.domain.product.dto.view.ProductOptionAdminRow;
+import com.cakeshop.domain.product.dto.form.ProductSearchCondition;
+import com.cakeshop.domain.product.dto.view.ProductDetailView;
+import com.cakeshop.domain.product.dto.view.ProductListView;
+import com.cakeshop.domain.product.dto.view.ProductOptionRow;
 
 import com.cakeshop.domain.product.entity.Product;
+import com.cakeshop.domain.product.entity.ProductImage;
 import com.cakeshop.domain.product.entity.ProductOption;
 import com.cakeshop.domain.product.entity.ProductOptionGroup;
 import com.cakeshop.domain.product.entity.ProductStatus;
@@ -57,10 +58,85 @@ public interface ProductMapper {
     );
 
     /**
+     * 상품에 등록된 이미지를 표시 순서대로 조회한다.
+     *
+     * <p>표시 순서가 같으면 이미지 식별자 순서로 정렬해
+     * 항상 같은 결과를 반환한다.</p>
+     *
+     * @param productId 조회할 상품 식별자
+     * @return 상품 이미지 목록
+     */
+    List<ProductImage> findProductImagesByProductId(
+            @Param("productId") long productId
+    );
+
+    /**
+     * 지정한 상품에 속한 이미지를 조회한다.
+     *
+     * @param productId 이미지를 소유한 상품 식별자
+     * @param imageId 조회할 상품 이미지 식별자
+     * @return 상품 이미지, 지정한 상품에 속하지 않으면 {@code null}
+     */
+    ProductImage findProductImageById(
+            @Param("productId") long productId,
+            @Param("imageId") long imageId
+    );
+
+    /** 상품에 등록된 이미지 개수를 조회한다. */
+    int countProductImagesByProductId(
+            @Param("productId") long productId
+    );
+
+    /**
+     * 새 상품 이미지에 사용할 다음 표시 순서를 조회한다.
+     *
+     * @param productId 이미지를 추가할 상품 식별자
+     * @return 이미지가 없으면 0, 있으면 현재 최대 표시 순서보다 1 큰 값
+     */
+    int findNextProductImageSortOrder(
+            @Param("productId") long productId
+    );
+
+    /**
+     * 상품 이미지를 등록한다.
+     *
+     * @param productImage 등록할 상품 이미지
+     * @return 등록된 행 개수
+     */
+    int insertProductImage(ProductImage productImage);
+
+    /**
+     * 지정한 상품에 속한 이미지의 저장 경로를 변경한다.
+     *
+     * @param productId 이미지를 소유한 상품 식별자
+     * @param imageId 변경할 상품 이미지 식별자
+     * @param imageUrl 새 이미지 웹 접근 경로
+     * @return 수정된 행 개수
+     */
+    int updateProductImageUrl(
+            @Param("productId") long productId,
+            @Param("imageId") long imageId,
+            @Param("imageUrl") String imageUrl
+    );
+
+    /**
+     * 지정한 상품에 속한 이미지를 삭제한다.
+     *
+     * @param productId 이미지를 소유한 상품 식별자
+     * @param imageId 삭제할 상품 이미지 식별자
+     * @return 삭제된 행 개수
+     */
+    int deleteProductImage(
+            @Param("productId") long productId,
+            @Param("imageId") long imageId
+    );
+
+    /**
      * 다른 도메인에 제공할 상품 판매 정보를 조회한다.
      *
      * <p>상품 존재 여부와 판매 상태를 Service에서 구분할 수 있도록
-     * 기본 가격, 재고 수량, 판매 상태를 함께 조회한다.</p>
+     * 상품명, 상품 유형, 준비 기간, 기본 가격, 재고 수량,
+     * 판매 상태를 함께 조회한다.</p>
      *
      * @param productId 조회할 상품 식별자
      * @return 상품 판매 정보, 존재하지 않으면 {@code null}
@@ -68,6 +144,57 @@ public interface ProductMapper {
     Product findSalesInfoById(
             @Param("productId")
             long productId
+    );
+
+    /**
+     * 재고 변경 판단에 사용할 상품 판매 정보를 잠금 조회한다.
+     *
+     * <p>반드시 트랜잭션 안에서 호출하며, 재고 변경이 끝날 때까지
+     * 관리자 수정과 다른 재고 변경이 같은 상품을 갱신하지 못하게 한다.</p>
+     *
+     * @param productId 잠금 조회할 상품 식별자
+     * @return 상품 판매 정보, 존재하지 않으면 {@code null}
+     */
+    Product findSalesInfoByIdForUpdate(
+            @Param("productId")
+            long productId
+    );
+
+    /**
+     * 판매 중인 일반 상품의 유한 재고를 요청 수량만큼 차감한다.
+     *
+     * <p>현재 재고가 요청 수량 이상인 경우에만 갱신하므로
+     * 동시에 여러 주문이 요청돼도 재고가 음수가 되지 않는다.</p>
+     *
+     * @param productId 재고를 차감할 상품 식별자
+     * @param quantity 차감할 수량
+     * @return 재고가 차감된 상품 행 개수
+     */
+    int decreaseStockIfAvailable(
+            @Param("productId")
+            long productId,
+
+            @Param("quantity")
+            int quantity
+    );
+
+    /**
+     * 앞서 차감한 유한 재고를 요청 수량만큼 복구한다.
+     *
+     * <p>차감 후 상품 유형이나 판매 상태가 변경돼도 복구한다.
+     * 복구의 중복 실행 방지는 호출하는 주문·결제 도메인이
+     * 저장한 차감 이력과 주문 상태 전이를 통해 보장해야 한다.</p>
+     *
+     * @param productId 재고를 복구할 상품 식별자
+     * @param quantity 복구할 수량
+     * @return 재고가 복구된 상품 행 개수
+     */
+    int restoreLimitedStock(
+            @Param("productId")
+            long productId,
+
+            @Param("quantity")
+            int quantity
     );
 
     /**
@@ -90,6 +217,37 @@ public interface ProductMapper {
             @Param("productId")
             long productId
     );
+
+    /**
+     * 판매 시작 검증에 사용할 모든 옵션 그룹과 옵션을 잠금 조회한다.
+     *
+     * @param productId 판매 상태를 변경할 상품 식별자
+     * @return 비활성 항목을 포함한 옵션 조회 행
+     */
+    List<ProductOptionAdminRow>
+            findAdminOptionRowsByProductIdForUpdate(
+                    @Param("productId")
+                    long productId
+            );
+
+    /**
+     * 옵션 상태 변경 판단에 사용할 그룹과 하위 옵션을 잠금 조회한다.
+     *
+     * <p>반드시 트랜잭션 안에서 호출하며, 상태 검증과 변경이 끝날 때까지
+     * 같은 그룹의 옵션 상태가 동시에 변경되지 못하게 한다.</p>
+     *
+     * @param productId 옵션 그룹을 소유한 상품 식별자
+     * @param optionGroupId 잠금 조회할 옵션 그룹 식별자
+     * @return 비활성 항목을 포함한 옵션 그룹 조회 행
+     */
+    List<ProductOptionAdminRow>
+            findAdminOptionRowsByGroupIdForUpdate(
+                    @Param("productId")
+                    long productId,
+
+                    @Param("optionGroupId")
+                    long optionGroupId
+            );
 
     /**
      * 옵션 그룹이 지정한 상품에 속하는지 확인한다.
@@ -261,7 +419,14 @@ public interface ProductMapper {
      * <p>판매 상태, 평점, 리뷰 수와 상품 옵션은 변경하지 않는다.</p>
      *
      * @param product 수정할 상품 정보
+     * @param originalStockQuantity 수정 화면을 열었을 때의 재고 수량
      * @return 수정된 상품 행 개수
      */
-    int updateProduct(Product product);
+    int updateProduct(
+            @Param("product")
+            Product product,
+
+            @Param("originalStockQuantity")
+            Integer originalStockQuantity
+    );
 }

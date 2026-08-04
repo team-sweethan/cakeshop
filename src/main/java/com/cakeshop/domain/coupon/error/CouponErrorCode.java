@@ -23,7 +23,7 @@ public enum CouponErrorCode implements ErrorCode {
     // 쿠폰 수정 가능 범위(종료/시작 시각)에 따른 정책 위반 오류다.
     CANNOT_EDIT_ENDED_COUPON("COUPON_013", "종료된 쿠폰은 수정할 수 없습니다.", 400),
     CANNOT_MODIFY_FIELDS("COUPON_014", "수정 불가능한 필드가 변경되었습니다.", 400),
-    EXPIRES_AT_EXTENSION_ONLY("COUPON_015", "쿠폰 종료 일시는 연장만 가능합니다.", 400);
+    EXPIRES_AT_EXTENSION_ONLY("COUPON_015", "쿠폰 종료 일시는 기존 값과 같거나 이후여야 합니다.", 400);
 
     private final String code;
     private final String message;

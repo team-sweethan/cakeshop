@@ -9,6 +9,8 @@
         <header th:replace="~{fragments/admin/header :: header('쿠폰 관리')}"></header>
 
         <main class="admin-content">
+            <div th:replace="~{fragments/common/alert :: alert}"></div>
+
             <h1 class="admin-page-title">쿠폰 상세 정보</h1>
 
             <!-- 수정 Form과 분리된 읽기 전용 영역: 화면 값은 저장 요청으로 전송하지 않는다. -->
@@ -69,7 +71,7 @@
                         <input id="startsAt"
                                class="form-control"
                                type="datetime-local"
-                               th:value="${couponForm.startsAt}"
+                               th:value="${#temporals.format(couponForm.startsAt, 'yyyy-MM-dd''T''HH:mm')}"
                                disabled>
                     </div>
 
@@ -78,7 +80,7 @@
                         <input id="expiresAt"
                                class="form-control"
                                type="datetime-local"
-                               th:value="${couponForm.expiresAt}"
+                               th:value="${#temporals.format(couponForm.expiresAt, 'yyyy-MM-dd''T''HH:mm')}"
                                disabled>
                     </div>
                 </div>
@@ -104,8 +106,16 @@
                 </div>
 
                 <div class="cluster">
-                    <a class="btn btn--primary" th:if="${#strings.toString(couponForm.status) != 'ENDED'}" th:href="@{/admin/coupons/{couponId}/edit(couponId=${couponId})}">수정</a>
-                    <a class="btn" th:href="@{/admin/coupons}">목록</a>
+                    <a class="btn btn--primary" th:if="${#strings.toString(couponForm.displayStatus) != 'ENDED'}"
+                       th:href="@{/admin/coupons/{couponId}/edit(couponId=${couponId}, keyword=${condition.keyword}, status=${condition.status}, page=${page}, origin='DETAIL')}">수정</a>
+                    <a class="btn"
+                       th:href="@{/admin/coupons(
+                           keyword=${condition.keyword},
+                           status=${condition.status},
+                           page=${page}
+                       )}">
+                        목록
+                    </a>
                 </div>
             </div>
 

@@ -44,6 +44,84 @@ public enum ProductErrorCode implements ErrorCode {
             "PRODUCT_007",
             "상품 옵션 입력값을 확인해 주세요.",
             400
+    ),
+
+    INVALID_PRODUCT_POLICY(
+            "PRODUCT_008",
+            "상품 유형에 맞는 준비 일수를 입력해 주세요.",
+            400
+    ),
+
+    INVALID_STOCK_QUANTITY(
+            "PRODUCT_009",
+            "재고 변경 수량은 1개 이상이어야 합니다.",
+            400
+    ),
+
+    INSUFFICIENT_STOCK(
+            "PRODUCT_010",
+            "주문 가능한 상품 재고가 부족합니다.",
+            409
+    ),
+
+    STOCK_RESTORE_FAILED(
+            "PRODUCT_011",
+            "차감된 상품 재고를 복구할 수 없습니다.",
+            409
+    ),
+
+    UPDATE_CONFLICT(
+            "PRODUCT_012",
+            "다른 주문으로 재고가 변경되었습니다. 최신 정보를 확인한 후 다시 수정해 주세요.",
+            409
+    ),
+
+    REQUIRED_OPTION_GROUP_EMPTY(
+            "PRODUCT_013",
+            "필수 옵션 그룹에는 하나 이상의 활성 옵션이 필요합니다.",
+            409
+    ),
+
+    INVALID_IMAGE_FILE(
+            "PRODUCT_014",
+            "JPEG 또는 PNG 이미지 파일을 선택해 주세요.",
+            400
+    ),
+
+    IMAGE_TOO_LARGE(
+            "PRODUCT_015",
+            "상품 이미지는 5MB 이하여야 합니다.",
+            400
+    ),
+
+    IMAGE_LIMIT_EXCEEDED(
+            "PRODUCT_016",
+            "상품 이미지는 최대 5장까지 등록할 수 있습니다.",
+            409
+    ),
+
+    IMAGE_UPLOAD_FAILED(
+            "PRODUCT_017",
+            "상품 이미지를 등록하지 못했습니다. 다시 시도해 주세요.",
+            500
+    ),
+
+    IMAGE_NOT_FOUND(
+            "PRODUCT_018",
+            "상품 이미지를 찾을 수 없습니다.",
+            404
+    ),
+
+    IMAGE_DELETE_FAILED(
+            "PRODUCT_019",
+            "상품 이미지를 삭제하지 못했습니다. 다시 시도해 주세요.",
+            500
+    ),
+
+    IMAGE_REPLACE_FAILED(
+            "PRODUCT_020",
+            "상품 이미지를 교체하지 못했습니다. 다시 시도해 주세요.",
+            500
     );
 
     private final String code;

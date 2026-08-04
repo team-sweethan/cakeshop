@@ -167,22 +167,50 @@ Entity는 DB 한 행을 표현하는 MyBatis용 POJO다.
 - Entity를 Controller의 입력 객체로 쓰거나 Model에 담아 Thymeleaf에 직접 전달하지 않는다.
 - 비밀번호 해시 등 민감한 필드를 가진 Entity는 웹 계층에 노출하지 않는다.
 - 공통 BaseEntity 상속은 사용하지 않는다. 시간 필드는 필요한 Entity에 `LocalDateTime`으로 직접 선언한다.
-- getter/setter는 Lombok `@Getter @Setter`로 생성한다.
+- 접근자를 손으로 작성하지 않는다. Lombok `@Getter` / `@Setter`로 생성한다.
+- **쓰지 않는 setter를 열어 두지 않는다. [권장]** 아무도 호출하지 않는 setter는 "이 객체는 언제든 바뀔 수 있다"고 말하면서 그 말을 지키는 코드가 없는 상태다.
+
+### 7-1. setter를 어디까지 열 것인가
+
+**MyBatis는 setter가 없어도 조회 결과를 채운다.** 실제 MariaDB로 확인한 결과다.
+
+| POJO 형태 | 매핑 | 어떻게 |
+|---|---|---|
+| setter 없음, 기본 생성자 있음 | 된다 | 세터가 없는 프로퍼티는 **필드에 직접** 주입한다 (`SetFieldInvoker`) |
+| 필드 전부 `final`, 전 인자 생성자만 | 된다 | **생성자 매핑**으로 채운다. 다만 인자 순서·타입에 의존하므로, 컬럼이 늘거나 순서가 바뀌면 조용히 어긋난다. 이 형태를 쓰려면 `resultMap`의 `<constructor>`로 컬럼을 명시한다 |
+
+그래서 "조회 Entity라서 setter가 필요하다"는 말은 **성립하지 않는다.** 기준은 이렇게 잡는다.
+
+- **쓰기 전용 파라미터 Entity**(INSERT·UPDATE에만 쓴다): 필드를 `final`로 잠근다. 생성 키를 받는 `id`에만 `@Setter`를 둔다 — `useGeneratedKeys`가 넣을 자리가 필요하다.
+- **조회 결과로 매핑되는 Entity**: 클래스 단위 `@Setter`가 **기본이되 필수는 아니다.** 불변으로 만들고 싶으면 `resultMap`의 `<constructor>`로 컬럼을 명시해 매핑한다. 자동 매핑에 기대어 생성자 순서에 의존하지 않는다.
 
 ```java
-import java.time.LocalDateTime;
-
-import lombok.Getter;
-import lombok.Setter;
-
+// 쓰기 전용 Entity — id에만 setter, 나머지는 final
 @Getter
-@Setter
-public class Member {
+public class Post {
+
+    @Setter                     // useGeneratedKeys가 INSERT 후 채우는 자리
     private Long id;
-    private String email;
-    private LocalDateTime createdAt;
+
+    private final Long memberId;
+    private final String title;
+
+    private Post(Long id, Long memberId, String title) { ... }
+
+    public static Post create(Long memberId, String title) {
+        return new Post(null, memberId, title);
+    }
+
+    public static Post edit(Long id, Long memberId, String title) {
+        return new Post(id, memberId, title);
+    }
 }
 ```
+
+**정적 팩터리를 쓰는 이유는 용도를 이름으로 드러내기 위해서다.** 위 예에서 작성과 수정은 인자 개수가 달라 생성자 하나로는 표현되지 않고, 오버로딩하면 호출부만 봐서는 어느 쪽인지 알 수 없다. 다만 **팩터리도 위치 인자라 같은 타입끼리 뒤바꾼 호출은 여전히 컴파일된다** — `Post.edit(memberId, postId, ...)`를 막아 주지 않는다. 그것까지 막으려면 식별자를 서로 다른 값 타입으로 감싸야 하는데, 이 프로젝트는 아직 그렇게 하지 않는다. **팩터리는 의도 표현이지 타입 안전장치가 아니다.**
+
+- `@Data`는 여전히 [금지]다. 필요한 `@Getter`, `@Setter`만 쓴다.
+- **이 규칙 때문에 기존 Entity를 일괄 수정하지 않는다** ([20절](#20-기존-코드-적용-방식)). 해당 도메인을 손볼 때 함께 정리한다.
 
 ## 8. DTO 규칙
 
@@ -264,9 +292,9 @@ Service가 업무 규칙과 트랜잭션 경계를 소유한다.
 
 - ordinal 숫자 저장 [금지]. DDL 규칙은 [6절](#6-데이터베이스-규약) 참고.
 - 재고 수량(파생값), 읽음 여부(boolean), 글 종류(type/category), 다른 도메인의 status는 내 status enum으로 만들지 않는다.
-- `OrderStatus`(11개 + 전이)·`PaymentStatus`(6개)가 확정된 레퍼런스 구현이다.
+- `OrderStatus`(7개 + 전이)·`PaymentStatus`(6개)가 확정된 레퍼런스 구현이다.
 
-> 도메인별 상태값 인벤토리, 담당자별 미확정 ☐ 항목(product_options·payment_cancellations·coupons·comments·reviews·chat_rooms·NotificationType), 함정 분류표는 [status-design.md](status-design.md)를 정본으로 한다. 담당자 ☐ 항목의 확정·갱신도 그 문서에서 계속한다.
+> 도메인별 상태값 인벤토리, 담당자별 미확정 ☐ 항목(product_options·payment_cancellations·coupons·reviews·chat_rooms·NotificationType), 함정 분류표는 [status-design.md](status-design.md)를 정본으로 한다. 담당자 ☐ 항목의 확정·갱신도 그 문서에서 계속한다.
 
 ## 15. 도메인 간 연동
 

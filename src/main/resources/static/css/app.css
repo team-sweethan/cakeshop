@@ -332,6 +332,18 @@ h2.section-title {
     color: #9ca3af
 }
 
+.birth-date-selects {
+    display: grid;
+    gap: var(--space-2);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-top: var(--space-2)
+}
+
+.birth-date-selects .form-control {
+    min-width: 0;
+    width: 100%
+}
+
 .form-control--textarea {
     min-height: 74px;
     resize: vertical
@@ -1662,6 +1674,35 @@ body > main {
 /* 관리자 폼 래퍼: 폼 가독성을 위해 너비 제한 (프론트는 인라인 style 사용) */
 .admin-form {
     max-width: 720px
+}
+
+.product-image-card {
+    display: grid;
+    gap: var(--space-3);
+    grid-template-rows: auto auto auto
+}
+
+.product-image-preview {
+    display: block
+}
+
+.product-image-preview img {
+    display: block
+}
+
+.product-image-badge {
+    justify-self: start;
+    width: fit-content
+}
+
+.product-image-badge--placeholder {
+    visibility: hidden
+}
+
+.product-image-actions {
+    display: flex;
+    gap: var(--space-2);
+    justify-content: flex-end
 }
 
 /* 매장 폼: 영업/픽업 시간 입력 */

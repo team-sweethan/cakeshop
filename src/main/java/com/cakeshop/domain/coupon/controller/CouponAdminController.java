@@ -6,18 +6,22 @@ import com.cakeshop.domain.coupon.dto.form.CouponUpdateForm;
 import com.cakeshop.domain.coupon.dto.view.CouponView;
 import com.cakeshop.domain.coupon.error.CouponErrorCode;
 import com.cakeshop.domain.coupon.service.CouponAdminService;
+import com.cakeshop.global.common.paging.PageNavigation;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.security.MemberDetails;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import java.util.Map;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.servlet.support.RequestContextUtils;
 
 /**
  * 관리자 쿠폰 목록·등록·수정·상태 전환 요청을 처리한다.
@@ -28,6 +32,9 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @RequiredArgsConstructor
 public class CouponAdminController {
 
+    private static final String LIST_ORIGIN = "LIST";
+    private static final String DETAIL_ORIGIN = "DETAIL";
+
     private final CouponAdminService couponAdminService;
 
     /**
@@ -37,18 +44,35 @@ public class CouponAdminController {
     @GetMapping
     public String coupons(@ModelAttribute CouponSearchCondition condition,
                           @RequestParam(required = false) Integer page,
-                          @RequestParam(required = false) Integer size,
-                          Model model) {
+                          Model model,
+                          HttpServletRequest request,
+                          RedirectAttributes redirectAttributes) {
 
-        PageRequest pageRequest = new PageRequest(page, size);
+        PageRequest pageRequest = new PageRequest(page, PageRequest.DEFAULT_SIZE);
 
         PageResult<CouponView> pageResult = couponAdminService.getCoupons(
                 condition,
                 pageRequest
         );
 
+        // 상태 변경 등으로 마지막 페이지가 사라진 경우 빈 목록을 보여 주지 않고 마지막 유효 페이지로 이동한다.
+        int lastPage = Math.max(pageResult.getTotalPages(), 1);
+        if (pageResult.getPage() > lastPage) {
+            // POST redirect가 전달한 처리 결과를 페이지 보정 redirect 뒤에도 한 번 더 노출한다.
+            preserveFlashAttributes(request, redirectAttributes);
+            return redirectToList(condition, lastPage, redirectAttributes);
+        }
+
+        // 목록 조회 결과와 분리해, 화면에 표시할 페이지 번호 블록만 공통 객체로 계산한다.
+        PageNavigation pageNavigation =
+                PageNavigation.of(
+                        pageResult.getPage(),
+                        pageResult.getTotalPages()
+                );
+
         model.addAttribute("condition", condition);
         model.addAttribute("pageResult", pageResult);
+        model.addAttribute("pageNavigation", pageNavigation);
 
         return "admin/coupon/list";
     }
@@ -97,7 +121,12 @@ public class CouponAdminController {
 
     /** 기존 쿠폰 값을 수정 Form으로 변환해 수정 화면에 제공한다. */
     @GetMapping("{couponId}/edit")
-    public String updateCouponForm(@PathVariable Long couponId, Model model, RedirectAttributes redirectAttributes) {
+    public String updateCouponForm(@PathVariable Long couponId,
+                                   @ModelAttribute CouponSearchCondition condition,
+                                   @RequestParam(required = false) Integer page,
+                                   @RequestParam(defaultValue = LIST_ORIGIN) String origin,
+                                   Model model,
+                                   RedirectAttributes redirectAttributes) {
         try {
             // 서비스에서 종료 쿠폰을 차단하므로, 수정 화면에는 수정 가능한 쿠폰만 진입한다.
             model.addAttribute(
@@ -106,6 +135,7 @@ public class CouponAdminController {
             );
             model.addAttribute("couponId", couponId);
             model.addAttribute("formMode", "update");
+            addUpdateNavigation(model, condition, page, origin);
 
             return "admin/coupon/form";
         } catch (BusinessException e) {
@@ -113,7 +143,7 @@ public class CouponAdminController {
                     "errorMessage",
                     e.getErrorCode().message()
             );
-            return "redirect:/admin/coupons";
+            return redirectAfterUpdate(couponId, condition, page, origin, redirectAttributes);
         }
     }
 
@@ -122,12 +152,16 @@ public class CouponAdminController {
     public String updateCoupon(@PathVariable Long couponId,
                                @Valid @ModelAttribute("couponForm") CouponUpdateForm form,
                                BindingResult bindingResult,
+                               @ModelAttribute CouponSearchCondition condition,
+                               @RequestParam(required = false) Integer page,
+                               @RequestParam(defaultValue = LIST_ORIGIN) String origin,
                                Model model,
                                RedirectAttributes redirectAttributes) {
 
         if (bindingResult.hasErrors()) {
             model.addAttribute("couponId", couponId);
             model.addAttribute("formMode", "update");
+            addUpdateNavigation(model, condition, page, origin);
             try {
                 // 요청 Form에는 fullEdit가 없으므로, DB 기준 수정 가능 범위를 다시 채운다.
                 CouponUpdateForm originalForm = couponAdminService.getUpdateForm(couponId);
@@ -161,6 +195,7 @@ public class CouponAdminController {
                 form.setFullEdit(originalForm.isFullEdit());
                 model.addAttribute("couponId", couponId);
                 model.addAttribute("formMode", "update");
+                addUpdateNavigation(model, condition, page, origin);
 
                 return "admin/coupon/form";
             }
@@ -171,13 +206,15 @@ public class CouponAdminController {
             );
         }
 
-        return "redirect:/admin/coupons";
+        return redirectAfterUpdate(couponId, condition, page, origin, redirectAttributes);
     }
 
     /** ACTIVE 쿠폰만 INACTIVE로 전환한다. */
     @PostMapping("/{couponId}/deactivate")
     public String deactivateCoupon(
             @PathVariable Long couponId,
+            @ModelAttribute CouponSearchCondition condition,
+            @RequestParam(required = false) Integer page,
             RedirectAttributes redirectAttributes) {
 
         try {
@@ -195,17 +232,19 @@ public class CouponAdminController {
             );
         }
 
-        return "redirect:/admin/coupons";
+        return redirectToList(condition, page, redirectAttributes);
     }
 
     /** INACTIVE이며 만료되지 않은 쿠폰만 ACTIVE로 되돌린다. */
     @PostMapping("/{couponId}/activate")
     public String activateCoupon(
             @PathVariable Long couponId,
+            @ModelAttribute CouponSearchCondition condition,
+            @RequestParam(required = false) Integer page,
             RedirectAttributes redirectAttributes) {
 
         try {
-            // 만료된 쿠폰은 서비스에서 거부하므로 ENDED를 ACTIVE로 되돌릴 수 없다.
+            // 만료 쿠폰은 서비스에서 거부하므로 관리자 발급 허용 상태로 전환할 수 없다.
             couponAdminService.activateCoupon(couponId);
 
             redirectAttributes.addFlashAttribute(
@@ -219,21 +258,76 @@ public class CouponAdminController {
             );
         }
 
-        return "redirect:/admin/coupons";
+        return redirectToList(condition, page, redirectAttributes);
     }
     /**
      * 쿠폰 기본 정보와 향후 발급 회원 기능의 안내를 보여 주는 읽기 전용 상세 화면이다.
      * 종료 쿠폰도 이 화면에서는 조회할 수 있지만 수정 버튼은 노출하지 않는다.
      */
     @GetMapping("{couponId}/detail")
-    public String couponDetail(@PathVariable Long couponId, Model model) {
+    public String couponDetail(
+            @PathVariable Long couponId,
+            @ModelAttribute CouponSearchCondition condition,
+            @RequestParam(required = false) Integer page,
+            Model model) {
         model.addAttribute(
                 "couponForm",
                 couponAdminService.getDetailCoupon(couponId)
         );
         model.addAttribute("couponId", couponId);
-        model.addAttribute("formMode", "detail");
+        // 상세 화면의 목록 버튼이 사용자가 보던 검색 결과와 페이지로 돌아가도록 보존한다.
+        model.addAttribute("condition", condition);
+        model.addAttribute("page", page);
 
         return "admin/coupon/detail";
+    }
+
+    /** 수정 화면의 취소·완료 뒤 이동 경로를 제한된 진입 출처에 따라 결정한다. */
+    private String redirectAfterUpdate(Long couponId,
+                                       CouponSearchCondition condition,
+                                       Integer page,
+                                       String origin,
+                                       RedirectAttributes redirectAttributes) {
+        if (DETAIL_ORIGIN.equals(origin)) {
+            addListState(condition, page, redirectAttributes);
+            redirectAttributes.addAttribute("couponId", couponId);
+            return "redirect:/admin/coupons/{couponId}/detail";
+        }
+
+        return redirectToList(condition, page, redirectAttributes);
+    }
+
+    /** 목록 상태를 redirect query parameter로 전달해 사용자가 보던 검색 결과를 유지한다. */
+    private String redirectToList(CouponSearchCondition condition,
+                                  Integer page,
+                                  RedirectAttributes redirectAttributes) {
+        addListState(condition, page, redirectAttributes);
+        return "redirect:/admin/coupons";
+    }
+
+    private void addListState(CouponSearchCondition condition,
+                              Integer page,
+                              RedirectAttributes redirectAttributes) {
+        redirectAttributes.addAttribute("keyword", condition.getKeyword());
+        redirectAttributes.addAttribute("status", condition.getStatus());
+        redirectAttributes.addAttribute("page", page);
+    }
+
+    /** 페이지 보정 redirect가 기존 FlashMap을 소비하지 않도록 다음 요청으로 다시 전달한다. */
+    private void preserveFlashAttributes(HttpServletRequest request,
+                                         RedirectAttributes redirectAttributes) {
+        Map<String, ?> inputFlashMap = RequestContextUtils.getInputFlashMap(request);
+        if (inputFlashMap != null) {
+            inputFlashMap.forEach(redirectAttributes::addFlashAttribute);
+        }
+    }
+
+    private void addUpdateNavigation(Model model,
+                                     CouponSearchCondition condition,
+                                     Integer page,
+                                     String origin) {
+        model.addAttribute("condition", condition);
+        model.addAttribute("page", page);
+        model.addAttribute("origin", DETAIL_ORIGIN.equals(origin) ? DETAIL_ORIGIN : LIST_ORIGIN);
     }
 }

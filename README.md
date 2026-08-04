@@ -68,7 +68,11 @@ macOS·Linux에서는 `./gradlew bootRun --args="--spring.profiles.active=local"
 ```powershell
 mariadb --host=localhost --port=3307 --user=root --password cakeshop `
   < src\main\resources\db\seed\seed-local.sql
+mariadb --host=localhost --port=3307 --user=root --password cakeshop `
+  < src\main\resources\db\seed\seed-community.sql
 ```
+
+**순서를 바꾸지 않는다.** `seed-local.sql`이 `members`와 `post_categories`를 지우고 다시 넣으므로, 먼저 실행하지 않으면 커뮤니티 시드의 글이 전부 사라진다.
 
 ### 5. 확인
 
@@ -80,7 +84,7 @@ FROM `flyway_schema_history`
 ORDER BY `installed_rank`;
 ```
 
-버전 `0`, `1`, `3`, `20260729.003452`가 모두 `success = 1`이어야 한다. 시드는 Flyway 관리 대상이 아니므로 이 목록에 나타나지 않는다.
+[현재 migration](#현재-migration) 13개가 모두 `success = 1`이어야 한다. 버전은 `0`, `1`, `3`으로 시작해 `20260802.113229`로 끝난다. 시드는 Flyway 관리 대상이 아니므로 이 목록에 나타나지 않는다.
 
 `http://localhost:8080/`에서 고객 화면이 뜨고, `admin@cakeshop.local / Admin1234!`로 관리자 로그인이 되면 완료다.
 
@@ -160,10 +164,23 @@ Remove-Item Env:SPRING_PROFILES_ACTIVE -ErrorAction SilentlyContinue
 
 `local` 프로필에서 다음 순서로 적용된다.
 
-1. `V0__initial_schema.sql`: 전체 공통 스키마 생성
-2. `V1__add_product_stock.sql`: 상품 재고 컬럼 추가
-3. `V3__add_member_name.sql`: 회원 이름 컬럼 추가 및 기존 로컬 계정 값 보정
-4. `V20260729_003452__provision_default_store.sql`: 모든 환경에 필요한 대표 매장과 7개 요일 영업시간 보장
+| # | 파일 | 내용 |
+|---|---|---|
+| 1 | `V0__initial_schema.sql` | 전체 공통 스키마 생성 |
+| 2 | `V1__add_product_stock.sql` | 상품 재고 컬럼 추가 |
+| 3 | `V3__add_member_name.sql` | 회원 이름 컬럼 추가 및 기존 로컬 계정 값 보정 |
+| 4 | `V20260729_003452__provision_default_store.sql` | 모든 환경에 필요한 대표 매장과 7개 요일 영업시간 보장 |
+| 5 | `V20260729_123306__add_member_status_constraint.sql` | `members.status` 기본값과 `CHECK` 제약 |
+| 6 | `V20260729_152154__add_product_option_group_status.sql` | 상품 옵션 그룹·옵션의 `status` 컬럼과 `CHECK` 제약 |
+| 7 | `V20260729_181617__add_member_birth_date.sql` | 회원 생년월일 컬럼 추가 |
+| 8 | `V20260729_184356__align_order_payment_schema.sql` | 주문·결제 스키마를 7개 상태 모델에 맞춰 정렬 |
+| 9 | `V20260730_123931__apply_product_preparation_policy.sql` | 상품 유형별 준비 기간 정책 적용 |
+| 10 | `V20260730_170822__add_payment_request_guards.sql` | 결제 요청 재시도 시 주문당 `READY` 결제 1건 보장 |
+| 11 | `V20260731_091629__unify_active_payment_guard.sql` | `READY`·`DONE`을 합친 활성 결제를 주문당 1건으로 통합 |
+| 12 | `V20260802_113219__add_post_status_constraint.sql` | `posts`·`comments`의 `status` `CHECK` 제약 |
+| 13 | `V20260802_113229__provision_post_categories.sql` | 모든 환경에 필요한 게시글 카테고리 3종 보장 |
+
+버전 번호가 `0`, `1`, `3`에서 타임스탬프로 바뀌는 것은 Flyway 도입 전후의 차이다(아래 [주의할 함정](#주의할-함정) 참고). 새 파일은 생성 명령이 이름을 짓는다.
 
 ### 새 migration 만들기
 
@@ -240,7 +257,7 @@ ORDER BY `installed_rank`;
 
 ### 샘플 데이터
 
-`db/seed/seed-local.sql`은 Flyway가 스캔하지 않는다. 그래서 checksum 검증에 걸리지 않고, 내용을 고쳐도 팀원들이 DB를 다시 만들 필요가 없다. 스크립트 맨 앞에서 로컬 샘플 데이터를 지운 뒤 다시 넣으므로 몇 번을 실행해도 결과가 같다. 로컬에서 만든 주문·리뷰·게시글도 함께 사라지므로 로컬 DB에서만 실행한다. 모든 환경에 필요한 대표 매장과 영업시간은 versioned migration으로 관리하며 로컬 seed가 삭제하거나 덮어쓰지 않는다.
+시드는 `db/seed/seed-local.sql`과 `db/seed/seed-community.sql` 두 개이며 **이 순서로** 실행한다. 커뮤니티 시드는 `seed-local.sql`이 지운 `post_categories`를 다시 채운 뒤 게시글·댓글·좋아요·신고 샘플을 넣는다. 두 파일 모두 Flyway가 스캔하지 않는다. 그래서 checksum 검증에 걸리지 않고, 내용을 고쳐도 팀원들이 DB를 다시 만들 필요가 없다. 스크립트 맨 앞에서 로컬 샘플 데이터를 지운 뒤 다시 넣으므로 몇 번을 실행해도 결과가 같다. 로컬에서 만든 주문·리뷰·게시글도 함께 사라지므로 로컬 DB에서만 실행한다. 모든 환경에 필요한 대표 매장과 영업시간은 versioned migration으로 관리하며 로컬 seed가 삭제하거나 덮어쓰지 않는다. 같은 migration이 넣는 `post_categories`는 예외로 `seed-local.sql`이 지우므로, 반드시 `seed-community.sql`까지 실행해 다시 채운다.
 
 ### 주의 사항
 
@@ -274,7 +291,7 @@ Flyway 도입 이전에 만든 로컬 DB에는 `flyway_schema_history`가 없어
 3. 접속하려는 호스트·포트·데이터베이스 이름이 `.env`의 `LOCAL_DB_*` 값과 일치하는지 다시 확인한다.
 4. `cakeshop` 데이터베이스 전체를 삭제하고 같은 이름으로 다시 생성한다.
 5. 애플리케이션을 `local` 프로필로 실행해 Flyway가 빈 DB를 처음부터 구성하도록 한다.
-6. `db/seed/seed-local.sql`을 실행해 샘플 데이터를 넣는다.
+6. `db/seed/seed-local.sql`, `db/seed/seed-community.sql`을 순서대로 실행해 샘플 데이터를 넣는다.
 7. `flyway_schema_history`와 샘플 계정을 확인한다.
 
 **2단계 — 백업.** Windows에서 MariaDB CLI로 백업하는 예시는 다음과 같다. 호스트, 포트, 사용자, 백업 경로는 자신의 `.env`에 맞게 바꾼다. `--password`는 명령행에 비밀번호를 노출하지 않고 입력 프롬프트를 표시한다.
@@ -311,7 +328,7 @@ CREATE DATABASE `cakeshop`
 
 `docs/sql/V0_ERD.sql`의 `DROP TABLE` 구문으로 일부 테이블만 삭제하면 안 된다. 그 방법은 `flyway_schema_history` 또는 이후 추가된 테이블을 남길 수 있고, Flyway가 이미 적용된 마이그레이션이라고 오판하게 만든다. `flyway_schema_history`만 따로 삭제하거나 임의로 수정하는 것도 금지한다.
 
-**5~7단계.** 이후는 [처음 설치하기](#처음-설치하기)의 3~5단계와 동일하다. 프로젝트 루트에서 애플리케이션을 실행해 Flyway가 [현재 migration](#현재-migration)을 적용하게 하고, `db/seed/seed-local.sql`을 실행한 뒤 `flyway_schema_history`를 확인한다. 초기화가 완료되면 `admin@cakeshop.local / Admin1234!` 계정으로 관리자 화면 로그인을 확인한다.
+**5~7단계.** 이후는 [처음 설치하기](#처음-설치하기)의 3~5단계와 동일하다. 프로젝트 루트에서 애플리케이션을 실행해 Flyway가 [현재 migration](#현재-migration)을 적용하게 하고, `db/seed/seed-local.sql`과 `db/seed/seed-community.sql`을 순서대로 실행한 뒤 `flyway_schema_history`를 확인한다. 초기화가 완료되면 `admin@cakeshop.local / Admin1234!` 계정으로 관리자 화면 로그인을 확인한다.
 
 ### 자주 발생하는 오류
 
@@ -410,7 +427,8 @@ CREATE DATABASE `cakeshop`
 | 결제 | `/orders/{id}/payment` | 목업 |
 | 마이페이지·프로필·쿠폰 | `/mypage`, `/mypage/profile`, `/mypage/coupons` | 목업 |
 | 알림·후기 | `/notifications`, `/reviews/new` | 목업 |
-| 커뮤니티 목록·상세·글쓰기 | `/community`, `/community/{id}`, `/community/new` | 목업 (별도 추가) |
+| 커뮤니티 목록·상세 | `/community`, `/community/{id}` | 실제 조회 (카테고리 필터·페이징·조회수) |
+| 커뮤니티 글쓰기 | `/community/new` | 목업 (별도 추가, 조각 2에서 연결) |
 
 프론트 저장소가 갱신되면 다음 명령으로 프론트 원본 기반 16개 목업 템플릿과 전용 CSS·JavaScript를 다시 가져온다. 메인·로그인과 별도로 추가한 커뮤니티 화면은 이 명령이 덮어쓰지 않는다.
 

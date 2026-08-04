@@ -1,6 +1,7 @@
 package com.cakeshop.domain.member.controller;
 
 import com.cakeshop.domain.member.dto.form.ProfileUpdateForm;
+import com.cakeshop.domain.member.dto.form.WithdrawForm;
 import com.cakeshop.domain.member.dto.view.MemberProfileView;
 import com.cakeshop.domain.member.error.MemberErrorCode;
 import com.cakeshop.domain.member.service.MemberService;
@@ -49,6 +50,7 @@ public class MyPageController {
         MemberProfileView member = memberService.getMemberProfile(email);
 
         model.addAttribute("profileForm", ProfileUpdateForm.from(member));
+        model.addAttribute("withdrawForm", new WithdrawForm());
 
         return "customer/member/profile-edit";
     }
@@ -70,6 +72,7 @@ public class MyPageController {
         if (bindingResult.hasErrors()) {
             // 읽기 전용 이메일은 요청값을 신뢰하지 않고 인증된 회원 정보로 되돌린다.
             form.setEmail(memberService.getMemberProfile(email).email());
+            model.addAttribute("withdrawForm", new WithdrawForm());
             return "customer/member/profile-edit";
         }
 
@@ -85,6 +88,7 @@ public class MyPageController {
                     MemberErrorCode.INVALID_CURRENT_PASSWORD.code(),
                     MemberErrorCode.INVALID_CURRENT_PASSWORD.message());
             form.setEmail(memberService.getMemberProfile(email).email());
+            model.addAttribute("withdrawForm", new WithdrawForm());
             return "customer/member/profile-edit";
         }
         return "redirect:/mypage?success=update";
@@ -93,13 +97,41 @@ public class MyPageController {
     @PostMapping("/mypage/withdraw")
     public String withdraw(
             @AuthenticationPrincipal MemberDetails memberDetails,
+            @Valid @ModelAttribute("withdrawForm") WithdrawForm form,
+            BindingResult bindingResult,
+            Model model,
             HttpServletRequest request,
             RedirectAttributes redirectAttributes) {
         if (memberDetails == null) {
             return "redirect:/login";
         }
 
-        memberService.withdraw(memberDetails.getUsername());
+        if (bindingResult.hasErrors()) {
+            model.addAttribute(
+                    "profileForm",
+                    ProfileUpdateForm.from(
+                            memberService.getMemberProfile(memberDetails.getUsername())));
+            return "customer/member/profile-edit";
+        }
+
+        try {
+            memberService.withdraw(
+                    memberDetails.getUsername(),
+                    form.getCurrentPassword());
+        } catch (BusinessException exception) {
+            if (exception.getErrorCode() != MemberErrorCode.INVALID_CURRENT_PASSWORD) {
+                throw exception;
+            }
+            bindingResult.rejectValue(
+                    "currentPassword",
+                    MemberErrorCode.INVALID_CURRENT_PASSWORD.code(),
+                    MemberErrorCode.INVALID_CURRENT_PASSWORD.message());
+            model.addAttribute(
+                    "profileForm",
+                    ProfileUpdateForm.from(
+                            memberService.getMemberProfile(memberDetails.getUsername())));
+            return "customer/member/profile-edit";
+        }
 
         sessionRegistry.getAllSessions(memberDetails, false)
                 .forEach(SessionInformation::expireNow);

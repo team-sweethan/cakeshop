@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.cakeshop.domain.member.dto.form.ProfileUpdateForm;
+import com.cakeshop.domain.member.dto.form.WithdrawForm;
 import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
 import com.cakeshop.domain.member.dto.view.MemberProfileView;
 import com.cakeshop.domain.member.error.MemberErrorCode;
@@ -85,13 +86,18 @@ class MyPageControllerTests {
 
         String viewName = myPageController.withdraw(
                 memberDetails,
+                confirmedWithdrawForm(),
+                bindingResult,
+                model,
                 request,
                 redirectAttributes);
 
         assertThat(viewName).isEqualTo("redirect:/login");
         assertThat(SecurityContextHolder.getContext().getAuthentication())
                 .isNull();
-        verify(memberService).withdraw(memberDetails.getUsername());
+        verify(memberService).withdraw(
+                memberDetails.getUsername(),
+                "CurrentPassword1!");
         verify(currentSessionInformation).expireNow();
         verify(otherSessionInformation).expireNow();
         verify(session).invalidate();
@@ -166,11 +172,58 @@ class MyPageControllerTests {
     void withdraw_unauthenticatedMember_redirectsWithoutWithdrawing() {
         String viewName = myPageController.withdraw(
                 null,
+                confirmedWithdrawForm(),
+                bindingResult,
+                model,
                 request,
                 redirectAttributes);
 
         assertThat(viewName).isEqualTo("redirect:/login");
         verifyNoInteractions(memberService, request);
+    }
+
+    @Test
+    void withdraw_invalidCurrentPassword_rendersProfileWithFieldError() {
+        MemberDetails memberDetails = memberDetails();
+        WithdrawForm form = confirmedWithdrawForm();
+        doThrow(new BusinessException(MemberErrorCode.INVALID_CURRENT_PASSWORD))
+                .when(memberService)
+                .withdraw(memberDetails.getUsername(), form.getCurrentPassword());
+        when(memberService.getMemberProfile(memberDetails.getUsername()))
+                .thenReturn(memberProfile());
+
+        String viewName = myPageController.withdraw(
+                memberDetails,
+                form,
+                bindingResult,
+                model,
+                request,
+                redirectAttributes);
+
+        assertThat(viewName).isEqualTo("customer/member/profile-edit");
+        verify(bindingResult).rejectValue(
+                "currentPassword",
+                MemberErrorCode.INVALID_CURRENT_PASSWORD.code(),
+                MemberErrorCode.INVALID_CURRENT_PASSWORD.message());
+        verify(model).addAttribute(
+                org.mockito.ArgumentMatchers.eq("profileForm"),
+                org.mockito.ArgumentMatchers.any(ProfileUpdateForm.class));
+    }
+
+    private WithdrawForm confirmedWithdrawForm() {
+        WithdrawForm form = new WithdrawForm();
+        form.setCurrentPassword("CurrentPassword1!");
+        form.setWithdrawalConfirmed(true);
+        return form;
+    }
+
+    private MemberProfileView memberProfile() {
+        return new MemberProfileView(
+                "member@cakeshop.local",
+                "회원",
+                "닉네임",
+                "010-1234-5678",
+                LocalDate.of(2000, 1, 15));
     }
 
     private MemberDetails memberDetails() {

@@ -1,14 +1,23 @@
 package com.cakeshop.admin;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
-import com.cakeshop.domain.product.admin.service.ProductAdminService;
+import com.cakeshop.domain.coupon.dto.form.CouponSearchCondition;
+import com.cakeshop.domain.coupon.dto.view.CouponView;
+import com.cakeshop.domain.product.service.ProductAdminService;
+import com.cakeshop.global.common.paging.PageRequest;
+import com.cakeshop.global.common.paging.PageResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -17,14 +26,22 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import com.cakeshop.domain.community.controller.CommunityAdminController;
+import com.cakeshop.domain.community.dto.view.AdminPostDetailView;
+import com.cakeshop.domain.community.dto.view.AdminPostListView;
+import com.cakeshop.domain.community.dto.view.CommentSectionView;
+import com.cakeshop.domain.community.entity.PostStatus;
+import com.cakeshop.domain.community.service.CommunityAdminService;
+import com.cakeshop.domain.community.service.CommunityService;
 import com.cakeshop.domain.coupon.controller.CouponAdminController;
 import com.cakeshop.domain.coupon.service.CouponAdminService;
 import com.cakeshop.domain.member.controller.MemberAdminController;
+import com.cakeshop.domain.member.service.MemberAdminService;
+import com.cakeshop.domain.member.service.MemberSessionService;
 import com.cakeshop.domain.notification.controller.NotificationAdminController;
 import com.cakeshop.domain.order.controller.FulfillmentAdminController;
 import com.cakeshop.domain.order.controller.OrderAdminController;
 import com.cakeshop.domain.payment.controller.PaymentAdminController;
-import com.cakeshop.domain.product.admin.controller.ProductAdminController;
+import com.cakeshop.domain.product.controller.ProductAdminController;
 import com.cakeshop.domain.review.controller.ReviewAdminController;
 import com.cakeshop.domain.statistics.controller.StatisticsAdminController;
 
@@ -36,11 +53,52 @@ class AdminPageControllerTests {
 
     @BeforeEach
     void setUp() {
+
+        CouponAdminService couponAdminService =
+                Mockito.mock(CouponAdminService.class);
+
+        // 관리자 공통 페이지 테스트에서 목록 컨트롤러가 페이징 값을 계산할 수 있도록 빈 결과를 반환한다.
+        when(couponAdminService.getCoupons(
+                any(CouponSearchCondition.class),
+                any(PageRequest.class)
+        )).thenReturn(new PageResult<CouponView>(
+                List.of(),
+                new PageRequest(null, null),
+                0
+        ));
+
+        // 커뮤니티 관리 화면은 조각 5에서 목업을 걷어내고 실제 데이터를 그린다.
+        // 이 테스트는 "주소가 그 템플릿을 가리키는가"만 보므로 빈 결과로 충분하다.
+        CommunityAdminService communityAdminService =
+                Mockito.mock(CommunityAdminService.class);
+        CommunityService communityService = Mockito.mock(CommunityService.class);
+
+        when(communityAdminService.getPosts(any(), any(), any(PageRequest.class)))
+                .thenReturn(new PageResult<AdminPostListView>(
+                        List.of(), new PageRequest(null, null), 0));
+        when(communityAdminService.getPostDetail(anyLong()))
+                .thenReturn(new AdminPostDetailView(
+                        15L, 1L, "후기", "제목", "본문", "작성자", false,
+                        PostStatus.PUBLISHED, null, null, null, 0, 0,
+                        LocalDateTime.now(), LocalDateTime.now()));
+        when(communityAdminService.getReports(anyLong())).thenReturn(List.of());
+        when(communityService.getComments(anyLong(), any()))
+                .thenReturn(new CommentSectionView(List.of(), 0, 0, 20));
+
         mockMvc = MockMvcBuilders.standaloneSetup(
-            new StatisticsAdminController(), new ProductAdminController(Mockito.mock(ProductAdminService.class)), new OrderAdminController(),
-            new FulfillmentAdminController(), new PaymentAdminController(),
-            new MemberAdminController(), new ReviewAdminController(), new NotificationAdminController(),
-            new CommunityAdminController(), new CouponAdminController(Mockito.mock(CouponAdminService.class))
+                new StatisticsAdminController(),
+                new ProductAdminController(
+                        Mockito.mock(ProductAdminService.class)),
+                new OrderAdminController(),
+                new FulfillmentAdminController(),
+                new PaymentAdminController(),
+                new MemberAdminController(
+                        Mockito.mock(MemberAdminService.class),
+                        Mockito.mock(MemberSessionService.class)),
+                new ReviewAdminController(),
+                new NotificationAdminController(),
+                new CommunityAdminController(communityAdminService, communityService),
+                new CouponAdminController(couponAdminService)
         ).build();
 
         pages.put("/admin", "admin/dashboard");

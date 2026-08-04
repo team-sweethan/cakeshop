@@ -27,7 +27,6 @@ public class Product {
     private ProductType productType; // enum
 
     private Integer preparationDays;
-    private Integer cancellationLimitDays;
 
     private ProductStatus status; // enum
 

@@ -15,8 +15,7 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * Flyway 실패 중 조치 방법이 정해져 있는 것만 안내 메시지로 바꿔 다시 던진다.
- *
- * <p>원인을 아는 오류만 감싸고 나머지는 원본 예외를 그대로 돌려준다.
+ * 원인을 아는 오류만 감싸고 나머지는 원본 예외를 그대로 돌려준다.
  * 실제 SQL 오류를 엉뚱한 조언으로 덮지 않기 위해서다.
  */
 @Configuration
@@ -28,9 +27,7 @@ public class FlywayConfig {
 
     /**
      * 이력 테이블과 db/migration 의 내용이 어긋났다.
-     *
-     * <p>migration 스크립트 실행 자체가 실패한 경우({@code FAILED_*})는 넣지 않는다.
-     * 조치가 다르다.
+     * migration 스크립트 실행 자체가 실패한 경우(FAILED_*)는 조치가 달라서 넣지 않는다.
      */
     private static final Set<ErrorCode> HISTORY_MISMATCH = Set.of(
             CoreErrorCode.CHECKSUM_MISMATCH,
@@ -107,7 +104,8 @@ public class FlywayConfig {
     }
 
     /**
-     * @param validationDetails validate 실패의 세부 error code. 필요할 때만 조회한다.
+     * 아는 원인이면 안내를 붙여 감싸고, 아니면 원본 예외를 그대로 돌려준다.
+     * validationDetails 는 validate 실패의 세부 error code 이며 필요할 때만 조회한다.
      */
     static RuntimeException translate(FlywayException cause, Supplier<Set<ErrorCode>> validationDetails) {
         ErrorCode errorCode = cause.getErrorCode();

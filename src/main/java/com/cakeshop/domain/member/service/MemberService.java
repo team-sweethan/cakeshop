@@ -4,6 +4,8 @@ import com.cakeshop.domain.member.dto.form.ProfileUpdateForm;
 import com.cakeshop.domain.member.dto.form.SignupForm;
 import com.cakeshop.domain.member.dto.view.EmailRecoveryResult;
 import com.cakeshop.domain.member.dto.view.MemberProfileView;
+import com.cakeshop.domain.member.dto.view.PasswordRecoveryTarget;
+import com.cakeshop.domain.member.dto.view.PasswordResetResult;
 import com.cakeshop.domain.member.dto.view.RecoveredEmailView;
 import com.cakeshop.domain.member.entity.Member;
 import com.cakeshop.domain.member.entity.MemberStatus;
@@ -12,6 +14,7 @@ import com.cakeshop.domain.member.mapper.MemberMapper;
 import com.cakeshop.global.error.BusinessException;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.IntStream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -68,6 +71,38 @@ public class MemberService {
         return new EmailRecoveryResult(emails, views);
     }
 
+    @Transactional(readOnly = true)
+    public Optional<PasswordRecoveryTarget> findPasswordRecoveryMember(
+            String email,
+            String name,
+            LocalDate birthDate,
+            String phone) {
+        return memberMapper.findPasswordRecoveryMember(
+                        email.trim(),
+                        name.trim(),
+                        birthDate,
+                        phone.replace("-", ""))
+                .map(member -> new PasswordRecoveryTarget(member.getId(), member.getEmail()));
+    }
+
+    @Transactional
+    public PasswordResetResult resetPassword(Long memberId, String newPassword) {
+        Optional<String> currentPassword =
+                memberMapper.findActivePasswordForUpdate(memberId);
+        if (currentPassword.isEmpty()) {
+            return PasswordResetResult.UNAVAILABLE;
+        }
+        if (passwordEncoder.matches(newPassword, currentPassword.get())) {
+            return PasswordResetResult.SAME_AS_CURRENT;
+        }
+
+        String encodedPassword = passwordEncoder.encode(newPassword);
+        if (memberMapper.updatePasswordForActiveMember(memberId, encodedPassword) != 1) {
+            return PasswordResetResult.UNAVAILABLE;
+        }
+        return PasswordResetResult.SUCCESS;
+    }
+
     @Transactional
     public void updateMemberInfo(String email, ProfileUpdateForm form) {
         Member member = memberMapper.findByEmail(email)
@@ -108,9 +143,13 @@ public class MemberService {
     }
 
     @Transactional
-    public void withdraw(String email) {
+    public void withdraw(String email, String currentPassword) {
         Member member = memberMapper.findByEmail(email)
                 .orElseThrow(() -> new BusinessException(MemberErrorCode.NOT_FOUND));
+        if (member.getPassword() == null
+                || !passwordEncoder.matches(currentPassword, member.getPassword())) {
+            throw new BusinessException(MemberErrorCode.INVALID_CURRENT_PASSWORD);
+        }
         if (member.getStatus() == null
                 || !member.getStatus().canTransitionTo(MemberStatus.WITHDRAWN)) {
             throw new BusinessException(MemberErrorCode.INVALID_STATUS_TRANSITION);

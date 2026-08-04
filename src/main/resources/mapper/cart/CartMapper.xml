@@ -2,4 +2,173 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.cakeshop.domain.cart.mapper.CartMapper">
     <!-- 사용자 입력은 #{} 만 사용 (${} 금지) -->
+
+    <select id="findCartIdByMemberId" resultType="long">
+        SELECT id
+        FROM carts
+        WHERE member_id = #{memberId}
+    </select>
+
+    <insert id="insertCartIfAbsent">
+        INSERT IGNORE INTO carts (member_id)
+        VALUES (#{memberId})
+    </insert>
+
+    <select id="findCartIdByMemberIdForUpdate" resultType="long">
+        SELECT id
+        FROM carts
+        WHERE member_id = #{memberId}
+        FOR UPDATE
+    </select>
+
+    <sql id="itemColumns">
+        ci.id,
+        ci.cart_id,
+        ci.product_id,
+        ci.quantity,
+        ci.requirements,
+        ci.created_at,
+        ci.updated_at
+    </sql>
+
+    <select id="findItemsByMemberId"
+            resultType="com.cakeshop.domain.cart.entity.CartItem">
+        SELECT <include refid="itemColumns"/>
+        FROM cart_items ci
+        INNER JOIN carts c ON c.id = ci.cart_id
+        WHERE c.member_id = #{memberId}
+        ORDER BY ci.created_at DESC, ci.id DESC
+    </select>
+
+    <select id="sumQuantityByMemberId" resultType="int">
+        SELECT COALESCE(SUM(ci.quantity), 0)
+        FROM cart_items ci
+        INNER JOIN carts c ON c.id = ci.cart_id
+        WHERE c.member_id = #{memberId}
+    </select>
+
+    <select id="findItemByMemberIdAndItemId"
+            resultType="com.cakeshop.domain.cart.entity.CartItem">
+        SELECT <include refid="itemColumns"/>
+        FROM cart_items ci
+        INNER JOIN carts c ON c.id = ci.cart_id
+        WHERE c.member_id = #{memberId}
+          AND ci.id = #{itemId}
+    </select>
+
+    <select id="findOptionsByCartItemIds"
+            resultType="com.cakeshop.domain.cart.entity.CartItemOption">
+        SELECT
+            id,
+            cart_item_id,
+            product_option_id,
+            option_name,
+            additional_price
+        FROM cart_item_options
+        WHERE cart_item_id IN
+        <foreach collection="itemIds" item="itemId" open="(" separator="," close=")">
+            #{itemId}
+        </foreach>
+        ORDER BY id
+    </select>
+
+    <insert id="insertItem"
+            parameterType="com.cakeshop.domain.cart.entity.CartItem"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO cart_items (
+            cart_id,
+            product_id,
+            quantity,
+            requirements
+        )
+        VALUES (
+            #{cartId},
+            #{productId},
+            #{quantity},
+            #{requirements}
+        )
+    </insert>
+
+    <insert id="insertItemOption"
+            parameterType="com.cakeshop.domain.cart.entity.CartItemOption">
+        INSERT INTO cart_item_options (
+            cart_item_id,
+            product_option_id,
+            option_name,
+            additional_price
+        )
+        VALUES (
+            #{cartItemId},
+            #{productOptionId},
+            #{optionName},
+            #{additionalPrice}
+        )
+    </insert>
+
+    <update id="updateItemQuantity">
+        UPDATE cart_items ci
+        INNER JOIN carts c ON c.id = ci.cart_id
+        SET ci.quantity = #{quantity}
+        WHERE ci.id = #{itemId}
+          AND c.member_id = #{memberId}
+    </update>
+
+    <delete id="deleteOptionsByMemberIdAndItemIds">
+        DELETE cio
+        FROM cart_item_options cio
+        INNER JOIN cart_items ci ON ci.id = cio.cart_item_id
+        INNER JOIN carts c ON c.id = ci.cart_id
+        WHERE c.member_id = #{memberId}
+          AND ci.id IN
+        <foreach collection="itemIds" item="itemId" open="(" separator="," close=")">
+            #{itemId}
+        </foreach>
+    </delete>
+
+    <delete id="deleteImagesByMemberIdAndItemIds">
+        DELETE cii
+        FROM cart_item_images cii
+        INNER JOIN cart_items ci ON ci.id = cii.cart_item_id
+        INNER JOIN carts c ON c.id = ci.cart_id
+        WHERE c.member_id = #{memberId}
+          AND ci.id IN
+        <foreach collection="itemIds" item="itemId" open="(" separator="," close=")">
+            #{itemId}
+        </foreach>
+    </delete>
+
+    <delete id="deleteItemsByMemberIdAndItemIds">
+        DELETE ci
+        FROM cart_items ci
+        INNER JOIN carts c ON c.id = ci.cart_id
+        WHERE c.member_id = #{memberId}
+          AND ci.id IN
+        <foreach collection="itemIds" item="itemId" open="(" separator="," close=")">
+            #{itemId}
+        </foreach>
+    </delete>
+
+    <delete id="deleteAllOptionsByMemberId">
+        DELETE cio
+        FROM cart_item_options cio
+        INNER JOIN cart_items ci ON ci.id = cio.cart_item_id
+        INNER JOIN carts c ON c.id = ci.cart_id
+        WHERE c.member_id = #{memberId}
+    </delete>
+
+    <delete id="deleteAllImagesByMemberId">
+        DELETE cii
+        FROM cart_item_images cii
+        INNER JOIN cart_items ci ON ci.id = cii.cart_item_id
+        INNER JOIN carts c ON c.id = ci.cart_id
+        WHERE c.member_id = #{memberId}
+    </delete>
+
+    <delete id="deleteAllItemsByMemberId">
+        DELETE ci
+        FROM cart_items ci
+        INNER JOIN carts c ON c.id = ci.cart_id
+        WHERE c.member_id = #{memberId}
+    </delete>
 </mapper>

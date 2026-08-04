@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.math.BigDecimal;
 import java.util.List;
 
-import com.cakeshop.domain.product.admin.dto.view.ProductOptionAdminRow;
-import com.cakeshop.domain.product.customer.dto.view.ProductOptionRow;
+import com.cakeshop.domain.product.dto.view.ProductOptionAdminRow;
+import com.cakeshop.domain.product.dto.view.ProductOptionRow;
 import com.cakeshop.domain.product.entity.ProductOption;
 import com.cakeshop.domain.product.entity.ProductOptionGroup;
 import com.cakeshop.domain.product.entity.ProductOptionSelectionType;
@@ -68,10 +68,9 @@ class ProductOptionMapperTests {
                     stock_quantity,
                     product_type,
                     preparation_days,
-                    cancellation_limit_days,
                     status
                 )
-                VALUES (?, ?, 35000, 10, 'GENERAL', 0, 0, 'ACTIVE')
+                VALUES (?, ?, 35000, 10, 'GENERAL', 0, 'ACTIVE')
                 """,
                 categoryId,
                 "옵션 테스트 상품 " + suffix
@@ -131,6 +130,102 @@ class ProductOptionMapperTests {
                 .isEqualTo(ProductOptionStatus.INACTIVE);
         assertThat(rows.get(2).groupStatus())
                 .isEqualTo(ProductOptionStatus.INACTIVE);
+    }
+
+    @Test
+    void findAdminOptionRowsByGroupIdForUpdate_targetGroup_returnsAllOptions() {
+        long targetGroupId = insertGroup(
+                "크기",
+                ProductOptionStatus.ACTIVE,
+                1
+        );
+        long otherGroupId = insertGroup(
+                "맛",
+                ProductOptionStatus.ACTIVE,
+                2
+        );
+
+        insertOption(
+                targetGroupId,
+                "2호",
+                ProductOptionStatus.INACTIVE,
+                2
+        );
+        insertOption(
+                targetGroupId,
+                "1호",
+                ProductOptionStatus.ACTIVE,
+                1
+        );
+        insertOption(
+                otherGroupId,
+                "초코",
+                ProductOptionStatus.ACTIVE,
+                1
+        );
+
+        List<ProductOptionAdminRow> rows =
+                productMapper
+                        .findAdminOptionRowsByGroupIdForUpdate(
+                                productId,
+                                targetGroupId
+                        );
+
+        assertThat(rows)
+                .extracting(ProductOptionAdminRow::groupId)
+                .containsOnly(targetGroupId);
+        assertThat(rows)
+                .extracting(ProductOptionAdminRow::optionName)
+                .containsExactly("1호", "2호");
+        assertThat(rows)
+                .extracting(ProductOptionAdminRow::optionStatus)
+                .containsExactly(
+                        ProductOptionStatus.ACTIVE,
+                        ProductOptionStatus.INACTIVE
+                );
+    }
+
+    @Test
+    void findAdminOptionRowsByProductIdForUpdate_returnsAllGroupsAndOptions() {
+        long requiredGroupId = insertGroup(
+                "크기",
+                ProductOptionStatus.ACTIVE,
+                1
+        );
+        long optionalGroupId = insertGroup(
+                "맛",
+                ProductOptionStatus.INACTIVE,
+                2
+        );
+
+        insertOption(
+                requiredGroupId,
+                "1호",
+                ProductOptionStatus.ACTIVE,
+                1
+        );
+        insertOption(
+                optionalGroupId,
+                "초코",
+                ProductOptionStatus.INACTIVE,
+                1
+        );
+
+        List<ProductOptionAdminRow> rows =
+                productMapper
+                        .findAdminOptionRowsByProductIdForUpdate(
+                                productId
+                        );
+
+        assertThat(rows)
+                .extracting(ProductOptionAdminRow::groupId)
+                .containsExactly(
+                        requiredGroupId,
+                        optionalGroupId
+                );
+        assertThat(rows)
+                .extracting(ProductOptionAdminRow::optionName)
+                .containsExactly("1호", "초코");
     }
 
     @Test

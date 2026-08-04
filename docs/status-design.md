@@ -24,7 +24,7 @@
 - **저장값은 영문 enum 이름 하나로 통일.** 한글·숫자·코드값으로 저장하지 않는다.
 - **한글은 화면에서만.** 저장값과 라벨을 섞으면 세 표현이 서로 어긋난다(drift). 라벨 매핑은 enum이나 view가 소유한다.
 - **전이는 service에서.** DB는 값 집합만, 상태 머신은 Java가 소유한다.
-- `OrderStatus`(11개 + 전이)·`PaymentStatus`(6개)가 **이미 이 형태의 모범답안**이다. 나머지 담당자는 이 두 enum을 그대로 복제해서 자기 도메인에 적용한다.
+- `OrderStatus`(7개 + 전이)·`PaymentStatus`(6개)가 **이미 이 형태의 모범답안**이다. 나머지 담당자는 이 두 enum을 그대로 복제해서 자기 도메인에 적용한다.
 
 ### DB 컬럼 작성 규칙 (전원 합의)
 
@@ -46,8 +46,8 @@
 | `payment_cancellations.status` | 주환 | 취소 요청 | `REQUESTED / DONE / REJECTED` ? | ☐ 열림 |
 | `coupons.status` | 정후 | 발급 중 | `ACTIVE / INACTIVE / ENDED` ? | ☐ 열림 |
 | `member_coupons.status` | 정후 | 사용 가능 / 사용 완료 | `ISSUED / USED / EXPIRED` | 거의 확정 |
-| `posts.status` | 현규 | 정상 / 제재 | `ACTIVE / DELETED / BLOCKED` | 거의 확정 |
-| `comments.status` | 현규 | (표기 없음) | `ACTIVE / DELETED` ? | ☐ 열림 |
+| `posts.status` | 현규 | 정상 / 제재 | **`PostStatus` `PUBLISHED / DELETED / BLOCKED` (확정)** | ✅ 코드 확정 |
+| `comments.status` | 현규 | (표기 없음) | **`CommentStatus` `PUBLISHED / DELETED` (확정)** | ✅ 코드 확정 |
 | `post_reports.status` | 현규 | (신고 처리) | `PENDING / ACCEPTED / REJECTED` | 거의 확정 |
 | `reviews.status` | 현규 | 숨김 | `VISIBLE / HIDDEN` ? | ☐ 열림 |
 | `chat_rooms.status` | 민정 | 상담가능 / 상담중 / 미답변 | `OPEN / CLOSED` ? (아래 함정 참고) | ☐ 열림 |
@@ -60,6 +60,19 @@
 - 비활성 그룹과 옵션은 관리자 화면에 남겨 재활성화할 수 있다.
 - 고객 화면에는 그룹과 옵션이 모두 `ACTIVE`인 경우만 노출한다.
 - 장바구니·주문이 참조할 수 있는 옵션 행의 식별자는 삭제하지 않는다.
+- `GENERAL`과 `CUSTOM` 상품 모두 필수 옵션 그룹을 사용할 수 있다.
+- 옵션별 재고는 관리하지 않는다. `GENERAL` 상품의 주문 가능 수량과
+  차감·복구는 `products.stock_quantity`만을 기준으로 처리한다.
+- 옵션별로 독립적인 재고가 필요한 품목은 옵션이 아니라 별도 상품으로
+  등록한다.
+- 판매 중지 상품은 옵션을 준비할 수 있도록 필수 옵션 그룹의 활성 옵션이
+  없어도 허용한다.
+- 판매 시작 시 활성 상태인 필수 옵션 그룹마다 활성 옵션이 하나 이상인지
+  최종 검증한다.
+- 판매 중인 상품의 활성 필수 옵션 그룹에서는 마지막 활성 옵션을
+  비활성화할 수 없고, 필수 옵션 그룹 자체도 비활성화할 수 없다.
+- 선택 옵션 그룹은 활성 옵션이 없어도 허용하며, 고객 화면에는 노출하지
+  않는다.
 
 ### 이미 확정된 두 enum
 
@@ -144,7 +157,7 @@ READY / DONE / CANCELED / PARTIAL_CANCELED / ABORTED / EXPIRED
 |---|---|
 | 주환 | `payment_cancellations.status` 값 확정 |
 | 정후 | `coupons.status`(캠페인 상태) 값 확정 |
-| 현규 | `comments.status` / `reviews.status`(숨김) 값 확정 |
+| 현규 | `reviews.status`(숨김) 값 확정 |
 | 민정 | `chat_rooms.status` 정의 + **`NotificationType` enum 값 채우기**(현재 TODO) |
 
 > ☐ 항목을 확정하면 인벤토리의 해당 행을 "확정"으로 갱신하고, enum + DDL을 함께 커밋한다.

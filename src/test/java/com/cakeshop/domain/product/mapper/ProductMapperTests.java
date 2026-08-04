@@ -6,16 +6,17 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import com.cakeshop.domain.product.admin.dto.form.AdminStockFilter;
-import com.cakeshop.domain.product.admin.dto.form.ProductAdminSearchCondition;
-import com.cakeshop.domain.product.admin.dto.form.ProductForm;
-import com.cakeshop.domain.product.admin.dto.view.ProductAdminListView;
-import com.cakeshop.domain.product.admin.dto.view.ProductCategoryOptionView;
-import com.cakeshop.domain.product.customer.dto.form.ProductSearchCondition;
-import com.cakeshop.domain.product.customer.dto.form.ProductSort;
-import com.cakeshop.domain.product.customer.dto.form.StockFilter;
-import com.cakeshop.domain.product.customer.dto.view.ProductListView;
+import com.cakeshop.domain.product.dto.form.AdminStockFilter;
+import com.cakeshop.domain.product.dto.form.ProductAdminSearchCondition;
+import com.cakeshop.domain.product.dto.form.ProductForm;
+import com.cakeshop.domain.product.dto.view.ProductAdminListView;
+import com.cakeshop.domain.product.dto.view.ProductCategoryOptionView;
+import com.cakeshop.domain.product.dto.form.ProductSearchCondition;
+import com.cakeshop.domain.product.dto.form.ProductSort;
+import com.cakeshop.domain.product.dto.form.StockFilter;
+import com.cakeshop.domain.product.dto.view.ProductListView;
 import com.cakeshop.domain.product.entity.Product;
+import com.cakeshop.domain.product.entity.ProductImage;
 import com.cakeshop.domain.product.entity.ProductStatus;
 import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
@@ -71,7 +72,7 @@ class ProductMapperTests {
         );
 
         insertProduct(
-                "A 당일 재고 상품",
+                "A 일반 재고 상품",
                 10_000,
                 10,
                 ProductType.GENERAL,
@@ -86,7 +87,7 @@ class ProductMapperTests {
                 20_000,
                 0,
                 ProductType.GENERAL,
-                2,
+                0,
                 "ACTIVE",
                 "4.00",
                 1,
@@ -119,7 +120,7 @@ class ProductMapperTests {
                 100_000,
                 1,
                 ProductType.GENERAL,
-                3,
+                0,
                 "ACTIVE",
                 "3.00",
                 0,
@@ -140,7 +141,7 @@ class ProductMapperTests {
         optionProductId = jdbcTemplate.queryForObject(
                 "SELECT id FROM products WHERE name = ?",
                 Long.class,
-                keyword + " A 당일 재고 상품"
+                keyword + " A 일반 재고 상품"
         );
 
         jdbcTemplate.update(
@@ -215,7 +216,7 @@ class ProductMapperTests {
         assertThat(firstPage)
                 .extracting(ProductListView::name)
                 .containsExactly(
-                        keyword + " A 당일 재고 상품",
+                        keyword + " A 일반 재고 상품",
                         keyword + " B 품절 상품"
                 );
 
@@ -228,14 +229,58 @@ class ProductMapperTests {
     }
 
     @Test
-    void typeStockAndSameDayFiltersCanBeCombined() {
+    void publicList_productsWithAndWithoutImages_returnsRepresentativeOrNull() {
+        jdbcTemplate.update(
+                """
+                INSERT INTO product_images (
+                    product_id,
+                    image_url,
+                    sort_order
+                )
+                VALUES
+                    (?, '/uploads/product/later.jpg', 2),
+                    (?, '/uploads/product/representative.jpg', 1)
+                """,
+                optionProductId,
+                optionProductId
+        );
+
+        ProductSearchCondition condition = baseCondition();
+        condition.setMaxPrice(BigDecimal.valueOf(200_000));
+
+        List<ProductListView> products =
+                productMapper.findPublicProducts(
+                        condition,
+                        10,
+                        0
+                );
+
+        ProductListView productWithImages = products.stream()
+                .filter(product -> product.id() == optionProductId)
+                .findFirst()
+                .orElseThrow();
+        ProductListView productWithoutImages = products.stream()
+                .filter(product -> product.name().equals(
+                        keyword + " B 품절 상품"
+                ))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(productWithImages.thumbnailUrl())
+                .isEqualTo(
+                        "/uploads/product/representative.jpg"
+                );
+        assertThat(productWithoutImages.thumbnailUrl()).isNull();
+    }
+
+    @Test
+    void typeAndStockFiltersCanBeCombined() {
         ProductSearchCondition condition =
                 baseCondition();
 
         condition.setMaxPrice(BigDecimal.valueOf(200_000));
         condition.setType(ProductType.GENERAL);
         condition.setStock(StockFilter.AVAILABLE);
-        condition.setSameDay(true);
 
         List<ProductListView> products =
                 productMapper.findPublicProducts(
@@ -247,7 +292,8 @@ class ProductMapperTests {
         assertThat(products)
                 .extracting(ProductListView::name)
                 .containsExactly(
-                        keyword + " A 당일 재고 상품"
+                        keyword + " A 일반 재고 상품",
+                        keyword + " E 최대 가격 상품"
                 );
     }
 
@@ -288,7 +334,7 @@ class ProductMapperTests {
                 .containsExactly(
                         keyword + " C 인기 주문 제작",
                         keyword + " F 10만원 초과 주문 제작",
-                        keyword + " A 당일 재고 상품",
+                        keyword + " A 일반 재고 상품",
                         keyword + " B 품절 상품",
                         keyword + " E 최대 가격 상품"
                 );
@@ -311,6 +357,13 @@ class ProductMapperTests {
 
         assertThat(product).isNotNull();
         assertThat(product.getId()).isEqualTo(productId);
+        assertThat(product.getName())
+                .isEqualTo(
+                        keyword + " D 판매 중지 상품"
+                );
+        assertThat(product.getProductType())
+                .isEqualTo(ProductType.GENERAL);
+        assertThat(product.getPreparationDays()).isZero();
         assertThat(product.getBasePrice())
                 .isEqualByComparingTo("40000");
         assertThat(product.getStockQuantity()).isEqualTo(5);
@@ -327,11 +380,437 @@ class ProductMapperTests {
     }
 
     @Test
+    void findSalesInfoByIdForUpdate_existingProduct_returnsLockedSalesInfo() {
+        Long productId = jdbcTemplate.queryForObject(
+                """
+                SELECT id
+                FROM products
+                WHERE name = ?
+                """,
+                Long.class,
+                keyword + " A 일반 재고 상품"
+        );
+
+        Product product =
+                productMapper.findSalesInfoByIdForUpdate(
+                        productId
+                );
+
+        assertThat(product).isNotNull();
+        assertThat(product.getId()).isEqualTo(productId);
+        assertThat(product.getProductType())
+                .isEqualTo(ProductType.GENERAL);
+        assertThat(product.getStockQuantity()).isEqualTo(10);
+        assertThat(product.getStatus())
+                .isEqualTo(ProductStatus.ACTIVE);
+    }
+
+    @Test
+    void decreaseStockIfAvailable_requestsExceedStock_neverMakesStockNegative() {
+        Long productId = jdbcTemplate.queryForObject(
+                """
+                SELECT id
+                FROM products
+                WHERE name = ?
+                """,
+                Long.class,
+                keyword + " A 일반 재고 상품"
+        );
+
+        int firstUpdate =
+                productMapper.decreaseStockIfAvailable(
+                        productId,
+                        7
+                );
+        int secondUpdate =
+                productMapper.decreaseStockIfAvailable(
+                        productId,
+                        7
+                );
+
+        assertThat(firstUpdate).isEqualTo(1);
+        assertThat(secondUpdate).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                """
+                SELECT stock_quantity
+                FROM products
+                WHERE id = ?
+                """,
+                Integer.class,
+                productId
+        )).isEqualTo(3);
+    }
+
+    @Test
+    void decreaseStockIfAvailable_customProduct_doesNotChangeStock() {
+        Long productId = jdbcTemplate.queryForObject(
+                """
+                SELECT id
+                FROM products
+                WHERE name = ?
+                """,
+                Long.class,
+                keyword + " C 인기 주문 제작"
+        );
+
+        int updatedRows =
+                productMapper.decreaseStockIfAvailable(
+                        productId,
+                        1
+                );
+
+        assertThat(updatedRows).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                """
+                SELECT stock_quantity
+                FROM products
+                WHERE id = ?
+                """,
+                Integer.class,
+                productId
+        )).isNull();
+    }
+
+    @Test
+    void restoreLimitedStock_inactiveGeneralProduct_restoresStock() {
+        Long productId = jdbcTemplate.queryForObject(
+                """
+                SELECT id
+                FROM products
+                WHERE name = ?
+                """,
+                Long.class,
+                keyword + " D 판매 중지 상품"
+        );
+
+        int updatedRows =
+                productMapper.restoreLimitedStock(
+                        productId,
+                        3
+                );
+
+        assertThat(updatedRows).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                """
+                SELECT stock_quantity
+                FROM products
+                WHERE id = ?
+                """,
+                Integer.class,
+                productId
+        )).isEqualTo(8);
+    }
+
+    @Test
+    void restoreLimitedStock_productChangedToCustom_restoresPreviouslyDeductedStock() {
+        Long productId = jdbcTemplate.queryForObject(
+                """
+                SELECT id
+                FROM products
+                WHERE name = ?
+                """,
+                Long.class,
+                keyword + " D 판매 중지 상품"
+        );
+        jdbcTemplate.update(
+                """
+                UPDATE products
+                SET product_type = 'CUSTOM',
+                    preparation_days = 1
+                WHERE id = ?
+                """,
+                productId
+        );
+
+        int updatedRows =
+                productMapper.restoreLimitedStock(
+                        productId,
+                        3
+                );
+
+        assertThat(updatedRows).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                """
+                SELECT stock_quantity
+                FROM products
+                WHERE id = ?
+                """,
+                Integer.class,
+                productId
+        )).isEqualTo(8);
+    }
+
+    @Test
+    void restoreLimitedStock_stockChangedToUnlimited_doesNotInventFiniteStock() {
+        Long productId = jdbcTemplate.queryForObject(
+                """
+                SELECT id
+                FROM products
+                WHERE name = ?
+                """,
+                Long.class,
+                keyword + " D 판매 중지 상품"
+        );
+        jdbcTemplate.update(
+                """
+                UPDATE products
+                SET stock_quantity = NULL
+                WHERE id = ?
+                """,
+                productId
+        );
+
+        int updatedRows =
+                productMapper.restoreLimitedStock(
+                        productId,
+                        3
+                );
+
+        assertThat(updatedRows).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                """
+                SELECT stock_quantity
+                FROM products
+                WHERE id = ?
+                """,
+                Integer.class,
+                productId
+        )).isNull();
+    }
+
+    @Test
     void detailOptionsIncludeOnlyActiveOptionsInOrder() {
         assertThat(productMapper
                 .findPublicOptionRowsByProductId(optionProductId))
                 .extracting(row -> row.optionName())
                 .containsExactly("1호", "2호");
+    }
+
+    @Test
+    void findProductImagesByProductId_imagesExist_returnsStableDisplayOrder() {
+        jdbcTemplate.update(
+                """
+                INSERT INTO product_images (
+                    product_id,
+                    image_url,
+                    sort_order
+                )
+                VALUES
+                    (?, '/uploads/product/second.jpg', 2),
+                    (?, '/uploads/product/first-b.jpg', 1),
+                    (?, '/uploads/product/first-a.jpg', 1)
+                """,
+                optionProductId,
+                optionProductId,
+                optionProductId
+        );
+
+        List<ProductImage> images =
+                productMapper.findProductImagesByProductId(
+                        optionProductId
+                );
+
+        assertThat(images)
+                .extracting(ProductImage::getImageUrl)
+                .containsExactly(
+                        "/uploads/product/first-b.jpg",
+                        "/uploads/product/first-a.jpg",
+                        "/uploads/product/second.jpg"
+                );
+        assertThat(images)
+                .extracting(ProductImage::getProductId)
+                .containsOnly(optionProductId);
+    }
+
+    @Test
+    void findProductImagesByProductId_imagesMissing_returnsEmptyList() {
+        assertThat(productMapper.findProductImagesByProductId(
+                optionProductId
+        )).isEmpty();
+    }
+
+    @Test
+    void findProductImageById_matchingProduct_returnsImage() {
+        long imageId = insertProductImage(
+                "/uploads/product/find-image.jpg",
+                1
+        );
+
+        ProductImage image = productMapper.findProductImageById(
+                optionProductId,
+                imageId
+        );
+
+        assertThat(image).isNotNull();
+        assertThat(image.getId()).isEqualTo(imageId);
+        assertThat(image.getProductId()).isEqualTo(optionProductId);
+        assertThat(image.getImageUrl())
+                .isEqualTo("/uploads/product/find-image.jpg");
+        assertThat(image.getSortOrder()).isEqualTo(1);
+    }
+
+    @Test
+    void findProductImageById_differentProduct_returnsNull() {
+        long imageId = insertProductImage(
+                "/uploads/product/owned-image.jpg",
+                0
+        );
+
+        ProductImage image = productMapper.findProductImageById(
+                optionProductId + 1,
+                imageId
+        );
+
+        assertThat(image).isNull();
+    }
+
+    @Test
+    void productImageSummary_imagesMissing_returnsZeroValues() {
+        assertThat(productMapper.countProductImagesByProductId(
+                optionProductId
+        )).isZero();
+        assertThat(productMapper.findNextProductImageSortOrder(
+                optionProductId
+        )).isZero();
+    }
+
+    @Test
+    void insertProductImage_existingImages_assignsIdAndNextDisplayOrder() {
+        jdbcTemplate.update(
+                """
+                INSERT INTO product_images (
+                    product_id,
+                    image_url,
+                    sort_order
+                )
+                VALUES
+                    (?, '/uploads/product/first.jpg', 0),
+                    (?, '/uploads/product/third.jpg', 2)
+                """,
+                optionProductId,
+                optionProductId
+        );
+
+        ProductImage image = new ProductImage();
+        image.setProductId(optionProductId);
+        image.setImageUrl("/uploads/product/fourth.jpg");
+        image.setSortOrder(
+                productMapper.findNextProductImageSortOrder(
+                        optionProductId
+                )
+        );
+
+        int insertedRows = productMapper.insertProductImage(image);
+
+        assertThat(insertedRows).isEqualTo(1);
+        assertThat(image.getId()).isPositive();
+        assertThat(image.getSortOrder()).isEqualTo(3);
+        assertThat(productMapper.countProductImagesByProductId(
+                optionProductId
+        )).isEqualTo(3);
+        assertThat(productMapper.findProductImagesByProductId(
+                optionProductId
+        )).extracting(ProductImage::getImageUrl)
+                .containsExactly(
+                        "/uploads/product/first.jpg",
+                        "/uploads/product/third.jpg",
+                        "/uploads/product/fourth.jpg"
+                );
+    }
+
+    @Test
+    void updateProductImageUrl_matchingProduct_updatesUrlOnly() {
+        long imageId = insertProductImage(
+                "/uploads/product/before.jpg",
+                2
+        );
+
+        int updatedRows = productMapper.updateProductImageUrl(
+                optionProductId,
+                imageId,
+                "/uploads/product/after.png"
+        );
+
+        ProductImage updatedImage =
+                productMapper.findProductImageById(
+                        optionProductId,
+                        imageId
+                );
+        assertThat(updatedRows).isEqualTo(1);
+        assertThat(updatedImage).isNotNull();
+        assertThat(updatedImage.getImageUrl())
+                .isEqualTo("/uploads/product/after.png");
+        assertThat(updatedImage.getProductId())
+                .isEqualTo(optionProductId);
+        assertThat(updatedImage.getSortOrder()).isEqualTo(2);
+    }
+
+    @Test
+    void updateProductImageUrl_differentProduct_keepsOriginalUrl() {
+        long imageId = insertProductImage(
+                "/uploads/product/original.jpg",
+                0
+        );
+
+        int updatedRows = productMapper.updateProductImageUrl(
+                optionProductId + 1,
+                imageId,
+                "/uploads/product/not-applied.png"
+        );
+
+        assertThat(updatedRows).isZero();
+        assertThat(productMapper.findProductImageById(
+                optionProductId,
+                imageId
+        ).getImageUrl()).isEqualTo(
+                "/uploads/product/original.jpg"
+        );
+    }
+
+    @Test
+    void deleteProductImage_matchingProduct_deletesOnlyTargetImage() {
+        long targetImageId = insertProductImage(
+                "/uploads/product/delete-target.jpg",
+                0
+        );
+        long remainingImageId = insertProductImage(
+                "/uploads/product/remain.jpg",
+                1
+        );
+
+        int deletedRows = productMapper.deleteProductImage(
+                optionProductId,
+                targetImageId
+        );
+
+        assertThat(deletedRows).isEqualTo(1);
+        assertThat(productMapper.findProductImageById(
+                optionProductId,
+                targetImageId
+        )).isNull();
+        assertThat(productMapper.findProductImageById(
+                optionProductId,
+                remainingImageId
+        )).isNotNull();
+    }
+
+    @Test
+    void deleteProductImage_differentProduct_keepsImage() {
+        long imageId = insertProductImage(
+                "/uploads/product/keep-image.jpg",
+                0
+        );
+
+        int deletedRows = productMapper.deleteProductImage(
+                optionProductId + 1,
+                imageId
+        );
+
+        assertThat(deletedRows).isZero();
+        assertThat(productMapper.findProductImageById(
+                optionProductId,
+                imageId
+        )).isNotNull();
     }
 
     private ProductSearchCondition baseCondition() {
@@ -341,6 +820,21 @@ class ProductMapperTests {
         condition.setKeyword(keyword);
 
         return condition;
+    }
+
+    private long insertProductImage(
+            String imageUrl,
+            int sortOrder
+    ) {
+        ProductImage image = new ProductImage();
+        image.setProductId(optionProductId);
+        image.setImageUrl(imageUrl);
+        image.setSortOrder(sortOrder);
+
+        assertThat(productMapper.insertProductImage(image))
+                .isEqualTo(1);
+
+        return image.getId();
     }
 
     private void insertProduct(
@@ -364,13 +858,12 @@ class ProductMapperTests {
                     stock_quantity,
                     product_type,
                     preparation_days,
-                    cancellation_limit_days,
                     status,
                     average_rating,
                     review_count,
                     created_at
                 )
-                VALUES (?, ?, '', ?, ?, ?, ?, 0, ?, ?, ?, ?)
+                VALUES (?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 categoryId,
                 keyword + " " + name,
@@ -421,7 +914,7 @@ class ProductMapperTests {
                         keyword + " D 판매 중지 상품",
                         keyword + " C 인기 주문 제작",
                         keyword + " B 품절 상품",
-                        keyword + " A 당일 재고 상품"
+                        keyword + " A 일반 재고 상품"
                 );
 
         assertThat(testProducts)
@@ -589,8 +1082,7 @@ class ProductMapperTests {
         );
         product.setStockQuantity(10);
         product.setProductType(ProductType.GENERAL);
-        product.setPreparationDays(2);
-        product.setCancellationLimitDays(1);
+        product.setPreparationDays(0);
         product.setStatus(ProductStatus.INACTIVE);
 
         int insertedRows =
@@ -625,7 +1117,7 @@ class ProductMapperTests {
                 .isEqualTo(categoryId);
         assertThat(form.getName())
                 .isEqualTo(
-                        keyword + " A 당일 재고 상품"
+                        keyword + " A 일반 재고 상품"
                 );
         assertThat(form.getDescription())
                 .isEmpty();
@@ -633,16 +1125,20 @@ class ProductMapperTests {
                 .isEqualByComparingTo("10000");
         assertThat(form.getStockQuantity())
                 .isEqualTo(10);
+        assertThat(form.getOriginalStockQuantity())
+                .isEqualTo(10);
         assertThat(form.getProductType())
                 .isEqualTo(ProductType.GENERAL);
         assertThat(form.getPreparationDays())
-                .isZero();
-        assertThat(form.getCancellationLimitDays())
                 .isZero();
     }
 
     @Test
     void adminCanUpdateProductWithoutChangingStatus() {
+        ProductForm originalForm =
+                productMapper.findAdminProductFormById(
+                        optionProductId
+                );
         Product product = new Product();
 
         product.setId(optionProductId);
@@ -655,7 +1151,6 @@ class ProductMapperTests {
         product.setStockQuantity(null);
         product.setProductType(ProductType.CUSTOM);
         product.setPreparationDays(3);
-        product.setCancellationLimitDays(2);
 
         LocalDateTime previousUpdatedAt =
                 LocalDateTime.of(2000, 1, 1, 0, 0);
@@ -671,7 +1166,10 @@ class ProductMapperTests {
         );
 
         int updatedRows =
-                productMapper.updateProduct(product);
+                productMapper.updateProduct(
+                        product,
+                        originalForm.getOriginalStockQuantity()
+                );
 
         ProductForm updatedForm =
                 productMapper.findAdminProductFormById(
@@ -713,12 +1211,58 @@ class ProductMapperTests {
                 .isEqualTo(ProductType.CUSTOM);
         assertThat(updatedForm.getPreparationDays())
                 .isEqualTo(3);
-        assertThat(updatedForm.getCancellationLimitDays())
-                .isEqualTo(2);
 
         // 기본 정보 수정 후에도 기존 판매 상태는 유지되어야 한다.
         assertThat(status).isEqualTo("ACTIVE");
         assertThat(actualUpdatedAt).isAfter(previousUpdatedAt);
+    }
+
+    @Test
+    void adminUpdateWithStaleStock_doesNotOverwritePaymentDeduction() {
+        ProductForm staleForm =
+                productMapper.findAdminProductFormById(
+                        optionProductId
+                );
+        int deductedRows =
+                productMapper.decreaseStockIfAvailable(
+                        optionProductId,
+                        3
+                );
+
+        Product product = new Product();
+
+        product.setId(optionProductId);
+        product.setCategoryId(staleForm.getCategoryId());
+        product.setName(staleForm.getName());
+        product.setDescription(staleForm.getDescription());
+        product.setBasePrice(staleForm.getBasePrice());
+        product.setStockQuantity(
+                staleForm.getStockQuantity()
+        );
+        product.setProductType(staleForm.getProductType());
+        product.setPreparationDays(
+                staleForm.getPreparationDays()
+        );
+
+        int updatedRows =
+                productMapper.updateProduct(
+                        product,
+                        staleForm.getOriginalStockQuantity()
+                );
+
+        Integer currentStock = jdbcTemplate.queryForObject(
+                """
+                SELECT stock_quantity
+                FROM products
+                WHERE id = ?
+                """,
+                Integer.class,
+                optionProductId
+        );
+
+        assertThat(deductedRows).isEqualTo(1);
+        assertThat(updatedRows).isZero();
+        assertThat(currentStock).isEqualTo(7);
     }
 
     @Test
@@ -739,10 +1283,12 @@ class ProductMapperTests {
         product.setStockQuantity(null);
         product.setProductType(ProductType.GENERAL);
         product.setPreparationDays(0);
-        product.setCancellationLimitDays(0);
 
         assertThat(
-                productMapper.updateProduct(product)
+                productMapper.updateProduct(
+                        product,
+                        null
+                )
         ).isZero();
     }
 }
