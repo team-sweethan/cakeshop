@@ -365,6 +365,14 @@
           AND (payment_key IS NULL OR payment_key = #{paymentKey})
     </update>
 
+    <update id="clearRecoveryPaymentKey">
+        UPDATE payments
+        SET payment_key = NULL
+        WHERE id = #{paymentId}
+          AND status = 'READY'
+          AND payment_key = #{paymentKey}
+    </update>
+
     <select id="findRequestedCompensations"
             resultType="com.cakeshop.domain.payment.entity.PaymentCancellation">
         SELECT

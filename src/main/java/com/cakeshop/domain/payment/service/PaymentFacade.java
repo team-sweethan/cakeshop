@@ -65,12 +65,14 @@ public class PaymentFacade {
         validateRequest(order, payment, form);
 
         Optional<CompensationRequest> preparedCompensation =
-                paymentRecoveryService.findPreparedCompensation(
-                        payment,
-                        form.getPaymentKey()
-                );
+                paymentRecoveryService.findPreparedCompensation(payment);
         if (preparedCompensation.isPresent()) {
-            throw cancelAndCompleteCompensation(preparedCompensation.get());
+            CompensationRequest request = preparedCompensation.get();
+            if (isNotApproved(request)) {
+                paymentRecoveryService.releaseUnapprovedCompensation(request);
+            } else {
+                throw cancelAndCompleteCompensation(request);
+            }
         }
 
         ApprovalResult approval = resolveApproval(payment, form);
@@ -186,6 +188,16 @@ public class PaymentFacade {
             return Optional.empty();
         }
         throw new BusinessException(PaymentErrorCode.TOSS_APPROVAL_FAILED);
+    }
+
+    private boolean isNotApproved(CompensationRequest request) {
+        try {
+            return tossPaymentClient.find(request.paymentKey())
+                    .map(lookup -> "READY".equals(lookup.status()))
+                    .orElse(true);
+        } catch (BusinessException lookupFailure) {
+            return false;
+        }
     }
 
     private void validateLookup(

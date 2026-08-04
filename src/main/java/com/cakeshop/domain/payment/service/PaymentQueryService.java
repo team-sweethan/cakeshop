@@ -26,6 +26,8 @@ import java.util.List;
 @Service
 public class PaymentQueryService {
 
+    private static final int TOSS_ORDER_NAME_MAX_LENGTH = 100;
+
     private final CustomerOrderQueryService orderQueryService;
     private final PaymentService paymentService;
     private final StoreService storeService;
@@ -224,10 +226,13 @@ public class PaymentQueryService {
             throw new BusinessException(CommonErrorCode.INTERNAL_ERROR);
         }
         String firstProductName = order.items().getFirst().productName();
-        if (order.items().size() == 1) {
-            return firstProductName;
+        String orderName = order.items().size() == 1
+                ? firstProductName
+                : firstProductName + " 외 " + (order.items().size() - 1) + "건";
+        if (orderName.length() <= TOSS_ORDER_NAME_MAX_LENGTH) {
+            return orderName;
         }
-        return firstProductName + " 외 " + (order.items().size() - 1) + "건";
+        return orderName.substring(0, TOSS_ORDER_NAME_MAX_LENGTH);
     }
 
     private String failureMessage(String failureCode) {

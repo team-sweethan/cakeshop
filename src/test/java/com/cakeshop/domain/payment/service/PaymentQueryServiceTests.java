@@ -90,6 +90,22 @@ class PaymentQueryServiceTests {
     }
 
     @Test
+    void getCheckout_productNameOver100Characters_truncatesOrderName() {
+        String longProductName = "가".repeat(101);
+        when(orderQueryService.getMemberOrder(10L, 1L))
+                .thenReturn(order(OrderStatus.PENDING_PAYMENT, longProductName));
+        when(paymentService.getReadyPayment(1L)).thenReturn(payment(PaymentStatus.READY, null));
+
+        PaymentCheckoutView checkout = paymentQueryService.getCheckout(
+                10L,
+                "member@example.com",
+                1L
+        );
+
+        assertThat(checkout.orderName()).hasSize(100);
+    }
+
+    @Test
     void validateSuccessCallback_completedSamePayment_acceptsCallback() {
         OrderDetailView order = order(OrderStatus.READY_FOR_PICKUP);
         Payment payment = payment(PaymentStatus.DONE, "payment-key");
@@ -138,6 +154,10 @@ class PaymentQueryServiceTests {
     }
 
     private OrderDetailView order(OrderStatus status) {
+        return order(status, "딸기 생크림 케이크");
+    }
+
+    private OrderDetailView order(OrderStatus status, String productName) {
         return new OrderDetailView(
                 1L,
                 "ORD-100",
@@ -161,7 +181,7 @@ class PaymentQueryServiceTests {
                 List.of(new OrderDetailView.Item(
                         100L,
                         1L,
-                        "딸기 생크림 케이크",
+                        productName,
                         ProductType.GENERAL,
                         1,
                         BigDecimal.valueOf(30_000),

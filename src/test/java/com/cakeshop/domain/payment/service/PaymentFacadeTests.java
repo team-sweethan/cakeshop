@@ -577,8 +577,19 @@ class PaymentFacadeTests {
         CancellationResult cancellation = cancellation();
         when(orderService.getGeneralPaymentOrder(10L, 1L)).thenReturn(order);
         when(paymentService.getReadyPayment(1L)).thenReturn(payment);
-        when(paymentRecoveryService.findPreparedCompensation(payment, "payment-key"))
+        when(paymentRecoveryService.findPreparedCompensation(payment))
                 .thenReturn(Optional.of(request));
+        when(tossPaymentClient.find(request.paymentKey())).thenReturn(Optional.of(
+                new PaymentLookupResult(
+                        request.paymentKey(),
+                        "ORD-100",
+                        "카드",
+                        "DONE",
+                        30_000L,
+                        NOW,
+                        null
+                )
+        ));
         when(tossPaymentClient.cancel(
                 request.paymentKey(),
                 request.reason(),
@@ -601,6 +612,39 @@ class PaymentFacadeTests {
                 "PAY-1"
         );
         verify(paymentRecoveryService).completeCompensation(request, cancellation);
+    }
+
+    @Test
+    void confirmGeneralPayment_unapprovedPreparedCompensation_releasesAndApprovesNewPayment() {
+        GeneralPaymentOrder order = order(NOW.plusMinutes(5));
+        Payment payment = payment();
+        payment.setPaymentKey("stale-payment-key");
+        CompensationRequest request = new CompensationRequest(
+                20L,
+                1L,
+                "stale-payment-key",
+                "COMPENSATE-20",
+                BigDecimal.valueOf(30_000),
+                "자동 취소"
+        );
+        ApprovalResult approval = approval();
+        when(orderService.getGeneralPaymentOrder(10L, 1L)).thenReturn(order);
+        when(paymentService.getReadyPayment(1L)).thenReturn(payment);
+        when(paymentRecoveryService.findPreparedCompensation(payment))
+                .thenReturn(Optional.of(request));
+        when(tossPaymentClient.find("stale-payment-key")).thenReturn(Optional.empty());
+        when(tossPaymentClient.find("payment-key")).thenReturn(Optional.empty());
+        when(tossPaymentClient.approve(
+                "payment-key",
+                "ORD-100",
+                30_000L,
+                "PAY-1"
+        )).thenReturn(approval);
+
+        paymentFacade.confirmGeneralPayment(10L, 1L, form(BigDecimal.valueOf(30_000)));
+
+        verify(paymentRecoveryService).releaseUnapprovedCompensation(request);
+        verify(paymentService).completeGeneralPayment(order, payment, approval);
     }
 
     @Test

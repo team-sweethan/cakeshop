@@ -97,6 +97,12 @@ public interface PaymentMapper {
             @Param("paymentKey") String paymentKey
     );
 
+    // 미승인 보상 요청을 해제할 때 READY 결제에 임시로 연결했던 paymentKey를 제거한다.
+    int clearRecoveryPaymentKey(
+            @Param("paymentId") long paymentId,
+            @Param("paymentKey") String paymentKey
+    );
+
     // 아직 끝나지 않은 시스템 보상 취소 요청을 오래된 순서로 조회한다.
     List<PaymentCancellation> findRequestedCompensations(
             @Param("limit") int limit

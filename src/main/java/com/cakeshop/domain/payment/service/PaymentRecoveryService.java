@@ -49,10 +49,12 @@ public class PaymentRecoveryService {
     /** 이전 confirm에서 외부 취소를 끝내지 못한 보상 요청을 찾는다. */
     @Transactional(readOnly = true)
     public Optional<CompensationRequest> findPreparedCompensation(
-            Payment payment,
-            String paymentKey
+            Payment payment
     ) {
-        CompensationRequest request = createRequest(payment, paymentKey);
+        if (payment == null || payment.getPaymentKey() == null || payment.getPaymentKey().isBlank()) {
+            return Optional.empty();
+        }
+        CompensationRequest request = createRequest(payment, payment.getPaymentKey());
         PaymentCancellation cancellation = findCompensation(request);
         if (cancellation == null) {
             return Optional.empty();
@@ -61,6 +63,25 @@ public class PaymentRecoveryService {
         return cancellation.getStatus() == PaymentCancellationStatus.REQUESTED
                 ? Optional.of(request)
                 : Optional.empty();
+    }
+
+    /** PG에 승인되지 않은 이전 보상 요청을 실패 처리하고 새 승인 시도를 허용한다. */
+    @Transactional
+    public void releaseUnapprovedCompensation(CompensationRequest request) {
+        PaymentCancellation cancellation = findCompensation(request);
+        if (cancellation == null
+                || cancellation.getStatus() != PaymentCancellationStatus.REQUESTED
+                || paymentMapper.failCancellationIfRequested(
+                        cancellation.getId(),
+                        "PAYMENT_NOT_APPROVED",
+                        "PG 승인 전 결제 요청이 종료되었습니다."
+                ) != 1
+                || paymentMapper.clearRecoveryPaymentKey(
+                        request.paymentId(),
+                        request.paymentKey()
+                ) != 1) {
+            throw new BusinessException(PaymentErrorCode.PAYMENT_RECOVERY_PENDING);
+        }
     }
 
     /** 외부 취소 전에 보상 요청을 저장한다. */
