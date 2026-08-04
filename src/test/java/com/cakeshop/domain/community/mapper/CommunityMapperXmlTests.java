@@ -1,6 +1,7 @@
 package com.cakeshop.domain.community.mapper;
 
 import com.cakeshop.domain.community.dto.view.AdminPostSort;
+import com.cakeshop.domain.community.dto.view.PostSort;
 
 import org.apache.ibatis.builder.xml.XMLMapperBuilder;
 import org.apache.ibatis.io.Resources;
@@ -100,16 +101,46 @@ class CommunityMapperXmlTests {
     }
 
     /**
-     * 목록 정렬에 id tiebreaker가 남아 있는지 확인한다.
+     * H28 — 목록의 정렬 분기가 <b>둘 다</b> id tiebreaker를 유지하는지 확인한다.
      *
-     * <p>{@code created_at}만으로 정렬하면 같은 시각에 작성된 글이 페이지 경계에서
-     * 중복되거나 누락된다(DOMAIN.md 6.1).
+     * <p>tiebreaker가 없으면 정렬 값이 같은 글이 페이지 경계에서 중복되거나 누락된다
+     * (DOMAIN.md 6.1). <b>조회수 분기에서 특히 잦다</b> — 조회수는 0이 대부분이라 동점이
+     * {@code created_at}보다 훨씬 흔하다.
+     *
+     * <p>기본 분기만 보면 새 분기가 tiebreaker 없이 들어와도 통과한다. 조각 5의 관리자
+     * 목록에서 이미 같은 자리를 겪었다(H18) — 분기가 늘 때 한쪽만 잃는 것이 이 실수의
+     * 모양이고, 잃은 쪽은 실패가 아니라 "가끔 글이 사라진다"로 나타난다.
      */
     @Test
-    void findPublishedPosts_ordersByCreatedAtWithIdTiebreaker() {
-        String sql = normalizedSql("findPublishedPosts");
+    void findPublishedPosts_everySortBranchKeepsIdTiebreaker() {
+        assertThat(normalizedSql("findPublishedPosts", Map.of("sort", PostSort.LATEST)))
+                .contains("ORDER BY P.CREATED_AT DESC, P.ID DESC");
 
-        assertThat(sql).contains("ORDER BY P.CREATED_AT DESC, P.ID DESC");
+        assertThat(normalizedSql("findPublishedPosts", Map.of("sort", PostSort.VIEWS)))
+                .contains("ORDER BY P.VIEW_COUNT DESC, P.ID DESC");
+    }
+
+    /**
+     * 정렬이 문자열 연결이 아니라 {@code <choose>} 분기로 갈리는지 확인한다.
+     *
+     * <p>{@code ${sort}}로 이으면 주소에서 온 문자열이 그대로 쿼리가 된다(AGENTS.md).
+     * <b>정상 동작은 완전히 똑같다</b> — {@code ?sort=VIEWS}는 어느 쪽 구현에서도 조회수순
+     * 목록을 내놓고, 갈리는 것은 이상한 값이 들어왔을 때뿐이다. 그래서 결과 검증으로는
+     * 절대 드러나지 않는다.
+     *
+     * <p>파라미터를 준 두 실행이 <b>서로 다른</b> SQL을 내놓는지까지 본다. 한쪽만 보면
+     * 정렬 분기를 통째로 지우고 최신순으로 고정한 구현이 통과한다.
+     */
+    @Test
+    void findPublishedPosts_mapsSortByBranchNotStringConcatenation() {
+        String latest = normalizedSql("findPublishedPosts", Map.of("sort", PostSort.LATEST));
+        String views = normalizedSql("findPublishedPosts", Map.of("sort", PostSort.VIEWS));
+
+        assertThat(latest).isNotEqualTo(views);
+
+        // enum 이름이 SQL에 박히면 ${}로 이었다는 뜻이다.
+        assertThat(views).doesNotContain("VIEWS'");
+        assertThat(views).doesNotContain("'LATEST");
     }
 
     /**

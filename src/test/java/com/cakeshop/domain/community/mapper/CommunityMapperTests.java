@@ -16,6 +16,7 @@ import com.cakeshop.domain.community.dto.view.CommentView;
 import com.cakeshop.domain.community.dto.view.PostCategoryView;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
+import com.cakeshop.domain.community.dto.view.PostSort;
 import com.cakeshop.domain.community.dto.view.PostLockView;
 import com.cakeshop.domain.community.dto.view.ReportView;
 import com.cakeshop.domain.community.entity.Comment;
@@ -107,6 +108,65 @@ class CommunityMapperTests {
         List<PostListView> posts = findPage(1, 20);
 
         assertThat(posts).extracting(PostListView::id).containsExactly(newer, older);
+    }
+
+    /**
+     * 조회수순이 실제로 조회수로 정렬하는지 확인한다.
+     *
+     * <p>작성 시각을 <b>조회수와 반대 순서로</b> 준다. 시각이 같거나 같은 방향이면 정렬
+     * 분기를 통째로 지우고 최신순으로 고정한 구현이 그대로 통과한다.
+     */
+    @Test
+    void findPublishedPosts_sortByViews_ordersByViewCountDescending() {
+        long few = insertPost("적게 본 글", PostStatus.PUBLISHED, BASE_TIME);
+        long many = insertPost("많이 본 글", PostStatus.PUBLISHED, BASE_TIME.minusDays(1));
+
+        setViewCount(few, 3);
+        setViewCount(many, 100);
+
+        List<PostListView> posts = findPage(1, 20, PostSort.VIEWS);
+
+        assertThat(posts).extracting(PostListView::id).containsExactly(many, few);
+    }
+
+    /**
+     * 조회수가 같은 글이 id 역순으로 갈리는지 확인한다(H28의 실제 데이터판).
+     *
+     * <p>조회수는 0이 대부분이라 <b>동점이 최신순보다 훨씬 잦다.</b> tiebreaker가 없으면
+     * DB가 매 쿼리마다 다른 순서를 돌려줄 수 있고, 그러면 페이지 경계에서 글이 중복되거나
+     * 사라진다. 여기서는 셋 다 조회수 0인 기본 상태를 그대로 쓴다.
+     */
+    @Test
+    void findPublishedPosts_sortByViews_sameViewCount_ordersByIdDescending() {
+        long first = insertPost("첫 번째", PostStatus.PUBLISHED, BASE_TIME);
+        long second = insertPost("두 번째", PostStatus.PUBLISHED, BASE_TIME);
+        long third = insertPost("세 번째", PostStatus.PUBLISHED, BASE_TIME);
+
+        List<PostListView> posts = findPage(1, 20, PostSort.VIEWS);
+
+        assertThat(posts).extracting(PostListView::id)
+                .containsExactly(third, second, first);
+    }
+
+    /**
+     * 조회수순에서도 노출 조건이 살아 있는지 확인한다.
+     *
+     * <p>새 분기에서 {@code status} 조건이 빠지면 <b>가장 많이 본 차단된 글이 목록 맨 위에</b>
+     * 뜬다. 분기가 늘 때 조건 한 벌을 흘리는 것은 조각 3·5에서 두 번 겪은 유형이다.
+     */
+    @Test
+    void findPublishedPosts_sortByViews_deletedAndBlockedPosts_areExcluded() {
+        long visible = insertPost("노출", PostStatus.PUBLISHED, BASE_TIME);
+        long blocked = insertPost("차단", PostStatus.BLOCKED, BASE_TIME);
+        long deleted = insertPost("삭제", PostStatus.DELETED, BASE_TIME);
+
+        setViewCount(visible, 1);
+        setViewCount(blocked, 999);
+        setViewCount(deleted, 998);
+
+        List<PostListView> posts = findPage(1, 20, PostSort.VIEWS);
+
+        assertThat(posts).extracting(PostListView::id).containsExactly(visible);
     }
 
     /**
@@ -857,7 +917,17 @@ class CommunityMapperTests {
     }
 
     private List<PostListView> findPage(int page, int size) {
-        return communityMapper.findPublishedPosts(categoryId, size, (page - 1) * size);
+        return findPage(page, size, PostSort.LATEST);
+    }
+
+    private List<PostListView> findPage(int page, int size, PostSort sort) {
+        return communityMapper.findPublishedPosts(categoryId, sort, size, (page - 1) * size);
+    }
+
+    private void setViewCount(long postId, long viewCount) {
+        jdbcTemplate.update(
+                "UPDATE posts SET view_count = ?, updated_at = updated_at WHERE id = ?",
+                viewCount, postId);
     }
 
     /**

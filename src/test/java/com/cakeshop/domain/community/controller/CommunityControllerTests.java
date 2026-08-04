@@ -29,6 +29,7 @@ import com.cakeshop.domain.community.dto.view.CommentSectionView;
 import com.cakeshop.domain.community.dto.view.PostCategoryView;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
+import com.cakeshop.domain.community.dto.view.PostSort;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
 import com.cakeshop.domain.community.service.CommunityService;
@@ -61,7 +62,7 @@ class CommunityControllerTests {
     void setUp() {
         communityService = mock(CommunityService.class);
 
-        when(communityService.getPosts(any(), any()))
+        when(communityService.getPosts(any(), any(), any()))
                 .thenReturn(new PageResult<>(List.of(), new PageRequest(1, 20), 0));
         when(communityService.getActiveCategories())
                 .thenReturn(List.of(new PostCategoryView(1L, "QNA", "질문")));
@@ -97,7 +98,7 @@ class CommunityControllerTests {
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("selectedCategoryId", 5L));
 
-        verify(communityService).getPosts(eq(5L), any());
+        verify(communityService).getPosts(eq(5L), any(), any());
     }
 
     /** 목록은 비로그인도 여는 공개 화면이라 주소가 망가져도 오류 페이지로 보내지 않는다. */
@@ -107,7 +108,40 @@ class CommunityControllerTests {
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("selectedCategoryId", (Object) null));
 
-        verify(communityService).getPosts(isNull(), any());
+        verify(communityService).getPosts(isNull(), any(), any());
+    }
+
+    @Test
+    void list_sortOption_isPassedToService() throws Exception {
+        mockMvc.perform(get("/community").param("sort", "VIEWS"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("selectedSort", PostSort.VIEWS));
+
+        verify(communityService).getPosts(any(), eq(PostSort.VIEWS), any());
+    }
+
+    /** 대소문자는 가리지 않는다. 주소를 손으로 고쳐 넣는 사람이 있다. */
+    @Test
+    void list_lowerCaseSortOption_isAccepted() throws Exception {
+        mockMvc.perform(get("/community").param("sort", "views"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("selectedSort", PostSort.VIEWS));
+    }
+
+    /**
+     * 모르는 정렬 값이 오류가 아니라 기본 정렬로 떨어지는지 확인한다.
+     *
+     * <p>SQL 조각을 넣는다. {@code ${}}로 이은 구현이라면 여기서 쿼리가 깨지거나 더 나쁘게는
+     * 그대로 실행되는데, {@code <choose>} 분기로 갈리면 <b>이 값이 SQL에 닿지도 않는다.</b>
+     * 카테고리·페이지 파라미터와 같은 처리다(목록은 공개 화면이다).
+     */
+    @Test
+    void list_invalidSortOption_fallsBackToLatestInsteadOfFailing() throws Exception {
+        mockMvc.perform(get("/community").param("sort", "id; DROP TABLE posts"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("selectedSort", PostSort.LATEST));
+
+        verify(communityService).getPosts(any(), eq(PostSort.LATEST), any());
     }
 
     @Test
@@ -762,7 +796,7 @@ class CommunityControllerTests {
 
     private PageRequest capturedPageRequest() {
         ArgumentCaptor<PageRequest> captor = ArgumentCaptor.forClass(PageRequest.class);
-        verify(communityService).getPosts(any(), captor.capture());
+        verify(communityService).getPosts(any(), any(), captor.capture());
         return captor.getValue();
     }
 

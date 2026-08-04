@@ -23,6 +23,7 @@ import com.cakeshop.domain.community.dto.view.CommentView;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
 import com.cakeshop.domain.community.dto.view.PostLockView;
+import com.cakeshop.domain.community.dto.view.PostSort;
 import com.cakeshop.domain.community.entity.Comment;
 import com.cakeshop.domain.community.entity.CommentStatus;
 import com.cakeshop.domain.community.entity.Post;
@@ -195,11 +196,12 @@ class CommunityServiceTests {
         PostListView post = new PostListView(
                 1L, "질문", "제목", "글쓴이", false, 0, 0, 0, CREATED_AT);
 
-        when(communityMapper.findPublishedPosts(3L, 20, 40)).thenReturn(List.of(post));
+        when(communityMapper.findPublishedPosts(3L, PostSort.LATEST, 20, 40))
+                .thenReturn(List.of(post));
         when(communityMapper.countPublishedPosts(3L)).thenReturn(45L);
 
         PageResult<PostListView> result =
-                communityService.getPosts(3L, new PageRequest(3, 20));
+                communityService.getPosts(3L, PostSort.LATEST, new PageRequest(3, 20));
 
         assertThat(result.getContent()).containsExactly(post);
         assertThat(result.getTotalElements()).isEqualTo(45L);
@@ -208,12 +210,31 @@ class CommunityServiceTests {
 
     @Test
     void getPosts_doesNotTouchViewCount() {
-        when(communityMapper.findPublishedPosts(null, 20, 0)).thenReturn(List.of());
+        when(communityMapper.findPublishedPosts(null, PostSort.LATEST, 20, 0))
+                .thenReturn(List.of());
         when(communityMapper.countPublishedPosts(null)).thenReturn(0L);
 
-        communityService.getPosts(null, new PageRequest(1, 20));
+        communityService.getPosts(null, PostSort.LATEST, new PageRequest(1, 20));
 
         verify(communityMapper, never()).increaseViewCount(anyLong(), any());
+    }
+
+    /**
+     * 정렬 기준이 Service를 그냥 통과해 Mapper까지 가는지 확인한다.
+     *
+     * <p>Service가 sort를 무시하고 기본값으로 덮어써도 <b>화면은 최신순 목록을 멀쩡히
+     * 그린다</b> — 사용자에게는 "조회수순 버튼이 안 먹는다"로만 보이고, 목록 자체가
+     * 정상이라 오류로 인식되지 않는다.
+     */
+    @Test
+    void getPosts_passesSortToMapperUnchanged() {
+        when(communityMapper.findPublishedPosts(null, PostSort.VIEWS, 20, 0))
+                .thenReturn(List.of());
+        when(communityMapper.countPublishedPosts(null)).thenReturn(0L);
+
+        communityService.getPosts(null, PostSort.VIEWS, new PageRequest(1, 20));
+
+        verify(communityMapper).findPublishedPosts(null, PostSort.VIEWS, 20, 0);
     }
 
     @Test

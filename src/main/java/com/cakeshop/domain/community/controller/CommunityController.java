@@ -6,6 +6,7 @@ import com.cakeshop.domain.community.dto.form.ReportForm;
 import com.cakeshop.domain.community.dto.view.CommentSectionView;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
+import com.cakeshop.domain.community.dto.view.PostSort;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
 import com.cakeshop.domain.community.service.CommunityService;
 import com.cakeshop.global.error.BusinessException;
@@ -45,12 +46,15 @@ public class CommunityController {
     @GetMapping("/community")
     public String list(
             @RequestParam(required = false) String categoryId,
+            @RequestParam(required = false) String sort,
             @RequestParam(required = false) String page,
             Model model
     ) {
         // 목록은 비로그인도 열 수 있는 공개 화면이다. 주소에 이상한 값이 들어와도
-        // 오류 페이지 대신 기본 목록을 보여준다.
+        // 오류 페이지 대신 기본 목록을 보여준다. 정렬도 같은 처리다 — 모르는 값과
+        // SQL 조각은 PostSort.from이 기본값(최신순)으로 떨어뜨린다.
         Long selectedCategoryId = parsePositiveLong(categoryId);
+        PostSort selectedSort = PostSort.from(sort);
 
         PageRequest pageRequest = new PageRequest(
                 parsePositiveInteger(page),
@@ -58,7 +62,7 @@ public class CommunityController {
         );
 
         PageResult<PostListView> pageResult =
-                communityService.getPosts(selectedCategoryId, pageRequest);
+                communityService.getPosts(selectedCategoryId, selectedSort, pageRequest);
 
         model.addAttribute("pageResult", pageResult);
         model.addAttribute(
@@ -67,6 +71,7 @@ public class CommunityController {
         );
         model.addAttribute("categories", communityService.getActiveCategories());
         model.addAttribute("selectedCategoryId", selectedCategoryId);
+        model.addAttribute("selectedSort", selectedSort);
 
         return "customer/community/list";
     }

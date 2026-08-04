@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.cakeshop.domain.community.entity.PostStatus;
+import com.cakeshop.domain.community.dto.view.PostSort;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 
@@ -92,13 +93,13 @@ class CommunityQueryCountTests {
         insertPosts(3, 2);
 
         queryCounter.reset();
-        communityService.getPosts(categoryId, new PageRequest(1, 20));
+        communityService.getPosts(categoryId, PostSort.LATEST, new PageRequest(1, 20));
         int withFewPosts = queryCounter.count();
 
         insertPosts(20, 2);
 
         queryCounter.reset();
-        communityService.getPosts(categoryId, new PageRequest(1, 20));
+        communityService.getPosts(categoryId, PostSort.LATEST, new PageRequest(1, 20));
         int withManyPosts = queryCounter.count();
 
         assertThat(withFewPosts).isEqualTo(EXPECTED_QUERY_COUNT);
