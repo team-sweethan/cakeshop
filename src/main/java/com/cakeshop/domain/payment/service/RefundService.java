@@ -64,7 +64,7 @@ public class RefundService {
             String canceledBy
     ) {
         LocalDateTime now = LocalDateTime.now(clock);
-        OrderStatus expectedStatus = requireGeneralCancelableStatus(order, now);
+        requireGeneralReadyForPickup(order);
         Payment payment = paymentMapper.findDonePaymentByOrderId(order.getId())
                 .orElseThrow(() -> new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_NOT_AVAILABLE));
         if (payment.getPaymentKey() == null || payment.getPaymentKey().isBlank()) {
@@ -75,6 +75,10 @@ public class RefundService {
                 .findRequestedCancellationByPaymentId(payment.getId())
                 .orElse(null);
         if (requestedCancellation != null) {
+            OrderStatus expectedStatus = requireGeneralCancelableStatus(
+                    order,
+                    requestedCancellation.getRequestedAt()
+            );
             return reuseRequestedCancellation(
                     requestedCancellation,
                     payment,
@@ -85,6 +89,7 @@ public class RefundService {
             );
         }
 
+        OrderStatus expectedStatus = requireGeneralCancelableStatus(order, now);
         PaymentCancellation cancellation = new PaymentCancellation();
         cancellation.setPaymentId(payment.getId());
         cancellation.setIdempotencyKey("CANCEL-" + UUID.randomUUID());
@@ -203,14 +208,19 @@ public class RefundService {
     }
 
     private OrderStatus requireGeneralCancelableStatus(Order order, LocalDateTime canceledAt) {
-        if (order.getOrderType() == OrderType.GENERAL
-                && order.getStatus() == OrderStatus.READY_FOR_PICKUP
-                && order.getPickupAt() != null
-                && canceledAt != null
-                && canceledAt.isBefore(order.getPickupAt())) {
+        requireGeneralReadyForPickup(order);
+        if (canceledAt != null && canceledAt.isBefore(order.getPickupAt())) {
             return OrderStatus.READY_FOR_PICKUP;
         }
         throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_NOT_AVAILABLE);
+    }
+
+    private void requireGeneralReadyForPickup(Order order) {
+        if (order.getOrderType() != OrderType.GENERAL
+                || order.getStatus() != OrderStatus.READY_FOR_PICKUP
+                || order.getPickupAt() == null) {
+            throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_NOT_AVAILABLE);
+        }
     }
 
     private void validateCancellationInput(long requestedBy, String reason) {

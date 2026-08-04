@@ -154,6 +154,28 @@ class RefundServiceTests {
     }
 
     @Test
+    void prepareCustomerCancellation_existingRequestedBeforePickup_reusesRequestAfterPickupTime() {
+        Order order = order(3L);
+        order.setPickupAt(NOW.minusMinutes(1));
+        Payment payment = payment();
+        PaymentCancellation existing = cancellation();
+        existing.setIdempotencyKey("existing-cancel-key");
+        existing.setRequestType("CUSTOMER");
+        existing.setRequestedBy(3L);
+        existing.setRequestedAt(NOW.minusMinutes(2));
+        when(orderMapper.findOrderByIdForUpdate(10L)).thenReturn(Optional.of(order));
+        when(paymentMapper.findDonePaymentByOrderId(10L)).thenReturn(Optional.of(payment));
+        when(paymentMapper.findRequestedCancellationByPaymentId(20L))
+                .thenReturn(Optional.of(existing));
+
+        RefundRequest result = refundService.prepareCustomerCancellation(3L, 10L, "단순 변심");
+
+        assertThat(result.cancellationId()).isEqualTo(30L);
+        assertThat(result.requestedAt()).isEqualTo(NOW.minusMinutes(2));
+        verify(paymentMapper, never()).insertPaymentCancellation(any());
+    }
+
+    @Test
     void prepareCustomerCancellation_customOrder_isNotSupportedInGeneralMvp() {
         Order order = order(3L);
         order.setOrderType(OrderType.CUSTOM);
@@ -199,10 +221,12 @@ class RefundServiceTests {
     }
 
     @Test
-    void prepareCustomerCancellation_afterPickup_rejectsBeforePaymentLookup() {
+    void prepareCustomerCancellation_afterPickup_rejectsAfterCheckingForExistingRequest() {
         Order order = order(3L);
         order.setPickupAt(NOW);
+        Payment payment = payment();
         when(orderMapper.findOrderByIdForUpdate(10L)).thenReturn(Optional.of(order));
+        when(paymentMapper.findDonePaymentByOrderId(10L)).thenReturn(Optional.of(payment));
 
         assertThatThrownBy(() -> refundService.prepareCustomerCancellation(3L, 10L, "단순 변심"))
                 .isInstanceOfSatisfying(
@@ -211,7 +235,7 @@ class RefundServiceTests {
                                 .isEqualTo(PaymentErrorCode.PAYMENT_CANCEL_NOT_AVAILABLE)
                 );
 
-        verify(paymentMapper, never()).findDonePaymentByOrderId(10L);
+        verify(paymentMapper).findRequestedCancellationByPaymentId(20L);
     }
 
     @Test
