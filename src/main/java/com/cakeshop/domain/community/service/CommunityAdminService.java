@@ -126,12 +126,22 @@ public class CommunityAdminService {
      * 기각이 필요한 이유는 "차단하지 않기로 했다"도 조치이기 때문이다. 닫을 길이 없으면
      * 문제없는 글이 신고 목록 맨 위에 영원히 남아, 진짜 처리할 글을 가린다.
      *
+     * <b>작성자가 지운 글에는 기각도 할 수 없다.</b> REJECTED는 "관리자가 보고 문제없다고
+     * 판단했다"는 기록인데, 글이 사라져 판단할 대상이 없어진 경우에 그 값을 남기면 기록이
+     * 사실과 달라진다. 남은 미처리 신고는 그대로 둔다 — 게시글을 지워도 자식 행은 건드리지
+     * 않는다(4.5). 그 대가는 PLAN.md R19에 적었다.
+     *
+     * 차단된 글은 다르다. 차단 시점에 미처리 신고가 함께 닫히므로 여기 남아 있는 것은
+     * 그 뒤에 들어온 신고이고(R16), 관리자가 이미 조치한 글이라 닫을 길이 있어야 한다.
+     *
      * 닫을 신고가 하나도 없으면 성공으로 넘기지 않는다. 화면에는 "기각했습니다"라고
      * 나오는데 아무 일도 일어나지 않은 상태다.
      */
     @Transactional
     public void rejectReports(long postId) {
-        getPostDetail(postId);
+        if (getPostDetail(postId).isDeleted()) {
+            throw new BusinessException(CommunityErrorCode.INVALID_POST_TRANSITION);
+        }
 
         if (communityMapper.closePendingReports(postId, ReportStatus.REJECTED) == 0) {
             throw new BusinessException(CommunityErrorCode.INVALID_POST_TRANSITION);

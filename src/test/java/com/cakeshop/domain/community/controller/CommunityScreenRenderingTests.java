@@ -815,6 +815,10 @@ class CommunityScreenRenderingTests {
     @Test
     void communityAdminDetail_deletedPost_hidesModerationActions() throws Exception {
         long postId = insertPost(memberId, "지워진 글", "본문", PostStatus.DELETED);
+        // 글이 노출 중일 때 접수된 신고는 작성자가 지워도 PENDING으로 남는다(DOMAIN.md 4.5).
+        long reporterId = insertMember(
+                "deleted-report-" + System.nanoTime() + "@cakeshop.local", "신고자", "ACTIVE");
+        insertReport(postId, reporterId, "PENDING");
 
         mockMvc.perform(get("/admin/community/" + postId).with(authentication(admin())))
                 .andExpect(status().isOk())
@@ -822,7 +826,36 @@ class CommunityScreenRenderingTests {
                 .andExpect(content().string(
                         containsString("작성자가 삭제한 게시글이라 조치할 수 없습니다.")))
                 .andExpect(content().string(not(containsString("차단하기"))))
-                .andExpect(content().string(not(containsString("차단 해제"))));
+                .andExpect(content().string(not(containsString("차단 해제"))))
+                // 미처리 신고가 남아 있어도 기각 버튼은 없다. 하나만 조건에 걸면
+                // "조치할 수 없습니다" 안내와 기각 버튼이 나란히 보인다(PR #96 Codex 리뷰).
+                .andExpect(content().string(not(containsString("신고 기각"))));
+    }
+
+    /**
+     * 작성자가 지운 글에는 기각도 막힌다. 버튼을 감추는 것은 안내일 뿐이고 막는 것은
+     * Service다 — 관리자는 이 화면에서 주소를 알게 되므로 요청만 따로 보낼 수 있다.
+     */
+    @Test
+    void communityAdminRejectReports_deletedPost_isRejectedAndLeavesReportPending()
+            throws Exception {
+        long postId = insertPost(memberId, "지워진 글", "본문", PostStatus.DELETED);
+        long reporterId = insertMember(
+                "deleted-reject-" + System.nanoTime() + "@cakeshop.local", "신고자", "ACTIVE");
+        insertReport(postId, reporterId, "PENDING");
+
+        mockMvc.perform(post("/admin/community/" + postId + "/reports/reject")
+                        .with(csrf())
+                        .with(authentication(admin())))
+                .andExpect(status().isBadRequest());
+
+        // 신고는 PENDING 그대로다. 지운 글의 신고를 자동으로 닫지 않는다(DOMAIN.md 4.5).
+        assertThat(reportStatusOf(postId)).isEqualTo("PENDING");
+    }
+
+    private String reportStatusOf(long postId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT status FROM post_reports WHERE post_id = ?", String.class, postId);
     }
 
     /** 관리자 화면은 관리자만 연다(DOMAIN.md 5). */

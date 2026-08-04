@@ -15,9 +15,11 @@
 |---|---|---|
 | 차단 (사유 필수) | `POST /admin/community/{postId}/block` | `PUBLISHED`일 때만 |
 | 차단 해제 | `POST /admin/community/{postId}/unblock` | `BLOCKED`일 때만 |
-| 신고 기각 | `POST /admin/community/{postId}/reports/reject` | 미처리 신고가 있을 때만 |
+| 신고 기각 | `POST /admin/community/{postId}/reports/reject` | 미처리 신고가 있고 `DELETED`가 아닐 때만 |
 
-**이 셋뿐이다**(DOMAIN.md 6.7). 게시글 삭제도 댓글 삭제도 관리자 권한이 아니다 — 게시글 삭제는 작성자만(4.2의 `BLOCKED → DELETED` 금지), 댓글 삭제는 그 댓글의 작성자만 할 수 있다(6.4). 작성자가 지운 글(`DELETED`)에는 아무 버튼도 보이지 않는다. 종착 상태라 되살릴 수도 차단할 수도 없다.
+**이 셋뿐이다**(DOMAIN.md 6.7). 게시글 삭제도 댓글 삭제도 관리자 권한이 아니다 — 게시글 삭제는 작성자만(4.2의 `BLOCKED → DELETED` 금지), 댓글 삭제는 그 댓글의 작성자만 할 수 있다(6.4).
+
+**작성자가 지운 글(`DELETED`)에는 아무 버튼도 보이지 않는다.** 차단·해제는 종착 상태라 불가능하고(4.2), **기각도 막는다** — `REJECTED`는 "관리자가 보고 문제없다고 판단했다"는 기록인데 판단할 글이 없어졌기 때문이다(6.6). 그래서 기각 버튼 조건에는 미처리 신고 수만이 아니라 `post.deleted`가 함께 붙는다. 하나만 걸면 "조치할 수 없습니다" 안내와 기각 버튼이 나란히 보이는 화면이 된다.
 
 차단을 해제해도 `blocked_at`·`blocked_reason`·`blocked_by`와 신고 상태 `RESOLVED`는 남는다(4.2, 6.6). 그래서 "차단됐다가 풀린 글"은 상태가 `노출 중`인데 차단 기록이 함께 보인다.
 
@@ -49,7 +51,7 @@
 | `차단 사유` | 항상 (차단 폼의 입력, 차단 기록의 항목) | `CommunityScreenRenderingTests.communityAdminDetail_rendersForAdmin` |
 | `차단하기` | `PUBLISHED`일 때만 | 없음 |
 | `차단 해제` | `BLOCKED`일 때만 | `CommunityScreenRenderingTests.communityAdminDetail_blockedPost_showsBlockRecordAndUnblock` |
-| `신고 기각` | 미처리 신고가 있을 때만 | `CommunityScreenRenderingTests.communityAdminDetail_rendersForAdmin` |
+| `신고 기각` | 미처리 신고가 있고 `DELETED`가 아닐 때만 | `CommunityScreenRenderingTests.communityAdminDetail_rendersForAdmin` |
 | `작성자가 삭제한 게시글이라 조치할 수 없습니다.` | `DELETED`일 때만 | `CommunityScreenRenderingTests.communityAdminDetail_deletedPost_hidesModerationActions` |
 | `삭제된 댓글입니다.` | 지워진 댓글 자리에만 | 없음 |
 | `아직 댓글이 없습니다.` | 댓글이 하나도 없을 때만 | 없음 |

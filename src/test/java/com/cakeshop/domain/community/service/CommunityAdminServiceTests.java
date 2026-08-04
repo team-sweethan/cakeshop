@@ -9,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.cakeshop.domain.community.dto.view.AdminPostDetailView;
 import com.cakeshop.domain.community.dto.view.PostLockView;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.entity.ReportStatus;
@@ -161,6 +162,43 @@ class CommunityAdminServiceTests {
     }
 
     /**
+     * 작성자가 지운 글에는 기각도 할 수 없다(DOMAIN.md 6.6, PR #96 Codex 리뷰).
+     *
+     * <p>글이 PUBLISHED일 때 접수된 신고는 작성자가 글을 지워도 PENDING으로 남는다 —
+     * 게시글을 지워도 자식 행은 건드리지 않기 때문이다(4.5). 그 신고를 REJECTED로 닫으면
+     * "관리자가 보고 문제없다고 판단했다"는 기록이 남는데, 실제로는 판단할 글이 사라진
+     * 것이라 기록이 사실과 달라진다.
+     */
+    @Test
+    void rejectReports_deletedPost_isRejected() {
+        givenAdminPost(PostStatus.DELETED);
+
+        assertThatThrownBy(() -> communityAdminService.rejectReports(POST_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(CommunityErrorCode.INVALID_POST_TRANSITION);
+
+        verify(communityMapper, never()).closePendingReports(anyLong(), any());
+    }
+
+    /**
+     * 차단된 글의 기각은 막지 않는다.
+     *
+     * <p>차단 시점에 미처리 신고가 함께 닫히므로 여기 남아 있는 것은 그 뒤에 들어온
+     * 신고이고(R16), 이미 조치한 글이라 닫을 길이 있어야 한다. 막아 버리면 그 신고가
+     * 관리자 목록 맨 위에 영원히 남는다.
+     */
+    @Test
+    void rejectReports_blockedPost_isAllowed() {
+        givenAdminPost(PostStatus.BLOCKED);
+        when(communityMapper.closePendingReports(POST_ID, ReportStatus.REJECTED)).thenReturn(1);
+
+        communityAdminService.rejectReports(POST_ID);
+
+        verify(communityMapper).closePendingReports(POST_ID, ReportStatus.REJECTED);
+    }
+
+    /**
      * 닫을 신고가 없으면 성공으로 넘기지 않는다.
      *
      * <p>화면에는 "기각했습니다"가 나오는데 아무 일도 일어나지 않은 상태다. 두 번 눌렀거나
@@ -197,9 +235,13 @@ class CommunityAdminServiceTests {
     }
 
     private void givenAdminPost() {
+        givenAdminPost(PostStatus.PUBLISHED);
+    }
+
+    private void givenAdminPost(PostStatus status) {
         when(communityMapper.findPostByIdForAdmin(POST_ID))
-                .thenReturn(new com.cakeshop.domain.community.dto.view.AdminPostDetailView(
+                .thenReturn(new AdminPostDetailView(
                         POST_ID, AUTHOR_ID, "질문", "제목", "본문", "글쓴이", false,
-                        PostStatus.PUBLISHED, null, null, null, 0, 0, null, null));
+                        status, null, null, null, 0, 0, null, null));
     }
 }
