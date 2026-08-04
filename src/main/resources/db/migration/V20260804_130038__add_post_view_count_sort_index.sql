@@ -1,0 +1,40 @@
+-- add_post_view_count_sort_index
+-- 생성: 2026-08-04 13:00:38
+--
+-- 규칙
+-- * 이 파일은 머지된 뒤 절대 수정하지 않는다. 변경이 필요하면 새 migration 을 만든다.
+-- * 로컬 샘플 데이터는 여기 넣지 않는다. db/seed/seed-local.sql 을 쓴다.
+-- * 서로 의존하는 DDL 은 파일을 나누지 말고 이 파일에 함께 담는다.
+
+-- 조회수 정렬(`GET /community?sort=VIEWS`) 을 받쳐 주는 인덱스
+-- (docs/community/PLAN.md 조각 7a).
+--
+-- ▸ 왜 필요한가
+--
+-- 목록 쿼리는 status = 'PUBLISHED' 로 좁힌 뒤 view_count DESC, id DESC 로 정렬해 20 건을
+-- 자른다. 지금 posts 에는 이 조합을 받쳐 주는 인덱스가 없어서 **필터를 통과한 게시글
+-- 전부를 filesort** 한다. 최신순은 그나마 PK 순서와 상관이 있지만 조회수는 아무 상관이
+-- 없다 — 정렬 옵션을 여는 것이 곧 전체 정렬을 여는 것이다.
+--
+-- ▸ 컬럼 순서가 규칙이다
+--
+-- (status, view_count, id) 이지 (view_count, status, id) 가 아니다. 선두가 등치 조건인
+-- status 여야 그 값으로 범위를 좁힌 **안에서** view_count 가 이미 정렬된 상태가 된다.
+-- 순서를 뒤집으면 view_count 로만 훑으며 status 를 하나씩 걸러야 해서 정렬은 살아도
+-- 스캔량이 줄지 않는다. 두 경우 모두 화면 결과는 똑같아서 **틀려도 느려질 뿐 드러나지
+-- 않는다.**
+--
+-- id 를 세 번째에 두는 것은 tiebreaker 까지 인덱스로 끝내기 위해서다. 조회수는 0 이
+-- 대부분이라 동점이 흔하고, 빠지면 그 구간에서 다시 정렬이 붙는다.
+--
+-- ▸ 카테고리 필터는 이 인덱스를 온전히 쓰지 못한다
+--
+-- ?categoryId= 가 붙으면 조건이 (status, category_id) 가 되어 선두만 맞는다. 그 조합까지
+-- 받으려면 인덱스가 하나 더 필요한데, 1차에서는 넣지 않는다 — 인덱스마다 쓰기 비용이
+-- 붙고 posts 는 조회수·좋아요로 이미 자주 갱신되는 테이블이다. 분류를 고르면 대상이
+-- 먼저 좁혀지므로 정렬 대상도 함께 준다. 되돌아올 계기는 PLAN.md R8 과 공유한다.
+--
+-- 되돌리기: DROP INDEX ix_posts_status_view_count 로 되돌릴 수 있다. 데이터를 바꾸지
+-- 않으므로 백업이 필요 없다.
+ALTER TABLE `posts`
+    ADD INDEX `ix_posts_status_view_count` (`status`, `view_count`, `id`);

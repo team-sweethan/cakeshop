@@ -53,10 +53,24 @@
         <include refid="publishedPostConditions"/>
 
         <!--
-            id tiebreaker가 없으면 created_at이 같은 글이 페이지 경계에서
-            중복되거나 누락된다(DOMAIN.md 6.1). 정렬 옵션은 없다.
+            정렬은 <choose> 로 갈린다. 주소에서 온 문자열을 ${} 로 이으면 그대로 쿼리가
+            되므로, 허용값을 PostSort 로 좁히고 분기는 SQL 에 적어 둔다(AGENTS.md).
+            관리자 목록(findPostsForAdmin)과 같은 방식이다.
+
+            id tiebreaker 는 어느 분기에도 붙인다. 없으면 정렬 값이 같은 글이 페이지
+            경계에서 중복되거나 누락된다(DOMAIN.md 6.1). 조회수 분기에서 특히 잦다 —
+            조회수는 0 이 대부분이라 동점이 created_at 보다 훨씬 흔하다.
+            분기마다 붙어 있는지는 CommunityMapperXmlTests 가 고정한다(H28).
         -->
-        ORDER BY p.created_at DESC, p.id DESC
+        <choose>
+            <when test="sort != null and sort.name() == 'VIEWS'">
+                ORDER BY p.view_count DESC, p.id DESC
+            </when>
+            <otherwise>
+                ORDER BY p.created_at DESC, p.id DESC
+            </otherwise>
+        </choose>
+
         LIMIT #{size} OFFSET #{offset}
     </select>
 

@@ -28,14 +28,29 @@
     <div class="cluster section">
       <a class="btn"
          th:classappend="${selectedCategoryId == null} ? ' is-active'"
-         th:href="@{/community}">전체</a>
+         th:href="@{/community(sort=${selectedSort})}">전체</a>
 
       <a class="btn"
          th:each="category : ${categories}"
          th:text="${category.name}"
          th:classappend="${selectedCategoryId != null
                            and selectedCategoryId == category.id} ? ' is-active'"
-         th:href="@{/community(categoryId=${category.id})}">카테고리</a>
+         th:href="@{/community(categoryId=${category.id}, sort=${selectedSort})}">카테고리</a>
+    </div>
+
+    <!--
+      정렬. 카테고리 필터와 서로를 지워버리지 않도록 각 링크가 상대의 현재 값을 함께
+      싣는다 — 분류를 고른 뒤 조회수순을 누르면 분류가 풀리는 것이 그 실수다.
+      모르는 값이 들어와도 오류가 아니라 최신순으로 떨어진다(PostSort).
+    -->
+    <div class="cluster section">
+      <a class="btn"
+         th:classappend="${selectedSort.name() == 'LATEST'} ? ' is-active'"
+         th:href="@{/community(categoryId=${selectedCategoryId}, sort='LATEST')}">최신순</a>
+
+      <a class="btn"
+         th:classappend="${selectedSort.name() == 'VIEWS'} ? ' is-active'"
+         th:href="@{/community(categoryId=${selectedCategoryId}, sort='VIEWS')}">조회수순</a>
     </div>
 
     <div class="stack">
@@ -74,6 +89,7 @@
          th:if="${pageNavigation.hasPreviousBlock}"
          th:href="@{/community(
              categoryId=${selectedCategoryId},
+             sort=${selectedSort},
              page=${pageNavigation.previousPage}
          )}">
         이전
@@ -95,6 +111,7 @@
          th:classappend="${pageNumber == pageResult.page} ? ' is-active'"
          th:href="@{/community(
              categoryId=${selectedCategoryId},
+             sort=${selectedSort},
              page=${pageNumber}
          )}">
         1
@@ -104,6 +121,7 @@
          th:if="${pageNavigation.hasNextBlock}"
          th:href="@{/community(
              categoryId=${selectedCategoryId},
+             sort=${selectedSort},
              page=${pageNavigation.nextPage}
          )}">
         다음

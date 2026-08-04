@@ -12,6 +12,7 @@ import com.cakeshop.domain.community.dto.view.PostCategoryView;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
 import com.cakeshop.domain.community.dto.view.PostLockView;
+import com.cakeshop.domain.community.dto.view.PostSort;
 import com.cakeshop.domain.community.entity.Comment;
 import com.cakeshop.domain.community.entity.Post;
 import com.cakeshop.domain.community.entity.PostStatus;
@@ -34,11 +35,19 @@ public class CommunityService {
         this.communityMapper = communityMapper;
     }
 
-    /** 노출 중인 게시글 목록. categoryId가 null이면 전체 카테고리다. 페이지 크기는 호출자가 정한다. */
+    /**
+     * 노출 중인 게시글 목록. categoryId가 null이면 전체 카테고리다.
+     * 페이지 크기는 호출자가 정하고, 정렬은 sort가 정한다(null이면 최신순).
+     */
     @Transactional(readOnly = true)
-    public PageResult<PostListView> getPosts(Long categoryId, PageRequest pageRequest) {
+    public PageResult<PostListView> getPosts(
+            Long categoryId,
+            PostSort sort,
+            PageRequest pageRequest
+    ) {
         List<PostListView> posts = communityMapper.findPublishedPosts(
                 categoryId,
+                sort,
                 pageRequest.getSize(),
                 pageRequest.getOffset()
         );

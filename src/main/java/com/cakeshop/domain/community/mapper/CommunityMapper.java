@@ -8,6 +8,7 @@ import com.cakeshop.domain.community.dto.view.PostCategoryView;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
 import com.cakeshop.domain.community.dto.view.PostLockView;
+import com.cakeshop.domain.community.dto.view.PostSort;
 import com.cakeshop.domain.community.entity.Comment;
 import com.cakeshop.domain.community.entity.Post;
 
@@ -27,9 +28,15 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 public interface CommunityMapper {
 
-    /** 노출 중인 게시글 목록을 최신순으로 조회한다. categoryId가 null이면 전체 카테고리다. */
+    /**
+     * 노출 중인 게시글 목록을 조회한다. categoryId가 null이면 전체 카테고리다.
+     *
+     * 정렬은 sort로 갈린다. 문자열이 아니라 enum을 받는 것은 주소에서 온 값이 SQL에
+     * 이어지지 않게 하기 위해서다(PostSort). 어느 분기든 id tiebreaker가 붙는다.
+     */
     List<PostListView> findPublishedPosts(
             @Param("categoryId") Long categoryId,
+            @Param("sort") PostSort sort,
             @Param("size") int size,
             @Param("offset") int offset
     );

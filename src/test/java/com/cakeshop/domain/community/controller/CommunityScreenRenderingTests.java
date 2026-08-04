@@ -135,7 +135,41 @@ class CommunityScreenRenderingTests {
                 // 링크에도 있어서, 쪽 링크가 필터를 잃어버려도 응답 어딘가에서는 둘 다
                 // 발견된다. 링크 하나에 함께 있는지 확인해야 회귀를 잡는다.
                 .andExpect(content().string(containsString(
-                        "/community?categoryId=" + categoryId + "&amp;page=2")));
+                        "/community?categoryId=" + categoryId + "&amp;sort=LATEST&amp;page=2")));
+    }
+
+    /**
+     * 정렬 링크가 카테고리 필터를 잃지 않는지 확인한다.
+     *
+     * <p>필터와 정렬은 서로의 현재 값을 함께 실어야 한다. 안 실으면 분류를 고른 뒤
+     * 조회수순을 누르는 순간 <b>분류가 조용히 풀린다</b> — 목록은 멀쩡히 그려지고 글만
+     * 늘어나서, 사용자에게는 정렬이 이상하게 동작한 것처럼 보인다.
+     *
+     * <p>쪽 이동 링크와 같은 이유로 <b>한 링크 안에</b> 둘 다 있는지를 본다. 따로 찾으면
+     * 상단 필터 링크가 categoryId를 갖고 있어서 정렬이 그것을 잃어버려도 통과한다.
+     */
+    @Test
+    void communityList_sortLinks_keepCategoryFilter() throws Exception {
+        mockMvc.perform(get("/community").param("categoryId", String.valueOf(categoryId)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("최신순")))
+                .andExpect(content().string(containsString("조회수순")))
+                .andExpect(content().string(containsString(
+                        "/community?categoryId=" + categoryId + "&amp;sort=VIEWS")));
+    }
+
+    /**
+     * 카테고리 링크가 반대로 정렬을 잃지 않는지 확인한다.
+     *
+     * <p>위 테스트의 반대쪽이다. 한쪽만 보면 <b>한 방향만 값을 싣는 구현</b>이 통과하는데,
+     * 실제로 사용자가 밟는 것은 "조회수순을 고른 뒤 분류를 바꾸는" 순서이기도 하다.
+     */
+    @Test
+    void communityList_categoryLinks_keepSortOption() throws Exception {
+        mockMvc.perform(get("/community").param("sort", "VIEWS"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(
+                        "/community?categoryId=" + categoryId + "&amp;sort=VIEWS")));
     }
 
     /**
