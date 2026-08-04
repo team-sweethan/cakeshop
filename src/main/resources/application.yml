@@ -39,7 +39,7 @@ app:
     public-preview: false
   kakao:
     alimtalk:
-      enabled: false
+      enabled: true
       # 솔라피 API Key & API Secret (김민정 계정으로 등록)
       api-key: "NCSEZJCAQK6WEWMB"
       api-secret: "BS7INVLQ3U79TVZ2KLZT0WOYPU5DK40F"
