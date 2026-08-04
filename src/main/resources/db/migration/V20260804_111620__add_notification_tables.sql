@@ -24,5 +24,4 @@ CREATE INDEX `idx_notifications_receiver_read`    ON `notifications` (`receiver_
 
 -- notification_deliveries 테이블 신규 컬럼 보충
 ALTER TABLE `notification_deliveries`
-    ADD COLUMN `failure_reason` TEXT NULL COMMENT '발송 실패 사유' AFTER `status`,
-    ADD COLUMN `updated_at`     DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '이력 수정 시간' AFTER `created_at`;
+    ADD COLUMN `updated_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '이력 수정 시간' AFTER `created_at`;
