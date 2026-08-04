@@ -6,7 +6,8 @@
 
   <title>메인 | 케이크 쇼핑몰</title>
 
-  <link rel="stylesheet" th:href="@{/css/app.css}">
+  <link rel="stylesheet"
+        th:href="@{/css/app.css(v='home-product-square')}">
   <script defer th:src="@{/js/app.js}"></script>
 </head>
 
@@ -70,14 +71,14 @@
              )}">
 
           <!-- 대표 이미지 URL이 있으면 실제 상품 이미지를 출력한다. -->
-          <img class="placeholder-image"
+          <img class="placeholder-image product-card__image"
                th:if="${product.thumbnailUrl != null
                          and !product.thumbnailUrl.isBlank()}"
                th:src="${product.thumbnailUrl}"
                th:alt="${product.name}">
 
           <!-- 대표 이미지가 없으면 이미지 준비 중 영역을 출력한다. -->
-          <div class="placeholder-image"
+          <div class="placeholder-image product-card__image"
                th:unless="${product.thumbnailUrl != null
                              and !product.thumbnailUrl.isBlank()}">
             상품 이미지 준비 중
