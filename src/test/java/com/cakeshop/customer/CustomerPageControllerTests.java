@@ -20,10 +20,10 @@ import com.cakeshop.domain.member.dto.view.MemberProfileView;
 import com.cakeshop.domain.member.controller.MyPageController;
 import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.notification.controller.NotificationController;
-import com.cakeshop.domain.order.controller.OrderController;
+import com.cakeshop.domain.order.controller.customer.OrderController;
 import com.cakeshop.domain.order.dto.view.OrderDetailView;
-import com.cakeshop.domain.order.service.OrderCheckoutService;
-import com.cakeshop.domain.order.service.OrderQueryService;
+import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
+import com.cakeshop.domain.order.service.customer.CustomerOrderQueryService;
 import com.cakeshop.domain.order.service.OrderService;
 import com.cakeshop.domain.payment.controller.PaymentController;
 import com.cakeshop.domain.payment.service.PaymentFacade;
@@ -76,7 +76,7 @@ class CustomerPageControllerTests {
                         "010-1234-5678",
                         LocalDate.of(2000, 1, 15)));
 
-        OrderQueryService orderQueryService = mock(OrderQueryService.class);
+        CustomerOrderQueryService orderQueryService = mock(CustomerOrderQueryService.class);
         when(orderQueryService.getMemberOrders(1L)).thenReturn(List.of());
         when(orderQueryService.getMemberOrder(1L, 1L))
                 .thenReturn(mock(OrderDetailView.class));

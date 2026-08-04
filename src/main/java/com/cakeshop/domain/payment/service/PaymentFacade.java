@@ -3,7 +3,7 @@ package com.cakeshop.domain.payment.service;
 import com.cakeshop.domain.order.service.OrderService;
 import com.cakeshop.domain.order.service.OrderService.GeneralPaymentOrder;
 import com.cakeshop.domain.order.dto.view.OrderDetailView;
-import com.cakeshop.domain.order.service.OrderQueryService;
+import com.cakeshop.domain.order.service.customer.CustomerOrderQueryService;
 import com.cakeshop.domain.payment.dto.form.PaymentConfirmForm;
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.error.PaymentErrorCode;
@@ -33,7 +33,7 @@ public class PaymentFacade {
     private static final Logger log = LoggerFactory.getLogger(PaymentFacade.class);
 
     private final OrderService orderService;
-    private final OrderQueryService orderQueryService;
+    private final CustomerOrderQueryService orderQueryService;
     private final PaymentService paymentService;
     private final PaymentRecoveryService paymentRecoveryService;
     private final TossPaymentClient tossPaymentClient;

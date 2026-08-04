@@ -15,7 +15,7 @@ public class Order {
     private String orderNumber;     // 고객에게 노출하는 주문번호
     // member.id
     private Long memberId;          // "주문 회원" 식별자
-    private String requestKey;      // 회원별 주문 생성 멱등키
+    private String requestKey;      // 회원별 주문 생성 [멱등키]
     private OrderType orderType;    // 주문 유형: GENERAL 또는 CUSTOM
     private String ordererName;     // 주문 당시 주문자 이름 스냅샷
     private String ordererPhone;    // 주문 당시 주문자 연락처 스냅샷

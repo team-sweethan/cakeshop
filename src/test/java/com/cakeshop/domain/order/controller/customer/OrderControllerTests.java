@@ -1,11 +1,12 @@
-package com.cakeshop.domain.order.controller;
+package com.cakeshop.domain.order.controller.customer;
 
 import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
 import com.cakeshop.domain.member.dto.view.MemberProfileView;
 import com.cakeshop.domain.member.service.MemberService;
-import com.cakeshop.domain.order.dto.view.GeneralOrderCheckoutView;
-import com.cakeshop.domain.order.service.OrderCheckoutService;
-import com.cakeshop.domain.order.service.OrderQueryService;
+import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView;
+import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
+import com.cakeshop.domain.order.controller.customer.OrderController;
+import com.cakeshop.domain.order.service.customer.CustomerOrderQueryService;
 import com.cakeshop.domain.order.service.OrderService;
 import com.cakeshop.global.security.MemberDetails;
 import org.junit.jupiter.api.AfterEach;
@@ -49,7 +50,7 @@ class OrderControllerTests {
     private OrderService orderService;
 
     @Mock
-    private OrderQueryService orderQueryService;
+    private CustomerOrderQueryService orderQueryService;
 
     @Mock
     private MemberService memberService;

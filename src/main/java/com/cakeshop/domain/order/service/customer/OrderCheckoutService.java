@@ -1,10 +1,11 @@
-package com.cakeshop.domain.order.service;
+package com.cakeshop.domain.order.service.customer;
 
-import com.cakeshop.domain.order.dto.view.GeneralOrderCheckoutView;
-import com.cakeshop.domain.order.dto.view.GeneralOrderCheckoutView.PickupDateView;
-import com.cakeshop.domain.order.dto.view.GeneralOrderCheckoutView.PickupTimeView;
-import com.cakeshop.domain.order.dto.view.GeneralOrderCheckoutView.SelectedOptionView;
+import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView;
+import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView.PickupDateView;
+import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView.PickupTimeView;
+import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView.SelectedOptionView;
 import com.cakeshop.domain.order.error.OrderErrorCode;
+import com.cakeshop.domain.order.service.OrderOptionValidator;
 import com.cakeshop.domain.order.service.OrderOptionValidator.ValidatedOption;
 import com.cakeshop.domain.product.dto.view.ProductSalesInfo;
 import com.cakeshop.domain.product.entity.ProductType;

@@ -3,7 +3,7 @@ package com.cakeshop.domain.payment.service;
 import com.cakeshop.domain.order.dto.view.OrderDetailView;
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.entity.OrderType;
-import com.cakeshop.domain.order.service.OrderQueryService;
+import com.cakeshop.domain.order.service.customer.CustomerOrderQueryService;
 import com.cakeshop.domain.payment.dto.form.TossPaymentSuccessForm;
 import com.cakeshop.domain.payment.dto.view.PaymentCheckoutView;
 import com.cakeshop.domain.payment.dto.view.PaymentCompletionView;
@@ -26,14 +26,14 @@ import java.util.List;
 @Service
 public class PaymentQueryService {
 
-    private final OrderQueryService orderQueryService;
+    private final CustomerOrderQueryService orderQueryService;
     private final PaymentService paymentService;
     private final StoreService storeService;
     private final Clock clock;
     private final String clientKey;
 
     public PaymentQueryService(
-            OrderQueryService orderQueryService,
+            CustomerOrderQueryService orderQueryService,
             PaymentService paymentService,
             StoreService storeService,
             Clock clock,

@@ -1,7 +1,7 @@
 package com.cakeshop.domain.order.service;
 
 import com.cakeshop.domain.member.service.MemberService;
-import com.cakeshop.domain.order.dto.form.GeneralOrderForm;
+import com.cakeshop.domain.order.dto.form.customer.GeneralOrderForm;
 import com.cakeshop.domain.payment.error.PaymentErrorCode;
 import com.cakeshop.domain.payment.service.PaymentPreparationService;
 import com.cakeshop.domain.product.dto.view.ProductOptionGroupView;

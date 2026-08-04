@@ -1,9 +1,9 @@
-package com.cakeshop.domain.order.controller;
+package com.cakeshop.domain.order.controller.admin;
 
-import com.cakeshop.domain.order.dto.form.FulfillmentSearchCondition;
-import com.cakeshop.domain.order.dto.view.FulfillmentListView;
+import com.cakeshop.domain.order.dto.form.admin.FulfillmentSearchCondition;
+import com.cakeshop.domain.order.dto.view.admin.FulfillmentListView;
 import com.cakeshop.domain.order.entity.OrderStatus;
-import com.cakeshop.domain.order.service.FulfillmentService;
+import com.cakeshop.domain.order.service.admin.FulfillmentService;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.error.CommonErrorCode;
 import com.cakeshop.global.security.MemberDetails;
@@ -51,15 +51,11 @@ public class FulfillmentAdminController {
 
         fulfillmentService.markPickedUp(orderId, admin.getMemberId());
         if (condition.getPickupDate() != null) {
-            redirectAttributes.addAttribute(
-                    "pickupDate",
-                    condition.getPickupDate().toString()
+            redirectAttributes.addAttribute("pickupDate", condition.getPickupDate().toString()
             );
         }
         if (condition.getStatus() != null) {
-            redirectAttributes.addAttribute(
-                    "status",
-                    condition.getStatus().name()
+            redirectAttributes.addAttribute("status", condition.getStatus().name()
             );
         }
         redirectAttributes.addFlashAttribute("successMessage", "픽업 완료로 변경했습니다.");

@@ -1,4 +1,4 @@
-package com.cakeshop.domain.order.controller;
+package com.cakeshop.domain.order.controller.admin;
 
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -11,7 +11,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
-import com.cakeshop.domain.order.service.OrderAdminService;
+import com.cakeshop.domain.order.controller.admin.OrderAdminController;
+import com.cakeshop.domain.order.service.admin.AdminOrderService;
 import com.cakeshop.domain.payment.service.RefundFacade;
 import com.cakeshop.global.security.MemberDetails;
 import com.cakeshop.global.security.SecurityConfig;
@@ -34,7 +35,7 @@ class OrderAdminControllerSecurityTests {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private OrderAdminService orderAdminService;
+    private AdminOrderService orderAdminService;
 
     @MockitoBean
     private RefundFacade refundFacade;

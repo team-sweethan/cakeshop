@@ -1,4 +1,4 @@
-package com.cakeshop.domain.order.controller;
+package com.cakeshop.domain.order.controller.customer;
 
 import com.cakeshop.domain.order.dto.form.CancelForm;
 import com.cakeshop.domain.payment.service.RefundFacade;

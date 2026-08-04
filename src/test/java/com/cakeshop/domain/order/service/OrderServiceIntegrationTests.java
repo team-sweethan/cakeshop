@@ -1,7 +1,7 @@
 package com.cakeshop.domain.order.service;
 
 import com.cakeshop.domain.member.service.MemberService;
-import com.cakeshop.domain.order.dto.form.GeneralOrderForm;
+import com.cakeshop.domain.order.dto.form.customer.GeneralOrderForm;
 import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.order.entity.OrderItem;
 import com.cakeshop.domain.order.entity.OrderItemOption;

@@ -1,4 +1,4 @@
-package com.cakeshop.domain.order.dto.view;
+package com.cakeshop.domain.order.dto.view.customer;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;

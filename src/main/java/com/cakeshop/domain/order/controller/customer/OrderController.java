@@ -1,10 +1,10 @@
-package com.cakeshop.domain.order.controller;
+package com.cakeshop.domain.order.controller.customer;
 
 import com.cakeshop.domain.member.dto.view.MemberProfileView;
 import com.cakeshop.domain.member.service.MemberService;
-import com.cakeshop.domain.order.dto.form.GeneralOrderForm;
-import com.cakeshop.domain.order.service.OrderCheckoutService;
-import com.cakeshop.domain.order.service.OrderQueryService;
+import com.cakeshop.domain.order.dto.form.customer.GeneralOrderForm;
+import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
+import com.cakeshop.domain.order.service.customer.CustomerOrderQueryService;
 import com.cakeshop.domain.order.service.OrderService;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.error.CommonErrorCode;
@@ -30,25 +30,26 @@ public class OrderController {
 
     private final OrderCheckoutService orderCheckoutService;
     private final OrderService orderService;
-    private final OrderQueryService orderQueryService;
+    private final CustomerOrderQueryService orderQueryService;
     private final MemberService memberService;
 
-    /** 장바구니 항목의 픽업 일시 수정용 목업 경로다. 일반 주문은 checkout에서 선택한다. */
-    @GetMapping(value = "/pickup", params = "intent=cart-edit")
-    public String pickupSetting() {
-        return "customer/order/pickup-setting";
-    }
+//    /** 장바구니 항목의 픽업 일시 수정용 목업 경로다. 일반 주문은 checkout에서 선택한다. */
+//    @GetMapping(value = "/pickup", params = "intent=cart-edit")
+//    public String pickupSetting() {
+//        return "customer/order/pickup-setting";
+//    }
+//
+//    @GetMapping("/custom/options")
+//    public String customOptions() {
+//        return "customer/order/custom-option";
+//    }
+//
+//    @GetMapping("/custom/request")
+//    public String customRequest() {
+//        return "customer/order/custom-request";
+//    }
 
-    @GetMapping("/custom/options")
-    public String customOptions() {
-        return "customer/order/custom-option";
-    }
-
-    @GetMapping("/custom/request")
-    public String customRequest() {
-        return "customer/order/custom-request";
-    }
-
+    // 일반 상품 주문서 화면
     @GetMapping("/checkout")
     public String checkout(
             @ModelAttribute("orderForm") GeneralOrderForm form,
@@ -60,6 +61,7 @@ public class OrderController {
         return renderCheckout(form, model);
     }
 
+    // 일반 상품 주문 생성
     @PostMapping("/general")
     public String createGeneralOrder(
             @AuthenticationPrincipal MemberDetails member,
@@ -73,26 +75,27 @@ public class OrderController {
             }
             return renderCheckout(form, model);
         }
+        long memberId = requireMemberId(member);
 
-        long orderId = orderService.createGeneralOrder(
-                requireMemberId(member),
-                form
-        );
+        long orderId = orderService.createGeneralOrder(memberId, form);
         return "redirect:/orders/" + orderId + "/payment";
     }
 
+    // 로그인 회원의 주문 목록
     @GetMapping
     public String orders(
             @AuthenticationPrincipal MemberDetails member,
             Model model
     ) {
+        long memberId = requireMemberId(member);
         model.addAttribute(
                 "orders",
-                orderQueryService.getMemberOrders(requireMemberId(member))
+                orderQueryService.getMemberOrders(memberId)
         );
         return "customer/order/detail";
     }
 
+    // 로그인 회원의 주문 상세.
     @GetMapping("/{orderId:\\d+}")
     public String detail(
             @PathVariable("orderId") long orderId,
@@ -117,6 +120,7 @@ public class OrderController {
         return "customer/order/form";
     }
 
+    /** 유효한 아이템인지 확인. **/
     private boolean hasInvalidOrderItem(BindingResult bindingResult) {
         return bindingResult.hasFieldErrors("productId")
                 || bindingResult.hasFieldErrors("quantity")
@@ -137,11 +141,14 @@ public class OrderController {
         form.setPickupPhone(profile.phone());
     }
 
+
     private MemberDetails requireMember(MemberDetails member) {
         requireMemberId(member);
         return member;
     }
 
+    /** 멤버 유효한지 체크.
+     * member_id 반환**/
     private long requireMemberId(MemberDetails member) {
         if (member == null || member.getMemberId() == null) {
             throw new BusinessException(CommonErrorCode.FORBIDDEN);

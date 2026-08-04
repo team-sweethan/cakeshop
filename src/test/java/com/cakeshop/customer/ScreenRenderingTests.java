@@ -13,8 +13,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.cakeshop.global.config.MariaDbIntegrationTest;
-import com.cakeshop.domain.order.dto.form.GeneralOrderForm;
-import com.cakeshop.domain.order.service.OrderCheckoutService;
+import com.cakeshop.domain.order.dto.form.customer.GeneralOrderForm;
+import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
 import com.cakeshop.domain.order.service.OrderServiceImpl;
 
 import org.junit.jupiter.api.BeforeEach;

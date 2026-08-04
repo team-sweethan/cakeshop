@@ -3,7 +3,7 @@ package com.cakeshop.domain.payment.service;
 import com.cakeshop.domain.order.dto.view.OrderDetailView;
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.entity.OrderType;
-import com.cakeshop.domain.order.service.OrderQueryService;
+import com.cakeshop.domain.order.service.customer.CustomerOrderQueryService;
 import com.cakeshop.domain.payment.dto.form.TossPaymentSuccessForm;
 import com.cakeshop.domain.payment.dto.view.PaymentCheckoutView;
 import com.cakeshop.domain.payment.dto.view.PaymentCompletionView;
@@ -41,7 +41,7 @@ class PaymentQueryServiceTests {
     );
 
     @Mock
-    private OrderQueryService orderQueryService;
+    private CustomerOrderQueryService orderQueryService;
 
     @Mock
     private PaymentService paymentService;

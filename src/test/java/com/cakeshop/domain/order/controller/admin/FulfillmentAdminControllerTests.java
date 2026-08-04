@@ -1,4 +1,4 @@
-package com.cakeshop.domain.order.controller;
+package com.cakeshop.domain.order.controller.admin;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
@@ -12,10 +12,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
-import com.cakeshop.domain.order.dto.form.FulfillmentSearchCondition;
-import com.cakeshop.domain.order.dto.view.FulfillmentListView;
+import com.cakeshop.domain.order.dto.form.admin.FulfillmentSearchCondition;
+import com.cakeshop.domain.order.dto.view.admin.FulfillmentListView;
 import com.cakeshop.domain.order.entity.OrderStatus;
-import com.cakeshop.domain.order.service.FulfillmentService;
+import com.cakeshop.domain.order.controller.admin.FulfillmentAdminController;
+import com.cakeshop.domain.order.service.admin.FulfillmentService;
 import com.cakeshop.global.security.MemberDetails;
 import java.time.LocalDate;
 import java.util.List;

@@ -1,4 +1,4 @@
-package com.cakeshop.domain.order.controller;
+package com.cakeshop.domain.order.controller.admin;
 
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -9,7 +9,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
-import com.cakeshop.domain.order.service.FulfillmentService;
+import com.cakeshop.domain.order.controller.admin.FulfillmentAdminController;
+import com.cakeshop.domain.order.service.admin.FulfillmentService;
 import com.cakeshop.global.security.MemberDetails;
 import com.cakeshop.global.security.SecurityConfig;
 import org.junit.jupiter.api.Test;

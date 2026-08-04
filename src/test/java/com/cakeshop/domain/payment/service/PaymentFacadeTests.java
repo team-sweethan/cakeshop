@@ -1,7 +1,7 @@
 package com.cakeshop.domain.payment.service;
 
 import com.cakeshop.domain.order.service.OrderService;
-import com.cakeshop.domain.order.service.OrderQueryService;
+import com.cakeshop.domain.order.service.customer.CustomerOrderQueryService;
 import com.cakeshop.domain.order.dto.view.OrderDetailView;
 import com.cakeshop.domain.order.service.OrderService.GeneralPaymentOrder;
 import com.cakeshop.domain.order.service.OrderService.PaymentProduct;
@@ -49,7 +49,7 @@ class PaymentFacadeTests {
     private OrderService orderService;
 
     @Mock
-    private OrderQueryService orderQueryService;
+    private CustomerOrderQueryService orderQueryService;
 
     @Mock
     private OrderDetailView ownedOrder;

@@ -1,6 +1,6 @@
 package com.cakeshop.domain.order.service;
 
-import com.cakeshop.domain.order.dto.form.GeneralOrderForm;
+import com.cakeshop.domain.order.dto.form.customer.GeneralOrderForm;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;

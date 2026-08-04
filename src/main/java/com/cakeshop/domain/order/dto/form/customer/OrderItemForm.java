@@ -1,4 +1,4 @@
-package com.cakeshop.domain.order.dto.form;
+package com.cakeshop.domain.order.dto.form.customer;
 
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;

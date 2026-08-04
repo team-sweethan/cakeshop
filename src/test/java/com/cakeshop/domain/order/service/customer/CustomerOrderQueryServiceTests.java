@@ -1,4 +1,4 @@
-package com.cakeshop.domain.order.service;
+package com.cakeshop.domain.order.service.customer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -15,6 +15,8 @@ import com.cakeshop.domain.order.entity.OrderItemOption;
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.order.mapper.OrderMapper;
+import com.cakeshop.domain.order.service.OrderViewAssembler;
+import com.cakeshop.domain.order.service.customer.CustomerOrderQueryService;
 import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.error.CommonErrorCode;
@@ -29,16 +31,16 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-class OrderQueryServiceTests {
+class CustomerOrderQueryServiceTests {
 
     @Mock
     private OrderMapper orderMapper;
 
-    private OrderQueryService orderQueryService;
+    private CustomerOrderQueryService orderQueryService;
 
     @BeforeEach
     void setUp() {
-        orderQueryService = new OrderQueryService(orderMapper);
+        orderQueryService = new CustomerOrderQueryService(new OrderViewAssembler(orderMapper));
     }
 
     @Test

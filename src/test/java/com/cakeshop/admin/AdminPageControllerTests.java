@@ -39,11 +39,11 @@ import com.cakeshop.domain.member.controller.MemberAdminController;
 import com.cakeshop.domain.member.service.MemberAdminService;
 import com.cakeshop.domain.member.service.MemberSessionService;
 import com.cakeshop.domain.notification.controller.NotificationAdminController;
-import com.cakeshop.domain.order.controller.FulfillmentAdminController;
-import com.cakeshop.domain.order.controller.OrderAdminController;
-import com.cakeshop.domain.order.dto.view.FulfillmentListView;
-import com.cakeshop.domain.order.service.OrderAdminService;
-import com.cakeshop.domain.order.service.FulfillmentService;
+import com.cakeshop.domain.order.controller.admin.FulfillmentAdminController;
+import com.cakeshop.domain.order.controller.admin.OrderAdminController;
+import com.cakeshop.domain.order.dto.view.admin.FulfillmentListView;
+import com.cakeshop.domain.order.service.admin.AdminOrderService;
+import com.cakeshop.domain.order.service.admin.FulfillmentService;
 import com.cakeshop.domain.payment.controller.PaymentAdminController;
 import com.cakeshop.domain.payment.dto.view.PaymentAdminListView;
 import com.cakeshop.domain.payment.dto.view.PaymentAdminSummaryView;
@@ -116,7 +116,7 @@ class AdminPageControllerTests {
                 new ProductAdminController(
                         Mockito.mock(ProductAdminService.class)),
                 new OrderAdminController(
-                        Mockito.mock(OrderAdminService.class),
+                        Mockito.mock(AdminOrderService.class),
                         Mockito.mock(RefundFacade.class)),
                 new FulfillmentAdminController(
                         fulfillmentService),

@@ -1,12 +1,14 @@
-package com.cakeshop.domain.order.service;
+package com.cakeshop.domain.order.service.admin;
+
+import com.cakeshop.domain.order.service.admin.FulfillmentService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.cakeshop.domain.order.dto.form.FulfillmentSearchCondition;
-import com.cakeshop.domain.order.dto.view.FulfillmentListView;
+import com.cakeshop.domain.order.dto.form.admin.FulfillmentSearchCondition;
+import com.cakeshop.domain.order.dto.view.admin.FulfillmentListView;
 import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.order.entity.OrderItem;
 import com.cakeshop.domain.order.entity.OrderItemOption;

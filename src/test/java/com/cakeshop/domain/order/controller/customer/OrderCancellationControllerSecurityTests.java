@@ -1,4 +1,4 @@
-package com.cakeshop.domain.order.controller;
+package com.cakeshop.domain.order.controller.customer;
 
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
+import com.cakeshop.domain.order.controller.customer.OrderCancellationController;
 import com.cakeshop.domain.payment.service.RefundFacade;
 import com.cakeshop.global.security.MemberDetails;
 import com.cakeshop.global.security.SecurityConfig;

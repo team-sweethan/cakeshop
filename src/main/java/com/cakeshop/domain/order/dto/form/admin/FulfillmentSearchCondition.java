@@ -1,4 +1,4 @@
-package com.cakeshop.domain.order.dto.form;
+package com.cakeshop.domain.order.dto.form.admin;
 
 import com.cakeshop.domain.order.entity.OrderStatus;
 import lombok.Getter;

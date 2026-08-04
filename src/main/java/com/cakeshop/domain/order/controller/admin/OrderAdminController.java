@@ -1,7 +1,7 @@
-package com.cakeshop.domain.order.controller;
+package com.cakeshop.domain.order.controller.admin;
 
 import com.cakeshop.domain.order.dto.form.CancelForm;
-import com.cakeshop.domain.order.service.OrderAdminService;
+import com.cakeshop.domain.order.service.admin.AdminOrderService;
 import com.cakeshop.domain.payment.service.RefundFacade;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.error.CommonErrorCode;
@@ -21,7 +21,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @RequiredArgsConstructor
 public class OrderAdminController {
 
-    private final OrderAdminService orderAdminService;
+    private final AdminOrderService orderAdminService;
     private final RefundFacade refundFacade;
 
     @GetMapping("/admin/orders")

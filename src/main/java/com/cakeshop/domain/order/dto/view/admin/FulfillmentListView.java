@@ -1,4 +1,4 @@
-package com.cakeshop.domain.order.dto.view;
+package com.cakeshop.domain.order.dto.view.admin;
 
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.entity.OrderType;
