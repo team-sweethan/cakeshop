@@ -136,15 +136,37 @@ public class PaymentFacade {
         } catch (BusinessException approvalFailure) {
             // timeout·연결 단절처럼 승인 결과가 불명확하면
             // paymentKey 조회 결과를 정본으로 삼는다.
-            Optional<PaymentLookupResult> afterFailure = tossPaymentClient.find(
-                    form.getPaymentKey()
-            );
+            Optional<PaymentLookupResult> afterFailure;
+            try {
+                afterFailure = tossPaymentClient.find(form.getPaymentKey());
+            } catch (BusinessException lookupFailure) {
+                throw persistUncertainApproval(payment, form.getPaymentKey());
+            }
             if (afterFailure.isEmpty()) {
-                throw approvalFailure;
+                throw persistUncertainApproval(payment, form.getPaymentKey());
             }
             return resolveLookup(payment, form, afterFailure.get())
-                    .orElseThrow(() -> approvalFailure);
+                    .orElseThrow(() -> persistUncertainApproval(
+                            payment,
+                            form.getPaymentKey()
+                    ));
         }
+    }
+
+    private BusinessException persistUncertainApproval(
+            Payment payment,
+            String paymentKey
+    ) {
+        try {
+            CompensationRequest request = paymentRecoveryService.createRequest(
+                    payment,
+                    paymentKey
+            );
+            paymentRecoveryService.prepareCompensation(request);
+        } catch (RuntimeException persistenceFailure) {
+            log.warn("Uncertain payment approval recovery could not be persisted.");
+        }
+        return new BusinessException(PaymentErrorCode.PAYMENT_RECOVERY_PENDING);
     }
 
     private Optional<ApprovalResult> resolveLookup(

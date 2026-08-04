@@ -339,6 +339,70 @@ class PaymentFacadeTests {
     }
 
     @Test
+    void confirmGeneralPayment_approvalAndLookupFailure_persistsRecoveryTarget() {
+        GeneralPaymentOrder order = order(NOW.plusMinutes(5));
+        Payment payment = payment();
+        PaymentConfirmForm form = form(BigDecimal.valueOf(30_000));
+        CompensationRequest request = compensationRequest();
+        when(orderService.getGeneralPaymentOrder(10L, 1L)).thenReturn(order);
+        when(paymentService.getReadyPayment(1L)).thenReturn(payment);
+        when(tossPaymentClient.find("payment-key"))
+                .thenReturn(Optional.empty())
+                .thenThrow(new BusinessException(
+                        PaymentErrorCode.PAYMENT_STATUS_LOOKUP_FAILED
+                ));
+        when(tossPaymentClient.approve(
+                "payment-key",
+                "ORD-100",
+                30_000L,
+                "PAY-1"
+        )).thenThrow(new BusinessException(PaymentErrorCode.TOSS_APPROVAL_FAILED));
+        when(paymentRecoveryService.createRequest(payment, "payment-key"))
+                .thenReturn(request);
+
+        assertPaymentError(
+                () -> paymentFacade.confirmGeneralPayment(10L, 1L, form),
+                PaymentErrorCode.PAYMENT_RECOVERY_PENDING
+        );
+
+        verify(paymentRecoveryService).prepareCompensation(request);
+        verify(paymentService, never()).completeGeneralPayment(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any()
+        );
+    }
+
+    @Test
+    void confirmGeneralPayment_approvalFailureLookupEmpty_persistsRecoveryTarget() {
+        GeneralPaymentOrder order = order(NOW.plusMinutes(5));
+        Payment payment = payment();
+        CompensationRequest request = compensationRequest();
+        when(orderService.getGeneralPaymentOrder(10L, 1L)).thenReturn(order);
+        when(paymentService.getReadyPayment(1L)).thenReturn(payment);
+        when(tossPaymentClient.find("payment-key")).thenReturn(Optional.empty());
+        when(tossPaymentClient.approve(
+                "payment-key",
+                "ORD-100",
+                30_000L,
+                "PAY-1"
+        )).thenThrow(new BusinessException(PaymentErrorCode.TOSS_APPROVAL_FAILED));
+        when(paymentRecoveryService.createRequest(payment, "payment-key"))
+                .thenReturn(request);
+
+        assertPaymentError(
+                () -> paymentFacade.confirmGeneralPayment(
+                        10L,
+                        1L,
+                        form(BigDecimal.valueOf(30_000))
+                ),
+                PaymentErrorCode.PAYMENT_RECOVERY_PENDING
+        );
+
+        verify(paymentRecoveryService).prepareCompensation(request);
+    }
+
+    @Test
     void confirmGeneralPayment_lookupInProgress_usesSameIdempotentApproval() {
         GeneralPaymentOrder order = order(NOW.plusMinutes(5));
         Payment payment = payment();
