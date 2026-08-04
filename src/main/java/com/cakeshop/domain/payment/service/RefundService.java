@@ -67,6 +67,20 @@ public class RefundService {
             throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_NOT_AVAILABLE);
         }
 
+        PaymentCancellation requestedCancellation = paymentMapper
+                .findRequestedCancellationByPaymentId(payment.getId())
+                .orElse(null);
+        if (requestedCancellation != null) {
+            return reuseRequestedCancellation(
+                    requestedCancellation,
+                    payment,
+                    order,
+                    expectedStatus,
+                    requestedBy,
+                    canceledBy
+            );
+        }
+
         PaymentCancellation cancellation = new PaymentCancellation();
         cancellation.setPaymentId(payment.getId());
         cancellation.setIdempotencyKey("CANCEL-" + UUID.randomUUID());
@@ -87,6 +101,38 @@ public class RefundService {
                 cancellation.getCancelReason(),
                 canceledBy,
                 now
+        );
+    }
+
+    private RefundRequest reuseRequestedCancellation(
+            PaymentCancellation cancellation,
+            Payment payment,
+            Order order,
+            OrderStatus expectedStatus,
+            long requestedBy,
+            String canceledBy
+    ) {
+        if (cancellation.getStatus() != PaymentCancellationStatus.REQUESTED
+                || !Long.valueOf(payment.getId()).equals(cancellation.getPaymentId())
+                || !canceledBy.equals(cancellation.getRequestType())
+                || !Long.valueOf(requestedBy).equals(cancellation.getRequestedBy())
+                || cancellation.getId() == null
+                || cancellation.getIdempotencyKey() == null
+                || cancellation.getIdempotencyKey().isBlank()
+                || cancellation.getCancelReason() == null
+                || cancellation.getCancelReason().isBlank()
+                || cancellation.getRequestedAt() == null) {
+            throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_NOT_AVAILABLE);
+        }
+        return new RefundRequest(
+                cancellation.getId(),
+                order.getId(),
+                expectedStatus,
+                payment.getPaymentKey(),
+                cancellation.getIdempotencyKey(),
+                cancellation.getCancelReason(),
+                canceledBy,
+                cancellation.getRequestedAt()
         );
     }
 

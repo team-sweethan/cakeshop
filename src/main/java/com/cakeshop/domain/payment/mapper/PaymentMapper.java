@@ -83,6 +83,11 @@ public interface PaymentMapper {
             @Param("idempotencyKey") String idempotencyKey
     );
 
+    // 결제에 이미 진행 중인 취소 요청이 있으면 재시도에서 같은 멱등 키를 재사용한다.
+    Optional<PaymentCancellation> findRequestedCancellationByPaymentId(
+            @Param("paymentId") long paymentId
+    );
+
     // READY 또는 DONE 결제에 시스템 보상 취소 요청을 한 건만 생성한다.
     int insertCompensationCancellation(PaymentCancellation cancellation);
 

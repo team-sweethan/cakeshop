@@ -96,6 +96,33 @@ class RefundServiceTests {
     }
 
     @Test
+    void prepareCustomerCancellation_existingRequestedCancellation_reusesIdempotencyKey() {
+        Order order = order(3L);
+        Payment payment = payment();
+        PaymentCancellation existing = cancellation();
+        existing.setIdempotencyKey("existing-cancel-key");
+        existing.setRequestType("CUSTOMER");
+        existing.setRequestedBy(3L);
+        existing.setRequestedAt(NOW.minusMinutes(1));
+        when(orderMapper.findOrderByIdForUpdate(10L)).thenReturn(Optional.of(order));
+        when(paymentMapper.findDonePaymentByOrderId(10L)).thenReturn(Optional.of(payment));
+        when(paymentMapper.findRequestedCancellationByPaymentId(20L))
+                .thenReturn(Optional.of(existing));
+
+        RefundRequest result = refundService.prepareCustomerCancellation(
+                3L,
+                10L,
+                "변경된 취소 사유"
+        );
+
+        assertThat(result.cancellationId()).isEqualTo(30L);
+        assertThat(result.idempotencyKey()).isEqualTo("existing-cancel-key");
+        assertThat(result.reason()).isEqualTo("단순 변심");
+        assertThat(result.requestedAt()).isEqualTo(NOW.minusMinutes(1));
+        verify(paymentMapper, never()).insertPaymentCancellation(any());
+    }
+
+    @Test
     void prepareCustomerCancellation_customOrder_isNotSupportedInGeneralMvp() {
         Order order = order(3L);
         order.setOrderType(OrderType.CUSTOM);

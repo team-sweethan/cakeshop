@@ -305,6 +305,29 @@
         WHERE idempotency_key = #{idempotencyKey}
     </select>
 
+    <select id="findRequestedCancellationByPaymentId"
+            resultType="com.cakeshop.domain.payment.entity.PaymentCancellation">
+        SELECT
+            id,
+            payment_id,
+            idempotency_key,
+            cancel_amount,
+            cancel_reason,
+            request_type,
+            requested_by,
+            status,
+            active_requested_payment_id,
+            transaction_key,
+            failure_code,
+            failure_message,
+            requested_at,
+            canceled_at,
+            created_at,
+            updated_at
+        FROM payment_cancellations
+        WHERE active_requested_payment_id = #{paymentId}
+    </select>
+
     <insert id="insertCompensationCancellation"
             parameterType="com.cakeshop.domain.payment.entity.PaymentCancellation"
             useGeneratedKeys="true"

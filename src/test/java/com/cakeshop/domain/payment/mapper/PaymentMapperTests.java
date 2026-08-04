@@ -338,6 +338,9 @@ class PaymentMapperTests {
         assertThat(saved.getRequestedAt()).isNotNull();
         assertThat(saved.getCreatedAt()).isNotNull();
         assertThat(saved.getUpdatedAt()).isNotNull();
+        assertThat(paymentMapper.findRequestedCancellationByPaymentId(payment.getId()))
+                .hasValueSatisfying(requested -> assertThat(requested.getId())
+                        .isEqualTo(cancellation.getId()));
     }
 
     @Test
