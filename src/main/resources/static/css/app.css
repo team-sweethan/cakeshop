@@ -852,6 +852,56 @@ h2.section-title {
     margin-top: var(--space-2)
 }
 
+.product-gallery__main {
+    position: relative
+}
+
+.product-gallery__nav {
+    align-items: center;
+    background: rgba(255, 255, 255, .9);
+    border: 1px solid var(--color-border);
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    font-size: var(--font-lg);
+    height: 40px;
+    justify-content: center;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 40px;
+    z-index: 1
+}
+
+.product-gallery__nav:hover {
+    background: #fff
+}
+
+.product-gallery__nav:focus-visible,
+.product-gallery__thumbnail-button:focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px
+}
+
+.product-gallery__nav--previous {
+    left: var(--space-2)
+}
+
+.product-gallery__nav--next {
+    right: var(--space-2)
+}
+
+.product-gallery__thumbnail-button {
+    background: transparent;
+    border: 2px solid transparent;
+    cursor: pointer;
+    padding: 0
+}
+
+.product-gallery__thumbnail-button.is-active {
+    border-color: var(--color-dark)
+}
+
 .product-gallery__thumbnails .placeholder-image {
     width: 100%
 }
