@@ -7,7 +7,8 @@
 
   <title>상품 목록 | 케이크 쇼핑몰</title>
 
-  <link rel="stylesheet" th:href="@{/css/app.css}">
+  <link rel="stylesheet"
+        th:href="@{/css/app.css(v='product-image-square')}">
   <link rel="stylesheet"
         th:href="@{/css/customer-mockup.css}">
 
@@ -194,7 +195,7 @@
         </div>
 
         <!-- 조회된 상품 카드 -->
-        <div class="grid grid--3 product-grid"
+        <div class="grid grid--4 product-grid"
              th:if="${!pageResult.content.isEmpty()}">
 
           <a class="product-card"
@@ -204,14 +205,14 @@
                )}">
 
             <!-- 대표 이미지가 있는 경우 -->
-            <img class="placeholder-image"
+            <img class="placeholder-image product-card__image"
                  th:if="${product.thumbnailUrl != null
                            and !product.thumbnailUrl.isBlank()}"
                  th:src="${product.thumbnailUrl}"
                  th:alt="${product.name}">
 
             <!-- 대표 이미지가 없는 경우 -->
-            <div class="placeholder-image"
+            <div class="placeholder-image product-card__image"
                  th:unless="${product.thumbnailUrl != null
                                and !product.thumbnailUrl.isBlank()}">
               상품 이미지 준비 중
