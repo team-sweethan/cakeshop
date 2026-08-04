@@ -1,5 +1,6 @@
 package com.cakeshop.domain.community.mapper;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import com.cakeshop.domain.community.dto.view.CommentCountView;
@@ -236,6 +237,51 @@ public interface CommunityMapper {
     boolean existsReport(
             @Param("postId") long postId,
             @Param("reporterId") long reporterId
+    );
+
+    // --- 인기글 배치 (조각 7b) ---
+    //
+    // 배치 문장을 별도 매퍼로 빼지 않는 이유: 매퍼는 고객과 관리자로만 가른다는 것이
+    // 이 도메인의 규칙이고(CLAUDE.md), 7c의 화면 조회도 여기로 들어온다. 인기글 SQL이
+    // 두 파일로 흩어지면 집계와 노출의 조건이 어긋나도 한자리에서 볼 수 없다 —
+    // 선정과 노출이 각각 PUBLISHED를 봐야 한다는 D5가 정확히 그 자리다.
+
+    /**
+     * 이 날짜의 배치가 이미 확정됐는지. 확정됐으면 재실행은 아무것도 하지 않는다(D4).
+     *
+     * 순위 표가 아니라 실행 기록 표를 본다. 순위가 0건인 날도 "돌았다"이기 때문이다 —
+     * 순위 표로 판단하면 활동 없는 날마다 배치가 매번 다시 집계한다(D11).
+     */
+    boolean existsBatchRun(
+            @Param("rankingDate") LocalDate rankingDate
+    );
+
+    /** 이 날짜의 순위를 지운다. 재집계의 첫 문장이며 INSERT와 한 트랜잭션이어야 한다. */
+    int deleteDailyRanking(
+            @Param("rankingDate") LocalDate rankingDate
+    );
+
+    /**
+     * 최근 7일 창을 집계해 상위 limit건을 이 날짜의 순위로 확정한다. 넣은 행 수를 돌려준다.
+     *
+     * 형태가 규칙이다 — 세 원본을 창으로 먼저 자른 뒤 UNION ALL로 합친다(H21).
+     * 게시글마다 도는 스칼라 서브쿼리로 바꾸면 결과는 같지만 대상이 창 안의 이벤트가
+     * 아니라 전체 게시글이 되어 창을 둔 이득이 사라진다. 자세한 근거는 XML에 적었다.
+     */
+    int insertDailyRanking(
+            @Param("rankingDate") LocalDate rankingDate,
+            @Param("limit") int limit
+    );
+
+    /**
+     * 이 날짜를 확정했다고 기록한다. postCount가 0이어도 행을 남긴다.
+     *
+     * 0건인 날에도 남기는 것이 이 표의 존재 이유다(D11). 남기지 않으면 "안 돈 날"과
+     * 구분되지 않아 화면이 옛 날짜로 되돌아간다.
+     */
+    int insertBatchRun(
+            @Param("rankingDate") LocalDate rankingDate,
+            @Param("postCount") int postCount
     );
 
 }
