@@ -1794,6 +1794,20 @@ body > main {
     grid-template-rows: auto auto auto
 }
 
+.product-create-image-placeholder {
+    min-height: 112px;
+    width: 100%
+}
+
+.product-create-image-placeholder[hidden] {
+    display: none
+}
+
+.product-create-image-button {
+    justify-self: start;
+    width: fit-content
+}
+
 .product-image-preview {
     aspect-ratio: 1 / 1;
     display: block;

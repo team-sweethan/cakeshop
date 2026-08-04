@@ -15,10 +15,10 @@
   </title>
 
   <link rel="stylesheet"
-        th:href="@{/css/app.css(v='admin-product-image-square')}">
+        th:href="@{/css/app.css(v='product-create-images-v4')}">
 
   <script defer
-          th:src="@{/js/product-admin-form.js}">
+          th:src="@{/js/product-admin-form.js(v='product-create-images-v4')}">
   </script>
 </head>
 
@@ -63,6 +63,7 @@
       <form id="productInfoForm"
             class="admin-form"
             method="post"
+            enctype="multipart/form-data"
             th:action="${formAction}"
             th:object="${productForm}">
 
@@ -314,6 +315,57 @@
               상품 정보를 수정해도 현재 판매 상태는 변경되지 않습니다.
               판매 시작 또는 중지는 상품 목록에서 변경해 주세요.
             </div>
+          </div>
+        </section>
+
+        <!-- 등록할 때 상품 정보와 이미지를 한 번에 저장한다. -->
+        <section class="section" th:unless="${editMode}">
+          <h2 class="section-title">
+            상품 이미지
+          </h2>
+
+          <div class="panel form-stack">
+            <p class="form-help">
+              JPEG·PNG 이미지를 최대 5장까지 등록할 수 있습니다.
+              파일당 최대 크기는 5MB입니다.
+            </p>
+
+            <div class="grid grid--4"
+                 data-product-create-image-grid
+                 hidden>
+            </div>
+
+            <div class="placeholder-image product-create-image-placeholder"
+                 data-product-create-image-placeholder>
+              등록할 상품 이미지가 없습니다.
+            </div>
+
+            <div class="form-group">
+              <label for="imageFiles">
+                이미지 파일
+              </label>
+
+              <input id="imageFiles"
+                     class="form-control"
+                     type="file"
+                     accept="image/jpeg,image/png"
+                     multiple
+                     data-product-create-image-input
+                     th:field="*{imageFiles}">
+
+            </div>
+
+            <button class="btn btn--primary product-create-image-button"
+                    type="button"
+                    data-product-create-image-select>
+              이미지 추가
+            </button>
+
+            <p class="form-help"
+               data-product-create-image-limit
+               hidden>
+              상품 이미지를 최대 5장까지 선택했습니다.
+            </p>
           </div>
         </section>
 

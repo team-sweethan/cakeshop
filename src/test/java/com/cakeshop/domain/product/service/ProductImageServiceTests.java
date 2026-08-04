@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -29,6 +30,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.multipart.MultipartFile;
 
 @ExtendWith(MockitoExtension.class)
 class ProductImageServiceTests {
@@ -213,6 +215,55 @@ class ProductImageServiceTests {
         );
 
         verify(fileStorageClient).delete(STORED_IMAGE_URL);
+    }
+
+    @Test
+    void uploadImages_moreThanFiveFiles_rejectsBeforeValidation() {
+        MockMultipartFile imageFile = (MockMultipartFile) uploadForm()
+                .getImageFile();
+        List<MultipartFile> imageFiles = List.of(
+                imageFile,
+                imageFile,
+                imageFile,
+                imageFile,
+                imageFile,
+                imageFile
+        );
+
+        assertBusinessError(
+                () -> productImageService.uploadImages(
+                        1L,
+                        imageFiles
+                ),
+                ProductErrorCode.IMAGE_LIMIT_EXCEEDED
+        );
+
+        verify(productImageValidator, never()).validate(any());
+        verify(fileStorageClient, never()).store(any(), any());
+    }
+
+    @Test
+    void uploadImages_invalidFile_rejectsBeforeAnyFileStorage() {
+        MockMultipartFile first = (MockMultipartFile) uploadForm()
+                .getImageFile();
+        MockMultipartFile second = (MockMultipartFile) uploadForm()
+                .getImageFile();
+        doNothing().when(productImageValidator).validate(first);
+        doThrow(new BusinessException(
+                ProductErrorCode.INVALID_IMAGE_FILE
+        )).when(productImageValidator).validate(second);
+
+        assertBusinessError(
+                () -> productImageService.uploadImages(
+                        1L,
+                        List.of(first, second)
+                ),
+                ProductErrorCode.INVALID_IMAGE_FILE
+        );
+
+        verify(fileStorageClient, never()).store(any(), any());
+        verify(productMapper, never())
+                .insertProductImage(any());
     }
 
     @Test

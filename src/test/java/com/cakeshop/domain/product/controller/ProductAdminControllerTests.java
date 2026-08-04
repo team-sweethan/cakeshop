@@ -1,6 +1,7 @@
 package com.cakeshop.domain.product.controller;
 
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
@@ -29,6 +30,7 @@ import com.cakeshop.global.error.BusinessException;
 
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -314,6 +316,54 @@ class ProductAdminControllerTests {
                 .isEqualByComparingTo("35000");
         assertThat(form.getProductType())
                 .isEqualTo(ProductType.GENERAL);
+    }
+
+    @Test
+    void createProductWithImagesBindsSelectedFiles()
+            throws Exception {
+        ProductAdminService productAdminService =
+                mock(ProductAdminService.class);
+        MockMultipartFile representative = new MockMultipartFile(
+                "imageFiles",
+                "representative.png",
+                "image/png",
+                new byte[] {(byte) 0x89, 0x50, 0x4E, 0x47}
+        );
+        MockMultipartFile detail = new MockMultipartFile(
+                "imageFiles",
+                "detail.png",
+                "image/png",
+                new byte[] {(byte) 0x89, 0x50, 0x4E, 0x47}
+        );
+        MockMvc mockMvc = MockMvcBuilders
+                .standaloneSetup(
+                        new ProductAdminController(
+                                productAdminService
+                        )
+                )
+                .build();
+
+        mockMvc.perform(
+                        multipart("/admin/products")
+                                .file(representative)
+                                .file(detail)
+                                .param("categoryId", "1")
+                                .param("name", "신규 케이크")
+                                .param("basePrice", "35000")
+                                .param("stockQuantity", "10")
+                                .param("productType", "GENERAL")
+                                .param("preparationDays", "0")
+                )
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/admin/products"));
+
+        ArgumentCaptor<ProductForm> formCaptor =
+                ArgumentCaptor.forClass(ProductForm.class);
+        verify(productAdminService).createProduct(
+                formCaptor.capture()
+        );
+        assertThat(formCaptor.getValue().getImageFiles())
+                .containsExactly(representative, detail);
     }
 
     @Test
