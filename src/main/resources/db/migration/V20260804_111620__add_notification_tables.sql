@@ -16,7 +16,7 @@ ALTER TABLE `notifications`
     ADD COLUMN `review_reply_id`   BIGINT NULL COMMENT '관련 사장님 리뷰 답글 ID' AFTER `review_id`,
     ADD COLUMN `user_coupon_id`    BIGINT NULL COMMENT '발급된 회원 쿠폰 ID' AFTER `review_reply_id`,
     ADD COLUMN `delivery_scope`    VARCHAR(30) NOT NULL DEFAULT 'WEB_ONLY' COMMENT '발송 범위 (WEB_ONLY, WEB_AND_SMS)' AFTER `content`,
-    ADD COLUMN `event_key`         VARCHAR(100) NULL COMMENT '동일 이벤트 중복 알림 방지 키' AFTER `target_url`,
+    ADD COLUMN `event_key`         VARCHAR(100) NOT NULL DEFAULT '' COMMENT '동일 이벤트 중복 알림 방지 키' AFTER `target_url`,
     ADD CONSTRAINT `fk_notifications_actor` FOREIGN KEY (`actor_id`) REFERENCES `members` (`id`) ON DELETE SET NULL,
     ADD CONSTRAINT `uk_notifications_receiver_event` UNIQUE (`receiver_id`, `event_key`);
 
