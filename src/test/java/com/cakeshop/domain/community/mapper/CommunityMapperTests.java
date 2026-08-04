@@ -48,6 +48,14 @@ class CommunityMapperTests {
     @Autowired
     private CommunityMapper communityMapper;
 
+    /**
+     * 관리자 쪽 문장은 CommunityAdminMapper로 갈라져 있다(고객 경로와 노출 규칙이 정반대라
+     * 나눴다). 검사는 한 클래스에 둔다 — 차단·기각이 고객 경로의 조회수·좋아요와 <b>같은
+     * 게시글 행</b>을 만지므로, 같은 픽스처 위에서 확인해야 두 쪽이 어긋나는 순간이 잡힌다.
+     */
+    @Autowired
+    private CommunityAdminMapper communityAdminMapper;
+
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
@@ -869,7 +877,7 @@ class CommunityMapperTests {
         long reporterId = insertReporter("closed");
 
         communityMapper.insertReport(postId, reporterId, "광고입니다");
-        communityMapper.closePendingReports(postId, ReportStatus.RESOLVED);
+        communityAdminMapper.closePendingReports(postId, ReportStatus.RESOLVED);
 
         assertThat(communityMapper.existsReport(postId, reporterId)).isTrue();
     }
@@ -880,7 +888,7 @@ class CommunityMapperTests {
         long postId = insertPost("차단 대상", PostStatus.PUBLISHED, BASE_TIME);
         long adminId = insertReporter("admin");
 
-        assertThat(communityMapper.blockPost(postId, "광고성 게시물", adminId)).isEqualTo(1);
+        assertThat(communityAdminMapper.blockPost(postId, "광고성 게시물", adminId)).isEqualTo(1);
 
         PostDetailView post = communityMapper.findPostById(postId);
         assertThat(post.status()).isEqualTo(PostStatus.BLOCKED);
@@ -899,7 +907,7 @@ class CommunityMapperTests {
         long postId = insertPost("차단 대상", PostStatus.PUBLISHED, BASE_TIME);
         long adminId = insertReporter("edit-admin");
 
-        communityMapper.blockPost(postId, "사유", adminId);
+        communityAdminMapper.blockPost(postId, "사유", adminId);
 
         assertThat(communityMapper.findPostById(postId).isEdited()).isFalse();
     }
@@ -911,9 +919,9 @@ class CommunityMapperTests {
         long firstAdminId = insertReporter("first-admin");
         long secondAdminId = insertReporter("second-admin");
 
-        communityMapper.blockPost(postId, "첫 번째 사유", firstAdminId);
+        communityAdminMapper.blockPost(postId, "첫 번째 사유", firstAdminId);
 
-        assertThat(communityMapper.blockPost(postId, "두 번째 사유", secondAdminId)).isZero();
+        assertThat(communityAdminMapper.blockPost(postId, "두 번째 사유", secondAdminId)).isZero();
         assertThat(communityMapper.findPostById(postId).blockedReason())
                 .isEqualTo("첫 번째 사유");
         assertThat(blockedBy(postId)).isEqualTo(firstAdminId);
@@ -925,7 +933,7 @@ class CommunityMapperTests {
         long postId = insertPost("지워진 글", PostStatus.DELETED, BASE_TIME);
         long adminId = insertReporter("deleted-admin");
 
-        assertThat(communityMapper.blockPost(postId, "사유", adminId)).isZero();
+        assertThat(communityAdminMapper.blockPost(postId, "사유", adminId)).isZero();
         assertThat(communityMapper.findPostById(postId).status()).isEqualTo(PostStatus.DELETED);
     }
 
@@ -935,9 +943,9 @@ class CommunityMapperTests {
         long postId = insertPost("해제 대상", PostStatus.PUBLISHED, BASE_TIME);
         long adminId = insertReporter("unblock-admin");
 
-        communityMapper.blockPost(postId, "광고성 게시물", adminId);
+        communityAdminMapper.blockPost(postId, "광고성 게시물", adminId);
 
-        assertThat(communityMapper.unblockPost(postId)).isEqualTo(1);
+        assertThat(communityAdminMapper.unblockPost(postId)).isEqualTo(1);
 
         PostDetailView post = communityMapper.findPostById(postId);
         assertThat(post.status()).isEqualTo(PostStatus.PUBLISHED);
@@ -951,8 +959,8 @@ class CommunityMapperTests {
         long publishedId = insertPost("노출 중", PostStatus.PUBLISHED, BASE_TIME);
         long deletedId = insertPost("지워진 글", PostStatus.DELETED, BASE_TIME);
 
-        assertThat(communityMapper.unblockPost(publishedId)).isZero();
-        assertThat(communityMapper.unblockPost(deletedId)).isZero();
+        assertThat(communityAdminMapper.unblockPost(publishedId)).isZero();
+        assertThat(communityAdminMapper.unblockPost(deletedId)).isZero();
         assertThat(communityMapper.findPostById(deletedId).status())
                 .isEqualTo(PostStatus.DELETED);
     }
@@ -965,14 +973,14 @@ class CommunityMapperTests {
         long secondReporterId = insertReporter("r2");
 
         communityMapper.insertReport(postId, firstReporterId, "광고입니다");
-        communityMapper.closePendingReports(postId, ReportStatus.REJECTED);
+        communityAdminMapper.closePendingReports(postId, ReportStatus.REJECTED);
 
         communityMapper.insertReport(postId, secondReporterId, "욕설입니다");
 
-        assertThat(communityMapper.closePendingReports(postId, ReportStatus.RESOLVED))
+        assertThat(communityAdminMapper.closePendingReports(postId, ReportStatus.RESOLVED))
                 .isEqualTo(1);
-        assertThat(communityMapper.countPendingReports(postId)).isZero();
-        assertThat(communityMapper.findReportsByPost(postId))
+        assertThat(communityAdminMapper.countPendingReports(postId)).isZero();
+        assertThat(communityAdminMapper.findReportsByPost(postId))
                 .extracting(ReportView::status)
                 .containsExactlyInAnyOrder(ReportStatus.REJECTED, ReportStatus.RESOLVED);
     }
@@ -1013,7 +1021,7 @@ class CommunityMapperTests {
         communityMapper.insertReport(pendingPostId, insertReporter("p1"), "광고입니다");
         communityMapper.insertReport(closedPostId, insertReporter("c1"), "광고입니다");
         communityMapper.insertReport(closedPostId, insertReporter("c2"), "욕설입니다");
-        communityMapper.closePendingReports(closedPostId, ReportStatus.RESOLVED);
+        communityAdminMapper.closePendingReports(closedPostId, ReportStatus.RESOLVED);
 
         List<AdminPostListView> posts = adminPosts(null, AdminPostSort.REPORTS);
 
@@ -1033,14 +1041,14 @@ class CommunityMapperTests {
         long blockedId = insertPost("차단됨", PostStatus.PUBLISHED, BASE_TIME);
         long adminId = insertReporter("detail-admin");
 
-        communityMapper.blockPost(blockedId, "광고성 게시물", adminId);
+        communityAdminMapper.blockPost(blockedId, "광고성 게시물", adminId);
 
-        AdminPostDetailView neverBlocked = communityMapper.findPostByIdForAdmin(neverBlockedId);
+        AdminPostDetailView neverBlocked = communityAdminMapper.findPostByIdForAdmin(neverBlockedId);
         assertThat(neverBlocked).isNotNull();
         assertThat(neverBlocked.hasBlockRecord()).isFalse();
         assertThat(neverBlocked.blockedByNickname()).isNull();
 
-        AdminPostDetailView blocked = communityMapper.findPostByIdForAdmin(blockedId);
+        AdminPostDetailView blocked = communityAdminMapper.findPostByIdForAdmin(blockedId);
         assertThat(blocked.hasBlockRecord()).isTrue();
         assertThat(blocked.blockedReason()).isEqualTo("광고성 게시물");
         assertThat(blocked.blockedByNickname()).isNotNull();
@@ -1048,7 +1056,7 @@ class CommunityMapperTests {
 
     /** 이 테스트 카테고리의 글만 본다. 다른 테스트가 남긴 글과 섞이지 않게 한다. */
     private List<AdminPostListView> adminPosts(PostStatus status, AdminPostSort sort) {
-        return communityMapper.findPostsForAdmin(status, sort, 100, 0).stream()
+        return communityAdminMapper.findPostsForAdmin(status, sort, 100, 0).stream()
                 .filter(post -> "커뮤니티 테스트".equals(post.categoryName()))
                 .toList();
     }

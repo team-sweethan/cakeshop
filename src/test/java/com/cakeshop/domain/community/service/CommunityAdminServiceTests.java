@@ -13,6 +13,7 @@ import com.cakeshop.domain.community.dto.view.PostLockView;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.entity.ReportStatus;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
+import com.cakeshop.domain.community.mapper.CommunityAdminMapper;
 import com.cakeshop.domain.community.mapper.CommunityMapper;
 import com.cakeshop.global.error.BusinessException;
 
@@ -32,13 +33,23 @@ class CommunityAdminServiceTests {
     private static final long AUTHOR_ID = 7L;
     private static final long ADMIN_ID = 1L;
 
+    private CommunityAdminMapper communityAdminMapper;
+
+    /**
+     * 잠금(lockPost)만 고객 매퍼에 있다. 순서 검증에는 <b>두 목이 함께</b> 들어가야 한다 —
+     * {@code inOrder}에 한쪽만 넣으면 다른 쪽 호출은 순서 판단에서 통째로 빠져서,
+     * 잠그기 전에 쓰는 구현이 그대로 통과한다(H17).
+     */
     private CommunityMapper communityMapper;
+
     private CommunityAdminService communityAdminService;
 
     @BeforeEach
     void setUp() {
+        communityAdminMapper = mock(CommunityAdminMapper.class);
         communityMapper = mock(CommunityMapper.class);
-        communityAdminService = new CommunityAdminService(communityMapper);
+        communityAdminService =
+                new CommunityAdminService(communityAdminMapper, communityMapper);
     }
 
     /**
@@ -50,14 +61,14 @@ class CommunityAdminServiceTests {
     @Test
     void blockPost_publishedPost_locksThenBlocksThenClosesReports() {
         givenLockedPost(PostStatus.PUBLISHED);
-        when(communityMapper.blockPost(POST_ID, "광고성 게시물", ADMIN_ID)).thenReturn(1);
+        when(communityAdminMapper.blockPost(POST_ID, "광고성 게시물", ADMIN_ID)).thenReturn(1);
 
         communityAdminService.blockPost(POST_ID, "광고성 게시물", ADMIN_ID);
 
-        InOrder order = inOrder(communityMapper);
+        InOrder order = inOrder(communityMapper, communityAdminMapper);
         order.verify(communityMapper).lockPost(POST_ID);
-        order.verify(communityMapper).blockPost(POST_ID, "광고성 게시물", ADMIN_ID);
-        order.verify(communityMapper).closePendingReports(POST_ID, ReportStatus.RESOLVED);
+        order.verify(communityAdminMapper).blockPost(POST_ID, "광고성 게시물", ADMIN_ID);
+        order.verify(communityAdminMapper).closePendingReports(POST_ID, ReportStatus.RESOLVED);
     }
 
     /**
@@ -75,8 +86,8 @@ class CommunityAdminServiceTests {
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(CommunityErrorCode.INVALID_POST_TRANSITION);
 
-        verify(communityMapper, never()).blockPost(anyLong(), any(), anyLong());
-        verify(communityMapper, never()).closePendingReports(anyLong(), any());
+        verify(communityAdminMapper, never()).blockPost(anyLong(), any(), anyLong());
+        verify(communityAdminMapper, never()).closePendingReports(anyLong(), any());
     }
 
     /** 작성자가 지운 글은 종착 상태다. 차단하면 지운 글이 되살아난다(DOMAIN.md 4.2). */
@@ -109,12 +120,12 @@ class CommunityAdminServiceTests {
     @Test
     void blockPost_updateAffectedNoRow_doesNotCloseReports() {
         givenLockedPost(PostStatus.PUBLISHED);
-        when(communityMapper.blockPost(POST_ID, "사유", ADMIN_ID)).thenReturn(0);
+        when(communityAdminMapper.blockPost(POST_ID, "사유", ADMIN_ID)).thenReturn(0);
 
         assertThatThrownBy(() -> communityAdminService.blockPost(POST_ID, "사유", ADMIN_ID))
                 .isInstanceOf(BusinessException.class);
 
-        verify(communityMapper, never()).closePendingReports(anyLong(), any());
+        verify(communityAdminMapper, never()).closePendingReports(anyLong(), any());
     }
 
     /**
@@ -126,12 +137,12 @@ class CommunityAdminServiceTests {
     @Test
     void unblockPost_blockedPost_leavesReportsClosed() {
         givenLockedPost(PostStatus.BLOCKED);
-        when(communityMapper.unblockPost(POST_ID)).thenReturn(1);
+        when(communityAdminMapper.unblockPost(POST_ID)).thenReturn(1);
 
         communityAdminService.unblockPost(POST_ID);
 
-        verify(communityMapper).unblockPost(POST_ID);
-        verify(communityMapper, never()).closePendingReports(anyLong(), any());
+        verify(communityAdminMapper).unblockPost(POST_ID);
+        verify(communityAdminMapper, never()).closePendingReports(anyLong(), any());
     }
 
     /** 차단된 적 없는 글에는 해제할 것이 없다. 성공으로 넘기면 화면만 거짓말을 한다. */
@@ -144,23 +155,23 @@ class CommunityAdminServiceTests {
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(CommunityErrorCode.INVALID_POST_TRANSITION);
 
-        verify(communityMapper, never()).unblockPost(anyLong());
+        verify(communityAdminMapper, never()).unblockPost(anyLong());
     }
 
     /** 기각은 게시글을 건드리지 않는다. "차단하지 않기로 했다"도 조치다(DOMAIN.md 6.6). */
     @Test
     void rejectReports_pendingReports_closesThemWithoutTouchingPost() {
         givenLockedPost(PostStatus.PUBLISHED);
-        when(communityMapper.closePendingReports(POST_ID, ReportStatus.REJECTED)).thenReturn(2);
+        when(communityAdminMapper.closePendingReports(POST_ID, ReportStatus.REJECTED)).thenReturn(2);
 
         communityAdminService.rejectReports(POST_ID);
 
         // 잠금이 먼저다. 차단·해제와 같은 행이라 순서가 어긋나면 교착이다(H17).
-        InOrder order = inOrder(communityMapper);
+        InOrder order = inOrder(communityMapper, communityAdminMapper);
         order.verify(communityMapper).lockPost(POST_ID);
-        order.verify(communityMapper).closePendingReports(POST_ID, ReportStatus.REJECTED);
-        verify(communityMapper, never()).blockPost(anyLong(), any(), anyLong());
-        verify(communityMapper, never()).unblockPost(anyLong());
+        order.verify(communityAdminMapper).closePendingReports(POST_ID, ReportStatus.REJECTED);
+        verify(communityAdminMapper, never()).blockPost(anyLong(), any(), anyLong());
+        verify(communityAdminMapper, never()).unblockPost(anyLong());
     }
 
     /**
@@ -180,7 +191,7 @@ class CommunityAdminServiceTests {
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(CommunityErrorCode.INVALID_POST_TRANSITION);
 
-        verify(communityMapper, never()).closePendingReports(anyLong(), any());
+        verify(communityAdminMapper, never()).closePendingReports(anyLong(), any());
     }
 
     /**
@@ -193,11 +204,11 @@ class CommunityAdminServiceTests {
     @Test
     void rejectReports_blockedPost_isAllowed() {
         givenLockedPost(PostStatus.BLOCKED);
-        when(communityMapper.closePendingReports(POST_ID, ReportStatus.REJECTED)).thenReturn(1);
+        when(communityAdminMapper.closePendingReports(POST_ID, ReportStatus.REJECTED)).thenReturn(1);
 
         communityAdminService.rejectReports(POST_ID);
 
-        verify(communityMapper).closePendingReports(POST_ID, ReportStatus.REJECTED);
+        verify(communityAdminMapper).closePendingReports(POST_ID, ReportStatus.REJECTED);
     }
 
     /**
@@ -209,7 +220,7 @@ class CommunityAdminServiceTests {
     @Test
     void rejectReports_withoutPendingReports_isRejected() {
         givenLockedPost(PostStatus.PUBLISHED);
-        when(communityMapper.closePendingReports(POST_ID, ReportStatus.REJECTED)).thenReturn(0);
+        when(communityAdminMapper.closePendingReports(POST_ID, ReportStatus.REJECTED)).thenReturn(0);
 
         assertThatThrownBy(() -> communityAdminService.rejectReports(POST_ID))
                 .isInstanceOf(BusinessException.class)
@@ -227,7 +238,7 @@ class CommunityAdminServiceTests {
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(CommunityErrorCode.POST_NOT_FOUND);
 
-        verify(communityMapper, never()).closePendingReports(anyLong(), any());
+        verify(communityAdminMapper, never()).closePendingReports(anyLong(), any());
     }
 
     /**
@@ -236,7 +247,7 @@ class CommunityAdminServiceTests {
      */
     @Test
     void getPostDetail_missingPost_isRejectedAsNotFound() {
-        when(communityMapper.findPostByIdForAdmin(POST_ID)).thenReturn(null);
+        when(communityAdminMapper.findPostByIdForAdmin(POST_ID)).thenReturn(null);
 
         assertThatThrownBy(() -> communityAdminService.getPostDetail(POST_ID))
                 .isInstanceOf(BusinessException.class)

@@ -35,8 +35,12 @@ class CommunityCommentScopeTests {
 
     private static final Path JAVA_ROOT =
             Path.of("src", "main", "java", "com", "cakeshop", "domain", "community");
-    private static final Path MAPPER_XML =
-            Path.of("src", "main", "resources", "mapper", "community", "CommunityMapper.xml");
+    /**
+     * 파일 하나가 아니라 디렉터리다. 매퍼가 고객·관리자로 갈렸고 앞으로 더 갈릴 수 있는데,
+     * 파일 이름을 박아 두면 <b>새 파일만 검사에서 빠진다</b> — 빠진 자리는 초록불로 보인다.
+     */
+    private static final Path MAPPER_DIRECTORY =
+            Path.of("src", "main", "resources", "mapper", "community");
     private static final List<Path> TEMPLATE_DIRECTORIES = List.of(
             Path.of("src", "main", "resources", "templates", "customer", "community"),
             Path.of("src", "main", "resources", "templates", "admin", "community"));
@@ -73,11 +77,27 @@ class CommunityCommentScopeTests {
      */
     @Test
     void commentSql_hasNoUpdatePathForContent() throws IOException {
-        String sql = strippedOf(MAPPER_XML);
+        for (Path mapperXml : mapperXmlFiles()) {
+            String sql = strippedOf(mapperXml);
 
-        assertThat(sql)
-                .as("댓글에는 수정이 없다(DOMAIN.md 6.4). 규칙을 바꾸려면 문서를 먼저 고친다")
-                .doesNotContain("UPDATE COMMENTS SET CONTENT");
+            assertThat(sql)
+                    .as("댓글에는 수정이 없다(DOMAIN.md 6.4). 규칙을 바꾸려면 문서를 먼저 고친다: "
+                            + mapperXml)
+                    .doesNotContain("UPDATE COMMENTS SET CONTENT");
+        }
+    }
+
+    /** 커뮤니티 매퍼 XML 전부. 하나도 못 읽었다면 경로가 바뀐 것이다. */
+    private List<Path> mapperXmlFiles() throws IOException {
+        List<Path> mappers;
+
+        try (Stream<Path> paths = Files.list(MAPPER_DIRECTORY)) {
+            mappers = paths.filter(path -> path.toString().endsWith(".xml")).sorted().toList();
+        }
+
+        assertThat(mappers).as("커뮤니티 매퍼 XML이 있어야 한다").isNotEmpty();
+
+        return mappers;
     }
 
     private List<Path> scannedSources() throws IOException {
@@ -89,8 +109,7 @@ class CommunityCommentScopeTests {
 
         assertThat(sources).as("커뮤니티 자바 소스를 하나도 못 읽었다면 경로가 바뀐 것이다").isNotEmpty();
 
-        assertThat(MAPPER_XML).as("매퍼 XML이 있어야 한다").exists();
-        sources.add(MAPPER_XML);
+        sources.addAll(mapperXmlFiles());
 
         for (Path directory : TEMPLATE_DIRECTORIES) {
             try (Stream<Path> paths = Files.list(directory)) {
