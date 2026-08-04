@@ -304,6 +304,26 @@ class OrderMapperTests {
     }
 
     @Test
+    void markPickedUpIfReady_beforePickupTime_doesNotAdvanceOrder() {
+        Order order = newOrder();
+        order.setOrderType(OrderType.GENERAL);
+        orderMapper.insertOrder(order);
+        insertPayment(order.getId(), "DONE", "FUTURE-PICKUP");
+        assertThat(orderMapper.markReadyForPickupAfterPaymentIfPending(
+                order.getId(),
+                LocalDateTime.of(2026, 8, 1, 12, 1)
+        )).isEqualTo(1);
+
+        assertThat(orderMapper.markPickedUpIfReady(
+                order.getId(),
+                memberId,
+                LocalDateTime.of(2026, 8, 10, 13, 59)
+        )).isZero();
+        assertThat(orderMapper.findOrderById(order.getId()).orElseThrow().getStatus())
+                .isEqualTo(OrderStatus.READY_FOR_PICKUP);
+    }
+
+    @Test
     void rejectIfUnderReview_recordsReasonTimeAndProcessorConditionally() {
         Order order = newOrder();
         orderMapper.insertOrder(order);

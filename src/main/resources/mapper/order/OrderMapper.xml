@@ -531,6 +531,7 @@
             picked_up_at = #{pickedUpAt}
         WHERE id = #{orderId}
           AND status = 'READY_FOR_PICKUP'
+          AND pickup_at &lt;= #{pickedUpAt}
           AND EXISTS (
               SELECT 1
               FROM payments AS payment
