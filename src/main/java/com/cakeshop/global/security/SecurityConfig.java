@@ -44,8 +44,8 @@ public class SecurityConfig {
                         .substring(request.getContextPath().length())));
 
         http
-            // 웹훅 및 알림 REST API 경로 CSRF 제외 — 전체 비활성화 금지
-            .csrf(csrf -> csrf.ignoringRequestMatchers("/webhooks/toss", "/api/notifications/**"))
+            // 웹훅 경로만 CSRF 제외 — 전체 비활성화 금지
+            .csrf(csrf -> csrf.ignoringRequestMatchers("/webhooks/toss"))
             .requestCache(cache -> cache.requestCache(requestCache))
             .authorizeHttpRequests(auth -> {
                 // ① 공개 GET을 먼저 선언 (matcher 순서 = 우선순위)

@@ -56,13 +56,15 @@
             n.is_read AS isRead,
             n.created_at AS createdAt,
             n.order_id AS orderId,
-            n.chat_room_id AS chatRoomId,
+            COALESCE(n.chat_room_id, cm.chat_room_id) AS chatRoomId,
             COALESCE(n.post_id, c.post_id) AS postId,
             n.comment_id AS commentId,
-            n.review_id AS reviewId,
+            COALESCE(n.review_id, rr.review_id) AS reviewId,
             n.user_coupon_id AS userCouponId
         FROM notifications n
         LEFT JOIN comments c ON c.id = n.comment_id
+        LEFT JOIN chat_messages cm ON cm.id = n.chat_message_id
+        LEFT JOIN review_replies rr ON rr.id = n.review_reply_id
         WHERE n.receiver_id = #{receiverId}
         ORDER BY n.created_at desc
         LIMIT #{size}
