@@ -38,17 +38,20 @@
 
 - `ReviewStatus { PUBLISHED, DELETED, BLOCKED }` + `canTransitionTo` (`PostStatus` 선례를 그대로 따름, `null` 방어 포함)
 - 새 migration: `reviews.status` 기본값을 `'VISIBLE'` → `'PUBLISHED'`로 바꾸고 `CHECK (status IN ('PUBLISHED','DELETED','BLOCKED'))` 추가
+  - **`CHECK`를 걸기 전에 기존 `'VISIBLE'` 행을 `'PUBLISHED'`로 변환한다.** 남아 있으면 제약 추가가 배포 중 실패한다. 지금 `reviews`는 비어 있고 INSERT 경로도 없지만, 한 줄로 막을 수 있는 것을 환경 상태에 맡기지 않는다. 선례: `V20260730_123931__apply_product_preparation_policy.sql`(보정 UPDATE 후 CHECK)
 - 새 migration: 평점 4종에 `CHECK (rating BETWEEN 1 AND 5)`
 - migration 파일명은 직접 짓지 않고 `gradlew newMigration -Pdesc=<snake_case>`로 생성
+- **`docs/status-design.md`의 `reviews.status` 행을 확정으로 갱신한다.** 그 문서가 상태값 인벤토리의 정본이고 지금 `VISIBLE / HIDDEN ?` · `☐ 열림`으로 남아 있다. 154절이 "☐ 항목을 확정하면 인벤토리 행을 갱신하고 **enum + DDL을 함께 커밋한다**"고 못 박고 있다
 
-**검증**: 전이 규칙 단위 테스트(허용/금지 각 케이스), Testcontainers로 `CHECK`가 잘못된 상태값·평점을 거부하는지.
+**검증**: 전이 규칙 단위 테스트(허용/금지 각 케이스), Testcontainers로 `CHECK`가 잘못된 상태값·평점을 거부하는지, 기본값이 `PUBLISHED`인지.
 
 ### 조각 1 — 작성 (#109)
 
 - 자격 검증: `order_items → orders`로 본인 주문인지, `orders.status == PICKED_UP`인지
 - `uk_reviews_order_item` UNIQUE로 주문상품당 1건. 중복은 `DuplicateKeyException`을 잡아 도메인 에러로 바꾼다(커뮤니티 신고 선례)
 - `reviews.product_id`는 요청값을 믿지 않고 `order_items.product_id`에서 파생시킨다 (R4)
-- `ReviewErrorCode`에 중복 작성·권한 없음 코드 추가
+- `ReviewErrorCode`에 `REVIEW_NOT_FOUND`·`ORDER_ITEM_NOT_FOUND`·`ALREADY_REVIEWED` 추가(SPEC 2.5의 번호를 그대로 쓴다). **소유권 전용 코드는 만들지 않는다** — 남의 주문 상품·후기를 건드리면 404다. 403을 두면 id를 훑어 존재 여부를 알아낼 수 있다
+- `SecurityConfig`의 local preview 목록에서 `/reviews/**`를 뺀다(SPEC 2.3). 남겨 두면 익명 사용자가 작성 폼까지 들어온다. `/community/new` 선례가 같은 자리에 있다
 - `POST /reviews` 핸들러와 `form.html` 실동작 전환
 
 **검증**: 남의 주문에 작성 거부, `PICKED_UP`이 아닌 주문 거부, 같은 주문상품에 두 번 작성 거부, 평점 범위 밖 거부.
@@ -133,6 +136,8 @@
 | R10 | **후기를 삭제하면 그 주문 상품에는 다시 쓸 수 없다.** `uk_reviews_order_item`이 `order_item_id`에 UNIQUE라, soft delete로 `DELETED`가 되어도 행이 남아 재작성 INSERT가 막힌다. 수정을 열어 두었으므로 실질적 손해는 작지만, 모르고 지우면 되돌릴 방법이 없다 | 삭제 확인창에 명시. 작성할 후기 목록(A1)도 `NOT EXISTS`로 걸러, 목록에 띄워 놓고 저장에서 거절하는 일을 막는다 (2026-08-05) |
 
 ## 결정 로그
+
+**2026-08-06 — PR #121 Codex 리뷰 10건을 반영했다.** P1 5건·P2 5건 전부 실재하는 지적이었다. 상태값 정본(`docs/status-design.md`)이 아직 `VISIBLE / HIDDEN ?`으로 열려 있다는 것과, local preview가 `GET /reviews/**`를 이미 공개하고 있다는 것은 **코드를 열어 확인했다.** 아홉 건은 SPEC·PLAN을 고쳐 닫았고, 관리자 조치 이력만 결정이 필요해 근거 문구를 걷어내는 쪽으로 정했다(SPEC 10절, C1). `NEW_REVIEW` 수신 관리자는 조각 7 차례라 SPEC 9절 미정으로 넘겼다.
 
 **2026-08-05 — 상태값을 `PostStatus`와 같은 어휘로 간다.** 스키마 기본값이 `'VISIBLE'`인데 이 어휘를 쓰는 곳이 코드베이스에 없다. 팀이 실제로 쓰는 패턴은 둘이고(`ACTIVE`/`INACTIVE` — 상품·옵션·쿠폰, `PUBLISHED`/`DELETED`/`BLOCKED` — 게시글), 리뷰는 **고객이 쓰고 관리자가 숨기는** 구조라 후자와 같다. 목업의 `숨김`이 `BLOCKED`에 대응한다. `ACTIVE`/`INACTIVE`는 관리자가 노출을 켜고 끄는 것이라 작성자 삭제를 담을 자리가 없다.
 
