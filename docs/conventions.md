@@ -305,7 +305,7 @@ Service가 업무 규칙과 트랜잭션 경계를 소유한다.
 
 | 도메인 | 계약 | 반환 |
 |---|---|---|
-| 회원 | `MemberService.findById(id)` | id, 이름, 권한, 상태 |
+| 회원 | `MemberQueryService.findByMemberId(memberId)`, `findAll(pageRequest)` | id, 이름, 권한, 상태 |
 | 상품 | `ProductQueryService.getSalesInfo(id)` | 판매가능여부, 가격, 재고 |
 
 ## 16. global 편입 기준

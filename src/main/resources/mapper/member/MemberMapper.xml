@@ -118,6 +118,32 @@
          WHERE email = #{email}
     </select>
 
+    <select id="findSummaryByMemberId"
+            resultType="com.cakeshop.domain.member.dto.view.MemberSummaryView">
+        SELECT id,
+               name,
+               role,
+               status
+          FROM members
+         WHERE id = #{memberId}
+    </select>
+
+    <select id="findAllSummaries"
+            resultType="com.cakeshop.domain.member.dto.view.MemberSummaryView">
+        SELECT id,
+               name,
+               role,
+               status
+          FROM members
+         ORDER BY id ASC
+         LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="countAllMembers" resultType="long">
+        SELECT COUNT(*)
+          FROM members
+    </select>
+
     <select id="findEmailsByMemberInfo" resultType="string">
         SELECT email
           FROM members

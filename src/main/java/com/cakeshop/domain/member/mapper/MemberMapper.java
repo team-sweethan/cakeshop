@@ -1,6 +1,7 @@
 package com.cakeshop.domain.member.mapper;
 
 import com.cakeshop.domain.member.dto.view.MemberAdminDetailRow;
+import com.cakeshop.domain.member.dto.view.MemberSummaryView;
 import com.cakeshop.domain.member.entity.Member;
 import com.cakeshop.domain.member.entity.MemberStatus;
 import com.cakeshop.domain.member.dto.form.MemberAdminSearchCondition;
@@ -33,6 +34,14 @@ public interface MemberMapper {
             @Param("memberId") Long memberId);
 
     Optional<Member> findByEmail(@Param("email") String email);
+
+    Optional<MemberSummaryView> findSummaryByMemberId(@Param("memberId") Long memberId);
+
+    List<MemberSummaryView> findAllSummaries(
+            @Param("size") int size,
+            @Param("offset") int offset);
+
+    long countAllMembers();
 
     List<String> findEmailsByMemberInfo(
             @Param("name") String name,
