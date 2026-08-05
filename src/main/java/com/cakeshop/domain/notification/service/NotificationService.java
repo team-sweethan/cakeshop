@@ -41,13 +41,15 @@ public class NotificationService {
         // 알림 발송 범위 결정
         DeliveryScope scope = request.getDeliveryScope() != null ? request.getDeliveryScope() : DeliveryScope.WEB_ONLY;
 
-        // 이벤트 키 결정 (누락 시 수신자, 타입, 연관ID 조합으로 결정론적 고유 키 생성)
+        // 이벤트 키 결정 (누락 시 수신자, 타입, 가장 세밀한 연관ID 조합으로 결정론적 고유 키 생성)
         String eventKey = request.getEventKey();
         if (eventKey == null || eventKey.trim().isEmpty()) {
-            Long targetId = request.getOrderId() != null ? request.getOrderId()
+            Long targetId = request.getCommentId() != null ? request.getCommentId()
+                    : request.getReviewReplyId() != null ? request.getReviewReplyId()
+                    : request.getChatMessageId() != null ? request.getChatMessageId()
+                    : request.getOrderId() != null ? request.getOrderId()
                     : request.getPostId() != null ? request.getPostId()
                     : request.getReviewId() != null ? request.getReviewId()
-                    : request.getChatMessageId() != null ? request.getChatMessageId()
                     : request.getUserCouponId() != null ? request.getUserCouponId()
                     : System.currentTimeMillis();
             eventKey = request.getType().name() + ":" + request.getReceiverId() + ":" + targetId;
@@ -78,7 +80,13 @@ public class NotificationService {
         try {
             notificationMapper.save(notification);
         } catch (DuplicateKeyException e) {
-            // 동일 eventKey 중복 알림은 멱등하게 무시
+            // 동일 eventKey 중복 알림 요청 시, WEB_AND_SMS 발송 보완 시도 후 멱등하게 종료
+            if (scope == DeliveryScope.WEB_AND_SMS && request.getReceiverId() != null) {
+                String receiverPhone = notificationMapper.findReceiverPhone(request.getReceiverId());
+                if (receiverPhone != null && !receiverPhone.trim().isEmpty()) {
+                    executeSmsSending(null, receiverPhone, title, content);
+                }
+            }
             return;
         }
 
