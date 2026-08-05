@@ -5,6 +5,7 @@ import java.util.List;
 
 import com.cakeshop.domain.community.dto.view.CommentCountView;
 import com.cakeshop.domain.community.dto.view.CommentView;
+import com.cakeshop.domain.community.dto.view.PopularPostView;
 import com.cakeshop.domain.community.dto.view.PostCategoryView;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
@@ -282,6 +283,36 @@ public interface CommunityMapper {
     int insertBatchRun(
             @Param("rankingDate") LocalDate rankingDate,
             @Param("postCount") int postCount
+    );
+
+    // --- 인기글 화면 (조각 7c) ---
+
+    /**
+     * 화면에 쓸 확정 날짜. 확정된 실행이 하나도 없으면 null이다.
+     *
+     * <b>순위 표가 아니라 실행 기록 표를 본다</b>(D11). 순위 표에서 MAX를 읽으면 활동이
+     * 0이라 순위가 비었던 날을 건너뛰고 그 이전 날짜로 돌아가는데, 그러면 7일 창 밖의
+     * 오래된 글이 어제 것인 양 무기한 걸린다. 그리고 그 화면은 정상일 때와 똑같이 생겼다.
+     *
+     * 어제가 아니라 최신 확정일인 것은 의도한 폴백이다 — 배치를 한 번 거른 날에 화면이
+     * 비는 대신 어제 순위를 유지한다(D6). 대가로 순위가 조용히 낡아 갈 수 있어서
+     * Service가 경고 로그를 남긴다.
+     */
+    LocalDate findLatestRankingDate();
+
+    /**
+     * 이 날짜의 확정 순위를 위에서부터 limit건 조회한다.
+     *
+     * <b>노출 시점의 status를 다시 확인한다</b>(D5). 선정 SQL도 그 시점의 PUBLISHED만
+     * 담지만, 확정된 뒤에 지워지거나 차단된 글은 여기서만 걸러진다 — 노출 판단의 유일한
+     * 기준은 언제나 현재 status다(DOMAIN.md 4.1). 그래서 스냅샷 20건 중 화면이 쓰는
+     * 것은 10건이고, 그 여유가 흡수하는 것이 정확히 이 상태 변화다.
+     *
+     * 결과가 limit보다 짧을 수 있다. 그것이 정상이며 화면은 있는 만큼만 그린다.
+     */
+    List<PopularPostView> findPopularPosts(
+            @Param("rankingDate") LocalDate rankingDate,
+            @Param("limit") int limit
     );
 
 }

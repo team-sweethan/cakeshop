@@ -546,6 +546,42 @@ class CommunityMapperXmlTests {
         assertThat(sql).doesNotContain("DAILY_POPULAR_POSTS");
     }
 
+    /**
+     * D11의 다른 쪽 짝 — 화면이 읽는 확정 날짜도 <b>실행 기록 표</b>에서 나오는지 본다.
+     *
+     * <p>{@code daily_popular_posts}에서 {@code MAX(ranking_date)}를 읽도록 바뀌면 활동이
+     * 0이라 순위가 비었던 날을 건너뛰고 그 이전 날짜로 되돌아간다. 그러면 7일 창 밖의
+     * 오래된 글이 어제 것인 양 무기한 걸리는데, <b>화면은 정상일 때와 똑같이 생겼다</b> —
+     * 순위가 안 바뀌는 것은 활동이 뜸한 날과 구분되지 않는다(H32).
+     */
+    @Test
+    void findLatestRankingDate_readsRunTableNotRankingTable() {
+        String sql = normalizedSql("findLatestRankingDate");
+
+        assertThat(sql).contains("FROM POPULAR_POST_BATCH_RUNS");
+        assertThat(sql).doesNotContain("DAILY_POPULAR_POSTS");
+    }
+
+    /**
+     * H25의 노출 쪽 — 스냅샷을 읽을 때 <b>현재</b> 상태를 다시 확인하는지 본다.
+     *
+     * <p>선정 SQL도 그 시점의 PUBLISHED만 담지만 둘은 서로 다른 것을 잡는다. 이 조건이
+     * 빠지면 확정된 뒤에 지워지거나 차단된 글이 인기글 영역에 그대로 남고, 눌러 들어가면
+     * 404가 난다 — 목록에서는 사라진 글이 상단에만 살아 있는 상태다.
+     *
+     * <p>정렬이 {@code ranking}이어야 하는 것도 함께 본다. 점수로 다시 줄을 세우면
+     * 동점 구간의 순서가 요청마다 흔들리는데, <b>순위 숫자는 그대로라</b> 화면에는
+     * 1,2,3이 멀쩡히 찍히고 제목만 자리를 바꾼다.
+     */
+    @Test
+    void findPopularPosts_rechecksCurrentStatusAndOrdersByStoredRanking() {
+        String sql = normalizedSql("findPopularPosts");
+
+        assertThat(sql).contains("P.STATUS = 'PUBLISHED'");
+        assertThat(sql).contains("ORDER BY D.RANKING");
+        assertThat(sql).doesNotContain("POPULARITY_SCORE");
+    }
+
     /** 공백을 하나로 줄이고 대문자로 바꿔 들여쓰기·줄바꿈 차이를 무시한다. */
     private String normalizedSql(String statementId) {
         return normalizedSql(statementId, Map.of());

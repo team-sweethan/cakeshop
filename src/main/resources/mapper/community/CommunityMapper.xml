@@ -717,5 +717,74 @@
         VALUES (#{rankingDate}, #{postCount})
     </insert>
 
+    <!--
+        화면에 쓸 확정 날짜 (조각 7c, D6).
+
+        ▸ 왜 daily_popular_posts 가 아니라 popular_post_batch_runs 인가
+
+        순위 표에서 MAX(ranking_date) 를 읽으면 **활동이 0 이라 순위가 비었던 날을
+        건너뛴다.** 그날은 배치가 정상적으로 돌았는데도 행이 없기 때문이다. 그러면
+        화면이 그 이전 날짜로 되돌아가고, 7 일 창 밖의 오래된 글이 어제 것인 양
+        무기한 걸린다 — 그 화면은 정상일 때와 **완전히 똑같이 생겼다**(H32).
+
+        실행 기록 표에는 0 건인 날도 행이 남으므로 "안 돈 날" 과 "돌았는데 0 건인 날"
+        이 갈린다. 그것이 이 표를 따로 둔 이유다(D11).
+
+        ▸ 어제가 아니라 최신 확정일인 것은 의도한 폴백이다
+
+        배치를 한 번 거른 날 화면이 비는 대신 어제 순위를 유지한다. 인기글은 하루
+        낡아도 읽을 만하지만(R24) 갑자기 비면 화면이 고장 난 것처럼 보인다. 대가는
+        폴백이 자기 일을 잘한다는 것 그 자체다 — 사용자에게 매끄러운 만큼 운영자에게도
+        아무 일 없어 보인다. 그 자리를 Service 의 경고 로그가 맡는다(D6).
+
+        확정된 실행이 하나도 없으면 MAX 가 NULL 이고, 그것이 곧 "그릴 것이 없다" 다.
+    -->
+    <select id="findLatestRankingDate" resultType="java.time.LocalDate">
+
+        SELECT MAX(ranking_date)
+        FROM popular_post_batch_runs
+    </select>
+
+    <!--
+        이 날짜의 확정 순위를 위에서부터 limit 건 (조각 7c, D5).
+
+        ▸ 노출 시점에 status 를 다시 본다
+
+        선정 SQL(insertDailyRanking) 도 그 시점의 PUBLISHED 만 담는다. **두 곳 모두
+        걸러야 하고, 둘은 서로 다른 것을 잡는다** — 선정 쪽은 이미 지워진 글이 20 칸을
+        먹는 것을, 이쪽은 **확정된 뒤에** 지워지거나 차단된 글을 잡는다. 노출 판단의
+        유일한 기준은 언제나 현재 status 다(DOMAIN.md 4.1).
+
+        스냅샷 20 건 중 화면이 10 건만 쓰는 여유가 정확히 이 자리의 몫이다. 비노출 글이
+        생긴 만큼 결과가 짧아지고, 그것이 정상이다 — 화면은 있는 만큼만 그린다.
+
+        ▸ ORDER BY 는 ranking 하나로 끝난다
+
+        점수로 다시 정렬하지 않는다. 순위는 배치가 이미 동점 tiebreaker 까지 포함해
+        확정한 값이고(D4), 여기서 점수로 다시 줄을 세우면 **동점 구간의 순서가 화면
+        요청마다 흔들린다.** 그런데 순위 숫자는 그대로라 화면에는 1,2,3 이 멀쩡히
+        찍히고 제목만 자리를 바꾼다. ranking 은 (ranking_date, ranking) PK 의 뒷자리라
+        정렬에 인덱스를 그대로 쓴다.
+    -->
+    <select id="findPopularPosts"
+            resultType="com.cakeshop.domain.community.dto.view.PopularPostView">
+
+        SELECT
+        d.ranking,
+        d.post_id,
+        pc.name AS category_name,
+        p.title
+
+        FROM daily_popular_posts d
+        JOIN posts p ON p.id = d.post_id
+        JOIN post_categories pc ON pc.id = p.category_id
+
+        WHERE d.ranking_date = #{rankingDate}
+        AND p.status = 'PUBLISHED'
+
+        ORDER BY d.ranking
+        LIMIT #{limit}
+    </select>
+
     <!-- 관리자 조회·조치는 CommunityAdminMapper.xml 에 있다. -->
 </mapper>
