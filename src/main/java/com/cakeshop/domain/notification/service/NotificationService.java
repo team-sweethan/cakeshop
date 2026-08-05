@@ -47,11 +47,11 @@ public class NotificationService {
             Object targetId = request.getCommentId() != null ? request.getCommentId()
                     : request.getReviewReplyId() != null ? request.getReviewReplyId()
                     : request.getChatMessageId() != null ? request.getChatMessageId()
-                    : request.getChatRoomId() != null ? request.getChatRoomId()
                     : request.getOrderId() != null ? request.getOrderId()
                     : request.getPostId() != null ? request.getPostId()
                     : request.getReviewId() != null ? request.getReviewId()
                     : request.getUserCouponId() != null ? request.getUserCouponId()
+                    : request.getChatRoomId() != null ? "ROOM_" + request.getChatRoomId() + "_" + java.util.UUID.randomUUID().toString()
                     : java.util.UUID.randomUUID().toString();
             eventKey = request.getType().name() + ":" + request.getReceiverId() + ":" + targetId;
         }
@@ -81,14 +81,7 @@ public class NotificationService {
         try {
             notificationMapper.save(notification);
         } catch (DuplicateKeyException e) {
-            // 동일 eventKey 중복 요청 시 웹 알림은 멱등하게 무시하되, WEB_AND_SMS인 경우 성공(SENT) 이력이 없을 때만 SMS 재발송 시도
-            if (scope == DeliveryScope.WEB_AND_SMS && request.getReceiverId() != null) {
-                Long existingId = notificationMapper.findIdByReceiverIdAndEventKey(request.getReceiverId(), eventKey);
-                if (existingId != null && !notificationMapper.hasSentDelivery(existingId)) {
-                    String receiverPhone = notificationMapper.findReceiverPhone(request.getReceiverId());
-                    executeSmsSending(existingId, receiverPhone, title, content);
-                }
-            }
+            // 동일 eventKey 중복 요청은 메인 트랜잭션이 멱등하게 처리하므로 조기 종료
             return;
         }
 

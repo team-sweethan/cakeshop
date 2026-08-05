@@ -25,6 +25,7 @@ public class NotificationDeliveryService {
             notificationMapper.saveDelivery(delivery);
         } catch (Exception e) {
             log.error("notification_deliveries DB 저장 실패 (notificationId: {})", delivery != null ? delivery.getNotificationId() : null);
+            throw e;
         }
     }
 }
