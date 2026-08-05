@@ -12,6 +12,7 @@
         <result property="updatedAt" column="updated_at"/>
         <result property="withdrawnAt" column="withdrawn_at"/>
         <result property="name" column="name"/>
+        <result property="phone" column="phone"/>
         <result property="birthDate" column="birth_date"/>
     </resultMap>
 

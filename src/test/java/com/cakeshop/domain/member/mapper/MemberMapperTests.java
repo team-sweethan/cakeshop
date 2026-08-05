@@ -46,6 +46,7 @@ class MemberMapperTests {
         assertThat(member.getUpdatedAt()).isEqualTo(UPDATED_AT);
         assertThat(member.getWithdrawnAt()).isNull();
         assertThat(member.getBirthDate()).isNull();
+        assertThat(member.getPhone()).isEqualTo("010-0000-0000");
     }
 
     @Test

@@ -650,6 +650,50 @@ class PaymentFacadeTests {
     }
 
     @Test
+    void confirmGeneralPayment_inProgressPreparedCompensation_releasesAndApprovesNewPayment() {
+        GeneralPaymentOrder order = order(NOW.plusMinutes(5));
+        Payment payment = payment();
+        payment.setPaymentKey("stale-payment-key");
+        Payment refreshedPayment = payment();
+        CompensationRequest request = new CompensationRequest(
+                20L,
+                1L,
+                "stale-payment-key",
+                "COMPENSATE-20",
+                BigDecimal.valueOf(30_000),
+                "자동 취소"
+        );
+        ApprovalResult approval = approval();
+        when(orderService.getGeneralPaymentOrder(10L, 1L)).thenReturn(order);
+        when(paymentService.getReadyPayment(1L)).thenReturn(payment, refreshedPayment);
+        when(paymentRecoveryService.findPreparedCompensation(payment))
+                .thenReturn(Optional.of(request));
+        when(tossPaymentClient.find("stale-payment-key")).thenReturn(Optional.of(
+                new PaymentLookupResult(
+                        "stale-payment-key",
+                        "ORD-100",
+                        "카드",
+                        "IN_PROGRESS",
+                        30_000L,
+                        null,
+                        null
+                )
+        ));
+        when(tossPaymentClient.find("payment-key")).thenReturn(Optional.empty());
+        when(tossPaymentClient.approve(
+                "payment-key",
+                "ORD-100",
+                30_000L,
+                "PAY-1"
+        )).thenReturn(approval);
+
+        paymentFacade.confirmGeneralPayment(10L, 1L, form(BigDecimal.valueOf(30_000)));
+
+        verify(paymentRecoveryService).releaseUnapprovedCompensation(request);
+        verify(paymentService).completeGeneralPayment(order, refreshedPayment, approval);
+    }
+
+    @Test
     void recoverPendingCompensations_persistedRequest_retriesSameCancelKey() {
         CompensationRequest request = compensationRequest();
         CancellationResult cancellation = cancellation();

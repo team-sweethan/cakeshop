@@ -376,6 +376,24 @@ class OrderServiceTests {
     }
 
     @Test
+    void createGeneralOrder_pickupBeforePaymentExpiration_throwsInvalidInput() {
+        lenient().when(storeService.getStoreView())
+                .thenReturn(storeView(Set.of(), List.of(), 5));
+        GeneralOrderForm form = form(1L, 1, List.of());
+        form.setPickupAt(FIXED_NOW.plusMinutes(5));
+
+        assertThatThrownBy(() -> orderService.createGeneralOrder(10L, form))
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        error -> assertThat(error.getErrorCode())
+                                .isEqualTo(CommonErrorCode.INVALID_INPUT)
+                );
+
+        verify(productQueryService, never()).getSalesInfo(1L);
+        verify(orderMapper, never()).insertOrder(any(Order.class));
+    }
+
+    @Test
     void createGeneralOrder_unavailablePickupTime_throwsInvalidInput() {
         GeneralOrderForm form = form(1L, 1, List.of());
         form.setPickupAt(form.getPickupAt().plusMinutes(30));
@@ -542,6 +560,14 @@ class OrderServiceTests {
             Set<DayOfWeek> closedDays,
             List<StoreHoliday> holidays
     ) {
+        return storeView(closedDays, holidays, 60);
+    }
+
+    private StoreView storeView(
+            Set<DayOfWeek> closedDays,
+            List<StoreHoliday> holidays,
+            int pickupIntervalMinutes
+    ) {
         return new StoreView(
                 1L,
                 "테스트 매장",
@@ -557,7 +583,7 @@ class OrderServiceTests {
                 "1층",
                 LocalTime.of(10, 0),
                 LocalTime.of(19, 0),
-                60,
+                pickupIntervalMinutes,
                 holidays
         );
     }

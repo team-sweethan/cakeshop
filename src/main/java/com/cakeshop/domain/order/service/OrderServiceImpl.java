@@ -195,6 +195,7 @@ public class OrderServiceImpl implements OrderService {
     ) {
         if (pickupAt == null
                 || !pickupAt.isAfter(now)
+                || !pickupAt.isAfter(now.plusMinutes(PAYMENT_EXPIRATION_MINUTES))
                 || !isPickupAvailable(pickupAt, storeService.getStoreView())) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }

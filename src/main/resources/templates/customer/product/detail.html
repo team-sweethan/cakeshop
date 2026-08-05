@@ -409,14 +409,6 @@
             주문서 작성하기
           </a>
 
-          <a
-                  class="btn btn--primary"
-                  th:if="${product.productType.name() == 'CUSTOM'}"
-                  th:href="@{/orders/custom/options}"
-          >
-            주문 제작 요청하기
-          </a>
-
           <form sec:authorize="isAuthenticated()"
                 th:action="@{/cart/items}" method="post" data-server-cart-form>
             <input type="hidden" name="productId" th:value="${product.id}">

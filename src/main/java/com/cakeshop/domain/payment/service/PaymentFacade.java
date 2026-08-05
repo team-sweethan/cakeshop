@@ -200,7 +200,8 @@ public class PaymentFacade {
     private boolean isNotApproved(CompensationRequest request) {
         try {
             return tossPaymentClient.find(request.paymentKey())
-                    .map(lookup -> "READY".equals(lookup.status()))
+                    .map(lookup -> "READY".equals(lookup.status())
+                            || "IN_PROGRESS".equals(lookup.status()))
                     .orElse(true);
         } catch (BusinessException lookupFailure) {
             return false;
