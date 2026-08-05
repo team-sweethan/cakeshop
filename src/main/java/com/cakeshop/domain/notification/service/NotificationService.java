@@ -119,6 +119,7 @@ public class NotificationService {
 
         SolapiKakaoAlimtalkClient.SmsResult result = solapiKakaoAlimtalkClient.sendAlimtalk(notificationId, receiverPhone, title, content);
         if (result != null) {
+            LocalDateTime sentAt = "SENT".equals(result.getStatus()) ? LocalDateTime.now() : null;
             com.cakeshop.domain.notification.entity.NotificationDelivery delivery = com.cakeshop.domain.notification.entity.NotificationDelivery.builder()
                     .notificationId(notificationId)
                     .recipient(receiverPhone)
@@ -126,6 +127,7 @@ public class NotificationService {
                     .providerMessageId(result.getProviderMessageId())
                     .status(result.getStatus())
                     .failureReason(result.getFailureReason())
+                    .sentAt(sentAt)
                     .createdAt(LocalDateTime.now())
                     .updatedAt(LocalDateTime.now())
                     .build();

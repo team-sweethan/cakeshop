@@ -113,11 +113,35 @@ ALTER TABLE `notifications`
         ON DELETE SET NULL;
 
 -- ---------------------------------------------------------
--- 1-3. 기존 알림 데이터의 event_key 백필
+-- 1-3. 기존 알림 데이터의 event_key 및 notification_type 백필 정규화
 -- ---------------------------------------------------------
 UPDATE `notifications`
 SET `event_key` = CONCAT('LEGACY_NOTIFICATION:', `id`)
 WHERE `event_key` IS NULL;
+
+UPDATE `notifications`
+SET `notification_type` = CASE
+    -- 레거시 주문/결제
+    WHEN `notification_type` IN ('ORDER', 'PAYMENT', '주문완료', '결제완료') THEN 'ORDER_PAID'
+    WHEN `notification_type` IN ('CUSTOM_ORDER', '주문제작') THEN 'CUSTOM_ORDER_PAID'
+    WHEN `notification_type` IN ('CANCEL', '주문취소') THEN 'ORDER_CANCELED'
+
+    -- 레거시 픽업
+    WHEN `notification_type` IN ('PICKUP', '픽업대기', '픽업안내') THEN 'CUSTOMER_PICKUP_REMINDER_TODAY'
+    WHEN `notification_type` IN ('PICKED_UP', '픽업완료') THEN 'CUSTOMER_ORDER_PICKED_UP'
+
+    -- 레거시 댓글/답글/리뷰
+    WHEN `notification_type` IN ('NEW_COMMENT', 'COMMENT', '댓글', '댓글 알림') THEN 'CUSTOMER_COMMENT'
+    WHEN `notification_type` IN ('COMMENT_REPLY', 'REPLY', '답글', '답글 알림') THEN 'CUSTOMER_COMMENT_REPLY'
+    WHEN `notification_type` IN ('REVIEW', '리뷰', '리뷰 답글 알림') THEN 'CUSTOMER_REVIEW'
+
+    -- 레거시 쿠폰/채팅
+    WHEN `notification_type` IN ('COUPON_ISSUED', '쿠폰', '쿠폰 발급') THEN 'COUPON'
+    WHEN `notification_type` IN ('CHAT', '채팅', '채팅 답변') THEN 'CUSTOMER_CHAT'
+
+    ELSE `notification_type`
+END
+WHERE `notification_type` IS NOT NULL;
 
 -- ---------------------------------------------------------
 -- 1-4. event_key 필수 처리 및 중복 방지 제약조건 추가
@@ -151,7 +175,7 @@ ALTER TABLE `notification_deliveries`
     DROP FOREIGN KEY `fk_notification_deliveries_notification`;
 
 -- ---------------------------------------------------------
--- 2-2. 기존 데이터 보정
+-- 2-2. 기존 데이터 보정 및 발송 시각 이력 보존
 -- ---------------------------------------------------------
 UPDATE `notification_deliveries`
 SET `status` = 'PENDING'
@@ -160,6 +184,10 @@ WHERE `status` = 'REQUESTED';
 UPDATE `notification_deliveries`
 SET `template_code` = 'NOTI_DEFAULT'
 WHERE `template_code` IS NULL;
+
+UPDATE `notification_deliveries`
+SET `sent_at` = COALESCE(`sent_at`, `requested_at`, `created_at`)
+WHERE `status` IN ('SENT', 'DELIVERED') AND `sent_at` IS NULL;
 
 -- ---------------------------------------------------------
 -- 2-3. 컬럼 정리 및 FK 추가
@@ -188,6 +216,10 @@ ALTER TABLE `notification_deliveries`
         VARCHAR(30) NOT NULL DEFAULT 'PENDING'
         COMMENT '발송 상태 (PENDING, SENT, DELIVERED, FAILED)',
 
+    MODIFY COLUMN `sent_at`
+        DATETIME NULL
+        COMMENT '실제 발송 완료 시각',
+
     MODIFY COLUMN `failure_reason`
         TEXT NULL
         COMMENT '발송 실패 사유',
@@ -195,7 +227,6 @@ ALTER TABLE `notification_deliveries`
     DROP COLUMN `channel`,
     DROP COLUMN `failure_code`,
     DROP COLUMN `requested_at`,
-    DROP COLUMN `sent_at`,
     DROP COLUMN `clicked_at`,
 
     ADD CONSTRAINT `fk_deliveries_notification`

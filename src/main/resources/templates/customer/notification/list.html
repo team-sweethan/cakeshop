@@ -110,8 +110,11 @@
           })
           .then(response => {
             if (response.ok) {
-              // 성공 시 알림 목록 다시 새로고침
+              // 성공 시 알림 목록 다시 새로고침 및 상단 헤더 배지 갱신
               loadNotifications();
+              if (typeof window.updateNotificationUnreadCount === "function") {
+                window.updateNotificationUnreadCount();
+              }
             }
           })
           .catch(error => console.error("전체 읽음 처리 실패:", error));

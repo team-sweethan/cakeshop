@@ -23,7 +23,7 @@ public class NotificationDelivery {
     // private String failureCode; // 발송 실패 코드
     private String failureReason; // 발송 실패 사유
     // private LocalDateTime requestedAt; // 카카오 API 발송 요청 시간
-    // private LocalDateTime sentAt; // 카카오 API 요청 성공 시간
+    private LocalDateTime sentAt; // 카카오 API 요청 성공 시간 (NULL 가능)
     private LocalDateTime deliveredAt; // 수신자에게 실제 전달 완료된 시간
     private LocalDateTime createdAt; // 발송 이력 생성 시간
     private LocalDateTime updatedAt; // 발송 이력 수정 시간
