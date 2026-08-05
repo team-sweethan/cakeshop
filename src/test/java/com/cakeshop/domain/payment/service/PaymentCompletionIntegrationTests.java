@@ -14,6 +14,7 @@ import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.entity.PaymentCancellation;
 import com.cakeshop.domain.payment.entity.PaymentCancellationStatus;
 import com.cakeshop.domain.payment.entity.PaymentStatus;
+import com.cakeshop.domain.payment.error.PaymentErrorCode;
 import com.cakeshop.domain.payment.infra.TossPaymentClient.ApprovalResult;
 import com.cakeshop.domain.payment.infra.TossPaymentClient.CancellationResult;
 import com.cakeshop.domain.payment.service.PaymentRecoveryService.CompensationRequest;
@@ -22,6 +23,7 @@ import com.cakeshop.domain.product.service.ProductQueryService;
 import com.cakeshop.domain.product.service.ProductStockService;
 import com.cakeshop.domain.store.service.StoreService;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
+import com.cakeshop.global.error.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mybatis.spring.boot.test.autoconfigure.MybatisTest;
@@ -39,6 +41,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @MybatisTest
 @Import({
@@ -284,6 +287,14 @@ class PaymentCompletionIntegrationTests {
         );
 
         paymentRecoveryService.prepareCompensation(request);
+        jdbcTemplate.update(
+                """
+                UPDATE payment_cancellations
+                SET requested_at = DATE_SUB(CURRENT_TIMESTAMP(6), INTERVAL 2 MINUTE)
+                WHERE idempotency_key = ?
+                """,
+                request.idempotencyKey()
+        );
         paymentRecoveryService.releaseUnapprovedCompensation(request);
         Payment releasedPayment = paymentMapper.findPaymentById(readyPayment.getId())
                 .orElseThrow();
@@ -295,8 +306,38 @@ class PaymentCompletionIntegrationTests {
                 .findPaymentCancellationByIdempotencyKey(request.idempotencyKey())
                 .orElseThrow();
         assertThat(cancellation.getStatus()).isEqualTo(PaymentCancellationStatus.REQUESTED);
+        assertThat(paymentMapper.findRequestedCompensations(10)).isEmpty();
         assertThat(paymentMapper.findPaymentById(readyPayment.getId()).orElseThrow().getPaymentKey())
                 .isEqualTo(paymentKey);
+    }
+
+    @Test
+    void releaseUnapprovedCompensation_recentRequest_keepsApprovalGuard() {
+        Payment readyPayment = paymentService.getReadyPayment(orderId);
+        String paymentKey = "RECENT-PAYMENT-KEY-" + suffix;
+        CompensationRequest request = paymentRecoveryService.createRequest(
+                readyPayment,
+                paymentKey
+        );
+        paymentRecoveryService.prepareCompensation(request);
+
+        assertThatThrownBy(() -> paymentRecoveryService.releaseUnapprovedCompensation(request))
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        error -> assertThat(error.getErrorCode())
+                                .isEqualTo(PaymentErrorCode.PAYMENT_RECOVERY_PENDING)
+                );
+
+        assertThat(paymentMapper.findPaymentCancellationByIdempotencyKey(
+                request.idempotencyKey()
+        )).hasValueSatisfying(saved -> assertThat(saved.getStatus())
+                .isEqualTo(PaymentCancellationStatus.REQUESTED));
+        assertThat(paymentMapper.findPaymentById(readyPayment.getId()))
+                .hasValueSatisfying(saved -> {
+                    assertThat(saved.getPaymentKey()).isEqualTo(paymentKey);
+                    assertThat(saved.getIdempotencyKey())
+                            .isEqualTo(readyPayment.getIdempotencyKey());
+                });
     }
 
     private long insertMember() {

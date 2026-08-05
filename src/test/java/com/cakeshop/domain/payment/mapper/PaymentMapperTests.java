@@ -6,6 +6,7 @@ import com.cakeshop.domain.payment.entity.PaymentCancellationStatus;
 import com.cakeshop.domain.payment.entity.PaymentStatus;
 import com.cakeshop.domain.payment.dto.view.PaymentAdminListRow;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
+import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mybatis.spring.boot.test.autoconfigure.MybatisTest;
@@ -35,11 +36,17 @@ class PaymentMapperTests {
 
     private final PaymentMapper paymentMapper;
     private final JdbcTemplate jdbcTemplate;
+    private final SqlSession sqlSession;
 
     @Autowired
-    PaymentMapperTests(PaymentMapper paymentMapper, JdbcTemplate jdbcTemplate) {
+    PaymentMapperTests(
+            PaymentMapper paymentMapper,
+            JdbcTemplate jdbcTemplate,
+            SqlSession sqlSession
+    ) {
         this.paymentMapper = paymentMapper;
         this.jdbcTemplate = jdbcTemplate;
+        this.sqlSession = sqlSession;
     }
 
     private String suffix;
@@ -150,6 +157,12 @@ class PaymentMapperTests {
                 "PAYMENT_COMPLETED",
                 "정상 완료"
         )).isEqualTo(1);
+        LocalDateTime oldRequestedAt = LocalDateTime.of(2026, 8, 1, 12, 0);
+        jdbcTemplate.update(
+                "UPDATE payment_cancellations SET requested_at = ? WHERE id = ?",
+                oldRequestedAt,
+                guard.getId()
+        );
 
         assertThat(paymentMapper.reopenReleasedCompensation(
                 payment.getId(),
@@ -159,7 +172,9 @@ class PaymentMapperTests {
                 .hasValueSatisfying(reopened -> {
                     assertThat(reopened.getStatus()).isEqualTo(PaymentCancellationStatus.REQUESTED);
                     assertThat(reopened.getFailureCode()).isNull();
+                    assertThat(reopened.getRequestedAt()).isAfter(oldRequestedAt);
                 });
+        assertThat(paymentMapper.findRequestedCompensations(10)).isEmpty();
     }
 
     @Test
@@ -171,20 +186,49 @@ class PaymentMapperTests {
         guard.setCancelAmount(payment.getAmount());
         guard.setCancelReason("승인 보호");
         assertThat(paymentMapper.insertCompensationCancellation(guard)).isEqualTo(1);
-        LocalDateTime requestedAt = LocalDateTime.of(2026, 8, 1, 12, 0);
+        assertThat(paymentMapper.findRequestedCompensations(10)).isEmpty();
+        assertThat(paymentMapper.failUnapprovedCompensationIfRequested(
+                guard.getId()
+        )).isZero();
         jdbcTemplate.update(
-                "UPDATE payment_cancellations SET requested_at = ? WHERE id = ?",
-                requestedAt,
+                """
+                UPDATE payment_cancellations
+                SET requested_at = DATE_SUB(CURRENT_TIMESTAMP(6), INTERVAL 2 MINUTE)
+                WHERE id = ?
+                """,
                 guard.getId()
         );
 
-        assertThat(paymentMapper.findRequestedCompensations(
-                requestedAt.minusNanos(1),
-                10
-        )).isEmpty();
-        assertThat(paymentMapper.findRequestedCompensations(requestedAt, 10))
+        assertThat(paymentMapper.findRequestedCompensations(10))
                 .extracting(PaymentCancellation::getId)
                 .containsExactly(guard.getId());
+        assertThat(paymentMapper.failUnapprovedCompensationIfRequested(
+                guard.getId()
+        )).isEqualTo(1);
+    }
+
+    @Test
+    void findRequestedRefundCancellations_onlyReturnsRequestsOlderThanCutoff() {
+        Payment payment = insertPayment("REFUND-GRACE-PERIOD");
+        completePayment(payment, "REFUND-GRACE-PERIOD");
+        PaymentCancellation cancellation =
+                newPaymentCancellation(payment.getId(), "REFUND-GRACE-PERIOD");
+        cancellation.setRequestType("CUSTOMER");
+        assertThat(paymentMapper.insertPaymentCancellation(cancellation)).isEqualTo(1);
+        assertThat(paymentMapper.findRequestedRefundCancellations(10)).isEmpty();
+        jdbcTemplate.update(
+                """
+                UPDATE payment_cancellations
+                SET requested_at = DATE_SUB(CURRENT_TIMESTAMP(6), INTERVAL 2 MINUTE)
+                WHERE id = ?
+                """,
+                cancellation.getId()
+        );
+        // JdbcTemplate 변경 뒤 같은 Mapper 조회가 실제 DB를 다시 읽게 한다.
+        sqlSession.clearCache();
+        assertThat(paymentMapper.findRequestedRefundCancellations(10))
+                .extracting(PaymentCancellation::getId)
+                .containsExactly(cancellation.getId());
     }
 
     // 한 주문에서 READY 결제는 UNIQUE 제약에 따라 한 건만 허용되는지 확인한다.

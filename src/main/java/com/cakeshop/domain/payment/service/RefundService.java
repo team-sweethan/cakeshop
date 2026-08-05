@@ -10,6 +10,7 @@ import com.cakeshop.domain.order.mapper.OrderMapper;
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.entity.PaymentCancellation;
 import com.cakeshop.domain.payment.entity.PaymentCancellationStatus;
+import com.cakeshop.domain.payment.entity.PaymentStatus;
 import com.cakeshop.domain.payment.error.PaymentErrorCode;
 import com.cakeshop.domain.payment.infra.TossPaymentClient.CancellationResult;
 import com.cakeshop.domain.payment.mapper.PaymentMapper;
@@ -23,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 /** 전체 결제 취소 요청과 내부 주문·결제·재고 완료 처리를 담당한다. */
@@ -144,23 +146,40 @@ public class RefundService {
     /** PG 취소 성공 뒤 결제·주문 상태와 실제 차감 재고 복구를 한 트랜잭션으로 완료한다. */
     @Transactional
     public void completeCancellation(RefundRequest request, CancellationResult result) {
-        if (request == null || result == null || !"CANCELED".equals(result.status())) {
+        if (request == null
+                || result == null
+                || !"CANCELED".equals(result.status())
+                || result.transactionKey() == null
+                || result.transactionKey().isBlank()
+                || result.canceledAt() == null) {
             throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_COMPLETE_FAILED);
         }
         PaymentCancellation cancellation = paymentMapper
-                .findPaymentCancellationById(request.cancellationId())
+                .findPaymentCancellationByIdForUpdate(request.cancellationId())
                 .orElseThrow(() -> new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_COMPLETE_FAILED));
-        if (cancellation.getStatus() != PaymentCancellationStatus.REQUESTED) {
-            throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_COMPLETE_FAILED);
-        }
         Payment payment = paymentMapper.findPaymentById(cancellation.getPaymentId())
                 .orElseThrow(() -> new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_COMPLETE_FAILED));
-        if (!Long.valueOf(request.orderId()).equals(payment.getOrderId())) {
+        if (!Long.valueOf(request.orderId()).equals(payment.getOrderId())
+                || !Objects.equals(request.paymentKey(), payment.getPaymentKey())
+                || !Objects.equals(request.idempotencyKey(), cancellation.getIdempotencyKey())
+                || !Objects.equals(request.reason(), cancellation.getCancelReason())
+                || !Objects.equals(request.canceledBy(), cancellation.getRequestType())) {
             throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_COMPLETE_FAILED);
         }
 
         Order order = orderMapper.findOrderById(request.orderId())
                 .orElseThrow(() -> new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_COMPLETE_FAILED));
+        if (cancellation.getStatus() == PaymentCancellationStatus.DONE) {
+            if (payment.getStatus() != PaymentStatus.CANCELED
+                    || order.getStatus() != OrderStatus.CANCELED
+                    || !Objects.equals(cancellation.getTransactionKey(), result.transactionKey())) {
+                throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_COMPLETE_FAILED);
+            }
+            return;
+        }
+        if (cancellation.getStatus() != PaymentCancellationStatus.REQUESTED) {
+            throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_COMPLETE_FAILED);
+        }
         LocalDateTime canceledAt = result.canceledAt();
         OrderStatus currentExpectedStatus = requireGeneralCancelableStatus(
                 order,

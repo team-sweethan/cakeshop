@@ -13,9 +13,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.Clock;
-import java.time.Duration;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -27,11 +24,9 @@ public class PaymentRecoveryService {
 
     private static final String CANCEL_REASON =
             "내부 주문 처리 실패로 인한 자동 결제 취소";
-    private static final Duration RECOVERY_GRACE_PERIOD = Duration.ofMinutes(1);
 
     private final PaymentMapper paymentMapper;
     private final OrderPaymentRecoveryService orderPaymentRecoveryService;
-    private final Clock clock;
 
     public CompensationRequest createRequest(Payment payment, String paymentKey) {
         if (payment == null
@@ -77,10 +72,8 @@ public class PaymentRecoveryService {
         PaymentCancellation cancellation = findCompensation(request);
         if (cancellation == null
                 || cancellation.getStatus() != PaymentCancellationStatus.REQUESTED
-                || paymentMapper.failCancellationIfRequested(
-                        cancellation.getId(),
-                        "PAYMENT_NOT_APPROVED",
-                        "PG 승인 전 결제 요청이 종료되었습니다."
+                || paymentMapper.failUnapprovedCompensationIfRequested(
+                        cancellation.getId()
                 ) != 1
                 || paymentMapper.rotateReadyPaymentIdempotencyKey(
                         request.paymentId(),
@@ -140,9 +133,7 @@ public class PaymentRecoveryService {
         if (limit <= 0) {
             throw new BusinessException(PaymentErrorCode.PAYMENT_RECOVERY_PENDING);
         }
-        LocalDateTime requestedBefore = LocalDateTime.now(clock)
-                .minus(RECOVERY_GRACE_PERIOD);
-        return paymentMapper.findRequestedCompensations(requestedBefore, limit)
+        return paymentMapper.findRequestedCompensations(limit)
                 .stream()
                 .map(this::toCompensationRequest)
                 .toList();

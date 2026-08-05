@@ -78,6 +78,11 @@ public interface PaymentMapper {
             @Param("cancellationId") long cancellationId
     );
 
+    // 같은 취소 요청의 동시 완료를 직렬화하기 위해 행 잠금으로 조회한다.
+    Optional<PaymentCancellation> findPaymentCancellationByIdForUpdate(
+            @Param("cancellationId") long cancellationId
+    );
+
     // 결제 승인 뒤 내부 처리 실패를 복구하는 시스템 취소 요청을 멱등키로 조회한다.
     Optional<PaymentCancellation> findPaymentCancellationByIdempotencyKey(
             @Param("idempotencyKey") String idempotencyKey
@@ -88,7 +93,7 @@ public interface PaymentMapper {
             @Param("paymentId") long paymentId
     );
 
-    // 고객·관리자 요청으로 남은 취소를 같은 멱등키로 재처리한다.
+    // 원래 웹 요청과 경쟁하지 않도록 DB 현재 시각보다 1분 이상 오래된 취소만 조회한다.
     List<PaymentCancellation> findRequestedRefundCancellations(@Param("limit") int limit);
 
     // READY 또는 DONE 결제에 시스템 보상 취소 요청을 한 건만 생성한다.
@@ -119,11 +124,8 @@ public interface PaymentMapper {
             @Param("idempotencyKey") String idempotencyKey
     );
 
-    // 정상 결제 완료와 경쟁하지 않도록 기준 시각 이전의 시스템 보상 요청만 조회한다.
-    List<PaymentCancellation> findRequestedCompensations(
-            @Param("requestedBefore") LocalDateTime requestedBefore,
-            @Param("limit") int limit
-    );
+    // 정상 결제 완료와 경쟁하지 않도록 DB 현재 시각보다 1분 이상 오래된 보상만 조회한다.
+    List<PaymentCancellation> findRequestedCompensations(@Param("limit") int limit);
 
     // REQUESTED 환불과 부모 DONE 결제를 함께 완료·취소 처리한다.
     int completeCancellationIfRequested(
@@ -138,6 +140,9 @@ public interface PaymentMapper {
             @Param("failureCode") String failureCode,
             @Param("failureMessage") String failureMessage
     );
+
+    // 승인 호출과 경쟁하지 않도록 DB 현재 시각 기준 1분 유예가 지난 보호 요청만 해제한다.
+    int failUnapprovedCompensationIfRequested(@Param("cancellationId") long cancellationId);
 
     // 시스템 보상 취소 결과를 기록하고 READY 또는 DONE 결제를 CANCELED로 맞춘다.
     int completeCompensationIfRequested(

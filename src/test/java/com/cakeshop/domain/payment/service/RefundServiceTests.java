@@ -2,8 +2,9 @@ package com.cakeshop.domain.payment.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -19,6 +20,7 @@ import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.entity.PaymentCancellation;
 import com.cakeshop.domain.payment.entity.PaymentCancellationStatus;
+import com.cakeshop.domain.payment.entity.PaymentStatus;
 import com.cakeshop.domain.payment.error.PaymentErrorCode;
 import com.cakeshop.domain.payment.infra.TossPaymentClient.CancellationResult;
 import com.cakeshop.domain.payment.mapper.PaymentMapper;
@@ -287,7 +289,8 @@ class RefundServiceTests {
         PaymentCancellation cancellation = cancellation();
         Order order = order(3L);
         OrderItem item = deductedItem();
-        when(paymentMapper.findPaymentCancellationById(30L)).thenReturn(Optional.of(cancellation));
+        when(paymentMapper.findPaymentCancellationByIdForUpdate(30L))
+                .thenReturn(Optional.of(cancellation));
         when(paymentMapper.findPaymentById(20L)).thenReturn(Optional.of(payment()));
         when(orderMapper.findOrderById(10L)).thenReturn(Optional.of(order));
         when(paymentMapper.completeCancellationIfRequested(30L, "transaction-key", NOW.plusSeconds(2)))
@@ -305,18 +308,42 @@ class RefundServiceTests {
     }
 
     @Test
-    void completeCancellation_alreadyCompleted_doesNotRestoreStockAgain() {
-        PaymentCancellation cancellation = cancellation();
-        cancellation.setStatus(PaymentCancellationStatus.DONE);
-        when(paymentMapper.findPaymentCancellationById(30L)).thenReturn(Optional.of(cancellation));
-
+    void completeCancellation_incompleteProviderResult_doesNotChangeInternalState() {
         assertThatThrownBy(() -> refundService.completeCancellation(
                 request(),
+                new CancellationResult("CANCELED", null, null)
+        )).isInstanceOfSatisfying(
+                BusinessException.class,
+                error -> assertThat(error.getErrorCode())
+                        .isEqualTo(PaymentErrorCode.PAYMENT_CANCEL_COMPLETE_FAILED)
+        );
+
+        verify(paymentMapper, never()).findPaymentCancellationByIdForUpdate(anyLong());
+        verify(productStockService, never()).restoreStock(anyLong(), anyInt());
+    }
+
+    @Test
+    void completeCancellation_sameCompletedRequest_returnsSuccessWithoutRestoringAgain() {
+        PaymentCancellation cancellation = cancellation();
+        cancellation.setStatus(PaymentCancellationStatus.DONE);
+        cancellation.setTransactionKey("transaction-key");
+        Payment payment = payment();
+        payment.setStatus(PaymentStatus.CANCELED);
+        Order order = order(3L);
+        order.setStatus(OrderStatus.CANCELED);
+        when(paymentMapper.findPaymentCancellationByIdForUpdate(30L))
+                .thenReturn(Optional.of(cancellation));
+        when(paymentMapper.findPaymentById(20L)).thenReturn(Optional.of(payment));
+        when(orderMapper.findOrderById(10L)).thenReturn(Optional.of(order));
+
+        refundService.completeCancellation(
+                request(),
                 new CancellationResult("CANCELED", "transaction-key", NOW.plusSeconds(2))
-        )).isInstanceOf(BusinessException.class);
+        );
 
         verify(productStockService, never()).restoreStock(1L, 2);
         verify(orderMapper, never()).findStockDeductedItemsForRestore(10L);
+        verify(paymentMapper, never()).completeCancellationIfRequested(anyLong(), any(), any());
     }
 
     @Test
@@ -327,8 +354,10 @@ class RefundServiceTests {
                 "transaction-key",
                 NOW.plusSeconds(2)
         );
-        when(paymentMapper.findPaymentCancellationById(30L))
-                .thenReturn(Optional.of(cancellation()));
+        PaymentCancellation cancellation = cancellation();
+        cancellation.setRequestType("ADMIN");
+        when(paymentMapper.findPaymentCancellationByIdForUpdate(30L))
+                .thenReturn(Optional.of(cancellation));
         when(paymentMapper.findPaymentById(20L)).thenReturn(Optional.of(payment()));
         when(orderMapper.findOrderById(10L)).thenReturn(Optional.of(order(3L)));
         when(paymentMapper.completeCancellationIfRequested(
@@ -356,6 +385,22 @@ class RefundServiceTests {
         );
     }
 
+    @Test
+    void getRequestedCancellations_requestedRows_mapsRecoveryRequest() {
+        PaymentCancellation cancellation = cancellation();
+        cancellation.setRequestedAt(NOW.minusMinutes(2));
+        when(paymentMapper.findRequestedRefundCancellations(10))
+                .thenReturn(List.of(cancellation));
+        when(paymentMapper.findPaymentById(20L)).thenReturn(Optional.of(payment()));
+        when(orderMapper.findOrderById(10L)).thenReturn(Optional.of(order(3L)));
+
+        assertThat(refundService.getRequestedCancellations(10))
+                .singleElement()
+                .satisfies(request -> assertThat(request.cancellationId()).isEqualTo(30L));
+
+        verify(paymentMapper).findRequestedRefundCancellations(10);
+    }
+
     private Order order(long memberId) {
         Order order = new Order();
         order.setId(10L);
@@ -379,8 +424,11 @@ class RefundServiceTests {
         PaymentCancellation cancellation = new PaymentCancellation();
         cancellation.setId(30L);
         cancellation.setPaymentId(20L);
+        cancellation.setIdempotencyKey("idempotency-key");
         cancellation.setCancelReason("단순 변심");
+        cancellation.setRequestType("CUSTOMER");
         cancellation.setStatus(PaymentCancellationStatus.REQUESTED);
+        cancellation.setRequestedAt(NOW);
         return cancellation;
     }
 

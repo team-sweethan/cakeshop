@@ -292,6 +292,30 @@
         WHERE id = #{cancellationId}
     </select>
 
+    <select id="findPaymentCancellationByIdForUpdate"
+            resultType="com.cakeshop.domain.payment.entity.PaymentCancellation">
+        SELECT
+            id,
+            payment_id,
+            idempotency_key,
+            cancel_amount,
+            cancel_reason,
+            request_type,
+            requested_by,
+            status,
+            active_requested_payment_id,
+            transaction_key,
+            failure_code,
+            failure_message,
+            requested_at,
+            canceled_at,
+            created_at,
+            updated_at
+        FROM payment_cancellations
+        WHERE id = #{cancellationId}
+        FOR UPDATE
+    </select>
+
     <select id="findPaymentCancellationByIdempotencyKey"
             resultType="com.cakeshop.domain.payment.entity.PaymentCancellation">
         SELECT
@@ -348,6 +372,7 @@
         FROM payment_cancellations
         WHERE status = 'REQUESTED'
           AND request_type IN ('CUSTOMER', 'ADMIN')
+          AND requested_at &lt;= DATE_SUB(CURRENT_TIMESTAMP(6), INTERVAL 1 MINUTE)
         ORDER BY requested_at, id
         LIMIT #{limit}
     </select>
@@ -411,7 +436,8 @@
             failure_code = NULL,
             failure_message = NULL,
             transaction_key = NULL,
-            canceled_at = NULL
+            canceled_at = NULL,
+            requested_at = CURRENT_TIMESTAMP(6)
         WHERE payment_id = #{paymentId}
           AND idempotency_key = #{idempotencyKey}
           AND request_type = 'SYSTEM_COMPENSATION'
@@ -441,7 +467,7 @@
         FROM payment_cancellations
         WHERE status = 'REQUESTED'
           AND request_type = 'SYSTEM_COMPENSATION'
-          AND requested_at &lt;= #{requestedBefore}
+          AND requested_at &lt;= DATE_SUB(CURRENT_TIMESTAMP(6), INTERVAL 1 MINUTE)
         ORDER BY requested_at, id
         LIMIT #{limit}
     </select>
@@ -472,6 +498,17 @@
             failure_message = #{failureMessage}
         WHERE id = #{cancellationId}
           AND status = 'REQUESTED'
+    </update>
+
+    <update id="failUnapprovedCompensationIfRequested">
+        UPDATE payment_cancellations
+        SET status = 'FAILED',
+            failure_code = 'PAYMENT_NOT_APPROVED',
+            failure_message = 'PG 승인 전 결제 요청이 종료되었습니다.'
+        WHERE id = #{cancellationId}
+          AND request_type = 'SYSTEM_COMPENSATION'
+          AND status = 'REQUESTED'
+          AND requested_at &lt;= DATE_SUB(CURRENT_TIMESTAMP(6), INTERVAL 1 MINUTE)
     </update>
 
     <update id="completeCompensationIfRequested">
