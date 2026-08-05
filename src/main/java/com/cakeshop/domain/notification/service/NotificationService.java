@@ -47,6 +47,7 @@ public class NotificationService {
             Object targetId = request.getCommentId() != null ? request.getCommentId()
                     : request.getReviewReplyId() != null ? request.getReviewReplyId()
                     : request.getChatMessageId() != null ? request.getChatMessageId()
+                    : request.getChatRoomId() != null ? request.getChatRoomId()
                     : request.getOrderId() != null ? request.getOrderId()
                     : request.getPostId() != null ? request.getPostId()
                     : request.getReviewId() != null ? request.getReviewId()

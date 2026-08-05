@@ -25,6 +25,7 @@ public class NotificationResponse {
     private LocalDateTime createdAt;
     private Long orderId;
     private Long chatRoomId;
+    private Long commentId;
     private Long postId;
     private Long reviewId;
     private Long userCouponId;
@@ -34,6 +35,7 @@ public class NotificationResponse {
         if (targetUrl != null) return targetUrl;
         if (orderId != null) return "/orders/" + orderId;
         if (chatRoomId != null) return "/chat";
+        if (postId != null && commentId != null) return "/community/" + postId + "#comment-" + commentId;
         if (postId != null) return "/community/" + postId;
         if (reviewId != null) return "/mypage";
         if (userCouponId != null) return "/mypage/coupons";

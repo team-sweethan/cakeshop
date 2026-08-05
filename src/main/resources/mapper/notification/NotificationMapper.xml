@@ -49,20 +49,22 @@
     <!-- 특정 회원 알림 목록 조회-->
     <select id="findUserNotificationList" resultType="NotificationResponse">
         SELECT 
-            id,
-            notification_type AS type,
-            title,
-            content,
-            is_read AS isRead,
-            created_at AS createdAt,
-            order_id AS orderId,
-            chat_room_id AS chatRoomId,
-            post_id AS postId,
-            review_id AS reviewId,
-            user_coupon_id AS userCouponId
-        FROM notifications
-        WHERE receiver_id = #{receiverId}
-        ORDER BY created_at desc
+            n.id,
+            n.notification_type AS type,
+            n.title,
+            n.content,
+            n.is_read AS isRead,
+            n.created_at AS createdAt,
+            n.order_id AS orderId,
+            n.chat_room_id AS chatRoomId,
+            COALESCE(n.post_id, c.post_id) AS postId,
+            n.comment_id AS commentId,
+            n.review_id AS reviewId,
+            n.user_coupon_id AS userCouponId
+        FROM notifications n
+        LEFT JOIN comments c ON c.id = n.comment_id
+        WHERE n.receiver_id = #{receiverId}
+        ORDER BY n.created_at desc
         LIMIT #{size}
         OFFSET #{offset}
     </select>
