@@ -35,7 +35,7 @@ public class NotificationResponse {
         if (orderId != null) return "/orders/" + orderId;
         if (chatRoomId != null) return "/chat";
         if (postId != null) return "/community/" + postId;
-        if (reviewId != null) return "/reviews";
+        if (reviewId != null) return "/mypage";
         if (userCouponId != null) return "/mypage/coupons";
         return null;
     }

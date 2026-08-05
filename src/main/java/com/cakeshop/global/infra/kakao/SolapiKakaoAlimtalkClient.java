@@ -29,10 +29,13 @@ import java.util.UUID;
 @Component
 public class SolapiKakaoAlimtalkClient {
 
+    // 아무 회원 계정으로 로그인 하고 http://localhost:8080/api/notifications/test-sms
+    // 테스트하면 콘솔에 결과 나오고, DB에 저장됨.
+
     private static final Logger log = LoggerFactory.getLogger(SolapiKakaoAlimtalkClient.class);
     private static final String SOLAPI_API_URL = "https://api.solapi.com/messages/v4/send"; // 솔라피 API 주소
 
-    private final NotificationMapper notificationMapper;
+    private final com.cakeshop.domain.notification.service.NotificationDeliveryService notificationDeliveryService;
     private final RestTemplate restTemplate; // HTTP 요청 전송용 객체
 
     @Value("${app.kakao.alimtalk.enabled:true}")
@@ -47,9 +50,12 @@ public class SolapiKakaoAlimtalkClient {
     @Value("${app.kakao.alimtalk.sender-phone:01000000000}")
     private String senderPhone; // 발신자 핸드폰 번호
 
-    public SolapiKakaoAlimtalkClient(NotificationMapper notificationMapper) {
-        this.notificationMapper = notificationMapper;
-        this.restTemplate = new RestTemplate();
+    public SolapiKakaoAlimtalkClient(com.cakeshop.domain.notification.service.NotificationDeliveryService notificationDeliveryService) {
+        this.notificationDeliveryService = notificationDeliveryService;
+        org.springframework.http.client.SimpleClientHttpRequestFactory requestFactory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(3000);
+        requestFactory.setReadTimeout(3000);
+        this.restTemplate = new RestTemplate(requestFactory);
     }
 
     /**
@@ -165,11 +171,7 @@ public class SolapiKakaoAlimtalkClient {
                 .updatedAt(now)
                 .build();
 
-        try {
-            notificationMapper.saveDelivery(delivery);
-        } catch (Exception e) {
-            log.error("notification_deliveries DB 저장 실패: {}", e.getMessage(), e);
-        }
+        notificationDeliveryService.recordDelivery(delivery);
     }
 
     /**

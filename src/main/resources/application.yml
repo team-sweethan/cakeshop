@@ -40,10 +40,10 @@ app:
     public-preview: false
   kakao:
     alimtalk:
-      enabled: ${SOLAPI_ENABLED:true}
+      enabled: ${SOLAPI_ENABLED:false}
       # 솔라피 API Key & API Secret (환경변수로 주입)
-      api-key: ${SOLAPI_API_KEY:NCSEZJCAQK6WEWMB}
-      api-secret: ${SOLAPI_API_SECRET:BS7INVLQ3U79TVZ2KLZT0WOYPU5DK40F}
+      api-key: ${SOLAPI_API_KEY:}
+      api-secret: ${SOLAPI_API_SECRET:}
       # 발신자 등록 휴대폰 번호
       sender-phone: ${SOLAPI_SENDER_PHONE:01099043410}
       # 카카오톡 채널 발신프로필 ID (선택 사항)

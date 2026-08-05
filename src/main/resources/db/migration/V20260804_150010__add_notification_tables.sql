@@ -69,8 +69,22 @@ ALTER TABLE `notifications`
     ADD COLUMN `event_key`
         VARCHAR(100) NULL
         COMMENT '동일 이벤트 중복 알림 방지 키'
-        AFTER `read_at`,
+        AFTER `read_at`;
 
+-- 레거시 target_url URL 문자열에서 실제 존재하는 주문/게시글 ID 안전 이관 (REGEXP & JOIN 검증)
+UPDATE `notifications` n
+JOIN `orders` o
+    ON o.`id` = CAST(SUBSTRING_INDEX(n.`target_url`, '/orders/', -1) AS UNSIGNED)
+SET n.`order_id` = o.`id`
+WHERE n.`order_id` IS NULL
+  AND n.`target_url` REGEXP '^/orders/[0-9]+$';
+
+UPDATE `notifications`
+SET `post_id` = CAST(SUBSTRING_INDEX(`target_url`, '/community/', -1) AS UNSIGNED)
+WHERE `post_id` IS NULL
+  AND `target_url` REGEXP '^/community/[0-9]+$';
+
+ALTER TABLE `notifications`
     DROP COLUMN `target_url`,
 
     ADD CONSTRAINT `fk_notifications_receiver`

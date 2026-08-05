@@ -40,8 +40,17 @@ public class NotificationService {
         // 알림 발송 범위 결정
         DeliveryScope scope = request.getDeliveryScope() != null ? request.getDeliveryScope() : DeliveryScope.WEB_ONLY;
 
-        // 이벤트 키 결정
-        String eventKey = request.getEventKey() != null ? request.getEventKey() : "EVENT_" + java.util.UUID.randomUUID().toString().substring(0, 8);
+        // 이벤트 키 결정 (누락 시 수신자, 타입, 연관ID 조합으로 결정론적 고유 키 생성)
+        String eventKey = request.getEventKey();
+        if (eventKey == null || eventKey.trim().isEmpty()) {
+            Long targetId = request.getOrderId() != null ? request.getOrderId()
+                    : request.getPostId() != null ? request.getPostId()
+                    : request.getReviewId() != null ? request.getReviewId()
+                    : request.getChatMessageId() != null ? request.getChatMessageId()
+                    : request.getUserCouponId() != null ? request.getUserCouponId()
+                    : System.currentTimeMillis();
+            eventKey = request.getType().name() + ":" + request.getReceiverId() + ":" + targetId;
+        }
 
         // 알림 만들기
         Notification notification = Notification.builder()

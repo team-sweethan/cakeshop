@@ -66,9 +66,15 @@ public class NotificationApiController {
         return ResponseEntity.ok(unreadCount);
     }
 
+    private final org.springframework.core.env.Environment environment;
+
     // SMS 발송 테스트용 전용 API
     @GetMapping("/test-sms")
     public ResponseEntity<String> testSmsNotification(@AuthenticationPrincipal MemberDetails memberDetails) {
+        if (environment != null && environment.acceptsProfiles(org.springframework.core.env.Profiles.of("prod"))) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN)
+                    .body("운영 프로필(prod)에서는 테스트 API를 사용할 수 없습니다.");
+        }
         if (memberDetails == null) {
             return ResponseEntity.status(401).body("로그인 후 접속해 주세요. (http://localhost:8080/login)");
         }

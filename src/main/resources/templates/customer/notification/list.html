@@ -128,7 +128,8 @@
 
             // 백엔드 @PatchMapping("/{id}/read") 호출
             fetch(`/api/notifications/${notiId}/read`, {
-              method: "PATCH"
+              method: "PATCH",
+              keepalive: true
             })
             .then(response => {
               if (response.ok) {

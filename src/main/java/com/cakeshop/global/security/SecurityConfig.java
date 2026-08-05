@@ -70,7 +70,7 @@ public class SecurityConfig {
                     // 열어 두면 폼을 다 채우고 등록에서야 로그인으로 튕긴다.
                     auth.requestMatchers(
                             HttpMethod.GET,
-                            "/orders/**", "/notifications",
+                            "/orders/**", "/notifications", "/api/notifications", "/api/notifications/**",
                             "/reviews/**", "/chat")
                             .permitAll();
                 }
