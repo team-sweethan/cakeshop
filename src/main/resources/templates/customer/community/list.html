@@ -22,6 +22,40 @@
     </div>
 
     <!--
+      인기글 영역 (DOMAIN.md 6.9). 1쪽이고 카테고리 필터가 없을 때만 실린다 —
+      그 판단은 Service가 하고 여기서는 비었는지만 본다.
+
+      비었으면 영역이 통째로 사라진다. 제목만 남기고 안을 비우지 않는다: 첫 배포
+      직후처럼 아직 확정된 순위가 없는 상태는 고장이 아니다.
+
+      날짜를 함께 적는 것이 규칙이다. 인기글은 실시간이 아니라 확정된 스냅샷이고,
+      배치를 한 번 거르면 어제 것으로 폴백한다. 언제 것인지 없으면 낡은 순위를
+      오늘 것으로 읽게 되는데, 그 화면은 정상일 때와 똑같이 생겼다.
+
+      숫자(조회수·좋아요·댓글)를 싣지 않는 것도 규칙이다. 같은 글이 아래 목록에도
+      나오고 그쪽은 현재 수치를 보여 준다 — 한 화면에 같은 글의 숫자가 둘이면
+      사용자에게는 어느 쪽도 못 믿을 값이 된다.
+    -->
+    <section class="section" th:if="${!popularSection.isEmpty()}">
+      <div class="cluster">
+        <h2>인기글</h2>
+        <span class="text-muted">
+          <span th:text="${#temporals.format(popularSection.rankingDate, 'yyyy.MM.dd')}">2026.01.01</span> 기준
+        </span>
+      </div>
+
+      <div class="stack">
+        <a class="panel cluster"
+           th:each="popular : ${popularSection.posts}"
+           th:href="@{/community/{postId}(postId=${popular.postId})}">
+          <span class="text-muted" th:text="${popular.ranking}">1</span>
+          <span class="badge badge--info" th:text="${popular.categoryName}">카테고리</span>
+          <strong th:text="${popular.title}">제목</strong>
+        </a>
+      </div>
+    </section>
+
+    <!--
       카테고리 필터. 선택지는 활성 카테고리만 노출한다(DOMAIN.md 6.8).
       필터는 주소로 표현해 새로고침·뒤로가기에서도 유지된다.
     -->
