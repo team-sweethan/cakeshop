@@ -138,9 +138,17 @@
             const notiId = this.getAttribute("data-id");
             if (!notiId) return;
 
+            const csrfToken = document.querySelector('meta[name="_csrf"]')?.getAttribute('content');
+            const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.getAttribute('content');
+            const headers = {};
+            if (csrfToken && csrfHeader) {
+              headers[csrfHeader] = csrfToken;
+            }
+
             // 백엔드 @PatchMapping("/{id}/read") 호출
             fetch(`/api/notifications/${notiId}/read`, {
               method: "PATCH",
+              headers: headers,
               keepalive: true
             })
             .then(response => {
