@@ -104,7 +104,7 @@ class FulfillmentAdminControllerTests {
     }
 
     @Test
-    void markPickedUp_admin_redirectsWithCurrentFilterAndSuccessMessage() throws Exception {
+    void markPickedUp_admin_redirectsWithSuccessMessage() throws Exception {
         MemberDetails admin = new MemberDetails(new MemberAuthenticationView(
                 7L,
                 "admin@cakeshop.local",
@@ -124,9 +124,7 @@ class FulfillmentAdminControllerTests {
                         .param("pickupDate", "2026-08-10")
                         .param("status", "READY_FOR_PICKUP"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl(
-                        "/admin/fulfillment?pickupDate=2026-08-10&status=READY_FOR_PICKUP"
-                ))
+                .andExpect(redirectedUrl("/admin/fulfillment"))
                 .andExpect(flash().attribute("successMessage", "픽업 완료로 변경했습니다."));
 
         verify(fulfillmentService).markPickedUp(10L, 7L);
