@@ -143,8 +143,8 @@ public class SolapiKakaoAlimtalkClient {
             return new SmsResult("SENT", providerMsgId, null);
 
         } catch (Exception e) {
-            log.error("✖ [Solapi SMS API] 전송 실패: {}", e.getMessage(), e);
-            return new SmsResult("FAILED", null, e.getMessage());
+            log.error("✖ [Solapi SMS API] 전송 실패 (notificationId: {})", notificationId);
+            return new SmsResult("FAILED", null, "Solapi API communication failure");
         }
     }
 

@@ -44,14 +44,14 @@ public class NotificationService {
         // 이벤트 키 결정 (누락 시 수신자, 타입, 가장 세밀한 연관ID 조합으로 결정론적 고유 키 생성)
         String eventKey = request.getEventKey();
         if (eventKey == null || eventKey.trim().isEmpty()) {
-            Long targetId = request.getCommentId() != null ? request.getCommentId()
+            Object targetId = request.getCommentId() != null ? request.getCommentId()
                     : request.getReviewReplyId() != null ? request.getReviewReplyId()
                     : request.getChatMessageId() != null ? request.getChatMessageId()
                     : request.getOrderId() != null ? request.getOrderId()
                     : request.getPostId() != null ? request.getPostId()
                     : request.getReviewId() != null ? request.getReviewId()
                     : request.getUserCouponId() != null ? request.getUserCouponId()
-                    : System.currentTimeMillis();
+                    : java.util.UUID.randomUUID().toString();
             eventKey = request.getType().name() + ":" + request.getReceiverId() + ":" + targetId;
         }
 
