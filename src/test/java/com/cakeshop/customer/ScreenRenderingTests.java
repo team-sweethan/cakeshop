@@ -435,7 +435,9 @@ class ScreenRenderingTests {
                 .with(csrf())
                 .param("pickupDate", pickupAt.toLocalDate().toString()))
             .andExpect(status().is3xxRedirection())
-            .andExpect(redirectedUrl("/admin/fulfillment"));
+            .andExpect(redirectedUrl(
+                "/admin/fulfillment?pickupDate=" + pickupAt.toLocalDate()
+            ));
 
         assertThat(jdbcTemplate.queryForObject(
             "SELECT status FROM orders WHERE id = ?",

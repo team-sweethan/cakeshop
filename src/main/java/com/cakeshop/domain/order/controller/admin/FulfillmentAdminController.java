@@ -84,7 +84,9 @@ public class FulfillmentAdminController {
         if (condition != null && condition.getPickupDate() != null) {
             redirect.queryParam("pickupDate", condition.getPickupDate());
         }
-        if (condition != null && FULFILLMENT_STATUSES.contains(condition.getStatus())) {
+        if (condition != null
+                && condition.getStatus() != null
+                && FULFILLMENT_STATUSES.contains(condition.getStatus())) {
             redirect.queryParam("status", condition.getStatus());
         }
         return redirect.toUriString();
