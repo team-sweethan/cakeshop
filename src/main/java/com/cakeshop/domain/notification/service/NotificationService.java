@@ -48,9 +48,9 @@ public class NotificationService {
                     : request.getReviewReplyId() != null ? request.getReviewReplyId()
                     : request.getChatMessageId() != null ? request.getChatMessageId()
                     : request.getOrderId() != null ? request.getOrderId()
-                    : request.getPostId() != null ? request.getPostId()
-                    : request.getReviewId() != null ? request.getReviewId()
-                    : request.getUserCouponId() != null ? request.getUserCouponId()
+                    : request.getPostId() != null ? "POST_" + request.getPostId() + "_" + java.util.UUID.randomUUID().toString()
+                    : request.getReviewId() != null ? "REVIEW_" + request.getReviewId() + "_" + java.util.UUID.randomUUID().toString()
+                    : request.getUserCouponId() != null ? "COUPON_" + request.getUserCouponId() + "_" + java.util.UUID.randomUUID().toString()
                     : request.getChatRoomId() != null ? "ROOM_" + request.getChatRoomId() + "_" + java.util.UUID.randomUUID().toString()
                     : java.util.UUID.randomUUID().toString();
             eventKey = request.getType().name() + ":" + request.getReceiverId() + ":" + targetId;
