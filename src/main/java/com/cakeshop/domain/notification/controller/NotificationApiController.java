@@ -72,12 +72,12 @@ public class NotificationApiController {
 
     private final org.springframework.core.env.Environment environment;
 
-    // SMS 발송 테스트용 전용 API
-    @GetMapping("/test-sms")
+    // SMS 발송 테스트용 전용 API (local 전용 POST 엔드포인트)
+    @PostMapping("/test-sms")
     public ResponseEntity<String> testSmsNotification(@AuthenticationPrincipal MemberDetails memberDetails) {
-        if (environment != null && environment.acceptsProfiles(org.springframework.core.env.Profiles.of("prod"))) {
+        if (environment != null && !environment.acceptsProfiles(org.springframework.core.env.Profiles.of("local"))) {
             return ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN)
-                    .body("운영 프로필(prod)에서는 테스트 API를 사용할 수 없습니다.");
+                    .body("테스트 API는 로컬 프로필(local)에서만 사용할 수 있습니다.");
         }
         if (memberDetails == null) {
             return ResponseEntity.status(401).body("로그인 후 접속해 주세요. (http://localhost:8080/login)");

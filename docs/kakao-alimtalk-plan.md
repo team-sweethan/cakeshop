@@ -31,7 +31,7 @@ app:
       enabled: true               # true: 실제 발송, false: 가상 콘솔 발송
       api-key: "솔라피_API_KEY"
       api-secret: "솔라피_API_SECRET"
-      sender-phone: "01099043410"  # 솔라피에 등록한 본인 발신 휴대폰 번호
+      sender-phone: "01000000000"  # 솔라피에 등록한 본인 발신 휴대폰 번호
 ```
 
 ---
