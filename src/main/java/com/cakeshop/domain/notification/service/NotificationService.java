@@ -80,13 +80,7 @@ public class NotificationService {
         try {
             notificationMapper.save(notification);
         } catch (DuplicateKeyException e) {
-            // 동일 eventKey 중복 알림 요청 시, WEB_AND_SMS 발송 보완 시도 후 멱등하게 종료
-            if (scope == DeliveryScope.WEB_AND_SMS && request.getReceiverId() != null) {
-                String receiverPhone = notificationMapper.findReceiverPhone(request.getReceiverId());
-                if (receiverPhone != null && !receiverPhone.trim().isEmpty()) {
-                    executeSmsSending(null, receiverPhone, title, content);
-                }
-            }
+            // 동일 eventKey 중복 요청은 먼저 성공한 트랜잭션이 처리하므로 멱등하게 무시하고 종료
             return;
         }
 

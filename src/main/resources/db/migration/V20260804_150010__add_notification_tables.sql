@@ -172,7 +172,7 @@ ALTER TABLE `notification_deliveries`
         COMMENT '수신 전화번호',
 
     MODIFY COLUMN `template_code`
-        VARCHAR(50) NOT NULL
+        VARCHAR(100) NOT NULL
         COMMENT '알림 문자 템플릿 코드',
 
     MODIFY COLUMN `provider_message_id`
