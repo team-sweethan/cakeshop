@@ -30,6 +30,7 @@ public class FulfillmentAdminController {
             BindingResult bindingResult,
             Model model
     ) {
+        // 검증
         recoverInvalidSearchValues(condition, bindingResult);
         FulfillmentListView fulfillment = fulfillmentService.getFulfillments(condition);
         condition.setPickupDate(fulfillment.pickupDate());
@@ -38,6 +39,7 @@ public class FulfillmentAdminController {
         return "admin/fulfillment/list";
     }
 
+    /** 픽업 대기 -> 픽업 완료**/
     @PostMapping("/admin/fulfillment/{orderId}/pickup")
     public String markPickedUp(
             @PathVariable("orderId") long orderId,
@@ -50,18 +52,12 @@ public class FulfillmentAdminController {
         }
 
         fulfillmentService.markPickedUp(orderId, admin.getMemberId());
-        if (condition.getPickupDate() != null) {
-            redirectAttributes.addAttribute("pickupDate", condition.getPickupDate().toString()
-            );
-        }
-        if (condition.getStatus() != null) {
-            redirectAttributes.addAttribute("status", condition.getStatus().name()
-            );
-        }
+
         redirectAttributes.addFlashAttribute("successMessage", "픽업 완료로 변경했습니다.");
         return "redirect:/admin/fulfillment";
     }
 
+    /** 배송 상태 (픽업 날짜가 없던가, 상태가 없던) 검증 로직.**/
     private void recoverInvalidSearchValues(
             FulfillmentSearchCondition condition,
             BindingResult bindingResult

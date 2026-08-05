@@ -24,18 +24,21 @@ public class OrderAdminController {
     private final AdminOrderService orderAdminService;
     private final RefundFacade refundFacade;
 
+    /** 주문 목록 리스트 가져오기**/
     @GetMapping("/admin/orders")
     public String orders(Model model) {
         model.addAttribute("orders", orderAdminService.getOrders());
         return "admin/order/list";
     }
 
+    /** 주문 목록 중 한건 한건에 대한 정보 가져오기.**/
     @GetMapping("/admin/orders/{orderId}")
     public String detail(@PathVariable long orderId, Model model) {
         model.addAttribute("order", orderAdminService.getOrder(orderId));
         return "admin/order/detail";
     }
 
+    /** 관리자 취소 로직. **/
     @PostMapping("/admin/orders/{orderId}/cancel")
     public String cancel(
             @PathVariable long orderId,

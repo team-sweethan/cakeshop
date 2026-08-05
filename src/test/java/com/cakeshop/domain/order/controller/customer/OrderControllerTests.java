@@ -8,6 +8,7 @@ import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
 import com.cakeshop.domain.order.controller.customer.OrderController;
 import com.cakeshop.domain.order.service.customer.CustomerOrderQueryService;
 import com.cakeshop.domain.order.service.OrderService;
+import com.cakeshop.domain.payment.service.RefundFacade;
 import com.cakeshop.global.security.MemberDetails;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -55,6 +56,9 @@ class OrderControllerTests {
     @Mock
     private MemberService memberService;
 
+    @Mock
+    private RefundFacade refundFacade;
+
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -64,7 +68,8 @@ class OrderControllerTests {
                                 orderCheckoutService,
                                 orderService,
                                 orderQueryService,
-                                memberService
+                                memberService,
+                                refundFacade
                         )
                 )
                 .setCustomArgumentResolvers(

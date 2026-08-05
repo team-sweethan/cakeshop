@@ -61,13 +61,16 @@ public class OrderCheckoutService {
             throw new BusinessException(OrderErrorCode.INVALID_QUANTITY);
         }
 
+        // DB에 저장된 상품 정보 가져옴.
         ProductSalesInfo product = productQueryService.getSalesInfo(productId);
+        // 주문 가능한 수량 검증
         validateProduct(product, quantity);
-
+        // 주문 가능한 옵션 검증
         List<ValidatedOption> validatedOptions = orderOptionValidator.validate(
                 productId,
                 optionIds
         );
+
         BigDecimal productAmount = product.basePrice()
                 .multiply(BigDecimal.valueOf(quantity));
         BigDecimal optionAmount = validatedOptions.stream()

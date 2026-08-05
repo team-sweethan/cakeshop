@@ -2,10 +2,12 @@ package com.cakeshop.domain.order.controller.customer;
 
 import com.cakeshop.domain.member.dto.view.MemberProfileView;
 import com.cakeshop.domain.member.service.MemberService;
+import com.cakeshop.domain.order.dto.form.CancelForm;
 import com.cakeshop.domain.order.dto.form.customer.GeneralOrderForm;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
 import com.cakeshop.domain.order.service.customer.CustomerOrderQueryService;
 import com.cakeshop.domain.order.service.OrderService;
+import com.cakeshop.domain.payment.service.RefundFacade;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.error.CommonErrorCode;
 import com.cakeshop.global.security.MemberDetails;
@@ -32,6 +34,7 @@ public class OrderController {
     private final OrderService orderService;
     private final CustomerOrderQueryService orderQueryService;
     private final MemberService memberService;
+    private final RefundFacade refundFacade;
 
 //    /** 장바구니 항목의 픽업 일시 수정용 목업 경로다. 일반 주문은 checkout에서 선택한다. */
 //    @GetMapping(value = "/pickup", params = "intent=cart-edit")
@@ -56,7 +59,7 @@ public class OrderController {
             @AuthenticationPrincipal MemberDetails member,
             Model model
     ) {
-        prefillMemberContact(form, requireMember(member));
+        prefillMemberContact(form, member);
         form.setRequestKey(UUID.randomUUID().toString());
         return renderCheckout(form, model);
     }
@@ -79,6 +82,17 @@ public class OrderController {
 
         long orderId = orderService.createGeneralOrder(memberId, form);
         return "redirect:/orders/" + orderId + "/payment";
+    }
+
+    // 로그인 회원의 주문 취소
+    @PostMapping("/{orderId}/cancel")
+    public String cancel(
+            @PathVariable long orderId,
+            @AuthenticationPrincipal MemberDetails member,
+            @Valid @ModelAttribute CancelForm form
+    ) {
+        refundFacade.cancelCustomerOrder(requireMemberId(member), orderId, form.getReason());
+        return "redirect:/orders/" + orderId;
     }
 
     // 로그인 회원의 주문 목록
@@ -108,6 +122,8 @@ public class OrderController {
         return "customer/order/detail";
     }
 
+
+    /** 클라이언트 값을 통해 DB정보를 활용해 주문서 화면용 데이터 구성.**/
     private String renderCheckout(GeneralOrderForm form, Model model) {
         model.addAttribute(
                 "checkout",
@@ -139,12 +155,6 @@ public class OrderController {
         form.setOrdererPhone(profile.phone());
         form.setPickupName(profile.name());
         form.setPickupPhone(profile.phone());
-    }
-
-
-    private MemberDetails requireMember(MemberDetails member) {
-        requireMemberId(member);
-        return member;
     }
 
     /** 멤버 유효한지 체크.

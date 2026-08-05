@@ -64,6 +64,7 @@ public class FulfillmentService {
         if (orderId <= 0 || adminMemberId <= 0) {
             throw new BusinessException(OrderErrorCode.INVALID_STATUS_TRANSITION);
         }
+        // 상태가 READY_FOR_PICKUP 인지
         int affectedRows = orderMapper.markPickedUpIfReady(
                 orderId,
                 adminMemberId,

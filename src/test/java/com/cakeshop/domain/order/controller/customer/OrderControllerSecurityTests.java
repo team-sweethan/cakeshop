@@ -9,7 +9,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
-import com.cakeshop.domain.order.controller.customer.OrderCancellationController;
+import com.cakeshop.domain.member.service.MemberService;
+import com.cakeshop.domain.order.service.OrderService;
+import com.cakeshop.domain.order.service.customer.CustomerOrderQueryService;
+import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
 import com.cakeshop.domain.payment.service.RefundFacade;
 import com.cakeshop.global.security.MemberDetails;
 import com.cakeshop.global.security.SecurityConfig;
@@ -21,15 +24,27 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-@WebMvcTest(OrderCancellationController.class)
+@WebMvcTest(OrderController.class)
 @Import(SecurityConfig.class)
-class OrderCancellationControllerSecurityTests {
+class OrderControllerSecurityTests {
 
     @Autowired
     private MockMvc mockMvc;
 
     @MockitoBean
     private RefundFacade refundFacade;
+
+    @MockitoBean
+    private OrderCheckoutService orderCheckoutService;
+
+    @MockitoBean
+    private OrderService orderService;
+
+    @MockitoBean
+    private CustomerOrderQueryService orderQueryService;
+
+    @MockitoBean
+    private MemberService memberService;
 
     @Test
     void cancel_missingCsrf_isForbidden() throws Exception {

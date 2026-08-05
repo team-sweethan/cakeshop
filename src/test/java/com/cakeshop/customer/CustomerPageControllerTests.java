@@ -28,6 +28,7 @@ import com.cakeshop.domain.order.service.OrderService;
 import com.cakeshop.domain.payment.controller.PaymentController;
 import com.cakeshop.domain.payment.service.PaymentFacade;
 import com.cakeshop.domain.payment.service.PaymentQueryService;
+import com.cakeshop.domain.payment.service.RefundFacade;
 import com.cakeshop.domain.product.controller.ProductController;
 import com.cakeshop.domain.product.service.ProductService;
 import com.cakeshop.domain.review.controller.ReviewController;
@@ -93,7 +94,8 @@ class CustomerPageControllerTests {
                                 mock(OrderCheckoutService.class),
                                 mock(OrderService.class),
                                 orderQueryService,
-                                memberService
+                                memberService,
+                                mock(RefundFacade.class)
                         ),
                         new PaymentController(
                                 mock(PaymentFacade.class),
@@ -116,8 +118,6 @@ class CustomerPageControllerTests {
         pages.put("/products", "customer/product/list");
         pages.put("/products/1", "customer/product/detail");
         pages.put("/cart", "customer/cart/list");
-        pages.put("/orders/custom/options", "customer/order/custom-option");
-        pages.put("/orders/custom/request", "customer/order/custom-request");
         pages.put(
                 "/orders/checkout?productId=1&quantity=1&optionIds=1",
                 "customer/order/form"

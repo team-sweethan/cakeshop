@@ -198,9 +198,7 @@ class ScreenRenderingTests {
     )
     void memberScreensRenderWithSeededUser() throws Exception {
         String[] paths = {
-            "/cart", "/orders/pickup?intent=cart-edit",
-            "/orders/custom/options", "/orders/custom/request",
-            "/orders/checkout?productId=1&quantity=1&optionIds=1",
+            "/cart", "/orders/checkout?productId=1&quantity=1&optionIds=1",
             "/mypage",
             "/orders", "/notifications", "/reviews/new", "/mypage/coupons",
             "/mypage/profile"
@@ -404,7 +402,8 @@ class ScreenRenderingTests {
             """
             UPDATE orders
             SET status = 'READY_FOR_PICKUP',
-                ready_at = CURRENT_TIMESTAMP(6)
+                ready_at = CURRENT_TIMESTAMP(6),
+                pickup_at = DATE_SUB(CURRENT_TIMESTAMP(6), INTERVAL 1 MINUTE)
             WHERE id = ?
             """,
             orderId
@@ -436,9 +435,7 @@ class ScreenRenderingTests {
                 .with(csrf())
                 .param("pickupDate", pickupAt.toLocalDate().toString()))
             .andExpect(status().is3xxRedirection())
-            .andExpect(redirectedUrl(
-                "/admin/fulfillment?pickupDate=" + pickupAt.toLocalDate()
-            ));
+            .andExpect(redirectedUrl("/admin/fulfillment"));
 
         assertThat(jdbcTemplate.queryForObject(
             "SELECT status FROM orders WHERE id = ?",
