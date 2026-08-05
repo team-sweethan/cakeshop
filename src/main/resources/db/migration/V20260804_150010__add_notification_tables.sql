@@ -84,6 +84,11 @@ SET `post_id` = CAST(SUBSTRING_INDEX(`target_url`, '/community/', -1) AS UNSIGNE
 WHERE `post_id` IS NULL
   AND `target_url` REGEXP '^/community/[0-9]+$';
 
+UPDATE `notifications` n
+JOIN `chat_messages` cm ON cm.`id` = n.`chat_message_id`
+SET n.`chat_room_id` = cm.`chat_room_id`
+WHERE n.`chat_room_id` IS NULL AND n.`chat_message_id` IS NOT NULL;
+
 ALTER TABLE `notifications`
     DROP COLUMN `target_url`,
 

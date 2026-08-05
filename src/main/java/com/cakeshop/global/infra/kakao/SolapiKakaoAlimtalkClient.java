@@ -126,10 +126,17 @@ public class SolapiKakaoAlimtalkClient {
             HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(body, headers);
             ResponseEntity<Map> response = restTemplate.postForEntity(SOLAPI_API_URL, requestEntity, Map.class);
 
-            // 4. 발송 결과 메시지 ID 추출
+            // 4. 발송 결과 메시지 ID 및 실패 목록 확인
             String providerMsgId = "SOLAPI_" + UUID.randomUUID().toString().substring(0, 8);
-            if (response.getBody() != null && response.getBody().containsKey("groupId")) {
-                providerMsgId = String.valueOf(response.getBody().get("groupId"));
+            Map responseBody = response.getBody();
+            if (responseBody != null) {
+                if (responseBody.containsKey("failedMessageList") && responseBody.get("failedMessageList") instanceof java.util.List list && !list.isEmpty()) {
+                    log.error("✖ [Solapi SMS API] 일부 수신자 발송 실패 (failedMessageList)");
+                    return new SmsResult("FAILED", null, "Solapi failedMessageList: " + list.get(0));
+                }
+                if (responseBody.containsKey("groupId")) {
+                    providerMsgId = String.valueOf(responseBody.get("groupId"));
+                }
             }
 
             log.info("✔ [Solapi SMS API] 성공적으로 전송되었습니다! MessageId: {}", providerMsgId);
