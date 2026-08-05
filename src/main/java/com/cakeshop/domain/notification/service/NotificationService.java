@@ -23,6 +23,7 @@ public class NotificationService {
 
     private final NotificationMapper notificationMapper;
     private final SolapiKakaoAlimtalkClient solapiKakaoAlimtalkClient;
+    private final NotificationDeliveryService notificationDeliveryService;
 
     // 알림 생성
     @Transactional
@@ -90,13 +91,30 @@ public class NotificationService {
                     TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                         @Override
                         public void afterCommit() {
-                            solapiKakaoAlimtalkClient.sendAlimtalk(notificationId, receiverPhone, title, content);
+                            executeSmsSending(notificationId, receiverPhone, title, content);
                         }
                     });
                 } else {
-                    solapiKakaoAlimtalkClient.sendAlimtalk(notificationId, receiverPhone, title, content);
+                    executeSmsSending(notificationId, receiverPhone, title, content);
                 }
             }
+        }
+    }
+
+    private void executeSmsSending(Long notificationId, String receiverPhone, String title, String content) {
+        SolapiKakaoAlimtalkClient.SmsResult result = solapiKakaoAlimtalkClient.sendAlimtalk(notificationId, receiverPhone, title, content);
+        if (result != null) {
+            com.cakeshop.domain.notification.entity.NotificationDelivery delivery = com.cakeshop.domain.notification.entity.NotificationDelivery.builder()
+                    .notificationId(notificationId)
+                    .recipient(receiverPhone)
+                    .templateCode("DEFAULT_SMS")
+                    .providerMessageId(result.getProviderMessageId())
+                    .status(result.getStatus())
+                    .failureReason(result.getFailureReason())
+                    .createdAt(LocalDateTime.now())
+                    .updatedAt(LocalDateTime.now())
+                    .build();
+            notificationDeliveryService.recordDelivery(delivery);
         }
     }
 

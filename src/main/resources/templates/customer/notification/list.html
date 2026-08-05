@@ -137,6 +137,9 @@
                 this.classList.remove("is-unread");
                 const dot = this.querySelector(".notification-dot");
                 if (dot) dot.remove();
+                if (typeof window.updateNotificationUnreadCount === "function") {
+                  window.updateNotificationUnreadCount();
+                }
               }
             });
           });

@@ -15,11 +15,15 @@ import com.cakeshop.domain.notification.entity.DeliveryScope;
 
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @RestController
 @RequestMapping("/api/notifications")
 @RequiredArgsConstructor
 public class NotificationApiController {
 
+    private static final Logger log = LoggerFactory.getLogger(NotificationApiController.class);
     private final NotificationService notificationService;
 
     // 내 알림 목록 최신순 페이징 조회 API
@@ -90,7 +94,8 @@ public class NotificationApiController {
             );
             return ResponseEntity.ok("테스트 알림이 성공적으로 전송되었습니다! 핸드폰을 확인해 보세요!");
         } catch (Exception e) {
-            return ResponseEntity.status(500).body("테스트 실패 상세 원인: " + e.getClass().getName() + " : " + e.getMessage());
+            log.error("테스트 알림 전송 실패", e);
+            return ResponseEntity.status(500).body("테스트 알림 전송 중 오류가 발생했습니다.");
         }
     }
 }

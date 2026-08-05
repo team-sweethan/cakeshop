@@ -141,8 +141,13 @@ ALTER TABLE `notification_deliveries`
     DROP FOREIGN KEY `fk_notification_deliveries_notification`;
 
 -- ---------------------------------------------------------
--- 2-2. 기존 데이터 보정
+-- 2-2. 기존 데이터 보정 및 notification_id 중복 정리 (최신 1건만 보존)
 -- ---------------------------------------------------------
+DELETE d1 FROM `notification_deliveries` d1
+INNER JOIN `notification_deliveries` d2
+    ON d1.`notification_id` = d2.`notification_id`
+   AND d1.`id` < d2.`id`;
+
 UPDATE `notification_deliveries`
 SET `status` = 'PENDING'
 WHERE `status` = 'REQUESTED';
@@ -171,7 +176,7 @@ ALTER TABLE `notification_deliveries`
         COMMENT '알림 문자 템플릿 코드',
 
     MODIFY COLUMN `provider_message_id`
-        VARCHAR(100) NULL
+        VARCHAR(200) NULL
         COMMENT '발송 중계사 메시지 ID',
 
     MODIFY COLUMN `status`
