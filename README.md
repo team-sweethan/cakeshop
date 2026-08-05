@@ -14,7 +14,6 @@ Spring Boot 4.0.2 · Java 21 · Gradle · Thymeleaf · MyBatis · MariaDB
 - [로컬 DB 초기화](#로컬-db-초기화) — 기동 실패 시 재생성 절차, 오류 대응표
 - [프로젝트 구조](#프로젝트-구조)
 - [Store 수직 슬라이스 구현 예시](#store-수직-슬라이스-구현-예시)
-- [화면 경로](#화면-경로) — 관리자·고객 화면 현황
 
 ---
 
@@ -53,7 +52,7 @@ CREATE DATABASE `cakeshop`
 
 ### 3. 애플리케이션 실행 — Flyway가 스키마를 만든다
 
-`docs/sql`의 파일을 직접 실행하지 않는다. 스키마는 Flyway가 적용한다.
+별도의 수동 DDL을 실행하지 않는다. 스키마는 Flyway가 적용한다.
 
 ```powershell
 .\gradlew.bat bootRun --args="--spring.profiles.active=local"
@@ -107,8 +106,6 @@ ORDER BY `installed_rank`;
 
 정상 실행 로그에는 `The following 1 profile is active: "local"`과 `Tomcat started on port 8080`이 표시된다. 실행 후 `http://localhost:8080/`에서 고객 화면을 확인한다.
 
-전체 화면 경로는 `http://localhost:8080/screens`에서 확인한다. `local` 프로필에서는 화면 선이관 기간 동안 고객 목업 흐름만 로그인 없이 열 수 있다. 모든 관리자 화면(`/admin/**`)은 관리자 로그인이 필요하며, 로컬에서는 `db/seed/seed-local.sql`로 생성된 `admin@cakeshop.local / Admin1234!` 계정으로 로그인해 확인한다. `rds` 프로필에서는 고객 목업 공개 조회도 비활성화된다.
-
 ### 공용 RDS로 실행
 
 `rds` 프로필에서는 Flyway를 비활성화한다. 애플리케이션 기동은 RDS 스키마를 생성하거나 변경하지 않으므로, 필요한 스키마가 별도 검토·승인 절차로 먼저 반영됐는지 확인한다. 로컬 DB 초기화 절차의 `DROP DATABASE`를 RDS에 실행해서는 안 된다.
@@ -158,7 +155,6 @@ Remove-Item Env:SPRING_PROFILES_ACTIVE -ErrorAction SilentlyContinue
 |---|---|
 | `src/main/resources/db/migration` | `local`, `test`에서 자동 적용. RDS에는 별도 검토·승인 절차로 반영하는 스키마 변경 |
 | `src/main/resources/db/seed` | 로컬 개발용 샘플 데이터. **Flyway 관리 대상이 아니다.** 필요할 때 직접 실행한다 |
-| `docs/sql` | 과거 수동 적용 SQL과 설계 참고 자료. 신규 DB에 직접 실행하지 않는다 |
 
 ### 현재 migration
 
@@ -270,7 +266,7 @@ ORDER BY `installed_rank`;
 
 ## 로컬 DB 초기화
 
-이 절차는 과거에 `docs/sql`의 DDL을 수동 적용했거나 Flyway 이력이 꼬인 **개인 로컬 DB만** 대상으로 한다. 데이터베이스 전체와 그 안의 모든 테이블, 데이터, `flyway_schema_history`가 삭제된다. 공용 RDS나 보존해야 할 데이터베이스에는 절대 실행하지 않는다.
+이 절차는 Flyway 도입 전에 DDL을 수동 적용했거나 Flyway 이력이 꼬인 **개인 로컬 DB만** 대상으로 한다. 데이터베이스 전체와 그 안의 모든 테이블, 데이터, `flyway_schema_history`가 삭제된다. 공용 RDS나 보존해야 할 데이터베이스에는 절대 실행하지 않는다.
 
 ### 언제 필요한가
 
@@ -326,7 +322,7 @@ CREATE DATABASE `cakeshop`
     COLLATE utf8mb4_unicode_ci;
 ```
 
-`docs/sql/V0_ERD.sql`의 `DROP TABLE` 구문으로 일부 테이블만 삭제하면 안 된다. 그 방법은 `flyway_schema_history` 또는 이후 추가된 테이블을 남길 수 있고, Flyway가 이미 적용된 마이그레이션이라고 오판하게 만든다. `flyway_schema_history`만 따로 삭제하거나 임의로 수정하는 것도 금지한다.
+일부 테이블만 골라 삭제하면 안 된다. 그 방법은 `flyway_schema_history` 또는 이후 추가된 테이블을 남길 수 있고, Flyway가 이미 적용된 마이그레이션이라고 오판하게 만든다. `flyway_schema_history`만 따로 삭제하거나 임의로 수정하는 것도 금지한다.
 
 **5~7단계.** 이후는 [처음 설치하기](#처음-설치하기)의 3~5단계와 동일하다. 프로젝트 루트에서 애플리케이션을 실행해 Flyway가 [현재 migration](#현재-migration)을 적용하게 하고, `db/seed/seed-local.sql`과 `db/seed/seed-community.sql`을 순서대로 실행한 뒤 `flyway_schema_history`를 확인한다. 초기화가 완료되면 `admin@cakeshop.local / Admin1234!` 계정으로 관리자 화면 로그인을 확인한다.
 
@@ -385,53 +381,3 @@ CREATE DATABASE `cakeshop`
 | `controller` | Model+View, BindingResult 재렌더, RedirectAttributes FlashMessage |
 
 구현 과정과 선택 이유는 각 계층의 핵심 지점에 주석으로 남겨 두었다. 새 도메인은 자명한 문법 주석까지 복사하지 말고, 트랜잭션 경계·검증 실패 처리·도메인 조합처럼 구조상 중요한 주석만 유지한다.
-
----
-
-## 화면 경로
-
-### 관리자 화면
-
-로그인 성공 시 저장된 요청이 없으면 `/admin`으로 이동한다. 매장 관리만 실제 DB에 연결되어 있고, 아래의 다른 화면은 기존 관리자 샘플을 Thymeleaf MVC 경로로 옮긴 목업 상태다. 목업 화면의 변경 버튼은 백엔드가 연결될 때까지 비활성화한다.
-
-| 기능 | 경로 | 현재 상태 |
-|---|---|---|
-| 대시보드 | `/admin` | 목업 |
-| 매장 | `/admin/store` | 실제 조회·수정·휴무일 관리 |
-| 상품 | `/admin/products`, `/admin/products/new` | 목업 |
-| 주문 | `/admin/orders`, `/admin/orders/{id}` | 목업 |
-| 제작·픽업 | `/admin/fulfillment` | 목업 |
-| 결제·환불 | `/admin/payments` | 목업 |
-| 쿠폰 | `/admin/coupons` | 목업 |
-| 회원 | `/admin/members` | 목업 |
-| 후기 | `/admin/reviews` | 목업 |
-| 커뮤니티 | `/admin/community`, `/admin/community/{id}` | 목업 |
-| 알림 | `/admin/notifications` | 목업 |
-| 통계 | `/admin/statistics` | 목업 |
-
-각 목업 화면은 해당 `domain/*/controller/*AdminController`가 소유한다. 백엔드를 구현할 때 URL과 템플릿은 유지하고 Controller의 Model 데이터와 비활성화된 명령 버튼만 실제 기능으로 교체한다.
-
-### 고객 화면 선이관
-
-프론트 원본 18개 화면 중 메인과 로그인은 각각 매장 조회와 Spring Security 연동을 유지한다. 나머지 16개 화면은 아래 import 스크립트로 도메인별 Thymeleaf 템플릿과 GET 경로에 먼저 연결했다. 커뮤니티 3개 화면은 프론트 원본에 없어 별도로 추가했으며, 이로써 `/screens` 기준 고객 화면은 총 21개다. 현재 목업 화면의 폼과 장바구니 동작은 브라우저 안에서만 실행되며 DB를 변경하지 않는다.
-
-| 기능 | 경로 | 현재 상태 |
-|---|---|---|
-| 전체 화면 목록 | `/screens` | 고객·관리자 35개 경로 안내 |
-| 회원가입 | `/signup` | 목업 |
-| 상품 목록·상세 | `/products`, `/products/{id}` | 목업 |
-| 장바구니 | `/cart` | 목업 (브라우저 `localStorage`) |
-| 픽업 설정 | `/orders/pickup` | 목업 |
-| 주문 제작 | `/orders/custom/options`, `/orders/custom/request` | 목업 |
-| 주문서·완료·상세 | `/orders/checkout`, `/orders/complete`, `/orders/{id}` | 목업 |
-| 결제 | `/orders/{id}/payment` | 목업 |
-| 마이페이지·프로필·쿠폰 | `/mypage`, `/mypage/profile`, `/mypage/coupons` | 목업 |
-| 알림·후기 | `/notifications`, `/reviews/new` | 목업 |
-| 커뮤니티 목록·상세 | `/community`, `/community/{id}` | 실제 조회 (카테고리 필터·페이징·조회수) |
-| 커뮤니티 글쓰기 | `/community/new` | 목업 (별도 추가, 조각 2에서 연결) |
-
-프론트 저장소가 갱신되면 다음 명령으로 프론트 원본 기반 16개 목업 템플릿과 전용 CSS·JavaScript를 다시 가져온다. 메인·로그인과 별도로 추가한 커뮤니티 화면은 이 명령이 덮어쓰지 않는다.
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\import-customer-mockups.ps1
-```
