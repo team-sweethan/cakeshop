@@ -1,20 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+******************************
+작성자 : HyunGyu-Cho
+담당자 : 현규
+작성일 : 2026-08-05
+기능 : 커뮤니티 데이터 접근
+설명 : CommunityAdminMapper 기능에 필요한 조회와 변경을 수행한다.
+******************************
+-->
 <mapper namespace="com.cakeshop.domain.community.mapper.CommunityAdminMapper">
-    <!-- 사용자 입력은 #{} 만 사용 (${} 금지) -->
-
-    <!--
-        관리자 경로의 조회와 조치. 고객 경로는 CommunityMapper.xml 이다.
-
-        게시글 행을 잠그는 lockPost 는 여기 없고 CommunityMapper 쪽에 있다. 차단·해제·기각도
-        같은 행을 같은 순서로 잠가야 하므로(H17), 잠금 문장은 한 벌만 둔다.
-    -->
-
-    <!--
-        관리자 상세의 신고 내역. 처리된 신고도 함께 돌려준다.
-
-        SELECT 컬럼 순서는 ReportView 의 컴포넌트 순서와 맞춘다.
-    -->
     <select id="findReportsByPost"
             resultType="com.cakeshop.domain.community.dto.view.ReportView">
 
@@ -34,7 +29,6 @@
         ORDER BY pr.created_at DESC, pr.id DESC
     </select>
 
-    <!-- 미처리 신고 수. 목록 정렬이 세는 값과 같은 뜻이어야 한다. -->
     <select id="countPendingReports" resultType="long">
 
         SELECT COUNT(*)
@@ -43,12 +37,6 @@
         AND pr.status = 'PENDING'
     </select>
 
-    <!--
-        관리자 목록과 전체 개수가 공유하는 조건.
-
-        고객 목록과 달리 기본이 "거르지 않음"이다. 관리자는 삭제·차단된 글까지 본다
-        (DOMAIN.md 4.3). status 는 화면의 필터에서 오고, 값이 없으면 전체다.
-    -->
     <sql id="adminPostConditions">
         <where>
             <if test="status != null">
@@ -57,21 +45,6 @@
         </where>
     </sql>
 
-    <!--
-        관리자 목록(DOMAIN.md 6.7).
-
-        미처리 신고 수는 고객 목록의 댓글 수와 같은 이유로 스칼라 서브쿼리다 — LEFT JOIN
-        ... GROUP BY 로 바꾸면 LIMIT 이 집계 이후에 적용되어 전체를 훑는다(6.1). 이 형태는
-        CommunityMapperXmlTests 가 고정한다.
-
-        정렬은 <choose> 로 갈린다. 주소에서 온 문자열을 ${} 로 이으면 그대로 쿼리가
-        되므로, 허용값을 AdminPostSort 로 좁히고 분기는 SQL 에 적어 둔다(AGENTS.md).
-
-        id tiebreaker 는 어느 분기에도 붙인다. 신고 수는 0 이 대부분이라 동점이 created_at
-        보다 훨씬 잦고, tiebreaker 가 없으면 페이지 경계에서 글이 사라지거나 두 번 나온다.
-
-        SELECT 컬럼 순서는 AdminPostListView 의 컴포넌트 순서와 맞춘다.
-    -->
     <select id="findPostsForAdmin"
             resultType="com.cakeshop.domain.community.dto.view.AdminPostListView">
 
@@ -106,7 +79,6 @@
         LIMIT #{size} OFFSET #{offset}
     </select>
 
-    <!-- 관리자 목록의 전체 개수. 표시 항목이 필요 없으므로 조인하지 않는다. -->
     <select id="countPostsForAdmin" resultType="long">
 
         SELECT COUNT(*)
@@ -115,13 +87,6 @@
         <include refid="adminPostConditions"/>
     </select>
 
-    <!--
-        관리자 상세(DOMAIN.md 4.3). 상태로 거르지 않으며 차단 기록까지 읽는다.
-        blocked_by 는 차단된 적이 없으면 NULL 이라 LEFT JOIN 이다 — INNER 로 두면
-        차단된 적 없는 글이 통째로 사라진다.
-
-        SELECT 컬럼 순서는 AdminPostDetailView 의 컴포넌트 순서와 맞춘다.
-    -->
     <select id="findPostByIdForAdmin"
             resultType="com.cakeshop.domain.community.dto.view.AdminPostDetailView">
 
@@ -150,17 +115,6 @@
         WHERE p.id = #{postId}
     </select>
 
-    <!--
-        게시글 차단(DOMAIN.md 6.7). status·blocked_at·blocked_reason·blocked_by 를 함께 쓴다.
-
-        status = 'PUBLISHED' 조건이 전이 규칙을 SQL 쪽에서도 지킨다(4.2). 이미 차단된 글에
-        다시 걸면 원래 조치의 시각과 사유가 덮여 사라지고, 작성자가 지운 글에 걸면
-        DELETED -> BLOCKED 가 되어 지운 글이 되살아난다. 둘 다 화면에는 성공으로 보인다.
-
-        updated_at 을 자기 값으로 다시 지정하는 것은 조회수·좋아요와 같은 이유다.
-        그냥 두면 ON UPDATE CURRENT_TIMESTAMP(6) 이 값을 갱신해서, 작성자가 고치지도 않은
-        글에 "(수정됨)" 이 붙는다(6.3). 차단은 관리자의 조치이지 작성자의 수정이 아니다.
-    -->
     <update id="blockPost">
 
         UPDATE posts p
@@ -173,15 +127,6 @@
         AND p.status = 'PUBLISHED'
     </update>
 
-    <!--
-        차단 해제(DOMAIN.md 4.2). status 만 되돌리고 blocked_* 는 그대로 둔다 —
-        "과거에 차단된 적이 있다"는 관리자에게 유용한 이력이고, 노출은 status 가 정한다.
-        지우면 같은 글이 두 번째로 신고됐을 때 앞선 조치를 알 수 없다.
-
-        status = 'BLOCKED' 조건은 차단된 적 없는 글이나 지워진 글이 이 UPDATE 로
-        PUBLISHED 가 되는 것을 막는다(DELETED -> PUBLISHED 금지).
-        updated_at 보존은 차단과 같은 이유다.
-    -->
     <update id="unblockPost">
 
         UPDATE posts p
@@ -191,14 +136,6 @@
         AND p.status = 'BLOCKED'
     </update>
 
-    <!--
-        미처리 신고를 게시글 단위로 닫는다(DOMAIN.md 6.6). 차단이면 RESOLVED,
-        기각이면 REJECTED 가 들어온다.
-
-        status = 'PENDING' 조건이 전이 규칙을 SQL 쪽에서도 지킨다. 이미 닫힌 신고를 다시
-        건드리면 첫 조치가 무엇이었는지가 덮이고, 차단 -> 해제 -> 재차단 같은 흐름에서
-        REJECTED 였던 신고가 RESOLVED 로 바뀌어 기록이 거짓이 된다.
-    -->
     <update id="closePendingReports">
 
         UPDATE post_reports pr
