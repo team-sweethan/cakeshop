@@ -619,6 +619,8 @@ class PaymentFacadeTests {
         GeneralPaymentOrder order = order(NOW.plusMinutes(5));
         Payment payment = payment();
         payment.setPaymentKey("stale-payment-key");
+        Payment refreshedPayment = payment();
+        refreshedPayment.setIdempotencyKey("PAY-RETRY");
         CompensationRequest request = new CompensationRequest(
                 20L,
                 1L,
@@ -629,7 +631,7 @@ class PaymentFacadeTests {
         );
         ApprovalResult approval = approval();
         when(orderService.getGeneralPaymentOrder(10L, 1L)).thenReturn(order);
-        when(paymentService.getReadyPayment(1L)).thenReturn(payment);
+        when(paymentService.getReadyPayment(1L)).thenReturn(payment, refreshedPayment);
         when(paymentRecoveryService.findPreparedCompensation(payment))
                 .thenReturn(Optional.of(request));
         when(tossPaymentClient.find("stale-payment-key")).thenReturn(Optional.empty());
@@ -638,13 +640,13 @@ class PaymentFacadeTests {
                 "payment-key",
                 "ORD-100",
                 30_000L,
-                "PAY-1"
+                "PAY-RETRY"
         )).thenReturn(approval);
 
         paymentFacade.confirmGeneralPayment(10L, 1L, form(BigDecimal.valueOf(30_000)));
 
         verify(paymentRecoveryService).releaseUnapprovedCompensation(request);
-        verify(paymentService).completeGeneralPayment(order, payment, approval);
+        verify(paymentService).completeGeneralPayment(order, refreshedPayment, approval);
     }
 
     @Test

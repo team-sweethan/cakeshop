@@ -103,6 +103,13 @@ public interface PaymentMapper {
             @Param("paymentKey") String paymentKey
     );
 
+    // 미승인 결제 요청을 해제할 때 다음 paymentKey용 승인 멱등키로 교체한다.
+    int rotateReadyPaymentIdempotencyKey(
+            @Param("paymentId") long paymentId,
+            @Param("paymentKey") String paymentKey,
+            @Param("idempotencyKey") String idempotencyKey
+    );
+
     // 미승인으로 해제했던 보상 요청을 이후 실제 승인 보상에 같은 멱등키로 재사용한다.
     int reopenReleasedCompensation(
             @Param("paymentId") long paymentId,

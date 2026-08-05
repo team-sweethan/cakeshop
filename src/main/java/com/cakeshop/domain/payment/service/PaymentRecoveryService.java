@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 /** Toss 승인 후 내부 완료 실패를 전액 취소하고 로컬 상태와 재고를 복구한다. */
 @Service
@@ -75,6 +76,11 @@ public class PaymentRecoveryService {
                         cancellation.getId(),
                         "PAYMENT_NOT_APPROVED",
                         "PG 승인 전 결제 요청이 종료되었습니다."
+                ) != 1
+                || paymentMapper.rotateReadyPaymentIdempotencyKey(
+                        request.paymentId(),
+                        request.paymentKey(),
+                        nextApprovalIdempotencyKey()
                 ) != 1
                 || paymentMapper.clearRecoveryPaymentKey(
                         request.paymentId(),
@@ -216,6 +222,10 @@ public class PaymentRecoveryService {
                 || result.canceledAt() == null) {
             throw new BusinessException(PaymentErrorCode.PAYMENT_RECOVERY_PENDING);
         }
+    }
+
+    private String nextApprovalIdempotencyKey() {
+        return "PAY-" + UUID.randomUUID().toString().replace("-", "");
     }
 
     public record CompensationRequest(

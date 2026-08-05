@@ -14,6 +14,16 @@
       errorNode.hidden = !message;
     }
 
+    function optionalCustomerEmail(value) {
+      const email = (value || "").trim();
+      return email && email.length <= 100 ? email : undefined;
+    }
+
+    function optionalCustomerMobilePhone(value) {
+      const phone = (value || "").replace(/[^0-9]/g, "");
+      return phone.length >= 8 && phone.length <= 15 ? phone : undefined;
+    }
+
     button.addEventListener("click", async function () {
       if (!agreement || !agreement.checked) {
         agreement.reportValidity();
@@ -38,7 +48,7 @@
         const payment = tossPayments.payment({
           customerKey: TossPayments.ANONYMOUS
         });
-        await payment.requestPayment({
+        const request = {
           method: "CARD",
           amount: {
             currency: "KRW",
@@ -47,11 +57,14 @@
           orderId: root.dataset.tossOrderId,
           orderName: root.dataset.orderName,
           customerName: root.dataset.customerName,
-          customerEmail: root.dataset.customerEmail,
-          customerMobilePhone: (root.dataset.customerPhone || "").replace(/[^0-9]/g, ""),
           successUrl: new URL(root.dataset.successUrl, location.origin).href,
           failUrl: new URL(root.dataset.failUrl, location.origin).href
-        });
+        };
+        const customerEmail = optionalCustomerEmail(root.dataset.customerEmail);
+        const customerMobilePhone = optionalCustomerMobilePhone(root.dataset.customerPhone);
+        if (customerEmail) request.customerEmail = customerEmail;
+        if (customerMobilePhone) request.customerMobilePhone = customerMobilePhone;
+        await payment.requestPayment(request);
       } catch (error) {
         button.disabled = false;
         showError("결제창을 열지 못했습니다. 잠시 후 다시 시도해 주세요.");

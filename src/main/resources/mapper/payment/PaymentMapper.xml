@@ -373,6 +373,14 @@
           AND payment_key = #{paymentKey}
     </update>
 
+    <update id="rotateReadyPaymentIdempotencyKey">
+        UPDATE payments
+        SET idempotency_key = #{idempotencyKey}
+        WHERE id = #{paymentId}
+          AND status = 'READY'
+          AND payment_key = #{paymentKey}
+    </update>
+
     <update id="reopenReleasedCompensation">
         UPDATE payment_cancellations
         SET status = 'REQUESTED',

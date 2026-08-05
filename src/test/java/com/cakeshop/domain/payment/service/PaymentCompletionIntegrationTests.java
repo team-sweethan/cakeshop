@@ -283,6 +283,10 @@ class PaymentCompletionIntegrationTests {
 
         paymentRecoveryService.prepareCompensation(request);
         paymentRecoveryService.releaseUnapprovedCompensation(request);
+        Payment releasedPayment = paymentMapper.findPaymentById(readyPayment.getId())
+                .orElseThrow();
+        assertThat(releasedPayment.getIdempotencyKey())
+                .isNotEqualTo(readyPayment.getIdempotencyKey());
         paymentRecoveryService.prepareCompensation(request);
 
         PaymentCancellation cancellation = paymentMapper

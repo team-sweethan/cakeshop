@@ -70,6 +70,8 @@ public class PaymentFacade {
             CompensationRequest request = preparedCompensation.get();
             if (isNotApproved(request)) {
                 paymentRecoveryService.releaseUnapprovedCompensation(request);
+                // 새 paymentKey로 재시도할 때 교체된 승인 멱등키를 다시 읽는다.
+                payment = paymentService.getReadyPayment(orderId);
             } else {
                 throw cancelAndCompleteCompensation(request);
             }
