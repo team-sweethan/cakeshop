@@ -56,6 +56,7 @@ public class PaymentService {
         // 주문 행을 먼저 잠가 스케줄러의 EXPIRED 전이와 동일한 잠금 순서를 사용한다.
         orderService.lockGeneralOrderForPayment(order.orderId());
 
+        // products는 주문 생성 시점에 GENERAL로 저장된 주문 항목 스냅샷이다.
         for (PaymentProduct product : order.products()) {
             boolean stockDeducted = productStockService.decreaseStock(
                     product.productId(),

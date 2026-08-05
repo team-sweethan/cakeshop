@@ -2,7 +2,6 @@ package com.cakeshop.domain.product.service;
 
 import com.cakeshop.domain.product.entity.Product;
 import com.cakeshop.domain.product.entity.ProductStatus;
-import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.error.ProductErrorCode;
 import com.cakeshop.domain.product.mapper.ProductMapper;
 import com.cakeshop.global.error.BusinessException;
@@ -28,7 +27,8 @@ public class ProductStockService {
     /**
      * 결제에 성공한 일반 상품의 재고를 차감한다.
      *
-     * <p>주문 제작 상품과 무제한 재고 상품은 차감하지 않는다.
+     * <p>무제한 재고 상품은 차감하지 않는다.
+     * 차감 대상 여부는 호출한 주문 도메인이 저장한 상품 유형 스냅샷으로 결정한다.
      * 반환값은 주문·결제 도메인이 차감 이력을 저장하는 데 사용한다.</p>
      *
      * @param productId 재고를 차감할 상품 식별자
@@ -50,7 +50,7 @@ public class ProductStockService {
             );
         }
 
-        if (isNotStockManaged(product)) {
+        if (product.getStockQuantity() == null) {
             return false;
         }
 
@@ -119,11 +119,6 @@ public class ProductStockService {
         }
 
         return product;
-    }
-
-    private boolean isNotStockManaged(Product product) {
-        return product.getProductType() == ProductType.CUSTOM
-                || product.getStockQuantity() == null;
     }
 
     private void validateQuantity(int quantity) {
