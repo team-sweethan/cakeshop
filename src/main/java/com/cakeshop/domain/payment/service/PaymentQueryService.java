@@ -33,19 +33,22 @@ public class PaymentQueryService {
     private final StoreService storeService;
     private final Clock clock;
     private final String clientKey;
+    private final String secretKey;
 
     public PaymentQueryService(
             CustomerOrderQueryService orderQueryService,
             PaymentService paymentService,
             StoreService storeService,
             Clock clock,
-            @Value("${app.payment.toss.client-key:}") String clientKey
+            @Value("${app.payment.toss.client-key:}") String clientKey,
+            @Value("${app.payment.toss.secret-key:}") String secretKey
     ) {
         this.orderQueryService = orderQueryService;
         this.paymentService = paymentService;
         this.storeService = storeService;
         this.clock = clock;
         this.clientKey = clientKey;
+        this.secretKey = secretKey;
     }
 
     /** 결제 기한 및 정보 검증 -> 일반 주믄용 Toss 결제 화면 데이터 구성**/
@@ -90,9 +93,13 @@ public class PaymentQueryService {
                 memberEmail,
                 order.ordererPhone(),
                 clientKey,
-                clientKey != null && !clientKey.isBlank(),
+                hasText(clientKey) && hasText(secretKey),
                 items
         );
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     /**

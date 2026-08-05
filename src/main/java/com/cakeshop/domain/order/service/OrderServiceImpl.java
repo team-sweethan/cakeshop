@@ -284,6 +284,9 @@ public class OrderServiceImpl implements OrderService {
         BigDecimal totalAmount = product.basePrice()
                 .add(optionAmount)
                 .multiply(BigDecimal.valueOf(form.getQuantity()));
+        if (totalAmount.signum() <= 0) {
+            throw new BusinessException(OrderErrorCode.INVALID_ORDER_AMOUNT);
+        }
         if (totalAmount.compareTo(MAX_ORDER_AMOUNT) > 0) {
             throw new BusinessException(OrderErrorCode.ORDER_AMOUNT_EXCEEDED);
         }

@@ -530,7 +530,22 @@ class OrderServiceTests {
                 stockQuantity == null || stockQuantity > 0,
                 BigDecimal.valueOf(basePrice),
                 stockQuantity
-        );
+                );
+    }
+
+    @Test
+    void createGeneralOrder_zeroAmount_throwsInvalidOrderAmountWithoutSaving() {
+        when(productQueryService.getSalesInfo(1L))
+                .thenReturn(product(1L, ProductType.GENERAL, "무료 케이크", 0, 2));
+        when(orderOptionValidator.validate(1L, List.of())).thenReturn(List.of());
+
+        assertThatThrownBy(() -> orderService.createGeneralOrder(10L, form(1L, 1, List.of())))
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(OrderErrorCode.INVALID_ORDER_AMOUNT)
+                );
+
+        verify(orderMapper, never()).insertOrder(any(Order.class));
     }
 
     private GeneralOrderForm form(

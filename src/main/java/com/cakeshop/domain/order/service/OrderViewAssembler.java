@@ -6,12 +6,16 @@ import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.order.entity.OrderItem;
 import com.cakeshop.domain.order.entity.OrderItemImage;
 import com.cakeshop.domain.order.entity.OrderItemOption;
+import com.cakeshop.domain.order.entity.OrderStatus;
+import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.order.mapper.OrderMapper;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.error.CommonErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -22,6 +26,7 @@ import java.util.stream.Collectors;
 public class OrderViewAssembler {
 
     private final OrderMapper orderMapper;
+    private final Clock clock;
 
     public List<Order> findOrdersByMemberId(long memberId) {
         return orderMapper.findOrdersByMemberId(memberId);
@@ -58,13 +63,28 @@ public class OrderViewAssembler {
         List<OrderDetailView.Item> itemViews = items.stream()
                 .map(item -> toItemView(item, optionsByItem, imagesByItem))
                 .toList();
+        LocalDateTime now = LocalDateTime.now(clock);
         return new OrderDetailView(
                 order.getId(), order.getOrderNumber(), order.getMemberId(), order.getOrderType(), order.getStatus(),
                 order.getOrdererName(), order.getOrdererPhone(), order.getPickupName(), order.getPickupPhone(),
                 order.getOriginalAmount(), order.getDiscountAmount(), order.getFinalAmount(), order.getPickupAt(),
-                order.getPaymentExpiresAt(), order.getRequestMessage(), order.getRejectReason(), order.getCanceledAt(),
-                order.getCancelReason(), order.getCreatedAt(), itemViews
+                order.getPaymentExpiresAt(), isPaymentPending(order, now), order.getRequestMessage(), order.getRejectReason(),
+                order.getCanceledAt(), order.getCancelReason(), order.getCreatedAt(), isCancellationRequestAvailable(order, now),
+                itemViews
         );
+    }
+
+    private boolean isPaymentPending(Order order, LocalDateTime now) {
+        return order.getStatus() == OrderStatus.PENDING_PAYMENT
+                && order.getPaymentExpiresAt() != null
+                && now.isBefore(order.getPaymentExpiresAt());
+    }
+
+    private boolean isCancellationRequestAvailable(Order order, LocalDateTime now) {
+        return order.getOrderType() == OrderType.GENERAL
+                && order.getStatus() == OrderStatus.READY_FOR_PICKUP
+                && order.getPickupAt() != null
+                && now.isBefore(order.getPickupAt());
     }
 
     private OrderDetailView.Item toItemView(

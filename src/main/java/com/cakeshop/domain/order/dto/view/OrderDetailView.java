@@ -24,11 +24,13 @@ public record OrderDetailView(
         BigDecimal finalAmount,
         LocalDateTime pickupAt,
         LocalDateTime paymentExpiresAt,
+        boolean paymentPending,
         String requestMessage,
         String rejectReason,
         LocalDateTime canceledAt,
         String cancelReason,
         LocalDateTime createdAt,
+        boolean cancelRequestAvailable,
         List<Item> items
 ) {
 
@@ -44,19 +46,8 @@ public record OrderDetailView(
         };
     }
 
-    public boolean paymentPending() {
-        return status == OrderStatus.PENDING_PAYMENT;
-    }
-
     public boolean readyForPickup() {
         return status == OrderStatus.READY_FOR_PICKUP;
-    }
-
-    public boolean cancelRequestAvailable() {
-        return orderType == OrderType.GENERAL
-                && status == OrderStatus.READY_FOR_PICKUP
-                && pickupAt != null
-                && LocalDateTime.now().isBefore(pickupAt);
     }
 
     public boolean adminCancellationAvailable() {

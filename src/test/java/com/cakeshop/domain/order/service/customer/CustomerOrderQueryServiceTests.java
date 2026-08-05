@@ -21,7 +21,9 @@ import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.error.CommonErrorCode;
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,6 +35,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class CustomerOrderQueryServiceTests {
 
+    private static final Clock CLOCK = Clock.fixed(
+            LocalDateTime.of(2026, 8, 3, 10, 0).atZone(ZoneId.of("Asia/Seoul")).toInstant(),
+            ZoneId.of("Asia/Seoul")
+    );
+
     @Mock
     private OrderMapper orderMapper;
 
@@ -40,7 +47,7 @@ class CustomerOrderQueryServiceTests {
 
     @BeforeEach
     void setUp() {
-        orderQueryService = new CustomerOrderQueryService(new OrderViewAssembler(orderMapper));
+        orderQueryService = new CustomerOrderQueryService(new OrderViewAssembler(orderMapper, CLOCK));
     }
 
     @Test
@@ -119,6 +126,21 @@ class CustomerOrderQueryServiceTests {
 
         assertThat(result.cancelRequestAvailable()).isFalse();
         assertThat(result.adminCancellationAvailable()).isFalse();
+    }
+
+    @Test
+    void getMemberOrder_expiredPayment_doesNotExposePaymentButton() {
+        Order order = order(10L, 3L);
+        order.setStatus(OrderStatus.PENDING_PAYMENT);
+        order.setPaymentExpiresAt(LocalDateTime.of(2026, 8, 3, 9, 59));
+        when(orderMapper.findOrderById(10L)).thenReturn(Optional.of(order));
+        when(orderMapper.findOrderItemsByOrderId(10L)).thenReturn(List.of());
+        when(orderMapper.findOrderItemOptionsByOrderId(10L)).thenReturn(List.of());
+        when(orderMapper.findOrderItemImagesByOrderId(10L)).thenReturn(List.of());
+
+        OrderDetailView result = orderQueryService.getMemberOrder(3L, 10L);
+
+        assertThat(result.paymentPending()).isFalse();
     }
 
     private Order order(long orderId, long memberId) {

@@ -58,7 +58,8 @@ class PaymentQueryServiceTests {
                 paymentService,
                 storeService,
                 CLOCK,
-                "test-client-key"
+                "test-client-key",
+                "test-secret-key"
         );
     }
 
@@ -103,6 +104,24 @@ class PaymentQueryServiceTests {
         );
 
         assertThat(checkout.orderName()).hasSize(100);
+    }
+
+    @Test
+    void getCheckout_missingSecretKey_disablesPayment() {
+        PaymentQueryService serviceWithoutSecretKey = new PaymentQueryService(
+                orderQueryService,
+                paymentService,
+                storeService,
+                CLOCK,
+                "test-client-key",
+                ""
+        );
+        when(orderQueryService.getMemberOrder(10L, 1L)).thenReturn(order(OrderStatus.PENDING_PAYMENT));
+        when(paymentService.getReadyPayment(1L)).thenReturn(payment(PaymentStatus.READY, null));
+
+        PaymentCheckoutView checkout = serviceWithoutSecretKey.getCheckout(10L, "member@example.com", 1L);
+
+        assertThat(checkout.paymentAvailable()).isFalse();
     }
 
     @Test
@@ -173,11 +192,13 @@ class PaymentQueryServiceTests {
                 BigDecimal.valueOf(30_000),
                 NOW.plusDays(1),
                 NOW.plusMinutes(10),
+                status == OrderStatus.PENDING_PAYMENT,
                 null,
                 null,
                 null,
                 null,
                 NOW.minusMinutes(1),
+                false,
                 List.of(new OrderDetailView.Item(
                         100L,
                         1L,
