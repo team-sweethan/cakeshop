@@ -277,12 +277,11 @@
         FOR UPDATE
     </select>
 
-    <!-- 판매 중인 일반 상품의 유한 재고 조건부 차감 -->
+    <!-- 판매 중인 유한 재고의 조건부 차감: 주문 항목 스냅샷이 차감 대상을 결정한다. -->
     <update id="decreaseStockIfAvailable">
         UPDATE products
         SET stock_quantity = stock_quantity - #{quantity}
         WHERE id = #{productId}
-          AND product_type = 'GENERAL'
           AND status = 'ACTIVE'
           AND stock_quantity IS NOT NULL
           AND stock_quantity

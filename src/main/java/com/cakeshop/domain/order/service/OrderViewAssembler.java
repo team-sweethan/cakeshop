@@ -64,12 +64,14 @@ public class OrderViewAssembler {
                 .map(item -> toItemView(item, optionsByItem, imagesByItem))
                 .toList();
         LocalDateTime now = LocalDateTime.now(clock);
+        boolean cancellationRetryAvailable = orderMapper.hasRequestedRefundCancellation(order.getId());
         return new OrderDetailView(
                 order.getId(), order.getOrderNumber(), order.getMemberId(), order.getOrderType(), order.getStatus(),
                 order.getOrdererName(), order.getOrdererPhone(), order.getPickupName(), order.getPickupPhone(),
                 order.getOriginalAmount(), order.getDiscountAmount(), order.getFinalAmount(), order.getPickupAt(),
                 order.getPaymentExpiresAt(), isPaymentPending(order, now), order.getRequestMessage(), order.getRejectReason(),
-                order.getCanceledAt(), order.getCancelReason(), order.getCreatedAt(), isCancellationRequestAvailable(order, now),
+                order.getCanceledAt(), order.getCancelReason(), order.getCreatedAt(),
+                cancellationRetryAvailable || isCancellationRequestAvailable(order, now),
                 itemViews
         );
     }

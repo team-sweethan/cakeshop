@@ -328,6 +328,20 @@
         WHERE active_requested_payment_id = #{paymentId}
     </select>
 
+    <select id="findRequestedRefundCancellations"
+            resultType="com.cakeshop.domain.payment.entity.PaymentCancellation">
+        SELECT
+            id, payment_id, idempotency_key, cancel_amount, cancel_reason,
+            request_type, requested_by, status, active_requested_payment_id,
+            transaction_key, failure_code, failure_message, requested_at,
+            canceled_at, created_at, updated_at
+        FROM payment_cancellations
+        WHERE status = 'REQUESTED'
+          AND request_type IN ('CUSTOMER', 'ADMIN')
+        ORDER BY requested_at, id
+        LIMIT #{limit}
+    </select>
+
     <insert id="insertCompensationCancellation"
             parameterType="com.cakeshop.domain.payment.entity.PaymentCancellation"
             useGeneratedKeys="true"

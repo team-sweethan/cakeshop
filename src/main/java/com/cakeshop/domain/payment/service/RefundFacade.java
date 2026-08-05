@@ -8,6 +8,8 @@ import com.cakeshop.domain.payment.service.RefundService.RefundRequest;
 import com.cakeshop.global.error.BusinessException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Optional;
 
@@ -15,6 +17,8 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 public class RefundFacade {
+
+    private static final Logger log = LoggerFactory.getLogger(RefundFacade.class);
 
     private final RefundService refundService;
     private final TossPaymentClient tossPaymentClient;
@@ -35,6 +39,17 @@ public class RefundFacade {
                 reason
         );
         cancel(request);
+    }
+
+    /** 남은 고객·관리자 취소 요청을 같은 멱등키로 재시도한다. */
+    public void recoverPendingCancellations(int batchSize) {
+        for (RefundRequest request : refundService.getRequestedCancellations(batchSize)) {
+            try {
+                cancel(request);
+            } catch (RuntimeException recoveryFailure) {
+                log.warn("Pending refund cancellation could not be completed.");
+            }
+        }
     }
 
     private void cancel(RefundRequest request) {

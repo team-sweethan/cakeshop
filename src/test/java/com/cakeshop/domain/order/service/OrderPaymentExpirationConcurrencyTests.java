@@ -10,6 +10,7 @@ import com.cakeshop.domain.payment.entity.PaymentStatus;
 import com.cakeshop.domain.payment.infra.TossPaymentClient.ApprovalResult;
 import com.cakeshop.domain.payment.mapper.PaymentMapper;
 import com.cakeshop.domain.payment.service.PaymentPreparationService;
+import com.cakeshop.domain.payment.service.PaymentRecoveryService;
 import com.cakeshop.domain.payment.service.PaymentService;
 import com.cakeshop.domain.product.service.ProductQueryService;
 import com.cakeshop.domain.product.service.ProductStockService;
@@ -72,6 +73,9 @@ class OrderPaymentExpirationConcurrencyTests {
 
     @MockitoBean
     private PaymentPreparationService paymentPreparationService;
+
+    @MockitoBean
+    private PaymentRecoveryService paymentRecoveryService;
 
     @MockitoBean
     private MemberService memberService;

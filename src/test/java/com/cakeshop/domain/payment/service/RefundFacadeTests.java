@@ -15,6 +15,7 @@ import com.cakeshop.domain.payment.infra.TossPaymentClient.PaymentLookupResult;
 import com.cakeshop.domain.payment.service.RefundService.RefundRequest;
 import com.cakeshop.global.error.BusinessException;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -109,6 +110,21 @@ class RefundFacadeTests {
 
         refundFacade.cancelAdminOrder(7L, 10L, "매장 사정");
 
+        verify(refundService).completeCancellation(request, result);
+    }
+
+    @Test
+    void recoverPendingCancellations_requestedCancellation_retriesWithOriginalIdempotencyKey() {
+        RefundRequest request = request();
+        CancellationResult result = new CancellationResult(
+                "CANCELED", "transaction-key", request.requestedAt().plusSeconds(1));
+        when(refundService.getRequestedCancellations(25)).thenReturn(List.of(request));
+        when(tossPaymentClient.cancel("payment-key", "단순 변심", "idempotency-key"))
+                .thenReturn(result);
+
+        refundFacade.recoverPendingCancellations(25);
+
+        verify(tossPaymentClient).cancel("payment-key", "단순 변심", "idempotency-key");
         verify(refundService).completeCancellation(request, result);
     }
 

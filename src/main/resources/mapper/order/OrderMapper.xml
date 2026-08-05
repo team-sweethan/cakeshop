@@ -83,6 +83,18 @@
         )
     </select>
 
+    <select id="hasRequestedRefundCancellation" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM payments payment
+            INNER JOIN payment_cancellations cancellation
+                ON cancellation.payment_id = payment.id
+            WHERE payment.order_id = #{orderId}
+              AND cancellation.status = 'REQUESTED'
+              AND cancellation.request_type IN ('CUSTOMER', 'ADMIN')
+        )
+    </select>
+
     <insert id="insertOrderItemOption"
             parameterType="com.cakeshop.domain.order.entity.OrderItemOption"
             useGeneratedKeys="true"

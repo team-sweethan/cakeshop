@@ -143,6 +143,21 @@ class CustomerOrderQueryServiceTests {
         assertThat(result.paymentPending()).isFalse();
     }
 
+    @Test
+    void getMemberOrder_requestedCancellationAfterPickup_exposesRetryAction() {
+        Order order = order(10L, 3L);
+        order.setPickupAt(LocalDateTime.of(2026, 8, 3, 9, 0));
+        when(orderMapper.findOrderById(10L)).thenReturn(Optional.of(order));
+        when(orderMapper.findOrderItemsByOrderId(10L)).thenReturn(List.of());
+        when(orderMapper.findOrderItemOptionsByOrderId(10L)).thenReturn(List.of());
+        when(orderMapper.findOrderItemImagesByOrderId(10L)).thenReturn(List.of());
+        when(orderMapper.hasRequestedRefundCancellation(10L)).thenReturn(true);
+
+        OrderDetailView result = orderQueryService.getMemberOrder(3L, 10L);
+
+        assertThat(result.cancelRequestAvailable()).isTrue();
+    }
+
     private Order order(long orderId, long memberId) {
         Order order = new Order();
         order.setId(orderId);

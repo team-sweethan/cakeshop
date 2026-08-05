@@ -40,6 +40,9 @@ class PaymentServiceTests {
     @Mock
     private OrderService orderService;
 
+    @Mock
+    private PaymentRecoveryService paymentRecoveryService;
+
     @InjectMocks
     private PaymentService paymentService;
 
@@ -62,7 +65,8 @@ class PaymentServiceTests {
         InOrder inOrder = inOrder(
                 productStockService,
                 paymentMapper,
-                orderService
+                orderService,
+                paymentRecoveryService
         );
         inOrder.verify(orderService).lockGeneralOrderForPayment(1L);
         inOrder.verify(productStockService).decreaseStock(100L, 2);
@@ -81,6 +85,7 @@ class PaymentServiceTests {
                 1L,
                 approval.approvedAt()
         );
+        inOrder.verify(paymentRecoveryService).discardApprovalRecovery(payment);
     }
 
     @Test

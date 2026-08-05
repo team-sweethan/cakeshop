@@ -442,7 +442,7 @@ class ProductMapperTests {
     }
 
     @Test
-    void decreaseStockIfAvailable_customProduct_doesNotChangeStock() {
+    void decreaseStockIfAvailable_currentlyCustomProductWithFiniteStock_deductsStock() {
         Long productId = jdbcTemplate.queryForObject(
                 """
                 SELECT id
@@ -452,6 +452,11 @@ class ProductMapperTests {
                 Long.class,
                 keyword + " C 인기 주문 제작"
         );
+        jdbcTemplate.update(
+                "UPDATE products SET stock_quantity = ? WHERE id = ?",
+                5,
+                productId
+        );
 
         int updatedRows =
                 productMapper.decreaseStockIfAvailable(
@@ -459,7 +464,7 @@ class ProductMapperTests {
                         1
                 );
 
-        assertThat(updatedRows).isZero();
+        assertThat(updatedRows).isEqualTo(1);
         assertThat(jdbcTemplate.queryForObject(
                 """
                 SELECT stock_quantity
@@ -468,7 +473,7 @@ class ProductMapperTests {
                 """,
                 Integer.class,
                 productId
-        )).isNull();
+        )).isEqualTo(4);
     }
 
     @Test

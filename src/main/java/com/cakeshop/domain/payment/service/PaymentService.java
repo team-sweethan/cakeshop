@@ -23,6 +23,7 @@ public class PaymentService {
     private final PaymentMapper paymentMapper;
     private final ProductStockService productStockService;
     private final OrderService orderService;
+    private final PaymentRecoveryService paymentRecoveryService;
 
     /** 주문의 현재 READY 결제를 조회한다. */
     @Transactional(readOnly = true)
@@ -83,6 +84,7 @@ public class PaymentService {
                 order.orderId(),
                 approval.approvedAt()
         );
+        paymentRecoveryService.discardApprovalRecovery(payment);
     }
 
     private void requireOneRow(int affectedRows) {

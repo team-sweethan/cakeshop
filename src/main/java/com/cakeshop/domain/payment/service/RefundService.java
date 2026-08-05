@@ -194,6 +194,26 @@ public class RefundService {
         );
     }
 
+    /** PG 오류로 남은 고객·관리자 취소 요청을 같은 멱등키로 재처리한다. */
+    @Transactional(readOnly = true)
+    public List<RefundRequest> getRequestedCancellations(int limit) {
+        if (limit <= 0) {
+            throw new BusinessException(PaymentErrorCode.PAYMENT_RECOVERY_PENDING);
+        }
+        return paymentMapper.findRequestedRefundCancellations(limit).stream()
+                .map(this::toRefundRequest)
+                .toList();
+    }
+
+    private RefundRequest toRefundRequest(PaymentCancellation cancellation) {
+        Payment payment = paymentMapper.findPaymentById(cancellation.getPaymentId())
+                .orElseThrow(() -> new BusinessException(PaymentErrorCode.PAYMENT_RECOVERY_PENDING));
+        Order order = orderMapper.findOrderById(payment.getOrderId())
+                .orElseThrow(() -> new BusinessException(PaymentErrorCode.PAYMENT_RECOVERY_PENDING));
+        OrderStatus expectedStatus = requireGeneralCancelableStatus(order, cancellation.getRequestedAt());
+        return reuseRequestedCancellation(cancellation, payment, order, expectedStatus);
+    }
+
     private Order findOwnedOrder(long memberId, long orderId) {
         Order order = orderMapper.findOrderByIdForUpdate(orderId)
                 .orElseThrow(() -> new BusinessException(CommonErrorCode.NOT_FOUND));

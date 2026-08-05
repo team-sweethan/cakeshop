@@ -135,6 +135,8 @@ public class PaymentFacade {
             }
         }
 
+        prepareApprovalRecovery(payment, form.getPaymentKey());
+
         try {
             return tossPaymentClient.approve(
                     form.getPaymentKey(),
@@ -166,16 +168,18 @@ public class PaymentFacade {
             Payment payment,
             String paymentKey
     ) {
+        // 승인 호출 전에 REQUESTED 보상 요청을 저장했으므로, 이 시점에는 재처리 대상이 보장된다.
+        return new BusinessException(PaymentErrorCode.PAYMENT_RECOVERY_PENDING);
+    }
+
+    private void prepareApprovalRecovery(Payment payment, String paymentKey) {
         try {
-            CompensationRequest request = paymentRecoveryService.createRequest(
-                    payment,
-                    paymentKey
-            );
+            CompensationRequest request = paymentRecoveryService.createRequest(payment, paymentKey);
             paymentRecoveryService.prepareCompensation(request);
         } catch (RuntimeException persistenceFailure) {
-            log.warn("Uncertain payment approval recovery could not be persisted.");
+            // 복구 요청을 보장할 수 없으면 PG 승인 자체를 호출하지 않는다.
+            throw new BusinessException(PaymentErrorCode.PAYMENT_RECOVERY_PENDING);
         }
-        return new BusinessException(PaymentErrorCode.PAYMENT_RECOVERY_PENDING);
     }
 
     private Optional<ApprovalResult> resolveLookup(

@@ -31,6 +31,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -479,7 +480,7 @@ class PaymentFacadeTests {
                 PaymentErrorCode.PAYMENT_COMPENSATED
         );
 
-        verify(paymentRecoveryService).prepareCompensation(request);
+        verify(paymentRecoveryService, times(2)).prepareCompensation(request);
         verify(paymentRecoveryService).completeCompensation(request, cancellation);
     }
 
@@ -491,10 +492,6 @@ class PaymentFacadeTests {
         CompensationRequest request = compensationRequest();
         when(orderService.getGeneralPaymentOrder(10L, 1L)).thenReturn(order);
         when(paymentService.getReadyPayment(1L)).thenReturn(payment);
-        when(tossPaymentClient.approve("payment-key", "ORD-100", 30_000L, "PAY-1"))
-                .thenReturn(approval);
-        org.mockito.Mockito.doThrow(new BusinessException(PaymentErrorCode.PAYMENT_COMPLETE_FAILED))
-                .when(paymentService).completeGeneralPayment(order, payment, approval);
         when(paymentRecoveryService.createRequest(payment, "payment-key")).thenReturn(request);
         org.mockito.Mockito.doThrow(new BusinessException(PaymentErrorCode.PAYMENT_RECOVERY_PENDING))
                 .when(paymentRecoveryService).prepareCompensation(request);

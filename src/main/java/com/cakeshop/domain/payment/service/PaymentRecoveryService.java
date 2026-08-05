@@ -183,6 +183,28 @@ public class PaymentRecoveryService {
         );
     }
 
+    /** 내부 결제가 정상 완료된 승인 보호용 보상 요청을 비활성화한다. */
+    @Transactional
+    public void discardApprovalRecovery(Payment payment) {
+        if (payment == null || payment.getId() == null) {
+            throw new BusinessException(PaymentErrorCode.PAYMENT_COMPLETE_FAILED);
+        }
+        PaymentCancellation cancellation = paymentMapper
+                .findPaymentCancellationByIdempotencyKey("COMPENSATE-" + payment.getId())
+                .orElse(null);
+        if (cancellation == null || cancellation.getStatus() == PaymentCancellationStatus.FAILED) {
+            return;
+        }
+        if (cancellation.getStatus() != PaymentCancellationStatus.REQUESTED
+                || paymentMapper.failCancellationIfRequested(
+                        cancellation.getId(),
+                        "PAYMENT_COMPLETED",
+                        "내부 결제가 정상 완료되어 보상 취소를 종료했습니다."
+                ) != 1) {
+            throw new BusinessException(PaymentErrorCode.PAYMENT_COMPLETE_FAILED);
+        }
+    }
+
     private PaymentCancellation findCompensation(CompensationRequest request) {
         return paymentMapper
                 .findPaymentCancellationByIdempotencyKey(request.idempotencyKey())

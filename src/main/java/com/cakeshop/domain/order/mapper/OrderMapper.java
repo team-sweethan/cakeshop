@@ -81,6 +81,9 @@ public interface OrderMapper {
     /** 주문이 존재하고 지정한 회원의 소유인지 확인한다. */
     boolean existsByIdAndMemberId(@Param("orderId") long orderId, @Param("memberId") long memberId);
 
+    /** 고객·관리자 요청으로 진행 중인 취소가 있는지 확인한다. */
+    boolean hasRequestedRefundCancellation(@Param("orderId") long orderId);
+
     /** 주문에 포함된 상품 스냅샷을 저장 순서대로 조회한다. */
     List<OrderItem> findOrderItemsByOrderId(@Param("orderId") long orderId);
 

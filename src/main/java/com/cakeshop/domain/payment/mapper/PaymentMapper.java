@@ -88,6 +88,9 @@ public interface PaymentMapper {
             @Param("paymentId") long paymentId
     );
 
+    // 고객·관리자 요청으로 남은 취소를 같은 멱등키로 재처리한다.
+    List<PaymentCancellation> findRequestedRefundCancellations(@Param("limit") int limit);
+
     // READY 또는 DONE 결제에 시스템 보상 취소 요청을 한 건만 생성한다.
     int insertCompensationCancellation(PaymentCancellation cancellation);
 
