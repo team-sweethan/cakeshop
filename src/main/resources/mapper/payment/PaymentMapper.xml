@@ -28,6 +28,11 @@
                 SELECT MAX(recent_cancellation.id)
                 FROM payment_cancellations AS recent_cancellation
                 WHERE recent_cancellation.payment_id = payment.id
+                  AND NOT (
+                      recent_cancellation.request_type = 'SYSTEM_COMPENSATION'
+                      AND recent_cancellation.status = 'FAILED'
+                      AND recent_cancellation.failure_code = 'PAYMENT_COMPLETED'
+                  )
             )
         <if test="status != null">
             WHERE payment.status = #{status}
@@ -48,6 +53,11 @@
                     FROM payment_cancellations AS cancellation
                     WHERE cancellation.payment_id = payment.id
                       AND cancellation.status IN ('REQUESTED', 'FAILED')
+                      AND NOT (
+                          cancellation.request_type = 'SYSTEM_COMPENSATION'
+                          AND cancellation.status = 'FAILED'
+                          AND cancellation.failure_code = 'PAYMENT_COMPLETED'
+                      )
                 )
             ), 0) AS attention_count
         FROM payments AS payment
@@ -406,7 +416,7 @@
           AND idempotency_key = #{idempotencyKey}
           AND request_type = 'SYSTEM_COMPENSATION'
           AND status = 'FAILED'
-          AND failure_code = 'PAYMENT_NOT_APPROVED'
+          AND failure_code IN ('PAYMENT_NOT_APPROVED', 'PAYMENT_COMPLETED')
     </update>
 
     <select id="findRequestedCompensations"
@@ -431,6 +441,7 @@
         FROM payment_cancellations
         WHERE status = 'REQUESTED'
           AND request_type = 'SYSTEM_COMPENSATION'
+          AND requested_at &lt;= #{requestedBefore}
         ORDER BY requested_at, id
         LIMIT #{limit}
     </select>

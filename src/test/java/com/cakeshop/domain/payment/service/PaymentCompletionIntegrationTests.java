@@ -247,8 +247,10 @@ class PaymentCompletionIntegrationTests {
         );
 
         paymentRecoveryService.prepareCompensation(request);
-        assertThat(paymentRecoveryService.getPreparedCompensations(10))
-                .containsExactly(request);
+        assertThat(paymentMapper.findPaymentCancellationByIdempotencyKey(
+                request.idempotencyKey()
+        )).hasValueSatisfying(saved -> assertThat(saved.getStatus())
+                .isEqualTo(PaymentCancellationStatus.REQUESTED));
         assertThat(paymentMapper.findPaymentById(readyPayment.getId())
                 .orElseThrow()
                 .getPaymentKey()).isEqualTo(paymentKey);

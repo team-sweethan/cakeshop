@@ -595,11 +595,18 @@ class PaymentFacadeTests {
     }
 
     @Test
-    void confirmGeneralPayment_preparedCompensation_resumesCancelWithoutApproval() {
+    void confirmGeneralPayment_duplicateCallbackDuringCompletion_resumesInternalCompletion() {
         GeneralPaymentOrder order = order(NOW.plusMinutes(5));
         Payment payment = payment();
         CompensationRequest request = compensationRequest();
-        CancellationResult cancellation = cancellation();
+        ApprovalResult approval = new ApprovalResult(
+                request.paymentKey(),
+                "ORD-100",
+                "카드",
+                "DONE",
+                30_000L,
+                NOW
+        );
         when(orderService.getGeneralPaymentOrder(10L, 1L)).thenReturn(order);
         when(paymentService.getReadyPayment(1L)).thenReturn(payment);
         when(paymentRecoveryService.findPreparedCompensation(payment))
@@ -615,19 +622,11 @@ class PaymentFacadeTests {
                         null
                 )
         ));
-        when(tossPaymentClient.cancel(
-                request.paymentKey(),
-                request.reason(),
-                request.idempotencyKey()
-        )).thenReturn(cancellation);
 
-        assertPaymentError(
-                () -> paymentFacade.confirmGeneralPayment(
-                        10L,
-                        1L,
-                        form(BigDecimal.valueOf(30_000))
-                ),
-                PaymentErrorCode.PAYMENT_COMPENSATED
+        paymentFacade.confirmGeneralPayment(
+                10L,
+                1L,
+                form(BigDecimal.valueOf(30_000))
         );
 
         verify(tossPaymentClient, never()).approve(
@@ -636,7 +635,12 @@ class PaymentFacadeTests {
                 30_000L,
                 "PAY-1"
         );
-        verify(paymentRecoveryService).completeCompensation(request, cancellation);
+        verify(tossPaymentClient, never()).cancel(
+                request.paymentKey(),
+                request.reason(),
+                request.idempotencyKey()
+        );
+        verify(paymentService).completeGeneralPayment(order, payment, approval);
     }
 
     @Test
@@ -755,6 +759,33 @@ class PaymentFacadeTests {
         when(paymentRecoveryService.getPreparedCompensations(50))
                 .thenReturn(List.of(request));
         when(tossPaymentClient.find(request.paymentKey())).thenReturn(Optional.empty());
+
+        paymentFacade.recoverPendingCompensations(50);
+
+        verify(paymentRecoveryService).releaseUnapprovedCompensation(request);
+        verify(tossPaymentClient, never()).cancel(
+                request.paymentKey(),
+                request.reason(),
+                request.idempotencyKey()
+        );
+    }
+
+    @Test
+    void recoverPendingCompensations_expiredRequest_releasesCompensation() {
+        CompensationRequest request = compensationRequest();
+        when(paymentRecoveryService.getPreparedCompensations(50))
+                .thenReturn(List.of(request));
+        when(tossPaymentClient.find(request.paymentKey())).thenReturn(Optional.of(
+                new PaymentLookupResult(
+                        request.paymentKey(),
+                        "ORD-100",
+                        null,
+                        "EXPIRED",
+                        30_000L,
+                        null,
+                        null
+                )
+        ));
 
         paymentFacade.recoverPendingCompensations(50);
 

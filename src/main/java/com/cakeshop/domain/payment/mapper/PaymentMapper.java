@@ -119,8 +119,9 @@ public interface PaymentMapper {
             @Param("idempotencyKey") String idempotencyKey
     );
 
-    // 아직 끝나지 않은 시스템 보상 취소 요청을 오래된 순서로 조회한다.
+    // 정상 결제 완료와 경쟁하지 않도록 기준 시각 이전의 시스템 보상 요청만 조회한다.
     List<PaymentCancellation> findRequestedCompensations(
+            @Param("requestedBefore") LocalDateTime requestedBefore,
             @Param("limit") int limit
     );
 

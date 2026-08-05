@@ -13,6 +13,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -24,9 +27,11 @@ public class PaymentRecoveryService {
 
     private static final String CANCEL_REASON =
             "내부 주문 처리 실패로 인한 자동 결제 취소";
+    private static final Duration RECOVERY_GRACE_PERIOD = Duration.ofMinutes(1);
 
     private final PaymentMapper paymentMapper;
     private final OrderPaymentRecoveryService orderPaymentRecoveryService;
+    private final Clock clock;
 
     public CompensationRequest createRequest(Payment payment, String paymentKey) {
         if (payment == null
@@ -129,13 +134,15 @@ public class PaymentRecoveryService {
         }
     }
 
-    /** 스케줄러가 이어서 취소할 영속화된 시스템 보상 요청을 조회한다. */
+    /** 정상 승인 완료 유예 시간이 지난 시스템 보상 요청을 조회한다. */
     @Transactional(readOnly = true)
     public List<CompensationRequest> getPreparedCompensations(int limit) {
         if (limit <= 0) {
             throw new BusinessException(PaymentErrorCode.PAYMENT_RECOVERY_PENDING);
         }
-        return paymentMapper.findRequestedCompensations(limit)
+        LocalDateTime requestedBefore = LocalDateTime.now(clock)
+                .minus(RECOVERY_GRACE_PERIOD);
+        return paymentMapper.findRequestedCompensations(requestedBefore, limit)
                 .stream()
                 .map(this::toCompensationRequest)
                 .toList();

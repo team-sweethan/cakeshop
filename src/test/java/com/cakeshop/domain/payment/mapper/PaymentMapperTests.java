@@ -110,6 +110,83 @@ class PaymentMapperTests {
         assertThat(summary.attentionCount()).isEqualTo(1);
     }
 
+    @Test
+    void findPaymentsForAdmin_completedApprovalGuard_isNotAttentionOrLatestCancellation() {
+        Payment payment = insertPayment("COMPLETED-GUARD");
+        PaymentCancellation guard = new PaymentCancellation();
+        guard.setPaymentId(payment.getId());
+        guard.setIdempotencyKey("COMPENSATE-" + payment.getId());
+        guard.setCancelAmount(payment.getAmount());
+        guard.setCancelReason("승인 보호");
+        assertThat(paymentMapper.insertCompensationCancellation(guard)).isEqualTo(1);
+        completePayment(payment, "COMPLETED-GUARD");
+        assertThat(paymentMapper.failCancellationIfRequested(
+                guard.getId(),
+                "PAYMENT_COMPLETED",
+                "내부 결제가 정상 완료되어 보상 취소를 종료했습니다."
+        )).isEqualTo(1);
+
+        assertThat(paymentMapper.findPaymentsForAdmin(PaymentStatus.DONE))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.cancellationStatus()).isNull();
+                    assertThat(row.cancellationRequestType()).isNull();
+                });
+        assertThat(paymentMapper.summarizePaymentsForAdmin().attentionCount()).isZero();
+    }
+
+    @Test
+    void reopenReleasedCompensation_completedApprovalGuard_reopensForActualCancellation() {
+        Payment payment = insertPayment("REOPEN-COMPLETED-GUARD");
+        PaymentCancellation guard = new PaymentCancellation();
+        guard.setPaymentId(payment.getId());
+        guard.setIdempotencyKey("COMPENSATE-" + payment.getId());
+        guard.setCancelAmount(payment.getAmount());
+        guard.setCancelReason("승인 보호");
+        assertThat(paymentMapper.insertCompensationCancellation(guard)).isEqualTo(1);
+        completePayment(payment, "REOPEN-COMPLETED-GUARD");
+        assertThat(paymentMapper.failCancellationIfRequested(
+                guard.getId(),
+                "PAYMENT_COMPLETED",
+                "정상 완료"
+        )).isEqualTo(1);
+
+        assertThat(paymentMapper.reopenReleasedCompensation(
+                payment.getId(),
+                guard.getIdempotencyKey()
+        )).isEqualTo(1);
+        assertThat(paymentMapper.findPaymentCancellationById(guard.getId()))
+                .hasValueSatisfying(reopened -> {
+                    assertThat(reopened.getStatus()).isEqualTo(PaymentCancellationStatus.REQUESTED);
+                    assertThat(reopened.getFailureCode()).isNull();
+                });
+    }
+
+    @Test
+    void findRequestedCompensations_onlyReturnsRequestsOlderThanCutoff() {
+        Payment payment = insertPayment("RECOVERY-GRACE-PERIOD");
+        PaymentCancellation guard = new PaymentCancellation();
+        guard.setPaymentId(payment.getId());
+        guard.setIdempotencyKey("COMPENSATE-" + payment.getId());
+        guard.setCancelAmount(payment.getAmount());
+        guard.setCancelReason("승인 보호");
+        assertThat(paymentMapper.insertCompensationCancellation(guard)).isEqualTo(1);
+        LocalDateTime requestedAt = LocalDateTime.of(2026, 8, 1, 12, 0);
+        jdbcTemplate.update(
+                "UPDATE payment_cancellations SET requested_at = ? WHERE id = ?",
+                requestedAt,
+                guard.getId()
+        );
+
+        assertThat(paymentMapper.findRequestedCompensations(
+                requestedAt.minusNanos(1),
+                10
+        )).isEmpty();
+        assertThat(paymentMapper.findRequestedCompensations(requestedAt, 10))
+                .extracting(PaymentCancellation::getId)
+                .containsExactly(guard.getId());
+    }
+
     // 한 주문에서 READY 결제는 UNIQUE 제약에 따라 한 건만 허용되는지 확인한다.
     @Test
     void onlyOneReadyPaymentIsAllowedPerOrder() {
