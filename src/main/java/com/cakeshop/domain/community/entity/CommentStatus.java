@@ -1,8 +1,13 @@
 package com.cakeshop.domain.community.entity;
 
 /**
- * 댓글 상태의 DB 저장값이다. 삭제된 댓글은 목록에서 지우지 않고 "삭제된 댓글입니다"
- * 자리 표시로 남기되, 댓글 개수 집계에서는 제외한다(docs/community/DOMAIN.md 4.4).
+ * ******************************
+ * 작성자 : HyunGyu-Cho
+ * 담당자 : 현규
+ * 작성일 : 2026-08-05
+ * 기능 : 커뮤니티 도메인 모델
+ * 설명 : CommentStatus 도메인의 상태와 값을 정의한다.
+ * ******************************
  */
 public enum CommentStatus {
     PUBLISHED,

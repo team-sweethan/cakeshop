@@ -1,3 +1,12 @@
+<!--/*
+******************************
+작성자 : HyunGyu-Cho
+담당자 : 현규
+작성일 : 2026-08-05
+기능 : 관리자 커뮤니티 화면
+설명 : list 커뮤니티 화면을 구성한다.
+******************************
+*/-->
 <!doctype html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
@@ -17,13 +26,6 @@
 
       <h1 class="admin-page-title">커뮤니티 관리</h1>
 
-      <!--
-        상태 필터와 정렬만 받는다(DOMAIN.md 6.7). 작성자·제목 검색은 넣지 않았다 —
-        관리자가 하는 일은 신고된 글을 찾아 조치하는 것이고, 그 동선은 정렬이 해결한다.
-
-        필터는 주소로 표현해 새로고침·뒤로가기에서도 유지된다. 고객 목록과 같은 방식이다.
-        모르는 값이 들어와도 오류가 아니라 기본값으로 떨어진다.
-      -->
       <div class="cluster section">
         <a class="btn"
            th:classappend="${selectedStatus == null} ? ' is-active'"
@@ -58,15 +60,10 @@
             <tr><th>번호</th><th>분류</th><th>제목</th><th>작성자</th><th>작성일</th><th>미처리 신고</th><th>상태</th><th>관리</th></tr>
           </thead>
           <tbody>
-            <!--
-              차단·해제 버튼은 여기 두지 않는다. 차단에는 사유가 필수인데(DOMAIN.md 4.3)
-              목록에는 사유를 입력할 자리가 없다. 조치는 상세에서 한다.
-            -->
             <tr th:each="post : ${pageResult.content}">
               <td th:text="${post.id}">0</td>
               <td th:text="${post.categoryName}">분류</td>
               <td>
-                <!-- 본문·제목은 순수 텍스트다. th:utext를 쓰지 않는다(DOMAIN.md 7). -->
                 <a th:href="@{/admin/community/{postId}(postId=${post.id})}"
                    th:text="${post.title}">제목</a>
               </td>
@@ -78,11 +75,6 @@
                 <span th:unless="${post.hasPendingReports()}" class="text-muted">-</span>
               </td>
               <td>
-                <!--
-                  상태 어휘는 문서와 같은 말을 쓴다(DOMAIN.md 6.7). 목업의 정상/제재는
-                  버렸다 — 화면·문서·코드가 서로 다른 말을 쓰면 같은 상태를 두고 다른
-                  것을 가리키고 있는지 알 수 없다.
-                -->
                 <span th:if="${post.status.name() == 'PUBLISHED'}"
                       class="badge badge--success">노출 중</span>
                 <span th:if="${post.status.name() == 'BLOCKED'}"
@@ -98,10 +90,6 @@
         </table>
       </div>
 
-      <!--
-        빈 목록은 평소 화면에 없어서 표현식이 깨져도 눈에 띄지 않는다. 조건부 블록은
-        렌더링 테스트로 고정한다(SCREENS.md).
-      -->
       <div class="panel panel--dashed text-muted"
            th:if="${pageResult.content.isEmpty()}"
            style="text-align:center">
