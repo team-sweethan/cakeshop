@@ -112,6 +112,11 @@ ALTER TABLE `notifications`
         REFERENCES `chat_messages` (`id`)
         ON DELETE SET NULL,
 
+    ADD CONSTRAINT `fk_notifications_chat_room`
+        FOREIGN KEY (`chat_room_id`)
+        REFERENCES `chat_rooms` (`id`)
+        ON DELETE SET NULL,
+
     ADD CONSTRAINT `fk_notifications_post`
         FOREIGN KEY (`post_id`)
         REFERENCES `posts` (`id`)
@@ -120,6 +125,21 @@ ALTER TABLE `notifications`
     ADD CONSTRAINT `fk_notifications_comment`
         FOREIGN KEY (`comment_id`)
         REFERENCES `comments` (`id`)
+        ON DELETE SET NULL,
+
+    ADD CONSTRAINT `fk_notifications_review`
+        FOREIGN KEY (`review_id`)
+        REFERENCES `reviews` (`id`)
+        ON DELETE SET NULL,
+
+    ADD CONSTRAINT `fk_notifications_review_reply`
+        FOREIGN KEY (`review_reply_id`)
+        REFERENCES `review_replies` (`id`)
+        ON DELETE SET NULL,
+
+    ADD CONSTRAINT `fk_notifications_user_coupon`
+        FOREIGN KEY (`user_coupon_id`)
+        REFERENCES `member_coupons` (`id`)
         ON DELETE SET NULL;
 
 -- ---------------------------------------------------------
