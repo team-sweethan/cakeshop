@@ -87,23 +87,36 @@ public class NotificationService {
         // 알림톡 / SMS 외부 발송 연동 (DB 트랜잭션 커밋 완료 후 안전하게 발송)
         if (scope == DeliveryScope.WEB_AND_SMS && request.getReceiverId() != null) {
             String receiverPhone = notificationMapper.findReceiverPhone(request.getReceiverId());
-            if (receiverPhone != null && !receiverPhone.trim().isEmpty()) {
-                Long notificationId = notification.getId();
-                if (TransactionSynchronizationManager.isActualTransactionActive()) {
-                    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                        @Override
-                        public void afterCommit() {
-                            executeSmsSending(notificationId, receiverPhone, title, content);
-                        }
-                    });
-                } else {
-                    executeSmsSending(notificationId, receiverPhone, title, content);
-                }
+            Long notificationId = notification.getId();
+            if (TransactionSynchronizationManager.isActualTransactionActive()) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        executeSmsSending(notificationId, receiverPhone, title, content);
+                    }
+                });
+            } else {
+                executeSmsSending(notificationId, receiverPhone, title, content);
             }
         }
     }
 
     private void executeSmsSending(Long notificationId, String receiverPhone, String title, String content) {
+        if (receiverPhone == null || receiverPhone.trim().isEmpty()) {
+            com.cakeshop.domain.notification.entity.NotificationDelivery delivery = com.cakeshop.domain.notification.entity.NotificationDelivery.builder()
+                    .notificationId(notificationId)
+                    .recipient("NO_PHONE")
+                    .templateCode("DEFAULT_SMS")
+                    .providerMessageId(null)
+                    .status("FAILED")
+                    .failureReason("No receiver phone number")
+                    .createdAt(LocalDateTime.now())
+                    .updatedAt(LocalDateTime.now())
+                    .build();
+            notificationDeliveryService.recordDelivery(delivery);
+            return;
+        }
+
         SolapiKakaoAlimtalkClient.SmsResult result = solapiKakaoAlimtalkClient.sendAlimtalk(notificationId, receiverPhone, title, content);
         if (result != null) {
             com.cakeshop.domain.notification.entity.NotificationDelivery delivery = com.cakeshop.domain.notification.entity.NotificationDelivery.builder()

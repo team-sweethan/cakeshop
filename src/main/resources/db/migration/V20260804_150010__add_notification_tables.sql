@@ -105,6 +105,11 @@ ALTER TABLE `notifications`
     ADD CONSTRAINT `fk_notifications_order`
         FOREIGN KEY (`order_id`)
         REFERENCES `orders` (`id`)
+        ON DELETE SET NULL,
+
+    ADD CONSTRAINT `fk_notifications_chat_message`
+        FOREIGN KEY (`chat_message_id`)
+        REFERENCES `chat_messages` (`id`)
         ON DELETE SET NULL;
 
 -- ---------------------------------------------------------
@@ -146,13 +151,8 @@ ALTER TABLE `notification_deliveries`
     DROP FOREIGN KEY `fk_notification_deliveries_notification`;
 
 -- ---------------------------------------------------------
--- 2-2. 기존 데이터 보정 및 notification_id 중복 정리 (최신 1건만 보존)
+-- 2-2. 기존 데이터 보정
 -- ---------------------------------------------------------
-DELETE d1 FROM `notification_deliveries` d1
-INNER JOIN `notification_deliveries` d2
-    ON d1.`notification_id` = d2.`notification_id`
-   AND d1.`id` < d2.`id`;
-
 UPDATE `notification_deliveries`
 SET `status` = 'PENDING'
 WHERE `status` = 'REQUESTED';
@@ -162,7 +162,7 @@ SET `template_code` = 'NOTI_DEFAULT'
 WHERE `template_code` IS NULL;
 
 -- ---------------------------------------------------------
--- 2-3. 컬럼 정리, FK 및 유니크 제약조건 추가
+-- 2-3. 컬럼 정리 및 FK 추가
 -- ---------------------------------------------------------
 ALTER TABLE `notification_deliveries`
     ADD COLUMN `updated_at`
@@ -201,16 +201,16 @@ ALTER TABLE `notification_deliveries`
     ADD CONSTRAINT `fk_deliveries_notification`
         FOREIGN KEY (`notification_id`)
         REFERENCES `notifications` (`id`)
-        ON DELETE CASCADE,
-
-    ADD CONSTRAINT `uk_deliveries_notification`
-        UNIQUE (`notification_id`),
-
-    ADD CONSTRAINT `uk_deliveries_provider_msg_id`
-        UNIQUE (`provider_message_id`);
+        ON DELETE CASCADE;
 
 -- ---------------------------------------------------------
--- 2-4. 발송 상태별 조회 인덱스
+-- 2-4. 조회 인덱스
 -- ---------------------------------------------------------
+CREATE INDEX `idx_deliveries_notification_id`
+    ON `notification_deliveries` (`notification_id`);
+
+CREATE INDEX `idx_deliveries_provider_msg_id`
+    ON `notification_deliveries` (`provider_message_id`);
+
 CREATE INDEX `idx_deliveries_status_created`
     ON `notification_deliveries` (`status`, `created_at` DESC);
