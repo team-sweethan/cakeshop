@@ -36,6 +36,7 @@ import java.util.Locale;
 public class OrderCheckoutService {
 
     private static final int PICKUP_WINDOW_DAYS = 14;
+    private static final long PAYMENT_EXPIRATION_MINUTES = 10L;
     private static final BigDecimal MAX_ORDER_AMOUNT = new BigDecimal("999999999999");
     private static final DateTimeFormatter DATE_LABEL_FORMATTER =
             DateTimeFormatter.ofPattern("M월 d일 (E)", Locale.KOREAN);
@@ -170,7 +171,7 @@ public class OrderCheckoutService {
 
         while (!cursor.isAfter(lastPickup)) {
             LocalTime time = cursor.toLocalTime();
-            if (cursor.isAfter(now)
+            if (cursor.isAfter(now.plusMinutes(PAYMENT_EXPIRATION_MINUTES))
                     && !time.isBefore(businessStart)
                     && !time.isAfter(businessEnd)) {
                 times.add(new PickupTimeView(

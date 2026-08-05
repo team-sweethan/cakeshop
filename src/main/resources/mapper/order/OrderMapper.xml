@@ -555,7 +555,7 @@
             canceled_at = #{canceledAt},
             cancel_reason = #{cancelReason}
         WHERE id = #{orderId}
-          AND status IN ('PENDING_PAYMENT', 'READY_FOR_PICKUP')
+          AND status IN ('PENDING_PAYMENT', 'READY_FOR_PICKUP', 'EXPIRED')
           AND EXISTS (
               SELECT 1
               FROM payments AS payment

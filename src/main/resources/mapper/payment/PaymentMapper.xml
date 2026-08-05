@@ -351,7 +351,7 @@
             'REQUESTED'
         FROM payments AS payment
         WHERE payment.id = #{paymentId}
-          AND payment.status IN ('READY', 'DONE')
+          AND payment.status IN ('READY', 'DONE', 'EXPIRED')
           AND payment.amount = #{cancelAmount}
         ON DUPLICATE KEY UPDATE
             payment_cancellations.id = LAST_INSERT_ID(payment_cancellations.id)
@@ -361,7 +361,7 @@
         UPDATE payments
         SET payment_key = #{paymentKey}
         WHERE id = #{paymentId}
-          AND status IN ('READY', 'DONE')
+          AND status IN ('READY', 'DONE', 'EXPIRED')
           AND (payment_key IS NULL OR payment_key = #{paymentKey})
     </update>
 
@@ -467,7 +467,7 @@
         WHERE cancellation.id = #{cancellationId}
           AND cancellation.status = 'REQUESTED'
           AND cancellation.request_type = 'SYSTEM_COMPENSATION'
-          AND payment.status IN ('READY', 'DONE')
+          AND payment.status IN ('READY', 'DONE', 'EXPIRED')
           AND (payment.payment_key IS NULL OR payment.payment_key = #{paymentKey})
     </update>
 </mapper>

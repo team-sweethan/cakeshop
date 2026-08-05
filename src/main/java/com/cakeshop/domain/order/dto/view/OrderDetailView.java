@@ -53,7 +53,10 @@ public record OrderDetailView(
     }
 
     public boolean cancelRequestAvailable() {
-        return orderType == OrderType.GENERAL && status == OrderStatus.READY_FOR_PICKUP;
+        return orderType == OrderType.GENERAL
+                && status == OrderStatus.READY_FOR_PICKUP
+                && pickupAt != null
+                && LocalDateTime.now().isBefore(pickupAt);
     }
 
     public boolean adminCancellationAvailable() {

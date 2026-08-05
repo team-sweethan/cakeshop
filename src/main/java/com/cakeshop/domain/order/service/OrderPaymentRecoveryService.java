@@ -34,7 +34,8 @@ public class OrderPaymentRecoveryService {
                 ));
         OrderStatus previousStatus = order.getStatus();
         if (previousStatus != OrderStatus.PENDING_PAYMENT
-                && previousStatus != OrderStatus.READY_FOR_PICKUP) {
+                && previousStatus != OrderStatus.READY_FOR_PICKUP
+                && previousStatus != OrderStatus.EXPIRED) {
             throw new BusinessException(OrderErrorCode.INVALID_STATUS_TRANSITION);
         }
 
