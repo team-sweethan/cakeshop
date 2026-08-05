@@ -158,6 +158,45 @@ class CommunitySchemaTests {
     }
 
     /**
+     * 집계용 인덱스 셋이 있는지, 그리고 <b>컬럼 순서</b>가 맞는지 확인한다(조각 7b).
+     *
+     * <p>{@code (created_at, post_id)}이지 그 반대가 아니다. 선두가 범위 조건인
+     * {@code created_at}이어야 배치가 7일 창으로 좁힐 수 있고, {@code post_id}가 둘째면
+     * 뒤따르는 집계까지 인덱스만 읽고 끝난다. 뒤집으면 창으로 못 좁혀 세 테이블을
+     * 통째로 훑는다.
+     *
+     * <p>여기가 틀려도 <b>순위 결과는 완전히 똑같다.</b> 달라지는 것은 스캔량뿐이라
+     * 조회수 정렬 인덱스와 같은 종류다 — 터지지 않고 조용히 느려지기만 한다. 게다가
+     * 배치는 새벽에 혼자 도니 느려진 것을 알아챌 사람도 없다.
+     *
+     * <p>{@code post_views}에 이미 있는 {@code ix_post_views_post_viewer_created}로는
+     * 이 일을 못 한다. 선두가 {@code post_id}라 창으로는 탈 수 없다 — 같은 컬럼이 들어
+     * 있다고 해서 쓸 수 있는 인덱스가 아니라는 것이 이 검사가 남기는 기록이다.
+     */
+    @Test
+    void popularityWindowIndexes_existInExpectedColumnOrder() {
+        assertThat(indexColumns("post_views", "ix_post_views_created"))
+                .containsExactly("created_at", "post_id");
+        assertThat(indexColumns("post_likes", "ix_post_likes_created"))
+                .containsExactly("created_at", "post_id");
+        assertThat(indexColumns("comments", "ix_comments_created"))
+                .containsExactly("created_at", "post_id");
+    }
+
+    private List<String> indexColumns(String tableName, String indexName) {
+        return jdbcTemplate.queryForList(
+                """
+                SELECT column_name
+                FROM information_schema.statistics
+                WHERE table_schema = DATABASE()
+                  AND table_name = ?
+                  AND index_name = ?
+                ORDER BY seq_in_index
+                """,
+                String.class, tableName, indexName);
+    }
+
+    /**
      * 조회 이력을 {@code viewed_on} 없이 넣을 수 있는지 확인한다(PR #98 Codex 리뷰 P1).
      *
      * <p>10분 창 migration은 <b>확장 단계만</b> 한다 — 컬럼을 지우지 않고 NULL 허용으로만

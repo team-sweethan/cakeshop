@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.InputStream;
 import java.lang.reflect.Method;
+import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -460,6 +461,91 @@ class CommunityMapperXmlTests {
         assertThat(sql).contains("PR.STATUS = 'PENDING'");
     }
 
+    /**
+     * H21 — 인기글 집계가 <b>창으로 먼저 자르고 그다음 합치는</b> 형태인지 확인한다.
+     *
+     * <p>게시글마다 도는 스칼라 서브쿼리로 바꿔도 <b>결과는 완전히 같다.</b> 달라지는 것은
+     * 대상뿐이다 — 창 안의 이벤트가 아니라 전체 게시글이 되어 창을 둔 이득이 사라진다.
+     * 데이터가 적을 때는 차이가 보이지 않으므로 결과 검증으로는 절대 안 잡힌다. 목록
+     * 쿼리(H1a)와 같은 종류이고 방향만 반대다.
+     *
+     * <p>{@code UNION ALL}이 셋인 것까지 세지는 않는다. 세는 대신 <b>세 원본이 각각
+     * FROM에 오는 것</b>을 본다 — 원본 하나가 통째로 빠지면 그 신호만 조용히 0이 되는데,
+     * 순위는 여전히 그럴듯하게 나온다.
+     */
+    @Test
+    void insertDailyRanking_slicesWindowFirstThenUnions() {
+        String sql = normalizedSql("insertDailyRanking");
+
+        assertThat(sql).contains("UNION ALL");
+        assertThat(sql).contains("FROM POST_VIEWS");
+        assertThat(sql).contains("FROM POST_LIKES");
+        assertThat(sql).contains("FROM COMMENTS");
+        assertThat(sql).contains("GROUP BY E.POST_ID");
+    }
+
+    /**
+     * H23의 짝 — 창의 경계가 <b>이상/미만</b>으로 적혀 있는지 확인한다.
+     *
+     * <p>{@code BETWEEN}이나 '23:59:59 이하'로 바뀌면 자정 직전 1초가 통째로 빠지는데,
+     * 그 1초에 이벤트가 없으면 결과 검사도 함께 통과한다. 세 원본이 같은 조각을
+     * 공유하는지도 여기서 본다 — 하나만 폭이 달라지면 그 신호만 덜/더 세어진다.
+     */
+    @Test
+    void insertDailyRanking_windowIsHalfOpen() {
+        String sql = normalizedSql("insertDailyRanking");
+
+        assertThat(sql).contains("CREATED_AT >= ? - INTERVAL 6 DAY");
+        assertThat(sql).contains("CREATED_AT < ? + INTERVAL 1 DAY");
+        assertThat(sql).doesNotContain("BETWEEN");
+    }
+
+    /**
+     * H24·H30의 짝 — 계수 25/15/1과 <b>댓글을 사람 수로 접는 것</b>이 SQL에 남아 있는지 본다.
+     *
+     * <p>계수가 원안의 5/3/1로 되돌아가거나 댓글 갈래의 {@code GROUP BY}가 빠져도 화면은
+     * 멀쩡하고 순위만 조용히 이상해진다. 실제 데이터로 보는 검사가 따로 있지만(H24·H30),
+     * 그쪽은 대소 관계가 뒤집히는 지점을 잡을 뿐이라 계수를 직접 읽지는 않는다.
+     */
+    @Test
+    void insertDailyRanking_keepsWeightsAndFoldsCommentsPerMember() {
+        String sql = normalizedSql("insertDailyRanking");
+
+        assertThat(sql).contains("* 25");
+        assertThat(sql).contains("* 15");
+        assertThat(sql).contains("GROUP BY POST_ID, MEMBER_ID");
+    }
+
+    /**
+     * D4·D5의 짝 — 선정이 그 시점의 {@code PUBLISHED}만 대상으로 삼고, 동점 tiebreaker가
+     * <b>자르는 곳과 번호 매기는 곳 양쪽</b>에 있는지 확인한다.
+     *
+     * <p>둘 중 하나만 있으면 자른 20건과 매긴 번호의 기준이 갈려 같은 날짜를 다시 집계할
+     * 때 순위가 흔들린다. 동점이 없는 데이터로만 확인하면 그대로 통과한다.
+     */
+    @Test
+    void insertDailyRanking_selectsPublishedOnlyAndBreaksTiesDeterministically() {
+        String sql = normalizedSql("insertDailyRanking");
+
+        assertThat(sql).contains("P.STATUS = 'PUBLISHED'");
+        assertThat(sql).contains("ROW_NUMBER() OVER (ORDER BY S.POPULARITY_SCORE DESC, S.POST_ID DESC)");
+        assertThat(sql).contains("ORDER BY POPULARITY_SCORE DESC, E.POST_ID DESC");
+    }
+
+    /**
+     * D11의 짝 — 확정 여부를 <b>실행 기록 표</b>에서 읽는지 확인한다.
+     *
+     * <p>{@code daily_popular_posts}를 보도록 바뀌면 활동이 0인 날이 매번 "안 돈 날"로
+     * 판단되어 재집계가 계속 돈다. 순위 결과는 어차피 0건이라 화면으로는 구분되지 않는다.
+     */
+    @Test
+    void existsBatchRun_readsRunTableNotRankingTable() {
+        String sql = normalizedSql("existsBatchRun");
+
+        assertThat(sql).contains("FROM POPULAR_POST_BATCH_RUNS");
+        assertThat(sql).doesNotContain("DAILY_POPULAR_POSTS");
+    }
+
     /** 공백을 하나로 줄이고 대문자로 바꿔 들여쓰기·줄바꿈 차이를 무시한다. */
     private String normalizedSql(String statementId) {
         return normalizedSql(statementId, Map.of());
@@ -483,6 +569,8 @@ class CommunityMapperXmlTests {
         parameters.put("adminId", 1L);
         parameters.put("status", null);
         parameters.put("sort", null);
+        parameters.put("rankingDate", LocalDate.of(2026, 8, 4));
+        parameters.put("postCount", 20);
         parameters.putAll(overrides);
 
         return statement.getBoundSql(parameters)

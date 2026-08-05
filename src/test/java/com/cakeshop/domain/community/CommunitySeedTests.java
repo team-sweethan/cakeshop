@@ -73,6 +73,49 @@ class CommunitySeedTests {
                 .doesNotContain("PARENT_COMMENT_ID");
     }
 
+    /**
+     * H6 확장 (조각 7b) — 두 시드가 인기글 자식 행을 {@code posts}보다 <b>먼저</b> 지운다.
+     *
+     * <p>{@code daily_popular_posts.post_id}가 {@code posts}를 FK로 참조하므로, 배치가 한 번
+     *이라도 돈 뒤에는 이 순서가 아니면 {@code DELETE FROM posts}가 제약에 걸려 <b>시드
+     * 재실행이 통째로 실패한다.</b> {@code post_views}를 넣을 때 똑같이 겪은 자리다.
+     *
+     * <p><b>줄이 있는지가 아니라 어디에 있는지를 본다.</b> 포함 여부만 확인하면
+     * {@code posts} 아래에 적혀 있어도 통과하는데, 그러면 FK 위반이 그대로 남는다 —
+     * 고쳤다고 믿는 상태가 가장 나쁘다.
+     */
+    @Test
+    void seedScripts_deletePopularPostRowsBeforePosts() throws IOException {
+        for (String location : new String[] {LOCAL_SEED, COMMUNITY_SEED}) {
+            String seed = normalize(readSeed(location));
+
+            int rankings = seed.indexOf("DELETE FROM DAILY_POPULAR_POSTS");
+            int posts = seed.indexOf("DELETE FROM POSTS");
+
+            assertThat(rankings)
+                    .as("%s이 daily_popular_posts를 지워야 한다", location)
+                    .isNotNegative();
+            assertThat(rankings)
+                    .as("%s에서 daily_popular_posts가 posts보다 먼저 지워져야 한다", location)
+                    .isLessThan(posts);
+        }
+    }
+
+    /**
+     * 실행 기록도 함께 지운다. FK는 없지만 남겨 두면 시드로 글을 새로 깔아도 배치가
+     * "이미 확정한 날짜"로 판단해 건너뛰어(PLAN.md D4) 인기글이 영원히 채워지지 않는다.
+     *
+     * <p>이쪽은 실패가 조용하다 — 시드는 성공하고 화면만 빈 채로 남는다.
+     */
+    @Test
+    void seedScripts_clearBatchRunHistory() throws IOException {
+        for (String location : new String[] {LOCAL_SEED, COMMUNITY_SEED}) {
+            assertThat(normalize(readSeed(location)))
+                    .as("%s이 popular_post_batch_runs를 비워야 한다", location)
+                    .contains("DELETE FROM POPULAR_POST_BATCH_RUNS");
+        }
+    }
+
     private String readSeed(String location) throws IOException {
         return new String(
                 new ClassPathResource(location).getInputStream().readAllBytes(),
