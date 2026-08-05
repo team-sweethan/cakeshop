@@ -1,9 +1,11 @@
 package com.cakeshop.domain.community.mapper;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import com.cakeshop.domain.community.dto.view.CommentCountView;
 import com.cakeshop.domain.community.dto.view.CommentView;
+import com.cakeshop.domain.community.dto.view.PopularPostView;
 import com.cakeshop.domain.community.dto.view.PostCategoryView;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
@@ -236,6 +238,81 @@ public interface CommunityMapper {
     boolean existsReport(
             @Param("postId") long postId,
             @Param("reporterId") long reporterId
+    );
+
+    // --- 인기글 배치 (조각 7b) ---
+    //
+    // 배치 문장을 별도 매퍼로 빼지 않는 이유: 매퍼는 고객과 관리자로만 가른다는 것이
+    // 이 도메인의 규칙이고(CLAUDE.md), 7c의 화면 조회도 여기로 들어온다. 인기글 SQL이
+    // 두 파일로 흩어지면 집계와 노출의 조건이 어긋나도 한자리에서 볼 수 없다 —
+    // 선정과 노출이 각각 PUBLISHED를 봐야 한다는 D5가 정확히 그 자리다.
+
+    /**
+     * 이 날짜의 배치가 이미 확정됐는지. 확정됐으면 재실행은 아무것도 하지 않는다(D4).
+     *
+     * 순위 표가 아니라 실행 기록 표를 본다. 순위가 0건인 날도 "돌았다"이기 때문이다 —
+     * 순위 표로 판단하면 활동 없는 날마다 배치가 매번 다시 집계한다(D11).
+     */
+    boolean existsBatchRun(
+            @Param("rankingDate") LocalDate rankingDate
+    );
+
+    /** 이 날짜의 순위를 지운다. 재집계의 첫 문장이며 INSERT와 한 트랜잭션이어야 한다. */
+    int deleteDailyRanking(
+            @Param("rankingDate") LocalDate rankingDate
+    );
+
+    /**
+     * 최근 7일 창을 집계해 상위 limit건을 이 날짜의 순위로 확정한다. 넣은 행 수를 돌려준다.
+     *
+     * 형태가 규칙이다 — 세 원본을 창으로 먼저 자른 뒤 UNION ALL로 합친다(H21).
+     * 게시글마다 도는 스칼라 서브쿼리로 바꾸면 결과는 같지만 대상이 창 안의 이벤트가
+     * 아니라 전체 게시글이 되어 창을 둔 이득이 사라진다. 자세한 근거는 XML에 적었다.
+     */
+    int insertDailyRanking(
+            @Param("rankingDate") LocalDate rankingDate,
+            @Param("limit") int limit
+    );
+
+    /**
+     * 이 날짜를 확정했다고 기록한다. postCount가 0이어도 행을 남긴다.
+     *
+     * 0건인 날에도 남기는 것이 이 표의 존재 이유다(D11). 남기지 않으면 "안 돈 날"과
+     * 구분되지 않아 화면이 옛 날짜로 되돌아간다.
+     */
+    int insertBatchRun(
+            @Param("rankingDate") LocalDate rankingDate,
+            @Param("postCount") int postCount
+    );
+
+    // --- 인기글 화면 (조각 7c) ---
+
+    /**
+     * 화면에 쓸 확정 날짜. 확정된 실행이 하나도 없으면 null이다.
+     *
+     * <b>순위 표가 아니라 실행 기록 표를 본다</b>(D11). 순위 표에서 MAX를 읽으면 활동이
+     * 0이라 순위가 비었던 날을 건너뛰고 그 이전 날짜로 돌아가는데, 그러면 7일 창 밖의
+     * 오래된 글이 어제 것인 양 무기한 걸린다. 그리고 그 화면은 정상일 때와 똑같이 생겼다.
+     *
+     * 어제가 아니라 최신 확정일인 것은 의도한 폴백이다 — 배치를 한 번 거른 날에 화면이
+     * 비는 대신 어제 순위를 유지한다(D6). 대가로 순위가 조용히 낡아 갈 수 있어서
+     * Service가 경고 로그를 남긴다.
+     */
+    LocalDate findLatestRankingDate();
+
+    /**
+     * 이 날짜의 확정 순위를 위에서부터 limit건 조회한다.
+     *
+     * <b>노출 시점의 status를 다시 확인한다</b>(D5). 선정 SQL도 그 시점의 PUBLISHED만
+     * 담지만, 확정된 뒤에 지워지거나 차단된 글은 여기서만 걸러진다 — 노출 판단의 유일한
+     * 기준은 언제나 현재 status다(DOMAIN.md 4.1). 그래서 스냅샷 20건 중 화면이 쓰는
+     * 것은 10건이고, 그 여유가 흡수하는 것이 정확히 이 상태 변화다.
+     *
+     * 결과가 limit보다 짧을 수 있다. 그것이 정상이며 화면은 있는 만큼만 그린다.
+     */
+    List<PopularPostView> findPopularPosts(
+            @Param("rankingDate") LocalDate rankingDate,
+            @Param("limit") int limit
     );
 
 }

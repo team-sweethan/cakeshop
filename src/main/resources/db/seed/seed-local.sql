@@ -31,6 +31,12 @@ DELETE FROM `chat_rooms`;
 DELETE FROM `member_coupons`;
 DELETE FROM `coupons`;
 DELETE FROM `post_reports`;
+-- daily_popular_posts 도 posts 를 FK 로 참조한다(조각 7b). 배치가 한 번이라도 돈
+-- 뒤에는 이 줄이 없으면 아래 DELETE FROM posts 가 제약에 걸린다.
+DELETE FROM `daily_popular_posts`;
+-- 실행 기록에는 FK 가 없지만 함께 지운다. 남겨 두면 시드로 글을 새로 깔아도 배치가
+-- "이미 확정한 날짜" 로 판단해 건너뛰어서(D4), 인기글이 영원히 안 채워진다.
+DELETE FROM `popular_post_batch_runs`;
 -- post_views 는 posts 를 FK 로 참조한다(조각 6). 여기서 지우지 않으면 아래
 -- DELETE FROM posts 가 제약에 걸려 시드를 두 번째 실행할 때부터 통째로 실패한다.
 DELETE FROM `post_views`;

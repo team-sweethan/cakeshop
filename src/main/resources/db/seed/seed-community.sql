@@ -35,6 +35,12 @@
 DELETE FROM `post_reports`;
 DELETE FROM `post_likes`;
 DELETE FROM `post_views`;
+-- daily_popular_posts 는 posts 를 FK 로 참조한다(조각 7b). 배치가 한 번이라도 돈
+-- 뒤에는 이 줄이 없으면 아래 DELETE FROM posts 가 제약에 걸려 시드가 통째로 실패한다.
+DELETE FROM `daily_popular_posts`;
+-- 실행 기록에는 FK 가 없지만 함께 지운다. 남겨 두면 글을 새로 깔아도 배치가
+-- "이미 확정한 날짜" 로 판단해 건너뛰어서(D4) 인기글이 채워지지 않는다.
+DELETE FROM `popular_post_batch_runs`;
 DELETE FROM `comments`;
 DELETE FROM `posts`;
 

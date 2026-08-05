@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.mapper.CommunityMapper;
+import com.cakeshop.global.config.ClockConfig;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -29,7 +30,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @MybatisTest
 @MariaDbIntegrationTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import(CommunityService.class)
+// CommunityService가 Clock을 주입받으므로 슬라이스에도 시계 설정을 함께 올린다.
+@Import({CommunityService.class, ClockConfig.class})
 class CommunityViewCountTests {
 
     private static final LocalDateTime BASE_TIME = LocalDateTime.of(2026, 3, 1, 10, 0);

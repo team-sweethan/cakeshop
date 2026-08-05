@@ -11,7 +11,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 import com.cakeshop.domain.community.dto.form.CommentForm;
@@ -20,6 +23,8 @@ import com.cakeshop.domain.community.dto.form.ReportForm;
 import com.cakeshop.domain.community.dto.view.CommentCountView;
 import com.cakeshop.domain.community.dto.view.CommentSectionView;
 import com.cakeshop.domain.community.dto.view.CommentView;
+import com.cakeshop.domain.community.dto.view.PopularPostView;
+import com.cakeshop.domain.community.dto.view.PopularSectionView;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
 import com.cakeshop.domain.community.dto.view.PostLockView;
@@ -34,10 +39,14 @@ import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
 
 /**
@@ -57,13 +66,37 @@ class CommunityServiceTests {
     private static final String VIEWER_KEY = "M:7";
     private static final LocalDateTime CREATED_AT = LocalDateTime.of(2026, 3, 1, 10, 0);
 
+    private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
+
+    /**
+     * 기본 시계가 가리키는 시각. 인기글 경고는 "확정일이 어제보다 오래됐는가"를 보므로
+     * 어제({@code 2026-03-09})와 그제({@code 2026-03-08})가 판단의 경계다.
+     *
+     * <p>10:00인 것은 새벽 유예(01:00)를 넘긴 시각을 기본으로 두기 위해서다. 유예 안쪽을
+     * 봐야 하는 검사만 자기 시계를 따로 만든다.
+     */
+    private static final LocalDateTime NOW = LocalDateTime.of(2026, 3, 10, 10, 0);
+
+    /** {@link #NOW} 기준 어제. 여기까지는 경고가 없고, 하루만 더 밀리면 경고가 뜬다. */
+    private static final LocalDate YESTERDAY = LocalDate.of(2026, 3, 9);
+
+    private static final PageRequest FIRST_PAGE = new PageRequest(1, 20);
+
     private CommunityMapper communityMapper;
     private CommunityService communityService;
 
     @BeforeEach
     void setUp() {
         communityMapper = mock(CommunityMapper.class);
-        communityService = new CommunityService(communityMapper);
+        communityService = new CommunityService(communityMapper, fixedClockAt(NOW));
+    }
+
+    /**
+     * 서울 기준 고정 시계. {@code Clock.systemDefaultZone()}을 쓰면 인기글 경고 검사가
+     * 실행한 날짜에 따라 결과가 갈린다 — 통과하다가 하루 지나면 깨지는 종류다.
+     */
+    private static Clock fixedClockAt(LocalDateTime now) {
+        return Clock.fixed(now.atZone(SEOUL).toInstant(), SEOUL);
     }
 
     @Test
@@ -235,6 +268,131 @@ class CommunityServiceTests {
         communityService.getPosts(null, PostSort.VIEWS, new PageRequest(1, 20));
 
         verify(communityMapper).findPublishedPosts(null, PostSort.VIEWS, 20, 0);
+    }
+
+    @Test
+    void getPopularSection_firstPageWithoutFilter_returnsLatestConfirmedRanking() {
+        givenConfirmedRanking(YESTERDAY, popular(1, 11L), popular(2, 22L));
+
+        PopularSectionView section = communityService.getPopularSection(null, FIRST_PAGE);
+
+        assertThat(section.isEmpty()).isFalse();
+        assertThat(section.rankingDate()).isEqualTo(YESTERDAY);
+        assertThat(section.posts()).extracting(PopularPostView::postId).containsExactly(11L, 22L);
+        // 20건을 저장하고 10건만 그린다(D5). 이 숫자가 어긋나면 화면이 조용히 길어진다.
+        verify(communityMapper).findPopularPosts(YESTERDAY, 10);
+    }
+
+    /**
+     * 카테고리 필터가 걸린 화면에서는 인기글을 <b>조회조차</b> 하지 않는지 확인한다(D7).
+     *
+     * <p>결과만 비었는지 보면 부족하다. 조회해 놓고 버리는 구현도 화면은 똑같이 나오지만,
+     * 필터를 건 모든 요청이 쿼리를 두 번 더 돌린다 — 목록은 공개 화면이라 그 비용이
+     * 사용자 수만큼 곱해지고, 화면이 정상이라 아무도 알아채지 못한다.
+     */
+    @Test
+    void getPopularSection_categoryFiltered_doesNotQueryAtAll() {
+        PopularSectionView section = communityService.getPopularSection(CATEGORY_ID, FIRST_PAGE);
+
+        assertThat(section.isEmpty()).isTrue();
+        verify(communityMapper, never()).findLatestRankingDate();
+        verify(communityMapper, never()).findPopularPosts(any(), anyInt());
+    }
+
+    @Test
+    void getPopularSection_secondPage_doesNotQueryAtAll() {
+        PopularSectionView section =
+                communityService.getPopularSection(null, new PageRequest(2, 20));
+
+        assertThat(section.isEmpty()).isTrue();
+        verify(communityMapper, never()).findLatestRankingDate();
+        verify(communityMapper, never()).findPopularPosts(any(), anyInt());
+    }
+
+    /**
+     * 확정된 실행이 하나도 없으면(첫 배포 직후) 순위를 조회하지 않고 빈 영역이다.
+     *
+     * <p>날짜가 null인 채로 조회하면 {@code ranking_date = NULL}은 아무 행도 안 맞아
+     * 결과는 같지만, 없는 것이 확실한 조회를 매 요청 돌리게 된다.
+     */
+    @Test
+    void getPopularSection_noConfirmedRun_returnsEmptyWithoutQueryingPosts() {
+        when(communityMapper.findLatestRankingDate()).thenReturn(null);
+
+        PopularSectionView section = communityService.getPopularSection(null, FIRST_PAGE);
+
+        assertThat(section.isEmpty()).isTrue();
+        assertThat(section.rankingDate()).isNull();
+        verify(communityMapper, never()).findPopularPosts(any(), anyInt());
+    }
+
+    /**
+     * 확정은 됐는데 오른 글이 전부 지워지거나 차단된 경우다(H27).
+     *
+     * <p>이때 날짜만 담아 돌려주면 화면에 <b>제목과 날짜만 있고 안은 빈</b> 영역이
+     * 남는다. 사용자에게는 고장으로 보이지만 서버에는 오류가 없어 드러나지 않는다.
+     */
+    @Test
+    void getPopularSection_everyRankedPostHidden_returnsEmptySection() {
+        givenConfirmedRanking(YESTERDAY);
+
+        PopularSectionView section = communityService.getPopularSection(null, FIRST_PAGE);
+
+        assertThat(section.isEmpty()).isTrue();
+        assertThat(section.rankingDate()).isNull();
+    }
+
+    /**
+     * 확정일이 그제 이하로 밀리면 경고를 남긴다(D6).
+     *
+     * <p>화면은 최신 확정일로 폴백해 정상처럼 보이므로 이 로그가 유일한 흔적이다.
+     */
+    @Test
+    void getPopularSection_rankingOlderThanYesterday_warns() {
+        givenConfirmedRanking(YESTERDAY.minusDays(1), popular(1, 11L));
+
+        List<String> warnings = warningsWhile(
+                () -> communityService.getPopularSection(null, FIRST_PAGE));
+
+        assertThat(warnings).hasSize(1);
+        assertThat(warnings.get(0)).contains("2026-03-08");
+    }
+
+    @Test
+    void getPopularSection_yesterdayRanking_doesNotWarn() {
+        givenConfirmedRanking(YESTERDAY, popular(1, 11L));
+
+        assertThat(warningsWhile(() -> communityService.getPopularSection(null, FIRST_PAGE)))
+                .isEmpty();
+    }
+
+    /**
+     * 배치가 도는 새벽에는 정상 상태에서도 최신 확정일이 그제다 — 그때는 경고하지 않는다.
+     *
+     * <p>유예가 없으면 매일 새벽 목록 요청마다 경고가 찍힌다. 울지 않아야 할 때 우는
+     * 경고는 곧 아무도 안 보게 되므로, 진짜 장애 때의 같은 줄까지 함께 죽는다.
+     */
+    @Test
+    void getPopularSection_beforeGraceEnds_doesNotWarnEvenIfStale() {
+        CommunityService atDawn = new CommunityService(
+                communityMapper, fixedClockAt(LocalDateTime.of(2026, 3, 10, 0, 30)));
+        givenConfirmedRanking(YESTERDAY.minusDays(1), popular(1, 11L));
+
+        assertThat(warningsWhile(() -> atDawn.getPopularSection(null, FIRST_PAGE))).isEmpty();
+    }
+
+    /**
+     * 확정된 실행이 하나도 없으면 아무리 오래돼도 경고하지 않는다(PLAN.md R30).
+     *
+     * <p>첫 배포 직후와 배치가 몇 주째 안 돈 상태를 구분할 수단이 없어 조용한 쪽으로
+     * 틀렸다. <b>의도한 빈자리이지 빠뜨린 것이 아니라는 표시로 여기 고정한다.</b>
+     */
+    @Test
+    void getPopularSection_noConfirmedRun_doesNotWarn() {
+        when(communityMapper.findLatestRankingDate()).thenReturn(null);
+
+        assertThat(warningsWhile(() -> communityService.getPopularSection(null, FIRST_PAGE)))
+                .isEmpty();
     }
 
     @Test
@@ -918,6 +1076,43 @@ class CommunityServiceTests {
 
     private void givenActiveCategory() {
         when(communityMapper.existsActiveCategory(CATEGORY_ID)).thenReturn(true);
+    }
+
+    private void givenConfirmedRanking(LocalDate rankingDate, PopularPostView... posts) {
+        when(communityMapper.findLatestRankingDate()).thenReturn(rankingDate);
+        when(communityMapper.findPopularPosts(rankingDate, 10)).thenReturn(List.of(posts));
+    }
+
+    private static PopularPostView popular(int ranking, long postId) {
+        return new PopularPostView(ranking, postId, "질문", "제목" + ranking);
+    }
+
+    /**
+     * 실행하는 동안 {@link CommunityService}가 남긴 WARN 메시지를 모은다.
+     *
+     * <p>경고는 반환값에 없어서 이 방법 말고는 확인할 길이 없다. 그리고 확인하지 않으면
+     * 조건이 어긋나도 <b>테스트도 화면도 똑같이 통과한다</b> — D6이 지키려는 것이
+     * "사람이 눈치채지 못하는 상태"라 검사까지 눈감으면 아무것도 안 남는다.
+     */
+    private List<String> warningsWhile(Runnable action) {
+        ch.qos.logback.classic.Logger logger = (ch.qos.logback.classic.Logger)
+                LoggerFactory.getLogger(CommunityService.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+
+        try {
+            action.run();
+        } finally {
+            // 떼지 않으면 다음 검사의 로그까지 이 appender에 쌓인다.
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+
+        return appender.list.stream()
+                .filter(event -> event.getLevel() == Level.WARN)
+                .map(ILoggingEvent::getFormattedMessage)
+                .toList();
     }
 
     private Post capturedInsert() {

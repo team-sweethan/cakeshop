@@ -73,6 +73,13 @@ public class CommunityController {
         model.addAttribute("selectedCategoryId", selectedCategoryId);
         model.addAttribute("selectedSort", selectedSort);
 
+        // 인기글을 실을지 말지(1쪽 + 필터 없음)는 Service가 정한다(DOMAIN.md 6.9).
+        // 여기서 조건을 걸면 같은 규칙이 화면마다 한 벌씩 늘어나고, 두 벌이 되는 순간 갈린다.
+        model.addAttribute(
+                "popularSection",
+                communityService.getPopularSection(selectedCategoryId, pageRequest)
+        );
+
         return "customer/community/list";
     }
 

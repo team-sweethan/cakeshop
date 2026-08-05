@@ -1,5 +1,9 @@
 package com.cakeshop.domain.community.service;
 
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 
 import com.cakeshop.domain.community.dto.form.CommentForm;
@@ -8,6 +12,8 @@ import com.cakeshop.domain.community.dto.form.ReportForm;
 import com.cakeshop.domain.community.dto.view.CommentCountView;
 import com.cakeshop.domain.community.dto.view.CommentSectionView;
 import com.cakeshop.domain.community.dto.view.CommentView;
+import com.cakeshop.domain.community.dto.view.PopularPostView;
+import com.cakeshop.domain.community.dto.view.PopularSectionView;
 import com.cakeshop.domain.community.dto.view.PostCategoryView;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
@@ -22,6 +28,8 @@ import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,10 +37,42 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class CommunityService {
 
-    private final CommunityMapper communityMapper;
+    private static final Logger log = LoggerFactory.getLogger(CommunityService.class);
 
-    public CommunityService(CommunityMapper communityMapper) {
+    /**
+     * 인기글 영역에 그리는 건수. 배치는 20건을 저장한다(D5).
+     *
+     * 20-10의 여유는 비노출 글의 몫이 아니라 <b>선정 이후의 상태 변화</b>를 흡수하는
+     * 몫이다. 선정 SQL도 그 시점의 PUBLISHED만 담기 때문이다.
+     */
+    private static final int POPULAR_POST_LIMIT = 10;
+
+    /** 인기글은 1쪽에만 싣는다(D7). {@link PageRequest}의 쪽 번호는 1부터다. */
+    private static final int FIRST_PAGE = 1;
+
+    /**
+     * 확정일이 낡았다는 경고를 이 시각부터 본다(서울 기준, D6).
+     *
+     * 배치는 00:05에 돌기 시작하므로 그 전에는 정상 상태에서도 최신 확정일이 그제다.
+     * 유예가 없으면 매일 새벽 목록 요청마다 경고가 찍혀 <b>정상 운영이 장애로
+     * 오인된다</b> — 울지 않아야 할 때 우는 경고는 아무도 안 보게 되므로, 로그를 붙인
+     * 목적 자체가 무너지는 자리다.
+     *
+     * 기준이 00:05가 아니라 01:00인 것은 00:05가 배치가 <b>끝나는</b> 시각이 아니라
+     * 시작하는 시각이기 때문이다. 크론 시각을 그대로 유예 종료로 쓰면 집계가 길어질수록
+     * 오경보 창이 도로 넓어진다. 55분은 측정값이 아니라 "집계가 그보다 오래 걸리면
+     * 경고보다 먼저 다른 문제가 있다"는 판단이다.
+     *
+     * <b>이 값은 PopularPostScheduler의 크론과 한 벌이다.</b> 한쪽을 바꾸면 다른 쪽도 본다.
+     */
+    private static final LocalTime STALE_WARNING_GRACE_UNTIL = LocalTime.of(1, 0);
+
+    private final CommunityMapper communityMapper;
+    private final Clock clock;
+
+    public CommunityService(CommunityMapper communityMapper, Clock clock) {
         this.communityMapper = communityMapper;
+        this.clock = clock;
     }
 
     /**
@@ -55,6 +95,75 @@ public class CommunityService {
         long totalElements = communityMapper.countPublishedPosts(categoryId);
 
         return new PageResult<>(posts, pageRequest, totalElements);
+    }
+
+    /**
+     * 목록 화면 상단에 실을 인기글 영역(DOMAIN.md 6.9). 그릴 것이 없으면 빈 영역이다.
+     *
+     * <b>1쪽이고 카테고리 필터가 없을 때만 싣는다</b>(D7). 필터를 건 화면에 전체 인기글이
+     * 뜨면 필터가 안 먹은 것처럼 보이고, 2쪽부터는 같은 영역이 매 쪽 반복될 이유가 없다.
+     * 이 판단이 Controller가 아니라 여기 있는 것은 <b>규칙이기 때문이다</b> — 화면을
+     * 하나 더 만들면 그쪽에서도 같은 조건을 다시 써야 하고, 두 벌이 되는 순간 갈린다.
+     *
+     * <b>빈 영역이 되는 경로가 둘이고 둘을 구분하지 않는다.</b> 확정된 실행이 하나도
+     * 없을 때(첫 배포 직후)와, 확정은 됐지만 노출 가능한 글이 하나도 남지 않았을 때다.
+     * 사용자가 할 수 있는 일이 같으므로 화면은 둘 다 영역을 그리지 않는다 — 구분이
+     * 필요한 쪽은 운영이고 그것은 아래 경고 로그가 맡는다(H27).
+     */
+    @Transactional(readOnly = true)
+    public PopularSectionView getPopularSection(Long categoryId, PageRequest pageRequest) {
+        if (categoryId != null || pageRequest.getPage() != FIRST_PAGE) {
+            return PopularSectionView.empty();
+        }
+
+        LocalDate rankingDate = communityMapper.findLatestRankingDate();
+
+        if (rankingDate == null) {
+            return PopularSectionView.empty();
+        }
+
+        warnIfRankingIsStale(rankingDate);
+
+        List<PopularPostView> popularPosts =
+                communityMapper.findPopularPosts(rankingDate, POPULAR_POST_LIMIT);
+
+        // 확정은 됐지만 그날 순위가 0건이거나, 오른 글이 전부 지워지거나 차단된 경우다.
+        if (popularPosts.isEmpty()) {
+            return PopularSectionView.empty();
+        }
+
+        return new PopularSectionView(rankingDate, popularPosts);
+    }
+
+    /**
+     * 최신 확정일이 어제보다 오래됐으면 경고를 남긴다(D6).
+     *
+     * 화면은 최신 확정일로 폴백해 매끄럽게 degrade 되는데, <b>대가는 폴백이 자기 일을
+     * 잘한다는 것 그 자체다</b> — 사용자에게 매끄러운 만큼 운영자에게도 아무 일 없어
+     * 보이고, 그래서 순위가 조용히 낡아 간다. 이 로그가 그 흔적이다.
+     *
+     * <b>확정된 실행이 하나도 없는 상태는 여기까지 오지 않고, 그래서 경고도 없다.</b>
+     * 첫 배포 직후에는 그것이 정상이기 때문인데, 배치가 몇 주째 한 번도 안 돈 상태와
+     * 구분할 방법이 지금은 없다(배포 시각을 모른다). 조용한 쪽으로 틀리는 것을 택했고,
+     * 이 빈자리는 PLAN.md R30에 적어 두었다.
+     */
+    private void warnIfRankingIsStale(LocalDate rankingDate) {
+        LocalDateTime now = LocalDateTime.now(clock);
+
+        if (!rankingDate.isBefore(now.toLocalDate().minusDays(1))) {
+            return;
+        }
+
+        if (now.toLocalTime().isBefore(STALE_WARNING_GRACE_UNTIL)) {
+            return;
+        }
+
+        log.warn(
+                "인기글 확정 날짜가 어제보다 오래됐습니다. 배치가 돌지 않았을 수 있습니다."
+                        + " latestRankingDate={}, now={}",
+                rankingDate,
+                now
+        );
     }
 
     /**
