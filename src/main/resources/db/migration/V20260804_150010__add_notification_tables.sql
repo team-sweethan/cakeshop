@@ -247,7 +247,7 @@ ALTER TABLE `notification_deliveries`
         AFTER `created_at`,
 
     MODIFY COLUMN `recipient`
-        VARCHAR(200) NOT NULL
+        VARCHAR(500) NOT NULL
         COMMENT '수신 전화번호',
 
     MODIFY COLUMN `template_code`

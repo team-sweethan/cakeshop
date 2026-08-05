@@ -58,7 +58,7 @@ notificationService.makeNotification(NotificationRequest.builder()
 - **테스트 URL**: `POST http://localhost:8080/api/notifications/test-sms` (local 프로필 전용)
 - **테스트 방법**: 
   1. 웹 사이트에서 전화번호가 등록된 계정으로 로그인 수행 (`local` 환경)
-  2. Postman 또는 cURL로 `POST http://localhost:8080/api/notifications/test-sms` 호출
+  2. Postman 또는 cURL로 `POST http://localhost:8080/api/notifications/test-sms` 호출 (세션 쿠키 및 `X-CSRF-TOKEN` 헤더 포함)
   3. 로그인 유저의 휴대폰으로 테스트 문자 발송 확인
 
 ---

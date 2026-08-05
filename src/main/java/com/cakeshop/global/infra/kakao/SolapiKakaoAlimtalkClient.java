@@ -86,10 +86,12 @@ public class SolapiKakaoAlimtalkClient {
         }
     }
 
-    // API Key와 Secret 설정 여부 확인
+    // API Key와 Secret 및 발신번호 설정 여부 확인 (더미 번호일 경우 mock 모드 전환)
     private boolean isConfigured() {
         return apiKey != null && !apiKey.trim().isEmpty() 
-            && apiSecret != null && !apiSecret.trim().isEmpty();
+            && apiSecret != null && !apiSecret.trim().isEmpty()
+            && senderPhone != null && !senderPhone.trim().isEmpty()
+            && !"01000000000".equals(senderPhone.replace("-", "").trim());
     }
 
     private String maskPhone(String phone) {
