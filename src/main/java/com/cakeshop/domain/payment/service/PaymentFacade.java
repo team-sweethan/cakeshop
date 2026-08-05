@@ -68,10 +68,14 @@ public class PaymentFacade {
                 paymentRecoveryService.findPreparedCompensation(payment);
         if (preparedCompensation.isPresent()) {
             CompensationRequest request = preparedCompensation.get();
-            if (isNotApproved(request)) {
+            ApprovalState approvalState = getApprovalState(request);
+            if (approvalState == ApprovalState.NOT_APPROVED) {
                 paymentRecoveryService.releaseUnapprovedCompensation(request);
                 // 새 paymentKey로 재시도할 때 교체된 승인 멱등키를 다시 읽는다.
                 payment = paymentService.getReadyPayment(orderId);
+            } else if (approvalState == ApprovalState.IN_PROGRESS) {
+                // PG 처리 중에는 보상 요청을 해제하거나 새 승인 요청을 보내지 않는다.
+                throw new BusinessException(PaymentErrorCode.PAYMENT_RECOVERY_PENDING);
             } else {
                 throw cancelAndCompleteCompensation(request);
             }
@@ -104,9 +108,14 @@ public class PaymentFacade {
         for (CompensationRequest request
                 : paymentRecoveryService.getPreparedCompensations(batchSize)) {
             try {
-                if (isNotApproved(request)) {
+                ApprovalState approvalState = getApprovalState(request);
+                if (approvalState == ApprovalState.NOT_APPROVED) {
                     // 승인되지 않은 요청은 보상을 해제해 만료 처리로 돌아갈 수 있게 한다.
                     paymentRecoveryService.releaseUnapprovedCompensation(request);
+                    continue;
+                }
+                if (approvalState == ApprovalState.IN_PROGRESS) {
+                    // PG 결과가 확정될 때까지 보호 요청을 유지한다.
                     continue;
                 }
                 executeCompensation(request);
@@ -201,14 +210,22 @@ public class PaymentFacade {
         throw new BusinessException(PaymentErrorCode.TOSS_APPROVAL_FAILED);
     }
 
-    private boolean isNotApproved(CompensationRequest request) {
+    private ApprovalState getApprovalState(CompensationRequest request) {
         try {
             return tossPaymentClient.find(request.paymentKey())
-                    .map(lookup -> "READY".equals(lookup.status())
-                            || "IN_PROGRESS".equals(lookup.status()))
-                    .orElse(true);
+                    .map(lookup -> {
+                        if ("READY".equals(lookup.status())) {
+                            return ApprovalState.NOT_APPROVED;
+                        }
+                        if ("IN_PROGRESS".equals(lookup.status())) {
+                            return ApprovalState.IN_PROGRESS;
+                        }
+                        return ApprovalState.FINAL_OR_UNKNOWN;
+                    })
+                    .orElse(ApprovalState.NOT_APPROVED);
         } catch (BusinessException lookupFailure) {
-            return false;
+            // 상태 조회 실패 때는 보상 요청을 유지해 승인 결과 유실을 막는다.
+            return ApprovalState.FINAL_OR_UNKNOWN;
         }
     }
 
@@ -416,5 +433,11 @@ public class PaymentFacade {
         return expected != null
                 && actual != null
                 && expected.compareTo(actual) == 0;
+    }
+
+    private enum ApprovalState {
+        NOT_APPROVED,
+        IN_PROGRESS,
+        FINAL_OR_UNKNOWN
     }
 }

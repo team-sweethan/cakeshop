@@ -675,11 +675,10 @@ class PaymentFacadeTests {
     }
 
     @Test
-    void confirmGeneralPayment_inProgressPreparedCompensation_releasesAndApprovesNewPayment() {
+    void confirmGeneralPayment_inProgressPreparedCompensation_keepsRecoveryRequest() {
         GeneralPaymentOrder order = order(NOW.plusMinutes(5));
         Payment payment = payment();
         payment.setPaymentKey("stale-payment-key");
-        Payment refreshedPayment = payment();
         CompensationRequest request = new CompensationRequest(
                 20L,
                 1L,
@@ -688,9 +687,8 @@ class PaymentFacadeTests {
                 BigDecimal.valueOf(30_000),
                 "자동 취소"
         );
-        ApprovalResult approval = approval();
         when(orderService.getGeneralPaymentOrder(10L, 1L)).thenReturn(order);
-        when(paymentService.getReadyPayment(1L)).thenReturn(payment, refreshedPayment);
+        when(paymentService.getReadyPayment(1L)).thenReturn(payment);
         when(paymentRecoveryService.findPreparedCompensation(payment))
                 .thenReturn(Optional.of(request));
         when(tossPaymentClient.find("stale-payment-key")).thenReturn(Optional.of(
@@ -704,18 +702,23 @@ class PaymentFacadeTests {
                         null
                 )
         ));
-        when(tossPaymentClient.find("payment-key")).thenReturn(Optional.empty());
-        when(tossPaymentClient.approve(
+        assertThatThrownBy(() -> paymentFacade.confirmGeneralPayment(
+                10L,
+                1L,
+                form(BigDecimal.valueOf(30_000))
+        )).isInstanceOfSatisfying(
+                BusinessException.class,
+                exception -> assertThat(exception.getErrorCode())
+                        .isEqualTo(PaymentErrorCode.PAYMENT_RECOVERY_PENDING)
+        );
+
+        verify(paymentRecoveryService, never()).releaseUnapprovedCompensation(request);
+        verify(tossPaymentClient, never()).approve(
                 "payment-key",
                 "ORD-100",
                 30_000L,
                 "PAY-1"
-        )).thenReturn(approval);
-
-        paymentFacade.confirmGeneralPayment(10L, 1L, form(BigDecimal.valueOf(30_000)));
-
-        verify(paymentRecoveryService).releaseUnapprovedCompensation(request);
-        verify(paymentService).completeGeneralPayment(order, refreshedPayment, approval);
+        );
     }
 
     @Test
@@ -756,6 +759,33 @@ class PaymentFacadeTests {
         paymentFacade.recoverPendingCompensations(50);
 
         verify(paymentRecoveryService).releaseUnapprovedCompensation(request);
+        verify(tossPaymentClient, never()).cancel(
+                request.paymentKey(),
+                request.reason(),
+                request.idempotencyKey()
+        );
+    }
+
+    @Test
+    void recoverPendingCompensations_inProgressRequest_keepsCompensation() {
+        CompensationRequest request = compensationRequest();
+        when(paymentRecoveryService.getPreparedCompensations(50))
+                .thenReturn(List.of(request));
+        when(tossPaymentClient.find(request.paymentKey())).thenReturn(Optional.of(
+                new PaymentLookupResult(
+                        request.paymentKey(),
+                        "ORD-100",
+                        "카드",
+                        "IN_PROGRESS",
+                        30_000L,
+                        null,
+                        null
+                )
+        ));
+
+        paymentFacade.recoverPendingCompensations(50);
+
+        verify(paymentRecoveryService, never()).releaseUnapprovedCompensation(request);
         verify(tossPaymentClient, never()).cancel(
                 request.paymentKey(),
                 request.reason(),
