@@ -471,6 +471,23 @@ class OrderServiceTests {
         assertThat(transactional).isNotNull();
     }
 
+    @Test
+    void createGeneralOrder_unlimitedStockOverMaximumQuantity_returnsInvalidQuantity() {
+        when(productQueryService.getSalesInfo(1L))
+                .thenReturn(product(1L, ProductType.GENERAL, "무제한 케이크", 30_000));
+
+        assertThatThrownBy(() -> orderService.createGeneralOrder(
+                10L,
+                form(1L, 11, List.of())
+        )).isInstanceOfSatisfying(
+                BusinessException.class,
+                error -> assertThat(error.getErrorCode())
+                        .isEqualTo(OrderErrorCode.INVALID_QUANTITY)
+        );
+
+        verify(orderMapper, never()).insertOrder(any(Order.class));
+    }
+
     private ProductSalesInfo product(
             long id,
             ProductType productType,

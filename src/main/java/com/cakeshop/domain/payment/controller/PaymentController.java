@@ -26,6 +26,7 @@ public class PaymentController {
     private final PaymentFacade paymentFacade;
     private final PaymentQueryService paymentQueryService;
 
+    /** 회원 소유의 [결제 대기] 주문을 검증하고 Toss 결제 화면에 필요한 정보를 모델에 담음.**/
     @GetMapping("/orders/{orderId:\\d+}/payment")
     public String payment(
             @PathVariable("orderId") long orderId,
@@ -34,10 +35,7 @@ public class PaymentController {
     ) {
         model.addAttribute(
                 "payment",
-                paymentQueryService.getCheckout(
-                        requireMemberId(member),
-                        member.getUsername(),
-                        orderId
+                paymentQueryService.getCheckout(requireMemberId(member), member.getUsername(), orderId
                 )
         );
         return "customer/payment/form";
@@ -56,11 +54,7 @@ public class PaymentController {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
 
-        paymentQueryService.validateSuccessCallback(
-                requireMemberId(member),
-                orderId,
-                form
-        );
+        paymentQueryService.validateSuccessCallback(requireMemberId(member), orderId, form);
 
         model.addAttribute("orderId", orderId);
         model.addAttribute("paymentForm", form.toConfirmForm());
@@ -118,6 +112,7 @@ public class PaymentController {
         return "customer/order/complete";
     }
 
+    /** 유효한 아이디인지 검증.**/
     private long requireMemberId(MemberDetails member) {
         if (member == null || member.getMemberId() == null) {
             throw new BusinessException(CommonErrorCode.FORBIDDEN);

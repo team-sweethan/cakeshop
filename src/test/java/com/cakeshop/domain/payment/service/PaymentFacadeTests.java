@@ -653,6 +653,17 @@ class PaymentFacadeTests {
         CancellationResult cancellation = cancellation();
         when(paymentRecoveryService.getPreparedCompensations(50))
                 .thenReturn(List.of(request));
+        when(tossPaymentClient.find(request.paymentKey())).thenReturn(Optional.of(
+                new PaymentLookupResult(
+                        request.paymentKey(),
+                        "ORD-100",
+                        "카드",
+                        "DONE",
+                        30_000L,
+                        NOW,
+                        null
+                )
+        ));
         when(tossPaymentClient.cancel(
                 request.paymentKey(),
                 request.reason(),
@@ -662,6 +673,23 @@ class PaymentFacadeTests {
         paymentFacade.recoverPendingCompensations(50);
 
         verify(paymentRecoveryService).completeCompensation(request, cancellation);
+    }
+
+    @Test
+    void recoverPendingCompensations_unapprovedRequest_releasesCompensation() {
+        CompensationRequest request = compensationRequest();
+        when(paymentRecoveryService.getPreparedCompensations(50))
+                .thenReturn(List.of(request));
+        when(tossPaymentClient.find(request.paymentKey())).thenReturn(Optional.empty());
+
+        paymentFacade.recoverPendingCompensations(50);
+
+        verify(paymentRecoveryService).releaseUnapprovedCompensation(request);
+        verify(tossPaymentClient, never()).cancel(
+                request.paymentKey(),
+                request.reason(),
+                request.idempotencyKey()
+        );
     }
 
     private GeneralPaymentOrder order(LocalDateTime expiresAt) {

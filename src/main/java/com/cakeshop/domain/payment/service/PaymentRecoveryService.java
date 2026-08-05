@@ -97,6 +97,15 @@ public class PaymentRecoveryService {
             paymentMapper.insertCompensationCancellation(cancellation);
             saved = findCompensation(request);
         }
+        if (saved != null && saved.getStatus() == PaymentCancellationStatus.FAILED) {
+            if (paymentMapper.reopenReleasedCompensation(
+                    request.paymentId(),
+                    request.idempotencyKey()
+            ) != 1) {
+                throw new BusinessException(PaymentErrorCode.PAYMENT_RECOVERY_PENDING);
+            }
+            saved = findCompensation(request);
+        }
         if (saved == null) {
             throw new BusinessException(PaymentErrorCode.PAYMENT_RECOVERY_PENDING);
         }

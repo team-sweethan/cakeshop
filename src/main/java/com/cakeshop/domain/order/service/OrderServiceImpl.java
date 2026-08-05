@@ -39,6 +39,7 @@ public class OrderServiceImpl implements OrderService {
 
     private static final BigDecimal ZERO = BigDecimal.ZERO;
     private static final BigDecimal MAX_ORDER_AMOUNT = new BigDecimal("999999999999");
+    private static final int MAX_UNLIMITED_STOCK_QUANTITY = 10;
     private static final long PAYMENT_EXPIRATION_MINUTES = 10L;
 
     private final StoreService storeService;
@@ -259,6 +260,10 @@ public class OrderServiceImpl implements OrderService {
                 productQueryService.getSalesInfo(form.getProductId());
         if (product.productType() != ProductType.GENERAL) {
             throw new BusinessException(OrderErrorCode.GENERAL_PRODUCT_REQUIRED);
+        }
+        if (product.stockQuantity() == null
+                && form.getQuantity() > MAX_UNLIMITED_STOCK_QUANTITY) {
+            throw new BusinessException(OrderErrorCode.INVALID_QUANTITY);
         }
         if (product.basePrice() == null || product.basePrice().signum() < 0) {
             throw new BusinessException(CommonErrorCode.INTERNAL_ERROR);

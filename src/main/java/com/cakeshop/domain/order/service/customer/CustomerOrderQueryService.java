@@ -33,13 +33,14 @@ public class CustomerOrderQueryService {
     public OrderDetailView getMemberOrder(long memberId, long orderId) {
         validateMemberId(memberId);
         Order order = orderViewAssembler.findOrder(orderId);
+        // 다른 회원에게 주문의 존재 여부도 노출하지 않는다.
         if (!Long.valueOf(memberId).equals(order.getMemberId())) {
-            // 다른 회원에게 주문의 존재 여부도 노출하지 않는다.
             throw new BusinessException(CommonErrorCode.NOT_FOUND);
         }
         return orderViewAssembler.toDetailView(order);
     }
 
+    /** 실존하는 회원인지 검증**/
     private void validateMemberId(long memberId) {
         if (memberId <= 0) {
             throw new BusinessException(OrderErrorCode.MEMBER_NOT_AVAILABLE);

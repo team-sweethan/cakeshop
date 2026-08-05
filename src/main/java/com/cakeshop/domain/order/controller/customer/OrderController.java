@@ -36,21 +36,21 @@ public class OrderController {
     private final MemberService memberService;
     private final RefundFacade refundFacade;
 
-//    /** 장바구니 항목의 픽업 일시 수정용 목업 경로다. 일반 주문은 checkout에서 선택한다. */
-//    @GetMapping(value = "/pickup", params = "intent=cart-edit")
-//    public String pickupSetting() {
-//        return "customer/order/pickup-setting";
-//    }
-//
-//    @GetMapping("/custom/options")
-//    public String customOptions() {
-//        return "customer/order/custom-option";
-//    }
-//
-//    @GetMapping("/custom/request")
-//    public String customRequest() {
-//        return "customer/order/custom-request";
-//    }
+    /** 장바구니 항목의 픽업 일시 수정용 목업 경로다. 일반 주문은 checkout에서 선택한다. */
+    @GetMapping(value = "/pickup", params = "intent=cart-edit")
+    public String pickupSetting() {
+        return "customer/order/pickup-setting";
+    }
+
+    @GetMapping("/custom/options")
+    public String customOptions() {
+        return "customer/order/custom-option";
+    }
+
+    @GetMapping("/custom/request")
+    public String customRequest() {
+        return "customer/order/custom-request";
+    }
 
     // 일반 상품 주문서 화면
     @GetMapping("/checkout")

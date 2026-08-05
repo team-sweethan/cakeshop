@@ -28,9 +28,7 @@ public class PaymentService {
     @Transactional(readOnly = true)
     public Payment getReadyPayment(long orderId) {
         return paymentMapper.findReadyPaymentByOrderId(orderId)
-                .orElseThrow(() -> new BusinessException(
-                        PaymentErrorCode.READY_PAYMENT_NOT_FOUND
-                ));
+                .orElseThrow(() -> new BusinessException(PaymentErrorCode.READY_PAYMENT_NOT_FOUND));
     }
 
     /** 중복 성공 콜백과 완료 화면 검증을 위해 완료 결제를 조회한다. */

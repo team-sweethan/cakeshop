@@ -102,6 +102,11 @@ public class PaymentFacade {
         for (CompensationRequest request
                 : paymentRecoveryService.getPreparedCompensations(batchSize)) {
             try {
+                if (isNotApproved(request)) {
+                    // 승인되지 않은 요청은 보상을 해제해 만료 처리로 돌아갈 수 있게 한다.
+                    paymentRecoveryService.releaseUnapprovedCompensation(request);
+                    continue;
+                }
                 executeCompensation(request);
             } catch (RuntimeException recoveryFailure) {
                 log.warn("Pending payment compensation could not be completed.");

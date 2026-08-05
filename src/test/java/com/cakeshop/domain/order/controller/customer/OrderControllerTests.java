@@ -176,4 +176,18 @@ class OrderControllerTests {
                 )
         );
     }
+
+    @Test
+    void customOptions_returnsExistingMockupPage() throws Exception {
+        mockMvc.perform(get("/orders/custom/options"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("customer/order/custom-option"));
+    }
+
+    @Test
+    void customRequest_returnsExistingMockupPage() throws Exception {
+        mockMvc.perform(get("/orders/custom/request"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("customer/order/custom-request"));
+    }
 }

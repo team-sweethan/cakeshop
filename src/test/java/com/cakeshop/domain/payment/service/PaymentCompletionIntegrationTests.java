@@ -272,6 +272,27 @@ class PaymentCompletionIntegrationTests {
         )).isNull();
     }
 
+    @Test
+    void prepareCompensation_releasedUnapprovedRequest_reopensSameIdempotencyKey() {
+        Payment readyPayment = paymentService.getReadyPayment(orderId);
+        String paymentKey = "PAYMENT-KEY-" + suffix;
+        CompensationRequest request = paymentRecoveryService.createRequest(
+                readyPayment,
+                paymentKey
+        );
+
+        paymentRecoveryService.prepareCompensation(request);
+        paymentRecoveryService.releaseUnapprovedCompensation(request);
+        paymentRecoveryService.prepareCompensation(request);
+
+        PaymentCancellation cancellation = paymentMapper
+                .findPaymentCancellationByIdempotencyKey(request.idempotencyKey())
+                .orElseThrow();
+        assertThat(cancellation.getStatus()).isEqualTo(PaymentCancellationStatus.REQUESTED);
+        assertThat(paymentMapper.findPaymentById(readyPayment.getId()).orElseThrow().getPaymentKey())
+                .isEqualTo(paymentKey);
+    }
+
     private long insertMember() {
         String email = "payment-completion-" + suffix + "@example.com";
         jdbcTemplate.update(

@@ -103,6 +103,12 @@ public interface PaymentMapper {
             @Param("paymentKey") String paymentKey
     );
 
+    // 미승인으로 해제했던 보상 요청을 이후 실제 승인 보상에 같은 멱등키로 재사용한다.
+    int reopenReleasedCompensation(
+            @Param("paymentId") long paymentId,
+            @Param("idempotencyKey") String idempotencyKey
+    );
+
     // 아직 끝나지 않은 시스템 보상 취소 요청을 오래된 순서로 조회한다.
     List<PaymentCancellation> findRequestedCompensations(
             @Param("limit") int limit

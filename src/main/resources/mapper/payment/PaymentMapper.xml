@@ -373,6 +373,20 @@
           AND payment_key = #{paymentKey}
     </update>
 
+    <update id="reopenReleasedCompensation">
+        UPDATE payment_cancellations
+        SET status = 'REQUESTED',
+            failure_code = NULL,
+            failure_message = NULL,
+            transaction_key = NULL,
+            canceled_at = NULL
+        WHERE payment_id = #{paymentId}
+          AND idempotency_key = #{idempotencyKey}
+          AND request_type = 'SYSTEM_COMPENSATION'
+          AND status = 'FAILED'
+          AND failure_code = 'PAYMENT_NOT_APPROVED'
+    </update>
+
     <select id="findRequestedCompensations"
             resultType="com.cakeshop.domain.payment.entity.PaymentCancellation">
         SELECT

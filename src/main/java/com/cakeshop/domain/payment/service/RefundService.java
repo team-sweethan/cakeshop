@@ -83,9 +83,7 @@ public class RefundService {
                     requestedCancellation,
                     payment,
                     order,
-                    expectedStatus,
-                    requestedBy,
-                    canceledBy
+                    expectedStatus
             );
         }
 
@@ -117,19 +115,17 @@ public class RefundService {
             PaymentCancellation cancellation,
             Payment payment,
             Order order,
-            OrderStatus expectedStatus,
-            long requestedBy,
-            String canceledBy
+            OrderStatus expectedStatus
     ) {
         if (cancellation.getStatus() != PaymentCancellationStatus.REQUESTED
                 || !Long.valueOf(payment.getId()).equals(cancellation.getPaymentId())
-                || !canceledBy.equals(cancellation.getRequestType())
-                || !Long.valueOf(requestedBy).equals(cancellation.getRequestedBy())
                 || cancellation.getId() == null
                 || cancellation.getIdempotencyKey() == null
                 || cancellation.getIdempotencyKey().isBlank()
                 || cancellation.getCancelReason() == null
                 || cancellation.getCancelReason().isBlank()
+                || cancellation.getRequestType() == null
+                || cancellation.getRequestType().isBlank()
                 || cancellation.getRequestedAt() == null) {
             throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_NOT_AVAILABLE);
         }
@@ -140,7 +136,7 @@ public class RefundService {
                 payment.getPaymentKey(),
                 cancellation.getIdempotencyKey(),
                 cancellation.getCancelReason(),
-                canceledBy,
+                cancellation.getRequestType(),
                 cancellation.getRequestedAt()
         );
     }

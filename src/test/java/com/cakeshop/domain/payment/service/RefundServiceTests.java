@@ -221,6 +221,33 @@ class RefundServiceTests {
     }
 
     @Test
+    void prepareAdminCancellation_existingCustomerRequest_reusesOriginalRequest() {
+        Order order = order(3L);
+        Payment payment = payment();
+        PaymentCancellation existing = cancellation();
+        existing.setIdempotencyKey("existing-cancel-key");
+        existing.setRequestType("CUSTOMER");
+        existing.setRequestedBy(3L);
+        existing.setRequestedAt(NOW.minusMinutes(1));
+        when(orderMapper.findOrderByIdForUpdate(10L)).thenReturn(Optional.of(order));
+        when(paymentMapper.findDonePaymentByOrderId(10L)).thenReturn(Optional.of(payment));
+        when(paymentMapper.findRequestedCancellationByPaymentId(20L))
+                .thenReturn(Optional.of(existing));
+
+        RefundRequest result = refundService.prepareAdminCancellation(
+                7L,
+                10L,
+                "매장 사정"
+        );
+
+        assertThat(result.cancellationId()).isEqualTo(30L);
+        assertThat(result.idempotencyKey()).isEqualTo("existing-cancel-key");
+        assertThat(result.canceledBy()).isEqualTo("CUSTOMER");
+        assertThat(result.requestedAt()).isEqualTo(NOW.minusMinutes(1));
+        verify(paymentMapper, never()).insertPaymentCancellation(any());
+    }
+
+    @Test
     void prepareCustomerCancellation_afterPickup_rejectsAfterCheckingForExistingRequest() {
         Order order = order(3L);
         order.setPickupAt(NOW);

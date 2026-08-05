@@ -48,17 +48,18 @@ public class PaymentQueryService {
         this.clientKey = clientKey;
     }
 
+    /** 결제 기한 및 정보 검증 -> 일반 주믄용 Toss 결제 화면 데이터 구성**/
     @Transactional(readOnly = true)
-    public PaymentCheckoutView getCheckout(
-            long memberId,
-            String memberEmail,
-            long orderId
-    ) {
+    public PaymentCheckoutView getCheckout(long memberId, String memberEmail, long orderId) {
+
         OrderDetailView order = orderQueryService.getMemberOrder(memberId, orderId);
+        // 일반 상품 검증.
         validatePendingGeneralOrder(order);
+        // 결제 기한 검증
         validatePaymentExpiration(order.paymentExpiresAt());
 
         Payment payment = paymentService.getReadyPayment(orderId);
+        // 결제 정보 검증
         validateReadyPayment(order, payment);
 
         List<PaymentCheckoutView.ItemView> items = order.items().stream()
@@ -94,41 +95,49 @@ public class PaymentQueryService {
         );
     }
 
-    /** 성공 URL의 값이 저장된 주문·결제 정보와 일치하는지 확인한다. */
+    /**
+     * Toss 성공 리다이렉트 요청이 회원 소유의 주문·결제 정보와 일치하는지 검증한다.
+     * 완료 결제는 동일 요청의 재시도 여부를, 미완료 결제는 승인 전 조건을 확인한다.
+     */
     @Transactional(readOnly = true)
-    public void validateSuccessCallback(
-            long memberId,
-            long orderId,
-            TossPaymentSuccessForm form
-    ) {
-        OrderDetailView order = orderQueryService.getMemberOrder(memberId, orderId);
-        validateGeneralOrder(order);
-        validateCallbackOrder(order, form);
+    public void validateSuccessCallback(long memberId, long orderId, TossPaymentSuccessForm form) {
 
+        // 회원 소유 주문을 조회한다.
+        OrderDetailView order = orderQueryService.getMemberOrder(memberId, orderId);
+        // 일반 상품 주문인지 확인한다.
+        validateGeneralOrder(order);
+        // 성공 리다이렉트로 전달된 주문 ID와 금액이 저장된 주문 정보와 일치하는지 확인한다.
+        validateSuccessRedirectOrder(order, form);
+
+        // 이미 완료된 결제는 재승인하지 않고, 동일 결제 요청인지 확인한다.
         Payment completedPayment = paymentService.findDonePayment(orderId)
                 .orElse(null);
         if (completedPayment != null) {
+            // Toss 주문 ID, 금액, 결제 키가 완료된 결제 정보와 일치하는지 확인한다.
             validateCompletedPayment(completedPayment, form);
             return;
         }
 
+        // 완료되지 않은 주문은 결제 대기 상태여야 한다.
         validatePendingGeneralOrder(order);
+        // 결제 기한이 만료되지 않았는지 확인한다.
         validatePaymentExpiration(order.paymentExpiresAt());
+
+        // READY 결제의 Toss 주문 ID와 금액이 주문 정보와 일치하는지 확인한다.
         validateReadyPayment(order, paymentService.getReadyPayment(orderId));
     }
 
+    /** 결제 실패 안내와 재결제 가능 여부 조회.**/
     @Transactional(readOnly = true)
-    public PaymentFailureView getFailure(
-            long memberId,
-            long orderId,
-            String failureCode
-    ) {
+    public PaymentFailureView getFailure(long memberId, long orderId, String failureCode) {
+
         OrderDetailView order = orderQueryService.getMemberOrder(memberId, orderId);
         validateGeneralOrder(order);
 
         boolean retryAvailable = order.status() == OrderStatus.PENDING_PAYMENT
                 && order.paymentExpiresAt() != null
                 && LocalDateTime.now(clock).isBefore(order.paymentExpiresAt());
+
         return new PaymentFailureView(
                 orderId,
                 failureMessage(failureCode),
@@ -162,12 +171,14 @@ public class PaymentQueryService {
         );
     }
 
+    /** OrderType = General**/
     private void validateGeneralOrder(OrderDetailView order) {
         if (order.orderType() != OrderType.GENERAL) {
             throw new BusinessException(PaymentErrorCode.READY_PAYMENT_NOT_FOUND);
         }
     }
 
+    /** OrderStatus = PENDING_PAYMENT(결제 대기)**/
     private void validatePendingGeneralOrder(OrderDetailView order) {
         validateGeneralOrder(order);
         if (order.status() != OrderStatus.PENDING_PAYMENT) {
@@ -175,16 +186,15 @@ public class PaymentQueryService {
         }
     }
 
+    /** 결제 만료 시각이 없거나, 이미 지났으면 결제 차단.**/
     private void validatePaymentExpiration(LocalDateTime paymentExpiresAt) {
-        if (paymentExpiresAt == null
-                || !LocalDateTime.now(clock).isBefore(paymentExpiresAt)) {
+        if (paymentExpiresAt == null || !LocalDateTime.now(clock).isBefore(paymentExpiresAt)) {
             throw new BusinessException(PaymentErrorCode.PAYMENT_EXPIRED);
         }
     }
-
+    /** 결제 대기 상태 결제 정보 == 주문 번호 & 최종금액**/
     private void validateReadyPayment(OrderDetailView order, Payment payment) {
-        if (payment.getTossOrderId() == null
-                || !payment.getTossOrderId().equals(order.orderNumber())) {
+        if (payment.getTossOrderId() == null || !payment.getTossOrderId().equals(order.orderNumber())) {
             throw new BusinessException(PaymentErrorCode.TOSS_ORDER_ID_MISMATCH);
         }
         if (!sameAmount(order.finalAmount(), payment.getAmount())) {
@@ -192,12 +202,10 @@ public class PaymentQueryService {
         }
     }
 
-    private void validateCallbackOrder(
-            OrderDetailView order,
-            TossPaymentSuccessForm form
-    ) {
-        if (form == null
-                || !order.orderNumber().equals(form.getOrderId())) {
+    /** Toss 성공 리다이렉트의 주문 ID와 들어온 주문 정보와 일치하는지 검증**/
+    private void validateSuccessRedirectOrder(OrderDetailView order, TossPaymentSuccessForm form) {
+
+        if (form == null || !order.orderNumber().equals(form.getOrderId())) {
             throw new BusinessException(PaymentErrorCode.TOSS_ORDER_ID_MISMATCH);
         }
         if (!sameAmount(order.finalAmount(), form.getAmount())) {
