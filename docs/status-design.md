@@ -49,7 +49,7 @@
 | `posts.status` | 현규 | 정상 / 제재 | **`PostStatus` `PUBLISHED / DELETED / BLOCKED` (확정)** | ✅ 코드 확정 |
 | `comments.status` | 현규 | (표기 없음) | **`CommentStatus` `PUBLISHED / DELETED` (확정)** | ✅ 코드 확정 |
 | `post_reports.status` | 현규 | (신고 처리) | `PENDING / ACCEPTED / REJECTED` | 거의 확정 |
-| `reviews.status` | 현규 | 숨김 | `VISIBLE / HIDDEN` ? | ☐ 열림 |
+| `reviews.status` | 현규 | 숨김 | **`ReviewStatus` `PUBLISHED / DELETED / BLOCKED` (확정)** | ✅ 코드 확정 |
 | `chat_rooms.status` | 민정 | 상담가능 / 상담중 / 미답변 | `OPEN / CLOSED` ? (아래 함정 참고) | ☐ 열림 |
 
 ### 상품 옵션 상태 정책
@@ -73,6 +73,24 @@
   비활성화할 수 없고, 필수 옵션 그룹 자체도 비활성화할 수 없다.
 - 선택 옵션 그룹은 활성 옵션이 없어도 허용하며, 고객 화면에는 노출하지
   않는다.
+
+### 리뷰 상태 정책 (2026-08-06 확정)
+
+- `reviews.status`는 `ReviewStatus` `PUBLISHED / DELETED / BLOCKED`를 쓴다.
+- 팀이 쓰는 상태 어휘는 둘인데(`ACTIVE / INACTIVE` — 관리자가 노출을 켜고 끈다,
+  `PUBLISHED / DELETED / BLOCKED` — 작성자가 쓰고 관리자가 차단한다), 후기는
+  **고객이 쓰고 관리자가 숨기는** 구조라 `PostStatus`와 같은 쪽이다.
+  `ACTIVE / INACTIVE`에는 작성자 삭제를 담을 자리가 없다.
+- V0 스키마의 기본값 `'VISIBLE'`은 코드베이스 어디에도 없는 어휘였다.
+  `V20260806_075114__add_review_status_and_rating_constraints.sql`에서
+  `'PUBLISHED'`로 바꾸고 `chk_reviews_status`를 걸었다.
+- 전이 규칙은 `ReviewStatus.canTransitionTo()`가 소유하고 `CHECK`는 값 집합만 나열한다
+  (`PostStatus`·`OrderStatus`와 같다).
+- `BLOCKED → DELETED`는 금지다. 숨김은 관리자가 걸어 둔 상태이고 작성자가 지워서
+  없앨 수 없어야 한다. 그래서 **숨겨진 후기에 작성자가 할 수 있는 일은 없다.**
+- 삭제는 soft delete다. `uk_reviews_order_item` 때문에 **지우면 그 주문 상품에는
+  다시 후기를 쓸 수 없다**(`docs/review/PLAN.md` R10).
+- 세부는 `docs/review/SPEC.md` 2.1이 정본이다.
 
 ### 이미 확정된 두 enum
 
@@ -157,7 +175,7 @@ READY / DONE / CANCELED / PARTIAL_CANCELED / ABORTED / EXPIRED
 |---|---|
 | 주환 | `payment_cancellations.status` 값 확정 |
 | 정후 | `coupons.status`(캠페인 상태) 값 확정 |
-| 현규 | `reviews.status`(숨김) 값 확정 |
+| ~~현규~~ | ~~`reviews.status`(숨김) 값 확정~~ → 2026-08-06 확정. `ReviewStatus PUBLISHED / DELETED / BLOCKED` + `chk_reviews_status` |
 | 민정 | `chat_rooms.status` 정의 + **`NotificationType` enum 값 채우기**(현재 TODO) |
 
 > ☐ 항목을 확정하면 인벤토리의 해당 행을 "확정"으로 갱신하고, enum + DDL을 함께 커밋한다.

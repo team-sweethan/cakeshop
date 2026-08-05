@@ -15,6 +15,15 @@
 -- 지금 바꾸는 이유는 reviews 에 행이 한 건도 없어 교체 비용이 가장 싼 시점이기 때문이다.
 -- 이후 모든 쿼리가 이 값을 전제하게 되면 데이터까지 함께 옮겨야 한다.
 -- 선례: V20260802_113219__add_post_status_constraint.sql
+
+-- CHECK 를 걸기 전에 옛 어휘로 남은 행을 먼저 옮긴다.
+-- 지금 reviews 는 비어 있고 INSERT 경로도 없지만, 한 행이라도 'VISIBLE' 로 남아 있으면
+-- 아래 제약 추가가 배포 도중 실패한다. 한 줄로 막을 수 있는 것을 환경 상태에 맡기지 않는다.
+-- 선례: V20260730_123931__apply_product_preparation_policy.sql (보정 UPDATE 후 CHECK)
+UPDATE `reviews`
+SET `status` = 'PUBLISHED'
+WHERE `status` = 'VISIBLE';
+
 ALTER TABLE `reviews`
     MODIFY COLUMN `status` VARCHAR(30) NOT NULL DEFAULT 'PUBLISHED',
     ADD CONSTRAINT `chk_reviews_status`
