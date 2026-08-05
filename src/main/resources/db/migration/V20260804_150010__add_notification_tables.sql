@@ -283,9 +283,6 @@ ALTER TABLE `notification_deliveries`
 -- ---------------------------------------------------------
 -- 2-4. 조회 인덱스
 -- ---------------------------------------------------------
-CREATE INDEX `idx_deliveries_notification_id`
-    ON `notification_deliveries` (`notification_id`);
-
 CREATE INDEX `idx_deliveries_provider_msg_id`
     ON `notification_deliveries` (`provider_message_id`);
 
