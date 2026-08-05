@@ -101,6 +101,13 @@
         )
     </select>
 
+    <!--중복 event_key 기반 기존 알림 ID 조회-->
+    <select id="findIdByReceiverIdAndEventKey" resultType="long">
+        SELECT id FROM notifications
+        WHERE receiver_id = #{receiverId} AND event_key = #{eventKey}
+        LIMIT 1
+    </select>
+
     <!-- 수신 회원 전화번호 조회 (알림 문자 발송용) -->
     <select id="findReceiverPhone" resultType="string">
         SELECT phone FROM members 

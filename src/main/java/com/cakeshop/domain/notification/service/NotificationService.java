@@ -81,7 +81,14 @@ public class NotificationService {
         try {
             notificationMapper.save(notification);
         } catch (DuplicateKeyException e) {
-            // 동일 eventKey 중복 요청은 먼저 성공한 트랜잭션이 처리하므로 멱등하게 무시하고 종료
+            // 동일 eventKey 중복 요청 시 웹 알림은 멱등하게 무시하되, WEB_AND_SMS인 경우 SMS 재발송 시도
+            if (scope == DeliveryScope.WEB_AND_SMS && request.getReceiverId() != null) {
+                Long existingId = notificationMapper.findIdByReceiverIdAndEventKey(request.getReceiverId(), eventKey);
+                if (existingId != null) {
+                    String receiverPhone = notificationMapper.findReceiverPhone(request.getReceiverId());
+                    executeSmsSending(existingId, receiverPhone, title, content);
+                }
+            }
             return;
         }
 

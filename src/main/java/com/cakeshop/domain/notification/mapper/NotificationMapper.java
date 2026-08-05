@@ -31,6 +31,9 @@ public interface NotificationMapper {
     // 중복 event_key 존재 여부
     boolean existsByReceiverIdAndEventKey(@Param("receiverId") Long receiverId, @Param("eventKey") String eventKey);
 
+    // 중복 event_key 기반 기존 알림 ID 조회
+    Long findIdByReceiverIdAndEventKey(@Param("receiverId") Long receiverId, @Param("eventKey") String eventKey);
+
     // 수신 회원 전화번호 조회 (알림톡 발송용)
     String findReceiverPhone(Long receiverId); 
 

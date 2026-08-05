@@ -132,7 +132,7 @@ public class SolapiKakaoAlimtalkClient {
             if (responseBody != null) {
                 if (responseBody.containsKey("failedMessageList") && responseBody.get("failedMessageList") instanceof java.util.List list && !list.isEmpty()) {
                     log.error("✖ [Solapi SMS API] 일부 수신자 발송 실패 (failedMessageList)");
-                    return new SmsResult("FAILED", null, "Solapi failedMessageList: " + list.get(0));
+                    return new SmsResult("FAILED", null, "Solapi message delivery failed");
                 }
                 if (responseBody.containsKey("groupId")) {
                     providerMsgId = String.valueOf(responseBody.get("groupId"));

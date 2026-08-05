@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="_csrf" th:content="${_csrf?.token}"/>
+  <meta name="_csrf_header" th:content="${_csrf?.headerName}"/>
   <title>알림 | 케이크 쇼핑몰</title>
   <link rel="stylesheet" th:href="@{/css/app.css}">
   <link rel="stylesheet" th:href="@{/css/customer-mockup.css}">
@@ -105,8 +107,15 @@
       // 3. "전체 읽음" 버튼 클릭 이벤트 처리
       if (readAllBtn) {
         readAllBtn.addEventListener("click", function () {
+          const csrfToken = document.querySelector('meta[name="_csrf"]')?.getAttribute('content');
+          const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.getAttribute('content');
+          const headers = {};
+          if (csrfToken && csrfHeader) {
+            headers[csrfHeader] = csrfToken;
+          }
           fetch("/api/notifications/read-all", {
-            method: "PATCH" // 백엔드 @PatchMapping("/read-all") 호출
+            method: "PATCH",
+            headers: headers
           })
           .then(response => {
             if (response.ok) {
