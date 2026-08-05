@@ -16,11 +16,20 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+import java.util.Set;
 
 @Controller
 @RequiredArgsConstructor
 public class FulfillmentAdminController {
+
+    private static final Set<OrderStatus> FULFILLMENT_STATUSES = Set.of(
+            OrderStatus.UNDER_REVIEW,
+            OrderStatus.READY_FOR_PICKUP,
+            OrderStatus.PICKED_UP
+    );
 
     private final FulfillmentService fulfillmentService;
 
@@ -54,7 +63,7 @@ public class FulfillmentAdminController {
         fulfillmentService.markPickedUp(orderId, admin.getMemberId());
 
         redirectAttributes.addFlashAttribute("successMessage", "픽업 완료로 변경했습니다.");
-        return "redirect:/admin/fulfillment";
+        return "redirect:" + fulfillmentRedirectUrl(condition);
     }
 
     /** 배송 상태 (픽업 날짜가 없던가, 상태가 없던) 검증 로직.**/
@@ -68,5 +77,16 @@ public class FulfillmentAdminController {
         if (bindingResult.hasFieldErrors("status")) {
             condition.setStatus(null);
         }
+    }
+
+    private String fulfillmentRedirectUrl(FulfillmentSearchCondition condition) {
+        UriComponentsBuilder redirect = UriComponentsBuilder.fromPath("/admin/fulfillment");
+        if (condition != null && condition.getPickupDate() != null) {
+            redirect.queryParam("pickupDate", condition.getPickupDate());
+        }
+        if (condition != null && FULFILLMENT_STATUSES.contains(condition.getStatus())) {
+            redirect.queryParam("status", condition.getStatus());
+        }
+        return redirect.toUriString();
     }
 }

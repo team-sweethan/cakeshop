@@ -80,7 +80,7 @@
             <div class="fulfillment-order__actions">
               <a class="btn"
                  th:href="@{/admin/orders/{id}(id=${order.orderId})}">주문 상세</a>
-              <form th:if="${order.readyForPickup}" method="post"
+              <form th:if="${order.pickupCompletable}" method="post"
                     th:action="@{/admin/fulfillment/{id}/pickup(id=${order.orderId})}">
                 <input type="hidden" name="pickupDate" th:value="${fulfillment.pickupDate}">
                 <input type="hidden" name="status"

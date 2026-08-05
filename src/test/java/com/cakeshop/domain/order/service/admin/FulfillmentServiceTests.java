@@ -90,7 +90,7 @@ class FulfillmentServiceTests {
         assertThat(result.orders()).singleElement().satisfies(view -> {
             assertThat(view.orderNumber()).isEqualTo("ORD-10");
             assertThat(view.statusLabel()).isEqualTo("픽업 준비");
-            assertThat(view.readyForPickup()).isTrue();
+            assertThat(view.pickupCompletable()).isTrue();
             assertThat(view.items()).singleElement().satisfies(itemView -> {
                 assertThat(itemView.productName()).isEqualTo("딸기 케이크");
                 assertThat(itemView.optionSummary()).isEqualTo("크기: 2호");
@@ -112,6 +112,24 @@ class FulfillmentServiceTests {
         FulfillmentListView result = fulfillmentService.getFulfillments(condition);
 
         assertThat(result.selectedStatus()).isNull();
+    }
+
+    @Test
+    void getFulfillments_futurePickupOrder_doesNotExposeCompletionAction() {
+        Order order = order(OrderStatus.READY_FOR_PICKUP);
+        order.setPickupAt(NOW.plusHours(1));
+        when(orderMapper.findFulfillmentOrders(
+                LocalDate.of(2026, 8, 2).atStartOfDay(),
+                LocalDate.of(2026, 8, 3).atStartOfDay(),
+                null
+        )).thenReturn(List.of(order));
+        when(orderMapper.findOrderItemsByOrderId(10L)).thenReturn(List.of());
+        when(orderMapper.findOrderItemOptionsByOrderId(10L)).thenReturn(List.of());
+
+        FulfillmentListView result = fulfillmentService.getFulfillments(null);
+
+        assertThat(result.orders()).singleElement()
+                .satisfies(view -> assertThat(view.pickupCompletable()).isFalse());
     }
 
     private Order order(OrderStatus status) {

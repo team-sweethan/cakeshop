@@ -247,11 +247,11 @@ public class PaymentFacade {
         try {
             paymentRecoveryService.prepareCompensation(request);
         } catch (RuntimeException prepareFailure) {
-            // DB 장애 중에도 PG 자동 취소는 시도하고,
-            // 같은 멱등키로 다음 confirm에서 복구한다.
+            // 재시도할 보상 요청을 저장하지 못하면 외부 취소 결과도 수습할 수 없다.
             log.warn(
                     "Payment compensation request could not be persisted before provider cancel."
             );
+            return new BusinessException(PaymentErrorCode.PAYMENT_RECOVERY_PENDING);
         }
 
         return cancelAndCompleteCompensation(request);

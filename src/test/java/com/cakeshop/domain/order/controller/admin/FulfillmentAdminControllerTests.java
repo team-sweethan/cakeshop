@@ -120,11 +120,11 @@ class FulfillmentAdminControllerTests {
                 );
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        mockMvc.perform(post("/admin/fulfillment/10/pickup")
+                mockMvc.perform(post("/admin/fulfillment/10/pickup")
                         .param("pickupDate", "2026-08-10")
                         .param("status", "READY_FOR_PICKUP"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/admin/fulfillment"))
+                .andExpect(redirectedUrl("/admin/fulfillment?pickupDate=2026-08-10&status=READY_FOR_PICKUP"))
                 .andExpect(flash().attribute("successMessage", "픽업 완료로 변경했습니다."));
 
         verify(fulfillmentService).markPickedUp(10L, 7L);

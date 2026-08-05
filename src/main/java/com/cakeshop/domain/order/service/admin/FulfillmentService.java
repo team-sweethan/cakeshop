@@ -44,6 +44,7 @@ public class FulfillmentService {
         OrderStatus selectedStatus = normalizeStatus(
                 condition == null ? null : condition.getStatus()
         );
+        LocalDateTime now = LocalDateTime.now(clock);
 
         List<FulfillmentListView.FulfillmentOrder> orders = orderMapper
                 .findFulfillmentOrders(
@@ -52,7 +53,7 @@ public class FulfillmentService {
                         selectedStatus
                 )
                 .stream()
-                .map(this::toFulfillmentOrder)
+                .map(order -> toFulfillmentOrder(order, now))
                 .toList();
 
         return new FulfillmentListView(pickupDate, selectedStatus, orders);
@@ -81,7 +82,10 @@ public class FulfillmentService {
                 : null;
     }
 
-    private FulfillmentListView.FulfillmentOrder toFulfillmentOrder(Order order) {
+    private FulfillmentListView.FulfillmentOrder toFulfillmentOrder(
+            Order order,
+            LocalDateTime now
+    ) {
         List<OrderItem> orderItems = orderMapper.findOrderItemsByOrderId(order.getId());
         Map<Long, List<OrderItemOption>> optionsByItem = orderMapper
                 .findOrderItemOptionsByOrderId(order.getId())
@@ -108,7 +112,14 @@ public class FulfillmentService {
                 order.getPickupName(),
                 order.getPickupPhone(),
                 order.getPickupAt(),
+                isPickupCompletable(order, now),
                 items
         );
+    }
+
+    private boolean isPickupCompletable(Order order, LocalDateTime now) {
+        return order.getStatus() == OrderStatus.READY_FOR_PICKUP
+                && order.getPickupAt() != null
+                && !now.isBefore(order.getPickupAt());
     }
 }

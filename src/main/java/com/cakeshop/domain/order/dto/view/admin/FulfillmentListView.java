@@ -22,6 +22,7 @@ public record FulfillmentListView(
             String pickupName,
             String pickupPhone,
             LocalDateTime pickupAt,
+            boolean pickupCompletable,
             List<Item> items
     ) {
 
@@ -47,9 +48,6 @@ public record FulfillmentListView(
             };
         }
 
-        public boolean readyForPickup() {
-            return status == OrderStatus.READY_FOR_PICKUP;
-        }
     }
 
     public record Item(

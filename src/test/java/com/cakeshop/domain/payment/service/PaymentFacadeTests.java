@@ -484,6 +484,34 @@ class PaymentFacadeTests {
     }
 
     @Test
+    void confirmGeneralPayment_compensationPrepareFailure_doesNotCancelWithoutRecoveryRecord() {
+        GeneralPaymentOrder order = order(NOW.plusMinutes(5));
+        Payment payment = payment();
+        ApprovalResult approval = approval();
+        CompensationRequest request = compensationRequest();
+        when(orderService.getGeneralPaymentOrder(10L, 1L)).thenReturn(order);
+        when(paymentService.getReadyPayment(1L)).thenReturn(payment);
+        when(tossPaymentClient.approve("payment-key", "ORD-100", 30_000L, "PAY-1"))
+                .thenReturn(approval);
+        org.mockito.Mockito.doThrow(new BusinessException(PaymentErrorCode.PAYMENT_COMPLETE_FAILED))
+                .when(paymentService).completeGeneralPayment(order, payment, approval);
+        when(paymentRecoveryService.createRequest(payment, "payment-key")).thenReturn(request);
+        org.mockito.Mockito.doThrow(new BusinessException(PaymentErrorCode.PAYMENT_RECOVERY_PENDING))
+                .when(paymentRecoveryService).prepareCompensation(request);
+
+        assertPaymentError(
+                () -> paymentFacade.confirmGeneralPayment(10L, 1L, form(BigDecimal.valueOf(30_000))),
+                PaymentErrorCode.PAYMENT_RECOVERY_PENDING
+        );
+
+        verify(tossPaymentClient, never()).cancel(
+                "payment-key",
+                request.reason(),
+                request.idempotencyKey()
+        );
+    }
+
+    @Test
     void confirmGeneralPayment_concurrentCompletion_doesNotCancelPayment() {
         GeneralPaymentOrder order = order(NOW.plusMinutes(5));
         Payment readyPayment = payment();
