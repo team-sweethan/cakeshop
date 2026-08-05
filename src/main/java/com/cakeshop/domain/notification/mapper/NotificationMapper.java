@@ -34,6 +34,9 @@ public interface NotificationMapper {
     // 중복 event_key 기반 기존 알림 ID 조회
     Long findIdByReceiverIdAndEventKey(@Param("receiverId") Long receiverId, @Param("eventKey") String eventKey);
 
+    // 이미 SENT 성공 발송 이력이 있는지 확인
+    boolean hasSentDelivery(@Param("notificationId") Long notificationId);
+
     // 수신 회원 전화번호 조회 (알림톡 발송용)
     String findReceiverPhone(Long receiverId); 
 

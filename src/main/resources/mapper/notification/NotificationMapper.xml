@@ -108,6 +108,15 @@
         LIMIT 1
     </select>
 
+    <!--이미 SENT 성공 발송 이력이 있는지 확인-->
+    <select id="hasSentDelivery" resultType="boolean">
+        SELECT EXISTS (
+            SELECT true FROM notification_deliveries
+            WHERE notification_id = #{notificationId} AND status = 'SENT'
+            LIMIT 1
+        )
+    </select>
+
     <!-- 수신 회원 전화번호 조회 (알림 문자 발송용) -->
     <select id="findReceiverPhone" resultType="string">
         SELECT phone FROM members 
