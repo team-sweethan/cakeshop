@@ -304,7 +304,7 @@ class OrderMapperTests {
     }
 
     @Test
-    void markPickedUpIfReady_beforePickupTime_doesNotAdvanceOrder() {
+    void markPickedUpIfReady_beforePickupTime_advancesOrder() {
         Order order = newOrder();
         order.setOrderType(OrderType.GENERAL);
         orderMapper.insertOrder(order);
@@ -318,9 +318,9 @@ class OrderMapperTests {
                 order.getId(),
                 memberId,
                 LocalDateTime.of(2026, 8, 10, 13, 59)
-        )).isZero();
+        )).isEqualTo(1);
         assertThat(orderMapper.findOrderById(order.getId()).orElseThrow().getStatus())
-                .isEqualTo(OrderStatus.READY_FOR_PICKUP);
+                .isEqualTo(OrderStatus.PICKED_UP);
     }
 
     @Test

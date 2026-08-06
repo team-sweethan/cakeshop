@@ -115,7 +115,7 @@ class FulfillmentServiceTests {
     }
 
     @Test
-    void getFulfillments_futurePickupOrder_doesNotExposeCompletionAction() {
+    void getFulfillments_futurePickupOrder_exposesCompletionAction() {
         Order order = order(OrderStatus.READY_FOR_PICKUP);
         order.setPickupAt(NOW.plusHours(1));
         when(orderMapper.findFulfillmentOrders(
@@ -129,7 +129,7 @@ class FulfillmentServiceTests {
         FulfillmentListView result = fulfillmentService.getFulfillments(null);
 
         assertThat(result.orders()).singleElement()
-                .satisfies(view -> assertThat(view.pickupCompletable()).isFalse());
+                .satisfies(view -> assertThat(view.pickupCompletable()).isTrue());
     }
 
     @Test
