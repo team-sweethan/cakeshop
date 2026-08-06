@@ -147,7 +147,7 @@ class CouponAdminServiceTests {
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(CouponErrorCode.UPDATE_FAILED);
 
-        verify(couponMapper, never()).insertMemberCouponIfAbsent(1L, 2L);
+        verify(couponMapper, never()).insertMemberCouponIfAbsent(1L, 2L, false);
     }
 
     @Test

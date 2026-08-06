@@ -170,6 +170,20 @@ class CouponAdminControllerTests {
     }
 
     @Test
+    void invalidUpdateRedirectsWhenCouponExpiresBeforeFormRerender() throws Exception {
+        doThrow(new BusinessException(CouponErrorCode.CANNOT_EDIT_ENDED_COUPON))
+                .when(couponAdminService).getUpdateForm(3L);
+
+        mockMvc.perform(post("/admin/coupons/3/edit")
+                        .param("name", ""))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/admin/coupons"))
+                .andExpect(flash().attribute(
+                        "errorMessage", CouponErrorCode.CANNOT_EDIT_ENDED_COUPON.message()
+                ));
+    }
+
+    @Test
     void validCreateUsesLoggedInAdminAndRedirects() throws Exception {
         authenticateAdmin(7L);
 

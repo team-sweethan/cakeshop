@@ -179,7 +179,9 @@ public class CouponAdminController {
                 form.setFullEdit(originalForm.isFullEdit());
                 form.setDisplayTargetType(originalForm.getDisplayTargetType());
             } catch (BusinessException e) {
-                // 종료 처리 등으로 조회할 수 없어진 경우에는 기본값으로 렌더링한다.
+                // 검증 오류를 재렌더링하기 전에 만료됐다면 수정 Form을 만들지 않고 원래 화면으로 보낸다.
+                redirectAttributes.addFlashAttribute("errorMessage", e.getErrorCode().message());
+                return redirectAfterUpdate(couponId, condition, page, origin, redirectAttributes);
             }
             return "admin/coupon/form";
         }

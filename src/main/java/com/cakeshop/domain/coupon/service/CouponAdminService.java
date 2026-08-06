@@ -109,7 +109,7 @@ public class CouponAdminService {
         if (coupon.getTotalQuantity() == null || coupon.getIssuedQuantity() >= coupon.getTotalQuantity()) {
             throw new BusinessException(CouponErrorCode.ISSUED_QUANTITY_EXCEEDED);
         }
-        if (couponMapper.insertMemberCouponIfAbsent(couponId, memberId) == 1
+        if (couponMapper.insertMemberCouponIfAbsent(couponId, memberId, false) == 1
                 && couponMapper.increaseIssuedQuantityIfAvailable(couponId) != 1) {
             throw new BusinessException(CouponErrorCode.UPDATE_FAILED);
         }

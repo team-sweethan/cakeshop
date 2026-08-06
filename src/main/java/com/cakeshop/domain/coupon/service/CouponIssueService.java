@@ -43,7 +43,7 @@ public class CouponIssueService {
     @Transactional
     public void issueOnCouponCreated(Coupon coupon) {
         if (coupon.getTargetType() == CouponTargetType.ALL_MEMBERS) {
-            issueMembers(coupon.getId(), memberCouponQueryService.getActiveMemberIds());
+            issueMembers(coupon.getId(), memberCouponQueryService.getActiveMemberIds(), true);
         }
         if (coupon.getTargetType() == CouponTargetType.FIRST_ORDER) {
             List<Long> activeMemberIds = memberCouponQueryService.getActiveMemberIds();
@@ -52,7 +52,7 @@ public class CouponIssueService {
             );
             issueMembers(coupon.getId(), activeMemberIds.stream()
                     .filter(memberId -> !orderedMemberIds.contains(memberId))
-                    .toList());
+                    .toList(), true);
         }
     }
 
@@ -60,7 +60,7 @@ public class CouponIssueService {
     @Transactional
     public void issueNewMemberCoupons(Long memberId) {
         for (Coupon coupon : couponMapper.findCouponsByTargetType(CouponTargetType.NEW_MEMBERS)) {
-            issueMembers(coupon.getId(), List.of(memberId));
+            issueMembers(coupon.getId(), List.of(memberId), false);
         }
     }
 
@@ -71,11 +71,15 @@ public class CouponIssueService {
         int month = LocalDateTime.now(KOREA_ZONE_ID).getMonthValue();
         List<Long> birthdayMemberIds = memberCouponQueryService.getBirthdayMemberIds(month);
         for (Coupon coupon : couponMapper.findCouponsByTargetType(CouponTargetType.BIRTHDAY)) {
-            issueMembers(coupon.getId(), birthdayMemberIds);
+            issueMembers(coupon.getId(), birthdayMemberIds, false);
         }
     }
 
-    private void issueMembers(Long couponId, List<Long> memberIds) {
+    /**
+     * 회원 쿠폰을 발급하고 발급 수량을 증가시킨다.
+     * 등록 직후 일괄 발급만 시작 전 발급 이력 생성을 허용하며, 실제 사용 가능 시각은 쿠폰 기간이 판단한다.
+     */
+    private void issueMembers(Long couponId, List<Long> memberIds, boolean allowBeforeStart) {
         Coupon coupon = couponMapper.findCouponByIdForUpdate(couponId)
                 .orElseThrow(() -> new BusinessException(CouponErrorCode.NOT_FOUND));
         if (coupon.getStatus() != CouponStatus.ACTIVE || !coupon.getExpiresAt().isAfter(LocalDateTime.now())) {
@@ -89,7 +93,7 @@ public class CouponIssueService {
             if (remaining <= 0) {
                 return;
             }
-            if (couponMapper.insertMemberCouponIfAbsent(couponId, memberId) == 1) {
+            if (couponMapper.insertMemberCouponIfAbsent(couponId, memberId, allowBeforeStart) == 1) {
                 if (couponMapper.increaseIssuedQuantityIfAvailable(couponId) != 1) {
                     throw new BusinessException(CouponErrorCode.UPDATE_FAILED);
                 }
