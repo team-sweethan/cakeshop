@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
   <meta charset="UTF-8">
@@ -19,7 +19,7 @@
       <strong th:text="${member.nickname}"></strong>
       <p class="text-muted" th:text="${member.email}"></p>
       <nav class="stack" style="margin-top:12px">
-        <span class="btn btn--block btn--disabled" aria-disabled="true">주문 내역 연동 준비 중</span>
+        <a class="btn btn--block" th:href="@{/orders}">주문 내역</a>
         <a class="btn btn--block" th:href="@{/chat}">1:1 문의</a>
         <a class="btn btn--block" href="/mypage/coupons">보유 쿠폰</a>
         <a class="btn btn--block" href="/reviews/new">작성할 후기</a>

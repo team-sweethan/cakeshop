@@ -53,7 +53,6 @@ public class S3StorageService implements FileStorageClient {
     }
 
     // Test-friendly constructor without explicit Clock
-    @Autowired(required = false)
     public S3StorageService(S3Client s3Client,
             @Value("${aws.s3.bucket}") String bucket,
             @Value("${aws.s3.base-url}") String baseUrl) {
