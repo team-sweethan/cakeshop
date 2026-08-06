@@ -1,4 +1,4 @@
-﻿/* source: cakeProjectSample/js/common.js */
+/* source: cakeProjectSample/js/common.js */
 (function () {
   "use strict";
   function markNavigation() {
@@ -462,9 +462,20 @@
     }
     const readAll = event.target.closest("[data-read-all]");
     if (readAll) {
-      document.querySelectorAll(".notification-item").forEach(function (item) { item.classList.remove("is-unread"); const dot = item.querySelector(".notification-dot"); if (dot) dot.remove(); });
-      readAll.textContent = "모두 읽음";
-      readAll.disabled = true;
+      const csrfToken = document.querySelector('meta[name="_csrf"]')?.getAttribute('content');
+      const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.getAttribute('content');
+      const headers = {};
+      if (csrfToken && csrfHeader) {
+        headers[csrfHeader] = csrfToken;
+      }
+      fetch('/api/notifications/read-all', { method: 'PATCH', headers: headers })
+        .then(function(res) {
+          if (!res || !res.ok) return;
+          document.querySelectorAll(".notification-item").forEach(function (item) { item.classList.remove("is-unread"); const dot = item.querySelector(".notification-dot"); if (dot) dot.remove(); });
+          readAll.textContent = "모두 읽음";
+          readAll.disabled = true;
+          if (typeof updateNotificationUnreadCount === 'function') updateNotificationUnreadCount();
+        });
     }
     const coupon = event.target.closest("[data-coupon-select]");
     if (coupon) {

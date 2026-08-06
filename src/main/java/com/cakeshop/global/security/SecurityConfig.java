@@ -60,7 +60,7 @@ public class SecurityConfig {
                 auth.requestMatchers(passwordRecoveryRequest).denyAll();
                 auth.requestMatchers(
                         "/", "/login", "/signup", "/join", "/emailCheck", "/find-email",
-                        "/find-email/login",
+                        "/find-email/login", "/api/notifications/unread-count", "/api/notifications/test-sms",
                         "/products/**", "/screens", "/favicon.ico",
                         "/css/**", "/js/**", "/images/**", "/uploads/**", "/error")
                         .permitAll();
@@ -79,7 +79,7 @@ public class SecurityConfig {
                     // 열어 두면 폼을 다 채우고 등록에서야 로그인으로 튕긴다.
                     auth.requestMatchers(
                             HttpMethod.GET,
-                            "/orders/**", "/notifications",
+                            "/orders/**", "/notifications", "/api/notifications", "/api/notifications/**",
                             "/reviews/**", "/chat")
                             .permitAll();
                 }
