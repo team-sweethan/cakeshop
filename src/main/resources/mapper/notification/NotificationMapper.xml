@@ -117,10 +117,13 @@
         )
     </select>
 
-    <!-- 수신 회원 전화번호 조회 (알림 문자 발송용) -->
+    <!-- 수신 전화번호 조회 (주문이 있으면 orderer_phone 우선, 없으면 members.phone) -->
     <select id="findReceiverPhone" resultType="string">
-        SELECT phone FROM members 
-        WHERE id = #{receiverId}
+        SELECT COALESCE(o.orderer_phone, m.phone)
+        FROM members m
+        LEFT JOIN orders o ON o.id = #{orderId} AND o.member_id = m.id
+        WHERE m.id = #{receiverId}
+        LIMIT 1
     </select>
 
     <!--알림 문자 DB에 저장하기-->
