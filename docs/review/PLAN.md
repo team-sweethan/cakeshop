@@ -25,7 +25,7 @@
 | 2 | 평점 집계 | **#33** | 대기 | 집계 연동. **1 직후에 붙인다.** 시은 담당 이슈와 같은 일이라 선행 합의가 필요하다 |
 | 3 | 조회·노출 | #110 | 대기 | 상품 상세 후기 목록, 페이징, 내 후기 조회 |
 | 4 | 수정·삭제 | #111 | 대기 | soft delete, 집계 재호출 |
-| 5 | 관리자 숨김 | #112 | 대기 | 관리자 목록·검색·필터, `BLOCKED` **전이와 해제 양쪽**, 집계 재호출, **관리자 상세 화면 신규**(SPEC C3) |
+| 5 | 관리자 숨김 | #112 | 대기 | 관리자 목록·검색·필터(**ReadModel**), `BLOCKED` **전이와 해제 양쪽**, 집계 재호출, **관리자 상세 화면 신규**(SPEC C3) |
 | 6 | 관리자 답글 | #113 | 대기 | `review_replies`, 후기당 1건, 작성·수정. **답글 UI 신규**(SPEC C5·C6) |
 | 7 | 알림 연동 | #114 | 대기 | `NEW_REVIEW`, `CUSTOMER_REVIEW`. **PR #107 머지 이후** |
 | 8 | (2차) 이미지 첨부 | — | 범위 밖 | `review_images` |
@@ -73,8 +73,8 @@
 
 **방식은 2026-08-06에 정했다.** 상세는 `SPEC.md` D1이 정본이다.
 
-- `products` **컬럼 갱신**, **재계산**, **상품 도메인 소유**
-- 계약 `ProductRatingService`, SQL은 신규 `ProductReviewMapper` + `mapper/product/ProductReviewMapper.xml`
+- `products` **컬럼 갱신**, **재계산**. 집계는 리뷰가 계산하고 쓰기만 상품이 맡는다(2026-08-06 개정)
+- 계약 `ProductReviewCommandService`, SQL은 신규 `ProductReviewMapper` + `mapper/product/ProductReviewMapper.xml`
 - 형판은 `ProductStockService`(주문·결제에 재고 변경을 공개하는 기존 쓰기 계약)
 - **잠금 문장은 새 매퍼에 복제하지 않는다.** 기존 `ProductMapper.findSalesInfoByIdForUpdate`를 재사용하고 Service가 두 매퍼를 함께 주입받는다
 - 호출 순서는 **잠금 → `reviews` 쓰기 → 집계**. 뒤집으면 FK 공유 잠금이 배타 잠금으로 승격되어 교착이다
@@ -83,16 +83,17 @@
 
 | 위치 | 무엇 |
 |---|---|
-| `domain/product/service/ProductRatingService.java` | 공개 계약 (**신규**) |
+| `domain/product/service/ProductReviewCommandService.java` | 공개 계약 (**신규**) |
 | `domain/product/mapper/ProductReviewMapper.java` | 매퍼 인터페이스 (**신규**) |
-| `mapper/product/ProductReviewMapper.xml` | 집계 SELECT + `UPDATE products` (**신규**) |
+| `mapper/product/ProductReviewMapper.xml` | `UPDATE products` (**신규**) |
+| `mapper/review/ReviewMapper.xml` | 집계 SELECT (`FOR UPDATE`) |
 | 리뷰 Service | A3의 호출 5곳 중 등록 자리 |
 
 **검증**: 작성 후 집계 일치, **동시 요청 후 `review_count == reviews 실제 개수`**, 집계 갱신이 `products.updated_at`을 건드리지 않는지, **마지막 공개 후기를 지웠을 때 평균이 0**(`COALESCE`), 후기 저장과 집계가 한 트랜잭션인지(rollback).
 
 ### 조각 3 — 조회·노출 (#110)
 
-**선행 2건.** 시그니처가 정해지기 전에는 착수하지 않는다(`SPEC.md` 2.7·9절).
+**선행이 하나 앞에 붙었다.** B1·B3를 ReadModel로 볼지부터 정한다(`docs/conventions.md` 15.9, `SPEC.md` 9절). **ReadModel이면 아래 두 합의가 통째로 없어진다.**
 
 - **수민님** — 작성자 표시명 계약(ID 묶음 조회). `members`를 JOIN하지 않는다
 - **주환님** — B3·C1·C3용 주문 스냅샷 계약. **조각 1 계약은 *미작성* 항목만 돌려주므로 이미 쓴 후기의 상품명·주문번호를 받을 자리가 없다**(`SPEC.md` 9절)
@@ -114,7 +115,7 @@
 
 ### 조각 5 — 관리자 숨김 (#112)
 
-**선행: 검색 계약(`writer`·`product`)을 수민·주환님과 합의한다.** `members`·`order_items`를 JOIN하지 않는다(`SPEC.md` 2.7·C2). 후기를 먼저 페이지한 뒤 이름으로 거르면 **화면의 건수와 실제 건수가 갈린다.**
+**선행 합의가 없어졌다**(2026-08-06 개정). 관리자 목록·검색은 **ReadModel**로 만든다 — 관리자 화면에서 여러 도메인을 조합하는 쓰기 없는 조회라 `docs/conventions.md` 15.9에 해당한다. 다만 **최초 작성 때 `members`·`order_items` 담당자 확인은 받는다.** 상세는 `SPEC.md` C2.
 
 - 관리자 목록(`GET /admin/reviews`)과 검색·필터, 관리자 상세 화면(SPEC C3)
 - **숨김과 해제를 함께 만든다** — `POST .../block`(`PUBLISHED → BLOCKED`), `POST .../unblock`(`BLOCKED → PUBLISHED`). **집계 재호출도 양쪽 다.**
@@ -174,13 +175,16 @@
 | 08-05 | 알림 연동을 마지막 조각으로 뺐다 — 규격이 `dev`가 아니라 PR #107에 있다. 조각 1~6은 알림 없이 완결된다 | 조각 7·R1 |
 | 08-05 | 평점 집계를 조각 2로 앞당겼다. `average_rating`·`review_count`가 이미 상품 정렬에 쓰이고 있다 | 조각 2·R2 |
 | 08-05 | 조각 2는 새 이슈를 만들지 않고 #33에서 진행한다. 같은 일을 두 곳에서 추적하지 않는다 | 조각 2·R9 |
-| 08-06 | 집계는 **컬럼 갱신·재계산·상품 도메인 소유**. 계약 `ProductRatingService`, SQL은 신규 `ProductReviewMapper` | SPEC D1 |
+| 08-06 | 집계는 **컬럼 갱신·재계산·상품 도메인 소유**. 계약 `ProductRatingService`, SQL은 신규 `ProductReviewMapper` | SPEC D1 (**같은 날 아래에서 개정**) |
 | 08-06 | 잠금 문장을 새 매퍼에 복제하지 않는다. 기존 `findSalesInfoByIdForUpdate`를 재사용 | SPEC D1 |
 | 08-06 | **다른 도메인 테이블 JOIN을 전면 금지한다**(2.7 신설). 표시용 예외를 두지 않는다 — 커뮤니티가 `members`를 8곳에서 직접 JOIN하지만 **리뷰는 따르지 않는다** | SPEC 2.7 |
 | 08-06 | 문서 중복을 걷어냈다. **규칙과 근거는 SPEC 본문에 한 번만 둔다** — 다른 문서는 가리킬 뿐 다시 적지 않는다 | SPEC 머리말 |
 | 08-06 | 상품 상세에는 후기 **최신 3개만** 모델 주입으로 붙이고, 전체는 별도 화면으로 뺐다. 개수를 고정해 상세 렌더링의 페이징 문제를 없앴다 (시은님 합의) | SPEC B1 |
 | 08-06 | **남의 도메인에 만드는 클래스·메서드에는 작성자·담당자 헤더 주석을 반드시 단다** | `domain/review/CLAUDE.md` |
 | 08-06 | 도메인 경계에 **예외 하나**를 열었다 — 자기 소유 파생 컬럼을 유지하기 위한 집계 읽기는 전용 매퍼에서 허용. 표시·검색·업무 규칙은 여전히 금지. 기준은 "전용 매퍼냐"가 아니라 "무엇을 위해 읽느냐"다 | SPEC 2.7 |
+| 08-06 | **위 예외를 걷었다.** 도메인 간 연동 규칙을 다시 세우면서 쓰기 근거가 되는 읽기에는 예외를 두지 않기로 했다. 갈리는 기준이 "무엇을 위해 읽느냐"에서 **"읽기 전용이냐"**로 바뀌었다 | `docs/conventions.md` 15 |
+| 08-06 | 그 결과 **D1의 방향이 뒤집혔다** — 리뷰가 평균·건수를 계산해 상품에 넘긴다. 08-06 오전에 기각했던 안이다. **상품은 받은 값을 검증할 수 없고**, 그 대가를 알고 택했다 | SPEC D1 |
+| 08-06 | **ReadModel을 열었다** — 여러 도메인을 조합하는 쓰기 없는 조회는 JOIN해도 된다. 그 결과 **조각 5의 검색 계약 선행 합의가 없어졌다** | `docs/conventions.md` 15.9 · SPEC C2 |
 | 08-06 | 그 결과 **집계 SQL은 상품이 소유**로 확정. 리뷰가 값을 계산해 넘기면 상품이 자기 컬럼인데도 검증할 수 없다 | SPEC D1 |
 
 **리뷰 지적을 반영한 것은 여기에 남기지 않는다.** 규칙은 정본 문서에, 언제 왜 고쳤는지는 커밋 메시지에 이미 있다(`git log -- docs/review/`). 로그에 남길 것은 **여러 안 중에 골랐고 나중에 다시 물을 만한 것**뿐이다.

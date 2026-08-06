@@ -175,40 +175,44 @@
 
 **리뷰 매퍼는 `reviews`·`review_replies`·`review_images` 외의 테이블을 JOIN하지 않는다.** 표시용이든 검색용이든 같다.
 
-**규칙은 양방향이다.** 다른 도메인이 `reviews`를 읽는 것도 같은 선을 받는다 — 아래 예외 하나만 뺀다.
+**규칙은 양방향이다.** 다른 도메인이 `reviews`를 읽는 것도 같은 선을 받는다.
 
 필요한 값은 **그 도메인의 전용 QueryService가 DTO로 돌려준다.** 없으면 만들고, 만드는 것은 그 도메인 담당자와 합의한다(`docs/conventions.md` 15절, `AGENTS.md`).
 
 | 필요한 것 | 쓰는 곳 | 도메인 | 담당 |
 |---|---|---|---|
-| 후기 쓸 수 있는 주문 상품 목록 + 단건 자격 검증 | A1·A2·A3 | `order` | 주환 |
-| 작성자 표시명(`nickname`, 탈퇴 여부) | B1·B3·C1·C3 | `member` | 수민 |
-| 관리자 검색의 작성자명·상품명 조건 | C2 | `member`·`order` | 수민·주환 |
+| 후기 쓸 수 있는 주문 상품 목록 + 단건 자격 검증 | A1·A2·A3 | `order` | 주환 (`OrderReviewQueryService` 신규) |
+| 작성자 표시명(`nickname`, 탈퇴 여부) | B1·B3·C1·C3 | `member` | 수민 — **ReadModel 여부 미정**(9절) |
+| 관리자 검색의 작성자명·상품명 조건 | C2 | — | **ReadModel로 간다**(15.9). 계약 합의 불필요 |
 | 상품 판매 여부 | B1 | `product` | 시은 (`getSalesInfo` 기존) |
-| 평점 집계 | D1 | `product` | 시은 (`ProductRatingService` 신규) |
+| 평점 갱신 | D1 | `product` | 시은 (`ProductReviewCommandService` 신규) |
+
+**연동 계약의 이름과 위치는 `docs/conventions.md` 15.2를 따른다** — 데이터를 소유한 도메인이 이름 앞에 온다.
 
 **목록 화면은 건별 조회가 아니라 ID 묶음 조회다.** 후기 20건에 회원 조회를 20번 하면 N+1이다. 계약은 `List<Long>`을 받아 DTO 목록을 돌려주는 모양이어야 한다. **이것도 시그니처 합의에 포함한다.**
 
-**예외 하나 — 파생 컬럼을 유지하기 위한 집계 읽기** (2026-08-06 확정)
+**예외는 ReadModel 하나다** (2026-08-06 개정)
 
 **규칙 문장과 그 근거는 `docs/conventions.md` 15절이 정본이다.** 팀 전체에 걸리는 규칙이라 여기 다시 적지 않는다. 리뷰에서 어디가 갈리는지만 남긴다.
 
 | 경우 | 판정 |
 |---|---|
-| `ProductReviewMapper`가 `reviews`를 집계해 `products` 컬럼을 유지 | **허용** |
-| 리뷰가 `members`를 JOIN해 닉네임을 표시 | 금지 |
-| 리뷰가 `orders`를 읽어 작성 자격을 판단 | 금지 |
-| 리뷰가 `order_items`를 JOIN해 관리자 검색을 건다 | 금지 |
+| 관리자 후기 검색을 **ReadModel**로 만들어 `members`·`order_items`를 JOIN | **허용** (15.9) |
+| 리뷰 매퍼가 `members`를 JOIN해 닉네임을 표시 | 금지 |
+| 리뷰 매퍼가 `orders`를 읽어 작성 자격을 판단 | 금지 |
+| 상품 매퍼가 `reviews`를 집계해 `products` 컬럼을 유지 | **금지** — 값은 리뷰가 계산해 넘긴다(D1) |
 
-- 리뷰에서 이 예외에 해당하는 것은 **D1 하나뿐**이다 — `ProductReviewMapper`가 `reviews`를 세어 `products.average_rating`·`review_count`를 유지한다.
-- **리뷰 매퍼 쪽은 예외가 없다.** 예외는 반대 방향, 즉 남이 `reviews`를 읽는 경우에만 열렸다.
+- **쓰기 근거가 되는 읽기에는 예외가 없다.** ReadModel은 조회 전용이고, 그 결과를 변경 가능 여부의 근거로 쓰지 못한다(15.9). 평점 집계가 여기 걸린다 — `reviews`를 세어 `products`를 갱신하는 것이므로 ReadModel이 아니다.
+- **한때 열었던 "파생 컬럼 유지를 위한 집계 읽기" 예외는 걷었다.** 그 예외로 허용하던 D1의 방향이 뒤집혔다(`PLAN.md` 결정 로그).
 - 결합을 막는 테스트는 D1 검증에 있다 — **"`BLOCKED` 후기는 평균에서 빠진다"**. `reviews.status` 어휘가 바뀌면 그 테스트가 빨간불이 된다.
+
+**아직 갈리지 않은 것** — B1·B3의 작성자 표시명이 ReadModel 대상인지는 정하지 않았다. 15.9는 대상을 "관리자 화면·통계·대시보드·검색 등"으로 적었는데 B1·B3는 고객 화면의 평범한 목록이다. ReadModel로 보면 수민님 계약이 필요 없어지고, 아니면 그대로 필요하다. **9절 미정에 올려 둔다.**
 
 **검색 조건은 리뷰가 뒤에서 거르지 않는다.** 후기를 먼저 페이지하고 이름을 나중에 맞추면 **일치 행과 전체 건수가 둘 다 틀어진다**(C2, A1이 같은 모양이다). 조건을 계약에 넘겨 ID 목록이나 페이지 결과를 받는다.
 
 > **커뮤니티는 `members`를 직접 JOIN한다**(`CommunityMapper.xml` 4곳, `CommunityAdminMapper.xml` 4곳). **리뷰는 따르지 않는다.** 표시용 조인까지 허용하면 어디까지가 표시용인지를 매번 판단해야 하고, 그 판단이 한 번 느슨해지는 순간 자격 검증 같은 업무 규칙도 같은 문으로 들어온다 — 실제로 A1·A2·A3가 그렇게 들어와 있었다. 선이 하나여야 지켜진다. 커뮤니티를 되돌리는 것은 이 문서의 범위가 아니다.
 >
-> 위 예외는 이 판단을 되살리지 않는다. **표시·검색이 아니라 파생 컬럼 유지에만** 열려 있고, 그 판정은 "무엇을 위해 읽느냐" 하나로 갈려 매번 다시 저울질할 일이 없다.
+> ReadModel 예외는 이 판단을 되살리지 않는다. 갈리는 지점이 **"표시용이냐"가 아니라 "읽기 전용이냐"**이기 때문이다. ReadModel은 쓰기 SQL을 아예 담지 못하고 그 결과를 변경 근거로 쓸 수도 없으므로, 자격 검증 같은 업무 규칙은 같은 문으로 들어올 수가 없다. 커뮤니티가 느슨해진 자리는 표시용 조인이 업무 판단으로 번진 것이었고, 그 경로가 닫혀 있다.
 
 ---
 
@@ -313,7 +317,7 @@ LIMIT #{size} OFFSET #{offset}
 - `reviews.member_id`는 인증 사용자에서 가져온다. 요청값을 받지 않는다.
 - `status`는 `PUBLISHED`로 저장한다.
 - INSERT는 `uk_reviews_order_item`에 걸릴 수 있다. **`DuplicateKeyException`을 잡아 `ALREADY_REVIEWED`로 바꾼다** — 4번 검증과 INSERT 사이의 동시 요청은 검증만으로 막히지 않는다(커뮤니티 신고 선례).
-- **순서가 정해져 있다: ① 상품 행 잠금(`ProductRatingService.lockForRating`) → ② `reviews` INSERT → ③ D1 집계.** 셋 다 같은 트랜잭션이다. **뒤집으면 교착이고, 순서를 지켜도 집계 SELECT가 잠금 읽기가 아니면 값이 어긋난다** — 둘 다 A3의 검증 4가지가 평범한 SELECT인 데서 나오며, 근거와 계약은 **D1이 정본이다.**
+- **순서가 정해져 있다: ① 상품 행 잠금(`ProductReviewCommandService.lockForRating`) → ② `reviews` INSERT → ③ D1 집계.** 셋 다 같은 트랜잭션이다. **뒤집으면 교착이고, 순서를 지켜도 집계 SELECT가 잠금 읽기가 아니면 값이 어긋난다** — 둘 다 A3의 검증 4가지가 평범한 SELECT인 데서 나오며, 근거와 계약은 **D1이 정본이다.**
 
 **성공 후**: `/mypage/reviews/writable`(A1)로 redirect. 방금 쓴 항목이 목록에서 빠진 것으로 완료를 확인한다.
 
@@ -471,15 +475,16 @@ C1의 요청 파라미터다. 목업의 검색 폼을 그대로 산다.
 
 | 파라미터 | 목업 | 처리 |
 |---|---|---|
-| `writer` | 작성자 검색 | 닉네임 부분 일치 — **member 계약 경유**(2.7) |
-| `product` | 상품명 검색 | 주문 상품명 부분 일치 — **order 계약 경유**(2.7) |
+| `writer` | 작성자 검색 | 닉네임 부분 일치 — ReadModel에서 `members` JOIN |
+| `product` | 상품명 검색 | 주문 상품명 부분 일치 — ReadModel에서 `order_items` JOIN |
 | `rating` | 평점 전체 / 5점 / 4점 / 3점 이하 | `overall_rating` 기준 — 리뷰 자체 컬럼 |
 
-**`writer`·`product`는 조각 5 착수 전에 계약을 합의한다.** `members`·`order_items`를 JOIN하지 않는다(2.7).
+**관리자 목록·검색은 ReadModel로 만든다**(`docs/conventions.md` 15.9, 2026-08-06 개정). 조각 5의 선행 합의였던 수민·주환님 검색 계약은 **없어졌다.**
 
-- **후기를 먼저 페이지한 뒤 이름을 보강해 거르면 안 된다.** 20건을 떠서 그중 이름이 맞는 3건만 남기면 화면에 3건이 뜨고 전체 건수는 20건 기준으로 나온다. **A1의 페이징 문제와 같은 모양이다.**
-- 조건을 계약에 넘겨 **일치하는 `memberId`·`orderItemId` 목록**을 받고, 그것을 `reviews` 조회 조건에 넣어 페이징한다. 이 방향이면 페이징과 건수가 리뷰 쪽에 남는다.
-- 두 조건이 함께 들어올 때의 조합(교집합)까지 정해 둔다.
+- 관리자 화면에서 여러 도메인을 조합하는 조회이고 쓰기가 없어 15.9에 정확히 해당한다.
+- 그래도 **최초 작성 때 `members`·`order_items` 담당자의 확인은 받는다**(15.9) — 그쪽 테이블 구조가 바뀌면 조용히 어긋난다.
+- **후기를 먼저 페이지한 뒤 이름을 보강해 거르면 안 된다.** 20건을 떠서 그중 이름이 맞는 3건만 남기면 화면에 3건이 뜨고 전체 건수는 20건 기준으로 나온다. **A1의 페이징 문제와 같은 모양이다.** ReadModel이면 JOIN한 상태로 한 번에 페이징하므로 이 문제가 생기지 않는다.
+- **C4의 숨김·해제는 ReadModel로 하지 않는다.** 목록에서 읽은 상태를 근거로 전이를 판단하면 15.9 위반이다. 조치는 리뷰 도메인의 Service가 자기 테이블을 다시 읽어 수행한다.
 
 - **`rating`은 허용값을 `<choose>`로 매핑한다.** 사용자가 주소로 넣는 값을 `${}`로 이어 붙이지 않는다(`AGENTS.md` SQL 안전성).
 - 모르는 값은 오류가 아니라 **전체(필터 없음)로 떨어뜨린다.**
@@ -564,24 +569,26 @@ C1의 요청 파라미터다. 목업의 검색 폼을 그대로 산다.
 > 별도 이슈를 만들지 않고 #33에서 진행한다. 상세는 `PLAN.md` 조각 2와 R9.
 > `domain/product/`는 시은님 담당이므로 **착수 전에 #33에 계약 시그니처를 올려 확인받는다**(`AGENTS.md` — 공개 Service 인터페이스는 먼저 협의).
 
-**방식: `products` 컬럼 갱신, 상품 도메인 소유** (2026-08-06 결정)
+**방식: `products` 컬럼 갱신. 집계는 리뷰가, 쓰기는 상품이** (2026-08-06 개정)
 
 | | |
 |---|---|
-| 계약 | `ProductRatingService` (상품 도메인 공개 Service) |
-| SQL | `ProductReviewMapper` + `mapper/product/ProductReviewMapper.xml` (**신규**) |
+| 계약 | `ProductReviewCommandService` (상품 도메인 공개 Service, **신규**) |
+| 상품 쪽 SQL | `ProductReviewMapper` + `mapper/product/ProductReviewMapper.xml` — **`products`만 만진다** |
+| 리뷰 쪽 SQL | 집계 SELECT는 `ReviewMapper`에 둔다 |
 | 형판 | `ProductStockService` — 주문·결제에 재고 변경을 공개하는 기존 쓰기 계약과 같은 모양 |
 
-- **`ProductQueryService`가 아니다.** 그쪽은 `@Transactional(readOnly = true)`인 읽기 전용 계약이고(`docs/conventions.md` 15절), 평점 집계는 `products`에 쓴다. 쓰기 계약의 선례는 `ProductStockService`다.
-- 집계 SQL은 상품 도메인이 소유한다. 리뷰는 값을 계산해 넘기지 않고 `productId`만 넘긴다. **`ProductReviewMapper`가 `reviews`를 직접 읽는 것은 2.7의 예외로 허용된다** — 파생 컬럼 유지를 위한 집계 읽기다. 리뷰가 평균과 건수를 계산해 넘기는 안은 택하지 않았다. 그러면 상품이 자기 컬럼인데도 받은 값을 검증할 수 없다.
+- **`ProductQueryService`가 아니다.** 그쪽은 `@Transactional(readOnly = true)`인 읽기 전용 계약이고(`docs/conventions.md` 15.3), 평점 갱신은 `products`에 쓴다. 쓰기 계약의 선례는 `ProductStockService`다.
+- **`reviews`를 세는 것은 리뷰다.** 평균과 건수를 계산해 `ProductReviewCommandService`에 넘긴다. 상품 매퍼가 `reviews`를 읽는 안은 2026-08-06에 한 번 택했다가 되돌렸다 — 규칙에서 그 예외를 걷었기 때문이다(2.7).
+  - **대가를 알고 택한다.** 상품은 자기 컬럼인데도 받은 값을 검증할 수 없다. 리뷰가 잘못 세면 상품은 그대로 쓴다. 이건 규칙으로 못 막고 **D1 검증의 집계 테스트가 유일한 방어선**이다.
 - **전용 매퍼를 새로 만드는 것은 이 저장소에서 첫 사례다.** `MemberQueryService`(PR #119)는 기존 `MemberMapper.xml`에 문장을 더했다. `ProductMapper.xml`이 724줄이라 나누는 것이지만, PR 본문에 그 이유를 남겨 다음 사람이 판단 기준을 갖게 한다.
 
 **잠금 문장을 새 매퍼에 복제하지 않는다.**
 
-- `ProductReviewMapper.xml`에 `SELECT ... products ... FOR UPDATE`를 따로 선언하지 않는다. 기존 `ProductMapper.findSalesInfoByIdForUpdate`를 재사용하고, `ProductRatingService`가 **두 매퍼를 함께 주입받는다.** 같은 패키지 안이라 도메인 경계를 넘지 않는다.
+- `ProductReviewMapper.xml`에 `SELECT ... products ... FOR UPDATE`를 따로 선언하지 않는다. 기존 `ProductMapper.findSalesInfoByIdForUpdate`를 재사용하고, `ProductReviewCommandService`가 **두 매퍼를 함께 주입받는다.** 같은 패키지 안이라 도메인 경계를 넘지 않는다.
 - 복제해도 당장은 똑같이 동작한다. 갈라지는 것이 문제다 — 한쪽에 `JOIN product_options`가 붙는 날 두 경로의 잠금 순서가 어긋나고, **두 파일을 함께 열어 본 사람이 없어 아무도 눈치채지 못한다.**
 - 선례: 커뮤니티는 `lockPost`를 관리자 매퍼에 복제하지 않고 `CommunityAdminService`가 고객 매퍼를 함께 주입받는다(`docs/community/CLAUDE.md`).
-- 결과적으로 새 매퍼에 들어가는 것은 **집계 SELECT와 `UPDATE products` 둘뿐**이다.
+- 결과적으로 `ProductReviewMapper.xml`에 들어가는 것은 **`UPDATE products` 하나뿐**이다.
 
 **리뷰 쪽에서 이미 정해진 것**
 
@@ -595,7 +602,7 @@ C1의 요청 파라미터다. 목업의 검색 폼을 그대로 산다.
 
 **호출 순서: 잠금 → `reviews` 쓰기 → 집계**
 
-`ProductRatingService.lockForRating(productId)`을 **후기 INSERT보다 먼저** 부른다. 저장한 뒤에 잠그면 이미 늦다.
+`ProductReviewCommandService.lockForRating(productId)`을 **후기 INSERT보다 먼저** 부른다. 저장한 뒤에 잠그면 이미 늦다.
 
 - **이유는 주문 흐름이 이미 같은 순서를 쓰기 때문이다.** `ProductStockService.decreaseStock`이 `findSalesInfoByIdForUpdate`로 `products` 행을 배타 잠금한 뒤 재고를 줄인다.
 - 리뷰가 `INSERT → 집계` 순서로 가면 `reviews` INSERT가 FK 확인으로 `products` 행에 **공유 잠금**을 먼저 걸고, 집계가 그것을 **배타 잠금으로 승격**하려 한다. 같은 상품에 후기 두 건이 동시에 들어오면 서로의 공유 잠금을 기다리며 교착이다.
@@ -605,7 +612,7 @@ C1의 요청 파라미터다. 목업의 검색 폼을 그대로 산다.
 
 **집계 SELECT는 잠금 읽기여야 한다.** 순서만으로는 부족하다.
 
-- `ProductReviewMapper`의 집계 SELECT에 `FOR UPDATE`를 붙인다. 평범한 SELECT로 두면 안 된다.
+- **집계 SELECT는 이제 `ReviewMapper`에 있다.** 거기에 `FOR UPDATE`를 붙인다. 평범한 SELECT로 두면 안 된다. 매퍼가 옮겨졌을 뿐 아래 이유는 그대로다 — 잠긴 것은 `products` 행이고 스냅샷이 굳는 것은 트랜잭션 단위라, 집계를 어느 도메인이 하든 같은 문제가 난다.
 - MariaDB 기본 격리 수준은 `REPEATABLE READ`이고, **읽기 스냅샷은 트랜잭션의 첫 평범한 SELECT에서 고정된다.** A3는 잠금을 잡기 **전에** A2의 검증 4가지를 평범한 SELECT로 수행하므로 스냅샷이 그때 이미 굳는다.
 - 그래서 동시 등록 두 건이 검증을 모두 끝낸 뒤 하나가 잠금을 기다리면, 그 트랜잭션은 잠금을 얻은 뒤에도 **먼저 커밋된 후기를 보지 못한다.** 자기 INSERT만 반영된 값으로 `products`를 마지막에 덮어써 `review_count`가 실제보다 작아진다. 잠금을 먼저 잡아 교착은 사라져도 값은 어긋난다.
 - 잠금 읽기는 스냅샷이 아니라 최신 커밋을 읽는다(current read). 이미 상품 행을 배타 잠금한 뒤라 다른 트랜잭션과 경합하지 않는다.
@@ -618,9 +625,10 @@ C1의 요청 파라미터다. 목업의 검색 폼을 그대로 산다.
 
 **#33에서 확인받을 것**
 
-- 계약 시그니처(`ProductRatingService`의 메서드 이름과 인자)
+- 계약 시그니처(`ProductReviewCommandService`의 메서드 이름과 인자)
 - 전용 매퍼(`ProductReviewMapper`)를 두는 것에 대한 상품 담당자 동의
 - 위 잠금 순서가 재고 경로와 어긋나지 않는지
+- **리뷰가 계산한 평균·건수를 상품이 그대로 쓰는 것**에 대한 동의. 상품 쪽에 검증할 방법이 없다
 
 ### D2. 알림
 
@@ -683,10 +691,10 @@ C1의 요청 파라미터다. 목업의 검색 폼을 그대로 산다.
 | 항목 | 결정 시점 |
 |---|---|
 | **주문 도메인 계약 시그니처**(A1 목록 + A2·A3 단건 검증) — 제외 목록과 페이징을 계약이 함께 처리 | **조각 1 착수 전, 주환님과 합의** (A1·2.7) |
-| **member 계약 시그니처** — 작성자 표시명, ID 묶음 조회 | **조각 3 착수 전, 수민님과 합의** (2.6·2.7) |
-| **관리자 검색 계약**(`writer`·`product`) | **조각 5 착수 전, 수민·주환님과 합의** (C2·2.7) |
-| D1 계약 시그니처·전용 매퍼 동의 | 조각 2 착수 전, 이슈 #33에서 확인 (방식 자체는 2026-08-06 확정) |
-| **후기 목록용 주문 스냅샷 계약** — B3·C1·C3가 `order_items.product_name`과 주문번호를 쓰는데, 합의 대상인 A1 계약은 *미작성* 항목만, C2 계약은 검색용 ID만 돌려준다. 이미 쓴 후기(`BLOCKED`·`DELETED` 포함)의 `orderItemId` 묶음을 받을 자리가 없다 | **조각 3 착수 전, 주환님과 합의** (2.7) |
+| **B1·B3가 ReadModel 대상인지** — 고객 화면의 후기 목록에 작성자 표시명을 붙이는 것이 15.9의 "여러 도메인을 조합하는 조회"인지. **ReadModel이면 아래 두 줄이 통째로 없어진다** | **조각 3 착수 전** (2.7) |
+| **member 계약 시그니처** — 작성자 표시명, ID 묶음 조회 | 조각 3 착수 전, 수민님과 합의 (2.6·2.7). **위 항목이 ReadModel로 정해지면 불필요** |
+| D1 계약 시그니처·전용 매퍼 동의 | 조각 2 착수 전, 이슈 #33에서 확인 (방식은 2026-08-06 개정) |
+| **후기 목록용 주문 스냅샷 계약** — B3·C1·C3가 `order_items.product_name`과 주문번호를 쓰는데, 합의 대상인 A1 계약은 *미작성* 항목만 돌려준다. 이미 쓴 후기(`BLOCKED`·`DELETED` 포함)의 `orderItemId` 묶음을 받을 자리가 없다 | 조각 3 착수 전, 주환님과 합의 (2.7). **위 항목이 ReadModel로 정해지면 불필요** |
 | **A4 수정 시 재집계 조건** — `overall_rating`이 바뀔 때만 부르면, 두 요청이 같은 값을 읽고 하나가 먼저 바꾼 뒤 다른 하나가 옛 값으로 되돌릴 때 집계가 누락된다. 잠금 아래에서 최신 값과 비교하거나 조건 없이 항상 재집계하는 쪽 | 조각 4 착수 전 (A4·D1) |
 | D2 `event_key` 규격 | 조각 7, PR #107 머지 후 |
 | D2 `NEW_REVIEW` 수신 관리자 | 조각 7, 민정님과 합의 |

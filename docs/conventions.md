@@ -84,6 +84,8 @@ Controller → Service → Mapper → DB
 | 화면 View | `<Domain><Purpose>View` | `ProductDetailView` |
 | 오류 코드 | `<Domain>ErrorCode` | `MemberErrorCode` |
 
+**도메인 간 연동 계약은 이 표가 아니라 [15.2](#152-명명)를 따른다** — 이름 앞에 데이터 소유 도메인이 한 번 더 붙는다(`OrderCouponQueryService`).
+
 ### 🔶 Form 네이밍
 
 | 안       | 형식 | 예시 | 비고 |
@@ -262,6 +264,7 @@ Service가 업무 규칙과 트랜잭션 경계를 소유한다.
 - 생성 키는 `useGeneratedKeys="true" keyProperty="id"`.
 - 컬럼-필드명이 다르거나 enum 변환이 불명확하면 `resultMap`을 작성한다.
 - `created_at`, `updated_at`은 DB 기본값이 관리하므로 SQL에서 세팅하지 않는다. ([6절](#6-데이터베이스-규약))
+- **다른 도메인의 테이블은 JOIN하지 않는다.** 연동 Mapper의 소유와 명명은 [15절](#15-도메인-간-연동), 조회 전용 예외는 [15.9](#159-통계조회-전용-readmodel).
 
 ## 12. 오류 처리 규칙
 
@@ -298,19 +301,114 @@ Service가 업무 규칙과 트랜잭션 경계를 소유한다.
 
 ## 15. 도메인 간 연동
 
-- 다른 도메인의 테이블을 직접 JOIN·조회하지 않고, Mapper·Entity를 직접 사용하지 않는다.
-- **예외 하나** — 자기 도메인이 소유한 **파생 컬럼을 유지하기 위한 집계 읽기**는 전용 매퍼에서 허용한다. **표시·검색·업무 규칙 판단은 예외 없이 금지한다.**
-  - 기준은 "전용 매퍼냐"가 아니라 **"무엇을 위해 읽느냐"**다. 파일을 하나 더 만들면 통과하는 규칙은 규칙이 아니라 절차다. 전용 매퍼는 허용의 근거가 아니라 허용된 읽기를 한 곳에 모아 두는 방법이다.
-  - 지금 이 예외로 허용되는 것은 하나다 — `ProductReviewMapper`가 `reviews`를 세어 `products.average_rating`·`review_count`를 유지한다. 자기 컬럼을 자기가 계산하는 것이라 도메인 침범이 아니라 구체화 뷰 유지에 가깝다. 리뷰 도메인에서의 적용과 판정 사례는 `docs/review/SPEC.md` 2.7에 있다.
-  - **예외를 열어도 결합은 남는다.** 원본 테이블의 어휘가 바뀌면 집계가 조용히 어긋나고 컴파일도 테스트도 통과한다. 이건 규칙이 아니라 **테스트로 막는다** — 집계 테스트에 제외 대상(예: 숨김 상태)이 실제로 빠지는지를 넣는다.
-- 각 도메인이 공개한 **Service 인터페이스** 또는 읽기 전용 **QueryService**를 통해 필요한 정보를 받는다.
-- 구현이 아직 없으면 인터페이스 시그니처만 먼저 합의하고, 사용하는 쪽은 stub으로 개발을 진행한다.
-- 최소 공개 계약 (1차 합의 대상):
+도메인 간 연동은 **데이터 소유권을 지키면서 공개 Service 계약으로만 수행한다.**
 
-| 도메인 | 계약 | 반환 |
-|---|---|---|
-| 회원 | `MemberService.findById(id)` | id, 이름, 권한, 상태 |
-| 상품 | `ProductQueryService.getSalesInfo(id)` | 판매가능여부, 가격, 재고 |
+### 15.1 기본 원칙
+
+- 데이터와 업무 규칙은 그 데이터를 **소유한 도메인**이 관리한다.
+- 다른 도메인의 테이블·Entity·Mapper를 직접 참조하거나 JOIN하지 않는다.
+- 도메인 간에는 공개 Service와 최소 범위의 DTO만 오간다.
+- **연동 코드의 패키지와 SQL은 데이터 소유 도메인에 둔다.** 쓰는 쪽이 아니라 가진 쪽이다.
+
+### 15.2 명명
+
+| 종류 | 형식 |
+|---|---|
+| 조회 | `<소유 도메인><참조 도메인>QueryService` |
+| 상태 변경 | `<소유 도메인><참조 도메인>CommandService` |
+| Mapper | `<소유 도메인><참조 도메인>Mapper` |
+| XML | `<소유 도메인><참조 도메인>Mapper.xml` |
+
+**이름의 첫 도메인이 데이터와 SQL의 소유자다.** `OrderCouponQueryService`는 쿠폰이 쓰지만 주문이 소유한다. 반대로 읽으면 SQL을 엉뚱한 도메인에 두게 된다.
+
+### 15.3 Service 책임
+
+**QueryService** — 조회만 공개한다. `@Transactional(readOnly = true)`. 등록·수정·삭제와 상태 변경을 하지 않는다.
+
+**CommandService** — 등록·수정·삭제와 상태 변경을 맡는다.
+
+- 공개 메서드는 SQL 동작이 아니라 **업무 행위**를 표현한다.
+- 상태 검증과 잠금에 필요한 조회는 해도 된다.
+- 상태 전이·유효성 검사·예외 처리를 책임진다.
+
+### 15.4 Mapper와 XML
+
+- 한 연동 Mapper와 XML을 QueryService와 CommandService가 함께 써도 된다. 조회 SQL과 변경 SQL이 같은 파일에 있어도 된다.
+- Mapper는 **데이터 소유 도메인 내부 Service에서만** 사용한다.
+- 다른 도메인의 테이블은 조회도 변경도 하지 않는다. **예외는 15.9 하나뿐이다.**
+- 파일이 지나치게 커지거나 동시 수정 충돌이 반복될 때만 담당자 합의 후 나눈다. 미리 나누지 않는다.
+
+### 15.5 일반 기능과 관리자 기능
+
+- **관리자 기능이라는 이유만으로 연동 Service·Mapper·XML을 새로 만들지 않는다.**
+- 같은 데이터와 업무 규칙을 쓰면 같은 연동 Service를 재사용한다.
+- 권한은 관리자 Controller·관리자 Service와 Spring Security에서 검증한다.
+- 관리자 전용 데이터, 조회 범위, 상태 변경 규칙이 **실제로 다를 때만** 별도 계약을 합의한다.
+- 일반·관리자 × Query·Command 네 조합을 미리 만들지 않는다.
+
+### 15.6 DTO와 Entity 경계
+
+- 다른 도메인에 Entity를 반환하거나 입력으로 받지 않는다.
+- 조회 결과와 명령 입력은 필요한 최소 필드만 담는다.
+- 비밀번호·인증 정보·불필요한 개인정보를 담지 않는다.
+- 사용자 입력으로 넘어온 권한·상태·금액을 그대로 믿지 않는다.
+
+### 15.7 트랜잭션
+
+- 여러 도메인의 변경이 하나의 업무라면 **요청을 시작한 공개 Service가 트랜잭션을 소유**한다.
+- 하위 CommandService는 같은 트랜잭션에 참여한다.
+- 한 단계라도 실패하면 관련 변경 전체가 rollback되어야 한다.
+- 상태 검증, **잠금 순서**, 중복 실행 방지 방식은 구현 전에 합의한다. 잠금 순서는 어긋나도 단일 요청에서는 결과가 같아 테스트를 통과한다.
+
+### 15.8 적용 범위
+
+- 필요한 계약만 만든다. "쓸 수도 있으니" 미리 만들지 않는다.
+- **기존 코드를 일괄로 개명하거나 옮기지 않는다.** 신규 연동 코드부터 적용한다.
+- 공개 계약과 담당 외 도메인 변경은 **데이터 소유 도메인 담당자의 확인을 받는다.**
+
+기존 이름 중 `MemberService.findById`, `ProductQueryService.getSalesInfo`는 15.2 형식이 아니지만 그대로 둔다.
+
+### 15.9 통계·조회 전용 ReadModel
+
+관리자 화면·통계·대시보드·검색처럼 **여러 도메인의 데이터를 한 번에 조합해야 하는 조회**는 ReadModel로 만들 수 있다. 직접 참조·JOIN 금지의 **조회 전용 예외**다.
+
+- 여러 도메인의 테이블을 직접 조회하거나 JOIN해도 된다.
+- **등록·수정·삭제·상태 변경 SQL을 쓰지 않는다.**
+- 결과는 Entity가 아니라 그 화면·통계 전용 DTO로 돌려준다.
+- 상태 전이·유효성 검증·권한 판단·업무 규칙을 여기서 처리하지 않는다.
+- **ReadModel 결과를 데이터 변경 가능 여부의 근거로 쓰지 않는다.** 상태 확인이나 변경 전 검증이 필요하면 소유 도메인의 QueryService·CommandService를 쓴다.
+- `@Transactional(readOnly = true)`.
+- Service·Mapper·DTO·XML은 개별 소유 도메인이 아니라 **그 조회 기능을 소유한 도메인**(예: `domain/statistics`) 아래에 둔다.
+- 명명은 `<업무 목적>ReadModelQueryService`, `<업무 목적>ReadModelMapper`.
+- 조회 대상 테이블의 구조 변경에 영향을 받으므로, **최초 작성과 주요 변경 때 관련 소유 도메인 담당자의 확인을 받는다.**
+- 같은 조회 목적의 ReadModel을 일반용·관리자용으로 중복해 만들지 않는다.
+
+```text
+domain/statistics/
+├── service/OrderStatisticsReadModelQueryService.java
+├── mapper/OrderStatisticsReadModelMapper.java
+└── dto/view/OrderStatisticsView.java
+
+resources/mapper/statistics/OrderStatisticsReadModelMapper.xml
+```
+
+```sql
+SELECT DATE(o.created_at)        AS orderDate,
+       COUNT(DISTINCT o.id)      AS orderCount,
+       SUM(p.amount)             AS paymentAmount,
+       COUNT(DISTINCT o.member_id) AS purchaserCount
+FROM orders o
+JOIN payments p ON p.order_id = o.id
+WHERE o.created_at >= #{startDate}
+  AND o.created_at <  #{endDate}
+  AND p.status = 'COMPLETED'
+GROUP BY DATE(o.created_at)
+ORDER BY orderDate
+```
+
+주문과 결제를 함께 읽지만 **읽기 위해서만** 쓴다. 주문 취소 가능 여부, 결제 상태 전이, 환불 처리 같은 업무 판단과 상태 변경은 각 소유 도메인의 공개 Service로 한다.
+
+**JOIN을 열어도 결합은 남는다.** 원본 테이블의 어휘가 바뀌면 ReadModel이 조용히 어긋나고 컴파일도 테스트도 통과한다. 이건 규칙이 아니라 **테스트로 막는다** — 제외 대상(예: 숨김 상태, 취소된 주문)이 실제로 빠지는지를 단언에 넣는다.
 
 ## 16. global 편입 기준
 
@@ -343,7 +441,7 @@ global에서 도메인 Mapper를 직접 호출하지 않는다. 필요하면 도
 리뷰에서 이 절 번호로 바로 지적한다.
 
 1. Controller → Mapper 직접 호출
-2. 다른 도메인의 Mapper·Entity 직접 사용
+2. 다른 도메인의 Mapper·Entity 직접 사용 ([15.9](#159-통계조회-전용-readmodel) ReadModel은 조회 전용 예외)
 3. Entity를 요청 Form이나 화면 View로 재사용
 4. Service에서 웹 객체(Model, HttpSession 등) 사용
 5. 일반 `Exception`으로 업무 흐름 제어

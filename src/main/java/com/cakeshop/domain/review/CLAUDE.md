@@ -54,7 +54,7 @@
 
 **형식과 규칙은 `AGENTS.md`의 "도메인 담당과 협업 경계"가 정본이다.** 여기 다시 적지 않는다.
 
-리뷰에서 이 규칙이 걸리는 자리는 **조각 2 하나**다 — `domain/product/`에 `ProductRatingService`·`ProductReviewMapper`를 **새로 만든다.** `담당자`는 **시은**이다.
+리뷰에서 이 규칙이 걸리는 자리는 **조각 1과 2**다 — `domain/order/`에 `OrderReviewQueryService`(담당자 **주환**), `domain/product/`에 `ProductReviewCommandService`·`ProductReviewMapper`(담당자 **시은**)를 새로 만든다. 이름 형식은 `docs/conventions.md` 15.2를 따른다.
 
 **조각 3의 모델 주입은 대상이 아니다.** 기존 `ProductController.detail`을 고치는 것이고, 정본 규칙은 **새로 만드는** 클래스·공개 Service 메서드로 범위를 한정한다.
 
@@ -80,9 +80,9 @@ SPEC.md의 결정이 잘못됐거나 부족하다고 판단되면 **코드로 �
 | 조각 | 합의할 것 | 상대 |
 |---|---|---|
 | 1 | 주문 도메인 계약 (A1 목록 + A2·A3 단건 검증, 제외 목록과 페이징 포함) | 주환 |
-| 2 | `ProductRatingService` 시그니처, 전용 매퍼 신설 동의 | 시은 (#33) |
-| 3 | 작성자 표시명 계약 (ID 묶음 조회) / **B3·C1·C3용 주문 스냅샷 계약** | 수민 / 주환 |
-| 5 | 관리자 검색 계약 (`writer`·`product`) | 수민·주환 |
+| 2 | `ProductReviewCommandService` 시그니처, 전용 매퍼 신설 동의, **리뷰가 계산한 값을 그대로 쓰는 것에 대한 동의** | 시은 (#33) |
+| 3 | **B1·B3가 ReadModel인지 먼저 정한다.** ReadModel이면 아래 두 합의가 없어진다 — 작성자 표시명 계약 / **B3·C1·C3용 주문 스냅샷 계약** | 수민 / 주환 |
+| 5 | ~~관리자 검색 계약~~ → ReadModel로 대체됨. 최초 작성 때 담당자 확인만 | 수민·주환 |
 | 7 | `event_key` 규격, `NEW_REVIEW` 수신 관리자 | 민정 (PR #107 머지 후) |
 
 - **조각 1과 2는 한 배포 단위다.** PR은 따로 열되 **조각 2 없이 조각 1만 `dev`에 머지하지 않는다.** (`PLAN.md` 작업 방식, R2)
@@ -90,9 +90,11 @@ SPEC.md의 결정이 잘못됐거나 부족하다고 판단되면 **코드로 �
 
 ## 이 도메인에서 절대 하지 않는 것
 
-**리뷰 매퍼는 `reviews`·`review_replies`·`review_images` 외의 테이블을 JOIN하지 않는다. 예외 없다.** 표시용이든 검색용이든 같다. 필요한 값은 그 도메인의 전용 QueryService가 DTO로 돌려받는다. **커뮤니티가 `members`를 8곳에서 직접 JOIN한다고 해서 따라 하지 않는다** — 리뷰는 더 엄격한 규칙을 쓰기로 정했고, 근거는 `SPEC.md` 2.7에 있다.
+**리뷰 매퍼는 `reviews`·`review_replies`·`review_images` 외의 테이블을 JOIN하지 않는다.** 표시용이든 검색용이든 같다. 필요한 값은 그 도메인의 전용 QueryService가 DTO로 돌려받는다. **커뮤니티가 `members`를 8곳에서 직접 JOIN한다고 해서 따라 하지 않는다** — 근거는 `SPEC.md` 2.7에 있다.
 
-2.7이 연 예외는 **반대 방향**이다 — 상품이 자기 파생 컬럼을 유지하려고 `reviews`를 세는 것(D1). **리뷰 매퍼 쪽은 여전히 예외가 없다.**
+**예외는 ReadModel 하나다**(`docs/conventions.md` 15.9). 여러 도메인을 조합하는 **쓰기 없는** 조회는 JOIN해도 되고, 리뷰에서는 C1·C2 관리자 목록·검색이 여기 해당한다. 그건 리뷰 매퍼가 아니라 별도 ReadModel 매퍼에 둔다.
+
+**쓰기 근거가 되는 읽기에는 예외가 없다.** ReadModel 결과로 상태 전이를 판단하지 않는다 — C4 숨김·해제는 리뷰 Service가 자기 테이블을 다시 읽어 수행한다.
 
 계약이 없으면 **만들지 말고 합의부터 한다.**
 
