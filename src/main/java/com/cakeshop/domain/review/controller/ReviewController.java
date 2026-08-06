@@ -63,11 +63,16 @@ public class ReviewController {
      *
      * <p>{@code orderItemId} 는 필수다. 같은 상품을 픽업한 주문이 여러 건일 수 있어 어느 주문
      * 상품인지 화면이 정할 수 없기 때문에, 진입은 A1 목록을 거친다.
+     *
+     * <p><b>{@code required} 를 풀지 않는다.</b> 풀면 인자 없는 요청이 {@code null} 로 들어와
+     * "없는 주문 상품" 404 가 되는데, SPEC A2 는 인자가 없거나 숫자가 아니면 400 이다. 없는
+     * 것과 못 찾은 것은 다른 오류다. 숫자가 아닌 값의 변환 실패도 마찬가지로 400 이며,
+     * 그 매핑은 {@code GlobalExceptionHandler} 에 있다.
      */
     @GetMapping("/reviews/new")
     public String reviewForm(
             @AuthenticationPrincipal MemberDetails member,
-            @RequestParam(required = false) Long orderItemId,
+            @RequestParam Long orderItemId,
             @ModelAttribute("reviewForm") ReviewForm reviewForm,
             Model model
     ) {

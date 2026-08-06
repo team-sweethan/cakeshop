@@ -47,6 +47,7 @@
 | `customer/member/mypage.html` | A1·B3 링크 2개 | 수민 |
 | `customer/order/detail.html` | `후기 작성` 링크에 `orderItemId` 전달 | 주환 |
 | `customer/product/detail.html` | 후기 영역 교체 (`"준비 중"` → B1) | 시은 |
+| `home/screens.html` | C16 링크·배지 | 공용(화면 인벤토리) |
 
 `customer/product/detail.html`과 `customer/order/detail.html`은 **PR #74(주환)가 함께 고쳤고 지금은 머지됐다.** 조각 3 착수 전에 `dev` 기준을 다시 확인한다.
 

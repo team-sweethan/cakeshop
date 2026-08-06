@@ -54,4 +54,18 @@ public class ReviewForm {
     @NotBlank(message = "후기 내용을 입력해 주세요.")
     @Size(min = 10, max = 2000, message = "후기는 10자 이상 2000자 이하로 입력해 주세요.")
     private String content;
+
+    /**
+     * 바인딩 시점에 앞뒤 공백을 걷는다(SPEC 2.4).
+     *
+     * <p><b>검증 전에 걷어야 한다.</b> 뒤에서 걷으면 공백 일곱 개에 세 글자짜리 입력이 10자
+     * 하한을 통과한 뒤 저장 직전에 세 글자로 줄어든다. 여기서 걷으면 {@code @Size} 와
+     * {@code @NotBlank} 가 이미 걷힌 값을 보므로 검증과 저장이 같은 값을 본다.
+     *
+     * <p>{@code strip()} 은 앞뒤만 걷고 <b>중간 줄바꿈은 보존한다.</b> 줄을 나눠 쓴 후기가
+     * 한 덩어리로 뭉치면 안 된다.
+     */
+    public void setContent(String content) {
+        this.content = (content == null) ? null : content.strip();
+    }
 }

@@ -2,7 +2,9 @@ package com.cakeshop.domain.review;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.doThrow;
 
+import com.cakeshop.domain.product.service.ProductRatingService;
 import com.cakeshop.domain.review.dto.form.ReviewForm;
 import com.cakeshop.domain.review.error.ReviewErrorCode;
 import com.cakeshop.domain.review.service.ReviewService;
@@ -23,6 +25,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.test.util.AopTestUtils;
 
 /**
  * 후기 작성과 평점 집계를 실제 DB 로 확인한다(SPEC A3 · D1).
@@ -43,6 +47,10 @@ class ReviewWriteIntegrationTests {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    /** rollback 테스트에서만 쓴다. spy 라 나머지 테스트는 실제 집계가 그대로 돈다. */
+    @MockitoSpyBean
+    private ProductRatingService productRatingService;
+
     /** 후기를 쓰면 상품 평점과 후기 수가 같은 트랜잭션에서 갱신된다. */
     @Test
     void createReview_updatesProductRating() {
@@ -53,6 +61,40 @@ class ReviewWriteIntegrationTests {
         assertThat(averageRating(fixture.productId()))
                 .isEqualByComparingTo(new BigDecimal("4.00"));
         assertThat(reviewCount(fixture.productId())).isEqualTo(1);
+    }
+
+    /**
+     * 집계가 실패하면 <b>후기 INSERT 도 함께 되돌아간다</b>(SPEC D1).
+     *
+     * <p>이 테스트가 없으면 {@code createReview} 의 {@code @Transactional} 이 빠지거나
+     * 집계 호출이 다른 트랜잭션으로 갈라져도 나머지 테스트가 전부 통과한다. 그렇게 되면
+     * <b>후기만 남고 상품 평점은 영구히 어긋난다</b> — 다음 후기가 달릴 때까지 아무도
+     * 모르고, 달려도 그때 값으로 덮여 원인이 지워진다.
+     *
+     * <p>{@code ProductRatingService} 를 spy 로 바꿔 집계만 실패시킨다. 실제 DB 오류를
+     * 만들려면 스키마를 건드려야 하는데 그건 이 테스트가 확인하려는 것이 아니다.
+     */
+    @Test
+    void createReview_recalculateFails_rollsBackInsert() {
+        Fixture fixture = insertPickedUpOrder("rollback");
+
+        // 주입된 것은 트랜잭션 프록시고 spy 는 그 아래에 있다. 프록시에 대고 stub 하면
+        // when(...) 호출이 그대로 인터셉터를 타고, recalculate 가 MANDATORY 라
+        // 트랜잭션 밖이라며 stub 도 하기 전에 터진다.
+        ProductRatingService spy = AopTestUtils.getUltimateTargetObject(productRatingService);
+        doThrow(new IllegalStateException("집계 실패"))
+                .when(spy).recalculate(fixture.productId());
+
+        // 메시지까지 고정한다. IllegalTransactionStateException 이 IllegalStateException 의
+        // 하위라, 타입만 보면 @Transactional 을 지워도 이 테스트가 통과한다 — 그때는 잠금이
+        // MANDATORY 위반으로 먼저 터져 INSERT 자체가 없으므로 rollback 단언도 같이 통과한다.
+        assertThatThrownBy(() ->
+                reviewService.createReview(fixture.memberId(), form(fixture.orderItemId(), 5)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("집계 실패");
+
+        assertThat(reviewRows(fixture.orderItemId())).isZero();
+        assertThat(reviewCount(fixture.productId())).isZero();
     }
 
     /**
@@ -188,6 +230,12 @@ class ReviewWriteIntegrationTests {
     private long reviewCount(long productId) {
         Long count = jdbcTemplate.queryForObject(
                 "SELECT review_count FROM products WHERE id = ?", Long.class, productId);
+        return count == null ? 0 : count;
+    }
+
+    private long reviewRows(long orderItemId) {
+        Long count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM reviews WHERE order_item_id = ?", Long.class, orderItemId);
         return count == null ? 0 : count;
     }
 

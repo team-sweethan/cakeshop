@@ -273,13 +273,16 @@ LIMIT #{size} OFFSET #{offset}
 
 **`orderItemId`는 필수다.** 없거나 숫자가 아니면 400이다.
 
-- 진입점 3곳이 모두 파라미터 없는 `/reviews/new`로 가고 있다. 셋 다 고쳐야 한다.
+- 진입점 3곳을 모두 고쳐야 한다.
 
 | 진입점 | 현재 | 바꿀 것 |
 |---|---|---|
-| 주문 상세 `후기 작성` | `/reviews/new` | `/reviews/new?orderItemId={N}` |
+| 주문 상세 `후기 작성` | **링크가 없다** | `/reviews/new?orderItemId={N}` — 새로 넣는다 |
 | 마이페이지 `작성할 후기` | `/reviews/new` | `/mypage/reviews/writable` (A1) |
 | 상품 상세 `후기 작성` | `/reviews/new` | `/mypage/reviews/writable` (A1) |
+| 화면 인벤토리 C16 | `/reviews/new` | `/mypage/reviews/writable` (A1) |
+
+- **주문 상세만 폼으로 곧바로 보낸다.** 어느 주문 상품인지 이미 아는 유일한 화면이라서다. 이미 후기를 쓴 항목에도 링크가 보이지만 폼에서 409로 막는다 — 여기서 가리려면 주문 상세가 `reviews`를 읽어야 해서 도메인 경계를 넘는다.
 
 - **상품 상세에서 곧바로 폼으로 보내지 않는 이유**: 그 상품을 픽업한 주문이 여러 건일 수 있어 어느 주문 상품인지 화면이 정할 수 없다. 고르는 중간 화면을 새로 만드느니 A1이 대신한다.
 
@@ -676,7 +679,7 @@ C1의 요청 파라미터다. 목업의 검색 폼을 그대로 산다.
 | 관리자 목록 (C1·C2) | `admin/review/list.html` | 목업 → 전환 (`삭제` 제거, 상태 필터 추가) |
 | 관리자 상세 (C3·C5·C6) | `admin/review/detail.html` | **신규** |
 
-진입점 수정: `customer/member/mypage.html`(A1·B3 링크 2개), `customer/order/detail.html`(`orderItemId` 전달), `customer/product/detail.html`(작성 버튼 → A1)
+진입점 수정: `customer/member/mypage.html`(A1·B3 링크 2개), `customer/order/detail.html`(`orderItemId` 전달), `customer/product/detail.html`(작성 버튼 → A1), `home/screens.html`(C16 → A1)
 
 ## 9. 미정
 

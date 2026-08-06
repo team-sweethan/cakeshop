@@ -14,17 +14,21 @@ import com.cakeshop.global.error.ErrorCode;
  * <p><b>소유권 위반 전용 코드는 두지 않는다.</b> 남의 주문 상품에 후기를 쓰려 하면 403 이
  * 아니라 {@link #ORDER_ITEM_NOT_FOUND} 404 다 — 두 응답이 갈리면 주소를 훑어 남의 주문 상품
  * 존재를 알아낼 수 있어 가리려던 것이 그대로 드러난다(SPEC 2.5).
+ *
+ * <p><b>번호는 SPEC 2.5 표가 정본이고 조각 순서가 아니라 표를 따른다.</b> 조각 1 에서 쓰지
+ * 않는 {@code REVIEW_002}({@code REVIEW_NOT_FOUND}) 자리를 당겨 쓰면 조각 4 에서 충돌한다.
+ * 이미 나간 응답의 코드를 나중에 바꿀 수는 없으므로 처음부터 비워 둔다.
  */
 public enum ReviewErrorCode implements ErrorCode {
 
     NOT_PICKED_UP("REVIEW_001", "픽업 완료된 주문만 후기를 작성할 수 있습니다.", 400),
 
+    // REVIEW_002 는 REVIEW_NOT_FOUND(조각 4) 자리다. 비워 둔다.
+
     /** 없는 주문 상품과 <b>남의</b> 주문 상품 둘 다 이 코드다. */
-    ORDER_ITEM_NOT_FOUND("REVIEW_002", "주문 상품을 찾을 수 없습니다.", 404),
+    ORDER_ITEM_NOT_FOUND("REVIEW_003", "주문 상품을 찾을 수 없습니다.", 404),
 
-    ALREADY_REVIEWED("REVIEW_003", "이미 후기를 작성한 주문 상품입니다.", 409),
-
-    INVALID_RATING("REVIEW_004", "평점은 1점에서 5점 사이여야 합니다.", 400);
+    ALREADY_REVIEWED("REVIEW_004", "이미 후기를 작성한 주문 상품입니다.", 409);
 
     private final String code;
     private final String message;

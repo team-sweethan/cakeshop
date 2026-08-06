@@ -59,6 +59,18 @@
               <li th:each="option : ${item.options}"
                   th:text="${option.groupName + ': ' + option.optionName}">크기: 2호</li>
             </ul>
+            <!--/*
+              작성자 : HyunGyu-Cho / 담당자 : 주환 / 작성일 : 2026-08-06
+              기능 : 후기 작성 진입점 (조각 1, SPEC A2)
+              설명 : 주문 상세는 어느 주문 상품인지 이미 알고 있는 유일한 진입점이라 목록(A1)을
+                     거치지 않고 곧바로 폼으로 보낸다. 마이페이지·상품 상세와 갈리는 이유다.
+                     이미 후기를 쓴 항목도 링크가 보이지만 폼에서 409 로 막힌다 — 여기서
+                     가리려면 주문 상세가 reviews 를 읽어야 해서 도메인 경계를 넘는다.
+            */-->
+            <div class="cluster" th:if="${order.status.name() == 'PICKED_UP'}">
+              <a class="btn"
+                 th:href="@{/reviews/new(orderItemId=${item.orderItemId})}">후기 작성</a>
+            </div>
           </article>
 
           <div class="data-row"><span class="data-row__label">상품 금액</span>
