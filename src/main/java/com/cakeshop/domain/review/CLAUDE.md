@@ -54,7 +54,7 @@
 
 **형식과 규칙은 `AGENTS.md`의 "도메인 담당과 협업 경계"가 정본이다.** 여기 다시 적지 않는다.
 
-리뷰에서 이 규칙이 걸리는 자리는 **조각 2 하나**다 — `domain/product/`에 `ProductRatingService`·`ProductReviewMapper`를 **새로 만든다.** `담당자`는 **시은**이다.
+리뷰에서 이 규칙이 걸리는 자리는 **조각 1과 2**다 — `domain/order/`에 `OrderReviewQueryService`(담당자 **주환**), `domain/product/`에 `ProductReviewCommandService`·`ProductReviewMapper`(담당자 **시은**)를 새로 만든다. 이름 형식은 `docs/conventions.md` 15.2를 따른다.
 
 **조각 3의 모델 주입은 대상이 아니다.** 기존 `ProductController.detail`을 고치는 것이고, 정본 규칙은 **새로 만드는** 클래스·공개 Service 메서드로 범위를 한정한다.
 
@@ -80,7 +80,7 @@ SPEC.md의 결정이 잘못됐거나 부족하다고 판단되면 **코드로 �
 | 조각 | 합의할 것 | 상대 |
 |---|---|---|
 | 1 | 주문 도메인 계약 (A1 목록 + A2·A3 단건 검증, 제외 목록과 페이징 포함) | 주환 |
-| 2 | `ProductRatingService` 시그니처, 전용 매퍼 신설 동의 | 시은 (#33) |
+| 2 | `ProductReviewCommandService` 시그니처, 전용 매퍼 신설 동의, **리뷰가 계산한 값을 그대로 쓰는 것에 대한 동의** | 시은 (#33) |
 | 3 | 작성자 표시명 계약 (ID 묶음 조회) / **B3·C1·C3용 주문 스냅샷 계약** | 수민 / 주환 |
 | 5 | 관리자 검색 계약 (`writer`·`product`) | 수민·주환 |
 | 7 | `event_key` 규격, `NEW_REVIEW` 수신 관리자 | 민정 (PR #107 머지 후) |
@@ -90,9 +90,9 @@ SPEC.md의 결정이 잘못됐거나 부족하다고 판단되면 **코드로 �
 
 ## 이 도메인에서 절대 하지 않는 것
 
-**리뷰 매퍼는 `reviews`·`review_replies`·`review_images` 외의 테이블을 JOIN하지 않는다. 예외 없다.** 표시용이든 검색용이든 같다. 필요한 값은 그 도메인의 전용 QueryService가 DTO로 돌려받는다. **커뮤니티가 `members`를 8곳에서 직접 JOIN한다고 해서 따라 하지 않는다** — 리뷰는 더 엄격한 규칙을 쓰기로 정했고, 근거는 `SPEC.md` 2.7에 있다.
+**리뷰 매퍼는 `reviews`·`review_replies`·`review_images` 외의 테이블을 JOIN하지 않는다.** 표시용이든 검색용이든 같다. 필요한 값은 그 도메인의 전용 QueryService가 DTO로 돌려받는다. **커뮤니티가 `members`를 8곳에서 직접 JOIN한다고 해서 따라 하지 않는다** — 근거는 `SPEC.md` 2.7에 있다.
 
-2.7이 연 예외는 **반대 방향**이다 — 상품이 자기 파생 컬럼을 유지하려고 `reviews`를 세는 것(D1). **리뷰 매퍼 쪽은 여전히 예외가 없다.**
+**리뷰에는 예외가 없다.** 팀 규칙이 연 ReadModel 예외(`docs/conventions.md` 15.9)는 여러 도메인을 **집계·요약**하는 통계·대시보드용이다. **C1·C2 관리자 목록·검색은 관리자 화면이지만 대상이 아니다** — 조건이 남의 도메인에서 올 뿐 결국 후기 목록이라 리뷰가 소유하고, 조건은 계약으로 받는다.
 
 계약이 없으면 **만들지 말고 합의부터 한다.**
 

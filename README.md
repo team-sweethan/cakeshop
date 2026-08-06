@@ -350,6 +350,8 @@ CREATE DATABASE `cakeshop`
 - `global`: 공통 기반(config·security·error·web·paging·infra)
 - `domain/{13개}`: controller·service·mapper·dto(form/view)·entity·error
 
+도메인 간에는 테이블을 직접 JOIN하지 않고 공개 Service 계약으로 주고받는다. **연동 계약의 코드와 SQL은 데이터를 소유한 도메인에 둔다** — `OrderCouponQueryService`는 쿠폰이 쓰지만 `domain/order`에 있다. 여러 도메인을 집계·요약하는 통계·대시보드 조회만 ReadModel(`domain/statistics`)로 예외를 연다. 규칙은 [`docs/conventions.md` 15절](docs/conventions.md#15-도메인-간-연동).
+
 ---
 
 ## Store 수직 슬라이스 구현 예시
