@@ -4,6 +4,7 @@ import com.cakeshop.domain.order.dto.view.OrderDetailView;
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.order.service.customer.CustomerOrderQueryService;
+import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.payment.dto.form.TossPaymentSuccessForm;
 import com.cakeshop.domain.payment.dto.view.PaymentCheckoutView;
 import com.cakeshop.domain.payment.dto.view.PaymentCompletionView;
@@ -12,6 +13,8 @@ import com.cakeshop.domain.payment.entity.PaymentStatus;
 import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.store.dto.view.StoreView;
 import com.cakeshop.domain.store.service.StoreService;
+import com.cakeshop.global.error.BusinessException;
+import com.cakeshop.global.error.CommonErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,6 +31,8 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -44,6 +49,9 @@ class PaymentQueryServiceTests {
     private CustomerOrderQueryService orderQueryService;
 
     @Mock
+    private MemberService memberService;
+
+    @Mock
     private PaymentService paymentService;
 
     @Mock
@@ -55,12 +63,14 @@ class PaymentQueryServiceTests {
     void setUp() {
         paymentQueryService = new PaymentQueryService(
                 orderQueryService,
+                memberService,
                 paymentService,
                 storeService,
                 CLOCK,
                 "test-client-key",
                 "test-secret-key"
         );
+        lenient().when(memberService.isActiveMember(10L)).thenReturn(true);
     }
 
     @Test
@@ -110,6 +120,7 @@ class PaymentQueryServiceTests {
     void getCheckout_missingSecretKey_disablesPayment() {
         PaymentQueryService serviceWithoutSecretKey = new PaymentQueryService(
                 orderQueryService,
+                memberService,
                 paymentService,
                 storeService,
                 CLOCK,
@@ -122,6 +133,20 @@ class PaymentQueryServiceTests {
         PaymentCheckoutView checkout = serviceWithoutSecretKey.getCheckout(10L, "member@example.com", 1L);
 
         assertThat(checkout.paymentAvailable()).isFalse();
+    }
+
+    @Test
+    void getCheckout_inactiveMember_rejectsBeforeOpeningPayment() {
+        when(memberService.isActiveMember(10L)).thenReturn(false);
+
+        assertThatThrownBy(() -> paymentQueryService.getCheckout(
+                10L,
+                "member@example.com",
+                1L
+        )).isInstanceOfSatisfying(
+                BusinessException.class,
+                error -> assertThat(error.getErrorCode()).isEqualTo(CommonErrorCode.FORBIDDEN)
+        );
     }
 
     @Test

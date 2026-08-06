@@ -4,6 +4,7 @@ import com.cakeshop.domain.order.dto.view.OrderDetailView;
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.order.service.customer.CustomerOrderQueryService;
+import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.payment.dto.form.TossPaymentSuccessForm;
 import com.cakeshop.domain.payment.dto.view.PaymentCheckoutView;
 import com.cakeshop.domain.payment.dto.view.PaymentCompletionView;
@@ -29,6 +30,7 @@ public class PaymentQueryService {
     private static final int TOSS_ORDER_NAME_MAX_LENGTH = 100;
 
     private final CustomerOrderQueryService orderQueryService;
+    private final MemberService memberService;
     private final PaymentService paymentService;
     private final StoreService storeService;
     private final Clock clock;
@@ -37,6 +39,7 @@ public class PaymentQueryService {
 
     public PaymentQueryService(
             CustomerOrderQueryService orderQueryService,
+            MemberService memberService,
             PaymentService paymentService,
             StoreService storeService,
             Clock clock,
@@ -44,6 +47,7 @@ public class PaymentQueryService {
             @Value("${app.payment.toss.secret-key:}") String secretKey
     ) {
         this.orderQueryService = orderQueryService;
+        this.memberService = memberService;
         this.paymentService = paymentService;
         this.storeService = storeService;
         this.clock = clock;
@@ -54,6 +58,9 @@ public class PaymentQueryService {
     /** 결제 기한 및 정보 검증 -> 일반 주믄용 Toss 결제 화면 데이터 구성**/
     @Transactional(readOnly = true)
     public PaymentCheckoutView getCheckout(long memberId, String memberEmail, long orderId) {
+        if (!memberService.isActiveMember(memberId)) {
+            throw new BusinessException(CommonErrorCode.FORBIDDEN);
+        }
 
         OrderDetailView order = orderQueryService.getMemberOrder(memberId, orderId);
         // 일반 상품 검증.

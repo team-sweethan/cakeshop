@@ -132,6 +132,24 @@ class FulfillmentServiceTests {
                 .satisfies(view -> assertThat(view.pickupCompletable()).isFalse());
     }
 
+    @Test
+    void getFulfillments_requestedCancellation_doesNotExposeCompletionAction() {
+        Order order = order(OrderStatus.READY_FOR_PICKUP);
+        when(orderMapper.findFulfillmentOrders(
+                LocalDate.of(2026, 8, 2).atStartOfDay(),
+                LocalDate.of(2026, 8, 3).atStartOfDay(),
+                null
+        )).thenReturn(List.of(order));
+        when(orderMapper.findOrderItemsByOrderId(10L)).thenReturn(List.of());
+        when(orderMapper.findOrderItemOptionsByOrderId(10L)).thenReturn(List.of());
+        when(orderMapper.hasRequestedRefundCancellation(10L)).thenReturn(true);
+
+        FulfillmentListView result = fulfillmentService.getFulfillments(null);
+
+        assertThat(result.orders()).singleElement()
+                .satisfies(view -> assertThat(view.pickupCompletable()).isFalse());
+    }
+
     private Order order(OrderStatus status) {
         Order order = new Order();
         order.setId(10L);

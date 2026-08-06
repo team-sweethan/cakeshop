@@ -120,6 +120,7 @@ public class FulfillmentService {
     private boolean isPickupCompletable(Order order, LocalDateTime now) {
         return order.getStatus() == OrderStatus.READY_FOR_PICKUP
                 && order.getPickupAt() != null
-                && !now.isBefore(order.getPickupAt());
+                && !now.isBefore(order.getPickupAt())
+                && !orderMapper.hasRequestedRefundCancellation(order.getId());
     }
 }
