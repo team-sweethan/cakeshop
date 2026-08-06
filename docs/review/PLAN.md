@@ -20,7 +20,7 @@
 
 | # | 조각 | 이슈 | 상태 | 내용 |
 |---|---|---|---|---|
-| 0 | 준비 | #108 | 대기 | `ReviewStatus` enum, `CHECK` 제약 migration, 평점 범위 제약, `status` 기본값 정리 |
+| 0 | 준비 | #108 | PR #125 | `ReviewStatus` enum, `CHECK` 제약 migration, 평점 범위 제약, `status` 기본값 정리 |
 | 1 | 작성 | #109 | 대기 | 자격 검증(`PICKED_UP` + 본인 주문), `reviews` INSERT, 주문상품당 1건, **작성할 후기 목록 화면 신규**(SPEC A1) |
 | 2 | 평점 집계 | **#33** | 대기 | 집계 연동. **1 직후에 붙인다.** 시은 담당 이슈와 같은 일이라 선행 합의가 필요하다 |
 | 3 | 조회·노출 | #110 | 대기 | 상품 상세 후기 목록, 페이징, 내 후기 조회 |
@@ -148,9 +148,9 @@
 |---|---|---|
 | R1 | **알림 규격이 `dev`에 없다.** `NotificationType.NEW_REVIEW`·`CUSTOMER_REVIEW`, `notifications.review_id`·`review_reply_id`, `NotificationRequest.reviewId`가 전부 PR #107(미머지)에만 있다. 머지 전에 조각 7을 시작하면 컴파일되지 않는 의존이 생기고, 규격이 바뀌면 다시 써야 한다. 그래서 순서로 풀었다 — 1~6은 알림 없이 완결된다 | 조각 7을 마지막에 두어 회피 |
 | R2 | **`products.average_rating`·`review_count`는 이미 상품 정렬에 쓰이는데 갱신되지 않는다.** 값을 쓰는 곳은 `seed-local.sql`(776~785행)뿐이라 운영에서는 영구히 0이다. 조각 1만 하고 2를 미루면 **후기가 쌓이는데 정렬은 안 바뀌는** 상태가 된다 | 조각 2를 1 직후에 배치. **조각 1·2를 한 배포 단위로 묶어** 조각 1 단독 머지를 막는다 (2026-08-06 강화) |
-| R3 | **`reviews.status` 기본값 `'VISIBLE'`은 코드베이스 어디에도 없는 어휘다.** 지금은 데이터가 없어 교체 비용이 가장 싸다 | 조각 0에서 해소 (SPEC 2.1) |
+| R3 | **`reviews.status` 기본값 `'VISIBLE'`은 코드베이스 어디에도 없는 어휘다.** 지금은 데이터가 없어 교체 비용이 가장 싸다 | 조각 0(PR #125)에서 해소 — 보정 UPDATE 후 `chk_reviews_status`, 기본값도 `'PUBLISHED'` (SPEC 2.1) |
 | R4 | **`reviews.product_id`가 `order_items.product_id`와 어긋날 수 있다.** 요청값을 믿으면 남의 상품에 후기를 붙일 수 있다 | 조각 1에서 `order_items`로부터 파생. 테스트로 고정 (SPEC A3) |
-| R5 | **평점 범위 제약이 DB에 없다.** `TINYINT UNSIGNED`라 0과 255가 들어간다 | 조각 0에서 `CHECK` 추가. 화면·서버를 합쳐 세 겹 (SPEC 2.2) |
+| R5 | **평점 범위 제약이 DB에 없다.** `TINYINT UNSIGNED`라 0과 255가 들어간다 | 조각 0(PR #125)에서 해소 — 평점 4종에 제약을 하나씩. 화면·서버를 합쳐 세 겹 (SPEC 2.2) |
 | R6 | **목업의 평점 4종이 스키마와 어긋난다.** 목업 `맛`/`디자인`/`포장`/`응대` vs 스키마 `overall`/`taste`/`design`/`service` | **해소** — 2026-08-05에 스키마를 택하고 `포장`을 `응대`로 흡수, 화면에 `전체` 추가 (SPEC 2.2) |
 | R7 | **PR #107의 migration이 V0의 `notifications`·`notification_deliveries`를 `DROP` 후 재생성한다.** 리뷰와 직접 관련은 없지만, 조각 7이 그 migration 이후 스키마를 전제하므로 머지 순서가 어긋나면 로컬에서 재현되지 않는 실패가 난다 | 조각 7 착수 시 `dev` 기준으로 확인 |
 | R8 | **상품별 후기 조회를 받쳐 줄 인덱스가 `fk_reviews_product`뿐이라 정렬에 filesort가 붙는다.** 1차 데이터로는 문제가 없고 온라인 DDL로 나중에 붙일 수 있다 | 1차에선 수용. **되돌아올 계기**: 한 상품의 후기가 수백 건을 넘거나 상품 상세가 눈에 띄게 느려지면 `(product_id, status, created_at, id)` 복합 인덱스를 새 migration으로 |
