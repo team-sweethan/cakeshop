@@ -34,9 +34,18 @@ class CouponDisplayStatusTests {
                 .isEqualTo(CouponDisplayStatus.SCHEDULED);
     }
 
+    @Test
+    void fromUnlimitedCouponDoesNotReturnExhausted() {
+        Coupon coupon = coupon(CouponStatus.ACTIVE, null, 100,
+                LocalDateTime.now().plusDays(1), LocalDateTime.now().minusHours(1));
+
+        assertThat(CouponDisplayStatus.from(coupon, LocalDateTime.now()))
+                .isEqualTo(CouponDisplayStatus.ACTIVE);
+    }
+
     private Coupon coupon(
             CouponStatus status,
-            int totalQuantity,
+            Integer totalQuantity,
             int issuedQuantity,
             LocalDateTime expiresAt,
             LocalDateTime startsAt) {

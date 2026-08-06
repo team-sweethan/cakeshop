@@ -4,128 +4,111 @@
 <body>
 <div class="admin-layout">
     <aside th:replace="~{fragments/admin/sidebar :: sidebar('coupons')}"></aside>
-
     <div class="admin-main">
         <header th:replace="~{fragments/admin/header :: header('쿠폰 관리')}"></header>
-
-        <main class="admin-content">
+        <main class="admin-content" data-coupon-detail
+              th:attr="data-coupon-id=${couponId},data-keyword=${condition.keyword},data-status=${condition.status},data-page=${page},data-csrf-name=${_csrf.parameterName},data-csrf-token=${_csrf.token},data-specific-members=${couponDetail.targetType.name() == 'SPECIFIC_MEMBERS'}">
             <div th:replace="~{fragments/common/alert :: alert}"></div>
-
             <h1 class="admin-page-title">쿠폰 상세 정보</h1>
 
-            <!-- 수정 Form과 분리된 읽기 전용 영역: 화면 값은 저장 요청으로 전송하지 않는다. -->
             <div class="panel">
-                <div class="form-group">
-                    <label for="name"> 쿠폰명 </label>
-                    <input id="name" class="form-control" th:value="${couponForm.name}" disabled>
+                <div class="form-group"><label for="name">쿠폰명</label><input id="name" class="form-control"
+                                                                            th:value="${couponDetail.name}" disabled>
                 </div>
-
                 <div class="grid grid--2">
-                    <fieldset class="form-group">
-                        <legend> 할인 유형 </legend>
-
-                        <div class="choice-list">
-                            <label class="choice">
-                                <input type="radio" name="discountType" value="FIXED_AMOUNT" th:checked="${#strings.toString(couponForm.discountType) == 'FIXED_AMOUNT'}" disabled> 금액 할인
-                            </label>
-
-                            <label class="choice">
-                                <input type="radio" name="discountType" value="PERCENTAGE" th:checked="${#strings.toString(couponForm.discountType) == 'PERCENTAGE'}" disabled> 비율 할인
-                            </label>
-                        </div>
-                    </fieldset>
-
-                    <div class="form-group">
-                        <label for="discountValue"> 할인값 </label>
-                        <input id="discountValue"
-                               class="form-control"
-                               type="number"
-                               th:value="${couponForm.discountValue}"
-                               disabled>
-                    </div>
+                    <div class="form-group"><label for="discountType">할인 유형</label><input id="discountType"
+                                                                                          class="form-control"
+                                                                                          th:value="${couponDetail.discountType.name() == 'FIXED_AMOUNT' ? '금액 할인' : '비율 할인'}"
+                                                                                          disabled></div>
+                    <div class="form-group"><label for="discountValue">할인값</label><input id="discountValue"
+                                                                                         class="form-control"
+                                                                                         th:value="${couponDetail.discountValue}"
+                                                                                         disabled></div>
                 </div>
-
                 <div class="grid grid--2">
-                    <div class="form-group">
-                        <label for="minimumOrderAmount"> 최소 주문 금액 </label>
-                        <input id="minimumOrderAmount"
-                               class="form-control"
-                               type="number"
-                               th:value="${couponForm.minimumOrderAmount}"
-                               disabled>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="maximumDiscountAmount"> 최대 할인 금액 </label>
-                        <input id="maximumDiscountAmount"
-                               class="form-control"
-                               type="number"
-                               th:value="${couponForm.maximumDiscountAmount}"
-                               disabled>
-                    </div>
+                    <div class="form-group"><label for="minimumOrderAmount">최소 주문 금액</label><input
+                            id="minimumOrderAmount" class="form-control" th:value="${couponDetail.minimumOrderAmount}"
+                            disabled></div>
+                    <div class="form-group"><label for="maximumDiscountAmount">최대 할인 금액</label><input
+                            id="maximumDiscountAmount" class="form-control"
+                            th:value="${couponDetail.maximumDiscountAmount}" disabled></div>
                 </div>
-
                 <div class="grid grid--2">
-                    <div class="form-group">
-                        <label for="startsAt"> 시작 일시 </label>
-                        <input id="startsAt"
-                               class="form-control"
-                               type="datetime-local"
-                               th:value="${#temporals.format(couponForm.startsAt, 'yyyy-MM-dd''T''HH:mm')}"
-                               disabled>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="expiresAt"> 종료 일시 </label>
-                        <input id="expiresAt"
-                               class="form-control"
-                               type="datetime-local"
-                               th:value="${#temporals.format(couponForm.expiresAt, 'yyyy-MM-dd''T''HH:mm')}"
-                               disabled>
-                    </div>
+                    <div class="form-group"><label for="startsAt">시작 일시</label><input id="startsAt" class="form-control"
+                                                                                      type="datetime-local"
+                                                                                      th:value="${#temporals.format(couponDetail.startsAt, 'yyyy-MM-dd''T''HH:mm')}"
+                                                                                      disabled></div>
+                    <div class="form-group"><label for="expiresAt">종료 일시</label><input id="expiresAt"
+                                                                                       class="form-control"
+                                                                                       type="datetime-local"
+                                                                                       th:value="${#temporals.format(couponDetail.expiresAt, 'yyyy-MM-dd''T''HH:mm')}"
+                                                                                       disabled></div>
                 </div>
-
-                <fieldset class="form-group">
-                    <legend>발급 대상</legend>
-
-                    <div class="choice-list">
-                        <label class="choice"><input type="radio" disabled checked>전체 회원</label>
-                        <label class="choice"><input type="radio" disabled>첫 주문 회원</label>
-                        <label class="choice"><input type="radio" disabled>생일 회원</label>
-                        <label class="choice"><input type="radio" disabled>특정 회원</label>
-                    </div>
-                </fieldset>
-
-                <div class="form-group">
-                    <label for="totalQuantity">총 발급 수량</label>
-                    <input id="totalQuantity"
-                           class="form-control"
-                           type="number"
-                           th:value="${couponForm.totalQuantity}"
-                           disabled>
+                <div class="grid grid--2">
+                    <div class="form-group"><label for="targetType">발급 대상</label><input id="targetType"
+                                                                                        class="form-control"
+                                                                                        th:value="${couponDetail.targetType.description}"
+                                                                                        disabled></div>
+                    <div class="form-group"><label for="displayStatus">상태</label><input id="displayStatus"
+                                                                                        class="form-control"
+                                                                                        th:value="${couponDetail.displayStatus.description}"
+                                                                                        disabled></div>
                 </div>
-
+                <div class="grid grid--2">
+                    <div class="form-group"><label for="totalQuantity">총 발급 수량</label><input id="totalQuantity"
+                                                                                             class="form-control"
+                                                                                             th:value="${couponDetail.totalQuantity == null ? '제한 없음' : couponDetail.totalQuantity}"
+                                                                                             disabled></div>
+                    <div class="form-group"><label for="issuedQuantity">발급 수량</label><input id="issuedQuantity"
+                                                                                            class="form-control"
+                                                                                            th:value="${couponDetail.issuedQuantity}"
+                                                                                            disabled></div>
+                </div>
                 <div class="cluster">
-                    <a class="btn btn--primary" th:if="${#strings.toString(couponForm.displayStatus) != 'ENDED'}"
+                    <a class="btn btn--primary" th:if="${couponDetail.displayStatus.name() != 'ENDED'}"
                        th:href="@{/admin/coupons/{couponId}/edit(couponId=${couponId}, keyword=${condition.keyword}, status=${condition.status}, page=${page}, origin='DETAIL')}">수정</a>
                     <a class="btn"
-                       th:href="@{/admin/coupons(
-                           keyword=${condition.keyword},
-                           status=${condition.status},
-                           page=${page}
-                       )}">
-                        목록
-                    </a>
+                       th:href="@{/admin/coupons(keyword=${condition.keyword}, status=${condition.status}, page=${page})}">목록</a>
                 </div>
             </div>
 
-            <!-- member_coupons 연동 전까지의 미구현 목업 영역이다. -->
-            <div class="panel" style="margin-top: 24px;">
-                <div class="cluster cluster--between" style="margin-bottom: 16px;">
-                    <h2 class="section-title" style="margin: 0; font-size: 1.25rem;">발급 회원 목록</h2>
-                    <span class="badge badge--warning">추후 구현 예정</span>
+            <div class="panel" style="margin-top: 24px;"
+                 th:if="${couponDetail.targetType.name() == 'SPECIFIC_MEMBERS'}">
+                <h2 class="section-title" style="margin: 0 0 16px; font-size: 1.25rem;">쿠폰 개별 발급</h2>
+                <div class="cluster" style="gap: 8px; margin-top: 8px;"><input id="targetMemberSearch"
+                                                                               class="form-control"
+                                                                               style="flex: 1; max-width: 400px;"
+                                                                               placeholder="회원 이름 또는 이메일 입력">
+                    <button class="btn" type="button" id="targetMemberSearchButton">검색</button>
                 </div>
-                
+                <div class="table-wrap" style="margin-top: 16px;">
+                    <table class="data-table">
+                        <thead>
+                        <tr>
+                            <th>회원 ID</th>
+                            <th>이름</th>
+                            <th>이메일</th>
+                            <th>휴대폰 번호</th>
+                            <th>생년월일</th>
+                            <th>발급 상태</th>
+                            <th>관리</th>
+                        </tr>
+                        </thead>
+                        <tbody id="targetMemberResults"></tbody>
+                    </table>
+                </div>
+                <nav id="targetMemberPagination" class="cluster"
+                     style="justify-content: center; margin-top: 12px;"></nav>
+            </div>
+
+            <div class="panel" style="margin-top: 24px;">
+                <h2 class="section-title" style="margin: 0 0 16px; font-size: 1.25rem;">발급 회원 목록</h2>
+                <div class="cluster" style="gap: 8px; margin-bottom: 12px;"><input id="issuedMemberSearch"
+                                                                                   class="form-control"
+                                                                                   style="flex: 1; max-width: 400px;"
+                                                                                   placeholder="회원 이름 또는 이메일 입력">
+                    <button class="btn" type="button" id="issuedMemberSearchButton">검색</button>
+                </div>
                 <div class="table-wrap">
                     <table class="data-table">
                         <thead>
@@ -133,41 +116,21 @@
                             <th>회원 ID</th>
                             <th>이름</th>
                             <th>이메일</th>
-                            <th>발급일시</th>
-                            <th>사용 여부</th>
-                            <th>사용일시</th>
+                            <th>발급 일시</th>
+                            <th>상태</th>
+                            <th>사용 일시</th>
+                            <th th:if="${couponDetail.targetType.name() == 'SPECIFIC_MEMBERS'}">관리</th>
                         </tr>
                         </thead>
-                        <tbody>
-                        <tr>
-                            <td colspan="6">
-                                발급 회원 조회 기능은 추후 제공될 예정입니다.
-                            </td>
-                        </tr>
-                        </tbody>
+                        <tbody id="issuedMemberResults"></tbody>
                     </table>
                 </div>
-                <p class="form-help" style="margin-top: 8px;">※ 현재는 데모용 목업 데이터이며, 실제 발급 회원 데이터 연동 기능은 추후 개발될 예정입니다.</p>
-            </div>
-
-            <!-- 회원 검색·개별 발급 기능 연동 전까지의 미구현 목업 영역이다. -->
-            <div class="panel" style="margin-top: 24px;">
-                <div class="cluster cluster--between" style="margin-bottom: 16px;">
-                    <h2 class="section-title" style="margin: 0; font-size: 1.25rem;">쿠폰 개별 발급</h2>
-                    <span class="badge badge--warning">추후 구현 예정</span>
-                </div>
-
-                <div class="form-group">
-                    <label for="memberSearch">발급 대상 회원 검색</label>
-                    <div class="cluster" style="gap: 8px; margin-top: 8px;">
-                        <input id="memberSearch" class="form-control" style="flex: 1; max-width: 400px;" placeholder="회원 이름 또는 이메일 입력" disabled>
-                        <button class="btn" type="button" disabled>검색</button>
-                    </div>
-                    <p class="form-help" style="margin-top: 8px;">※ 회원을 검색하여 해당 회원에게 이 쿠폰을 직접 수동 발급할 수 있는 기능이 추가될 예정입니다.</p>
-                </div>
+                <nav id="issuedMemberPagination" class="cluster"
+                     style="justify-content: center; margin-top: 12px;"></nav>
             </div>
         </main>
     </div>
 </div>
+<script defer th:src="@{/js/coupon-detail.js}"></script>
 </body>
 </html>

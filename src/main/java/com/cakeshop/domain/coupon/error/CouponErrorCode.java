@@ -9,9 +9,6 @@ import com.cakeshop.global.error.ErrorCode;
 public enum CouponErrorCode implements ErrorCode {
 
     EXPIRED_COUPON("COUPON_001", "만료된 쿠폰입니다.", 400),
-    INVALID_PERIOD("COUPON_002", "종료 일시는 시작 일시보다 뒤여야 합니다.", 400),
-    INVALID_DISCOUNT_VALUE("COUPON_003", "올바르지 않은 할인값입니다.",400),
-    MAXIMUM_DISCOUNT_REQUIRED("COUPON_004", "비율 할인은 최대 할인 금액을 입력해야 합니다.", 400),
     CREATE_FAILED("COUPON_005", "쿠폰 등록에 실패했습니다.", 500),
     NOT_FOUND("COUPON_006", "쿠폰을 찾을 수 없습니다.", 404),
     UPDATE_FAILED("COUPON_007", "쿠폰 수정에 실패했습니다.", 500),
@@ -23,7 +20,10 @@ public enum CouponErrorCode implements ErrorCode {
     // 쿠폰 수정 가능 범위(종료/시작 시각)에 따른 정책 위반 오류다.
     CANNOT_EDIT_ENDED_COUPON("COUPON_013", "종료된 쿠폰은 수정할 수 없습니다.", 400),
     CANNOT_MODIFY_FIELDS("COUPON_014", "수정 불가능한 필드가 변경되었습니다.", 400),
-    EXPIRES_AT_EXTENSION_ONLY("COUPON_015", "쿠폰 종료 일시는 기존 값과 같거나 이후여야 합니다.", 400);
+    EXPIRES_AT_EXTENSION_ONLY("COUPON_015", "쿠폰 종료 일시는 기존 값과 같거나 이후여야 합니다.", 400),
+    ISSUED_QUANTITY_EXCEEDED("COUPON_016", "총 발급 수량을 초과하여 발급할 수 없습니다.", 400),
+    ISSUE_TARGET_UNAVAILABLE("COUPON_017", "현재 발급할 수 없는 회원입니다.", 400),
+    ISSUE_CANCELLATION_UNAVAILABLE("COUPON_018", "이미 사용되었거나 취소된 발급 내역입니다.", 400);
 
     private final String code;
     private final String message;

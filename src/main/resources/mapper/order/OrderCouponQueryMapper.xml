@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cakeshop.domain.order.mapper.OrderCouponQueryMapper">
+    <select id="findMemberIdsWithOrderHistory" resultType="long">
+        SELECT DISTINCT member_id FROM orders WHERE member_id IN
+        <foreach collection="memberIds" item="memberId" open="(" separator="," close=")">
+            #{memberId}
+        </foreach>
+    </select>
+
+    <select id="existsOrderHistory" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM orders
+            WHERE member_id = #{memberId}
+        )
+    </select>
+</mapper>

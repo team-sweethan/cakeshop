@@ -19,11 +19,12 @@ public class Coupon {
     private BigDecimal discountValue;           // 할인 값 - 금액/비율
     private BigDecimal minimumOrderAmount;      // 최소 주문 금액
     private BigDecimal maximumDiscountAmount;   // 최대 할인 금액
-    private Integer totalQuantity;              // 발급 가능한 전체 쿠폰 수량
+    private Integer totalQuantity;              // 특정 회원 대상의 발급 가능 수량, 자동 대상은 null
     private Integer issuedQuantity;             // 현재까지 발급된 쿠폰 수량
-    private LocalDateTime startsAt;             // 쿠폰 발급 시작 일시
-    private LocalDateTime expiresAt;            // 쿠폰 만료 일시
-    private CouponStatus status;                // 관리자가 설정하는 발급 허용 상태
+    private LocalDateTime startsAt;             // 쿠폰 사용 및 수동 발급 가능 시작 일시
+    private LocalDateTime expiresAt;            // 쿠폰 사용 가능 만료 일시
+    private CouponStatus status;                // 관리자가 설정하는 쿠폰 운영 상태
+    private CouponTargetType targetType;        // 발급 대상 정책
     private Long createdBy;                     // 쿠폰 생성 관리자 회원
     private LocalDateTime createdAt;            // 쿠폰 생성 일시
     private LocalDateTime updatedAt;            // 쿠폰 최종 수정 일시

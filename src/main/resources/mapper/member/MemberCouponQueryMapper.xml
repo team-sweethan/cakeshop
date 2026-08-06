@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cakeshop.domain.member.mapper.MemberCouponQueryMapper">
+    <select id="findActiveMembers" resultType="com.cakeshop.domain.member.dto.view.MemberCouponView">
+        SELECT id AS memberId, name, email, phone, birth_date AS birthDate
+        FROM members
+        WHERE role = 'USER' AND status = 'ACTIVE'
+          AND (name LIKE CONCAT('%', #{keyword}, '%') OR email LIKE CONCAT('%', #{keyword}, '%'))
+        ORDER BY name, id
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="countActiveMembers" resultType="long">
+        SELECT COUNT(*) FROM members
+        WHERE role = 'USER' AND status = 'ACTIVE'
+          AND (name LIKE CONCAT('%', #{keyword}, '%') OR email LIKE CONCAT('%', #{keyword}, '%'))
+    </select>
+
+    <select id="findMembersByIds" resultType="com.cakeshop.domain.member.dto.view.MemberCouponView">
+        SELECT id AS memberId, name, email, phone, birth_date AS birthDate
+        FROM members
+        WHERE id IN
+        <foreach collection="memberIds" item="memberId" open="(" separator="," close=")">
+            #{memberId}
+        </foreach>
+    </select>
+
+    <select id="findActiveMemberIds" resultType="long">
+        SELECT id FROM members WHERE role = 'USER' AND status = 'ACTIVE'
+    </select>
+
+    <select id="findBirthdayMemberIds" resultType="long">
+        SELECT id FROM members
+        WHERE role = 'USER' AND status = 'ACTIVE' AND MONTH(birth_date) = #{month}
+    </select>
+</mapper>
