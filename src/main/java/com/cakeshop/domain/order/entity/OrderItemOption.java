@@ -11,7 +11,9 @@ import java.math.BigDecimal;
 public class OrderItemOption {
 
     private Long id;
+    //OrderItem.id
     private Long orderItemId;
+    //ProductOption.id
     private Long productOptionId;
     private String optionGroupName;
     private String optionName;

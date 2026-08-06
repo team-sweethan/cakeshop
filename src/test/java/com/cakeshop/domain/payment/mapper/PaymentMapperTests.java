@@ -4,7 +4,9 @@ import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.entity.PaymentCancellation;
 import com.cakeshop.domain.payment.entity.PaymentCancellationStatus;
 import com.cakeshop.domain.payment.entity.PaymentStatus;
+import com.cakeshop.domain.payment.dto.view.PaymentAdminListRow;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
+import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mybatis.spring.boot.test.autoconfigure.MybatisTest;
@@ -34,11 +36,17 @@ class PaymentMapperTests {
 
     private final PaymentMapper paymentMapper;
     private final JdbcTemplate jdbcTemplate;
+    private final SqlSession sqlSession;
 
     @Autowired
-    PaymentMapperTests(PaymentMapper paymentMapper, JdbcTemplate jdbcTemplate) {
+    PaymentMapperTests(
+            PaymentMapper paymentMapper,
+            JdbcTemplate jdbcTemplate,
+            SqlSession sqlSession
+    ) {
         this.paymentMapper = paymentMapper;
         this.jdbcTemplate = jdbcTemplate;
+        this.sqlSession = sqlSession;
     }
 
     private String suffix;
@@ -78,6 +86,149 @@ class PaymentMapperTests {
         assertThat(payments)
                 .extracting(Payment::getActivePaymentOrderId)
                 .containsExactly(orderId);
+    }
+
+    @Test
+    void findPaymentsForAdmin_filtersStatusAndIncludesLatestCancellation() {
+        Payment payment = insertPayment("ADMIN-LIST");
+        completePayment(payment, "ADMIN-LIST");
+        PaymentCancellation cancellation =
+                newPaymentCancellation(payment.getId(), "ADMIN-LIST");
+        assertThat(paymentMapper.insertPaymentCancellation(cancellation)).isEqualTo(1);
+
+        assertThat(paymentMapper.findPaymentsForAdmin(PaymentStatus.READY)).isEmpty();
+        assertThat(paymentMapper.findPaymentsForAdmin(PaymentStatus.DONE))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.paymentId()).isEqualTo(payment.getId());
+                    assertThat(row.orderId()).isEqualTo(orderId);
+                    assertThat(row.orderNumber()).startsWith("PAYMENT-MAPPER-");
+                    assertThat(row.ordererName()).isEqualTo("주문자");
+                    assertThat(row.status()).isEqualTo(PaymentStatus.DONE);
+                    assertThat(row.cancellationStatus())
+                            .isEqualTo(PaymentCancellationStatus.REQUESTED);
+                    assertThat(row.cancellationRequestType()).isEqualTo("CUSTOMER_CANCEL");
+                });
+
+        var summary = paymentMapper.summarizePaymentsForAdmin();
+        assertThat(summary.totalCount()).isEqualTo(1);
+        assertThat(summary.doneCount()).isEqualTo(1);
+        assertThat(summary.canceledCount()).isZero();
+        assertThat(summary.attentionCount()).isEqualTo(1);
+    }
+
+    @Test
+    void findPaymentsForAdmin_completedApprovalGuard_isNotAttentionOrLatestCancellation() {
+        Payment payment = insertPayment("COMPLETED-GUARD");
+        PaymentCancellation guard = new PaymentCancellation();
+        guard.setPaymentId(payment.getId());
+        guard.setIdempotencyKey("COMPENSATE-" + payment.getId());
+        guard.setCancelAmount(payment.getAmount());
+        guard.setCancelReason("승인 보호");
+        assertThat(paymentMapper.insertCompensationCancellation(guard)).isEqualTo(1);
+        completePayment(payment, "COMPLETED-GUARD");
+        assertThat(paymentMapper.failCancellationIfRequested(
+                guard.getId(),
+                "PAYMENT_COMPLETED",
+                "내부 결제가 정상 완료되어 보상 취소를 종료했습니다."
+        )).isEqualTo(1);
+
+        assertThat(paymentMapper.findPaymentsForAdmin(PaymentStatus.DONE))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.cancellationStatus()).isNull();
+                    assertThat(row.cancellationRequestType()).isNull();
+                });
+        assertThat(paymentMapper.summarizePaymentsForAdmin().attentionCount()).isZero();
+    }
+
+    @Test
+    void reopenReleasedCompensation_completedApprovalGuard_reopensForActualCancellation() {
+        Payment payment = insertPayment("REOPEN-COMPLETED-GUARD");
+        PaymentCancellation guard = new PaymentCancellation();
+        guard.setPaymentId(payment.getId());
+        guard.setIdempotencyKey("COMPENSATE-" + payment.getId());
+        guard.setCancelAmount(payment.getAmount());
+        guard.setCancelReason("승인 보호");
+        assertThat(paymentMapper.insertCompensationCancellation(guard)).isEqualTo(1);
+        completePayment(payment, "REOPEN-COMPLETED-GUARD");
+        assertThat(paymentMapper.failCancellationIfRequested(
+                guard.getId(),
+                "PAYMENT_COMPLETED",
+                "정상 완료"
+        )).isEqualTo(1);
+        LocalDateTime oldRequestedAt = LocalDateTime.of(2026, 8, 1, 12, 0);
+        jdbcTemplate.update(
+                "UPDATE payment_cancellations SET requested_at = ? WHERE id = ?",
+                oldRequestedAt,
+                guard.getId()
+        );
+
+        assertThat(paymentMapper.reopenReleasedCompensation(
+                payment.getId(),
+                guard.getIdempotencyKey()
+        )).isEqualTo(1);
+        assertThat(paymentMapper.findPaymentCancellationById(guard.getId()))
+                .hasValueSatisfying(reopened -> {
+                    assertThat(reopened.getStatus()).isEqualTo(PaymentCancellationStatus.REQUESTED);
+                    assertThat(reopened.getFailureCode()).isNull();
+                    assertThat(reopened.getRequestedAt()).isAfter(oldRequestedAt);
+                });
+        assertThat(paymentMapper.findRequestedCompensations(10)).isEmpty();
+    }
+
+    @Test
+    void findRequestedCompensations_onlyReturnsRequestsOlderThanCutoff() {
+        Payment payment = insertPayment("RECOVERY-GRACE-PERIOD");
+        PaymentCancellation guard = new PaymentCancellation();
+        guard.setPaymentId(payment.getId());
+        guard.setIdempotencyKey("COMPENSATE-" + payment.getId());
+        guard.setCancelAmount(payment.getAmount());
+        guard.setCancelReason("승인 보호");
+        assertThat(paymentMapper.insertCompensationCancellation(guard)).isEqualTo(1);
+        assertThat(paymentMapper.findRequestedCompensations(10)).isEmpty();
+        assertThat(paymentMapper.failUnapprovedCompensationIfRequested(
+                guard.getId()
+        )).isZero();
+        jdbcTemplate.update(
+                """
+                UPDATE payment_cancellations
+                SET requested_at = DATE_SUB(CURRENT_TIMESTAMP(6), INTERVAL 2 MINUTE)
+                WHERE id = ?
+                """,
+                guard.getId()
+        );
+
+        assertThat(paymentMapper.findRequestedCompensations(10))
+                .extracting(PaymentCancellation::getId)
+                .containsExactly(guard.getId());
+        assertThat(paymentMapper.failUnapprovedCompensationIfRequested(
+                guard.getId()
+        )).isEqualTo(1);
+    }
+
+    @Test
+    void findRequestedRefundCancellations_onlyReturnsRequestsOlderThanCutoff() {
+        Payment payment = insertPayment("REFUND-GRACE-PERIOD");
+        completePayment(payment, "REFUND-GRACE-PERIOD");
+        PaymentCancellation cancellation =
+                newPaymentCancellation(payment.getId(), "REFUND-GRACE-PERIOD");
+        cancellation.setRequestType("CUSTOMER");
+        assertThat(paymentMapper.insertPaymentCancellation(cancellation)).isEqualTo(1);
+        assertThat(paymentMapper.findRequestedRefundCancellations(10)).isEmpty();
+        jdbcTemplate.update(
+                """
+                UPDATE payment_cancellations
+                SET requested_at = DATE_SUB(CURRENT_TIMESTAMP(6), INTERVAL 2 MINUTE)
+                WHERE id = ?
+                """,
+                cancellation.getId()
+        );
+        // JdbcTemplate 변경 뒤 같은 Mapper 조회가 실제 DB를 다시 읽게 한다.
+        sqlSession.clearCache();
+        assertThat(paymentMapper.findRequestedRefundCancellations(10))
+                .extracting(PaymentCancellation::getId)
+                .containsExactly(cancellation.getId());
     }
 
     // 한 주문에서 READY 결제는 UNIQUE 제약에 따라 한 건만 허용되는지 확인한다.
@@ -308,6 +459,9 @@ class PaymentMapperTests {
         assertThat(saved.getRequestedAt()).isNotNull();
         assertThat(saved.getCreatedAt()).isNotNull();
         assertThat(saved.getUpdatedAt()).isNotNull();
+        assertThat(paymentMapper.findRequestedCancellationByPaymentId(payment.getId()))
+                .hasValueSatisfying(requested -> assertThat(requested.getId())
+                        .isEqualTo(cancellation.getId()));
     }
 
     @Test

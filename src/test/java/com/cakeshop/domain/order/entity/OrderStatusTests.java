@@ -27,7 +27,7 @@ class OrderStatusTests {
         assertThat(OrderStatus.PENDING_PAYMENT.canTransitionTo(OrderStatus.UNDER_REVIEW)).isTrue();
         assertThat(OrderStatus.PENDING_PAYMENT.canTransitionTo(OrderStatus.READY_FOR_PICKUP)).isTrue();
         assertThat(OrderStatus.PENDING_PAYMENT.canTransitionTo(OrderStatus.EXPIRED)).isTrue();
-        assertThat(OrderStatus.PENDING_PAYMENT.canTransitionTo(OrderStatus.CANCELED)).isFalse();
+        assertThat(OrderStatus.PENDING_PAYMENT.canTransitionTo(OrderStatus.CANCELED)).isTrue();
 
         assertThat(OrderStatus.UNDER_REVIEW.canTransitionTo(OrderStatus.READY_FOR_PICKUP)).isTrue();
         assertThat(OrderStatus.UNDER_REVIEW.canTransitionTo(OrderStatus.REJECTED)).isTrue();

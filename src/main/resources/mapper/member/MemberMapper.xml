@@ -12,6 +12,7 @@
         <result property="updatedAt" column="updated_at"/>
         <result property="withdrawnAt" column="withdrawn_at"/>
         <result property="name" column="name"/>
+        <result property="phone" column="phone"/>
         <result property="birthDate" column="birth_date"/>
     </resultMap>
 
@@ -116,6 +117,15 @@
                created_at, updated_at, withdrawn_at, phone, name, birth_date
           FROM members
          WHERE email = #{email}
+    </select>
+
+    <select id="existsActiveMember" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+              FROM members
+             WHERE id = #{memberId}
+               AND status = 'ACTIVE'
+        )
     </select>
 
     <select id="findEmailsByMemberInfo" resultType="string">
