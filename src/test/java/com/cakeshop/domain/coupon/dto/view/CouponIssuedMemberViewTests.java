@@ -15,6 +15,7 @@ class CouponIssuedMemberViewTests {
                 CustomerCouponStatus.AVAILABLE, LocalDateTime.of(2026, 8, 6, 10, 0)
         );
 
+        assertThat(view.email()).isEqualTo("me***@example.com");
         assertThat(view.phone()).isEqualTo("010-****-5678");
         assertThat(view.birthday()).isEqualTo("01-15");
     }

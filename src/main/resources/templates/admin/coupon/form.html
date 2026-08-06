@@ -13,7 +13,7 @@
 
             <form class="panel"
                   id="couponForm"
-                  th:attr="data-form-mode=${formMode}"
+                  th:attr="data-form-mode=${formMode},data-target-type=${formMode == 'update' ? couponForm.displayTargetType : ''}"
                   th:action="${formMode == 'create' ? '/admin/coupons/create' : '/admin/coupons/' + couponId + '/edit'}"
                   th:object="${couponForm}"
                   method="post">
@@ -151,14 +151,14 @@
                 <fieldset class="form-group">
                     <legend>발급 대상</legend>
 
-                    <div class="choice-list">
+                    <div class="choice-list" th:if="${formMode == 'create'}">
                         <label class="choice"><input type="radio" th:field="*{targetType}" value="ALL_MEMBERS" th:disabled="${formMode == 'update'}">전체 회원</label>
                         <label class="choice"><input type="radio" th:field="*{targetType}" value="NEW_MEMBERS" th:disabled="${formMode == 'update'}">신규 회원</label>
                         <label class="choice"><input type="radio" th:field="*{targetType}" value="FIRST_ORDER" th:disabled="${formMode == 'update'}">첫 주문 회원</label>
                         <label class="choice"><input type="radio" th:field="*{targetType}" value="BIRTHDAY" th:disabled="${formMode == 'update'}">생일 회원</label>
                         <label class="choice"><input type="radio" th:field="*{targetType}" value="SPECIFIC_MEMBERS" th:disabled="${formMode == 'update'}">특정 회원</label>
                     </div>
-                    <input type="hidden" name="targetType" th:value="*{targetType}" th:if="${formMode == 'update'}">
+                    <p class="form-help" th:if="${formMode == 'update'}" th:text="${couponForm.displayTargetType.description}">발급 대상</p>
                     <p id="targetTypeGuide" class="form-help" th:if="${formMode == 'create'}"></p>
                 </fieldset>
 

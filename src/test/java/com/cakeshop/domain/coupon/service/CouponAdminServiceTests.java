@@ -131,8 +131,23 @@ class CouponAdminServiceTests {
         PageResult<CouponIssueCandidateView> result = couponAdminService.searchTargetMembers(3L, "홍", 1);
 
         CouponIssueCandidateView candidate = result.getContent().getFirst();
+        assertThat(candidate.email()).isEqualTo("me***@example.com");
         assertThat(candidate.phone()).isEqualTo("010-****-5678");
         assertThat(candidate.birthday()).isEqualTo("01-15");
+    }
+
+    @Test
+    void issueSpecificMemberRejectsCouponBeforeStart() {
+        Coupon coupon = coupon(CouponStatus.ACTIVE, 10, 0, LocalDateTime.now().plusDays(1));
+        coupon.setStartsAt(LocalDateTime.now().plusHours(1));
+        when(couponMapper.findCouponByIdForUpdate(1L)).thenReturn(Optional.of(coupon));
+
+        assertThatThrownBy(() -> couponAdminService.issueSpecificMember(1L, 2L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(CouponErrorCode.UPDATE_FAILED);
+
+        verify(couponMapper, never()).insertMemberCouponIfAbsent(1L, 2L);
     }
 
     @Test
@@ -447,7 +462,6 @@ class CouponAdminServiceTests {
         form.setDiscountValue(BigDecimal.valueOf(3000));
         form.setMinimumOrderAmount(BigDecimal.valueOf(10000));
         form.setTotalQuantity(10L);
-        form.setTargetType(CouponTargetType.SPECIFIC_MEMBERS);
         form.setStartsAt(LocalDateTime.of(2026, 8, 1, 9, 0));
         form.setExpiresAt(LocalDateTime.of(2026, 8, 31, 23, 59));
         return form;

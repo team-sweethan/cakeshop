@@ -177,6 +177,7 @@ public class CouponAdminController {
                 // 요청 Form에는 fullEdit가 없으므로, DB 기준 수정 가능 범위를 다시 채운다.
                 CouponUpdateForm originalForm = couponAdminService.getUpdateForm(couponId);
                 form.setFullEdit(originalForm.isFullEdit());
+                form.setDisplayTargetType(originalForm.getDisplayTargetType());
             } catch (BusinessException e) {
                 // 종료 처리 등으로 조회할 수 없어진 경우에는 기본값으로 렌더링한다.
             }
@@ -204,6 +205,7 @@ public class CouponAdminController {
                         couponAdminService.getUpdateCoupon(couponId);
 
                 form.setFullEdit(originalForm.isFullEdit());
+                form.setDisplayTargetType(originalForm.getDisplayTargetType());
                 model.addAttribute("couponId", couponId);
                 model.addAttribute("formMode", "update");
                 addUpdateNavigation(model, condition, page, origin);

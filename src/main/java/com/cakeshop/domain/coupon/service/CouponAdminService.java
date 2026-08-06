@@ -77,7 +77,7 @@ public class CouponAdminService {
         return new PageResult<>(
                 memberPage.getContent().stream()
                         .map(member -> new CouponIssueCandidateView(
-                                member.memberId(), member.name(), member.email(), maskPhone(member.phone()),
+                                member.memberId(), member.name(), maskEmail(member.email()), maskPhone(member.phone()),
                                 member.birthDate() == null ? null : member.birthDate().format(BIRTHDAY_FORMATTER),
                                 issuedMemberIds.contains(member.memberId())))
                         .toList(),
@@ -102,6 +102,7 @@ public class CouponAdminService {
         Coupon coupon = findCouponForUpdate(couponId);
         if (coupon.getTargetType() != CouponTargetType.SPECIFIC_MEMBERS
                 || coupon.getStatus() != CouponStatus.ACTIVE
+                || coupon.getStartsAt().isAfter(LocalDateTime.now())
                 || !coupon.getExpiresAt().isAfter(LocalDateTime.now())) {
             throw new BusinessException(CouponErrorCode.UPDATE_FAILED);
         }
@@ -189,9 +190,7 @@ public class CouponAdminService {
 
         boolean isFullEdit = validateUpdate(coupon, form);
 
-        applyForm(coupon, form);
-        // 발급 대상 정책은 등록 시에만 결정한다. 수정 요청의 조작값은 기존 정책으로 되돌린다.
-        coupon.setTargetType(findCoupon(couponId).getTargetType());
+        applyUpdateForm(coupon, form);
 
         int updated = isFullEdit
                 ? couponMapper.updateCouponBeforeStart(coupon)
@@ -305,7 +304,7 @@ public class CouponAdminService {
         return left.compareTo(right) == 0;
     }
 
-    /** 등록/수정 화면에서 변경 가능한 항목만 Entity에 복사한다. */
+    /** 등록 Form의 발급 대상 정책과 입력값을 Entity에 복사한다. */
     private void applyForm(
             Coupon coupon,
             CouponCreateForm form) {
@@ -330,6 +329,20 @@ public class CouponAdminService {
         coupon.setTargetType(form.getTargetType());
     }
 
+    /** 수정 Form에는 발급 대상이 없으므로 기존 쿠폰의 정책을 유지한 채 수정 가능 값만 복사한다. */
+    private void applyUpdateForm(Coupon coupon, CouponUpdateForm form) {
+        coupon.setName(form.getName().trim());
+        coupon.setDiscountType(form.getDiscountType());
+        coupon.setDiscountValue(form.getDiscountValue());
+        coupon.setMinimumOrderAmount(form.getMinimumOrderAmount());
+        coupon.setMaximumDiscountAmount(form.getMaximumDiscountAmount());
+        coupon.setTotalQuantity(coupon.getTargetType() == CouponTargetType.SPECIFIC_MEMBERS
+                ? Math.toIntExact(form.getTotalQuantity())
+                : null);
+        coupon.setStartsAt(form.getStartsAt().truncatedTo(ChronoUnit.MINUTES));
+        coupon.setExpiresAt(form.getExpiresAt().truncatedTo(ChronoUnit.MINUTES));
+    }
+
     /** 관리자 화면용 JSON 응답에는 회원 원본 연락처를 포함하지 않는다. */
     private String maskPhone(String phone) {
         if (phone == null || phone.isBlank()) {
@@ -341,6 +354,17 @@ public class CouponAdminService {
             return "****";
         }
         return digits.substring(0, 3) + "-****-" + digits.substring(digits.length() - 4);
+    }
+
+    /** 관리자 화면용 JSON 응답에도 이메일 원문을 남기지 않는다. */
+    private String maskEmail(String email) {
+        if (email == null || email.isBlank() || !email.contains("@")) {
+            return null;
+        }
+
+        int atIndex = email.indexOf('@');
+        String localPart = email.substring(0, atIndex);
+        return localPart.substring(0, Math.min(2, localPart.length())) + "***" + email.substring(atIndex);
     }
 
     private Coupon findCouponForUpdate(Long couponId) {

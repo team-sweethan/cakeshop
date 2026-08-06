@@ -13,7 +13,7 @@
         SPECIFIC_MEMBERS: '등록 후 상세 화면에서 관리자가 선택한 회원에게 수동 발급합니다. 발급 수량을 입력해 주세요.'
     };
 
-    const selectedType = () => document.querySelector('input[name="targetType"]:checked')?.value;
+    const selectedType = () => document.querySelector('input[name="targetType"]:checked')?.value ?? form.dataset.targetType;
     const refreshTargetPolicy = () => {
         const isSpecificMembers = selectedType() === 'SPECIFIC_MEMBERS';
         if (guide) guide.textContent = guides[selectedType()] ?? '발급 대상을 선택해 주세요.';

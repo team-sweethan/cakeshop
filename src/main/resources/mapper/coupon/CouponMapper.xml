@@ -234,9 +234,14 @@
         INSERT INTO member_coupons (coupon_id, member_id)
         SELECT #{couponId}, m.id
         FROM members m
+        JOIN coupons c ON c.id = #{couponId}
         WHERE m.id = #{memberId}
           AND m.status = 'ACTIVE'
           AND m.role = 'USER'
+          AND c.status = 'ACTIVE'
+          AND c.starts_at &lt;= NOW(6)
+          AND c.expires_at &gt; NOW(6)
+          AND (c.total_quantity IS NULL OR c.issued_quantity &lt; c.total_quantity)
           AND NOT EXISTS (
               SELECT 1
               FROM member_coupons mc
