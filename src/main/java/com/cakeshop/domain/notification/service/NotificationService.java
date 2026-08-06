@@ -29,14 +29,15 @@ public class NotificationService {
     @Transactional
     public void makeNotification(NotificationRequest request) {
 
-        // 중복 알림인지 체크하기
-        if (request.getEventKey() != null && notificationMapper.existsByReceiverIdAndEventKey(request.getReceiverId(), request.getEventKey())) {
-            return;
-        }
-
         // 알림 제목, 내용 만들기
         String title = request.getType().getDefaultTitle();
         String content = request.getType().formatContent(request.getArgs());
+
+        // 중복 알림인 경우 최근 이벤트 시각 및 unread 처리 갱신 후 종료 (묶음 알림 대응)
+        if (request.getEventKey() != null && notificationMapper.existsByReceiverIdAndEventKey(request.getReceiverId(), request.getEventKey())) {
+            notificationMapper.updateLastEventAtAndUnread(request.getReceiverId(), request.getEventKey(), title, content);
+            return;
+        }
 
         // 알림 발송 범위 결정
         DeliveryScope scope = request.getDeliveryScope() != null ? request.getDeliveryScope() : DeliveryScope.WEB_ONLY;
@@ -82,7 +83,8 @@ public class NotificationService {
         try {
             notificationMapper.save(notification);
         } catch (DuplicateKeyException e) {
-            // 동일 eventKey 중복 요청은 메인 트랜잭션이 멱등하게 처리하므로 조기 종료
+            // 동일 eventKey 중복 요청 시 기존 알림의 last_event_at 갱신 및 unread 처리
+            notificationMapper.updateLastEventAtAndUnread(request.getReceiverId(), eventKey, title, content);
             return;
         }
 

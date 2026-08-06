@@ -31,6 +31,12 @@ public interface NotificationMapper {
     // 중복 event_key 존재 여부
     boolean existsByReceiverIdAndEventKey(@Param("receiverId") Long receiverId, @Param("eventKey") String eventKey);
 
+    // 중복 event_key 기반 최근 시각 갱신 및 unread 처리
+    void updateLastEventAtAndUnread(@Param("receiverId") Long receiverId,
+                                    @Param("eventKey") String eventKey,
+                                    @Param("title") String title,
+                                    @Param("content") String content);
+
     // 중복 event_key 기반 기존 알림 ID 조회
     Long findIdByReceiverIdAndEventKey(@Param("receiverId") Long receiverId, @Param("eventKey") String eventKey);
 

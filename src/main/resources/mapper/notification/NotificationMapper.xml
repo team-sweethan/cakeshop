@@ -105,6 +105,17 @@
         )
     </select>
 
+    <!-- 동일 eventKey 알림 재발생 시 최근 시각 갱신 및 unread 처리 -->
+    <update id="updateLastEventAtAndUnread">
+        UPDATE notifications
+        SET last_event_at = NOW(),
+            is_read = false,
+            read_at = NULL,
+            title = COALESCE(#{title}, title),
+            content = COALESCE(#{content}, content)
+        WHERE receiver_id = #{receiverId} AND event_key = #{eventKey}
+    </update>
+
     <!--중복 event_key 기반 기존 알림 ID 조회-->
     <select id="findIdByReceiverIdAndEventKey" resultType="long">
         SELECT id FROM notifications

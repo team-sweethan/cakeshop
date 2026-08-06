@@ -68,8 +68,9 @@
               const unreadClass = !isRead ? " is-unread" : "";
               const unreadDot = !isRead ? '<span class="notification-dot" aria-hidden="true"></span>' : "";
               
-              // 날짜 포맷 변환 (YYYY-MM-DD HH:mm 형태로 자르기)
-              const formattedDate = item.createdAt ? item.createdAt.replace("T", " ").substring(0, 16) : "";
+              // 날짜 포맷 변환 (YYYY-MM-DD HH:mm 형태로 자르기, 최근 이벤트 시각 우선)
+              const displayDate = item.lastEventAt || item.createdAt;
+              const formattedDate = displayDate ? displayDate.replace("T", " ").substring(0, 16) : "";
 
               // 상세 링크 버튼 생성 (targetUrl이 있는 경우)
               const detailBtn = item.targetUrl 
