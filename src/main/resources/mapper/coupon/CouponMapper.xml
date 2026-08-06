@@ -244,6 +244,13 @@
           </if>
           AND c.expires_at &gt; NOW(6)
           AND (c.total_quantity IS NULL OR c.issued_quantity &lt; c.total_quantity)
+          <if test="firstOrderOnly">
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM orders o
+                  WHERE o.member_id = m.id
+              )
+          </if>
           AND NOT EXISTS (
               SELECT 1
               FROM member_coupons mc

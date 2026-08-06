@@ -54,7 +54,7 @@
 | --- | --- | --- | --- |
 | 전체 회원 | `ALL_MEMBERS` | `NULL` (제한 없음) | 등록 직후 기존 활성 회원에게 일괄 발급 |
 | 신규 회원 | `NEW_MEMBERS` | `NULL` (제한 없음) | 유효기간 중 회원가입 완료 시 발급 |
-| 첫 주문 회원 | `FIRST_ORDER` | `NULL` (제한 없음) | 등록 시점의 미주문 기존 회원에게 일괄 발급하며, INSERT 직전에 주문 이력을 다시 확인 |
+| 첫 주문 회원 | `FIRST_ORDER` | `NULL` (제한 없음) | 등록 시점의 미주문 기존 회원에게 일괄 발급하며, INSERT 조건과 직전 조회에서 주문 이력을 다시 확인 |
 | 생일 회원 | `BIRTHDAY` | `NULL` (제한 없음) | 매시 정각 스케줄러가 해당 월 생일 회원에게 발급 |
 | 특정 회원 | `SPECIFIC_MEMBERS` | 양의 정수 필수 | 상세 화면에서 관리자가 선택해 수동 발급 |
 
@@ -132,6 +132,9 @@ SPECIFIC_MEMBERS
 | order | `OrderCouponQueryService` | 주문 이력이 있는 회원 식별 |
 
 신규 회원 발급은 member 도메인이 회원가입 완료 트랜잭션의 적절한 시점에 `CouponIssueService.issueNewMemberCoupons(memberId)`를 호출해 연결한다.
+
+첫 주문 대상은 쿠폰 INSERT의 `NOT EXISTS (orders)` 조건으로 마지막 주문 이력 확인을 수행한다.
+주문 생성과 쿠폰 발급의 회원 단위 비관적 락 경계는 주문 담당자와 후속 협의한다.
 
 ## 6. 데이터와 migration
 

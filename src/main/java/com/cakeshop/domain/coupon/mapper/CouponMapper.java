@@ -48,7 +48,8 @@ public interface CouponMapper {
     /** 발급 시 회원 상태를 확인하고, 같은 쿠폰의 중복 발급은 무시한다. */
     int insertMemberCouponIfAbsent(@Param("couponId") Long couponId,
                                    @Param("memberId") Long memberId,
-                                   @Param("allowBeforeStart") boolean allowBeforeStart);
+                                   @Param("allowBeforeStart") boolean allowBeforeStart,
+                                   @Param("firstOrderOnly") boolean firstOrderOnly);
     int increaseIssuedQuantityIfAvailable(@Param("couponId") Long couponId);
     int deleteAvailableMemberCoupon(@Param("couponId") Long couponId, @Param("memberId") Long memberId);
     int decreaseIssuedQuantity(@Param("couponId") Long couponId);

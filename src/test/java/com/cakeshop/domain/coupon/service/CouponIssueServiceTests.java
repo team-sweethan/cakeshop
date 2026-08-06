@@ -41,12 +41,12 @@ class CouponIssueServiceTests {
         Coupon coupon = coupon(CouponTargetType.ALL_MEMBERS, LocalDateTime.now().plusDays(1));
         when(memberCouponQueryService.getActiveMemberIds()).thenReturn(List.of(2L));
         when(couponMapper.findCouponByIdForUpdate(1L)).thenReturn(Optional.of(coupon));
-        when(couponMapper.insertMemberCouponIfAbsent(1L, 2L, true)).thenReturn(1);
+        when(couponMapper.insertMemberCouponIfAbsent(1L, 2L, true, false)).thenReturn(1);
         when(couponMapper.increaseIssuedQuantityIfAvailable(1L)).thenReturn(1);
 
         couponIssueService.issueOnCouponCreated(coupon);
 
-        verify(couponMapper).insertMemberCouponIfAbsent(1L, 2L, true);
+        verify(couponMapper).insertMemberCouponIfAbsent(1L, 2L, true, false);
         verify(couponMapper).increaseIssuedQuantityIfAvailable(1L);
     }
 
@@ -61,7 +61,7 @@ class CouponIssueServiceTests {
         couponIssueService.issueOnCouponCreated(coupon);
 
         verify(orderCouponQueryService).hasOrderHistory(2L);
-        verify(couponMapper, never()).insertMemberCouponIfAbsent(1L, 2L, true);
+        verify(couponMapper, never()).insertMemberCouponIfAbsent(1L, 2L, true, true);
     }
 
     private Coupon coupon(CouponTargetType targetType, LocalDateTime startsAt) {

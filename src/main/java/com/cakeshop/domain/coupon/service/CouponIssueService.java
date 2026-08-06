@@ -100,7 +100,8 @@ public class CouponIssueService {
             if (firstOrderOnly && orderCouponQueryService.hasOrderHistory(memberId)) {
                 continue;
             }
-            if (couponMapper.insertMemberCouponIfAbsent(couponId, memberId, allowBeforeStart) == 1) {
+            if (couponMapper.insertMemberCouponIfAbsent(
+                    couponId, memberId, allowBeforeStart, firstOrderOnly) == 1) {
                 if (couponMapper.increaseIssuedQuantityIfAvailable(couponId) != 1) {
                     throw new BusinessException(CouponErrorCode.UPDATE_FAILED);
                 }

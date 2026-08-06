@@ -147,14 +147,14 @@ class CouponAdminServiceTests {
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(CouponErrorCode.UPDATE_FAILED);
 
-        verify(couponMapper, never()).insertMemberCouponIfAbsent(1L, 2L, false);
+        verify(couponMapper, never()).insertMemberCouponIfAbsent(1L, 2L, false, false);
     }
 
     @Test
     void issueSpecificMemberThrowsWhenTargetIsNoLongerIssuable() {
         Coupon coupon = coupon(CouponStatus.ACTIVE, 10, 0, LocalDateTime.now().plusDays(1));
         when(couponMapper.findCouponByIdForUpdate(1L)).thenReturn(Optional.of(coupon));
-        when(couponMapper.insertMemberCouponIfAbsent(1L, 2L, false)).thenReturn(0);
+        when(couponMapper.insertMemberCouponIfAbsent(1L, 2L, false, false)).thenReturn(0);
 
         assertThatThrownBy(() -> couponAdminService.issueSpecificMember(1L, 2L))
                 .isInstanceOf(BusinessException.class)

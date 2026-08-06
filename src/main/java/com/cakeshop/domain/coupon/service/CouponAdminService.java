@@ -109,7 +109,7 @@ public class CouponAdminService {
         if (coupon.getTotalQuantity() == null || coupon.getIssuedQuantity() >= coupon.getTotalQuantity()) {
             throw new BusinessException(CouponErrorCode.ISSUED_QUANTITY_EXCEEDED);
         }
-        if (couponMapper.insertMemberCouponIfAbsent(couponId, memberId, false) != 1) {
+        if (couponMapper.insertMemberCouponIfAbsent(couponId, memberId, false, false) != 1) {
             // 조회 시점 이후 회원 상태나 발급 이력이 달라졌으면 성공으로 처리하지 않는다.
             throw new BusinessException(CouponErrorCode.ISSUE_TARGET_UNAVAILABLE);
         }
