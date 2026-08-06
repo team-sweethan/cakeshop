@@ -24,11 +24,6 @@ UPDATE `reviews`
 SET `status` = 'PUBLISHED'
 WHERE `status` = 'VISIBLE';
 
-ALTER TABLE `reviews`
-    MODIFY COLUMN `status` VARCHAR(30) NOT NULL DEFAULT 'PUBLISHED',
-    ADD CONSTRAINT `chk_reviews_status`
-        CHECK (`status` IN ('PUBLISHED', 'DELETED', 'BLOCKED'));
-
 -- 평점 4종은 1~5 정수다(SPEC.md 2.2).
 --
 -- 컬럼이 TINYINT UNSIGNED 라 DB 만으로는 0 과 255 가 들어간다. 화면 검증은 폼을 거친
@@ -37,7 +32,25 @@ ALTER TABLE `reviews`
 --
 -- 제약을 4개로 나눈 것은 위반했을 때 어느 평점이 잘못됐는지 제약 이름으로 드러나게
 -- 하려는 것이다. 하나로 묶으면 chk_reviews_ratings 만 나와 넷 중 무엇인지 다시 찾아야 한다.
+
+-- 상태와 평점을 ALTER 한 문장에 함께 담는다. 문장을 나누면 DDL 이 문장 단위로 암시적
+-- 커밋되어, 뒤쪽 평점 제약이 범위 밖 행 때문에 실패해도 앞쪽 status 변경과
+-- chk_reviews_status 는 이미 남는다. 그 뒤에 데이터를 고쳐 재실행하면 이번에는
+-- chk_reviews_status 중복으로 실패해서 배포를 정상적으로 재시도할 수 없다.
+-- 한 문장이면 어느 절이 실패하든 전부 되돌아가므로 데이터만 고치고 다시 실행하면 된다.
+--
+-- 복구 절차: 범위 밖 평점을 고치거나 지운 뒤 `flyway repair` 로 실패 기록을 지우고
+-- 다시 마이그레이션한다. 이 파일은 절이 전부 적용되거나 전부 적용되지 않거나 둘 뿐이라
+-- 중간 상태를 손으로 되돌릴 일이 없다. AGENTS.md 의 "기존 데이터 영향과 복구 방법"이다.
+-- 회귀 방지: ReviewMigrationRetryTests.
+--
+-- 평점에는 status 와 달리 사전 보정 UPDATE 를 두지 않는다. 범위 밖 평점은 무엇으로
+-- 고쳐야 옳은지 알 수 없어 임의로 정하면 사용자가 매긴 값을 조용히 바꾸게 된다.
+-- 그래서 고치지 않고 실패시킨다. 근거는 SPEC.md 2.2.
 ALTER TABLE `reviews`
+    MODIFY COLUMN `status` VARCHAR(30) NOT NULL DEFAULT 'PUBLISHED',
+    ADD CONSTRAINT `chk_reviews_status`
+        CHECK (`status` IN ('PUBLISHED', 'DELETED', 'BLOCKED')),
     ADD CONSTRAINT `chk_reviews_overall_rating` CHECK (`overall_rating` BETWEEN 1 AND 5),
     ADD CONSTRAINT `chk_reviews_taste_rating`   CHECK (`taste_rating`   BETWEEN 1 AND 5),
     ADD CONSTRAINT `chk_reviews_design_rating`  CHECK (`design_rating`  BETWEEN 1 AND 5),
