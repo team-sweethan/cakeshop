@@ -1,9 +1,13 @@
 package com.cakeshop.global.config;
 
+import org.apache.ibatis.annotations.Mapper;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@MapperScan("com.cakeshop.domain")
+@MapperScan(
+        basePackages = "com.cakeshop.domain",
+        annotationClass = Mapper.class
+)
 public class MyBatisConfig {
 }

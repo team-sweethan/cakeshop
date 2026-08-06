@@ -20,10 +20,15 @@ import com.cakeshop.domain.member.dto.view.MemberProfileView;
 import com.cakeshop.domain.member.controller.MyPageController;
 import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.notification.controller.NotificationUserController;
-import com.cakeshop.domain.notification.service.NotificationService;
-import com.cakeshop.domain.store.service.StoreService;
-import com.cakeshop.domain.order.controller.OrderController;
+import com.cakeshop.domain.order.controller.customer.OrderController;
+import com.cakeshop.domain.order.dto.view.OrderDetailView;
+import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
+import com.cakeshop.domain.order.service.customer.CustomerOrderQueryService;
+import com.cakeshop.domain.order.service.OrderService;
 import com.cakeshop.domain.payment.controller.PaymentController;
+import com.cakeshop.domain.payment.service.PaymentFacade;
+import com.cakeshop.domain.payment.service.PaymentQueryService;
+import com.cakeshop.domain.payment.service.RefundFacade;
 import com.cakeshop.domain.product.controller.ProductController;
 import com.cakeshop.domain.product.service.ProductService;
 import com.cakeshop.domain.review.controller.ReviewController;
@@ -72,6 +77,10 @@ class CustomerPageControllerTests {
                         "010-1234-5678",
                         LocalDate.of(2000, 1, 15)));
 
+        CustomerOrderQueryService orderQueryService = mock(CustomerOrderQueryService.class);
+        when(orderQueryService.getMemberOrders(1L)).thenReturn(List.of());
+        when(orderQueryService.getMemberOrder(1L, 1L))
+                .thenReturn(mock(OrderDetailView.class));
         CartService cartService = mock(CartService.class);
         when(cartService.getCart(1L)).thenReturn(new CartView(
                 List.of(), 0, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO));
@@ -81,8 +90,17 @@ class CustomerPageControllerTests {
                         new AuthController(memberService),
                         new ProductController(mock(ProductService.class)),
                         new CartController(cartService),
-                        new OrderController(),
-                        new PaymentController(),
+                        new OrderController(
+                                mock(OrderCheckoutService.class),
+                                mock(OrderService.class),
+                                orderQueryService,
+                                memberService,
+                                mock(RefundFacade.class)
+                        ),
+                        new PaymentController(
+                                mock(PaymentFacade.class),
+                                mock(PaymentQueryService.class)
+                        ),
                         new MyPageController(
                                 memberService,
                                 mock(SessionRegistry.class)),
@@ -100,12 +118,12 @@ class CustomerPageControllerTests {
         pages.put("/products", "customer/product/list");
         pages.put("/products/1", "customer/product/detail");
         pages.put("/cart", "customer/cart/list");
-        pages.put("/orders/pickup", "customer/order/pickup-setting");
-        pages.put("/orders/custom/options", "customer/order/custom-option");
-        pages.put("/orders/custom/request", "customer/order/custom-request");
-        pages.put("/orders/checkout", "customer/order/form");
+        pages.put(
+                "/orders/checkout?productId=1&quantity=1&optionIds=1",
+                "customer/order/form"
+        );
         pages.put("/orders/1/payment", "customer/payment/form");
-        pages.put("/orders/complete", "customer/order/complete");
+        pages.put("/orders/complete?orderId=1", "customer/order/complete");
         pages.put("/mypage", "customer/member/mypage");
         pages.put("/orders/1", "customer/order/detail");
         pages.put("/notifications", "customer/notification/list");
@@ -210,5 +228,24 @@ class CustomerPageControllerTests {
                 .contains("state.available");
         assertThat(cartTemplate)
                 .contains("item.stockQuantity != null ? item.stockQuantity : 10");
+    }
+
+    @Test
+    void productDetail_generalOrder_usesIntegratedCheckout() throws IOException {
+        String productDetail = new ClassPathResource(
+                "templates/customer/product/detail.html"
+        ).getContentAsString(StandardCharsets.UTF_8);
+        String customerScript = new ClassPathResource(
+                "static/js/customer-mockup.js"
+        ).getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(productDetail)
+                .contains("th:href=\"@{/orders/checkout}\"")
+                .contains("data-order-checkout")
+                .doesNotContain("@{/orders/pickup(intent='order')}");
+        assertThat(customerScript)
+                .contains("new URL(\"/orders/checkout\", location.origin)")
+                .contains("url.searchParams.set(\"productId\"")
+                .contains("url.searchParams.append(\"optionIds\"");
     }
 }

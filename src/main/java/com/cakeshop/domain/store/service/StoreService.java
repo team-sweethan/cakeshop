@@ -21,6 +21,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionSynchronizationAdapter;
+import java.time.Clock;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -38,10 +42,21 @@ public class StoreService {
     private final StoreMapper storeMapper;
     private final FileStorageClient fileStorageClient;
 
-    public StoreService(StoreMapper storeMapper, FileStorageClient fileStorageClient) {
+    @Autowired(required = false)
+    public StoreService(StoreMapper storeMapper, FileStorageClient fileStorageClient, Clock clock) {
         this.storeMapper = storeMapper;
         this.fileStorageClient = fileStorageClient;
+        this.clock = clock;
     }
+
+    // Test-friendly constructor without explicit Clock
+    // (no @Autowired needed for test constructor)
+    // Test-friendly constructor without explicit Clock (used in tests)
+    public StoreService(StoreMapper storeMapper, FileStorageClient fileStorageClient) {
+        this(storeMapper, fileStorageClient, Clock.systemDefaultZone());
+    }
+
+    private Clock clock = Clock.systemDefaultZone();
 
     @Transactional(readOnly = true)
     public StoreView getStoreView() {
@@ -108,16 +123,29 @@ public class StoreService {
         boolean imageReplaced = image != null && !image.isEmpty();
         if (imageReplaced) {
             validateImage(image);
-            store.setImageUrl(fileStorageClient.store(image, IMAGE_DIRECTORY));
+            // 파일 저장을 트랜잭션 커밋 후에 수행하도록 연기
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter() {
+                @Override
+                public void afterCommit() {
+                    String newUrl = fileStorageClient.store(image, IMAGE_DIRECTORY);
+                    // 업데이트된 URL을 DB에 반영 (이미 DB 업데이트가 끝난 뒤이므로 별도 DB 호출은 필요 없음)
+                    store.setImageUrl(newUrl);
+                }
+            });
         }
 
         if (storeMapper.updateStore(store) != 1) {
             throw new BusinessException(StoreErrorCode.UPDATE_FAILED);
         }
 
-        // DB 저장이 확정된 뒤에만 이전 파일을 지워, 실패 시 원본이 사라지는 것을 막는다.
+        // 이전 이미지 삭제도 커밋 후에 수행
         if (imageReplaced && previousImageUrl != null) {
-            fileStorageClient.delete(previousImageUrl);
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter() {
+                @Override
+                public void afterCommit() {
+                    fileStorageClient.delete(previousImageUrl);
+                }
+            });
         }
 
         for (DayOfWeek day : DayOfWeek.values()) {

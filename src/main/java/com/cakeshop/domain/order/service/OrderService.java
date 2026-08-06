@@ -1,8 +1,46 @@
 package com.cakeshop.domain.order.service;
 
-import org.springframework.stereotype.Service;
+import com.cakeshop.domain.order.dto.form.customer.GeneralOrderForm;
 
-@Service
-public class OrderService {
-    // TODO: 생성·조회·고객 취소 — 소유자 검증 필수
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+
+/** 일반 상품 주문 생성과 결제 연동을 제공하는 주문 도메인의 공개 계약이다. */
+public interface OrderService {
+
+    /**
+     * 일반 상품 주문과 결제 대기 정보를 생성한다.
+     *
+     * @return 결제 화면으로 이동할 때 사용할 주문 ID
+     */
+    long createGeneralOrder(long memberId, GeneralOrderForm form);
+
+    /** 결제 검증과 재고 차감에 필요한 회원 소유의 일반 주문을 조회한다. */
+    GeneralPaymentOrder getGeneralPaymentOrder(long memberId, long orderId);
+
+    /** 승인 결과를 내부 반영하기 전에 주문 행을 잠가 만료 처리와 직렬화한다. */
+    void lockGeneralOrderForPayment(long orderId);
+
+    /** 결제가 완료된 일반 주문을 픽업 대기 상태로 변경한다. */
+    void completeGeneralOrderAfterPayment(
+            long orderId,
+            LocalDateTime readyAt
+    );
+
+    /** 결제 성공 때 실제 차감된 유한 재고 주문 항목을 기록한다. */
+    void recordGeneralStockDeduction(long orderItemId, LocalDateTime deductedAt);
+
+    /** 결제 검증과 완료 처리에 필요한 일반 주문 정보다. */
+    record GeneralPaymentOrder(
+            long orderId,
+            BigDecimal amount,
+            LocalDateTime paymentExpiresAt,
+            List<PaymentProduct> products
+    ) {
+    }
+
+    /** 결제 성공 시 재고를 차감할 주문 상품이다. */
+    record PaymentProduct(long orderItemId, long productId, int quantity) {
+    }
 }

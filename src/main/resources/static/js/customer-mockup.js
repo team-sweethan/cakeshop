@@ -202,13 +202,25 @@
     };
   }
 
-  function prepareProduct() {
-    if (!validateProductOptions()) return false;
+  function moveProductToCheckout(event) {
+    if (!validateProductOptions()) {
+      event.preventDefault();
+      return;
+    }
     const product = productFromDetail();
-    if (!product) return false;
-    try { sessionStorage.removeItem(PICKUP_TARGET_KEY); } catch (error) { /* 세션 저장소 미지원 */ }
-    writePendingProduct(product);
-    return true;
+    if (!product) {
+      event.preventDefault();
+      return;
+    }
+
+    event.preventDefault();
+    const url = new URL("/orders/checkout", location.origin);
+    url.searchParams.set("productId", product.productId);
+    url.searchParams.set("quantity", String(product.quantity));
+    product.options.forEach(function (option) {
+      url.searchParams.append("optionIds", option.id);
+    });
+    location.href = url.pathname + url.search;
   }
 
   function addProductFromDetail() {
@@ -272,6 +284,35 @@
     if (!node) return;
     node.textContent = message;
     node.hidden = !message;
+  }
+
+  function movePendingProductToCheckout(event) {
+    event.preventDefault();
+
+    const pending = readPendingProduct();
+    const date = document.getElementById("pickup-date");
+    const time = document.querySelector("[data-select-group] [data-select].is-active");
+    const quantity = document.querySelector("[data-quantity-value]");
+    if (!pending || !pending.productId || !date || !date.value || !time) {
+      showPickupError("상품과 픽업 일시를 확인해 주세요.");
+      return;
+    }
+
+    const url = new URL("/orders/checkout", location.origin);
+    url.searchParams.set("productId", pending.productId);
+    url.searchParams.set(
+      "quantity",
+      quantity ? quantity.textContent.trim() : String(pending.quantity || 1)
+    );
+    url.searchParams.set(
+      "pickupAt",
+      date.value + "T" + time.textContent.trim()
+    );
+    (pending.options || []).forEach(function (option) {
+      url.searchParams.append("optionIds", option.id);
+    });
+
+    location.href = url.pathname + url.search;
   }
 
   function addNormalProduct() {
@@ -427,8 +468,10 @@
   window.CakeCart = { read: readCart, write: writeCart, add: addCartItem, updateCount: updateCartCount };
 
   document.addEventListener("click", function (event) {
-    const prepare = event.target.closest("[data-prepare-product]");
-    if (prepare && !prepareProduct()) event.preventDefault();
+    const orderCheckout = event.target.closest("[data-order-checkout]");
+    if (orderCheckout) moveProductToCheckout(event);
+    const pickupOrder = event.target.closest("[data-pickup-order-link]");
+    if (pickupOrder) movePendingProductToCheckout(event);
     const addProduct = event.target.closest("[data-add-product-cart]");
     if (addProduct) addProductFromDetail();
     const serverCart = event.target.closest("[data-server-cart-submit]");

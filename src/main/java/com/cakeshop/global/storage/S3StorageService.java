@@ -4,9 +4,11 @@ import com.cakeshop.global.infra.FileStorageClient;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.time.LocalDate;
+import java.time.Clock;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
@@ -29,12 +31,16 @@ public class S3StorageService implements FileStorageClient {
     private final S3Client s3Client;
     private final String bucket;
     private final String baseUrl;
+    private final Clock clock;
 
     // S3 클라이언트와 저장 대상 버킷·공개 URL 설정
+    @Autowired
     public S3StorageService(
             S3Client s3Client,
             @Value("${aws.s3.bucket}") String bucket,
-            @Value("${aws.s3.base-url}") String baseUrl) {
+            @Value("${aws.s3.base-url}") String baseUrl,
+            Clock clock) {
+        this.clock = clock;
         if (!StringUtils.hasText(bucket)) {
             throw new IllegalArgumentException("aws.s3.bucket 설정이 비어 있습니다.");
         }
@@ -44,6 +50,14 @@ public class S3StorageService implements FileStorageClient {
         this.s3Client = s3Client;
         this.bucket = bucket.trim();
         this.baseUrl = stripTrailingSlash(baseUrl.trim());
+    }
+
+    // Test-friendly constructor without explicit Clock
+    @Autowired(required = false)
+    public S3StorageService(S3Client s3Client,
+            @Value("${aws.s3.bucket}") String bucket,
+            @Value("${aws.s3.base-url}") String baseUrl) {
+        this(s3Client, bucket, baseUrl, Clock.systemDefaultZone());
     }
 
     // 파일을 S3에 저장하고 화면과 DB에서 사용할 공개 URL 반환
@@ -115,7 +129,7 @@ public class S3StorageService implements FileStorageClient {
         String extension = extension(file.getOriginalFilename());
         return directory
                 + "/"
-                + LocalDate.now().format(MONTH)
+                + LocalDate.now(clock).format(MONTH)
                 + "/"
                 + UUID.randomUUID()
                 + extension;

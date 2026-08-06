@@ -19,6 +19,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.EnumSet;
 import java.util.Optional;
+import java.time.Clock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,7 +42,7 @@ class StoreServiceTests {
 
     @BeforeEach
     void setUp() {
-        storeService = new StoreService(storeMapper, fileStorageClient);
+        storeService = new StoreService(storeMapper, fileStorageClient, Clock.systemDefaultZone());
     }
 
     @Test

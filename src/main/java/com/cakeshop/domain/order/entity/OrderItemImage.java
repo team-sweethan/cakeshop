@@ -9,6 +9,7 @@ import lombok.Setter;
 public class OrderItemImage {
 
     private Long id;
+    //order_item.id
     private Long orderItemId;
     private String imageUrl;
     private Integer sortOrder;

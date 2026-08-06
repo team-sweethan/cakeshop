@@ -60,6 +60,7 @@ class OrderPaymentEntitySchemaTests {
                 Map.entry("id", Long.class),
                 Map.entry("orderNumber", String.class),
                 Map.entry("memberId", Long.class),
+                Map.entry("requestKey", String.class),
                 Map.entry("orderType", OrderType.class),
                 Map.entry("ordererName", String.class),
                 Map.entry("ordererPhone", String.class),
@@ -105,7 +106,9 @@ class OrderPaymentEntitySchemaTests {
                 Map.entry("totalAmount", BigDecimal.class),
                 Map.entry("requirements", String.class),
                 Map.entry("preparationDays", Integer.class),
-                Map.entry("cancellationLimitDays", Integer.class)
+                Map.entry("cancellationLimitDays", Integer.class),
+                Map.entry("stockDeductedAt", LocalDateTime.class),
+                Map.entry("stockRestoredAt", LocalDateTime.class)
         ));
         assertFields(OrderItemOption.class, Map.ofEntries(
                 Map.entry("id", Long.class),
