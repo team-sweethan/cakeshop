@@ -19,14 +19,13 @@
     </sql>
 
     <select id="findPublishedPosts"
-            resultType="com.cakeshop.domain.community.dto.view.PostListView">
+            resultType="com.cakeshop.domain.community.dto.view.PostListRow">
 
         SELECT
         p.id,
+        p.member_id,
         pc.name AS category_name,
         p.title,
-        m.nickname AS author_nickname,
-        (m.status = 'WITHDRAWN') AS author_withdrawn,
         p.view_count,
         p.like_count,
         (SELECT COUNT(*)
@@ -37,7 +36,6 @@
 
         FROM posts p
         JOIN post_categories pc ON pc.id = p.category_id
-        JOIN members m ON m.id = p.member_id
 
         <include refid="publishedPostConditions"/>
 
@@ -62,7 +60,7 @@
     </select>
 
     <select id="findPostById"
-            resultType="com.cakeshop.domain.community.dto.view.PostDetailView">
+            resultType="com.cakeshop.domain.community.dto.view.PostDetailRow">
 
         SELECT
         p.id,
@@ -71,8 +69,6 @@
         pc.name AS category_name,
         p.title,
         p.content,
-        m.nickname AS author_nickname,
-        (m.status = 'WITHDRAWN') AS author_withdrawn,
         p.status,
         p.blocked_reason,
         p.view_count,
@@ -82,7 +78,6 @@
 
         FROM posts p
         JOIN post_categories pc ON pc.id = p.category_id
-        JOIN members m ON m.id = p.member_id
 
         WHERE p.id = #{postId}
     </select>
@@ -167,20 +162,17 @@
     </update>
 
     <select id="findRecentComments"
-            resultType="com.cakeshop.domain.community.dto.view.CommentView">
+            resultType="com.cakeshop.domain.community.dto.view.CommentRow">
 
         SELECT
         c.id,
         c.post_id,
         c.member_id,
-        m.nickname AS author_nickname,
-        (m.status = 'WITHDRAWN') AS author_withdrawn,
         CASE WHEN c.status = 'PUBLISHED' THEN c.content END AS content,
         c.status,
         c.created_at
 
         FROM comments c
-        JOIN members m ON m.id = c.member_id
 
         WHERE c.post_id = #{postId}
 
@@ -200,20 +192,17 @@
     </select>
 
     <select id="findCommentById"
-            resultType="com.cakeshop.domain.community.dto.view.CommentView">
+            resultType="com.cakeshop.domain.community.dto.view.CommentRow">
 
         SELECT
         c.id,
         c.post_id,
         c.member_id,
-        m.nickname AS author_nickname,
-        (m.status = 'WITHDRAWN') AS author_withdrawn,
         CASE WHEN c.status = 'PUBLISHED' THEN c.content END AS content,
         c.status,
         c.created_at
 
         FROM comments c
-        JOIN members m ON m.id = c.member_id
 
         WHERE c.id = #{commentId}
     </select>

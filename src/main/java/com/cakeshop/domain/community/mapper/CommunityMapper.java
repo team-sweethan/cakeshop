@@ -4,11 +4,11 @@ import java.time.LocalDate;
 import java.util.List;
 
 import com.cakeshop.domain.community.dto.view.CommentCountView;
-import com.cakeshop.domain.community.dto.view.CommentView;
+import com.cakeshop.domain.community.dto.view.CommentRow;
 import com.cakeshop.domain.community.dto.view.PopularPostView;
 import com.cakeshop.domain.community.dto.view.PostCategoryView;
-import com.cakeshop.domain.community.dto.view.PostDetailView;
-import com.cakeshop.domain.community.dto.view.PostListView;
+import com.cakeshop.domain.community.dto.view.PostDetailRow;
+import com.cakeshop.domain.community.dto.view.PostListRow;
 import com.cakeshop.domain.community.dto.view.PostLockView;
 import com.cakeshop.domain.community.dto.view.PostSort;
 import com.cakeshop.domain.community.entity.Comment;
@@ -29,7 +29,7 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 public interface CommunityMapper {
 
-    List<PostListView> findPublishedPosts(
+    List<PostListRow> findPublishedPosts(
             @Param("categoryId") Long categoryId,
             @Param("sort") PostSort sort,
             @Param("size") int size,
@@ -40,7 +40,7 @@ public interface CommunityMapper {
             @Param("categoryId") Long categoryId
     );
 
-    PostDetailView findPostById(
+    PostDetailRow findPostById(
             @Param("postId") long postId
     );
 
@@ -73,7 +73,7 @@ public interface CommunityMapper {
             @Param("memberId") long memberId
     );
 
-    List<CommentView> findRecentComments(
+    List<CommentRow> findRecentComments(
             @Param("postId") long postId,
             @Param("limit") int limit
     );
@@ -82,7 +82,7 @@ public interface CommunityMapper {
             @Param("postId") long postId
     );
 
-    CommentView findCommentById(
+    CommentRow findCommentById(
             @Param("commentId") long commentId
     );
 

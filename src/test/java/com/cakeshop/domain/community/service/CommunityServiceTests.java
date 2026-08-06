@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -22,10 +23,13 @@ import com.cakeshop.domain.community.dto.form.PostForm;
 import com.cakeshop.domain.community.dto.form.ReportForm;
 import com.cakeshop.domain.community.dto.view.CommentCountView;
 import com.cakeshop.domain.community.dto.view.CommentSectionView;
+import com.cakeshop.domain.community.dto.view.CommentRow;
 import com.cakeshop.domain.community.dto.view.CommentView;
 import com.cakeshop.domain.community.dto.view.PopularPostView;
 import com.cakeshop.domain.community.dto.view.PopularSectionView;
+import com.cakeshop.domain.community.dto.view.PostDetailRow;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
+import com.cakeshop.domain.community.dto.view.PostListRow;
 import com.cakeshop.domain.community.dto.view.PostListView;
 import com.cakeshop.domain.community.dto.view.PostLockView;
 import com.cakeshop.domain.community.dto.view.PostSort;
@@ -35,6 +39,8 @@ import com.cakeshop.domain.community.entity.Post;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
 import com.cakeshop.domain.community.mapper.CommunityMapper;
+import com.cakeshop.domain.member.dto.view.MemberCommunityView;
+import com.cakeshop.domain.member.service.MemberCommunityQueryService;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
@@ -83,12 +89,16 @@ class CommunityServiceTests {
     private static final PageRequest FIRST_PAGE = new PageRequest(1, 20);
 
     private CommunityMapper communityMapper;
+    private MemberCommunityQueryService memberCommunityQueryService;
     private CommunityService communityService;
 
     @BeforeEach
     void setUp() {
         communityMapper = mock(CommunityMapper.class);
-        communityService = new CommunityService(communityMapper, fixedClockAt(NOW));
+        memberCommunityQueryService = mock(MemberCommunityQueryService.class);
+        when(memberCommunityQueryService.getMembersByIds(anyList())).thenReturn(List.of());
+        communityService = new CommunityService(
+                communityMapper, memberCommunityQueryService, fixedClockAt(NOW));
     }
 
     /**
@@ -226,19 +236,102 @@ class CommunityServiceTests {
 
     @Test
     void getPosts_passesPageSizeAndOffsetToMapper() {
-        PostListView post = new PostListView(
-                1L, "질문", "제목", "글쓴이", false, 0, 0, 0, CREATED_AT);
+        PostListRow post = new PostListRow(
+                1L, AUTHOR_ID, "질문", "제목", 0, 0, 0, CREATED_AT);
 
         when(communityMapper.findPublishedPosts(3L, PostSort.LATEST, 20, 40))
                 .thenReturn(List.of(post));
         when(communityMapper.countPublishedPosts(3L)).thenReturn(45L);
+        givenAuthors(new MemberCommunityView(AUTHOR_ID, "글쓴이", false));
 
         PageResult<PostListView> result =
                 communityService.getPosts(3L, PostSort.LATEST, new PageRequest(3, 20));
 
-        assertThat(result.getContent()).containsExactly(post);
+        assertThat(result.getContent())
+                .containsExactly(PostListView.of(post, new MemberCommunityView(AUTHOR_ID, "글쓴이", false)));
         assertThat(result.getTotalElements()).isEqualTo(45L);
         assertThat(result.getTotalPages()).isEqualTo(3);
+    }
+
+    /** 목록의 작성자는 members JOIN 이 아니라 회원 도메인 계약으로 채운다(조각 10b). */
+    @Test
+    void getPosts_fillsAuthorFromMemberContract() {
+        PostListRow post = new PostListRow(
+                1L, AUTHOR_ID, "질문", "제목", 0, 0, 0, CREATED_AT);
+
+        when(communityMapper.findPublishedPosts(null, PostSort.LATEST, 20, 0))
+                .thenReturn(List.of(post));
+        when(communityMapper.countPublishedPosts(null)).thenReturn(1L);
+        givenAuthors(new MemberCommunityView(AUTHOR_ID, "글쓴이", false));
+
+        PageResult<PostListView> result =
+                communityService.getPosts(null, PostSort.LATEST, FIRST_PAGE);
+
+        assertThat(result.getContent()).singleElement()
+                .satisfies(view -> assertThat(view.authorName()).isEqualTo("글쓴이"));
+    }
+
+    /**
+     * 회원 행을 찾지 못해도 게시글은 목록에 남고 작성자만 가려진다.
+     *
+     * <p>members 를 INNER JOIN 하던 때는 그런 게시글이 통째로 사라졌다. DOMAIN.md 8절은
+     * 글을 유지하고 표시명만 바꾸라고 하므로 조각 10b 에서 바뀐 쪽이 규칙에 맞다.</p>
+     */
+    @Test
+    void getPosts_missingAuthor_keepsPostAndMasksAuthor() {
+        PostListRow post = new PostListRow(
+                1L, AUTHOR_ID, "질문", "제목", 0, 0, 0, CREATED_AT);
+
+        when(communityMapper.findPublishedPosts(null, PostSort.LATEST, 20, 0))
+                .thenReturn(List.of(post));
+        when(communityMapper.countPublishedPosts(null)).thenReturn(1L);
+        givenAuthors();
+
+        PageResult<PostListView> result =
+                communityService.getPosts(null, PostSort.LATEST, FIRST_PAGE);
+
+        assertThat(result.getContent()).singleElement()
+                .satisfies(view -> assertThat(view.authorName()).isEqualTo("탈퇴한 회원"));
+    }
+
+    /** 댓글 작성자도 members JOIN 이 아니라 회원 도메인 계약으로 채운다(조각 10b). */
+    @Test
+    void getComments_fillsAuthorFromMemberContract() {
+        givenComments(commentOf(1L, CommentStatus.PUBLISHED));
+        givenAuthors(new MemberCommunityView(AUTHOR_ID, "글쓴이", false));
+
+        CommentSectionView section = communityService.getComments(POST_ID, null);
+
+        assertThat(section.comments()).singleElement()
+                .satisfies(comment -> assertThat(comment.authorName()).isEqualTo("글쓴이"));
+    }
+
+    /** 탈퇴 회원의 댓글도 지우지 않고 표시명만 가린다(DOMAIN.md 8). */
+    @Test
+    void getComments_withdrawnAuthor_showsPlaceholderName() {
+        givenComments(commentOf(1L, CommentStatus.PUBLISHED));
+        givenAuthors(new MemberCommunityView(AUTHOR_ID, "글쓴이", true));
+
+        CommentSectionView section = communityService.getComments(POST_ID, null);
+
+        assertThat(section.comments()).singleElement()
+                .satisfies(comment -> assertThat(comment.authorName()).isEqualTo("탈퇴한 회원"));
+    }
+
+    /** 상세의 작성자도 같은 계약으로 채운다. 회원 행이 없으면 탈퇴로 본다(조각 10b). */
+    @Test
+    void getVisiblePost_missingAuthor_masksAuthor() {
+        givenPost(PostStatus.PUBLISHED);
+        givenAuthors();
+
+        PostDetailView post = communityService.getVisiblePost(POST_ID, AUTHOR_ID);
+
+        assertThat(post.authorName()).isEqualTo("탈퇴한 회원");
+    }
+
+    private void givenAuthors(MemberCommunityView... authors) {
+        when(memberCommunityQueryService.getMembersByIds(anyList()))
+                .thenReturn(List.of(authors));
     }
 
     @Test
@@ -375,7 +468,9 @@ class CommunityServiceTests {
     @Test
     void getPopularSection_beforeGraceEnds_doesNotWarnEvenIfStale() {
         CommunityService atDawn = new CommunityService(
-                communityMapper, fixedClockAt(LocalDateTime.of(2026, 3, 10, 0, 30)));
+                communityMapper,
+                memberCommunityQueryService,
+                fixedClockAt(LocalDateTime.of(2026, 3, 10, 0, 30)));
         givenConfirmedRanking(YESTERDAY.minusDays(1), popular(1, 11L));
 
         assertThat(warningsWhile(() -> atDawn.getPopularSection(null, FIRST_PAGE))).isEmpty();
@@ -1028,7 +1123,7 @@ class CommunityServiceTests {
         when(communityMapper.increaseViewCount(POST_ID, VIEWER_KEY)).thenReturn(recorded ? 1 : 0);
     }
 
-    private void givenComments(CommentView... comments) {
+    private void givenComments(CommentRow... comments) {
         when(communityMapper.findRecentComments(anyLong(), anyInt()))
                 .thenReturn(List.of(comments));
         when(communityMapper.countComments(POST_ID))
@@ -1040,18 +1135,16 @@ class CommunityServiceTests {
                 .thenReturn(commentOf(COMMENT_ID, POST_ID, authorId, status));
     }
 
-    private CommentView commentOf(long commentId, CommentStatus status) {
+    private CommentRow commentOf(long commentId, CommentStatus status) {
         return commentOf(commentId, POST_ID, AUTHOR_ID, status);
     }
 
-    private CommentView commentOf(
+    private CommentRow commentOf(
             long commentId, long postId, long authorId, CommentStatus status) {
-        return new CommentView(
+        return new CommentRow(
                 commentId,
                 postId,
                 authorId,
-                "글쓴이",
-                false,
                 status == CommentStatus.DELETED ? null : "댓글 본문",
                 status,
                 CREATED_AT
@@ -1240,15 +1333,13 @@ class CommunityServiceTests {
     }
 
     private void givenPost(PostStatus status) {
-        when(communityMapper.findPostById(POST_ID)).thenReturn(new PostDetailView(
+        when(communityMapper.findPostById(POST_ID)).thenReturn(new PostDetailRow(
                 POST_ID,
                 AUTHOR_ID,
                 1L,
                 "질문",
                 "제목",
                 "본문",
-                "글쓴이",
-                false,
                 status,
                 status == PostStatus.BLOCKED ? "광고성 게시물" : null,
                 10L,

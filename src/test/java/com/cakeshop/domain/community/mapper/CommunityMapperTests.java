@@ -13,11 +13,11 @@ import com.cakeshop.domain.community.dto.view.AdminPostDetailView;
 import com.cakeshop.domain.community.dto.view.AdminPostListView;
 import com.cakeshop.domain.community.dto.view.AdminPostSort;
 import com.cakeshop.domain.community.dto.view.CommentCountView;
-import com.cakeshop.domain.community.dto.view.CommentView;
+import com.cakeshop.domain.community.dto.view.CommentRow;
 import com.cakeshop.domain.community.dto.view.PopularPostView;
 import com.cakeshop.domain.community.dto.view.PostCategoryView;
-import com.cakeshop.domain.community.dto.view.PostDetailView;
-import com.cakeshop.domain.community.dto.view.PostListView;
+import com.cakeshop.domain.community.dto.view.PostDetailRow;
+import com.cakeshop.domain.community.dto.view.PostListRow;
 import com.cakeshop.domain.community.dto.view.PostSort;
 import com.cakeshop.domain.community.dto.view.PostLockView;
 import com.cakeshop.domain.community.dto.view.ReportView;
@@ -94,9 +94,9 @@ class CommunityMapperTests {
         insertPost("삭제됨", PostStatus.DELETED, BASE_TIME);
         insertPost("차단됨", PostStatus.BLOCKED, BASE_TIME);
 
-        List<PostListView> posts = findPage(1, 20);
+        List<PostListRow> posts = findPage(1, 20);
 
-        assertThat(posts).extracting(PostListView::title).containsExactly("노출");
+        assertThat(posts).extracting(PostListRow::title).containsExactly("노출");
     }
 
     @Test
@@ -105,9 +105,9 @@ class CommunityMapperTests {
         long second = insertPost("두 번째", PostStatus.PUBLISHED, BASE_TIME);
         long third = insertPost("세 번째", PostStatus.PUBLISHED, BASE_TIME);
 
-        List<PostListView> posts = findPage(1, 20);
+        List<PostListRow> posts = findPage(1, 20);
 
-        assertThat(posts).extracting(PostListView::id)
+        assertThat(posts).extracting(PostListRow::id)
                 .containsExactly(third, second, first);
     }
 
@@ -116,9 +116,9 @@ class CommunityMapperTests {
         long older = insertPost("어제 글", PostStatus.PUBLISHED, BASE_TIME.minusDays(1));
         long newer = insertPost("오늘 글", PostStatus.PUBLISHED, BASE_TIME);
 
-        List<PostListView> posts = findPage(1, 20);
+        List<PostListRow> posts = findPage(1, 20);
 
-        assertThat(posts).extracting(PostListView::id).containsExactly(newer, older);
+        assertThat(posts).extracting(PostListRow::id).containsExactly(newer, older);
     }
 
     /**
@@ -135,9 +135,9 @@ class CommunityMapperTests {
         setViewCount(few, 3);
         setViewCount(many, 100);
 
-        List<PostListView> posts = findPage(1, 20, PostSort.VIEWS);
+        List<PostListRow> posts = findPage(1, 20, PostSort.VIEWS);
 
-        assertThat(posts).extracting(PostListView::id).containsExactly(many, few);
+        assertThat(posts).extracting(PostListRow::id).containsExactly(many, few);
     }
 
     /**
@@ -153,9 +153,9 @@ class CommunityMapperTests {
         long second = insertPost("두 번째", PostStatus.PUBLISHED, BASE_TIME);
         long third = insertPost("세 번째", PostStatus.PUBLISHED, BASE_TIME);
 
-        List<PostListView> posts = findPage(1, 20, PostSort.VIEWS);
+        List<PostListRow> posts = findPage(1, 20, PostSort.VIEWS);
 
-        assertThat(posts).extracting(PostListView::id)
+        assertThat(posts).extracting(PostListRow::id)
                 .containsExactly(third, second, first);
     }
 
@@ -175,9 +175,9 @@ class CommunityMapperTests {
         setViewCount(blocked, 999);
         setViewCount(deleted, 998);
 
-        List<PostListView> posts = findPage(1, 20, PostSort.VIEWS);
+        List<PostListRow> posts = findPage(1, 20, PostSort.VIEWS);
 
-        assertThat(posts).extracting(PostListView::id).containsExactly(visible);
+        assertThat(posts).extracting(PostListRow::id).containsExactly(visible);
     }
 
     /**
@@ -195,7 +195,7 @@ class CommunityMapperTests {
 
         List<Long> collected = new ArrayList<>();
         for (int page = 1; page <= 3; page++) {
-            collected.addAll(findPage(page, 2).stream().map(PostListView::id).toList());
+            collected.addAll(findPage(page, 2).stream().map(PostListRow::id).toList());
         }
 
         assertThat(collected).hasSize(5);
@@ -226,31 +226,11 @@ class CommunityMapperTests {
         insertComment(postId, CommentStatus.PUBLISHED);
         insertComment(postId, CommentStatus.DELETED);
 
-        List<PostListView> posts = findPage(1, 20);
+        List<PostListRow> posts = findPage(1, 20);
 
         assertThat(posts).singleElement()
-                .extracting(PostListView::commentCount)
+                .extracting(PostListRow::commentCount)
                 .isEqualTo(2L);
-    }
-
-    @Test
-    void findPublishedPosts_withdrawnAuthor_isMarkedAsWithdrawn() {
-        insertPost(withdrawnMemberId, "탈퇴 회원 글", PostStatus.PUBLISHED, BASE_TIME);
-
-        PostListView post = findPage(1, 20).getFirst();
-
-        assertThat(post.authorWithdrawn()).isTrue();
-        assertThat(post.authorName()).isEqualTo("탈퇴한 회원");
-    }
-
-    @Test
-    void findPublishedPosts_activeAuthor_showsNickname() {
-        insertPost("일반 회원 글", PostStatus.PUBLISHED, BASE_TIME);
-
-        PostListView post = findPage(1, 20).getFirst();
-
-        assertThat(post.authorWithdrawn()).isFalse();
-        assertThat(post.authorName()).isEqualTo("글쓴이");
     }
 
     @Test
@@ -258,7 +238,7 @@ class CommunityMapperTests {
         insertPost("이 카테고리", PostStatus.PUBLISHED, BASE_TIME);
         insertPost(memberId, otherCategoryId, "다른 카테고리", PostStatus.PUBLISHED, BASE_TIME);
 
-        assertThat(findPage(1, 20)).extracting(PostListView::title)
+        assertThat(findPage(1, 20)).extracting(PostListRow::title)
                 .containsExactly("이 카테고리");
     }
 
@@ -279,7 +259,7 @@ class CommunityMapperTests {
                 "UPDATE posts SET blocked_reason = ?, blocked_at = ? WHERE id = ?",
                 "광고성 게시물", BASE_TIME, postId);
 
-        PostDetailView post = communityMapper.findPostById(postId);
+        PostDetailRow post = communityMapper.findPostById(postId);
 
         // 노출 판단은 Service가 한다. Mapper가 상태로 걸러 버리면 작성자에게 사유를 줄 수 없다.
         assertThat(post.status()).isEqualTo(PostStatus.BLOCKED);
@@ -291,7 +271,7 @@ class CommunityMapperTests {
         long postId = insertPost("삭제된 글", PostStatus.DELETED, BASE_TIME);
 
         assertThat(communityMapper.findPostById(postId)).isNotNull()
-                .extracting(PostDetailView::status)
+                .extracting(PostDetailRow::status)
                 .isEqualTo(PostStatus.DELETED);
     }
 
@@ -304,13 +284,12 @@ class CommunityMapperTests {
     void findPostById_publishedPost_mapsDisplayFields() {
         long postId = insertPost("제목", PostStatus.PUBLISHED, BASE_TIME);
 
-        PostDetailView post = communityMapper.findPostById(postId);
+        PostDetailRow post = communityMapper.findPostById(postId);
 
         assertThat(post.memberId()).isEqualTo(memberId);
         assertThat(post.categoryId()).isEqualTo(categoryId);
         assertThat(post.categoryName()).isEqualTo("커뮤니티 테스트");
         assertThat(post.content()).isEqualTo("본문");
-        assertThat(post.authorNickname()).isEqualTo("글쓴이");
         assertThat(post.isEdited()).isFalse();
     }
 
@@ -465,7 +444,7 @@ class CommunityMapperTests {
 
         communityMapper.increaseViewCount(postId, "M:1");
 
-        PostDetailView post = communityMapper.findPostById(postId);
+        PostDetailRow post = communityMapper.findPostById(postId);
         assertThat(post.updatedAt()).isEqualTo(post.createdAt());
         assertThat(post.isEdited()).isFalse();
     }
@@ -496,7 +475,7 @@ class CommunityMapperTests {
         communityMapper.insertPost(post);
 
         assertThat(post.getId()).isNotNull();
-        PostDetailView saved = communityMapper.findPostById(post.getId());
+        PostDetailRow saved = communityMapper.findPostById(post.getId());
         assertThat(saved.title()).isEqualTo("새 글");
         // 새 글은 언제나 PUBLISHED다. 컬럼 기본값에 맡기지 않고 SQL이 명시한다.
         assertThat(saved.status()).isEqualTo(PostStatus.PUBLISHED);
@@ -520,7 +499,7 @@ class CommunityMapperTests {
         int updated = communityMapper.updatePost(post);
 
         assertThat(updated).isEqualTo(1);
-        PostDetailView saved = communityMapper.findPostById(postId);
+        PostDetailRow saved = communityMapper.findPostById(postId);
         assertThat(saved.title()).isEqualTo("고친 제목");
         assertThat(saved.content()).isEqualTo("고친 본문");
         assertThat(saved.categoryId()).isEqualTo(otherCategoryId);
@@ -619,7 +598,7 @@ class CommunityMapperTests {
 
         // 잘라 내는 쪽이 과거여야 방금 쓴 댓글이 화면에 남는다(DOMAIN.md 6.4).
         assertThat(communityMapper.findRecentComments(postId, 2))
-                .extracting(CommentView::content)
+                .extracting(CommentRow::content)
                 .containsExactly("세 번째", "두 번째");
     }
 
@@ -637,7 +616,7 @@ class CommunityMapperTests {
         long third = insertComment(postId, "세 번째", CommentStatus.PUBLISHED, BASE_TIME);
 
         assertThat(communityMapper.findRecentComments(postId, 20))
-                .extracting(CommentView::id)
+                .extracting(CommentRow::id)
                 .containsExactly(third, second, first);
     }
 
@@ -653,7 +632,7 @@ class CommunityMapperTests {
         long postId = insertPost("삭제 댓글", PostStatus.PUBLISHED, BASE_TIME);
         insertComment(postId, "지워진 본문", CommentStatus.DELETED, BASE_TIME);
 
-        CommentView comment = communityMapper.findRecentComments(postId, 20).getFirst();
+        CommentRow comment = communityMapper.findRecentComments(postId, 20).getFirst();
 
         assertThat(comment.isDeleted()).isTrue();
         assertThat(comment.content()).isNull();
@@ -667,20 +646,8 @@ class CommunityMapperTests {
         insertComment(otherPostId, "다른 글의 댓글", CommentStatus.PUBLISHED, BASE_TIME);
 
         assertThat(communityMapper.findRecentComments(postId, 20))
-                .extracting(CommentView::content)
+                .extracting(CommentRow::content)
                 .containsExactly("이 글의 댓글");
-    }
-
-    /** 탈퇴 회원의 댓글도 지우지 않고 표시명만 가린다(DOMAIN.md 8). */
-    @Test
-    void findRecentComments_withdrawnAuthor_showsPlaceholderName() {
-        long postId = insertPost("탈퇴 회원 댓글", PostStatus.PUBLISHED, BASE_TIME);
-        insertComment(postId, withdrawnMemberId, "댓글", CommentStatus.PUBLISHED, BASE_TIME);
-
-        CommentView comment = communityMapper.findRecentComments(postId, 20).getFirst();
-
-        assertThat(comment.authorWithdrawn()).isTrue();
-        assertThat(comment.authorName()).isEqualTo("탈퇴한 회원");
     }
 
     /**
@@ -718,7 +685,7 @@ class CommunityMapperTests {
         long postId = insertPost("글", PostStatus.PUBLISHED, BASE_TIME);
         long commentId = insertComment(postId, "지워진 본문", CommentStatus.DELETED, BASE_TIME);
 
-        CommentView comment = communityMapper.findCommentById(commentId);
+        CommentRow comment = communityMapper.findCommentById(commentId);
 
         // 상태로 걸러 버리면 없는 댓글과 지워진 댓글을 Service가 구분할 수 없다.
         assertThat(comment).isNotNull();
@@ -739,7 +706,7 @@ class CommunityMapperTests {
         communityMapper.insertComment(comment);
 
         assertThat(comment.getId()).isNotNull();
-        CommentView saved = communityMapper.findCommentById(comment.getId());
+        CommentRow saved = communityMapper.findCommentById(comment.getId());
         assertThat(saved.content()).isEqualTo("새 댓글");
         assertThat(saved.status()).isEqualTo(CommentStatus.PUBLISHED);
     }
@@ -927,11 +894,11 @@ class CommunityMapperTests {
         return Post.edit(postId, authorId, postCategoryId, title, content);
     }
 
-    private List<PostListView> findPage(int page, int size) {
+    private List<PostListRow> findPage(int page, int size) {
         return findPage(page, size, PostSort.LATEST);
     }
 
-    private List<PostListView> findPage(int page, int size, PostSort sort) {
+    private List<PostListRow> findPage(int page, int size, PostSort sort) {
         return communityMapper.findPublishedPosts(categoryId, sort, size, (page - 1) * size);
     }
 
@@ -1012,7 +979,7 @@ class CommunityMapperTests {
 
         assertThat(communityAdminMapper.blockPost(postId, "광고성 게시물", adminId)).isEqualTo(1);
 
-        PostDetailView post = communityMapper.findPostById(postId);
+        PostDetailRow post = communityMapper.findPostById(postId);
         assertThat(post.status()).isEqualTo(PostStatus.BLOCKED);
         assertThat(post.blockedReason()).isEqualTo("광고성 게시물");
         assertThat(blockedBy(postId)).isEqualTo(adminId);
@@ -1069,7 +1036,7 @@ class CommunityMapperTests {
 
         assertThat(communityAdminMapper.unblockPost(postId)).isEqualTo(1);
 
-        PostDetailView post = communityMapper.findPostById(postId);
+        PostDetailRow post = communityMapper.findPostById(postId);
         assertThat(post.status()).isEqualTo(PostStatus.PUBLISHED);
         assertThat(post.blockedReason()).isEqualTo("광고성 게시물");
         assertThat(blockedBy(postId)).isEqualTo(adminId);

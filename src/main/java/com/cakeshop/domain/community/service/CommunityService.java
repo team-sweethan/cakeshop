@@ -5,17 +5,24 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import com.cakeshop.domain.community.dto.form.CommentForm;
 import com.cakeshop.domain.community.dto.form.PostForm;
 import com.cakeshop.domain.community.dto.form.ReportForm;
 import com.cakeshop.domain.community.dto.view.CommentCountView;
 import com.cakeshop.domain.community.dto.view.CommentSectionView;
+import com.cakeshop.domain.community.dto.view.CommentRow;
 import com.cakeshop.domain.community.dto.view.CommentView;
 import com.cakeshop.domain.community.dto.view.PopularPostView;
 import com.cakeshop.domain.community.dto.view.PopularSectionView;
 import com.cakeshop.domain.community.dto.view.PostCategoryView;
+import com.cakeshop.domain.community.dto.view.PostDetailRow;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
+import com.cakeshop.domain.community.dto.view.PostListRow;
 import com.cakeshop.domain.community.dto.view.PostListView;
 import com.cakeshop.domain.community.dto.view.PostLockView;
 import com.cakeshop.domain.community.dto.view.PostSort;
@@ -24,6 +31,8 @@ import com.cakeshop.domain.community.entity.Post;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
 import com.cakeshop.domain.community.mapper.CommunityMapper;
+import com.cakeshop.domain.member.dto.view.MemberCommunityView;
+import com.cakeshop.domain.member.service.MemberCommunityQueryService;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
@@ -55,10 +64,16 @@ public class CommunityService {
     private static final LocalTime STALE_WARNING_GRACE_UNTIL = LocalTime.of(1, 0);
 
     private final CommunityMapper communityMapper;
+    private final MemberCommunityQueryService memberCommunityQueryService;
     private final Clock clock;
 
-    public CommunityService(CommunityMapper communityMapper, Clock clock) {
+    public CommunityService(
+            CommunityMapper communityMapper,
+            MemberCommunityQueryService memberCommunityQueryService,
+            Clock clock
+    ) {
         this.communityMapper = communityMapper;
+        this.memberCommunityQueryService = memberCommunityQueryService;
         this.clock = clock;
     }
 
@@ -68,7 +83,7 @@ public class CommunityService {
             PostSort sort,
             PageRequest pageRequest
     ) {
-        List<PostListView> posts = communityMapper.findPublishedPosts(
+        List<PostListRow> rows = communityMapper.findPublishedPosts(
                 categoryId,
                 sort,
                 pageRequest.getSize(),
@@ -76,6 +91,13 @@ public class CommunityService {
         );
 
         long totalElements = communityMapper.countPublishedPosts(categoryId);
+
+        Map<Long, MemberCommunityView> authors =
+                findAuthors(rows.stream().map(PostListRow::memberId).toList());
+
+        List<PostListView> posts = rows.stream()
+                .map(row -> PostListView.of(row, authors.get(row.memberId())))
+                .toList();
 
         return new PageResult<>(posts, pageRequest, totalElements);
     }
@@ -190,8 +212,15 @@ public class CommunityService {
     public CommentSectionView getComments(long postId, Integer requestedLimit) {
         int limit = CommentSectionView.clampLimit(requestedLimit);
 
-        List<CommentView> recent = communityMapper.findRecentComments(postId, limit);
+        List<CommentRow> rows = communityMapper.findRecentComments(postId, limit);
         CommentCountView counts = communityMapper.countComments(postId);
+
+        Map<Long, MemberCommunityView> authors =
+                findAuthors(rows.stream().map(CommentRow::memberId).toList());
+
+        List<CommentView> recent = rows.stream()
+                .map(row -> CommentView.of(row, authors.get(row.memberId())))
+                .toList();
 
         return new CommentSectionView(
                 List.copyOf(recent.reversed()),
@@ -272,7 +301,7 @@ public class CommunityService {
     private PostDetailView requireReportablePost(long postId, long memberId) {
         PostDetailView post = requireVisiblePost(postId, memberId);
 
-        if (isAuthor(post, memberId)) {
+        if (isAuthor(post.memberId(), memberId)) {
             throw new BusinessException(CommunityErrorCode.OWN_POST_REPORT);
         }
 
@@ -321,7 +350,8 @@ public class CommunityService {
     }
 
     private void requireOwnComment(long postId, long commentId, long memberId) {
-        CommentView comment = communityMapper.findCommentById(commentId);
+        // 소유권 판단에만 쓰므로 작성자 표기가 필요 없고, 그래서 회원 조회도 붙지 않는다.
+        CommentRow comment = communityMapper.findCommentById(commentId);
 
         if (comment == null
                 || !comment.postId().equals(postId)
@@ -332,13 +362,13 @@ public class CommunityService {
     }
 
     private PostDetailView requireVisiblePost(long postId, Long viewerId) {
-        PostDetailView post = communityMapper.findPostById(postId);
+        PostDetailRow post = communityMapper.findPostById(postId);
 
         if (post == null || !isVisibleTo(post, viewerId)) {
             throw new BusinessException(CommunityErrorCode.POST_NOT_FOUND);
         }
 
-        return post;
+        return toDetailView(post);
     }
 
     private void requireApplied(int affectedRows, long postId, long editorId) {
@@ -352,9 +382,11 @@ public class CommunityService {
     }
 
     private PostDetailView requireEditablePost(long postId, long editorId) {
-        PostDetailView post = communityMapper.findPostById(postId);
+        PostDetailRow post = communityMapper.findPostById(postId);
 
-        if (post == null || !isAuthor(post, editorId) || post.status() == PostStatus.DELETED) {
+        if (post == null
+                || !isAuthor(post.memberId(), editorId)
+                || post.status() == PostStatus.DELETED) {
             throw new BusinessException(CommunityErrorCode.POST_NOT_FOUND);
         }
 
@@ -362,7 +394,33 @@ public class CommunityService {
             throw new BusinessException(CommunityErrorCode.BLOCKED_POST);
         }
 
-        return post;
+        return toDetailView(post);
+    }
+
+    /**
+     * 매퍼가 읽어 온 상세 한 줄에 작성자를 붙여 화면용 DTO로 만든다.
+     *
+     * <p>노출·소유권 판단은 {@link PostDetailRow}만으로 끝나므로, 상세가 실제로 화면으로
+     * 나가는 자리에서만 회원을 조회한다.</p>
+     */
+    private PostDetailView toDetailView(PostDetailRow row) {
+        return PostDetailView.of(row, findAuthors(List.of(row.memberId())).get(row.memberId()));
+    }
+
+    /**
+     * 회원 ID 목록으로 작성자 정보를 한 번에 조회해 ID로 찾을 수 있게 담는다.
+     *
+     * <p>게시글마다 회원을 따로 조회하면 N+1이 된다(H1b). 없는 회원은 Map에서 빠지고,
+     * 그 자리는 각 View의 {@code withAuthor}가 탈퇴로 처리한다.</p>
+     */
+    private Map<Long, MemberCommunityView> findAuthors(List<Long> memberIds) {
+        List<Long> distinctIds = memberIds.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        return memberCommunityQueryService.getMembersByIds(distinctIds).stream()
+                .collect(Collectors.toMap(MemberCommunityView::id, Function.identity()));
     }
 
     private void requireActiveCategory(Long categoryId) {
@@ -371,15 +429,15 @@ public class CommunityService {
         }
     }
 
-    private boolean isVisibleTo(PostDetailView post, Long viewerId) {
+    private boolean isVisibleTo(PostDetailRow post, Long viewerId) {
         return switch (post.status()) {
             case PUBLISHED -> true;
-            case BLOCKED -> isAuthor(post, viewerId);
+            case BLOCKED -> isAuthor(post.memberId(), viewerId);
             case DELETED -> false;
         };
     }
 
-    private boolean isAuthor(PostDetailView post, Long viewerId) {
-        return viewerId != null && viewerId.equals(post.memberId());
+    private boolean isAuthor(Long postMemberId, Long viewerId) {
+        return viewerId != null && viewerId.equals(postMemberId);
     }
 }
