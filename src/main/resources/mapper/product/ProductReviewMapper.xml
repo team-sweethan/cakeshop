@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!--
+  작성자 : HyunGyu-Cho / 담당자 : 시은 / 작성일 : 2026-08-06
+  기능 : 리뷰 평점 집계 (조각 2, #33)
+  설명 : products 의 파생 컬럼(average_rating, review_count)을 유지하기 위한 집계다.
+         reviews 를 직접 읽는 근거는 docs/conventions.md 15절의 예외다.
+-->
+<mapper namespace="com.cakeshop.domain.product.mapper.ProductReviewMapper">
+
+    <!--
+      COALESCE 가 없으면 공개 후기가 하나도 없을 때 AVG 가 NULL 을 돌려주는데
+      products.average_rating 은 NOT NULL DEFAULT 0.00 이라 그대로 실패한다.
+      이 자리는 등록이 아니라 마지막 한 건을 지우거나 숨길 때만 온다.
+
+      FOR UPDATE 는 스냅샷이 아니라 최신 커밋을 읽기 위한 것이다. 근거는 매퍼 인터페이스 주석.
+    -->
+    <select id="summarizeForUpdate"
+            resultType="com.cakeshop.domain.product.dto.view.ProductRatingSummary">
+        SELECT
+            COALESCE(AVG(r.overall_rating), 0) AS averageRating,
+            COUNT(*)                           AS reviewCount
+        FROM reviews r
+        WHERE r.product_id = #{productId}
+          AND r.status = 'PUBLISHED'
+        FOR UPDATE
+    </select>
+
+    <!--
+      updated_at = updated_at 로 수정 시각을 보존한다. 빠뜨리면 후기가 하나 달릴 때마다
+      상품에 수정 흔적이 남아 화면에 (수정됨)이 붙는다. 커뮤니티에서 실제로 났던 버그다.
+    -->
+    <update id="updateRating">
+        UPDATE products
+        SET average_rating = #{averageRating},
+            review_count   = #{reviewCount},
+            updated_at     = updated_at
+        WHERE id = #{productId}
+    </update>
+
+</mapper>

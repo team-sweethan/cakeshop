@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!--
+  작성자 : HyunGyu-Cho / 담당자 : 주환 / 작성일 : 2026-08-06
+  기능 : 후기 작성 자격 조회 계약 (조각 1, #109)
+  설명 : 리뷰 도메인이 orders·order_items 를 직접 읽지 않도록 주문 쪽에 둔 조회 문장이다.
+-->
+<mapper namespace="com.cakeshop.domain.order.mapper.OrderItemQueryMapper">
+
+    <!--
+      제외 목록이 비면 NOT IN () 이 되어 문법 오류다. 비었을 때는 조건을 아예 붙이지 않는다.
+      목록 크기는 그 회원이 쓴 후기 수라 한 사람이 주문한 상품 수를 넘지 않는다.
+    -->
+    <sql id="pickedUpItemConditions">
+        WHERE o.member_id = #{memberId}
+          AND o.status = 'PICKED_UP'
+        <if test="excludedOrderItemIds != null and excludedOrderItemIds.size() > 0">
+            AND oi.id NOT IN
+            <foreach item="excludedId" collection="excludedOrderItemIds"
+                     open="(" separator="," close=")">
+                #{excludedId}
+            </foreach>
+        </if>
+    </sql>
+
+    <!--
+      정렬에 oi.id tiebreaker 를 붙인다. picked_up_at 이 같은 항목이 여럿이면
+      없이는 같은 행이 두 페이지에 나오거나 빠진다.
+    -->
+    <select id="findPickedUpItems"
+            resultType="com.cakeshop.domain.order.dto.view.PickedUpOrderItem">
+        SELECT
+            oi.id           AS orderItemId,
+            oi.product_name AS productName,
+            o.order_number  AS orderNumber,
+            o.picked_up_at  AS pickedUpAt
+        FROM order_items oi
+        JOIN orders o ON o.id = oi.order_id
+        <include refid="pickedUpItemConditions"/>
+        ORDER BY o.picked_up_at DESC, oi.id DESC
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="countPickedUpItems" resultType="long">
+        SELECT COUNT(*)
+        FROM order_items oi
+        JOIN orders o ON o.id = oi.order_id
+        <include refid="pickedUpItemConditions"/>
+    </select>
+
+    <select id="findOrderItem"
+            resultType="com.cakeshop.domain.order.dto.view.OrderItemDetail">
+        SELECT
+            oi.id           AS orderItemId,
+            o.member_id     AS memberId,
+            oi.product_id   AS productId,
+            o.status = 'PICKED_UP' AS pickedUp,
+            oi.product_name AS productName,
+            o.order_number  AS orderNumber,
+            o.picked_up_at  AS pickedUpAt
+        FROM order_items oi
+        JOIN orders o ON o.id = oi.order_id
+        WHERE oi.id = #{orderItemId}
+    </select>
+
+</mapper>

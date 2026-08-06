@@ -1,5 +1,47 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!--
+  작성자 : HyunGyu-Cho / 담당자 : 현규 / 작성일 : 2026-08-06
+  기능 : 리뷰 저장·조회 (조각 1, #109)
+  설명 : 사용자 입력은 #{} 만 사용 (${} 금지).
+         이 매퍼는 reviews 외의 테이블을 JOIN 하지 않는다 (SPEC 2.7).
+-->
 <mapper namespace="com.cakeshop.domain.review.mapper.ReviewMapper">
-    <!-- 사용자 입력은 #{} 만 사용 (${} 금지) -->
+
+    <!--
+      status 를 넣지 않는다. migration 이 기본값을 'PUBLISHED' 로 바꿔 두었고,
+      작성 시점의 값은 언제나 PUBLISHED 라 컬럼을 여기 적으면 두 곳이 갈릴 수 있다.
+      product_id 는 요청값이 아니라 주문 계약이 돌려준 값이다 (PLAN R4) — Service 책임.
+    -->
+    <insert id="insertReview" useGeneratedKeys="true" keyProperty="review.id">
+        INSERT INTO reviews (
+            order_item_id, product_id, member_id,
+            overall_rating, taste_rating, design_rating, service_rating, content
+        )
+        VALUES (
+            #{review.orderItemId}, #{review.productId}, #{review.memberId},
+            #{review.overallRating}, #{review.tasteRating},
+            #{review.designRating}, #{review.serviceRating}, #{review.content}
+        )
+    </insert>
+
+    <!--
+      상태 조건을 붙이지 않는다. DELETED 후기도 행이 남아 uk_reviews_order_item 이
+      재작성을 막으므로, 목록에 다시 띄워 놓고 저장에서 거절하는 일을 만들지 않는다 (PLAN R10).
+    -->
+    <select id="findReviewedOrderItemIds" resultType="long">
+        SELECT order_item_id
+        FROM reviews
+        WHERE member_id = #{memberId}
+    </select>
+
+    <select id="existsByOrderItemId" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM reviews
+            WHERE order_item_id = #{orderItemId}
+        )
+    </select>
+
 </mapper>

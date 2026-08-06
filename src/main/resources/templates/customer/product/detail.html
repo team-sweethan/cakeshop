@@ -523,9 +523,14 @@
             class="cluster"
             style="margin-top:16px"
     >
+      <!--/*
+        작성자 : HyunGyu-Cho / 담당자 : 시은 / 작성일 : 2026-08-06
+        링크 한 줄만 고쳤다. 상품 상세에서 곧바로 폼으로 보내지 않는 이유는 그 상품을 픽업한
+        주문이 여러 건일 수 있어 어느 주문 상품인지 화면이 정할 수 없기 때문이다(SPEC A2).
+      */-->
       <a
               class="btn"
-              th:href="@{/reviews/new}"
+              th:href="@{/mypage/reviews/writable}"
       >
         후기 작성
       </a>

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>작성할 후기 | 케이크 쇼핑몰</title>
+  <link rel="stylesheet" th:href="@{/css/app.css}">
+  <script defer th:src="@{/js/app.js}"></script>
+</head>
+<body data-page-title="작성할 후기">
+  <header th:replace="~{fragments/common/header :: header}"></header>
+
+  <main class="page-container">
+    <h1>작성할 후기</h1>
+
+    <section class="section">
+      <p class="text-muted" th:if="${pageResult.totalElements > 0}"
+         th:text="|전체 ${pageResult.totalElements}건|">전체 0건</p>
+
+      <p class="panel" th:if="${pageResult.totalElements == 0}">
+        작성할 후기가 없습니다.
+      </p>
+
+      <div class="stack" th:unless="${pageResult.totalElements == 0}">
+        <div class="panel cluster" th:each="item : ${pageResult.content}">
+          <div>
+            <strong th:text="${item.productName}">상품명</strong>
+            <p class="text-muted">
+              <span th:text="${item.orderNumber}">주문번호</span>
+              <span> | 픽업 완료 </span>
+              <span th:text="${#temporals.format(item.pickedUpAt, 'yyyy-MM-dd')}">날짜</span>
+            </p>
+          </div>
+          <a class="btn btn--primary"
+             th:href="@{/reviews/new(orderItemId=${item.orderItemId})}">후기 쓰기</a>
+        </div>
+      </div>
+    </section>
+
+    <nav class="cluster" th:if="${pageResult.totalPages > 1}">
+      <a class="btn"
+         th:if="${pageNavigation.hasPreviousBlock}"
+         th:href="@{/mypage/reviews/writable(page=${pageNavigation.previousPage})}">이전</a>
+      <span class="btn btn--disabled" th:unless="${pageNavigation.hasPreviousBlock}">이전</span>
+
+      <a class="btn"
+         th:each="pageNumber : ${#numbers.sequence(pageNavigation.startPage, pageNavigation.endPage)}"
+         th:text="${pageNumber}"
+         th:classappend="${pageNumber == pageResult.page} ? ' is-active'"
+         th:href="@{/mypage/reviews/writable(page=${pageNumber})}">1</a>
+
+      <a class="btn"
+         th:if="${pageNavigation.hasNextBlock}"
+         th:href="@{/mypage/reviews/writable(page=${pageNavigation.nextPage})}">다음</a>
+      <span class="btn btn--disabled" th:unless="${pageNavigation.hasNextBlock}">다음</span>
+    </nav>
+  </main>
+
+  <footer th:replace="~{fragments/common/footer :: footer(${store})}"></footer>
+</body>
+</html>

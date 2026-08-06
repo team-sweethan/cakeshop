@@ -200,8 +200,10 @@ class ScreenRenderingTests {
         String[] paths = {
             "/cart", "/orders/checkout?productId=1&quantity=1&optionIds=1",
             "/mypage",
-            "/orders", "/notifications", "/reviews/new", "/mypage/coupons",
-            "/mypage/profile"
+            // /reviews/new 는 orderItemId 가 있어야 열린다(조각 1). 인자 없는 스모크
+            // 대상은 목록 화면인 /mypage/reviews/writable 로 바꿨다.
+            "/orders", "/notifications", "/mypage/reviews/writable",
+            "/mypage/coupons", "/mypage/profile"
         };
 
         assertScreensRender(paths);
