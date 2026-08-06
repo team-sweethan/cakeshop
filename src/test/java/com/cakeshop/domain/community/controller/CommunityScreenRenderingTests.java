@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -49,6 +50,12 @@ class CommunityScreenRenderingTests {
 
     private static final LocalDateTime BASE_TIME = LocalDateTime.of(2026, 3, 1, 10, 0);
     private static final int PAGE_SIZE = PageRequest.DEFAULT_SIZE;
+
+    /**
+     * 인기글 검사가 확정할 날짜. 화면은 표 전체의 {@code MAX(ranking_date)}를 읽으므로
+     * 시드나 다른 검사가 남긴 날짜보다 확실히 뒤인 값이어야 이 검사가 이긴다.
+     */
+    private static final LocalDate RANKING_DATE = LocalDate.of(2099, 1, 2);
 
     @Autowired
     private WebApplicationContext context;
@@ -135,7 +142,86 @@ class CommunityScreenRenderingTests {
                 // 링크에도 있어서, 쪽 링크가 필터를 잃어버려도 응답 어딘가에서는 둘 다
                 // 발견된다. 링크 하나에 함께 있는지 확인해야 회귀를 잡는다.
                 .andExpect(content().string(containsString(
-                        "/community?categoryId=" + categoryId + "&amp;page=2")));
+                        "/community?categoryId=" + categoryId + "&amp;sort=LATEST&amp;page=2")));
+    }
+
+    /**
+     * 정렬 링크가 카테고리 필터를 잃지 않는지 확인한다.
+     *
+     * <p>필터와 정렬은 서로의 현재 값을 함께 실어야 한다. 안 실으면 분류를 고른 뒤
+     * 조회수순을 누르는 순간 <b>분류가 조용히 풀린다</b> — 목록은 멀쩡히 그려지고 글만
+     * 늘어나서, 사용자에게는 정렬이 이상하게 동작한 것처럼 보인다.
+     *
+     * <p>쪽 이동 링크와 같은 이유로 <b>한 링크 안에</b> 둘 다 있는지를 본다. 따로 찾으면
+     * 상단 필터 링크가 categoryId를 갖고 있어서 정렬이 그것을 잃어버려도 통과한다.
+     */
+    @Test
+    void communityList_sortLinks_keepCategoryFilter() throws Exception {
+        mockMvc.perform(get("/community").param("categoryId", String.valueOf(categoryId)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("최신순")))
+                .andExpect(content().string(containsString("조회수순")))
+                .andExpect(content().string(containsString(
+                        "/community?categoryId=" + categoryId + "&amp;sort=VIEWS")));
+    }
+
+    /**
+     * 카테고리 링크가 반대로 정렬을 잃지 않는지 확인한다.
+     *
+     * <p>위 테스트의 반대쪽이다. 한쪽만 보면 <b>한 방향만 값을 싣는 구현</b>이 통과하는데,
+     * 실제로 사용자가 밟는 것은 "조회수순을 고른 뒤 분류를 바꾸는" 순서이기도 하다.
+     */
+    @Test
+    void communityList_categoryLinks_keepSortOption() throws Exception {
+        mockMvc.perform(get("/community").param("sort", "VIEWS"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(
+                        "/community?categoryId=" + categoryId + "&amp;sort=VIEWS")));
+    }
+
+    /**
+     * 인기글 영역이 실제로 그려지는지 확인한다(조각 7c).
+     *
+     * <p>이 영역은 <b>확정된 순위가 있어야만</b> 나타난다. 배치를 한 번도 안 돌린 개발
+     * 환경에서는 화면에 아예 없어서, 표현식이 깨져도 목록은 멀쩡히 뜬다(SCREENS.md).
+     *
+     * <p>날짜를 함께 보는 것은 문구가 아니라 규칙이라서다. 인기글은 실시간이 아니라
+     * 확정된 스냅샷이고 배치를 거르면 어제 것으로 폴백하는데, 언제 것인지 없으면 낡은
+     * 순위를 오늘 것으로 읽게 된다 — 그 화면은 정상일 때와 똑같이 생겼다.
+     */
+    @Test
+    void communityList_withConfirmedRanking_rendersPopularSection() throws Exception {
+        long postId = insertPost(memberId, "이번 주 인기 케이크", "본문", PostStatus.PUBLISHED);
+        insertRanking(1, postId);
+        insertBatchRun(1);
+
+        mockMvc.perform(get("/community"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("<h2>인기글</h2>")))
+                .andExpect(content().string(containsString("이번 주 인기 케이크")))
+                .andExpect(content().string(containsString("2099.01.02")))
+                .andExpect(content().string(containsString("기준")));
+    }
+
+    /**
+     * H27 — 확정은 됐는데 오른 글이 전부 지워지거나 차단된 날이다.
+     *
+     * <p>날짜만 남기고 영역을 그리면 <b>제목과 날짜만 있고 안은 빈</b> 칸이 상단에 남는다.
+     * 사용자에게는 고장으로 보이지만 서버에는 오류가 없어 로그에도 안 남는다.
+     *
+     * <p>{@code 인기글}이라는 낱말이 아니라 {@code <h2>인기글</h2>}가 없는지를 본다 —
+     * Thymeleaf는 HTML 주석을 응답에 그대로 내보내고, 그 주석에 이 낱말이 들어 있다.
+     */
+    @Test
+    void communityList_everyRankedPostHidden_omitsPopularSection() throws Exception {
+        long blockedId = insertPost(memberId, "차단된 인기글", "본문", PostStatus.BLOCKED);
+        insertRanking(1, blockedId);
+        insertBatchRun(1);
+
+        mockMvc.perform(get("/community"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("<h2>인기글</h2>"))))
+                .andExpect(content().string(not(containsString("차단된 인기글"))));
     }
 
     /**
@@ -893,6 +979,27 @@ class CommunityScreenRenderingTests {
 
         mockMvc.perform(post("/admin/community/" + postId + "/reports/reject").with(csrf()))
                 .andExpect(status().is3xxRedirection());
+    }
+
+    private void insertRanking(int ranking, long postId) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO daily_popular_posts (
+                    ranking_date, ranking, post_id, popularity_score,
+                    view_count, like_count, comment_count
+                )
+                VALUES (?, ?, ?, 100, 0, 0, 0)
+                """,
+                RANKING_DATE, ranking, postId);
+    }
+
+    private void insertBatchRun(int postCount) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO popular_post_batch_runs (ranking_date, post_count)
+                VALUES (?, ?)
+                """,
+                RANKING_DATE, postCount);
     }
 
     private String statusOf(long postId) {

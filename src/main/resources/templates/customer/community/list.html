@@ -1,3 +1,12 @@
+<!--/*
+******************************
+작성자 : HyunGyu-Cho
+담당자 : 현규
+작성일 : 2026-08-05
+기능 : 고객 커뮤니티 화면
+설명 : list 커뮤니티 화면을 구성한다.
+******************************
+*/-->
 <!doctype html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
@@ -13,7 +22,6 @@
   <header th:replace="~{fragments/common/header :: header}"></header>
   <main class="page-container">
 
-    <!-- 삭제처럼 결과가 이 화면에 남지 않는 동작의 성공 메시지를 받는다(conventions.md 9). -->
     <div th:replace="~{fragments/common/alert :: alert}"></div>
 
     <div class="cluster cluster--between">
@@ -21,21 +29,46 @@
       <a class="btn btn--primary" th:href="@{/community/new}">글쓰기</a>
     </div>
 
-    <!--
-      카테고리 필터. 선택지는 활성 카테고리만 노출한다(DOMAIN.md 6.8).
-      필터는 주소로 표현해 새로고침·뒤로가기에서도 유지된다.
-    -->
+    <section class="section" th:if="${!popularSection.isEmpty()}">
+      <div class="cluster">
+        <h2>인기글</h2>
+        <span class="text-muted">
+          <span th:text="${#temporals.format(popularSection.rankingDate, 'yyyy.MM.dd')}">2026.01.01</span> 기준
+        </span>
+      </div>
+
+      <div class="stack">
+        <a class="panel cluster"
+           th:each="popular : ${popularSection.posts}"
+           th:href="@{/community/{postId}(postId=${popular.postId})}">
+          <span class="text-muted" th:text="${popular.ranking}">1</span>
+          <span class="badge badge--info" th:text="${popular.categoryName}">카테고리</span>
+          <strong th:text="${popular.title}">제목</strong>
+        </a>
+      </div>
+    </section>
+
     <div class="cluster section">
       <a class="btn"
          th:classappend="${selectedCategoryId == null} ? ' is-active'"
-         th:href="@{/community}">전체</a>
+         th:href="@{/community(sort=${selectedSort})}">전체</a>
 
       <a class="btn"
          th:each="category : ${categories}"
          th:text="${category.name}"
          th:classappend="${selectedCategoryId != null
                            and selectedCategoryId == category.id} ? ' is-active'"
-         th:href="@{/community(categoryId=${category.id})}">카테고리</a>
+         th:href="@{/community(categoryId=${category.id}, sort=${selectedSort})}">카테고리</a>
+    </div>
+
+    <div class="cluster section">
+      <a class="btn"
+         th:classappend="${selectedSort.name() == 'LATEST'} ? ' is-active'"
+         th:href="@{/community(categoryId=${selectedCategoryId}, sort='LATEST')}">최신순</a>
+
+      <a class="btn"
+         th:classappend="${selectedSort.name() == 'VIEWS'} ? ' is-active'"
+         th:href="@{/community(categoryId=${selectedCategoryId}, sort='VIEWS')}">조회수순</a>
     </div>
 
     <div class="stack">
@@ -69,11 +102,11 @@
          aria-label="페이지 이동"
          style="justify-content:center">
 
-      <!-- 이전/다음은 한 페이지씩이 아니라 현재 번호 블록 단위로 이동한다. -->
       <a class="btn"
          th:if="${pageNavigation.hasPreviousBlock}"
          th:href="@{/community(
              categoryId=${selectedCategoryId},
+             sort=${selectedSort},
              page=${pageNavigation.previousPage}
          )}">
         이전
@@ -84,7 +117,6 @@
         이전
       </span>
 
-      <!-- startPage부터 endPage까지만 렌더링해 전체 페이지 번호 노출을 막는다. -->
       <a class="btn"
          th:each="pageNumber :
              ${#numbers.sequence(
@@ -95,6 +127,7 @@
          th:classappend="${pageNumber == pageResult.page} ? ' is-active'"
          th:href="@{/community(
              categoryId=${selectedCategoryId},
+             sort=${selectedSort},
              page=${pageNumber}
          )}">
         1
@@ -104,6 +137,7 @@
          th:if="${pageNavigation.hasNextBlock}"
          th:href="@{/community(
              categoryId=${selectedCategoryId},
+             sort=${selectedSort},
              page=${pageNavigation.nextPage}
          )}">
         다음

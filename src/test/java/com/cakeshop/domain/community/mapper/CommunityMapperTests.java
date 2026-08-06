@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -13,9 +14,11 @@ import com.cakeshop.domain.community.dto.view.AdminPostListView;
 import com.cakeshop.domain.community.dto.view.AdminPostSort;
 import com.cakeshop.domain.community.dto.view.CommentCountView;
 import com.cakeshop.domain.community.dto.view.CommentView;
+import com.cakeshop.domain.community.dto.view.PopularPostView;
 import com.cakeshop.domain.community.dto.view.PostCategoryView;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
+import com.cakeshop.domain.community.dto.view.PostSort;
 import com.cakeshop.domain.community.dto.view.PostLockView;
 import com.cakeshop.domain.community.dto.view.ReportView;
 import com.cakeshop.domain.community.entity.Comment;
@@ -45,6 +48,15 @@ import org.springframework.jdbc.core.JdbcTemplate;
 class CommunityMapperTests {
 
     private static final LocalDateTime BASE_TIME = LocalDateTime.of(2026, 3, 1, 10, 0);
+
+    /**
+     * 인기글 검사가 쓰는 확정 날짜. 실제로 올 리 없는 먼 미래를 쓴다.
+     *
+     * <p>{@code findLatestRankingDate}는 표 전체에서 {@code MAX}를 읽으므로 <b>이 검사만의
+     * 데이터로 격리할 수가 없다</b> — 시드나 다른 검사가 남긴 날짜가 더 크면 그쪽이 답이
+     * 된다. 날짜 자체를 아무도 안 쓸 값으로 미는 것이 유일한 격리 수단이다.
+     */
+    private static final LocalDate RANKING_DATE = LocalDate.of(2099, 1, 2);
 
     @Autowired
     private CommunityMapper communityMapper;
@@ -107,6 +119,65 @@ class CommunityMapperTests {
         List<PostListView> posts = findPage(1, 20);
 
         assertThat(posts).extracting(PostListView::id).containsExactly(newer, older);
+    }
+
+    /**
+     * 조회수순이 실제로 조회수로 정렬하는지 확인한다.
+     *
+     * <p>작성 시각을 <b>조회수와 반대 순서로</b> 준다. 시각이 같거나 같은 방향이면 정렬
+     * 분기를 통째로 지우고 최신순으로 고정한 구현이 그대로 통과한다.
+     */
+    @Test
+    void findPublishedPosts_sortByViews_ordersByViewCountDescending() {
+        long few = insertPost("적게 본 글", PostStatus.PUBLISHED, BASE_TIME);
+        long many = insertPost("많이 본 글", PostStatus.PUBLISHED, BASE_TIME.minusDays(1));
+
+        setViewCount(few, 3);
+        setViewCount(many, 100);
+
+        List<PostListView> posts = findPage(1, 20, PostSort.VIEWS);
+
+        assertThat(posts).extracting(PostListView::id).containsExactly(many, few);
+    }
+
+    /**
+     * 조회수가 같은 글이 id 역순으로 갈리는지 확인한다(H28의 실제 데이터판).
+     *
+     * <p>조회수는 0이 대부분이라 <b>동점이 최신순보다 훨씬 잦다.</b> tiebreaker가 없으면
+     * DB가 매 쿼리마다 다른 순서를 돌려줄 수 있고, 그러면 페이지 경계에서 글이 중복되거나
+     * 사라진다. 여기서는 셋 다 조회수 0인 기본 상태를 그대로 쓴다.
+     */
+    @Test
+    void findPublishedPosts_sortByViews_sameViewCount_ordersByIdDescending() {
+        long first = insertPost("첫 번째", PostStatus.PUBLISHED, BASE_TIME);
+        long second = insertPost("두 번째", PostStatus.PUBLISHED, BASE_TIME);
+        long third = insertPost("세 번째", PostStatus.PUBLISHED, BASE_TIME);
+
+        List<PostListView> posts = findPage(1, 20, PostSort.VIEWS);
+
+        assertThat(posts).extracting(PostListView::id)
+                .containsExactly(third, second, first);
+    }
+
+    /**
+     * 조회수순에서도 노출 조건이 살아 있는지 확인한다.
+     *
+     * <p>새 분기에서 {@code status} 조건이 빠지면 <b>가장 많이 본 차단된 글이 목록 맨 위에</b>
+     * 뜬다. 분기가 늘 때 조건 한 벌을 흘리는 것은 조각 3·5에서 두 번 겪은 유형이다.
+     */
+    @Test
+    void findPublishedPosts_sortByViews_deletedAndBlockedPosts_areExcluded() {
+        long visible = insertPost("노출", PostStatus.PUBLISHED, BASE_TIME);
+        long blocked = insertPost("차단", PostStatus.BLOCKED, BASE_TIME);
+        long deleted = insertPost("삭제", PostStatus.DELETED, BASE_TIME);
+
+        setViewCount(visible, 1);
+        setViewCount(blocked, 999);
+        setViewCount(deleted, 998);
+
+        List<PostListView> posts = findPage(1, 20, PostSort.VIEWS);
+
+        assertThat(posts).extracting(PostListView::id).containsExactly(visible);
     }
 
     /**
@@ -857,7 +928,17 @@ class CommunityMapperTests {
     }
 
     private List<PostListView> findPage(int page, int size) {
-        return communityMapper.findPublishedPosts(categoryId, size, (page - 1) * size);
+        return findPage(page, size, PostSort.LATEST);
+    }
+
+    private List<PostListView> findPage(int page, int size, PostSort sort) {
+        return communityMapper.findPublishedPosts(categoryId, sort, size, (page - 1) * size);
+    }
+
+    private void setViewCount(long postId, long viewCount) {
+        jdbcTemplate.update(
+                "UPDATE posts SET view_count = ?, updated_at = updated_at WHERE id = ?",
+                viewCount, postId);
     }
 
     /**
@@ -1093,6 +1174,135 @@ class CommunityMapperTests {
         assertThat(blocked.hasBlockRecord()).isTrue();
         assertThat(blocked.blockedReason()).isEqualTo("광고성 게시물");
         assertThat(blocked.blockedByNickname()).isNotNull();
+    }
+
+    /**
+     * H25의 노출 쪽 — 확정된 뒤에 지워지거나 차단된 글은 인기글에서 빠진다.
+     *
+     * <p>스냅샷은 <b>그날의 순위를 그대로 보존하는 것이 목적</b>이라 원본이 변해도 행이
+     * 남는다. 그 성질이 여기서는 반대로 작용해서, 조건이 없으면 목록에서는 사라진 글이
+     * 상단에만 살아 있고 눌러 들어가면 404가 난다.
+     */
+    @Test
+    void findPopularPosts_excludesPostsHiddenAfterRanking() {
+        long visible = insertPost("노출", PostStatus.PUBLISHED, BASE_TIME);
+        long blocked = insertPost("차단", PostStatus.BLOCKED, BASE_TIME);
+        long deleted = insertPost("삭제", PostStatus.DELETED, BASE_TIME);
+
+        insertRanking(RANKING_DATE, 1, blocked, 300);
+        insertRanking(RANKING_DATE, 2, visible, 200);
+        insertRanking(RANKING_DATE, 3, deleted, 100);
+
+        assertThat(communityMapper.findPopularPosts(RANKING_DATE, 10))
+                .extracting(PopularPostView::postId)
+                .containsExactly(visible);
+    }
+
+    /**
+     * 줄 세우는 기준이 저장된 {@code ranking}이지 점수가 아닌지 확인한다.
+     *
+     * <p>점수로 다시 정렬해도 보통은 순서가 같아서 드러나지 않는다. 어긋나는 것은 동점
+     * 구간뿐이고, 그때도 <b>순위 숫자는 그대로 1,2,3이 찍힌 채</b> 제목만 자리를 바꾼다 —
+     * 화면만 보고는 틀린 것을 알 수 없다. 그래서 점수를 일부러 거꾸로 넣어 본다.
+     */
+    @Test
+    void findPopularPosts_ordersByStoredRankingNotScore() {
+        long first = insertPost("1위", PostStatus.PUBLISHED, BASE_TIME);
+        long second = insertPost("2위", PostStatus.PUBLISHED, BASE_TIME);
+
+        insertRanking(RANKING_DATE, 1, first, 10);
+        insertRanking(RANKING_DATE, 2, second, 999);
+
+        assertThat(communityMapper.findPopularPosts(RANKING_DATE, 10))
+                .extracting(PopularPostView::ranking)
+                .containsExactly(1, 2);
+    }
+
+    /** 20건을 저장하고 화면은 위에서부터 자른다(D5). 아래에서 자르면 1위가 사라진다. */
+    @Test
+    void findPopularPosts_limitCutsFromTheTop() {
+        for (int ranking = 1; ranking <= 5; ranking++) {
+            long postId = insertPost(ranking + "위", PostStatus.PUBLISHED, BASE_TIME);
+            insertRanking(RANKING_DATE, ranking, postId, 100L - ranking);
+        }
+
+        assertThat(communityMapper.findPopularPosts(RANKING_DATE, 2))
+                .extracting(PopularPostView::ranking)
+                .containsExactly(1, 2);
+    }
+
+    /**
+     * 다른 날짜의 순위가 섞여 들어오지 않는지 본다.
+     *
+     * <p>날짜 조건이 빠지면 순위 번호가 날짜마다 1부터 다시 시작하는 탓에 <b>1위가 여러
+     * 개인 목록</b>이 나온다. 그런데 정렬은 여전히 오름차순이라 화면에는 1,1,2,2로
+     * 그럴듯하게 찍힌다.
+     */
+    @Test
+    void findPopularPosts_doesNotMixOtherRankingDates() {
+        long today = insertPost("오늘 1위", PostStatus.PUBLISHED, BASE_TIME);
+        long yesterday = insertPost("어제 1위", PostStatus.PUBLISHED, BASE_TIME);
+
+        insertRanking(RANKING_DATE, 1, today, 100);
+        insertRanking(RANKING_DATE.minusDays(1), 1, yesterday, 100);
+
+        assertThat(communityMapper.findPopularPosts(RANKING_DATE, 10))
+                .extracting(PopularPostView::title)
+                .containsExactly("오늘 1위");
+    }
+
+    /** 화면에 실을 값(카테고리 이름·제목)이 스냅샷이 아니라 현재 글에서 온다. */
+    @Test
+    void findPopularPosts_readsCategoryNameAndTitleFromPost() {
+        long postId = insertPost("제목입니다", PostStatus.PUBLISHED, BASE_TIME);
+        insertRanking(RANKING_DATE, 1, postId, 100);
+
+        assertThat(communityMapper.findPopularPosts(RANKING_DATE, 10))
+                .singleElement()
+                .satisfies(popular -> {
+                    assertThat(popular.title()).isEqualTo("제목입니다");
+                    assertThat(popular.categoryName()).isEqualTo("커뮤니티 테스트");
+                });
+    }
+
+    /**
+     * D11의 짝 — 활동이 0이라 순위가 한 건도 없는 날에도 그날이 최신 확정일이다.
+     *
+     * <p>{@code daily_popular_posts}에서 날짜를 읽으면 이 날을 통째로 건너뛰고 그 전날로
+     * 되돌아간다. 그러면 7일 창 밖의 오래된 글이 어제 것인 양 계속 걸리는데, 순위가
+     * 안 바뀌는 것은 활동이 뜸한 날과 구분되지 않아 <b>화면으로는 정상과 똑같다</b>.
+     */
+    @Test
+    void findLatestRankingDate_returnsRunDateEvenWhenNothingWasRanked() {
+        long postId = insertPost("1위", PostStatus.PUBLISHED, BASE_TIME);
+
+        insertRanking(RANKING_DATE.minusDays(1), 1, postId, 100);
+        insertBatchRun(RANKING_DATE.minusDays(1), 1);
+        insertBatchRun(RANKING_DATE, 0);
+
+        assertThat(communityMapper.findLatestRankingDate()).isEqualTo(RANKING_DATE);
+        assertThat(communityMapper.findPopularPosts(RANKING_DATE, 10)).isEmpty();
+    }
+
+    private void insertRanking(LocalDate rankingDate, int ranking, long postId, long score) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO daily_popular_posts (
+                    ranking_date, ranking, post_id, popularity_score,
+                    view_count, like_count, comment_count
+                )
+                VALUES (?, ?, ?, ?, 0, 0, 0)
+                """,
+                rankingDate, ranking, postId, score);
+    }
+
+    private void insertBatchRun(LocalDate rankingDate, int postCount) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO popular_post_batch_runs (ranking_date, post_count)
+                VALUES (?, ?)
+                """,
+                rankingDate, postCount);
     }
 
     /** 이 테스트 카테고리의 글만 본다. 다른 테스트가 남긴 글과 섞이지 않게 한다. */

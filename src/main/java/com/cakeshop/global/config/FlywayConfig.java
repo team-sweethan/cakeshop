@@ -49,7 +49,7 @@ public class FlywayConfig {
             로컬 DB가 Flyway 관리 이전 상태입니다.
 
               데이터베이스에 테이블은 있지만 flyway_schema_history 가 없습니다.
-              Flyway 도입 전에 docs/sql 을 직접 실행해 만든 DB 라면 정상입니다.
+              Flyway 도입 전에 DDL을 직접 실행해 만든 DB라면 정상입니다.
 
             조치: README '기존 로컬 DB 완전 초기화' 절차를 한 번만 실행하세요.
               1. DROP DATABASE / CREATE DATABASE
