@@ -185,7 +185,7 @@ SET `notification_type` = CASE
     WHEN `notification_type` IN ('COUPON_ISSUED', '쿠폰', '쿠폰 발급') THEN 'COUPON'
     WHEN `notification_type` IN ('CHAT', '채팅', '채팅 답변') THEN 'CUSTOMER_CHAT'
 
-    ELSE 'ORDER_PAID'
+    ELSE `notification_type`
 END
 WHERE `notification_type` IS NOT NULL;
 
