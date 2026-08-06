@@ -14,6 +14,8 @@ Spring Boot 4.0.2 · Java 21 · Gradle · Thymeleaf · MyBatis · MariaDB
 - [로컬 DB 초기화](#로컬-db-초기화) — 기동 실패 시 재생성 절차, 오류 대응표
 - [프로젝트 구조](#프로젝트-구조)
 - [Store 수직 슬라이스 구현 예시](#store-수직-슬라이스-구현-예시)
+- [파일 업로드 저장소](#파일-업로드-저장소) — 로컬 디스크 / S3 선택과 RDS 연동
+
 
 ---
 
@@ -381,3 +383,103 @@ CREATE DATABASE `cakeshop`
 | `controller` | Model+View, BindingResult 재렌더, RedirectAttributes FlashMessage |
 
 구현 과정과 선택 이유는 각 계층의 핵심 지점에 주석으로 남겨 두었다. 새 도메인은 자명한 문법 주석까지 복사하지 말고, 트랜잭션 경계·검증 실패 처리·도메인 조합처럼 구조상 중요한 주석만 유지한다.
+---
+
+## 파일 업로드 저장소
+
+파일 업로드 호출부는 공통 `FileStorageClient`만 사용한다. 활성 프로필에 따라 다음 구현체가
+자동으로 선택된다.
+
+| 활성 프로필 | 저장소 구현체 | 용도 |
+|---|---|---|
+| `local` | `LocalFileStorageClient` | 개인 PC의 `FILE_UPLOAD_DIR`에 저장 |
+| `local,s3` | `S3StorageService` | 로컬 DB를 사용하면서 실제 S3 업로드 확인 |
+| `rds` | `LocalFileStorageClient` | RDS만 연결하고 파일은 실행 PC에 저장 |
+| `rds,s3` | `S3StorageService` | RDS와 S3를 함께 사용하는 배포 환경 |
+
+RDS는 데이터베이스이고 S3는 파일 저장소이므로 서로 독립적으로 선택한다. RDS에 연결한다는
+이유만으로 S3 관련 코드를 수정하지 않는다.
+
+### 로컬 디스크에 업로드
+
+`.env_sample`을 복사한 `.env`에서 `FILE_UPLOAD_DIR`을 지정하고 기본 `local` 프로필로
+실행한다. 값을 생략하면 `<user home>/cakeshop-uploads`를 사용한다.
+
+```properties
+FILE_UPLOAD_DIR=C:/cakeshop-uploads
+```
+
+```powershell
+.\gradlew.bat bootRun --args="--spring.profiles.active=local"
+```
+
+관리자 상품 이미지 또는 매장 이미지 화면에서 파일을 등록한다. 저장된 파일은
+`FILE_UPLOAD_DIR/<도메인>/<yyyyMM>/`에서 확인하고, 브라우저에서는 `/uploads/**` 경로로
+접근한다. 프로젝트 내부 디렉토리에 업로드 파일을 저장하거나 Git에 추가하지 않는다.
+
+### 로컬 DB에서 S3 업로드 확인
+
+`.env`에 다음 일반 설정을 추가한다. 실제 버킷 이름과 URL은 팀에서 공유받은 값을 사용한다.
+
+```properties
+AWS_REGION=ap-northeast-2
+AWS_S3_BUCKET=your-s3-bucket
+AWS_S3_BASE_URL=https://your-s3-or-cloudfront-domain
+```
+
+`AWS_S3_BASE_URL`은 브라우저에서 파일을 읽을 때 사용할 S3 또는 CloudFront 기본 URL이다.
+끝에 `/`를 붙이지 않는다. DB에는 이 기본 URL과 객체 키를 합친 전체 URL이 저장된다.
+
+AWS 자격 증명은 `.env`나 소스 코드에 저장하지 않는다. 로컬에서는 다음 방법 중 하나로
+AWS SDK 기본 자격 증명 체인에 제공한다.
+
+1. `aws configure`로 `%UserProfile%/.aws/credentials`에 개발용 자격 증명을 설정한다.
+2. 현재 PowerShell 프로세스에 `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`를 설정한다.
+3. 임시 자격 증명이면 `AWS_SESSION_TOKEN`도 함께 설정한다.
+
+PowerShell 환경 변수 사용 예시는 다음과 같다. 아래 값은 **예시**이며 실제 키를 문서,
+채팅, 로그 또는 Git에 남기지 않는다.
+
+```powershell
+$env:AWS_ACCESS_KEY_ID="example-access-key"
+$env:AWS_SECRET_ACCESS_KEY="example-secret-key"
+$env:AWS_SESSION_TOKEN="example-session-token"
+.\gradlew.bat bootRun --args="--spring.profiles.active=local,s3"
+```
+
+정상 기동 후 관리자 상품·매장 화면에서 업로드하는 방법이 실제 기능 기준 확인 방법이다.
+단순 연결 확인이 필요하면 현재 PC에서만 다음 API를 사용할 수 있다.
+
+```powershell
+curl.exe -X POST -F "file=@C:\temp\cake.jpg" `
+  http://localhost:8080/api/local/s3-test/upload
+```
+
+성공 응답의 `imageUrl`을 브라우저에서 열어 파일 읽기 권한과 공개 URL 설정까지 확인한다.
+이 API는 `local,s3` 프로필에서만 생성되고 loopback 요청만 허용된다.
+
+### RDS와 S3를 함께 사용할 때
+
+RDS 접속 설정은 기존 `RDS_*` 값을 그대로 사용하고 S3 일반 설정을 추가한다. 애플리케이션
+코드는 수정하지 않고 프로필만 조합한다.
+
+```powershell
+.\gradlew.bat bootRun --args="--spring.profiles.active=rds,s3"
+```
+
+배포 환경에서는 장기 액세스 키를 서버에 저장하지 않는다. EC2 Instance Profile, ECS Task
+Role 등 실행 환경의 IAM Role을 사용한다. 애플리케이션에는 최소한 다음 S3 권한만 부여한다.
+
+- 업로드 대상 prefix의 `s3:PutObject`
+- 삭제 대상 prefix의 `s3:DeleteObject`
+- 공개 URL이 S3를 직접 사용하고 애플리케이션이 읽기도 수행한다면 필요한 범위의
+  `s3:GetObject`
+
+버킷을 무조건 전체 공개하지 않는다. 운영에서는 CloudFront와 비공개 S3 조합을 우선
+검토하고, `AWS_S3_BASE_URL`에는 CloudFront 도메인을 지정한다.
+
+RDS의 이미지 URL 컬럼은 `VARCHAR(500)`이므로 현재 S3 URL 저장을 위한 migration은 필요하지
+않다. 다만 기존 DB에 `/uploads/...` 값이 있다면 S3 전환만으로 기존 파일이 자동 이전되지
+않는다. 기존 파일을 S3에 복사한 뒤 DB URL을 새 공개 URL로 바꾸는 별도 이관 계획이 필요하다.
+공유 RDS의 데이터 변경은 반드시 백업과 팀 승인 후 수행하며 애플리케이션 기동 중 자동으로
+변환하지 않는다.

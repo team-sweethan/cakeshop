@@ -19,7 +19,7 @@
       <strong th:text="${member.nickname}"></strong>
       <p class="text-muted" th:text="${member.email}"></p>
       <nav class="stack" style="margin-top:12px">
-        <a class="btn btn--block" href="/orders/1">주문 내역</a>
+        <span class="btn btn--block btn--disabled" aria-disabled="true">주문 내역 연동 준비 중</span>
         <a class="btn btn--block" th:href="@{/chat}">1:1 문의</a>
         <a class="btn btn--block" href="/mypage/coupons">보유 쿠폰</a>
         <a class="btn btn--block" href="/reviews/new">작성할 후기</a>
@@ -56,29 +56,9 @@
       </section>
 
       <section class="section">
-        <h2 class="section-title">진행 중인 주문</h2>
-        <div class="stack">
-          <article class="panel cluster cluster--between">
-            <div><strong>레터링 케이크</strong><p class="text-muted">픽업: 01.20 14:00 | ORD-001</p></div>
-            <div class="cluster"><span class="badge badge--warning">승인 대기</span><a class="btn" href="/orders/1">상세</a></div>
-          </article>
-          <article class="panel cluster cluster--between">
-            <div><strong>딸기 케이크</strong><p class="text-muted">픽업: 01.22 15:00 | ORD-002</p></div>
-            <div class="cluster"><span class="badge badge--info">제작 중</span><a class="btn" href="/orders/1">상세</a></div>
-          </article>
-        </div>
-      </section>
-
-      <section class="section">
-        <h2 class="section-title">최근 주문</h2>
-        <div class="table-wrap">
-          <table class="data-table">
-            <thead><tr><th>주문번호</th><th>상품명</th><th>금액</th><th>상태</th><th>픽업일</th><th>상세</th></tr></thead>
-            <tbody>
-            <tr><td>ORD-003</td><td>초코 케이크</td><td>40,000원</td><td>픽업 완료</td><td>01.10</td><td><a class="btn" href="/orders/1">보기</a></td></tr>
-            <tr><td>ORD-004</td><td>마카롱 케이크</td><td>38,000원</td><td>픽업 완료</td><td>01.05</td><td><a class="btn" href="/orders/1">보기</a></td></tr>
-            </tbody>
-          </table>
+        <h2 class="section-title">주문 내역</h2>
+        <div class="panel panel--dashed text-muted">
+          주문 도메인 연동 후 진행 중인 주문과 최근 주문을 표시합니다.
         </div>
       </section>
     </div>

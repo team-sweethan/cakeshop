@@ -9,6 +9,7 @@ import com.cakeshop.domain.product.error.ProductErrorCode;
 import com.cakeshop.domain.product.mapper.ProductMapper;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.infra.FileStorageClient;
+import com.cakeshop.global.infra.FileStorageDirectory;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,6 +24,9 @@ import org.springframework.web.multipart.MultipartFile;
 public class ProductImageService {
 
     static final int MAX_IMAGES_PER_PRODUCT = 5;
+
+    private static final String IMAGE_DIRECTORY =
+            FileStorageDirectory.PRODUCT.getPath();
 
     private static final Logger log = LoggerFactory.getLogger(
             ProductImageService.class
@@ -300,7 +304,7 @@ public class ProductImageService {
         try {
             return fileStorageClient.store(
                     imageFile,
-                    "product"
+                    IMAGE_DIRECTORY
             );
         } catch (RuntimeException exception) {
             throw new BusinessException(
@@ -313,7 +317,7 @@ public class ProductImageService {
         try {
             return fileStorageClient.store(
                     imageFile,
-                    "product"
+                    IMAGE_DIRECTORY
             );
         } catch (RuntimeException exception) {
             throw new BusinessException(

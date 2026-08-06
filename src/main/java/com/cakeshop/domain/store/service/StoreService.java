@@ -11,6 +11,7 @@ import com.cakeshop.domain.store.entity.StoreBusinessHour;
 import com.cakeshop.domain.store.entity.StoreHoliday;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.infra.FileStorageClient;
+import com.cakeshop.global.infra.FileStorageDirectory;
 import java.time.DayOfWeek;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
@@ -31,7 +32,8 @@ public class StoreService {
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
 
     // 매장 도메인이 저장하는 이미지의 저장 하위 디렉토리 (/{directory}/{yyyyMM}/{uuid}.{ext})
-    private static final String IMAGE_DIRECTORY = "store";
+    private static final String IMAGE_DIRECTORY =
+            FileStorageDirectory.STORE.getPath();
 
     private final StoreMapper storeMapper;
     private final FileStorageClient fileStorageClient;
