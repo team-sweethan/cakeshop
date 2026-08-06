@@ -53,7 +53,9 @@
 
 ### 조각 1 — 작성 (#109)
 
-- 자격 검증: `order_items → orders`로 본인 주문인지, `orders.status == PICKED_UP`인지
+**선행: 주문 도메인 계약 시그니처를 주환님과 합의한다.** 자격 검증과 A1 목록이 `order_items`·`orders`를 직접 JOIN하는 모양이라 `docs/conventions.md` 15절과 어긋난다. 시그니처가 정해지기 전에는 착수하지 않는다. 구현이 없으면 stub으로 진행한다(15절). 상세는 `SPEC.md` A1.
+
+- 자격 검증: 본인 주문인지, `orders.status == PICKED_UP`인지 — **주문 도메인 공개 계약으로 받는다**
 - `uk_reviews_order_item` UNIQUE로 주문상품당 1건. 중복은 `DuplicateKeyException`을 잡아 도메인 에러로 바꾼다(커뮤니티 신고 선례)
 - `reviews.product_id`는 요청값을 믿지 않고 `order_items.product_id`에서 파생시킨다 (R4)
 - `ReviewErrorCode`에 `REVIEW_NOT_FOUND`·`ORDER_ITEM_NOT_FOUND`·`ALREADY_REVIEWED` 추가(SPEC 2.5의 번호를 그대로 쓴다). **소유권 전용 코드는 만들지 않는다** — 남의 주문 상품·후기를 건드리면 404다. 403을 두면 id를 훑어 존재 여부를 알아낼 수 있다
@@ -115,8 +117,10 @@
 
 - `review_replies` INSERT. `uk_review_replies_review`가 후기당 1건을 강제
 - `admin_id`는 `members(id)` FK — 사람이 다는 것을 전제한다
+- **고객 화면의 답글 노출도 이 조각이다**(SPEC B4) — B1(상품 후기 목록)과 B3(내 후기)의 각 후기 아래에 붙인다. 빼면 관리자는 답글을 쓰고 알림까지 나가는데 **고객이 들어올 화면에 답글이 없다**
+- `PUBLISHED` 후기에만 답글을 달고, 확인과 INSERT를 한 문장에 묶는다(SPEC C5)
 
-**검증**: 같은 후기에 두 번째 답글 거부, 비관리자 접근 거부.
+**검증**: 같은 후기에 두 번째 답글 거부, 비관리자 접근 거부, **B1·B3에 답글이 보이는지**, `BLOCKED` 후기의 답글이 함께 가려지는지, 답글 작성과 숨김의 동시 실행.
 
 ### 조각 7 — 알림 연동 (#114)
 
