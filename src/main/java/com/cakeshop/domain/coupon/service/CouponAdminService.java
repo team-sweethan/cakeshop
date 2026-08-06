@@ -2,6 +2,7 @@ package com.cakeshop.domain.coupon.service;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -30,6 +31,8 @@ import java.util.Set;
 /** 관리자 쿠폰의 등록·조회·수정 및 발급 상태 전환을 담당한다. */
 @Service
 public class CouponAdminService {
+
+    private static final DateTimeFormatter BIRTHDAY_FORMATTER = DateTimeFormatter.ofPattern("MM-dd");
 
     private final CouponMapper couponMapper;
     private final CouponIssueService couponIssueService;
@@ -73,8 +76,10 @@ public class CouponAdminService {
                 : Set.copyOf(couponMapper.findIssuedMemberIds(couponId, memberIds));
         return new PageResult<>(
                 memberPage.getContent().stream()
-                        .map(member -> new CouponIssueCandidateView(member.memberId(), member.name(), member.email(),
-                                member.phone(), member.birthDate(), issuedMemberIds.contains(member.memberId())))
+                        .map(member -> new CouponIssueCandidateView(
+                                member.memberId(), member.name(), member.email(), maskPhone(member.phone()),
+                                member.birthDate() == null ? null : member.birthDate().format(BIRTHDAY_FORMATTER),
+                                issuedMemberIds.contains(member.memberId())))
                         .toList(),
                 request,
                 memberPage.getTotalElements()
@@ -323,6 +328,19 @@ public class CouponAdminService {
         coupon.setStartsAt(form.getStartsAt().truncatedTo(ChronoUnit.MINUTES));
         coupon.setExpiresAt(form.getExpiresAt().truncatedTo(ChronoUnit.MINUTES));
         coupon.setTargetType(form.getTargetType());
+    }
+
+    /** 관리자 화면용 JSON 응답에는 회원 원본 연락처를 포함하지 않는다. */
+    private String maskPhone(String phone) {
+        if (phone == null || phone.isBlank()) {
+            return null;
+        }
+
+        String digits = phone.replaceAll("\\D", "");
+        if (digits.length() < 8) {
+            return "****";
+        }
+        return digits.substring(0, 3) + "-****-" + digits.substring(digits.length() - 4);
     }
 
     private Coupon findCouponForUpdate(Long couponId) {

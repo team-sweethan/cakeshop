@@ -25,7 +25,7 @@
     <sql id="couponDisplayStatus">
         CASE
             WHEN expires_at &lt;= NOW(6) THEN 'ENDED'
-            WHEN issued_quantity &gt;= total_quantity THEN 'EXHAUSTED'
+            WHEN total_quantity IS NOT NULL AND issued_quantity &gt;= total_quantity THEN 'EXHAUSTED'
             WHEN status = 'INACTIVE' THEN 'INACTIVE'
             WHEN starts_at &gt; NOW(6) THEN 'SCHEDULED'
             ELSE 'ACTIVE'
@@ -49,21 +49,22 @@
                         AND status = 'ACTIVE'
                         AND starts_at &gt; NOW(6)
                         AND expires_at &gt; NOW(6)
-                        AND issued_quantity &lt; total_quantity
+                        AND (total_quantity IS NULL OR issued_quantity &lt; total_quantity)
                     </when>
                     <when test="condition.status.name() == 'ACTIVE'">
                         AND status = 'ACTIVE'
                         AND starts_at &lt;= NOW(6)
                         AND expires_at &gt; NOW(6)
-                        AND issued_quantity &lt; total_quantity
+                        AND (total_quantity IS NULL OR issued_quantity &lt; total_quantity)
                     </when>
                     <when test="condition.status.name() == 'INACTIVE'">
                         AND status = 'INACTIVE'
                         AND expires_at &gt; NOW(6)
-                        AND issued_quantity &lt; total_quantity
+                        AND (total_quantity IS NULL OR issued_quantity &lt; total_quantity)
                     </when>
                     <when test="condition.status.name() == 'EXHAUSTED'">
                         AND expires_at &gt; NOW(6)
+                        AND total_quantity IS NOT NULL
                         AND issued_quantity &gt;= total_quantity
                     </when>
                     <when test="condition.status.name() == 'ENDED'">
@@ -133,7 +134,7 @@
             <!-- 만료 시각이 지난 쿠폰은 스케줄러 실행 전에도 종료 그룹으로 우선 정렬한다. -->
             CASE
             WHEN expires_at &lt;= NOW(6) THEN 5
-            WHEN issued_quantity &gt;= total_quantity THEN 4
+            WHEN total_quantity IS NOT NULL AND issued_quantity &gt;= total_quantity THEN 4
             WHEN status = 'INACTIVE' THEN 2
             WHEN starts_at &gt; NOW(6) THEN 3
             ELSE 1
@@ -144,7 +145,7 @@
             WHEN status = 'ACTIVE'
             AND starts_at &lt;= NOW(6)
             AND expires_at &gt; NOW(6)
-            AND issued_quantity &lt; total_quantity
+            AND (total_quantity IS NULL OR issued_quantity &lt; total_quantity)
             THEN expires_at
             END ASC,
 
@@ -152,7 +153,7 @@
             CASE
             WHEN status = 'INACTIVE'
             AND expires_at &gt; NOW(6)
-            AND issued_quantity &lt; total_quantity
+            AND (total_quantity IS NULL OR issued_quantity &lt; total_quantity)
             THEN updated_at
             END DESC,
 
@@ -160,7 +161,7 @@
             WHEN status = 'ACTIVE'
             AND starts_at &gt; NOW(6)
             AND expires_at &gt; NOW(6)
-            AND issued_quantity &lt; total_quantity
+            AND (total_quantity IS NULL OR issued_quantity &lt; total_quantity)
             THEN starts_at
             END ASC,
 
@@ -200,6 +201,7 @@
           AND status IN ('ACTIVE', 'INACTIVE')
           AND starts_at &gt; NOW(6)
           AND expires_at &gt; NOW(6)
+          AND (#{totalQuantity} IS NULL OR issued_quantity &lt;= #{totalQuantity})
     </update>
 
     <update id="updateCouponAfterStart">
@@ -216,7 +218,7 @@
           AND status IN ('ACTIVE', 'INACTIVE')
           AND starts_at &lt;= NOW(6)
           AND expires_at &gt; NOW(6)
-          AND (total_quantity IS NULL OR issued_quantity &lt;= total_quantity)
+          AND (#{totalQuantity} IS NULL OR issued_quantity &lt;= #{totalQuantity})
           <!-- 기존 DATETIME(6)의 초·밀리초 차이는 화면에서 표현하지 않으므로 같은 분까지 허용한다. -->
           AND expires_at &lt; DATE_ADD(#{expiresAt}, INTERVAL 1 MINUTE)
     </update>
@@ -234,6 +236,7 @@
         FROM members m
         WHERE m.id = #{memberId}
           AND m.status = 'ACTIVE'
+          AND m.role = 'USER'
           AND NOT EXISTS (
               SELECT 1
               FROM member_coupons mc
@@ -274,7 +277,8 @@
     </select>
 
     <select id="findIssuedMembers" resultType="com.cakeshop.domain.coupon.dto.view.CouponIssuedMemberView">
-        SELECT mc.member_id AS memberId, m.name, m.email, m.phone, m.birth_date AS birthDate,
+        SELECT mc.member_id AS memberId, m.name, m.email, m.phone,
+               DATE_FORMAT(m.birth_date, '%m-%d') AS birthday,
                mc.status, mc.used_at AS usedAt
         FROM member_coupons mc JOIN members m ON m.id = mc.member_id
         WHERE mc.coupon_id = #{couponId}

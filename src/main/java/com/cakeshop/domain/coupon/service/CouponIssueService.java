@@ -1,6 +1,7 @@
 package com.cakeshop.domain.coupon.service;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Set;
 
@@ -23,6 +24,8 @@ import com.cakeshop.global.error.BusinessException;
  */
 @Service
 public class CouponIssueService {
+
+    private static final ZoneId KOREA_ZONE_ID = ZoneId.of("Asia/Seoul");
 
     private final CouponMapper couponMapper;
     private final MemberCouponQueryService memberCouponQueryService;
@@ -64,7 +67,8 @@ public class CouponIssueService {
     /** 매월 등록된 생일 쿠폰을 매시 정각 스케줄러가 이번 달 생일 회원에게 생일 쿠폰을 발급한다. */
     @Transactional
     public void issueBirthdayCoupons() {
-        int month = LocalDateTime.now().getMonthValue();
+        // 스케줄러와 동일한 Asia/Seoul 기준으로 생일 대상 월을 계산한다.
+        int month = LocalDateTime.now(KOREA_ZONE_ID).getMonthValue();
         List<Long> birthdayMemberIds = memberCouponQueryService.getBirthdayMemberIds(month);
         for (Coupon coupon : couponMapper.findCouponsByTargetType(CouponTargetType.BIRTHDAY)) {
             issueMembers(coupon.getId(), birthdayMemberIds);

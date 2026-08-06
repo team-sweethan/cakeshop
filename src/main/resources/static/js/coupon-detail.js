@@ -46,9 +46,9 @@
         members.forEach(member => {
             const row = document.createElement('tr');
             const values = canIssue
-                ? [member.memberId, member.name, member.email, maskPhone(member.phone), formatBirthday(member.birthDate),
+                ? [member.memberId, member.name, member.email, member.phone, formatBirthday(member.birthday),
                     member.issued ? '발급 완료' : '미발급']
-                : [member.memberId, member.name, member.email, maskPhone(member.phone), formatBirthday(member.birthDate),
+                : [member.memberId, member.name, member.email, member.phone, formatBirthday(member.birthday),
                     member.statusDescription, formatDate(member.usedAt)];
             values.forEach(value => { const cell = document.createElement('td'); cell.textContent = value ?? '-'; row.appendChild(cell); });
             const action = document.createElement('td');
@@ -133,13 +133,6 @@
 
     function formatDate(value) { return value ? value.replace('T', ' ').slice(0, 16) : '-'; }
 
-    function formatBirthday(value) { return value ? value.slice(5, 10) : '-'; }
-
-    function maskPhone(value) {
-        if (!value) return '-';
-        const digits = value.replace(/\D/g, '');
-        if (digits.length < 8) return '****';
-        return `${digits.slice(0, 3)}-****-${digits.slice(-4)}`;
-    }
+    function formatBirthday(value) { return value || '-'; }
 
 })();
