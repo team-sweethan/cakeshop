@@ -53,17 +53,16 @@ public class NotificationService {
             eventKey = request.getType().name() + ":" + request.getReceiverId() + ":" + targetId;
         }
 
-        // 묶음 알림(채팅 문의 등) 여부 확인
+        // 방 단위 묶음 알림(ROOM_...) 여부 확인 (메시지 ID 단위 단건 알림 키는 멱등 처리)
         boolean isBundleNotification = request.getChatRoomId() != null
-            || (request.getType() != null && (request.getType() == NotificationType.CUSTOMER_CHAT || request.getType() == NotificationType.ADMIN_CHAT));
-
-        LocalDateTime now = LocalDateTime.now();
+            || (eventKey != null && eventKey.contains("ROOM_"));
 
         // 중복 eventKey가 존재하는 경우 처리
         if (notificationMapper.existsByReceiverIdAndEventKey(request.getReceiverId(), eventKey)) {
             if (isBundleNotification) {
-                // 비관적 잠금(FOR UPDATE) 조회로 동시성 중복 발송 차단
+                // 비관적 잠금(FOR UPDATE) 획득 후 최신 시각(now) 측정하여 0.001초 동시성 덮어쓰기 방지
                 Notification existing = notificationMapper.findNotificationByReceiverAndEventKeyForUpdate(request.getReceiverId(), eventKey);
+                LocalDateTime now = LocalDateTime.now();
                 notificationMapper.updateLastEventAtAndUnread(request.getReceiverId(), eventKey, title, content, now);
 
                 // 30분 쿨타임 체크: 직전 메시지 시각(last_event_at) 대비 30분 이상 경과했으면 새 묶음으로 간주해 SMS 재발송
@@ -79,6 +78,8 @@ public class NotificationService {
             // 일반 알림(주문, 쿠폰 등) 중복 시에는 읽은 상태 유지를 위해 멱등하게 종료
             return;
         }
+
+        LocalDateTime createNow = LocalDateTime.now();
 
         // 신규 알림 생성
         Notification notification = Notification.builder()
@@ -98,8 +99,8 @@ public class NotificationService {
             .deliveryScope(scope)
             .isRead(false)
             .eventKey(eventKey)
-            .createdAt(now)
-            .lastEventAt(now)
+            .createdAt(createNow)
+            .lastEventAt(createNow)
             .build();
 
         // 알림 DB 저장하기 (동시 요청으로 인한 중복 키 예외 멱등 처리)
@@ -108,10 +109,11 @@ public class NotificationService {
         } catch (DuplicateKeyException e) {
             if (isBundleNotification) {
                 Notification existing = notificationMapper.findNotificationByReceiverAndEventKeyForUpdate(request.getReceiverId(), eventKey);
-                notificationMapper.updateLastEventAtAndUnread(request.getReceiverId(), eventKey, title, content, now);
+                LocalDateTime updateNow = LocalDateTime.now();
+                notificationMapper.updateLastEventAtAndUnread(request.getReceiverId(), eventKey, title, content, updateNow);
 
                 long minutesGap = (existing != null && existing.getLastEventAt() != null)
-                    ? Duration.between(existing.getLastEventAt(), now).toMinutes() : 999;
+                    ? Duration.between(existing.getLastEventAt(), updateNow).toMinutes() : 999;
 
                 if (minutesGap >= 30 && scope == DeliveryScope.WEB_AND_SMS && request.getReceiverId() != null) {
                     Long existingId = existing != null ? existing.getId() : notificationMapper.findIdByReceiverIdAndEventKey(request.getReceiverId(), eventKey);

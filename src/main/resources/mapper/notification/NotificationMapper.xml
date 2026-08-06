@@ -105,10 +105,10 @@
         )
     </select>
 
-    <!-- 동일 eventKey 알림 재발생 시 최근 시각 갱신 및 unread 처리 (자바 시계 파라미터 사용) -->
+    <!-- 동일 eventKey 알림 재발생 시 최근 시각 갱신 및 unread 처리 (GREATEST 단조 증가 보장) -->
     <update id="updateLastEventAtAndUnread">
         UPDATE notifications
-        SET last_event_at = #{lastEventAt},
+        SET last_event_at = GREATEST(last_event_at, #{lastEventAt}),
             is_read = false,
             read_at = NULL,
             title = COALESCE(#{title}, title),
