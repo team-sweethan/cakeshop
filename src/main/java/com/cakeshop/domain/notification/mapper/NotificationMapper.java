@@ -1,5 +1,6 @@
 package com.cakeshop.domain.notification.mapper;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -31,11 +32,15 @@ public interface NotificationMapper {
     // 중복 event_key 존재 여부
     boolean existsByReceiverIdAndEventKey(@Param("receiverId") Long receiverId, @Param("eventKey") String eventKey);
 
+    // 중복 event_key 기반 기존 알림 객체 조회
+    Notification findNotificationByReceiverAndEventKey(@Param("receiverId") Long receiverId, @Param("eventKey") String eventKey);
+
     // 중복 event_key 기반 최근 시각 갱신 및 unread 처리
     void updateLastEventAtAndUnread(@Param("receiverId") Long receiverId,
                                     @Param("eventKey") String eventKey,
                                     @Param("title") String title,
-                                    @Param("content") String content);
+                                    @Param("content") String content,
+                                    @Param("lastEventAt") LocalDateTime lastEventAt);
 
     // 중복 event_key 기반 기존 알림 ID 조회
     Long findIdByReceiverIdAndEventKey(@Param("receiverId") Long receiverId, @Param("eventKey") String eventKey);
