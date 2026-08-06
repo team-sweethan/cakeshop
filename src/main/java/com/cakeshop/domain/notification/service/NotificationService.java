@@ -87,7 +87,7 @@ public class NotificationService {
 
         // 알림톡 / SMS 외부 발송 연동 (DB 트랜잭션 커밋 완료 후 안전하게 발송)
         if (scope == DeliveryScope.WEB_AND_SMS && request.getReceiverId() != null) {
-            String receiverPhone = notificationMapper.findReceiverPhone(request.getReceiverId());
+            String receiverPhone = notificationMapper.findReceiverPhone(request.getReceiverId(), request.getOrderId());
             Long notificationId = notification.getId();
             if (TransactionSynchronizationManager.isActualTransactionActive()) {
                 TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
