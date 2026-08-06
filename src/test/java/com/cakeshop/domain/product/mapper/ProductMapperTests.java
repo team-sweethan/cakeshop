@@ -930,6 +930,41 @@ class ProductMapperTests {
     }
 
     @Test
+    void adminList_productsWithImages_returnsRepresentativeImage() {
+        jdbcTemplate.update(
+                """
+                INSERT INTO product_images (
+                    product_id,
+                    image_url,
+                    sort_order
+                )
+                VALUES
+                    (?, '/uploads/product/later.jpg', 2),
+                    (?, '/uploads/product/representative.jpg', 1)
+                """,
+                optionProductId,
+                optionProductId
+        );
+
+        List<ProductAdminListView> products =
+                productMapper.findAdminProducts(
+                        new ProductAdminSearchCondition(),
+                        100,
+                        0
+                );
+
+        ProductAdminListView product = products.stream()
+                .filter(item -> item.id() == optionProductId)
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(product.thumbnailUrl())
+                .isEqualTo(
+                        "/uploads/product/representative.jpg"
+                );
+    }
+
+    @Test
     void adminSearchConditionsCanBeCombined() {
         ProductAdminSearchCondition condition =
                 new ProductAdminSearchCondition();

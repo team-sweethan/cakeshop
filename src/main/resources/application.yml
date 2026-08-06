@@ -12,7 +12,8 @@ spring:
     multipart:
       # 매장·상품 등의 이미지 업로드 상한. 기본값(1MB)은 사진에 너무 작다.
       max-file-size: 5MB
-      max-request-size: 10MB
+      # 상품 이미지 5장과 multipart 부가 데이터를 한 요청으로 받을 수 있게 여유를 둔다.
+      max-request-size: 30MB
   flyway:
     enabled: true
     locations: classpath:db/migration
@@ -72,7 +73,18 @@ spring:
   thymeleaf:
     cache: false
   datasource:
-    url: jdbc:mariadb://${LOCAL_DB_HOST:localhost}:${LOCAL_DB_PORT}/${LOCAL_DB_DATABASE}
+    # connectionTimeZone: 애플리케이션과 DB가 같은 날짜 경계를 쓰게 만든다.
+    # 인기글 배치가 서울 기준 날짜를 넘기는데 created_at 은 DB 시계로 박히므로,
+    # 세션 시간대를 맞추지 않으면 DB 가 UTC 인 환경에서 창이 9시간 어긋난다.
+    # (docs/community/PLAN.md D10)
+    #
+    # 'Asia/Seoul' 이 아니라 '+09:00' 인 이유: 이 옵션은 세션에 SET time_zone 을 거는데,
+    # 이름으로 된 시간대는 MariaDB 의 mysql.time_zone_name 테이블이 채워져 있어야 한다.
+    # 기본 설치에는 비어 있어서 이름을 쓰면 연결 자체가 'Unknown or incorrect time zone'
+    # 으로 실패한다 — 팀원마다 로컬 DB 에 tzinfo 를 적재해야 하는 설치 단계가 생긴다.
+    # 한국 표준시는 1988년 이후 서머타임이 없어 +09:00 이 항상 KST 와 같으므로,
+    # 고정 오프셋으로 적어 그 전제를 없앤다.
+    url: "jdbc:mariadb://${LOCAL_DB_HOST:localhost}:${LOCAL_DB_PORT}/${LOCAL_DB_DATABASE}?connectionTimeZone=+09:00&forceConnectionTimeZoneToSession=true"
     username: ${LOCAL_DB_USERNAME}
     password: ${LOCAL_DB_PASSWORD}
 app:
@@ -91,7 +103,24 @@ spring:
       on-profile: rds
   datasource:
     # 공용 개발 RDS의 require_secure_transport=ON 대응: TLS로 암호화해 연결한다.
-    url: "jdbc:mariadb://${RDS_ENDPOINT}:${RDS_PORT:3306}/${RDS_DATABASE}?sslMode=trust"
+    # connectionTimeZone 은 local 과 같은 이유이고 값도 같아야 한다(PLAN.md D10).
+    # RDS 는 기본이 UTC 라 이 설정이 빠지면 서울 기준 날짜 경계가 9시간 어긋난다.
+    # 두 프로필이 다른 값을 쓰면 로컬에서 맞던 날짜가 배포에서만 틀어지므로 함께 고친다.
+    #
+    # ▸ 이미 데이터가 쌓인 DB 에 이 설정을 처음 붙일 때는 보정이 먼저다 (PLAN.md R31)
+    #
+    # 우리 시각 컬럼은 전부 DATETIME 이고 TIMESTAMP 가 하나도 없다. DATETIME 은 시간대가
+    # 안 붙은 벽시계 숫자라 세션 시간대를 바꿔도 **기존 행의 값이 따라오지 않는다**
+    # (TIMESTAMP 였다면 읽을 때 자동 변환되어 저절로 맞았다).
+    #
+    # 그래서 UTC 세션으로 쌓인 DB 에 이 줄을 그냥 붙이면, 그 순간부터 NOW(6) 는 KST 인데
+    # 기존 created_at 은 UTC 벽시계 그대로라 둘의 기준이 갈린다. 조회수 10분 창이 기존
+    # 이력을 못 보고(중복 차단이 잠시 뚫린다), 인기글 7일 창의 경계가 9시간 밀린다.
+    #
+    # 지금은 해당하는 DB 가 없다 — rds 는 아래대로 Flyway 가 꺼져 있어 테이블 자체가
+    # 만들어지지 않았고, 로컬은 MariaDB 기본값이 time_zone=SYSTEM 이라 원래 KST 였다.
+    # 스키마 반영 절차가 생기는 시점에 이 문단을 다시 읽는다.
+    url: "jdbc:mariadb://${RDS_ENDPOINT}:${RDS_PORT:3306}/${RDS_DATABASE}?sslMode=trust&connectionTimeZone=+09:00&forceConnectionTimeZoneToSession=true"
     username: ${RDS_USERNAME}
     password: ${RDS_PASSWORD}
   flyway:

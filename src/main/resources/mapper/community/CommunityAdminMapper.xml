@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+******************************
+작성자 : HyunGyu-Cho
+담당자 : 현규
+작성일 : 2026-08-05
+기능 : 커뮤니티 데이터 접근
+설명 : CommunityAdminMapper 기능에 필요한 조회와 변경을 수행한다.
+******************************
+-->
+<mapper namespace="com.cakeshop.domain.community.mapper.CommunityAdminMapper">
+    <select id="findReportsByPost"
+            resultType="com.cakeshop.domain.community.dto.view.ReportView">
+
+        SELECT
+        pr.id,
+        m.nickname AS reporter_nickname,
+        (m.status = 'WITHDRAWN') AS reporter_withdrawn,
+        pr.reason,
+        pr.status,
+        pr.created_at
+
+        FROM post_reports pr
+        JOIN members m ON m.id = pr.reporter_id
+
+        WHERE pr.post_id = #{postId}
+
+        ORDER BY pr.created_at DESC, pr.id DESC
+    </select>
+
+    <select id="countPendingReports" resultType="long">
+
+        SELECT COUNT(*)
+        FROM post_reports pr
+        WHERE pr.post_id = #{postId}
+        AND pr.status = 'PENDING'
+    </select>
+
+    <sql id="adminPostConditions">
+        <where>
+            <if test="status != null">
+                p.status = #{status}
+            </if>
+        </where>
+    </sql>
+
+    <select id="findPostsForAdmin"
+            resultType="com.cakeshop.domain.community.dto.view.AdminPostListView">
+
+        SELECT
+        p.id,
+        pc.name AS category_name,
+        p.title,
+        m.nickname AS author_nickname,
+        (m.status = 'WITHDRAWN') AS author_withdrawn,
+        p.status,
+        (SELECT COUNT(*)
+        FROM post_reports pr
+        WHERE pr.post_id = p.id
+        AND pr.status = 'PENDING') AS pending_report_count,
+        p.created_at
+
+        FROM posts p
+        JOIN post_categories pc ON pc.id = p.category_id
+        JOIN members m ON m.id = p.member_id
+
+        <include refid="adminPostConditions"/>
+
+        <choose>
+            <when test="sort != null and sort.name() == 'REPORTS'">
+                ORDER BY pending_report_count DESC, p.id DESC
+            </when>
+            <otherwise>
+                ORDER BY p.created_at DESC, p.id DESC
+            </otherwise>
+        </choose>
+
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="countPostsForAdmin" resultType="long">
+
+        SELECT COUNT(*)
+        FROM posts p
+
+        <include refid="adminPostConditions"/>
+    </select>
+
+    <select id="findPostByIdForAdmin"
+            resultType="com.cakeshop.domain.community.dto.view.AdminPostDetailView">
+
+        SELECT
+        p.id,
+        p.member_id,
+        pc.name AS category_name,
+        p.title,
+        p.content,
+        m.nickname AS author_nickname,
+        (m.status = 'WITHDRAWN') AS author_withdrawn,
+        p.status,
+        p.blocked_reason,
+        p.blocked_at,
+        b.nickname AS blocked_by_nickname,
+        p.view_count,
+        p.like_count,
+        p.created_at,
+        p.updated_at
+
+        FROM posts p
+        JOIN post_categories pc ON pc.id = p.category_id
+        JOIN members m ON m.id = p.member_id
+        LEFT JOIN members b ON b.id = p.blocked_by
+
+        WHERE p.id = #{postId}
+    </select>
+
+    <update id="blockPost">
+
+        UPDATE posts p
+        SET p.status = 'BLOCKED',
+        p.blocked_at = CURRENT_TIMESTAMP(6),
+        p.blocked_reason = #{reason},
+        p.blocked_by = #{adminId},
+        p.updated_at = p.updated_at
+        WHERE p.id = #{postId}
+        AND p.status = 'PUBLISHED'
+    </update>
+
+    <update id="unblockPost">
+
+        UPDATE posts p
+        SET p.status = 'PUBLISHED',
+        p.updated_at = p.updated_at
+        WHERE p.id = #{postId}
+        AND p.status = 'BLOCKED'
+    </update>
+
+    <update id="closePendingReports">
+
+        UPDATE post_reports pr
+        SET pr.status = #{status}
+        WHERE pr.post_id = #{postId}
+        AND pr.status = 'PENDING'
+    </update>
+</mapper>

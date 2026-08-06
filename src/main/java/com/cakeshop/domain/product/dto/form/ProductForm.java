@@ -1,6 +1,8 @@
 package com.cakeshop.domain.product.dto.form;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 
 import com.cakeshop.domain.product.entity.ProductType;
 
@@ -15,6 +17,8 @@ import jakarta.validation.constraints.Size;
 
 import lombok.Getter;
 import lombok.Setter;
+
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * 관리자 상품 등록 및 수정 입력값을 담는다.
@@ -90,6 +94,9 @@ public class ProductForm {
             message = "상품 준비 일수가 너무 큽니다."
     )
     private Integer preparationDays = 0;
+
+    /** 상품 등록과 함께 저장할 이미지 목록. */
+    private List<MultipartFile> imageFiles = new ArrayList<>();
 
     /**
      * 주문 제작 상품의 준비 기간이 최소 1일인지 확인한다.

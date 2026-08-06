@@ -35,6 +35,12 @@
 DELETE FROM `post_reports`;
 DELETE FROM `post_likes`;
 DELETE FROM `post_views`;
+-- daily_popular_posts 는 posts 를 FK 로 참조한다(조각 7b). 배치가 한 번이라도 돈
+-- 뒤에는 이 줄이 없으면 아래 DELETE FROM posts 가 제약에 걸려 시드가 통째로 실패한다.
+DELETE FROM `daily_popular_posts`;
+-- 실행 기록에는 FK 가 없지만 함께 지운다. 남겨 두면 글을 새로 깔아도 배치가
+-- "이미 확정한 날짜" 로 판단해 건너뛰어서(D4) 인기글이 채워지지 않는다.
+DELETE FROM `popular_post_batch_runs`;
 DELETE FROM `comments`;
 DELETE FROM `posts`;
 
@@ -261,12 +267,16 @@ UPDATE `posts` p
 -- 글마다 조회수가 다르므로 조각 7 의 조회수 정렬도 이 데이터로 확인할 수 있다.
 --
 -- viewer_key 접두사를 'S:seed-' 로 두어 실제 세션 키('S:{sessionId}')와 겹치지 않게 한다.
+--
+-- created_at 을 기본값(지금) 에 맡기지 않고 과거로 박아 둔다. 중복 방지 창이 이제 이
+-- 컬럼을 보기 때문에(DOMAIN.md 6.2), 기본값으로 두면 시드 직후 10분 동안 'S:seed-*' 로
+-- 들어온 조회가 창에 걸린다 — 로컬에서 조회수를 확인하려는 그 시간대다.
 -- ---------------------------------------------------------------------------
 
-INSERT INTO `post_views` (`post_id`, `viewer_key`, `viewed_on`)
+INSERT INTO `post_views` (`post_id`, `viewer_key`, `created_at`)
 SELECT p.`id`,
        CONCAT('S:seed-', nums.`n`),
-       '2026-07-26'
+       '2026-07-26 12:00:00'
   FROM `posts` p
   JOIN (
         SELECT (tens.`n` - 1) * 10 + ones.`n` AS `n`

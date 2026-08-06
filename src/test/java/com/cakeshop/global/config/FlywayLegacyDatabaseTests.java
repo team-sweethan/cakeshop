@@ -44,7 +44,7 @@ class FlywayLegacyDatabaseTests {
 
     @Test
     void migrate_nonEmptySchemaWithoutHistoryTable_reportsLocalResetGuidance() throws SQLException {
-        // docs/sql 의 DDL을 손으로 실행해 만든 로컬 DB를 흉내 낸다.
+        // Flyway 도입 전에 DDL을 손으로 실행해 만든 로컬 DB를 흉내 낸다.
         try (Connection connection = openConnection();
              Statement statement = connection.createStatement()) {
             statement.execute("CREATE TABLE `legacy_manual_table` (`id` BIGINT PRIMARY KEY)");

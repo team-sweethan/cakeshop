@@ -252,8 +252,21 @@ public class ProductAdminController {
             return "admin/product/form";
         }
 
-        // 검증된 입력값으로 새로운 상품을 등록한다.
-        productAdminService.createProduct(form);
+        try {
+            // 상품 정보와 선택한 이미지를 하나의 등록 작업으로 처리한다.
+            productAdminService.createProduct(form);
+        } catch (BusinessException exception) {
+            bindingResult.reject(
+                    "product.create",
+                    exception.getErrorCode().message()
+            );
+
+            model.addAttribute("editMode", false);
+            model.addAttribute("formAction", "/admin/products");
+            addProductFormOptions(model);
+
+            return "admin/product/form";
+        }
 
         // 리다이렉트된 목록 화면에 등록 완료 메시지를 전달한다.
         redirectAttributes.addFlashAttribute(

@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.mapper.CommunityMapper;
+import com.cakeshop.global.config.ClockConfig;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -29,7 +30,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @MybatisTest
 @MariaDbIntegrationTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import(CommunityService.class)
+// CommunityService가 Clock을 주입받으므로 슬라이스에도 시계 설정을 함께 올린다.
+@Import({CommunityService.class, ClockConfig.class})
 class CommunityViewCountTests {
 
     private static final LocalDateTime BASE_TIME = LocalDateTime.of(2026, 3, 1, 10, 0);
@@ -105,7 +107,7 @@ class CommunityViewCountTests {
      *
      * <p>더 보기는 상세를 같은 주소로 다시 여는 것이라 조각 3까지는 클릭마다 +1이었다.
      * 댓글이 많은 글일수록 조회수가 저절로 올라가므로, 순위 신호로 삼으면 자가 인플레가
-     * 된다. 같은 조회자의 재조회로 처리되어 막힌다.
+     * 된다. 창 안에서는 같은 조회자의 재조회로 처리되어 막힌다.
      */
     @Test
     void getPostDetail_loadingMoreComments_doesNotInflateViewCount() {
@@ -119,6 +121,40 @@ class CommunityViewCountTests {
         communityService.getPostDetail(postId, null, viewerKey);
 
         assertThat(viewCountOf(postId)).isEqualTo(1);
+    }
+
+    /**
+     * 창이 닫힌 뒤의 더 보기도 세지 않는지 확인한다(PR #98 Codex 리뷰 P2).
+     *
+     * <p><b>위 테스트는 창을 한 번도 넘지 않아 이 경계를 놓친다.</b> 상세를 10분 넘게 읽다가
+     * `더 보기`를 누르면 창이 이미 닫혀 있고, 그때 창에만 기대면 그대로 +1이 된다. 막는
+     * 것은 창이 아니라 <b>경로가 갈리는 것</b>이다 — 더 보기는 조회수를 올리지 않는
+     * {@code getVisiblePost}로 간다(CommunityController.detail).
+     *
+     * <p>시각은 DB의 {@code NOW(6)}라 주입할 자리가 없으므로 이력을 과거로 민다(H19와 같은
+     * 방식). 11분이면 창 밖이다.
+     */
+    @Test
+    void getVisiblePost_afterWindowClosed_stillDoesNotCount() {
+        long postId = insertPost(PostStatus.PUBLISHED);
+        String viewerKey = "S:reader";
+
+        communityService.getPostDetail(postId, null, viewerKey);
+        agePostViews(postId, 11);
+
+        // 창이 닫힌 뒤 "이전 댓글 더 보기"를 누른 것과 같다.
+        communityService.getVisiblePost(postId, null);
+
+        assertThat(viewCountOf(postId)).isEqualTo(1);
+        assertThatViewCountMatchesHistory(postId);
+    }
+
+    /** 이력을 과거로 민다. 창 판단이 DB 시계를 쓰므로 시각을 주입할 자리가 없다(H19). */
+    private void agePostViews(long postId, int minutes) {
+        jdbcTemplate.update(
+                "UPDATE post_views SET created_at = created_at - INTERVAL ? MINUTE"
+                        + " WHERE post_id = ?",
+                minutes, postId);
     }
 
     /**

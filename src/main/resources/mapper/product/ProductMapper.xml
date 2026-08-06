@@ -590,7 +590,16 @@
         p.base_price AS basePrice,
         p.stock_quantity AS stockQuantity,
         p.status,
-        p.created_at AS createdAt
+        p.created_at AS createdAt,
+        (
+            SELECT pi.image_url
+            FROM product_images pi
+            WHERE pi.product_id = p.id
+            ORDER BY
+                pi.sort_order ASC,
+                pi.id ASC
+            LIMIT 1
+        ) AS thumbnailUrl
         FROM products p
 
         <include refid="adminProductConditions"/>

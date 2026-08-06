@@ -29,6 +29,7 @@ import com.cakeshop.domain.community.dto.view.CommentSectionView;
 import com.cakeshop.domain.community.dto.view.PostCategoryView;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
+import com.cakeshop.domain.community.dto.view.PostSort;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
 import com.cakeshop.domain.community.service.CommunityService;
@@ -61,7 +62,7 @@ class CommunityControllerTests {
     void setUp() {
         communityService = mock(CommunityService.class);
 
-        when(communityService.getPosts(any(), any()))
+        when(communityService.getPosts(any(), any(), any()))
                 .thenReturn(new PageResult<>(List.of(), new PageRequest(1, 20), 0));
         when(communityService.getActiveCategories())
                 .thenReturn(List.of(new PostCategoryView(1L, "QNA", "질문")));
@@ -97,7 +98,7 @@ class CommunityControllerTests {
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("selectedCategoryId", 5L));
 
-        verify(communityService).getPosts(eq(5L), any());
+        verify(communityService).getPosts(eq(5L), any(), any());
     }
 
     /** 목록은 비로그인도 여는 공개 화면이라 주소가 망가져도 오류 페이지로 보내지 않는다. */
@@ -107,7 +108,40 @@ class CommunityControllerTests {
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("selectedCategoryId", (Object) null));
 
-        verify(communityService).getPosts(isNull(), any());
+        verify(communityService).getPosts(isNull(), any(), any());
+    }
+
+    @Test
+    void list_sortOption_isPassedToService() throws Exception {
+        mockMvc.perform(get("/community").param("sort", "VIEWS"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("selectedSort", PostSort.VIEWS));
+
+        verify(communityService).getPosts(any(), eq(PostSort.VIEWS), any());
+    }
+
+    /** 대소문자는 가리지 않는다. 주소를 손으로 고쳐 넣는 사람이 있다. */
+    @Test
+    void list_lowerCaseSortOption_isAccepted() throws Exception {
+        mockMvc.perform(get("/community").param("sort", "views"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("selectedSort", PostSort.VIEWS));
+    }
+
+    /**
+     * 모르는 정렬 값이 오류가 아니라 기본 정렬로 떨어지는지 확인한다.
+     *
+     * <p>SQL 조각을 넣는다. {@code ${}}로 이은 구현이라면 여기서 쿼리가 깨지거나 더 나쁘게는
+     * 그대로 실행되는데, {@code <choose>} 분기로 갈리면 <b>이 값이 SQL에 닿지도 않는다.</b>
+     * 카테고리·페이지 파라미터와 같은 처리다(목록은 공개 화면이다).
+     */
+    @Test
+    void list_invalidSortOption_fallsBackToLatestInsteadOfFailing() throws Exception {
+        mockMvc.perform(get("/community").param("sort", "id; DROP TABLE posts"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("selectedSort", PostSort.LATEST));
+
+        verify(communityService).getPosts(any(), eq(PostSort.LATEST), any());
     }
 
     @Test
@@ -171,6 +205,37 @@ class CommunityControllerTests {
                 .andExpect(status().isOk());
 
         verify(communityService).getPostDetail(eq(15L), eq(7L), anyString());
+    }
+
+    /**
+     * 댓글 "더 보기" 요청이 조회수를 올리지 않는지 확인한다(DOMAIN.md 6.2, PR #98 Codex 리뷰).
+     *
+     * <p>10분 창만으로는 막히지 않는다 — 상세를 10분 넘게 읽다가 누르면 창이 이미 닫혀
+     * 그대로 +1이 된다. 창 안에서만 확인하는 테스트는 이 경계를 통째로 놓치고, 통과한다.
+     * 그래서 창의 폭이 아니라 <b>경로가 갈리는지</b>를 본다.
+     */
+    @Test
+    void detail_loadingMoreComments_doesNotCountAsView() throws Exception {
+        when(communityService.getVisiblePost(eq(15L), isNull())).thenReturn(publishedPost());
+
+        mockMvc.perform(get("/community/15").param("comments", "40"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("customer/community/detail"));
+
+        verify(communityService).getVisiblePost(eq(15L), isNull());
+        verify(communityService, never()).getPostDetail(anyLong(), any(), anyString());
+    }
+
+    /** 반대쪽. 평범한 진입은 그대로 세어야 한다 — 위 테스트만 있으면 아무도 안 세도 통과한다. */
+    @Test
+    void detail_directEntry_stillCountsAsView() throws Exception {
+        when(communityService.getPostDetail(eq(15L), isNull(), anyString()))
+                .thenReturn(publishedPost());
+
+        mockMvc.perform(get("/community/15")).andExpect(status().isOk());
+
+        verify(communityService).getPostDetail(eq(15L), isNull(), anyString());
+        verify(communityService, never()).getVisiblePost(anyLong(), any());
     }
 
     /**
@@ -433,7 +498,8 @@ class CommunityControllerTests {
     /** "더 보기"가 실어 보낸 값이 그대로 Service에 넘어가야 펼친 상태가 유지된다. */
     @Test
     void detail_commentsParameter_isPassedToService() throws Exception {
-        when(communityService.getPostDetail(eq(15L), isNull(), anyString())).thenReturn(publishedPost());
+        // comments가 있는 요청은 조회수를 올리지 않는 경로로 간다.
+        when(communityService.getVisiblePost(eq(15L), isNull())).thenReturn(publishedPost());
 
         mockMvc.perform(get("/community/15").param("comments", "40"))
                 .andExpect(status().isOk());
@@ -444,7 +510,8 @@ class CommunityControllerTests {
     /** 상세는 공개 화면이라 주소가 망가져도 오류 페이지 대신 기본 상태를 보여준다. */
     @Test
     void detail_invalidCommentsParameter_fallsBackToDefault() throws Exception {
-        when(communityService.getPostDetail(eq(15L), isNull(), anyString())).thenReturn(publishedPost());
+        // 값이 망가져도 comments가 붙은 요청은 더 보기다. 조회수는 여기서도 올리지 않는다.
+        when(communityService.getVisiblePost(eq(15L), isNull())).thenReturn(publishedPost());
 
         mockMvc.perform(get("/community/15").param("comments", "전체"))
                 .andExpect(status().isOk());
@@ -729,7 +796,7 @@ class CommunityControllerTests {
 
     private PageRequest capturedPageRequest() {
         ArgumentCaptor<PageRequest> captor = ArgumentCaptor.forClass(PageRequest.class);
-        verify(communityService).getPosts(any(), captor.capture());
+        verify(communityService).getPosts(any(), any(), captor.capture());
         return captor.getValue();
     }
 

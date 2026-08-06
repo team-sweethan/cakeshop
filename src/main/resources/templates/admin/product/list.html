@@ -10,7 +10,7 @@
     <title>상품 관리 | 관리자</title>
 
     <link rel="stylesheet"
-          th:href="@{/css/app.css}">
+          th:href="@{/css/app.css(v='admin-product-thumbnail')}">
 </head>
 
 <body>
@@ -137,7 +137,18 @@
 
             <!-- 상품 목록 -->
             <div class="table-wrap">
-                <table class="data-table">
+                <table class="data-table admin-product-table">
+
+                    <colgroup>
+                        <col class="admin-product-table__image-column">
+                        <col class="admin-product-table__name-column">
+                        <col class="admin-product-table__type-column">
+                        <col class="admin-product-table__price-column">
+                        <col class="admin-product-table__stock-column">
+                        <col class="admin-product-table__status-column">
+                        <col class="admin-product-table__date-column">
+                        <col class="admin-product-table__actions-column">
+                    </colgroup>
 
                     <thead>
                     <tr>
@@ -159,9 +170,16 @@
 
                         <!-- 상품 이미지 -->
                         <td>
-                            <div class=
-                                         "placeholder-image placeholder-image--sm">
-                                이미지
+                            <img class="placeholder-image admin-product-thumbnail"
+                                 th:if="${product.thumbnailUrl != null
+                                          and !product.thumbnailUrl.isBlank()}"
+                                 th:src="${product.thumbnailUrl}"
+                                 th:alt="|${product.name} 대표 이미지|">
+
+                            <div class="placeholder-image admin-product-thumbnail"
+                                 th:unless="${product.thumbnailUrl != null
+                                              and !product.thumbnailUrl.isBlank()}">
+                                이미지 준비 중
                             </div>
                         </td>
 

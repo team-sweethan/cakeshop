@@ -1,3 +1,12 @@
+<!--/*
+******************************
+작성자 : HyunGyu-Cho
+담당자 : 현규
+작성일 : 2026-08-05
+기능 : 고객 커뮤니티 화면
+설명 : form 커뮤니티 화면을 구성한다.
+******************************
+*/-->
 <!doctype html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
@@ -15,10 +24,6 @@
 
     <h1 th:text="${editingPostId} != null ? '글 수정' : '글쓰기'">글쓰기</h1>
 
-    <!--
-      작성과 수정이 같은 폼을 쓴다. 수정 항목이 작성 항목과 같아서(DOMAIN.md 6.3)
-      마크업을 두 벌로 두면 한쪽만 고치는 일이 생긴다.
-    -->
     <form method="post"
           th:object="${form}"
           th:action="${editingPostId} != null
@@ -26,10 +31,6 @@
                      : @{/community}">
       <div class="form-group">
         <label class="form-label" for="categoryId">분류 <span class="required">*</span></label>
-        <!--
-          선택지는 목록 필터와 같은 활성 카테고리다(DOMAIN.md 6.8).
-          화면에 직접 적어 두면 비활성 카테고리가 선택지에 남는다.
-        -->
         <select class="form-control" id="categoryId" th:field="*{categoryId}" required>
           <option value="">선택하세요</option>
           <option th:each="category : ${categories}"
@@ -46,10 +47,6 @@
       </div>
       <div class="form-group">
         <label class="form-label" for="content">내용 <span class="required">*</span></label>
-        <!--
-          maxlength는 서버 검증(DOMAIN.md 7)과 같은 5000자다. 화면 제한이 없으면
-          긴 글을 다 쓰고 나서 거절당한다.
-        -->
         <textarea class="form-control form-control--textarea" id="content" th:field="*{content}"
                   style="min-height:220px" placeholder="내용을 입력하세요"
                   maxlength="5000" required></textarea>

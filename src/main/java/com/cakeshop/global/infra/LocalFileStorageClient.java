@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
@@ -24,10 +25,12 @@ public class LocalFileStorageClient implements FileStorageClient {
 
     private final Path baseDir;
     private final String urlPrefix;
+    private final Clock clock;
 
     public LocalFileStorageClient(
             @Value("${app.file.upload-dir}") String uploadDir,
-            @Value("${app.file.url-prefix}") String urlPrefix) {
+            @Value("${app.file.url-prefix}") String urlPrefix,
+            Clock clock) {
         if (!StringUtils.hasText(uploadDir)) {
             throw new IllegalArgumentException("app.file.upload-dir 설정이 비어 있습니다.");
         }
@@ -38,9 +41,21 @@ public class LocalFileStorageClient implements FileStorageClient {
         }
         this.baseDir = Path.of(uploadDir).toAbsolutePath().normalize();
         this.urlPrefix = prefix;
+        this.clock = clock;
     }
 
-    // 저장 경로 규칙: /{도메인}/{yyyyMM}/{uuid}.{ext}
+    /**
+     * 저장 경로 규칙: {@code /{도메인}/{yyyyMM}/{uuid}.{ext}}
+     *
+     * <p>{@code yyyyMM}은 <b>서울 기준</b>의 달이다({@code ClockConfig}). 시계를 주입받는
+     * 이유는 {@code LocalDate.now()}가 JVM 기본 시간대를 읽기 때문인데, 이 저장소에는
+     * 그 값을 고정하는 설정이 없어 OS에 달려 있다 — 로컬(KST)에서는 맞고 UTC로 뜬 서버
+     * 에서만 어긋난다.
+     *
+     * <p>어긋나도 <b>아무 증상이 없다.</b> 파일은 정상 저장되고 URL도 그대로 살아 있다.
+     * 매일 09:00 KST에 폴더가 넘어가서, 월말 자정~09시 업로드분이 전달 폴더에 들어갈
+     * 뿐이다. 나중에 "8월 업로드분"을 폴더 단위로 세거나 옮기려는 순간에야 드러난다.
+     */
     @Override
     public String store(MultipartFile file, String directory) {
         if (file == null || file.isEmpty()) {
@@ -50,7 +65,8 @@ public class LocalFileStorageClient implements FileStorageClient {
         if (!StringUtils.hasText(directory)) {
             throw new IllegalArgumentException("저장 디렉터리가 비어 있습니다.");
         }
-        String relativeDir = stripTrailingSlash(directory.trim()) + "/" + LocalDate.now().format(MONTH);
+        String relativeDir =
+                stripTrailingSlash(directory.trim()) + "/" + LocalDate.now(clock).format(MONTH);
         String filename = UUID.randomUUID() + extension(file.getOriginalFilename());
         Path targetDir = baseDir.resolve(relativeDir).normalize();
         // directory 에 '..' 등이 섞여 baseDir 밖으로 나가는 것을 차단한다.
