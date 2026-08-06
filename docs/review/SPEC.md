@@ -250,7 +250,11 @@ LIMIT #{size} OFFSET #{offset}
 - `reviews.member_id`는 인증 사용자에서 가져온다. 요청값을 받지 않는다.
 - `status`는 `PUBLISHED`로 저장한다.
 - INSERT는 `uk_reviews_order_item`에 걸릴 수 있다. **`DuplicateKeyException`을 잡아 `ALREADY_REVIEWED`로 바꾼다** — 4번 검증과 INSERT 사이의 동시 요청은 검증만으로 막히지 않는다(커뮤니티 신고 선례).
-- 저장 후 **D1(평점 집계)을 호출**한다. 같은 트랜잭션 안이다.
+- **순서가 정해져 있다: 상품 행 잠금 → `reviews` INSERT → 집계.** 셋 다 같은 트랜잭션이다.
+  1. `ProductRatingService.lockForRating(productId)` — **INSERT보다 먼저다.** 저장한 뒤에 잠그면 이미 늦다
+  2. `reviews` INSERT
+  3. D1(평점 집계) 호출
+  - INSERT가 FK 확인으로 `products` 행에 공유 잠금을 먼저 걸기 때문이다. 그 상태로 집계가 배타 잠금을 요구하면 승격이 되고, 같은 상품에 후기가 동시에 들어오면 교착이다. 주문 흐름과도 교착한다(D1).
 
 **성공 후**: `/mypage/reviews/writable`(A1)로 redirect. 방금 쓴 항목이 목록에서 빠진 것으로 완료를 확인한다.
 
@@ -313,7 +317,11 @@ LIMIT #{size} OFFSET #{offset}
 
 **처리**
 
-- `WHERE r.product_id = ? AND r.status = 'PUBLISHED'`. 노출 판단은 `status` 하나다(2.1).
+- **먼저 그 상품이 고객에게 공개되는 상품인지 확인한다.** 아니면 `404`다.
+  - `ProductQueryService.getSalesInfo(productId)`가 이미 있다(`docs/conventions.md` 15절의 최소 공개 계약). 리뷰가 `products`를 직접 조회하지 않는다.
+  - **없으면 판매 중지 상품의 후기가 계속 공개된다.** `ProductMapper.xml`은 상품 상세를 `p.status = 'ACTIVE'`로 거르는데 후기 목록은 후기의 `status`만 본다. 상품 화면에서는 사라진 상품인데 `/products/{id}/reviews`를 직접 부르면 후기 본문과 작성자 닉네임이 그대로 나온다.
+  - 화면 안에서는 드러나지 않는다. 상세가 이미 404라 후기 영역까지 갈 일이 없고, **주소를 직접 넣는 경로에서만 보인다.**
+- `WHERE r.product_id = ? AND r.status = 'PUBLISHED'`. 후기의 노출 판단은 `status` 하나다(2.1). 위 상품 확인은 후기 조건이 아니라 **선행 관문**이라 이 원칙과 어긋나지 않는다.
 - 정렬은 `created_at DESC, id DESC`. **`id` tiebreaker는 반드시 붙인다** — 없으면 동일 시각 후기가 두 페이지에 중복되거나 누락된다.
 - 페이징은 `PageRequest`/`PageResult` 재사용.
 
@@ -468,8 +476,28 @@ C1의 요청 파라미터다. 목업의 검색 폼을 그대로 산다.
 
 ### D1. 상품 평점 집계
 
-> **이 기능은 이슈 #33 `feat(product): 리뷰 평점 및 후기 수 연동`(시은 담당)과 같은 일이다. 리뷰 단독으로 정할 수 없다.**
+> **이 기능은 이슈 #33 `feat(product): 리뷰 평점 및 후기 수 연동`(시은 담당)과 같은 일이다.**
 > 별도 이슈를 만들지 않고 #33에서 진행한다. 상세는 `PLAN.md` 조각 2와 R9.
+> `domain/product/`는 시은님 담당이므로 **착수 전에 #33에 계약 시그니처를 올려 확인받는다**(`AGENTS.md` — 공개 Service 인터페이스는 먼저 협의).
+
+**방식: `products` 컬럼 갱신, 상품 도메인 소유** (2026-08-06 결정)
+
+| | |
+|---|---|
+| 계약 | `ProductRatingService` (상품 도메인 공개 Service) |
+| SQL | `ProductReviewMapper` + `mapper/product/ProductReviewMapper.xml` (**신규**) |
+| 형판 | `ProductStockService` — 주문·결제에 재고 변경을 공개하는 기존 쓰기 계약과 같은 모양 |
+
+- **`ProductQueryService`가 아니다.** 그쪽은 `@Transactional(readOnly = true)`인 읽기 전용 계약이고(`docs/conventions.md` 15절), 평점 집계는 `products`에 쓴다. 쓰기 계약의 선례는 `ProductStockService`다.
+- 집계 SQL은 상품 도메인이 소유한다. 리뷰는 값을 계산해 넘기지 않고 `productId`만 넘긴다.
+- **전용 매퍼를 새로 만드는 것은 이 저장소에서 첫 사례다.** `MemberQueryService`(PR #119)는 기존 `MemberMapper.xml`에 문장을 더했다. `ProductMapper.xml`이 724줄이라 나누는 것이지만, PR 본문에 그 이유를 남겨 다음 사람이 판단 기준을 갖게 한다.
+
+**잠금 문장을 새 매퍼에 복제하지 않는다.**
+
+- `ProductReviewMapper.xml`에 `SELECT ... products ... FOR UPDATE`를 따로 선언하지 않는다. 기존 `ProductMapper.findSalesInfoByIdForUpdate`를 재사용하고, `ProductRatingService`가 **두 매퍼를 함께 주입받는다.** 같은 패키지 안이라 도메인 경계를 넘지 않는다.
+- 복제해도 당장은 똑같이 동작한다. 갈라지는 것이 문제다 — 한쪽에 `JOIN product_options`가 붙는 날 두 경로의 잠금 순서가 어긋나고, **두 파일을 함께 열어 본 사람이 없어 아무도 눈치채지 못한다.**
+- 선례: 커뮤니티는 `lockPost`를 관리자 매퍼에 복제하지 않고 `CommunityAdminService`가 고객 매퍼를 함께 주입받는다(`docs/community/CLAUDE.md`).
+- 결과적으로 새 매퍼에 들어가는 것은 **집계 SELECT와 `UPDATE products` 둘뿐**이다.
 
 **리뷰 쪽에서 이미 정해진 것**
 
@@ -481,17 +509,26 @@ C1의 요청 파라미터다. 목업의 검색 폼을 그대로 산다.
   - 이 지점은 등록이 아니라 **마지막 한 건을 삭제하거나 숨길 때** 온다. 후기가 쌓이는 동안에는 절대 드러나지 않아서, 검증에 "마지막 공개 후기를 지운다"를 따로 넣지 않으면 통과한다.
 - **리뷰에서 `UPDATE products ...`를 직접 날리지 않는다.** #33 완료 조건에 "review 도메인이 Product Mapper를 직접 사용하지 않는다"가 못 박혀 있다. 도메인 간 공개 Service 계약을 거친다.
 
-**#33에서 합의해야 하는 것**
+**호출 순서: 잠금 → `reviews` 쓰기 → 집계**
 
-- 집계 책임을 product와 review 중 어느 도메인이 갖는가
-- 실시간 집계 조회인가, `products` 컬럼 갱신인가
-- 컬럼 갱신이면 재계산인가 증분인가
+`ProductRatingService.lockForRating(productId)`을 **후기 INSERT보다 먼저** 부른다. 저장한 뒤에 잠그면 이미 늦다.
 
-**컬럼 갱신으로 정해질 경우 가져올 커뮤니티 선례**
+- **이유는 주문 흐름이 이미 같은 순서를 쓰기 때문이다.** `ProductStockService.decreaseStock`이 `findSalesInfoByIdForUpdate`로 `products` 행을 배타 잠금한 뒤 재고를 줄인다.
+- 리뷰가 `INSERT → 집계` 순서로 가면 `reviews` INSERT가 FK 확인으로 `products` 행에 **공유 잠금**을 먼저 걸고, 집계가 그것을 **배타 잠금으로 승격**하려 한다. 같은 상품에 후기 두 건이 동시에 들어오면 서로의 공유 잠금을 기다리며 교착이다.
+- **리뷰끼리만이 아니다.** 누가 그 케이크를 주문하는 동안 다른 사람이 후기를 쓰면 주문 흐름과도 교착한다.
+- 커뮤니티 좋아요와 같은 모양이고 해법도 같다 — 먼저 배타 잠금을 잡으면 승격이 없어 교착도 없다.
+- **동시 요청이 없으면 결과가 똑같아 단일 스레드 테스트로는 드러나지 않는다.** 동시 요청 테스트로 고정한다.
 
-- **재계산 방식.** 후기는 좋아요보다 훨씬 적게 쌓여 증분의 이점이 없고, 호출 지점이 5곳이나 되어 증분은 "여기서도 조정해야 하나"를 매번 판단해야 한다.
-- **`updated_at = updated_at` 보존.** 커뮤니티에서 같은 자리를 두 번 빠뜨려 화면에 `(수정됨)`이 붙는 버그가 실제로 났다.
-- **잠금 순서.** `reviews` INSERT가 FK로 `products` 행에 공유 잠금을 걸고 재계산이 배타 잠금을 요구한다. 커뮤니티 좋아요와 같은 모양이므로 `SELECT ... FOR UPDATE` 선행이 후보다.
+**재계산 방식으로 간다** (증분 아님)
+
+- 후기는 좋아요보다 훨씬 적게 쌓여 증분의 이점이 없고, 호출 지점이 5곳이나 되어 증분은 "여기서도 조정해야 하나"를 매번 판단해야 한다. 평균의 증분 갱신은 특히 어긋나기 쉽다.
+- **`updated_at = updated_at` 보존.** 넣지 않으면 집계가 바뀔 때마다 상품에 수정 흔적이 남는다. 커뮤니티에서 같은 자리를 두 번 빠뜨려 화면에 `(수정됨)`이 붙는 버그가 실제로 났다.
+
+**#33에서 확인받을 것**
+
+- 계약 시그니처(`ProductRatingService`의 메서드 이름과 인자)
+- 전용 매퍼(`ProductReviewMapper`)를 두는 것에 대한 상품 담당자 동의
+- 위 잠금 순서가 재고 경로와 어긋나지 않는지
 
 ### D2. 알림
 
@@ -552,7 +589,7 @@ C1의 요청 파라미터다. 목업의 검색 폼을 그대로 산다.
 
 | 항목 | 결정 시점 |
 |---|---|
-| D1 집계 책임 도메인·갱신 방식 | 조각 2 착수 전, 이슈 #33에서 합의 |
+| D1 계약 시그니처·전용 매퍼 동의 | 조각 2 착수 전, 이슈 #33에서 확인 (방식 자체는 2026-08-06 확정) |
 | D2 `event_key` 규격 | 조각 7, PR #107 머지 후 |
 | D2 `NEW_REVIEW` 수신 관리자 | 조각 7, 민정님과 합의 |
 | 관리자 숨김 사유·조치 이력 기록 여부 | 필요해지면 새 migration (C1) |
@@ -567,6 +604,14 @@ C1의 요청 파라미터다. 목업의 검색 폼을 그대로 산다.
 **2026-08-05 — 수정·삭제를 둘 다 열고 기간 제한을 두지 않는다.** 목업에 버튼이 둘 다 있다. 기간 제한은 기준 시각·시간대 판단과 화면의 잔여 기간 표시를 함께 데려오는데 얻는 것이 크지 않다. 대신 `uk_reviews_order_item` 때문에 **삭제하면 재작성이 막힌다**는 것을 확인했고, 삭제 확인창에 명시하기로 했다(`PLAN.md` R10).
 
 **2026-08-05 — 후기 목록을 비로그인에게 공개한다.** 상품 상세의 평균 평점·후기 수는 이미 공개다. 근거가 되는 후기만 가리면 숫자만 있고 이유는 없는 화면이 된다. 경로를 `/products/{id}/reviews`로 두면 `SecurityConfig`를 고칠 필요도 없다.
+
+**2026-08-06 — 집계는 컬럼 갱신·재계산이고 상품 도메인이 소유한다. 계약은 `ProductRatingService`, SQL은 신규 `ProductReviewMapper`.** #33이 남긴 세 미합의(책임 도메인·실시간이냐 컬럼 갱신이냐·재계산이냐 증분이냐)를 이렇게 닫았다. 실시간 집계로 가면 잠금 문제가 소멸하지만 `ProductMapper.xml`의 조회와 정렬(`review_count DESC, average_rating DESC`)을 전부 갈아야 해서 상품 쪽 변경이 훨씬 크다. 형판은 `ProductQueryService`가 아니라 **`ProductStockService`**다 — 15절의 QueryService는 읽기 전용이고 평점 집계는 `products`에 쓴다. 전용 매퍼를 두는 것은 저장소 첫 사례이므로(PR #119는 기존 매퍼에 문장을 더했다) PR에 이유를 남긴다.
+
+**2026-08-06 — 잠금 문장은 새 매퍼에 복제하지 않는다.** `ProductReviewMapper.xml`에 `FOR UPDATE`를 따로 선언하지 않고 기존 `ProductMapper.findSalesInfoByIdForUpdate`를 재사용한다. 복제해도 당장 동작은 같지만, 한쪽에 `JOIN product_options`가 붙는 날 두 경로의 잠금 순서가 갈리고 **두 파일을 함께 열어 본 사람이 없어 드러나지 않는다.** 커뮤니티가 `lockPost`를 관리자 매퍼에 복제하지 않은 것과 같은 이유다. 새 매퍼에는 집계 SELECT와 `UPDATE products` 둘만 남는다.
+
+**2026-08-06 — 후기 저장의 호출 순서를 잠금 → INSERT → 집계로 못 박았다(PR #121 재리뷰 P1).** A3가 "저장 후 D1을 호출한다"로만 적혀 있었는데, `reviews` INSERT가 FK 확인으로 `products` 행에 공유 잠금을 먼저 걸어 집계가 배타 잠금으로 **승격**하는 모양이었다. 같은 상품에 후기가 동시에 들어오면 교착이고, `ProductStockService.decreaseStock`이 이미 그 행을 먼저 잠그므로 **주문 흐름과도 교착**한다. 먼저 잠그면 승격이 없다.
+
+**2026-08-06 — 판매 중지 상품의 후기는 공개하지 않는다(PR #121 재리뷰 P2).** B1이 후기의 `status`만 봐서, 상품 상세는 `p.status = 'ACTIVE'`로 가려지는데 `/products/{id}/reviews`를 직접 부르면 후기가 그대로 나왔다. `ProductQueryService.getSalesInfo`가 이미 있어 계약을 새로 만들 필요가 없다. 화면 안에서는 상세가 먼저 404라 드러나지 않고 주소를 직접 넣는 경로에서만 보인다.
 
 **2026-08-06 — 관리자 목록에서 "조치 이력" 근거를 걷어냈다(PR #121 Codex P2).** C1이 "모든 상태를 보여 조치 이력을 확인한다"고 적혀 있었는데, `reviews`에는 `blocked_at`·`blocked_by`가 없어 **숨김을 해제하는 순간 그 사실이 사라진다.** 없는 것을 근거로 삼은 문장이었다. 메타데이터를 추가하는 길도 있었지만 1차 범위를 넓히지 않고 문구를 고치는 쪽을 택했다 — 모든 상태를 보여 주는 이유는 이력이 아니라 **숨긴 것을 해제하려면 목록에 있어야 하기 때문**이다. 이력 기록 여부는 9절 미정으로 남긴다.
 
