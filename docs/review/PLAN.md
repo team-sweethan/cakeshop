@@ -46,6 +46,7 @@
 - 새 migration: `reviews.status` 기본값을 `'VISIBLE'` → `'PUBLISHED'`로 바꾸고 `CHECK (status IN ('PUBLISHED','DELETED','BLOCKED'))` 추가
   - **`CHECK`를 걸기 전에 기존 `'VISIBLE'` 행을 `'PUBLISHED'`로 변환한다.** 남아 있으면 제약 추가가 배포 중 실패한다. 지금 `reviews`는 비어 있고 INSERT 경로도 없지만, 한 줄로 막을 수 있는 것을 환경 상태에 맡기지 않는다. 선례: `V20260730_123931__apply_product_preparation_policy.sql`(보정 UPDATE 후 CHECK)
 - 새 migration: 평점 4종에 `CHECK (rating BETWEEN 1 AND 5)`
+  - **`status`와 달리 사전 보정 UPDATE를 두지 않는다.** `status`는 `DEFAULT 'VISIBLE'`이라는 체계적 발생원이 있어 한 줄로 막은 것이고, 평점 컬럼에는 `DEFAULT`가 없어 범위 밖 값이 들어오려면 명시적 INSERT가 있어야 하는데 그 코드가 저장소에 없다. **6을 5로 깎는 "보정"은 고객 평가를 지어내는 것**이라 `CHECK`가 멈추는 것이 올바른 동작이다(`SPEC.md` 2.2)
 - migration 파일명은 직접 짓지 않고 `gradlew newMigration -Pdesc=<snake_case>`로 생성
 - **`docs/status-design.md`의 `reviews.status` 행을 확정으로 갱신한다.** 그 문서가 상태값 인벤토리의 정본이고 지금 `VISIBLE / HIDDEN ?` · `☐ 열림`으로 남아 있다. 154절이 "☐ 항목을 확정하면 인벤토리 행을 갱신하고 **enum + DDL을 함께 커밋한다**"고 못 박고 있다
 
@@ -91,11 +92,16 @@
 
 ### 조각 3 — 조회·노출 (#110)
 
+**선행 2건.** 시그니처가 정해지기 전에는 착수하지 않는다(`SPEC.md` 2.7·9절).
+
+- **수민님** — 작성자 표시명 계약(ID 묶음 조회). `members`를 JOIN하지 않는다
+- **시은님** — 상품 상세 화면에 후기를 붙이는 방식(모델 주입이냐 fragment/API냐). **`GET /products/{id}/reviews`만 만들면 고객이 가는 화면은 계속 `준비 중`이다**(`SPEC.md` B1)
+
 - 상품 상세에 후기 목록. `PageRequest`/`PageResult` 재사용
 - 내 후기 조회(마이페이지 또는 주문 상세)
 - 노출 판단은 `status = 'PUBLISHED'` 하나로 (`docs/community/DOMAIN.md` 4.1 선례)
 
-**검증**: `BLOCKED`·`DELETED` 후기가 목록에 안 나오는지, 페이징 경계, 탈퇴 회원 표시명.
+**검증**: `BLOCKED`·`DELETED` 후기가 목록에 안 나오는지, 페이징 경계, 탈퇴 회원 표시명, **상품 상세 화면 자체가 후기를 렌더링하는지**(`/products/{id}/reviews` 응답만 보면 구멍이 통과한다).
 
 ### 조각 4 — 수정·삭제 (#111)
 
@@ -105,6 +111,8 @@
 **검증**: 남의 후기 수정·삭제 거부, `BLOCKED` 후기 수정·삭제 거부, 삭제 후 집계 반영.
 
 ### 조각 5 — 관리자 숨김 (#112)
+
+**선행: 검색 계약(`writer`·`product`)을 수민·주환님과 합의한다.** `members`·`order_items`를 JOIN하지 않는다(`SPEC.md` 2.7·C2). 후기를 먼저 페이지한 뒤 이름으로 거르면 **화면의 건수와 실제 건수가 갈린다.**
 
 - 관리자 목록(`GET /admin/reviews`)과 검색·필터, 관리자 상세 화면(SPEC C3)
 - **숨김과 해제를 함께 만든다** — `POST .../block`(`PUBLISHED → BLOCKED`), `POST .../unblock`(`BLOCKED → PUBLISHED`). **집계 재호출도 양쪽 다.**
