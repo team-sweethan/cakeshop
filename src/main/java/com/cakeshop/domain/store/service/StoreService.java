@@ -22,8 +22,7 @@ import java.util.Map;
 import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
-import org.springframework.transaction.support.TransactionSynchronizationAdapter;
+
 import java.time.Clock;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -123,29 +122,18 @@ public class StoreService {
         boolean imageReplaced = image != null && !image.isEmpty();
         if (imageReplaced) {
             validateImage(image);
-            // 파일 저장을 트랜잭션 커밋 후에 수행하도록 연기
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter() {
-                @Override
-                public void afterCommit() {
-                    String newUrl = fileStorageClient.store(image, IMAGE_DIRECTORY);
-                    // 업데이트된 URL을 DB에 반영 (이미 DB 업데이트가 끝난 뒤이므로 별도 DB 호출은 필요 없음)
-                    store.setImageUrl(newUrl);
-                }
-            });
+            // 이미지 저장 및 URL 업데이트를 즉시 수행
+            String newUrl = fileStorageClient.store(image, IMAGE_DIRECTORY);
+            store.setImageUrl(newUrl);
         }
 
         if (storeMapper.updateStore(store) != 1) {
             throw new BusinessException(StoreErrorCode.UPDATE_FAILED);
         }
 
-        // 이전 이미지 삭제도 커밋 후에 수행
+        // 이전 이미지가 존재하면 즉시 삭제
         if (imageReplaced && previousImageUrl != null) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronizationAdapter() {
-                @Override
-                public void afterCommit() {
-                    fileStorageClient.delete(previousImageUrl);
-                }
-            });
+            fileStorageClient.delete(previousImageUrl);
         }
 
         for (DayOfWeek day : DayOfWeek.values()) {
