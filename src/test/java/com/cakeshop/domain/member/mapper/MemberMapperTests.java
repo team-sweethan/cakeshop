@@ -46,6 +46,20 @@ class MemberMapperTests {
         assertThat(member.getUpdatedAt()).isEqualTo(UPDATED_AT);
         assertThat(member.getWithdrawnAt()).isNull();
         assertThat(member.getBirthDate()).isNull();
+        assertThat(member.getPhone()).isEqualTo("010-0000-0000");
+    }
+
+    @Test
+    void existsActiveMember_returnsTrueOnlyForCurrentActiveMember() {
+        Long activeId = insertMember(uniqueEmail("active-check"), MemberStatus.ACTIVE);
+        Long withdrawnId = insertMember(
+                uniqueEmail("withdrawn-check"),
+                MemberStatus.WITHDRAWN
+        );
+
+        assertThat(memberMapper.existsActiveMember(activeId)).isTrue();
+        assertThat(memberMapper.existsActiveMember(withdrawnId)).isFalse();
+        assertThat(memberMapper.existsActiveMember(Long.MAX_VALUE)).isFalse();
     }
 
     @Test

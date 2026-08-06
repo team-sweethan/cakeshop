@@ -92,20 +92,20 @@ class ProductStockServiceTests {
     }
 
     @Test
-    void decreaseStock_customProduct_returnsFalse() {
+    void decreaseStock_currentProductChangedToCustomWithLimitedStock_returnsTrue() {
         when(productMapper.findSalesInfoByIdForUpdate(1L))
                 .thenReturn(product(
                         ProductType.CUSTOM,
                         ProductStatus.ACTIVE,
                         5
                 ));
+        when(productMapper.decreaseStockIfAvailable(1L, 3)).thenReturn(1);
 
         boolean stockDeducted =
                 productStockService.decreaseStock(1L, 3);
 
-        assertThat(stockDeducted).isFalse();
-        verify(productMapper, never())
-                .decreaseStockIfAvailable(1L, 3);
+        assertThat(stockDeducted).isTrue();
+        verify(productMapper).decreaseStockIfAvailable(1L, 3);
     }
 
     @Test

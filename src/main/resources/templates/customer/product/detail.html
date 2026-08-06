@@ -425,13 +425,14 @@
                 th:if="${product.available
                         and product.productType.name() == 'GENERAL'}"
         >
-          <!-- 픽업 일시 선택 화면 -->
+          <!-- 일반 상품은 픽업 선택을 포함한 통합 주문서로 바로 이동한다. -->
           <a
                   class="btn btn--primary"
-                  th:href="@{/orders/pickup(intent='order')}"
-                  data-prepare-product
+                  th:if="${product.productType.name() == 'GENERAL'}"
+                  th:href="@{/orders/checkout}"
+                  data-order-checkout
           >
-            픽업 일시 선택
+            주문서 작성하기
           </a>
 
           <form sec:authorize="isAuthenticated()"
