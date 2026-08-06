@@ -75,6 +75,7 @@ public class NotificationService {
             .isRead(false)
             .eventKey(eventKey)
             .createdAt(LocalDateTime.now())
+            .lastEventAt(LocalDateTime.now()) // 최초 알림 생성 시각 = 가장 최근 이벤트 시각
             .build();
 
         // 알림 DB 저장하기 (동시 요청으로 인한 중복 키 예외 멱등 처리)
