@@ -1,6 +1,7 @@
 package com.cakeshop.domain.notification.service;
 
 import java.util.List;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,6 +13,7 @@ import com.cakeshop.domain.notification.dto.view.NotificationResponse;
 import com.cakeshop.domain.notification.dto.form.NotificationRequest;
 import com.cakeshop.domain.notification.entity.DeliveryScope;
 import com.cakeshop.domain.notification.entity.Notification;
+import com.cakeshop.domain.notification.entity.NotificationType;
 
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -28,11 +30,6 @@ public class NotificationService {
     // 알림 생성
     @Transactional
     public void makeNotification(NotificationRequest request) {
-
-        // 중복 알림인지 체크하기
-        if (request.getEventKey() != null && notificationMapper.existsByReceiverIdAndEventKey(request.getReceiverId(), request.getEventKey())) {
-            return;
-        }
 
         // 알림 제목, 내용 만들기
         String title = request.getType().getDefaultTitle();
@@ -51,12 +48,40 @@ public class NotificationService {
                     : request.getPostId() != null ? request.getPostId()
                     : request.getReviewId() != null ? request.getReviewId()
                     : request.getUserCouponId() != null ? request.getUserCouponId()
-                    : request.getChatRoomId() != null ? "ROOM_" + request.getChatRoomId() + "_" + java.util.UUID.randomUUID().toString()
+                    : request.getChatRoomId() != null ? "ROOM_" + request.getChatRoomId()
                     : java.util.UUID.randomUUID().toString();
             eventKey = request.getType().name() + ":" + request.getReceiverId() + ":" + targetId;
         }
 
-        // 알림 만들기
+        // 방 단위 묶음 알림(ROOM_...) 여부 확인 (메시지 ID 단위 단건 알림 키는 멱등 처리)
+        boolean isBundleNotification = request.getChatRoomId() != null
+            || (eventKey != null && eventKey.contains("ROOM_"));
+
+        // 중복 eventKey가 존재하는 경우 처리
+        if (notificationMapper.existsByReceiverIdAndEventKey(request.getReceiverId(), eventKey)) {
+            if (isBundleNotification) {
+                // 비관적 잠금(FOR UPDATE) 획득 후 최신 시각(now) 측정하여 0.001초 동시성 덮어쓰기 방지
+                Notification existing = notificationMapper.findNotificationByReceiverAndEventKeyForUpdate(request.getReceiverId(), eventKey);
+                LocalDateTime now = LocalDateTime.now();
+                notificationMapper.updateLastEventAtAndUnread(request.getReceiverId(), eventKey, title, content, now);
+
+                // 30분 쿨타임 체크: 직전 메시지 시각(last_event_at) 대비 30분 이상 경과했으면 새 묶음으로 간주해 SMS 재발송
+                long minutesGap = (existing != null && existing.getLastEventAt() != null)
+                    ? Duration.between(existing.getLastEventAt(), now).toMinutes() : 999;
+
+                if (minutesGap >= 30 && scope == DeliveryScope.WEB_AND_SMS && request.getReceiverId() != null) {
+                    Long existingId = existing != null ? existing.getId() : notificationMapper.findIdByReceiverIdAndEventKey(request.getReceiverId(), eventKey);
+                    String receiverPhone = notificationMapper.findReceiverPhone(request.getReceiverId(), request.getOrderId());
+                    registerSmsSending(existingId, receiverPhone, title, content);
+                }
+            }
+            // 일반 알림(주문, 쿠폰 등) 중복 시에는 읽은 상태 유지를 위해 멱등하게 종료
+            return;
+        }
+
+        LocalDateTime createNow = LocalDateTime.now();
+
+        // 신규 알림 생성
         Notification notification = Notification.builder()
             .receiverId(request.getReceiverId())
             .actorId(request.getActorId())
@@ -74,31 +99,49 @@ public class NotificationService {
             .deliveryScope(scope)
             .isRead(false)
             .eventKey(eventKey)
-            .createdAt(LocalDateTime.now())
+            .createdAt(createNow)
+            .lastEventAt(createNow)
             .build();
 
         // 알림 DB 저장하기 (동시 요청으로 인한 중복 키 예외 멱등 처리)
         try {
             notificationMapper.save(notification);
         } catch (DuplicateKeyException e) {
-            // 동일 eventKey 중복 요청은 메인 트랜잭션이 멱등하게 처리하므로 조기 종료
+            if (isBundleNotification) {
+                Notification existing = notificationMapper.findNotificationByReceiverAndEventKeyForUpdate(request.getReceiverId(), eventKey);
+                LocalDateTime updateNow = LocalDateTime.now();
+                notificationMapper.updateLastEventAtAndUnread(request.getReceiverId(), eventKey, title, content, updateNow);
+
+                long minutesGap = (existing != null && existing.getLastEventAt() != null)
+                    ? Duration.between(existing.getLastEventAt(), updateNow).toMinutes() : 999;
+
+                if (minutesGap >= 30 && scope == DeliveryScope.WEB_AND_SMS && request.getReceiverId() != null) {
+                    Long existingId = existing != null ? existing.getId() : notificationMapper.findIdByReceiverIdAndEventKey(request.getReceiverId(), eventKey);
+                    String receiverPhone = notificationMapper.findReceiverPhone(request.getReceiverId(), request.getOrderId());
+                    registerSmsSending(existingId, receiverPhone, title, content);
+                }
+            }
             return;
         }
 
         // 알림톡 / SMS 외부 발송 연동 (DB 트랜잭션 커밋 완료 후 안전하게 발송)
         if (scope == DeliveryScope.WEB_AND_SMS && request.getReceiverId() != null) {
             String receiverPhone = notificationMapper.findReceiverPhone(request.getReceiverId(), request.getOrderId());
-            Long notificationId = notification.getId();
-            if (TransactionSynchronizationManager.isActualTransactionActive()) {
-                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                    @Override
-                    public void afterCommit() {
-                        executeSmsSending(notificationId, receiverPhone, title, content);
-                    }
-                });
-            } else {
-                executeSmsSending(notificationId, receiverPhone, title, content);
-            }
+            registerSmsSending(notification.getId(), receiverPhone, title, content);
+        }
+    }
+
+    private void registerSmsSending(Long notificationId, String receiverPhone, String title, String content) {
+        if (notificationId == null) return;
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    executeSmsSending(notificationId, receiverPhone, title, content);
+                }
+            });
+        } else {
+            executeSmsSending(notificationId, receiverPhone, title, content);
         }
     }
 

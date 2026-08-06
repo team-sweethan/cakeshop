@@ -34,4 +34,5 @@ public class Notification {
     private LocalDateTime readAt; // 웹 알림을 읽은 시간 (필요 없으면 없앨 예정)
     private String eventKey; // 동일 이벤트의 중복 알림 방지 키
     private LocalDateTime createdAt; // 알림 생성 시간
+    private LocalDateTime lastEventAt; // 최근 이벤트 시각
 }

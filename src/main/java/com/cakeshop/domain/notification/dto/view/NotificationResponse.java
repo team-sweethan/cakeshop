@@ -30,6 +30,7 @@ public class NotificationResponse {
     private Long reviewId;
     private Long userCouponId;
     private String targetUrl;
+    private LocalDateTime lastEventAt;
 
     public String getTargetUrl() {
         if (targetUrl != null) return targetUrl;
