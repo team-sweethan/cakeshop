@@ -1,5 +1,6 @@
 package com.cakeshop.domain.coupon.service;
 
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -47,6 +48,20 @@ class CouponIssueServiceTests {
 
         verify(couponMapper).insertMemberCouponIfAbsent(1L, 2L, true);
         verify(couponMapper).increaseIssuedQuantityIfAvailable(1L);
+    }
+
+    @Test
+    void issueOnCouponCreated_firstOrderRechecksOrderHistoryBeforeIssuance() {
+        Coupon coupon = coupon(CouponTargetType.FIRST_ORDER, LocalDateTime.now().plusDays(1));
+        when(memberCouponQueryService.getActiveMemberIds()).thenReturn(List.of(2L));
+        when(orderCouponQueryService.getMemberIdsWithOrderHistory(List.of(2L))).thenReturn(List.of());
+        when(couponMapper.findCouponByIdForUpdate(1L)).thenReturn(Optional.of(coupon));
+        when(orderCouponQueryService.hasOrderHistory(2L)).thenReturn(true);
+
+        couponIssueService.issueOnCouponCreated(coupon);
+
+        verify(orderCouponQueryService).hasOrderHistory(2L);
+        verify(couponMapper, never()).insertMemberCouponIfAbsent(1L, 2L, true);
     }
 
     private Coupon coupon(CouponTargetType targetType, LocalDateTime startsAt) {

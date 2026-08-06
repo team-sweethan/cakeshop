@@ -43,7 +43,7 @@ public class CouponIssueService {
     @Transactional
     public void issueOnCouponCreated(Coupon coupon) {
         if (coupon.getTargetType() == CouponTargetType.ALL_MEMBERS) {
-            issueMembers(coupon.getId(), memberCouponQueryService.getActiveMemberIds(), true);
+            issueMembers(coupon.getId(), memberCouponQueryService.getActiveMemberIds(), true, false);
         }
         if (coupon.getTargetType() == CouponTargetType.FIRST_ORDER) {
             List<Long> activeMemberIds = memberCouponQueryService.getActiveMemberIds();
@@ -52,7 +52,7 @@ public class CouponIssueService {
             );
             issueMembers(coupon.getId(), activeMemberIds.stream()
                     .filter(memberId -> !orderedMemberIds.contains(memberId))
-                    .toList(), true);
+                    .toList(), true, true);
         }
     }
 
@@ -60,7 +60,7 @@ public class CouponIssueService {
     @Transactional
     public void issueNewMemberCoupons(Long memberId) {
         for (Coupon coupon : couponMapper.findCouponsByTargetType(CouponTargetType.NEW_MEMBERS)) {
-            issueMembers(coupon.getId(), List.of(memberId), false);
+            issueMembers(coupon.getId(), List.of(memberId), false, false);
         }
     }
 
@@ -71,7 +71,7 @@ public class CouponIssueService {
         int month = LocalDateTime.now(KOREA_ZONE_ID).getMonthValue();
         List<Long> birthdayMemberIds = memberCouponQueryService.getBirthdayMemberIds(month);
         for (Coupon coupon : couponMapper.findCouponsByTargetType(CouponTargetType.BIRTHDAY)) {
-            issueMembers(coupon.getId(), birthdayMemberIds, false);
+            issueMembers(coupon.getId(), birthdayMemberIds, false, false);
         }
     }
 
@@ -79,7 +79,10 @@ public class CouponIssueService {
      * 회원 쿠폰을 발급하고 발급 수량을 증가시킨다.
      * 등록 직후 일괄 발급만 시작 전 발급 이력 생성을 허용하며, 실제 사용 가능 시각은 쿠폰 기간이 판단한다.
      */
-    private void issueMembers(Long couponId, List<Long> memberIds, boolean allowBeforeStart) {
+    private void issueMembers(Long couponId,
+                              List<Long> memberIds,
+                              boolean allowBeforeStart,
+                              boolean firstOrderOnly) {
         Coupon coupon = couponMapper.findCouponByIdForUpdate(couponId)
                 .orElseThrow(() -> new BusinessException(CouponErrorCode.NOT_FOUND));
         if (coupon.getStatus() != CouponStatus.ACTIVE || !coupon.getExpiresAt().isAfter(LocalDateTime.now())) {
@@ -92,6 +95,10 @@ public class CouponIssueService {
         for (Long memberId : memberIds) {
             if (remaining <= 0) {
                 return;
+            }
+            // 후보 조회 뒤 주문이 생성될 수 있으므로 INSERT 직전에 최신 주문 이력을 다시 확인한다.
+            if (firstOrderOnly && orderCouponQueryService.hasOrderHistory(memberId)) {
+                continue;
             }
             if (couponMapper.insertMemberCouponIfAbsent(couponId, memberId, allowBeforeStart) == 1) {
                 if (couponMapper.increaseIssuedQuantityIfAvailable(couponId) != 1) {

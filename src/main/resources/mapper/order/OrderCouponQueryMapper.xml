@@ -7,4 +7,12 @@
             #{memberId}
         </foreach>
     </select>
+
+    <select id="existsOrderHistory" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM orders
+            WHERE member_id = #{memberId}
+        )
+    </select>
 </mapper>

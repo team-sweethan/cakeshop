@@ -14,4 +14,6 @@ import org.apache.ibatis.annotations.Param;
 public interface OrderCouponQueryMapper {
 
     List<Long> findMemberIdsWithOrderHistory(@Param("memberIds") List<Long> memberIds);
+
+    boolean existsOrderHistory(@Param("memberId") Long memberId);
 }

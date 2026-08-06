@@ -29,4 +29,10 @@ public class OrderCouponQueryService {
         }
         return orderCouponQueryMapper.findMemberIdsWithOrderHistory(memberIds);
     }
+
+    /** 첫 주문 쿠폰을 실제 발급하기 직전 회원의 주문 이력을 다시 확인한다. */
+    @Transactional(readOnly = true)
+    public boolean hasOrderHistory(Long memberId) {
+        return orderCouponQueryMapper.existsOrderHistory(memberId);
+    }
 }
