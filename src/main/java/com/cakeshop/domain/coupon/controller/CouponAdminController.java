@@ -4,6 +4,8 @@ import com.cakeshop.domain.coupon.dto.form.CouponCreateForm;
 import com.cakeshop.domain.coupon.dto.form.CouponSearchCondition;
 import com.cakeshop.domain.coupon.dto.form.CouponUpdateForm;
 import com.cakeshop.domain.coupon.dto.view.CouponView;
+import com.cakeshop.domain.coupon.dto.view.CouponDetailView;
+import com.cakeshop.domain.coupon.dto.view.CouponIssueCandidateView;
 import com.cakeshop.domain.coupon.error.CouponErrorCode;
 import com.cakeshop.domain.coupon.service.CouponAdminService;
 import com.cakeshop.global.common.paging.PageNavigation;
@@ -13,6 +15,7 @@ import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.security.MemberDetails;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import java.util.Map;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -84,6 +87,14 @@ public class CouponAdminController {
         model.addAttribute("formMode", "create");
 
         return "admin/coupon/form";
+    }
+
+    @GetMapping("{couponId}/target-members")
+    @ResponseBody
+    public PageResult<CouponIssueCandidateView> targetMembers(@PathVariable Long couponId,
+                                                              @RequestParam(required = false) String keyword,
+                                                              @RequestParam(required = false) Integer page) {
+        return couponAdminService.searchTargetMembers(couponId, keyword, page);
     }
 
     /**
@@ -190,7 +201,7 @@ public class CouponAdminController {
 
                 // 비활성화할 필드를 결정할 수 있도록 현재 수정 범위를 다시 조회한다.
                 CouponUpdateForm originalForm =
-                        couponAdminService.getDetailCoupon(couponId);
+                        couponAdminService.getUpdateCoupon(couponId);
 
                 form.setFullEdit(originalForm.isFullEdit());
                 model.addAttribute("couponId", couponId);
@@ -271,8 +282,8 @@ public class CouponAdminController {
             @RequestParam(required = false) Integer page,
             Model model) {
         model.addAttribute(
-                "couponForm",
-                couponAdminService.getDetailCoupon(couponId)
+                "couponDetail",
+                couponAdminService.getCouponDetail(couponId)
         );
         model.addAttribute("couponId", couponId);
         // 상세 화면의 목록 버튼이 사용자가 보던 검색 결과와 페이지로 돌아가도록 보존한다.
@@ -280,6 +291,43 @@ public class CouponAdminController {
         model.addAttribute("page", page);
 
         return "admin/coupon/detail";
+    }
+
+    @GetMapping("{couponId}/issued-members")
+    @ResponseBody
+    public PageResult<com.cakeshop.domain.coupon.dto.view.CouponIssuedMemberView> issuedMembers(
+            @PathVariable Long couponId,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Integer page) {
+        return couponAdminService.getIssuedMembers(couponId, keyword, page);
+    }
+
+    @PostMapping("{couponId}/members/{memberId}/issue")
+    public String issueSpecificMember(@PathVariable Long couponId, @PathVariable Long memberId,
+                                      @ModelAttribute CouponSearchCondition condition,
+                                      @RequestParam(required = false) Integer page,
+                                      RedirectAttributes redirectAttributes) {
+        try {
+            couponAdminService.issueSpecificMember(couponId, memberId);
+            redirectAttributes.addFlashAttribute("successMessage", "쿠폰을 발급했습니다.");
+        } catch (BusinessException e) {
+            redirectAttributes.addFlashAttribute("errorMessage", e.getErrorCode().message());
+        }
+        return redirectAfterUpdate(couponId, condition, page, DETAIL_ORIGIN, redirectAttributes);
+    }
+
+    @PostMapping("{couponId}/members/{memberId}/cancel")
+    public String cancelSpecificMemberCoupon(@PathVariable Long couponId, @PathVariable Long memberId,
+                                              @ModelAttribute CouponSearchCondition condition,
+                                              @RequestParam(required = false) Integer page,
+                                              RedirectAttributes redirectAttributes) {
+        try {
+            couponAdminService.cancelSpecificMemberCoupon(couponId, memberId);
+            redirectAttributes.addFlashAttribute("successMessage", "발급을 취소했습니다.");
+        } catch (BusinessException e) {
+            redirectAttributes.addFlashAttribute("errorMessage", e.getErrorCode().message());
+        }
+        return redirectAfterUpdate(couponId, condition, page, DETAIL_ORIGIN, redirectAttributes);
     }
 
     /** 수정 화면의 취소·완료 뒤 이동 경로를 제한된 진입 출처에 따라 결정한다. */

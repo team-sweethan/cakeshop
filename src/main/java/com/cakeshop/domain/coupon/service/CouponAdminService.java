@@ -11,7 +11,11 @@ import com.cakeshop.domain.coupon.dto.form.CouponCreateForm;
 import com.cakeshop.domain.coupon.dto.form.CouponSearchCondition;
 import com.cakeshop.domain.coupon.dto.form.CouponUpdateForm;
 import com.cakeshop.domain.coupon.dto.view.CouponView;
+import com.cakeshop.domain.coupon.dto.view.CouponDetailView;
+import com.cakeshop.domain.coupon.dto.view.CouponIssuedMemberView;
+import com.cakeshop.domain.coupon.dto.view.CouponIssueCandidateView;
 import com.cakeshop.domain.coupon.entity.Coupon;
+import com.cakeshop.domain.coupon.entity.CouponTargetType;
 import com.cakeshop.domain.coupon.entity.CouponDisplayStatus;
 import com.cakeshop.domain.coupon.entity.CouponStatus;
 import com.cakeshop.domain.coupon.error.CouponErrorCode;
@@ -19,15 +23,23 @@ import com.cakeshop.domain.coupon.mapper.CouponMapper;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
+import com.cakeshop.domain.member.dto.view.MemberCouponView;
+import com.cakeshop.domain.member.service.MemberCouponQueryService;
+import java.util.Set;
 
 /** 관리자 쿠폰의 등록·조회·수정 및 발급 상태 전환을 담당한다. */
 @Service
 public class CouponAdminService {
 
     private final CouponMapper couponMapper;
+    private final CouponIssueService couponIssueService;
+    private final MemberCouponQueryService memberCouponQueryService;
 
-    public CouponAdminService(CouponMapper couponMapper) {
+    public CouponAdminService(CouponMapper couponMapper, CouponIssueService couponIssueService,
+                              MemberCouponQueryService memberCouponQueryService) {
         this.couponMapper = couponMapper;
+        this.couponIssueService = couponIssueService;
+        this.memberCouponQueryService = memberCouponQueryService;
     }
 
     /**
@@ -47,7 +59,66 @@ public class CouponAdminService {
                     CouponErrorCode.CREATE_FAILED
             );
         }
+        couponIssueService.issueOnCouponCreated(coupon);
 
+    }
+
+    @Transactional(readOnly = true)
+    public PageResult<CouponIssueCandidateView> searchTargetMembers(Long couponId, String keyword, Integer page) {
+        PageRequest request = new PageRequest(page, 5);
+        PageResult<MemberCouponView> memberPage = memberCouponQueryService.searchActiveMembers(keyword, request);
+        List<Long> memberIds = memberPage.getContent().stream().map(MemberCouponView::memberId).toList();
+        Set<Long> issuedMemberIds = memberIds.isEmpty()
+                ? Set.of()
+                : Set.copyOf(couponMapper.findIssuedMemberIds(couponId, memberIds));
+        return new PageResult<>(
+                memberPage.getContent().stream()
+                        .map(member -> new CouponIssueCandidateView(member.memberId(), member.name(), member.email(),
+                                member.phone(), member.birthDate(), issuedMemberIds.contains(member.memberId())))
+                        .toList(),
+                request,
+                memberPage.getTotalElements()
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public PageResult<CouponIssuedMemberView> getIssuedMembers(Long couponId, String keyword, Integer page) {
+        String normalizedKeyword = keyword == null ? "" : keyword.trim();
+        PageRequest request = new PageRequest(page, 5);
+        return new PageResult<>(
+                couponMapper.findIssuedMembers(couponId, normalizedKeyword, request.getSize(), request.getOffset()),
+                request,
+                couponMapper.countIssuedMembers(couponId, normalizedKeyword)
+        );
+    }
+
+    @Transactional
+    public void issueSpecificMember(Long couponId, Long memberId) {
+        Coupon coupon = findCouponForUpdate(couponId);
+        if (coupon.getTargetType() != CouponTargetType.SPECIFIC_MEMBERS
+                || coupon.getStatus() != CouponStatus.ACTIVE
+                || !coupon.getExpiresAt().isAfter(LocalDateTime.now())) {
+            throw new BusinessException(CouponErrorCode.UPDATE_FAILED);
+        }
+        if (coupon.getTotalQuantity() == null || coupon.getIssuedQuantity() >= coupon.getTotalQuantity()) {
+            throw new BusinessException(CouponErrorCode.ISSUED_QUANTITY_EXCEEDED);
+        }
+        if (couponMapper.insertMemberCouponIfAbsent(couponId, memberId) == 1
+                && couponMapper.increaseIssuedQuantityIfAvailable(couponId) != 1) {
+            throw new BusinessException(CouponErrorCode.UPDATE_FAILED);
+        }
+    }
+
+    @Transactional
+    public void cancelSpecificMemberCoupon(Long couponId, Long memberId) {
+        Coupon coupon = findCoupon(couponId);
+        if (coupon.getTargetType() != CouponTargetType.SPECIFIC_MEMBERS) {
+            throw new BusinessException(CouponErrorCode.UPDATE_FAILED);
+        }
+        if (couponMapper.deleteAvailableMemberCoupon(couponId, memberId) == 1
+                && couponMapper.decreaseIssuedQuantity(couponId) != 1) {
+            throw new BusinessException(CouponErrorCode.UPDATE_FAILED);
+        }
     }
 
     /** 검색 조건을 정규화한 뒤 COUNT와 목록 쿼리에 동일하게 적용한다. */
@@ -114,6 +185,8 @@ public class CouponAdminService {
         boolean isFullEdit = validateUpdate(coupon, form);
 
         applyForm(coupon, form);
+        // 발급 대상 정책은 등록 시에만 결정한다. 수정 요청의 조작값은 기존 정책으로 되돌린다.
+        coupon.setTargetType(findCoupon(couponId).getTargetType());
 
         int updated = isFullEdit
                 ? couponMapper.updateCouponBeforeStart(coupon)
@@ -190,7 +263,8 @@ public class CouponAdminService {
             throw new BusinessException(CouponErrorCode.CANNOT_EDIT_ENDED_COUPON);
         }
 
-        if (form.getTotalQuantity() < coupon.getIssuedQuantity()) {
+        if (coupon.getTargetType() == CouponTargetType.SPECIFIC_MEMBERS
+                && (form.getTotalQuantity() == null || form.getTotalQuantity() < coupon.getIssuedQuantity())) {
             throw new BusinessException(CouponErrorCode.QUANTITY_BELOW_ISSUED);
         }
 
@@ -241,27 +315,41 @@ public class CouponAdminService {
                 form.getMaximumDiscountAmount()
         );
 
-        coupon.setTotalQuantity(
-                Math.toIntExact(form.getTotalQuantity())
-        );
+        coupon.setTotalQuantity(form.getTargetType() == CouponTargetType.SPECIFIC_MEMBERS
+                ? Math.toIntExact(form.getTotalQuantity())
+                : null);
 
         // 화면 정책이 분 단위이므로 저장값도 분 단위로 통일한다.
         coupon.setStartsAt(form.getStartsAt().truncatedTo(ChronoUnit.MINUTES));
         coupon.setExpiresAt(form.getExpiresAt().truncatedTo(ChronoUnit.MINUTES));
+        coupon.setTargetType(form.getTargetType());
     }
+
+    private Coupon findCouponForUpdate(Long couponId) {
+        return couponMapper.findCouponByIdForUpdate(couponId)
+                .orElseThrow(() -> new BusinessException(CouponErrorCode.NOT_FOUND));
+    }
+
 
     /**
      * 종료 쿠폰도 포함해 상세 화면에 필요한 Form을 반환한다.
      * 수정 화면 조회와 달리 ENDED 상태를 예외로 처리하지 않는다.
      */
     @Transactional(readOnly = true)
-    public CouponUpdateForm getDetailCoupon(Long couponId) {
+    public CouponUpdateForm getUpdateCoupon(Long couponId) {
         Coupon coupon = findCoupon(couponId);
         CouponUpdateForm form = CouponUpdateForm.from(coupon);
         boolean isFullEdit = coupon.getStartsAt().isAfter(LocalDateTime.now());
         form.setFullEdit(isFullEdit);
         form.setDisplayStatus(displayStatusOf(coupon));
         return form;
+    }
+
+    /** 종료 여부와 관계없이 관리자 상세 화면에 표시할 읽기 전용 데이터를 반환한다. */
+    @Transactional(readOnly = true)
+    public CouponDetailView getCouponDetail(Long couponId) {
+        Coupon coupon = findCoupon(couponId);
+        return CouponDetailView.from(coupon, displayStatusOf(coupon));
     }
 
     /** DB 상태와 시간·발급 수량을 조합한 읽기 전용 화면 상태를 계산한다. */

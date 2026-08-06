@@ -15,9 +15,11 @@ import com.cakeshop.domain.coupon.dto.view.CouponView;
 import com.cakeshop.domain.coupon.entity.Coupon;
 import com.cakeshop.domain.coupon.entity.CouponDisplayStatus;
 import com.cakeshop.domain.coupon.entity.CouponStatus;
+import com.cakeshop.domain.coupon.entity.CouponTargetType;
 import com.cakeshop.domain.coupon.entity.DiscountType;
 import com.cakeshop.domain.coupon.error.CouponErrorCode;
 import com.cakeshop.domain.coupon.mapper.CouponMapper;
+import com.cakeshop.domain.member.service.MemberCouponQueryService;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
@@ -37,6 +39,12 @@ class CouponAdminServiceTests {
 
     @Mock
     private CouponMapper couponMapper;
+
+    @Mock
+    private CouponIssueService couponIssueService;
+
+    @Mock
+    private MemberCouponQueryService memberCouponQueryService;
 
     @InjectMocks
     private CouponAdminService couponAdminService;
@@ -59,6 +67,20 @@ class CouponAdminServiceTests {
         assertThat(saved.getMinimumOrderAmount()).isEqualByComparingTo("10000");
         assertThat(saved.getTotalQuantity()).isEqualTo(100);
         assertThat(saved.getCreatedBy()).isEqualTo(7L);
+    }
+
+    @Test
+    void insertAutomaticTargetStoresNullTotalQuantity() {
+        CouponCreateForm form = createForm();
+        form.setTargetType(CouponTargetType.ALL_MEMBERS);
+        form.setTotalQuantity(null);
+        when(couponMapper.insertCoupon(any())).thenReturn(1);
+
+        couponAdminService.insertCoupon(form, 7L);
+
+        ArgumentCaptor<Coupon> couponCaptor = ArgumentCaptor.forClass(Coupon.class);
+        verify(couponMapper).insertCoupon(couponCaptor.capture());
+        assertThat(couponCaptor.getValue().getTotalQuantity()).isNull();
     }
 
     @Test
@@ -391,6 +413,7 @@ class CouponAdminServiceTests {
         form.setDiscountValue(BigDecimal.valueOf(3000));
         form.setMinimumOrderAmount(BigDecimal.valueOf(10000));
         form.setTotalQuantity(100L);
+        form.setTargetType(CouponTargetType.SPECIFIC_MEMBERS);
         form.setStartsAt(LocalDateTime.of(2026, 8, 1, 9, 0));
         form.setExpiresAt(LocalDateTime.of(2026, 8, 31, 23, 59));
         return form;
@@ -403,6 +426,7 @@ class CouponAdminServiceTests {
         form.setDiscountValue(BigDecimal.valueOf(3000));
         form.setMinimumOrderAmount(BigDecimal.valueOf(10000));
         form.setTotalQuantity(10L);
+        form.setTargetType(CouponTargetType.SPECIFIC_MEMBERS);
         form.setStartsAt(LocalDateTime.of(2026, 8, 1, 9, 0));
         form.setExpiresAt(LocalDateTime.of(2026, 8, 31, 23, 59));
         return form;
@@ -417,6 +441,7 @@ class CouponAdminServiceTests {
         coupon.setId(1L);
         coupon.setName("여름 할인");
         coupon.setStatus(status);
+        coupon.setTargetType(CouponTargetType.SPECIFIC_MEMBERS);
         coupon.setTotalQuantity(totalQuantity);
         coupon.setIssuedQuantity(issuedQuantity);
         coupon.setStartsAt(LocalDateTime.now().minusDays(1));

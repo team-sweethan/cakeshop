@@ -15,6 +15,7 @@
         starts_at AS startsAt,
         expires_at AS expiresAt,
         status AS status,
+        target_type AS targetType,
         created_by AS createdBy,
         created_at AS createdAt,
         updated_at AS updatedAt
@@ -84,6 +85,7 @@
             total_quantity,
             starts_at,
             expires_at,
+            target_type,
             created_by
         )
         VALUES (
@@ -95,6 +97,7 @@
                    #{totalQuantity},
                    #{startsAt},
                    #{expiresAt},
+                   #{targetType},
                    #{createdBy}
                )
     </insert>
@@ -192,6 +195,7 @@
             total_quantity = #{totalQuantity},
             starts_at = #{startsAt},
             expires_at = #{expiresAt}
+            , target_type = #{targetType}
         WHERE id = #{id}
           AND status IN ('ACTIVE', 'INACTIVE')
           AND starts_at &gt; NOW(6)
@@ -212,7 +216,7 @@
           AND status IN ('ACTIVE', 'INACTIVE')
           AND starts_at &lt;= NOW(6)
           AND expires_at &gt; NOW(6)
-          AND issued_quantity &lt;= #{totalQuantity}
+          AND (total_quantity IS NULL OR issued_quantity &lt;= total_quantity)
           <!-- 기존 DATETIME(6)의 초·밀리초 차이는 화면에서 표현하지 않으므로 같은 분까지 허용한다. -->
           AND expires_at &lt; DATE_ADD(#{expiresAt}, INTERVAL 1 MINUTE)
     </update>
@@ -223,5 +227,72 @@
         SET status = #{status}
         WHERE id = #{couponId}
     </update>
+
+    <insert id="insertMemberCouponIfAbsent">
+        INSERT INTO member_coupons (coupon_id, member_id)
+        SELECT #{couponId}, m.id
+        FROM members m
+        WHERE m.id = #{memberId}
+          AND m.status = 'ACTIVE'
+          AND NOT EXISTS (
+              SELECT 1
+              FROM member_coupons mc
+              WHERE mc.coupon_id = #{couponId}
+                AND mc.member_id = #{memberId}
+          )
+    </insert>
+
+    <update id="increaseIssuedQuantityIfAvailable">
+        UPDATE coupons SET issued_quantity = issued_quantity + 1
+        WHERE id = #{couponId} AND status = 'ACTIVE'
+          AND expires_at &gt; NOW(6)
+          AND (total_quantity IS NULL OR issued_quantity &lt; total_quantity)
+    </update>
+
+    <delete id="deleteAvailableMemberCoupon">
+        DELETE FROM member_coupons
+        WHERE coupon_id = #{couponId} AND member_id = #{memberId} AND status = 'AVAILABLE'
+    </delete>
+
+    <update id="decreaseIssuedQuantity">
+        UPDATE coupons SET issued_quantity = issued_quantity - 1
+        WHERE id = #{couponId} AND issued_quantity &gt; 0
+    </update>
+
+    <select id="findCouponByIdForUpdate" resultType="com.cakeshop.domain.coupon.entity.Coupon">
+        SELECT <include refid="couponColumns"/> FROM coupons WHERE id = #{couponId} FOR UPDATE
+    </select>
+
+    <select id="findIssuedMemberIds" resultType="long">
+        SELECT member_id
+        FROM member_coupons
+        WHERE coupon_id = #{couponId}
+          AND member_id IN
+        <foreach collection="memberIds" item="memberId" open="(" separator="," close=")">
+            #{memberId}
+        </foreach>
+    </select>
+
+    <select id="findIssuedMembers" resultType="com.cakeshop.domain.coupon.dto.view.CouponIssuedMemberView">
+        SELECT mc.member_id AS memberId, m.name, m.email, m.phone, m.birth_date AS birthDate,
+               mc.status, mc.used_at AS usedAt
+        FROM member_coupons mc JOIN members m ON m.id = mc.member_id
+        WHERE mc.coupon_id = #{couponId}
+          AND (m.name LIKE CONCAT('%', #{keyword}, '%') OR m.email LIKE CONCAT('%', #{keyword}, '%'))
+        ORDER BY mc.issued_at DESC, mc.id DESC LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="countIssuedMembers" resultType="long">
+        SELECT COUNT(*) FROM member_coupons mc JOIN members m ON m.id = mc.member_id
+        WHERE mc.coupon_id = #{couponId}
+          AND (m.name LIKE CONCAT('%', #{keyword}, '%') OR m.email LIKE CONCAT('%', #{keyword}, '%'))
+    </select>
+
+    <select id="findCouponsByTargetType" resultType="com.cakeshop.domain.coupon.entity.Coupon">
+        SELECT <include refid="couponColumns"/> FROM coupons
+        WHERE target_type = #{targetType} AND status = 'ACTIVE'
+          AND starts_at &lt;= NOW(6) AND expires_at &gt; NOW(6)
+          AND (total_quantity IS NULL OR issued_quantity &lt; total_quantity)
+    </select>
 
 </mapper>

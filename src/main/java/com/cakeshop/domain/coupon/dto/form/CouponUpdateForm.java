@@ -27,9 +27,10 @@ public class CouponUpdateForm extends CouponCreateForm {
         form.setDiscountValue(coupon.getDiscountValue());
         form.setMinimumOrderAmount(coupon.getMinimumOrderAmount());
         form.setMaximumDiscountAmount(coupon.getMaximumDiscountAmount());
-        form.setTotalQuantity(coupon.getTotalQuantity().longValue());
+        form.setTotalQuantity(coupon.getTotalQuantity() == null ? null : coupon.getTotalQuantity().longValue());
         form.setStartsAt(coupon.getStartsAt());
         form.setExpiresAt(coupon.getExpiresAt());
+        form.setTargetType(coupon.getTargetType());
         return form;
     }
 }

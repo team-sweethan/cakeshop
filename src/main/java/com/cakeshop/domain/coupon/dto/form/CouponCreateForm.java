@@ -1,18 +1,21 @@
 package com.cakeshop.domain.coupon.dto.form;
 
+import com.cakeshop.domain.coupon.entity.CouponTargetType;
+import com.cakeshop.domain.coupon.entity.DiscountType;
+import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-
-import com.cakeshop.domain.coupon.entity.DiscountType;
-import jakarta.validation.constraints.*;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.format.annotation.DateTimeFormat;
 
-/**
- * 관리자 쿠폰 등록 화면의 입력값과 Bean Validation 규칙을 담는다.
- * 상태·발급 수량·생성자처럼 서버가 결정하는 값은 포함하지 않는다.
- */
+/** 관리자 쿠폰 등록 화면의 입력값과 형식 검증 규칙이다. */
 @Getter
 @Setter
 public class CouponCreateForm {
@@ -26,31 +29,18 @@ public class CouponCreateForm {
 
     @NotNull(message = "할인값을 입력해 주세요.")
     @DecimalMin(value = "0.01", message = "할인값은 0보다 커야 합니다.")
-    @Digits(
-            integer = 10,
-            fraction = 2,
-            message = "할인값은 정수 10자리, 소수점 2자리 이하여야 합니다."
-    )
+    @Digits(integer = 10, fraction = 2, message = "할인값 형식이 올바르지 않습니다.")
     private BigDecimal discountValue;
 
     @NotNull(message = "최소 주문 금액을 입력해 주세요.")
     @DecimalMin(value = "0", message = "최소 주문 금액은 0 이상이어야 합니다.")
-    @Digits(
-            integer = 12,
-            fraction = 0,
-            message = "최소 주문 금액은 12자리 이하의 정수여야 합니다."
-    )
+    @Digits(integer = 12, fraction = 0, message = "최소 주문 금액 형식이 올바르지 않습니다.")
     private BigDecimal minimumOrderAmount = BigDecimal.ZERO;
 
     @DecimalMin(value = "0", message = "최대 할인 금액은 0 이상이어야 합니다.")
-    @Digits(
-            integer = 12,
-            fraction = 0,
-            message = "최대 할인 금액은 12자리 이하의 정수여야 합니다."
-    )
+    @Digits(integer = 12, fraction = 0, message = "최대 할인 금액 형식이 올바르지 않습니다.")
     private BigDecimal maximumDiscountAmount;
 
-    @NotNull(message = "총 발급 수량을 입력해 주세요.")
     @Positive(message = "총 발급 수량은 1개 이상이어야 합니다.")
     private Long totalQuantity;
 
@@ -62,25 +52,29 @@ public class CouponCreateForm {
     @DateTimeFormat(pattern = "yyyy-MM-dd'T'HH:mm")
     private LocalDateTime expiresAt;
 
-    @AssertTrue(message = "종료 일시는 시작 일시보다 뒤여야 합니다.")
+    @NotNull(message = "발급 대상을 선택해 주세요.")
+    private CouponTargetType targetType;
+
+    @AssertTrue(message = "종료 일시는 시작 일시보다 늦어야 합니다.")
     public boolean isPeriodValid() {
         return startsAt == null || expiresAt == null || startsAt.isBefore(expiresAt);
     }
 
     @AssertTrue(message = "비율 할인은 최대 할인 금액을 입력해야 합니다.")
     public boolean isMaxDiscountAmountValid() {
-        if (discountType == DiscountType.PERCENTAGE) {
-            return maximumDiscountAmount != null;
-        }
-        return true;
+        return discountType != DiscountType.PERCENTAGE || maximumDiscountAmount != null;
     }
 
-    @AssertTrue(message = "비율 할인의 할인값은 100 이하여야 합니다.")
+    /** 특정 회원 대상만 관리자가 발급 가능 수량을 제한한다. */
+    @AssertTrue(message = "특정 회원 쿠폰은 총 발급 수량을 입력해 주세요.")
+    public boolean isTotalQuantityValid() {
+        return targetType != CouponTargetType.SPECIFIC_MEMBERS || totalQuantity != null;
+    }
+
+    @AssertTrue(message = "비율 할인값은 100 이하여야 합니다.")
     public boolean isDiscountValueValid() {
-        if (discountType == DiscountType.PERCENTAGE) {
-            return discountValue == null || discountValue.compareTo(BigDecimal.valueOf(100)) <= 0;
-        }
-        return true;
+        return discountType != DiscountType.PERCENTAGE
+                || discountValue == null
+                || discountValue.compareTo(BigDecimal.valueOf(100)) <= 0;
     }
-
 }
