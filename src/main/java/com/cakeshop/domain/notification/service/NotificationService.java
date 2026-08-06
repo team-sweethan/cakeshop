@@ -48,7 +48,7 @@ public class NotificationService {
                     : request.getPostId() != null ? request.getPostId()
                     : request.getReviewId() != null ? request.getReviewId()
                     : request.getUserCouponId() != null ? request.getUserCouponId()
-                    : request.getChatRoomId() != null ? "ROOM_" + request.getChatRoomId() + "_" + java.util.UUID.randomUUID().toString()
+                    : request.getChatRoomId() != null ? "ROOM_" + request.getChatRoomId()
                     : java.util.UUID.randomUUID().toString();
             eventKey = request.getType().name() + ":" + request.getReceiverId() + ":" + targetId;
         }
@@ -62,7 +62,8 @@ public class NotificationService {
         // 중복 eventKey가 존재하는 경우 처리
         if (notificationMapper.existsByReceiverIdAndEventKey(request.getReceiverId(), eventKey)) {
             if (isBundleNotification) {
-                Notification existing = notificationMapper.findNotificationByReceiverAndEventKey(request.getReceiverId(), eventKey);
+                // 비관적 잠금(FOR UPDATE) 조회로 동시성 중복 발송 차단
+                Notification existing = notificationMapper.findNotificationByReceiverAndEventKeyForUpdate(request.getReceiverId(), eventKey);
                 notificationMapper.updateLastEventAtAndUnread(request.getReceiverId(), eventKey, title, content, now);
 
                 // 30분 쿨타임 체크: 직전 메시지 시각(last_event_at) 대비 30분 이상 경과했으면 새 묶음으로 간주해 SMS 재발송
@@ -106,7 +107,7 @@ public class NotificationService {
             notificationMapper.save(notification);
         } catch (DuplicateKeyException e) {
             if (isBundleNotification) {
-                Notification existing = notificationMapper.findNotificationByReceiverAndEventKey(request.getReceiverId(), eventKey);
+                Notification existing = notificationMapper.findNotificationByReceiverAndEventKeyForUpdate(request.getReceiverId(), eventKey);
                 notificationMapper.updateLastEventAtAndUnread(request.getReceiverId(), eventKey, title, content, now);
 
                 long minutesGap = (existing != null && existing.getLastEventAt() != null)
@@ -129,7 +130,7 @@ public class NotificationService {
     }
 
     private void registerSmsSending(Long notificationId, String receiverPhone, String title, String content) {
-        if (notificationId == null || receiverPhone == null) return;
+        if (notificationId == null) return;
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override

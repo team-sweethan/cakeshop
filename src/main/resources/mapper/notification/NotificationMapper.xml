@@ -123,6 +123,14 @@
         LIMIT 1
     </select>
 
+    <!-- 중복 eventKey 기반 기존 알림 비관적 잠금 조회 (FOR UPDATE) -->
+    <select id="findNotificationByReceiverAndEventKeyForUpdate" resultType="Notification">
+        SELECT * FROM notifications
+        WHERE receiver_id = #{receiverId} AND event_key = #{eventKey}
+        LIMIT 1
+        FOR UPDATE
+    </select>
+
     <!--중복 event_key 기반 기존 알림 ID 조회-->
     <select id="findIdByReceiverIdAndEventKey" resultType="long">
         SELECT id FROM notifications
