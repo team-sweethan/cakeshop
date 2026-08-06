@@ -8,6 +8,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.dto.view.PostSort;
 import com.cakeshop.global.common.paging.PageRequest;
+import com.cakeshop.domain.member.service.MemberCommunityQueryService;
 import com.cakeshop.global.config.ClockConfig;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 
@@ -32,9 +33,14 @@ import org.springframework.jdbc.core.JdbcTemplate;
 /**
  * H1b — 목록 조회가 게시글 수와 무관하게 정해진 횟수의 쿼리만 실행하는지 확인한다.
  *
- * <p>목록 1회 + 총 개수 1회, 합쳐서 2회다. 여기서 잡으려는 것은 댓글 수·작성자·카테고리를
- * 게시글마다 따로 조회하는 형태(N+1)로 바뀌는 변경이다. 화면 결과가 같아 눈으로는 드러나지
- * 않고, 게시글이 늘어야 느려지므로 개발 데이터에서는 멀쩡해 보인다.
+ * <p>목록 1회 + 총 개수 1회 + 작성자 1회, 합쳐서 3회다. 여기서 잡으려는 것은 댓글 수·작성자·
+ * 카테고리를 게시글마다 따로 조회하는 형태(N+1)로 바뀌는 변경이다. 화면 결과가 같아 눈으로는
+ * 드러나지 않고, 게시글이 늘어야 느려지므로 개발 데이터에서는 멀쩡해 보인다.
+ *
+ * <p><b>조각 10b에서 한 회씩 늘었다.</b> members JOIN을 걷어내고 작성자를 회원 도메인
+ * 계약으로 받으면서 쿼리가 한 번 더 붙는다. 늘어난 것은 <b>고정된 1회</b>이고, 이 검사가
+ * 지키려는 것은 여전히 "게시글 수와 무관하다"는 쪽이다 — 적은 글과 많은 글의 횟수가 같은지를
+ * 함께 단언하므로 회원을 게시글마다 조회하는 형태로 바뀌면 그대로 깨진다.
  *
  * <p>쿼리 <b>형태</b>가 {@code GROUP BY}로 바뀌는 것은 이 테스트로 잡히지 않는다.
  * 그때도 쿼리는 여전히 2회다(PLAN.md R2). 그쪽은 H1a가 맡는다.
@@ -43,16 +49,16 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @MariaDbIntegrationTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 // CommunityService가 Clock을 주입받으므로 슬라이스에도 시계 설정을 함께 올린다.
-@Import({CommunityService.class, ClockConfig.class})
+@Import({CommunityService.class, MemberCommunityQueryService.class, ClockConfig.class})
 class CommunityQueryCountTests {
 
     private static final LocalDateTime BASE_TIME = LocalDateTime.of(2026, 3, 1, 10, 0);
 
-    /** 목록 조회 한 번에 실행되어야 하는 쿼리 수. 목록 1 + 총 개수 1. */
-    private static final int EXPECTED_QUERY_COUNT = 2;
+    /** 목록 조회 한 번에 실행되어야 하는 쿼리 수. 목록 1 + 총 개수 1 + 작성자 1. */
+    private static final int EXPECTED_QUERY_COUNT = 3;
 
-    /** 댓글 구역 한 번에 실행되어야 하는 쿼리 수. 댓글 목록 1 + 개수 1. */
-    private static final int EXPECTED_COMMENT_QUERY_COUNT = 2;
+    /** 댓글 구역 한 번에 실행되어야 하는 쿼리 수. 댓글 목록 1 + 개수 1 + 작성자 1. */
+    private static final int EXPECTED_COMMENT_QUERY_COUNT = 3;
 
     @Autowired
     private CommunityService communityService;
@@ -116,18 +122,18 @@ class CommunityQueryCountTests {
         communityService.getPostDetail(postId, null, "M:1");
 
         // 조회 기록(INSERT)과 조회수 UPDATE는 query가 아니라 update로 실행되므로
-        // SELECT는 상세 1회뿐이다.
+        // SELECT는 상세 1회 + 작성자 1회다(작성자는 조각 10b에서 붙었다).
         //
         // 중복 판단을 "이미 봤는지 SELECT로 확인" 하는 형태로 바꾸면 이 수가 늘어난다.
         // DB의 UNIQUE가 판단하게 두면 늘지 않는다 — 그게 6.2가 제약을 쓰는 이유이기도 하다.
-        assertThat(queryCounter.count()).isEqualTo(1);
+        assertThat(queryCounter.count()).isEqualTo(2);
     }
 
     /**
      * 댓글 구역이 댓글 수와 무관하게 정해진 횟수의 쿼리만 실행하는지 확인한다.
      *
-     * <p>목록 1회 + 개수 1회, 합쳐서 2회다. 개수를 "전체 행"과 "노출 중"으로 따로 세느라
-     * 쿼리를 하나 더 날리거나, 작성자를 댓글마다 조회하는 형태(N+1)로 바뀌는 것을 잡는다.
+     * <p>목록 1회 + 개수 1회 + 작성자 1회, 합쳐서 3회다. 개수를 "전체 행"과 "노출 중"으로 따로
+     * 세느라 쿼리를 하나 더 날리거나, 작성자를 댓글마다 조회하는 형태(N+1)로 바뀌는 것을 잡는다.
      * 둘 다 화면 결과가 같아서 눈으로는 드러나지 않는다.
      */
     @Test
