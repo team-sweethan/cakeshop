@@ -37,7 +37,7 @@
 | **A4** | 후기 수정 | 고객 | `GET·POST /reviews/{id}/edit` | 목업 버튼만 | 4 |
 | **A5** | 후기 삭제 | 고객 | `POST /reviews/{id}/delete` | 목업 버튼만 | 4 |
 | **A6** | 이미지 첨부 | 고객 | (A2·A3에 포함) | 목업 입력만 | 8 (2차) |
-| **B1** | 상품 후기 목록 | 누구나 | `GET /products/{id}/reviews` | "준비 중" | 3 |
+| **B1** | 상품 후기 목록 | 누구나 | 미리보기 3개(상품 상세 안) · 전체 `GET /products/{id}/reviews` | "준비 중" | 3 |
 | **B2** | 상품 평균 평점·후기 수 | 누구나 | (상품 상세에 포함) | 화면 완료 | 2 |
 | **B3** | 내가 쓴 후기 목록 | 고객 | `GET /mypage/reviews` | 없음 | 3 |
 | **B4** | 후기에 달린 답글 노출 | 누구나 | (B1·B3에 포함) | 없음 | 6 |
@@ -53,7 +53,7 @@
 | **E2** | 평점 범위 `CHECK` | — | — | 없음 | 0 |
 | **E3** | `Review`·`ReviewReply` 엔티티 | — | — | 빈 클래스 | 0 |
 
-**신규 화면 4개**: A1(`customer/review/writable.html`), A4(`customer/review/edit.html`), B3(`customer/review/my.html`), C3(`admin/review/detail.html`). C5·C6의 답글 영역은 C3 화면 안에 들어간다. 전체 목록은 8절이 정본이다.
+**신규 화면 5개**: A1(`customer/review/writable.html`), A4(`customer/review/edit.html`), **B1 전체 목록**(`customer/review/product.html`), B3(`customer/review/my.html`), C3(`admin/review/detail.html`). C5·C6의 답글 영역은 C3 화면 안에 들어간다. 화면 인벤토리의 정본은 8절이다.
 
 ## 2. 공통 규칙
 
