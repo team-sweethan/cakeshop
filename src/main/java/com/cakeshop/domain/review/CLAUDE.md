@@ -48,7 +48,25 @@
 | `customer/order/detail.html` | `후기 작성` 링크에 `orderItemId` 전달 | 주환 |
 | `customer/product/detail.html` | 후기 영역 교체 (`"준비 중"` → B1) | 시은 |
 
-`customer/product/detail.html`과 `customer/order/detail.html`은 **PR #74(주환, 열려 있음)가 지금 함께 고치고 있다.** 조각 3 착수 전에 `dev` 기준을 다시 확인한다.
+`customer/product/detail.html`과 `customer/order/detail.html`은 **PR #74(주환)가 함께 고쳤고 지금은 머지됐다.** 조각 3 착수 전에 `dev` 기준을 다시 확인한다.
+
+### 남의 영역에 클래스·메서드를 만들 때는 주석으로 흔적을 남긴다
+
+조각 2가 `domain/product/`에 `ProductRatingService`·`ProductReviewMapper`를 만들고, 조각 3이 시은님 `ProductController`에 모델 주입을 넣는다. **남의 담당 구역에 새로 만드는 클래스와 공용 서비스 메서드에는 아래 헤더를 반드시 단다.** 담당자가 나중에 "이건 누가 왜 넣었나"를 코드만 보고 알 수 있어야 한다.
+
+```java
+/**
+ * ******************************
+ * 작성자 : HyunGyu-Cho
+ * 담당자 : 현규
+ * 작성일 : 2026-08-06
+ * 기능 : 리뷰 평점 집계 계약
+ * 설명 : 후기 등록·수정·삭제 시 products 의 평균 평점과 후기 수를 다시 계산한다.
+ * ******************************
+ */
+```
+
+저장소에 이미 32개 파일이 쓰는 형식이다. 전부에 붙어 있지는 않으므로 **기존 파일을 소급해 고치지는 않는다** — 새로 만드는 것에만 적용한다.
 
 `domain/product/`에 파일을 만드는 조각 2(D1)는 **시은님 담당 구역이다.** 아래 "혼자 정하면 안 되는 것"을 본다.
 
