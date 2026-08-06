@@ -1,8 +1,10 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="_csrf" th:content="${_csrf?.token}"/>
+  <meta name="_csrf_header" th:content="${_csrf?.headerName}"/>
   <title>알림 | 케이크 쇼핑몰</title>
   <link rel="stylesheet" th:href="@{/css/app.css}">
   <link rel="stylesheet" th:href="@{/css/customer-mockup.css}">
@@ -13,13 +15,161 @@
   <header th:replace="~{fragments/common/header :: header}"></header>
   <main class="page-container page-container--narrow">
     <div th:replace="~{fragments/customer/mock-notice :: notice}"></div>
-    <div class="cluster cluster--between"><h1>알림</h1><button class="btn" type="button" data-read-all>전체 읽음</button></div><div class="stack">
-      <article class="notification-item is-unread"><div class="cluster" style="align-items:flex-start"><span class="notification-dot" aria-hidden="true"></span><div><span class="badge">주문 승인</span><p>레터링 케이크 주문이 승인되었습니다.</p><time class="text-muted">10분 전</time></div></div><a class="btn" href="/orders/1">상세</a></article>
-      <article class="notification-item is-unread"><div class="cluster" style="align-items:flex-start"><span class="notification-dot" aria-hidden="true"></span><div><span class="badge">결제 완료</span><p>ORD-001 결제가 완료되었습니다.</p><time class="text-muted">1시간 전</time></div></div><a class="btn" href="/orders/1">상세</a></article>
-      <article class="notification-item"><div><span class="badge">제작 시작</span><p>딸기 케이크 제작을 시작했습니다.</p><time class="text-muted">어제</time></div><a class="btn" href="/orders/1">상세</a></article><article class="notification-item"><div><span class="badge">픽업 준비</span><p>초코 케이크 픽업 준비가 완료되었습니다.</p><time class="text-muted">2일 전</time></div><a class="btn" href="/orders/1">상세</a></article><article class="notification-item"><div><span class="badge">취소 완료</span><p>마카롱 케이크 취소 및 환불이 처리되었습니다.</p><time class="text-muted">1주일 전</time></div><a class="btn" href="/orders/1">상세</a></article><article class="notification-item"><div><span class="badge">주문 거절</span><p>레터링 케이크 제작 요청이 거절되었습니다. 사유: 일정 불가</p><time class="text-muted">1주일 전</time></div><a class="btn" href="/orders/1">상세</a></article>
+    <div class="cluster cluster--between">
+      <h1>알림</h1>
+      <button class="btn" type="button" data-read-all>전체 읽음</button>
+    </div>
+    <!-- 알림 목록이 들어갈 컨테이너 (JS가 이곳에 데이터를 동적으로 삽입합니다) -->
+    <div class="stack" id="notification-container">
+      <!-- 로딩 중 표시 (JS가 데이터를 받아오면 대체됩니다) -->
+      <p class="text-muted text-center" style="padding: 2rem 0;">알림을 불러오는 중입니다...</p>
     </div>
   </main>
   <footer th:replace="~{fragments/common/footer :: footer(${store})}"></footer>
+
+  <!-- ================================================================= -->
+  <!-- 🚀 비동기 REST API 처리 자바스크립트 코드 -->
+  <!-- ================================================================= -->
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      // 1. 화면의 주요 엘리먼트(요소) 가져오기
+      const container = document.getElementById("notification-container");
+      const readAllBtn = document.querySelector("[data-read-all]");
+
+      // 2. 알림 목록을 백엔드 REST API(/api/notifications)에서 가져오는 함수
+      function loadNotifications() {
+        fetch("/api/notifications")
+          .then(response => {
+            if (!response.ok) throw new Error("알림을 가져오는 데 실패했습니다.");
+            return response.json(); // 백엔드가 전달한 JSON 데이터를 자바스크립트 객체로 변환
+          })
+          .then(data => {
+            // 받아온 데이터가 비어있는 경우 (알림이 0개일 때)
+            if (!data || data.length === 0) {
+              container.innerHTML = `<p class="text-muted text-center" style="padding: 2rem 0;">등록된 알림이 없습니다.</p>`;
+              return;
+            }
+
+            function escapeHtml(str) {
+              if (!str) return "";
+              return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+            }
+
+            // 받아온 알림 데이터 배열을 돌며 HTML 태그 조립하기
+            let html = "";
+            data.forEach(item => {
+              // 안 읽은 알림인 경우 스타일 클래스(is-unread) 및 점 표시(notification-dot) 추가
+              const isRead = item.isRead !== undefined ? item.isRead : item.read;
+              const unreadClass = !isRead ? " is-unread" : "";
+              const unreadDot = !isRead ? '<span class="notification-dot" aria-hidden="true"></span>' : "";
+              
+              // 날짜 포맷 변환 (YYYY-MM-DD HH:mm 형태로 자르기)
+              const formattedDate = item.createdAt ? item.createdAt.replace("T", " ").substring(0, 16) : "";
+
+              // 상세 링크 버튼 생성 (targetUrl이 있는 경우)
+              const detailBtn = item.targetUrl 
+                ? `<a class="btn" href="${escapeHtml(item.targetUrl)}">상세</a>` 
+                : "";
+
+              // 개별 알림 HTML 조립 (XSS 방지 이스케이프 적용)
+              html += `
+                <article class="notification-item${unreadClass}" data-id="${item.id}">
+                  <div class="cluster" style="align-items:flex-start">
+                    ${unreadDot}
+                    <div>
+                      <span class="badge">${escapeHtml(item.title || '알림')}</span>
+                      <p>${escapeHtml(item.content || '')}</p>
+                      <time class="text-muted">${formattedDate}</time>
+                    </div>
+                  </div>
+                  ${detailBtn}
+                </article>
+              `;
+            });
+
+            // 조립된 HTML을 컨테이너 상자에 주입
+            container.innerHTML = html;
+
+            // 개별 알림 항목 클릭 이벤트 추가 (클릭 시 읽음 처리)
+            attachItemClickEvents();
+          })
+          .catch(error => {
+            console.error("오류 발생:", error);
+            container.innerHTML = `<p class="text-muted text-center" style="padding: 2rem 0;">알림을 불러오는 중 오류가 발생했습니다.</p>`;
+          });
+      }
+
+      // 3. "전체 읽음" 버튼 클릭 이벤트 처리
+      if (readAllBtn) {
+        readAllBtn.addEventListener("click", function () {
+          const csrfToken = document.querySelector('meta[name="_csrf"]')?.getAttribute('content');
+          const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.getAttribute('content');
+          const headers = {};
+          if (csrfToken && csrfHeader) {
+            headers[csrfHeader] = csrfToken;
+          }
+          fetch("/api/notifications/read-all", {
+            method: "PATCH",
+            headers: headers
+          })
+          .then(response => {
+            if (response.ok) {
+              // 성공 시 알림 목록 다시 새로고침 및 상단 헤더 배지 갱신
+              loadNotifications();
+              if (typeof window.updateNotificationUnreadCount === "function") {
+                window.updateNotificationUnreadCount();
+              }
+            }
+          })
+          .catch(error => console.error("전체 읽음 처리 실패:", error));
+        });
+      }
+
+      // 4. 개별 알림 클릭 시 읽음 처리 이벤트
+      function attachItemClickEvents() {
+        const items = document.querySelectorAll(".notification-item.is-unread");
+        items.forEach(item => {
+          item.addEventListener("click", function () {
+            const notiId = this.getAttribute("data-id");
+            if (!notiId) return;
+
+            const csrfToken = document.querySelector('meta[name="_csrf"]')?.getAttribute('content');
+            const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.getAttribute('content');
+            const headers = {};
+            if (csrfToken && csrfHeader) {
+              headers[csrfHeader] = csrfToken;
+            }
+
+            // 백엔드 @PatchMapping("/{id}/read") 호출
+            fetch(`/api/notifications/${notiId}/read`, {
+              method: "PATCH",
+              headers: headers,
+              keepalive: true
+            })
+            .then(response => {
+              if (response.ok) {
+                // 성공 시 화면에서 안 읽음 스타일 및 빨간 점 제거
+                this.classList.remove("is-unread");
+                const dot = this.querySelector(".notification-dot");
+                if (dot) dot.remove();
+                if (typeof window.updateNotificationUnreadCount === "function") {
+                  window.updateNotificationUnreadCount();
+                }
+              }
+            });
+          });
+        });
+      }
+
+      // 🚀 페이지 첫 진입 시 알림 목록 로드 실행
+      loadNotifications();
+    });
+  </script>
 </body>
 </html>
 

@@ -19,7 +19,7 @@ import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
 import com.cakeshop.domain.member.dto.view.MemberProfileView;
 import com.cakeshop.domain.member.controller.MyPageController;
 import com.cakeshop.domain.member.service.MemberService;
-import com.cakeshop.domain.notification.controller.NotificationController;
+import com.cakeshop.domain.notification.controller.NotificationUserController;
 import com.cakeshop.domain.order.controller.customer.OrderController;
 import com.cakeshop.domain.order.dto.view.OrderDetailView;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
@@ -104,7 +104,7 @@ class CustomerPageControllerTests {
                         new MyPageController(
                                 memberService,
                                 mock(SessionRegistry.class)),
-                        new NotificationController(),
+                        new NotificationUserController(),
                         new CouponController(),
                         new ReviewController())
                 .setCustomArgumentResolvers(
