@@ -44,8 +44,6 @@ public class FulfillmentService {
         OrderStatus selectedStatus = normalizeStatus(
                 condition == null ? null : condition.getStatus()
         );
-        LocalDateTime now = LocalDateTime.now(clock);
-
         List<FulfillmentListView.FulfillmentOrder> orders = orderMapper
                 .findFulfillmentOrders(
                         pickupDate.atStartOfDay(),
@@ -53,7 +51,7 @@ public class FulfillmentService {
                         selectedStatus
                 )
                 .stream()
-                .map(order -> toFulfillmentOrder(order, now))
+                .map(this::toFulfillmentOrder)
                 .toList();
 
         return new FulfillmentListView(pickupDate, selectedStatus, orders);
@@ -82,10 +80,7 @@ public class FulfillmentService {
                 : null;
     }
 
-    private FulfillmentListView.FulfillmentOrder toFulfillmentOrder(
-            Order order,
-            LocalDateTime now
-    ) {
+    private FulfillmentListView.FulfillmentOrder toFulfillmentOrder(Order order) {
         List<OrderItem> orderItems = orderMapper.findOrderItemsByOrderId(order.getId());
         Map<Long, List<OrderItemOption>> optionsByItem = orderMapper
                 .findOrderItemOptionsByOrderId(order.getId())
@@ -112,15 +107,14 @@ public class FulfillmentService {
                 order.getPickupName(),
                 order.getPickupPhone(),
                 order.getPickupAt(),
-                isPickupCompletable(order, now),
+                isPickupCompletable(order),
                 items
         );
     }
 
-    private boolean isPickupCompletable(Order order, LocalDateTime now) {
+    private boolean isPickupCompletable(Order order) {
         return order.getStatus() == OrderStatus.READY_FOR_PICKUP
                 && order.getPickupAt() != null
-                && !now.isBefore(order.getPickupAt())
                 && !orderMapper.hasRequestedRefundCancellation(order.getId());
     }
 }
