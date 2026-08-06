@@ -21,7 +21,9 @@ public enum CouponErrorCode implements ErrorCode {
     CANNOT_EDIT_ENDED_COUPON("COUPON_013", "종료된 쿠폰은 수정할 수 없습니다.", 400),
     CANNOT_MODIFY_FIELDS("COUPON_014", "수정 불가능한 필드가 변경되었습니다.", 400),
     EXPIRES_AT_EXTENSION_ONLY("COUPON_015", "쿠폰 종료 일시는 기존 값과 같거나 이후여야 합니다.", 400),
-    ISSUED_QUANTITY_EXCEEDED("COUPON_016", "총 발급 수량을 초과하여 발급할 수 없습니다.", 400);
+    ISSUED_QUANTITY_EXCEEDED("COUPON_016", "총 발급 수량을 초과하여 발급할 수 없습니다.", 400),
+    ISSUE_TARGET_UNAVAILABLE("COUPON_017", "현재 발급할 수 없는 회원입니다.", 400),
+    ISSUE_CANCELLATION_UNAVAILABLE("COUPON_018", "이미 사용되었거나 취소된 발급 내역입니다.", 400);
 
     private final String code;
     private final String message;

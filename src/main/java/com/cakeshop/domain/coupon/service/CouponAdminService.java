@@ -109,20 +109,29 @@ public class CouponAdminService {
         if (coupon.getTotalQuantity() == null || coupon.getIssuedQuantity() >= coupon.getTotalQuantity()) {
             throw new BusinessException(CouponErrorCode.ISSUED_QUANTITY_EXCEEDED);
         }
-        if (couponMapper.insertMemberCouponIfAbsent(couponId, memberId, false) == 1
-                && couponMapper.increaseIssuedQuantityIfAvailable(couponId) != 1) {
+        if (couponMapper.insertMemberCouponIfAbsent(couponId, memberId, false) != 1) {
+            // 조회 시점 이후 회원 상태나 발급 이력이 달라졌으면 성공으로 처리하지 않는다.
+            throw new BusinessException(CouponErrorCode.ISSUE_TARGET_UNAVAILABLE);
+        }
+        if (couponMapper.increaseIssuedQuantityIfAvailable(couponId) != 1) {
             throw new BusinessException(CouponErrorCode.UPDATE_FAILED);
         }
     }
 
     @Transactional
     public void cancelSpecificMemberCoupon(Long couponId, Long memberId) {
-        Coupon coupon = findCoupon(couponId);
+        Coupon coupon = findCouponForUpdate(couponId);
         if (coupon.getTargetType() != CouponTargetType.SPECIFIC_MEMBERS) {
             throw new BusinessException(CouponErrorCode.UPDATE_FAILED);
         }
-        if (couponMapper.deleteAvailableMemberCoupon(couponId, memberId) == 1
-                && couponMapper.decreaseIssuedQuantity(couponId) != 1) {
+        if (!coupon.getExpiresAt().isAfter(LocalDateTime.now())) {
+            throw new BusinessException(CouponErrorCode.EXPIRED_COUPON);
+        }
+        if (couponMapper.deleteAvailableMemberCoupon(couponId, memberId) != 1) {
+            // 이미 사용됐거나 다른 관리자가 먼저 취소한 이력은 성공으로 응답하지 않는다.
+            throw new BusinessException(CouponErrorCode.ISSUE_CANCELLATION_UNAVAILABLE);
+        }
+        if (couponMapper.decreaseIssuedQuantity(couponId) != 1) {
             throw new BusinessException(CouponErrorCode.UPDATE_FAILED);
         }
     }
