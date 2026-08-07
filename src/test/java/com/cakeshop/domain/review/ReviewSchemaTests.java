@@ -22,7 +22,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 /**
  * 조각 0(#108)에서 추가한 migration 을 검증한다.
  *
- * <p>상태 어휘와 평점 범위 둘 다 docs/review/SPEC.md 의 결정을 DB 에 못 박은 것이므로, 규칙이
+ * <p>상태 어휘와 평점 범위 둘 다 docs/review/DOMAIN.md 의 결정을 DB 에 못 박은 것이므로, 규칙이
  * 코드에서만 지켜지고 DB 에서는 뚫리는 상황을 여기서 잡는다. 선례는 CommunitySchemaTests 다.
  *
  * <p>여기서 지키는 것은 <b>화면 검증이 막지 못하는 경로</b>다. 상태 어휘든 평점 범위든 폼을
@@ -106,7 +106,7 @@ class ReviewSchemaTests {
     }
 
     /**
-     * 평점 범위 밖의 값이 거절되는지 네 컬럼 각각에서 확인한다(SPEC.md 2.2, PLAN.md R5).
+     * 평점 범위 밖의 값이 거절되는지 네 컬럼 각각에서 확인한다(DOMAIN.md 2.2, PLAN.md R5).
      *
      * <p>컬럼이 {@code TINYINT UNSIGNED} 라 제약이 없으면 0 과 255 가 그대로 들어간다. 화면의
      * 별점 입력은 폼을 거친 요청만 막으므로 API 를 직접 부르면 통과한다. 평점은

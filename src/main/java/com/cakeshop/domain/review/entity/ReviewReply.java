@@ -33,7 +33,7 @@ public class ReviewReply {
      * 관리자 답글 작성용.
      *
      * <p>{@code adminId}는 {@code members(id)} FK다. 사람이 다는 것을 전제하며 인증 관리자에서
-     * 가져온다(docs/review/SPEC.md C5).
+     * 가져온다(docs/review/specs/review-reply.md C5).
      */
     public static ReviewReply create(Long reviewId, Long adminId, String content) {
         return new ReviewReply(null, reviewId, adminId, content);
