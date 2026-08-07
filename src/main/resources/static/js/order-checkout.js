@@ -103,8 +103,10 @@
         const value = form.elements[name] && form.elements[name].value;
         if (value) params.set(name, value);
       });
-      form.querySelectorAll("[name='optionIds']:checked").forEach(function (option) {
-        params.append("optionIds", option.value);
+      form.querySelectorAll("[name='optionIds']").forEach(function (option) {
+        if (option.type !== "checkbox" || option.checked) {
+          params.append("optionIds", option.value);
+        }
       });
       fetch("/orders/coupon-preview?" + params.toString())
         .then(response => response.ok ? response.json() : Promise.reject())

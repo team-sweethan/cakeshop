@@ -115,6 +115,15 @@ public class PaymentFacade {
 
     /** 0원 주문은 Toss 승인 요청 없이 서버가 READY 결제를 완료한다. */
     public void completeZeroAmountGeneralPayment(long memberId, long orderId) {
+        // 브라우저 재전송은 이미 완료된 0원 결제를 성공으로 간주하되, 회원 소유권은 먼저 확인한다.
+        orderQueryService.getMemberOrder(memberId, orderId);
+        Payment completedPayment = paymentService.findDonePayment(orderId).orElse(null);
+        if (completedPayment != null) {
+            if (completedPayment.getAmount() == null || completedPayment.getAmount().signum() != 0) {
+                throw new BusinessException(PaymentErrorCode.AMOUNT_MISMATCH);
+            }
+            return;
+        }
         GeneralPaymentOrder order = orderService.getGeneralPaymentOrder(memberId, orderId);
         if (order.amount().signum() != 0) {
             throw new BusinessException(PaymentErrorCode.AMOUNT_MISMATCH);

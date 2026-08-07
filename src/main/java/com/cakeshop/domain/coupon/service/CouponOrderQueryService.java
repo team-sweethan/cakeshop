@@ -40,7 +40,7 @@ public class CouponOrderQueryService {
         }
         BigDecimal discount = coupon.discountType() == DiscountType.PERCENTAGE
                 ? originalAmount.multiply(coupon.discountValue()).divide(BigDecimal.valueOf(100), 0, RoundingMode.DOWN)
-                : coupon.discountValue();
+                : coupon.discountValue().setScale(0, RoundingMode.DOWN);
         if (coupon.maximumDiscountAmount() != null) discount = discount.min(coupon.maximumDiscountAmount());
         discount = discount.min(originalAmount);
         return new CouponPricePreview(discount, originalAmount.subtract(discount));

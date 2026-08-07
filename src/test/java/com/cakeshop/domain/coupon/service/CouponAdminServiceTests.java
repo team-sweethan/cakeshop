@@ -13,7 +13,6 @@ import com.cakeshop.domain.coupon.dto.form.CouponSearchCondition;
 import com.cakeshop.domain.coupon.dto.form.CouponUpdateForm;
 import com.cakeshop.domain.coupon.dto.view.CouponView;
 import com.cakeshop.domain.coupon.dto.view.CouponIssueCandidateView;
-import com.cakeshop.domain.coupon.dto.view.CouponIssuedMemberHistoryView;
 import com.cakeshop.domain.coupon.dto.view.CouponIssuedMemberView;
 import com.cakeshop.domain.coupon.entity.CustomerCouponStatus;
 import com.cakeshop.domain.coupon.entity.Coupon;
@@ -25,6 +24,7 @@ import com.cakeshop.domain.coupon.error.CouponErrorCode;
 import com.cakeshop.domain.coupon.mapper.CouponMapper;
 import com.cakeshop.domain.member.service.MemberCouponQueryService;
 import com.cakeshop.domain.member.dto.view.MemberCouponView;
+import com.cakeshop.domain.member.dto.view.MemberCouponIssuedHistoryView;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
@@ -147,17 +147,13 @@ class CouponAdminServiceTests {
     }
 
     @Test
-    void getIssuedMembers_combinesCouponHistoryWithMemberProfile() {
-        CouponIssuedMemberHistoryView history = new CouponIssuedMemberHistoryView(
-                1L, CustomerCouponStatus.AVAILABLE, LocalDateTime.of(2026, 8, 7, 10, 0), null
+    void getIssuedMembers_returnsMemberContractPage() {
+        MemberCouponIssuedHistoryView history = new MemberCouponIssuedHistoryView(
+                1L, "회원", "member@example.com", "010-1234-5678", "01-15", "AVAILABLE", null
         );
-        MemberCouponView member = new MemberCouponView(
-                1L, "회원", "member@example.com", "010-1234-5678", LocalDate.of(2000, 1, 15)
+        when(memberCouponQueryService.getCouponIssuedMemberHistories(any(), any(), any())).thenReturn(
+                new PageResult<>(List.of(history), new PageRequest(1, 5), 1)
         );
-        when(memberCouponQueryService.getMemberIdsByKeyword("회원")).thenReturn(List.of(1L));
-        when(couponMapper.countIssuedMemberHistories(3L, List.of(1L))).thenReturn(1L);
-        when(couponMapper.findIssuedMemberHistories(3L, List.of(1L), 5, 0)).thenReturn(List.of(history));
-        when(memberCouponQueryService.getMembersByIds(List.of(1L))).thenReturn(List.of(member));
 
         PageResult<CouponIssuedMemberView> result = couponAdminService.getIssuedMembers(3L, "회원", 1);
 

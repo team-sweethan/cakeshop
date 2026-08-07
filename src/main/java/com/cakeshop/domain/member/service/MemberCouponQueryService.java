@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.cakeshop.domain.member.dto.view.MemberCouponView;
+import com.cakeshop.domain.member.dto.view.MemberCouponIssuedHistoryView;
 import com.cakeshop.domain.member.mapper.MemberCouponMapper;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
@@ -70,13 +71,23 @@ public class MemberCouponQueryService {
      * 작성자 : 이정후
      * 담당자 : 수민
      * 작성일 : 2026-08-07
-     * 기능 : 쿠폰 발급 회원 검색 대상 조회
-     * 설명 : 쿠폰 관리자 발급 이력 목록의 이름·이메일 검색에 사용할 회원 ID를 제공한다.
+     * 기능 : 쿠폰 발급 회원 이력 페이지 조회
+     * 설명 : 관리자 쿠폰 상세의 발급 회원 목록을 위한 조회 전용 ReadModel 예외다.
+     *       회원 이름·이메일 검색과 발급 이력 정렬·페이징을 한 번에 처리해 회원 ID 전체 목록을 만들지 않는다.
+     *       members와 member_coupons를 JOIN하며, 회원·쿠폰 담당자 합의 범위에서만 사용하고 상태 변경은 포함하지 않는다.
      * ******************************
      */
     @Transactional(readOnly = true)
-    public List<Long> getMemberIdsByKeyword(String keyword) {
-        return memberCouponMapper.findMemberIdsByKeyword(keyword);
+    public PageResult<MemberCouponIssuedHistoryView> getCouponIssuedMemberHistories(
+            Long couponId, String keyword, PageRequest pageRequest
+    ) {
+        String normalizedKeyword = keyword == null ? "" : keyword.trim();
+        return new PageResult<>(
+                memberCouponMapper.findCouponIssuedMembers(
+                        couponId, normalizedKeyword, pageRequest.getSize(), pageRequest.getOffset()),
+                pageRequest,
+                memberCouponMapper.countCouponIssuedMembers(couponId, normalizedKeyword)
+        );
     }
 
     /**
