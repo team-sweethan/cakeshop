@@ -2,4 +2,12 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.cakeshop.domain.statistics.mapper.DashboardReadModelMapper">
     <!-- 사용자 입력은 #{}만 사용하고 ${}는 사용하지 않는다. -->
+
+    <select id="countTodayOrders" resultType="long">
+        SELECT COUNT(DISTINCT payment.order_id)
+        FROM payments AS payment
+        WHERE payment.status = 'DONE'
+          AND payment.approved_at &gt;= #{start}
+          AND payment.approved_at &lt; #{end}
+    </select>
 </mapper>

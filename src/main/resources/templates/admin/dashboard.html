@@ -13,7 +13,7 @@
       <div th:replace="~{fragments/admin/mock-notice :: notice}"></div>
       <h1 class="admin-page-title">대시보드</h1>
       <section class="grid grid--4 section">
-        <article class="metric-card"><p>오늘 주문</p><strong>12건</strong></article>
+        <article class="metric-card"><p>오늘 주문</p><strong th:text="|${dashboard.todayOrderCount}건|">0건</strong></article>
         <article class="metric-card"><p>오늘 매출</p><strong>480,000원</strong></article>
         <article class="metric-card"><p>승인 대기</p><strong>3건</strong></article>
         <article class="metric-card"><p>확인 필요 결제</p><strong>1건</strong></article>
