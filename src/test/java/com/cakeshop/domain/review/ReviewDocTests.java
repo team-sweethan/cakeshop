@@ -74,14 +74,21 @@ class ReviewDocTests {
     private static final List<String> JAVA_PREFIXES = List.of("docs/");
 
     /**
-     * 없어졌지만 <b>일부러 이름을 부르는</b> 문서.
+     * 없어진 문서를 <b>이름으로 불러도 되는 유일한 자리</b> — 이 migration을 설명하는 줄.
      *
-     * <p>문서 재배치가 이 둘을 지웠고, PLAN.md 결정 로그와 migration 주석 설명이 그 사실을
-     * 적으면서 이름을 부른다. <b>없앤 파일을 없앴다고 적는 것이 검사 위반이 되면 안 된다.</b>
-     * 되살아나면 이 목록에서 빼는 것이 그때 할 일이다.
+     * <p>머지된 Flyway migration의 주석 세 곳이 지금은 없는 SPEC.md를 가리키는데, 체크섬 때문에
+     * 주석 한 글자도 고칠 수 없다(PLAN.md 하네스 절). 그 사실을 문서에 적으려면 없어진 이름을
+     * 불러야 하고, <b>없앤 파일을 없앴다고 적는 것이 검사 위반이 되면 안 된다.</b>
+     *
+     * <p><b>이름이 아니라 줄로 좁혔다.</b> 처음에는 그 두 이름을 <b>어디서 부르든</b>
+     * 통과시켰는데, 그러면 다른 문서에 낡은 참조가 새로 들어와도 H1이 그냥 넘긴다 — 막으려던
+     * 죽은 참조가 그 이름으로만 뚫린다(PR #154 Codex 리뷰). 이제 <b>이 migration을 함께 적은
+     * 줄에서만</b> 봐준다. migration이 사라지는 날 이 상수도 함께 사라진다.
+     *
+     * <p>이 주석이 없어진 문서를 <b>맨 이름</b>으로 부르는 것도 같은 이유다. 전체 경로로 적으면
+     * 이 줄 자체가 죽은 참조가 된다.
      */
-    private static final Set<String> REMOVED_DOCS_NAMED_ON_PURPOSE =
-            Set.of("docs/review/SPEC.md", "docs/review/FLOW.md");
+    private static final String UNTOUCHABLE_MIGRATION = "V20260806_075114";
 
     /** DOMAIN.md 1절 기능 표의 행. `| **A1** | ... | `review-write.md` |` */
     private static final Pattern INVENTORY_ROW =
@@ -122,7 +129,9 @@ class ReviewDocTests {
      * 줄임 표기도 검사 밖이다 — 실제 경로는 `src/main/java/...` 아래라 접두사 규칙에 걸리지 않는다.
      *
      * <p><b>일부러 보지 않는 곳</b>: 머지된 Flyway migration. 체크섬 때문에 주석 한 글자도 고칠 수
-     * 없어 검사 대상에 넣으면 영원히 빨간불이다. 근거는 PLAN.md 하네스 절.
+     * 없어 검사 대상에 넣으면 영원히 빨간불이다. 근거는 PLAN.md 하네스 절. <b>그 migration을
+     * 설명하는 줄도 함께 건너뛴다</b> — 없어진 문서 이름을 불러야 설명이 되기 때문이고, 범위는
+     * 이름이 아니라 줄이다({@link #UNTOUCHABLE_MIGRATION}).
      */
     @Test
     @DisplayName("H1. 문서와 리뷰 소스가 가리키는 문서 경로가 전부 실존한다")
@@ -140,18 +149,22 @@ class ReviewDocTests {
                     file.getFileName().toString().endsWith(".java")
                             ? JAVA_PREFIXES
                             : DOC_RELATIVE_PREFIXES;
-            Matcher matcher = DOC_REFERENCE.matcher(read(file));
-            while (matcher.find()) {
-                String reference = matcher.group();
-                if (prefixes.stream().noneMatch(reference::startsWith)) {
+
+            for (String line : read(file).lines().toList()) {
+                // 없어진 문서를 이름으로 부를 수 있는 자리는 이 migration을 설명하는 줄뿐이다.
+                if (line.contains(UNTOUCHABLE_MIGRATION)) {
                     continue;
                 }
-                if (REMOVED_DOCS_NAMED_ON_PURPOSE.contains(reference)) {
-                    continue;
-                }
-                checkedCount++;
-                if (!resolves(file, reference)) {
-                    broken.add(file + " -> " + reference);
+                Matcher matcher = DOC_REFERENCE.matcher(line);
+                while (matcher.find()) {
+                    String reference = matcher.group();
+                    if (prefixes.stream().noneMatch(reference::startsWith)) {
+                        continue;
+                    }
+                    checkedCount++;
+                    if (!resolves(file, reference)) {
+                        broken.add(file + ":" + reference);
+                    }
                 }
             }
         }
@@ -194,15 +207,28 @@ class ReviewDocTests {
      * 돌아온다. <b>"정확히 한 번"이 중요하다</b> — 옮기다 남긴 사본이 두 곳에 있으면 한쪽만 고치는
      * 일이 반드시 생긴다.
      *
+     * <p><b>1절 표 자체의 중복도 함께 본다.</b> 라우팅을 `Map`으로 읽으므로 같은 ID 행이 두 번
+     * 있으면 뒤 행이 앞 행을 조용히 덮어쓴다 — 그러면 H2는 뒤 행만 검사하고 H3는 집합 비교라
+     * 중복을 아예 잃어서, 두 행이 <b>서로 다른 spec을 가리켜도</b> 셋 다 통과한다(PR #154 Codex
+     * 리뷰). 표를 복사해 새 기능을 만들 때 ID를 안 고치는 것이 이 구조에서 흔한 실수다.
+     *
      * <p><b>보증하지 않는 것</b>: 절의 내용은 보지 않는다. 제목만 있고 본문이 비어도 통과한다.
      */
     @Test
     @DisplayName("H2. 기능 표의 모든 ID가 지정된 specs 파일에 정확히 한 번 있다")
     void everyFeatureId_hasExactlyOneSection_inItsSpecFile() {
-        Map<String, String> routing = featureRouting();
-        assertThat(routing).as("1절 기능 표를 한 행도 읽지 못했다").hasSizeGreaterThanOrEqualTo(21);
-
         List<String> problems = new ArrayList<>();
+
+        List<String> idsInOrder = inventoryIdsInOrder();
+        assertThat(idsInOrder).as("1절 기능 표를 한 행도 읽지 못했다").hasSizeGreaterThanOrEqualTo(21);
+        for (String id : new LinkedHashSet<>(idsInOrder)) {
+            long rows = idsInOrder.stream().filter(id::equals).count();
+            if (rows != 1) {
+                problems.add(id + ": 1절 기능 표에 " + rows + "행 있다. 라우팅이 뒤 행으로 덮어써진다");
+            }
+        }
+
+        Map<String, String> routing = featureRouting();
         for (Map.Entry<String, String> entry : routing.entrySet()) {
             String id = entry.getKey();
             String specFileName = entry.getValue();
@@ -364,7 +390,23 @@ class ReviewDocTests {
     // 파싱 도우미
     // ------------------------------------------------------------------
 
-    /** DOMAIN.md 1절 기능 표를 ID → spec 파일 이름으로 읽는다. */
+    /**
+     * DOMAIN.md 1절 기능 표의 ID를 <b>행 순서 그대로</b> 읽는다.
+     *
+     * <p>{@link #featureRouting()}은 `Map`이라 중복을 잃는다. 중복을 보려면 행을 그대로 세야 한다.
+     */
+    private List<String> inventoryIdsInOrder() {
+        List<String> ids = new ArrayList<>();
+        for (String line : read(DOMAIN_DOC).lines().toList()) {
+            Matcher matcher = INVENTORY_ROW.matcher(line);
+            if (matcher.matches()) {
+                ids.add(matcher.group(1));
+            }
+        }
+        return ids;
+    }
+
+    /** DOMAIN.md 1절 기능 표를 ID → spec 파일 이름으로 읽는다. 중복 ID는 H2가 따로 본다. */
     private Map<String, String> featureRouting() {
         Map<String, String> routing = new LinkedHashMap<>();
         for (String line : read(DOMAIN_DOC).lines().toList()) {
