@@ -134,6 +134,25 @@ class RefundServiceTests {
     }
 
     @Test
+    void cancelCustomerZeroAmountOrder_zeroAmount_cancelsWithoutPaymentCancellation() {
+        Order order = order(3L);
+        Payment payment = payment();
+        payment.setAmount(BigDecimal.ZERO);
+        when(orderMapper.findOrderByIdForUpdate(10L)).thenReturn(Optional.of(order));
+        when(paymentMapper.findDonePaymentByOrderId(10L)).thenReturn(Optional.of(payment));
+        when(paymentMapper.cancelIfDone(20L, "ZERO_AMOUNT_CANCELED", NOW)).thenReturn(1);
+        when(orderMapper.cancelIfCurrent(
+                10L, OrderStatus.READY_FOR_PICKUP, "CUSTOMER", "cancel", NOW
+        )).thenReturn(1);
+        when(orderMapper.findStockDeductedItemsForRestore(10L)).thenReturn(List.of());
+
+        assertThat(refundService.cancelCustomerZeroAmountOrder(3L, 10L, "cancel")).isTrue();
+
+        verify(paymentMapper, never()).insertPaymentCancellation(any(PaymentCancellation.class));
+        verify(couponOrderCommandService).restoreCouponForCanceledOrder(10L);
+    }
+
+    @Test
     void prepareCustomerCancellation_existingRequestedCancellation_reusesIdempotencyKey() {
         Order order = order(3L);
         Payment payment = payment();

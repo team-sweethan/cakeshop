@@ -97,8 +97,15 @@
     select.addEventListener("change", function () {
       if (!select.value) { discount.textContent = "0원"; finalAmount.textContent = format(original); return; }
       const form = select.form;
-      const params = new URLSearchParams(new FormData(form));
-      params.set("memberCouponId", select.value);
+      // 미리보기 계산에는 상품·수량·옵션·선택 쿠폰만 필요하다. 폼 전체를 URL에 담지 않는다.
+      const params = new URLSearchParams();
+      ["productId", "quantity", "memberCouponId"].forEach(function (name) {
+        const value = form.elements[name] && form.elements[name].value;
+        if (value) params.set(name, value);
+      });
+      form.querySelectorAll("[name='optionIds']:checked").forEach(function (option) {
+        params.append("optionIds", option.value);
+      });
       fetch("/orders/coupon-preview?" + params.toString())
         .then(response => response.ok ? response.json() : Promise.reject())
         .then(result => { discount.textContent = "-" + format(result.discountAmount); finalAmount.textContent = format(result.finalAmount); })

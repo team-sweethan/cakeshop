@@ -62,6 +62,26 @@ public class RefundService {
         return prepareCancellation(adminMemberId, order, reason, ADMIN);
     }
 
+    /**
+     * PG 승인 없이 완료된 0원 일반 주문을 내부 상태 전이만으로 취소한다.
+     * 일반 금액 주문이면 기존 PG 취소 흐름을 사용하도록 false를 반환한다.
+     */
+    @Transactional
+    public boolean cancelCustomerZeroAmountOrder(long memberId, long orderId, String reason) {
+        validateCancellationInput(memberId, reason);
+        validateActiveMember(memberId);
+        return cancelZeroAmountOrder(findOwnedOrder(memberId, orderId), reason, CUSTOMER);
+    }
+
+    /** 관리자가 요청한 0원 일반 주문 취소를 PG 호출 없이 완료한다. */
+    @Transactional
+    public boolean cancelAdminZeroAmountOrder(long adminMemberId, long orderId, String reason) {
+        validateCancellationInput(adminMemberId, reason);
+        Order order = orderMapper.findOrderByIdForUpdate(orderId)
+                .orElseThrow(() -> new BusinessException(CommonErrorCode.NOT_FOUND));
+        return cancelZeroAmountOrder(order, reason, ADMIN);
+    }
+
     private RefundRequest prepareCancellation(
             long requestedBy,
             Order order,
@@ -114,6 +134,25 @@ public class RefundService {
                 canceledBy,
                 now
         );
+    }
+
+    private boolean cancelZeroAmountOrder(Order order, String reason, String canceledBy) {
+        requireGeneralReadyForPickup(order);
+        Payment payment = paymentMapper.findDonePaymentByOrderId(order.getId())
+                .orElseThrow(() -> new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_NOT_AVAILABLE));
+        if (payment.getAmount() == null || payment.getAmount().signum() != 0) {
+            return false;
+        }
+
+        LocalDateTime canceledAt = LocalDateTime.now(clock);
+        OrderStatus expectedStatus = requireGeneralCancelableStatus(order, canceledAt);
+        requireOneRow(paymentMapper.cancelIfDone(payment.getId(), "ZERO_AMOUNT_CANCELED", canceledAt));
+        requireOneRow(orderMapper.cancelIfCurrent(
+                order.getId(), expectedStatus, canceledBy, reason.trim(), canceledAt
+        ));
+        couponOrderCommandService.restoreCouponForCanceledOrder(order.getId());
+        restoreDeductedStock(order, canceledAt);
+        return true;
     }
 
     private RefundRequest reuseRequestedCancellation(

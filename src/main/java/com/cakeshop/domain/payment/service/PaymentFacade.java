@@ -119,6 +119,8 @@ public class PaymentFacade {
         if (order.amount().signum() != 0) {
             throw new BusinessException(PaymentErrorCode.AMOUNT_MISMATCH);
         }
+        // 일반 PG 승인 경로와 동일하게 완료 직전에도 결제 가능 시간을 다시 확인한다.
+        validatePaymentExpiration(order.paymentExpiresAt());
         Payment payment = paymentService.getReadyPayment(orderId);
         paymentService.completeZeroAmountGeneralPayment(order, payment, LocalDateTime.now(clock));
     }

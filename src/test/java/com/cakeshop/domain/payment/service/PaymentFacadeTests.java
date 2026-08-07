@@ -110,6 +110,21 @@ class PaymentFacadeTests {
     }
 
     @Test
+    void completeZeroAmountGeneralPayment_expiredOrder_rejectsBeforeCompleting() {
+        GeneralPaymentOrder order = new GeneralPaymentOrder(
+                1L, BigDecimal.ZERO, NOW, List.of()
+        );
+        when(orderService.getGeneralPaymentOrder(10L, 1L)).thenReturn(order);
+
+        assertPaymentError(
+                () -> paymentFacade.completeZeroAmountGeneralPayment(10L, 1L),
+                PaymentErrorCode.PAYMENT_EXPIRED
+        );
+
+        verify(paymentService, never()).getReadyPayment(1L);
+    }
+
+    @Test
     void confirmGeneralPayment_amountMismatch_doesNotCallToss() {
         GeneralPaymentOrder order = order(NOW.plusMinutes(5));
         Payment payment = payment();
