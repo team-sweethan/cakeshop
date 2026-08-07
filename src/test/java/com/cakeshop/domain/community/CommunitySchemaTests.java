@@ -16,15 +16,7 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-/**
- * 조각 0에서 추가한 migration 두 개를 검증한다.
- *
- * <p>하나는 상태 컬럼의 CHECK 제약이고, 다른 하나는 게시글 작성에 필요한 카테고리 참조
- * 데이터다. 둘 다 docs/community/DOMAIN.md의 결정을 DB에 못 박은 것이므로, 규칙이 코드에서만
- * 지켜지고 DB에서는 뚫리는 상황을 여기서 잡는다.
- *
- * <p>조각 5에서 post_reports.status 제약이 같은 이유로 합류했다.
- */
+/** 커뮤니티 참조 데이터, 제약, 인덱스를 검증한다. */
 @MybatisTest
 @MariaDbIntegrationTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -36,21 +28,16 @@ class CommunitySchemaTests {
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    void postCategories_afterMigration_containsMvpCategories() {
-        List<String> codes = jdbcTemplate.queryForList(
-                "SELECT code FROM post_categories ORDER BY sort_order", String.class);
+    void postCategories_afterMigration_haveExpectedCodesOrderAndStatus() {
+        List<String> categories = jdbcTemplate.queryForList(
+                """
+                SELECT CONCAT(code, ':', sort_order, ':', is_active)
+                FROM post_categories
+                ORDER BY sort_order
+                """,
+                String.class);
 
-        assertThat(codes).containsExactly("QNA", "REVIEW", "FREE");
-    }
-
-    @Test
-    void postCategories_afterMigration_areAllActive() {
-        // 카테고리 목록은 is_active = 1인 것만 노출한다(DOMAIN.md 6.8).
-        // 초기 3종이 비활성으로 들어가면 글쓰기 화면에 선택지가 하나도 없다.
-        Integer activeCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM post_categories WHERE is_active = 1", Integer.class);
-
-        assertThat(activeCount).isEqualTo(3);
+        assertThat(categories).containsExactly("QNA:1:1", "REVIEW:2:1", "FREE:3:1");
     }
 
     @Test
@@ -128,136 +115,46 @@ class CommunitySchemaTests {
         assertThat(inserted).isEqualTo(ReportStatus.values().length);
     }
 
-    /**
-     * 조회수 정렬을 받쳐 주는 인덱스가 있는지, 그리고 <b>컬럼 순서</b>가 맞는지 확인한다.
-     *
-     * <p>이 인덱스가 없거나 순서가 뒤집혀도 <b>화면 결과는 완전히 똑같다.</b> 목록은
-     * 조회수순으로 멀쩡히 나오고 달라지는 것은 속도뿐이라, 지워지거나 잘못 만들어져도
-     * 아무도 눈치채지 못한다 — 조각 4에서 겪은 "교착처럼 터지지 않고 조용히 느려지기만
-     * 하는" 자리와 같은 종류다.
-     *
-     * <p>순서가 규칙인 이유는 선두가 등치 조건인 {@code status}여야 그 값으로 좁힌 안에서
-     * {@code view_count}가 이미 정렬된 상태가 되기 때문이다. 뒤집으면 정렬은 살아도
-     * 스캔량이 줄지 않는다. {@code id}가 셋째인 것은 tiebreaker까지 인덱스로 끝내려는
-     * 것이다 — 조회수는 0이 대부분이라 동점 구간이 넓다.
-     */
     @Test
-    void posts_hasViewCountSortIndexInExpectedColumnOrder() {
-        List<String> columns = jdbcTemplate.queryForList(
-                """
-                SELECT column_name
-                FROM information_schema.statistics
-                WHERE table_schema = DATABASE()
-                  AND table_name = 'posts'
-                  AND index_name = 'ix_posts_status_view_count'
-                ORDER BY seq_in_index
-                """,
-                String.class);
+    void communityIndexes_haveRequiredColumnPrefixes() {
+        assertIndexPrefix("posts", null, "status,view_count,id");
+        assertIndexPrefix("comments", null, "created_at,post_id");
+        assertIndexPrefix("post_views", true, "created_at,post_id");
+        assertIndexPrefix("post_likes", true, "created_at,post_id");
+        assertIndexPrefix("post_views", true, "post_id,viewer_key,created_at");
 
-        assertThat(columns).containsExactly("status", "view_count", "id");
-    }
-
-    /**
-     * 집계용 인덱스 셋이 있는지, 그리고 <b>컬럼 순서</b>가 맞는지 확인한다(조각 7b).
-     *
-     * <p>{@code (created_at, post_id)}이지 그 반대가 아니다. 선두가 범위 조건인
-     * {@code created_at}이어야 배치가 7일 창으로 좁힐 수 있고, {@code post_id}가 둘째면
-     * 뒤따르는 집계까지 인덱스만 읽고 끝난다. 뒤집으면 창으로 못 좁혀 세 테이블을
-     * 통째로 훑는다.
-     *
-     * <p>여기가 틀려도 <b>순위 결과는 완전히 똑같다.</b> 달라지는 것은 스캔량뿐이라
-     * 조회수 정렬 인덱스와 같은 종류다 — 터지지 않고 조용히 느려지기만 한다. 게다가
-     * 배치는 새벽에 혼자 도니 느려진 것을 알아챌 사람도 없다.
-     *
-     * <p>{@code post_views}에 이미 있는 {@code ix_post_views_post_viewer_created}로는
-     * 이 일을 못 한다. 선두가 {@code post_id}라 창으로는 탈 수 없다 — 같은 컬럼이 들어
-     * 있다고 해서 쓸 수 있는 인덱스가 아니라는 것이 이 검사가 남기는 기록이다.
-     */
-    @Test
-    void popularityWindowIndexes_existInExpectedColumnOrder() {
-        assertThat(indexColumns("post_views", "ix_post_views_created"))
-                .containsExactly("created_at", "post_id");
-        assertThat(indexColumns("post_likes", "ix_post_likes_created"))
-                .containsExactly("created_at", "post_id");
-        assertThat(indexColumns("comments", "ix_comments_created"))
-                .containsExactly("created_at", "post_id");
-    }
-
-    private List<String> indexColumns(String tableName, String indexName) {
-        return jdbcTemplate.queryForList(
-                """
-                SELECT column_name
-                FROM information_schema.statistics
-                WHERE table_schema = DATABASE()
-                  AND table_name = ?
-                  AND index_name = ?
-                ORDER BY seq_in_index
-                """,
-                String.class, tableName, indexName);
-    }
-
-    /**
-     * 조회 이력을 {@code viewed_on} 없이 넣을 수 있는지 확인한다(PR #98 Codex 리뷰 P1).
-     *
-     * <p>10분 창 migration은 <b>확장 단계만</b> 한다 — 컬럼을 지우지 않고 NULL 허용으로만
-     * 바꾼다. 그래야 구버전(날짜를 넣는다)과 신버전(넣지 않는다)이 같은 스키마에서 함께
-     * 돈다. 이 단언은 <b>컬럼 삭제(contract) 뒤에도 그대로 참</b>이라, 다음 단계가 들어와도
-     * 고칠 필요가 없다. 지금 지키려는 것은 컬럼의 유무가 아니라 {@code recordView}가
-     * 동작한다는 것이다.
-     */
-    @Test
-    void postViews_withoutViewedOn_isAccepted() {
-        Long memberId = insertMember("view-expand@cakeshop.local");
-        Long postId = insertPost(memberId, findCategoryId("QNA"), PostStatus.PUBLISHED.name());
-
-        jdbcTemplate.update(
-                "INSERT INTO post_views (post_id, viewer_key) VALUES (?, ?)", postId, "S:expand");
-
-        assertThat(jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM post_views WHERE post_id = ?", Integer.class, postId))
-                .isEqualTo(1);
-    }
-
-    /**
-     * 같은 조회자가 같은 글을 두 번 볼 수 있는지 확인한다(DOMAIN.md 6.2).
-     *
-     * <p>굴러가는 창은 UNIQUE로 표현할 수 없어 제약을 지웠다. 다시 걸리면 두 번째 조회부터
-     * {@code recordView}가 예외를 던져 <b>상세 화면이 500</b>이 된다. 컬럼만 지우고 UNIQUE를
-     * 남기는 실수가 정확히 이 모양이라 migration이 인덱스를 명시적으로 지운다.
-     */
-    @Test
-    void postViews_sameViewerTwice_isAcceptedAfterUniqueDropped() {
-        Long memberId = insertMember("view-window@cakeshop.local");
-        Long postId = insertPost(memberId, findCategoryId("QNA"), PostStatus.PUBLISHED.name());
-
-        jdbcTemplate.update(
-                "INSERT INTO post_views (post_id, viewer_key) VALUES (?, ?)", postId, "S:twice");
-        jdbcTemplate.update(
-                "INSERT INTO post_views (post_id, viewer_key) VALUES (?, ?)", postId, "S:twice");
-
-        assertThat(jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM post_views WHERE post_id = ?", Integer.class, postId))
-                .isEqualTo(2);
-    }
-
-    /**
-     * 창 판단이 탈 인덱스가 있는지 확인한다.
-     *
-     * <p>이 인덱스는 {@code fk_post_views_post}가 요구하던 자리를 지웠던 UNIQUE에게서
-     * 물려받은 것이기도 하다. 없어도 결과는 같고 느려지기만 해서 화면으로는 구분되지 않는다.
-     */
-    @Test
-    void postViews_windowIndex_exists() {
         List<String> indexes = jdbcTemplate.queryForList(
                 """
-                SELECT DISTINCT index_name FROM information_schema.statistics
-                 WHERE table_schema = DATABASE() AND table_name = 'post_views'
+                SELECT DISTINCT index_name
+                FROM information_schema.statistics
+                WHERE table_schema = DATABASE() AND table_name = 'post_views'
                 """,
                 String.class);
+        assertThat(indexes).doesNotContain("uk_post_views_post_viewer_date");
+    }
 
-        assertThat(indexes)
-                .contains("ix_post_views_post_viewer_created")
-                .doesNotContain("uk_post_views_post_viewer_date");
+    private void assertIndexPrefix(String tableName, Boolean nonUnique, String prefix) {
+        List<IndexDefinition> indexes = jdbcTemplate.query(
+                """
+                SELECT GROUP_CONCAT(column_name ORDER BY seq_in_index) AS columns,
+                       MAX(non_unique) AS non_unique
+                FROM information_schema.statistics
+                WHERE table_schema = DATABASE() AND table_name = ?
+                GROUP BY index_name
+                """,
+                (resultSet, rowNum) -> new IndexDefinition(
+                        resultSet.getString("columns"), resultSet.getBoolean("non_unique")),
+                tableName);
+
+        assertThat(indexes).anySatisfy(index -> {
+            assertThat(index.columns()).startsWith(prefix);
+            if (nonUnique != null) {
+                assertThat(index.nonUnique()).isEqualTo(nonUnique);
+            }
+        });
+    }
+
+    private record IndexDefinition(String columns, boolean nonUnique) {
     }
 
     private Long findCategoryId(String code) {

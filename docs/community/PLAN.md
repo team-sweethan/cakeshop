@@ -52,7 +52,7 @@ docs/community/DOMAIN.md와 기존 코드를 먼저 읽고 구현 계획을 보�
 
 **검증**: 전이 규칙 단위 테스트(허용 3 / 금지 3), MariaDB Testcontainers로 CHECK 제약이 잘못된 값을 거부하는지, 카테고리 3건이 주입되는지.
 
-**완료 (2026-08-02, `4c9cdb7`)**. `PostStatus`(전이 규칙 포함), `CommentStatus`, `V20260802_113219__add_post_status_constraint.sql`(`posts`·`comments` 두 컬럼), `V20260802_113229__provision_post_categories.sql`을 추가했다. 검증은 `PostStatusTests`(6), `CommentStatusTests`(3), `CommunitySchemaTests`(6)로 고정했고 하네스 표에 H0a·H0b로 올렸다. `comments.status`도 함께 제약을 건 것은 계획보다 넓지만, 댓글 자리 표시 정책(DOMAIN.md 4.4)이 상태값에 의존하므로 같은 migration에 담았다.
+**완료 (2026-08-02, `4c9cdb7`)**. `PostStatus`(전이 규칙 포함), `CommentStatus`, `V20260802_113219__add_post_status_constraint.sql`(`posts`·`comments` 두 컬럼), `V20260802_113229__provision_post_categories.sql`을 추가했다. 검증은 `PostStatusTests`와 `CommunitySchemaTests`로 고정했고 하네스 표에 H0a·H0b로 올렸다. `comments.status`도 함께 제약을 건 것은 계획보다 넓지만, 댓글 자리 표시 정책(DOMAIN.md 4.4)이 상태값에 의존하므로 같은 migration에 담았다.
 
 ### 조각 1 — 목록·상세
 
@@ -136,7 +136,7 @@ H7은 리뷰를 거치며 다섯 번 강해졌다.
 
 **검증**: 같은 요청 반복 시 카운트 불변, **동시 요청 후 `like_count == post_likes 실제 개수`**, 삭제된 게시글에 좋아요 시도 거부.
 
-**완료 (2026-08-04)**. `CommunityMapper` +6 statement(`lockPost`·`insertLike`·`deleteLike`·`recalculateLikeCount`·`existsLike`·`countLikes`), `dto/view/PostLockView`, `CommunityService` 3개 메서드 + `requireLikeablePost`, `CommunityController` 2개 핸들러 + 상세 모델 확장(`canLike`·`likedByViewer`), `detail.html`의 숫자만 있던 `좋아요 N` 자리를 버튼과 함께 교체. migration은 없다 — `post_likes`(`UNIQUE(post_id, member_id)` + FK 2개)와 `posts.like_count`가 V0에 전부 있다. `SecurityConfig`도 그대로다. 공개 규칙이 `GET` 한정이라 새 POST 경로는 `anyRequest().authenticated()`에 걸린다.
+**완료 (2026-08-04)**. `CommunityMapper` +5 statement(`lockPost`·`insertLike`·`deleteLike`·`recalculateLikeCount`·`existsLike`), `dto/view/PostLockView`, `CommunityService` 3개 메서드 + `requireLikeablePost`, `CommunityController` 2개 핸들러 + 상세 모델 확장(`canLike`·`likedByViewer`), `detail.html`의 숫자만 있던 `좋아요 N` 자리를 버튼과 함께 교체. migration은 없다 — `post_likes`(`UNIQUE(post_id, member_id)` + FK 2개)와 `posts.like_count`가 V0에 전부 있다. `SecurityConfig`도 그대로다. 공개 규칙이 `GET` 한정이라 새 POST 경로는 `anyRequest().authenticated()`에 걸린다.
 
 검증은 `CommunityMapperTests`(+7), `CommunityMapperXmlTests`(+3), `CommunityServiceTests`(+9), `CommunityControllerTests`(+8), `CommunityScreenRenderingTests`(+5), 새 `CommunityLikeConcurrencyTests`(3)로 고정했다. 하네스 표에 H2c(예정이던 것)와 H15를 올렸다.
 
@@ -164,7 +164,7 @@ H7은 리뷰를 거치며 다섯 번 강해졌다.
 - **차단·해제·기각**: `ReportStatus`(전이 규칙 포함), `V20260804_074043__add_post_report_status_constraint.sql`, `CommunityMapper` +5 statement(`findPostsForAdmin`·`countPostsForAdmin`·`findPostByIdForAdmin`·`blockPost`·`unblockPost`), `dto/view` 3종(`AdminPostListView`·`AdminPostDetailView`·`AdminPostSort`), `dto/form/BlockForm`, 새 `CommunityAdminService`, `CommunityAdminController` 5개 핸들러, 관리자 템플릿 2종 전면 교체.
 - migration은 CHECK 제약 하나뿐이다 — `post_reports`와 `posts.blocked_*`가 V0에 전부 있다. `SecurityConfig`도 그대로다. 새 경로는 `/admin/**` → `hasRole("ADMIN")`과 `anyRequest().authenticated()`에 걸린다.
 
-검증은 `CommunitySchemaTests`(+2), `ReportStatusTests`(2), `CommunityMapperXmlTests`(+9), `CommunityMapperTests`(+12), `CommunityServiceTests`(+7), 새 `CommunityAdminServiceTests`(11), `CommunityControllerTests`(+5), 새 `CommunityAdminControllerTests`(9), `CommunityScreenRenderingTests`(+9)로 고정했다. 하네스 표에 H16·H17·H18을 올렸다.
+검증은 `CommunitySchemaTests`, `CommunityMapperXmlTests`, `CommunityMapperTests`, `CommunityServiceTests`, `CommunityAdminServiceTests`, `CommunityControllerTests`, `CommunityAdminControllerTests`, `CommunityScreenRenderingTests`로 고정했다. 하네스 표에 H16·H17·H18을 올렸다.
 
 **관리자 서비스를 따로 뒀다.** 고객 경로는 "노출 중인 글만"이 기본이고 그 판단이 거의 모든 메서드에 붙어 있는데, 관리자 경로는 **모든 상태를 보는 것이 기본**이다(4.3). 한 클래스에 섞으면 노출 판단을 빠뜨린 메서드가 고객 경로에서 호출되는 날이 오고, 그때 새는 것은 차단된 글의 본문이다.
 
@@ -195,7 +195,7 @@ H7은 리뷰를 거치며 다섯 번 강해졌다.
 
 **함께 손봐야 하는 것**: `CommunityQueryCountTests.getPostDetail_queryCount_isFixed`가 상세 SELECT 1회를 단언한다. `INSERT`는 update 경로라 세지 않지만, 중복 여부를 SELECT로 확인하는 구현으로 가면 이 수가 바뀐다 — **DB가 판단하게 두면 안 바뀐다.**
 
-**완료 (2026-08-04)**. `V20260803_235726__add_post_views.sql`, `CommunityMapper` +2 statement(`recordView`·`countViews`) 및 `increaseViewCount` 재작성, `CommunityService.getPostDetail`에 `viewerKey` 추가, `CommunityController.viewerKeyOf`, `seed-community.sql`에 조회 이력 절 추가. 하네스 표에 H12·H13·H14를 올렸다.
+**완료 (2026-08-04)**. `V20260803_235726__add_post_views.sql`, `CommunityMapper.recordView` 및 `increaseViewCount` 재작성, `CommunityService.getPostDetail`에 `viewerKey` 추가, `CommunityController.viewerKeyOf`, `seed-community.sql`에 조회 이력 절 추가. 하네스 표에 H12·H13·H14를 올렸다.
 
 검증은 `CommunityMapperTests`(+8), `CommunityMapperXmlTests`(+2), `CommunityServiceTests`(+3), `CommunityControllerTests`(+2), 새 `CommunityViewCountTests`(6)·`CommunityViewCountConcurrencyTests`(2)로 고정했다.
 
@@ -452,7 +452,7 @@ resources/mapper/member/MemberCommunityMapper.xml
 
 **10d — 되돌아오는 것을 막는다.** 조각 10이 한 일은 JOIN을 지운 것이지만, 지운 상태를 유지하는 것은 다른 문제다. **JOIN 하나를 다시 넣으면 화면 결과가 똑같고 기존 테스트도 전부 통과한다.** 빠르고 편하기까지 해서 되돌아올 이유는 늘 있다. 그래서 세 갈래로 막았다.
 
-- **형태 검사**(`CommunityDomainBoundaryTests`) — 커뮤니티 SQL이 `members`를 건드리지 않는지, 커뮤니티 코드가 회원 도메인에서 **합의된 계약 둘만** 쓰는지. 뒤쪽은 금지 목록이 아니라 **허용 목록**이다. 금지 목록은 새로 생기는 것을 못 잡는다 — 회원 쪽에 Service가 하나 더 생기면 그것을 직접 가져다 쓰는 변경이 조용히 통과한다. 목록을 늘리는 것 자체가 "새 연동 계약을 만드는 중"이라는 신호가 되게 했다. 허용 목록이 **실제로 쓰이는 이름인지** 확인하는 검사를 하나 더 붙였다 — 참조가 하나도 없어도 첫 검사는 통과하므로, 계약 이름이 바뀌면 목록만 남고 검사는 초록불이 된다.
+- **형태 검사**(`CommunityDomainBoundaryTests`) — 커뮤니티 SQL이 `members`를 건드리지 않는지, 커뮤니티 코드가 회원 도메인에서 **합의된 계약 둘만 정확히** 쓰는지 확인한다. 허용 계약의 누락과 미합의 참조를 한 검사에서 함께 잡는다.
 - **실제 DB 조립 검사**(`CommunityMemberContractTests`) — 탈퇴 회원의 글·댓글·신고가 목록에 남고 표시명만 가려지는지를 고객·관리자 양쪽에서 본다. 15.9의 마지막 문단이 가리키는 자리다: `members.status`에 값이 하나 늘거나 `nickname`이 옮겨 가면 화면의 작성자가 전부 "탈퇴한 회원"이 되는데 커뮤니티 쪽 검사는 전부 초록불이다.
 - **쿼리 수**(H1b) — 관리자 목록까지 넓혔다.
 
@@ -483,14 +483,14 @@ resources/mapper/member/MemberCommunityMapper.xml
 
 | # | 무엇을 고정하나 | 형태 | 상태 |
 |---|---|---|---|
-| H0a | 게시글·댓글의 상태 전이 규칙(DOMAIN.md 4.2, 4.4). 특히 `BLOCKED -> DELETED` 금지와 `DELETED` 종착 | `PostStatusTests`(6), `CommentStatusTests`(3) | **적용** (조각 0) |
+| H0a | 게시글 상태 전이 규칙과 게시글·댓글 상태값 제약 | `PostStatusTests`, `CommunitySchemaTests` | **적용** (조각 0) |
 | H0b | `posts.status`·`comments.status`에 미정의 값이 저장되지 않음, 카테고리 3종이 활성 상태로 존재함 | `CommunitySchemaTests`(6), MariaDB Testcontainers로 CHECK 제약 검증 | **적용** (조각 0) |
 | H1a | 목록 SQL이 스칼라 서브쿼리 형태를 유지함. 정렬의 `id` tiebreaker, 노출 조건이 `status` 하나인 것도 함께 고정 | `CommunityMapperXmlTests` — `XMLMapperBuilder`로 XML 파싱 후 SQL 문자열 검사 (선례: `OrderMapperXmlTests`). ~~**조각 7에서 넓혀야 한다**~~ — **넓혔다 (조각 7a)**. 정렬 분기가 생기면서 `ORDER BY` 단언은 H28로 옮겨 분기마다 고정했고, 이 행은 스칼라 서브쿼리 형태와 노출 조건만 맡는다. **지워서 넘어가지 않았다** | **적용** (조각 1, 2026-08-04 분리) |
 | H1b | 목록 조회 시 실행 쿼리 수가 게시글 수와 무관. **고객 목록·댓글 구역·상세와 관리자 목록** | `CommunityQueryCountTests` — MyBatis `Interceptor`로 실행 statement 수 카운트. 조각 10b에서 작성자 조회가 붙어 기대값이 고정 1회씩 늘었고(목록 2→3, 댓글 2→3, 상세 1→2), 조각 10d에서 **관리자 목록**까지 넓혔다 — 10c에서 같은 N+1 위험이 생겼는데 배치 조회로 막아 뒀을 뿐 고정하지는 않은 상태였다. 조립을 행마다 조회하는 형태로 바꿔 무는 것을 확인했다 | **적용** (조각 1, 10b·10d 갱신) |
-| H1c | 조회수 증가가 게시글을 "수정됨"으로 만들지 않음 | `CommunityMapperTests.increaseViewCount_doesNotMarkPostAsEdited` + H1a의 SQL 형태 검사 | **적용** (조각 1) |
+| H1c | 조회수 증가가 게시글을 "수정됨"으로 만들지 않음 | `CommunityViewCountTests.getPostDetail_doesNotMarkPostAsEdited` | **적용** (조각 1) |
 | H2a | 소유권·상태 조건이 **SQL에도** 있음. 남의 글·차단된 글은 UPDATE가 0행이다 | `CommunityMapperTests` — `updatePost`/`deletePost`에 남의 회원 번호와 `BLOCKED` 글을 넣고 갱신 행 수와 실제 값을 함께 본다 | **적용** (조각 2) |
 | H2d | 조건부 UPDATE·DELETE가 0행이면 성공으로 넘어가지 않음. 검증 통과 후 상태가 바뀐 순간을 잡는다 | `CommunityServiceTests` — 갱신 행 수 0을 돌려주게 하고, 그 사이 `BLOCKED`가 되면 403이 나오는지까지 본다 | **적용** (조각 2) |
-| H2b | 차단된 글에 작성자가 아무 조치도 못 함. 수정·삭제 모두 403이고 Mapper까지 내려가지 않음 | `CommunityServiceTests` — 버튼 숨김이 아니라 Service 거절을 본다. 화면 쪽은 `CommunityScreenRenderingTests.communityDetail_blockedPost_author_hidesEditAndDeleteButtons` | **적용** (조각 2) |
+| H2b | 차단된 글에 작성자가 아무 조치도 못 함. 수정·삭제 모두 403이고 Mapper까지 내려가지 않음 | `CommunityServiceTests` — 버튼 숨김이 아니라 Service 거절을 본다. 화면 쪽은 `CommunityScreenRenderingTests.communityDetail_blockedPostAuthor_showsReasonAndHidesActions` | **적용** (조각 2) |
 | H2c | `like_count`와 실제 좋아요 수 일치. **동시 요청 뒤에도.** 그리고 그 동시 요청이 **교착 없이** 끝나는지 | `CommunityLikeConcurrencyTests`(3) — 8개 스레드를 배리어로 같은 순간에 출발시킨다. H14와 같이 **트랜잭션 롤백을 쓰지 않는다**(감싸면 다른 스레드가 게시글을 못 봐서 경쟁이 일어나지 않는다). 세 번째 테스트가 추가·취소를 섞는데, 두 경로가 서로 다른 순서로 잠그는 구현은 **같은 종류끼리는 멀쩡하고 섞였을 때만** 교착이라 앞의 둘로는 안 잡힌다 | **적용** (조각 4) |
 | H15 | 좋아요가 게시글 행을 **먼저** 잠그고 시작함. 잠금 조회가 다른 테이블을 조인하지 않음. 추가는 중복 키만 삼키고, 수는 증분이 아니라 재계산이며 `updated_at`을 보존함 | `CommunityMapperXmlTests` +3(SQL 형태), `CommunityServiceTests` +2(`InOrder`로 잠금 → 쓰기 → 재계산 순서), `CommunityMapperTests` +7(실제 MariaDB). 순서를 되돌리면 **교착**인데 동시 요청이 없으면 결과가 똑같다(H13과 같은 성질). 조인을 붙이면 교착이 아니라 **조용한 직렬화**라 더 안 보인다 | **적용** (조각 4) |
 | H16 | 신고가 좋아요의 반대편에 있음. 중복을 삼키지 않고(`IGNORE`·`ON DUPLICATE KEY` 부재), "이미 신고했는지"를 처리 상태와 무관하게 판단하며, 자기 글·비노출 글은 거절 | `CommunityMapperXmlTests` +2(SQL 형태), `CommunityMapperTests` +2(실제 UNIQUE 위반과 처리 후 재신고), `CommunityServiceTests` +6. **정상 흐름에서는 어느 쪽이든 똑같이 동작한다** — 갈리는 것은 두 번째 신고뿐이고, 그때 조용히 성공하면 신고자는 접수됐다고 믿는다 | **적용** (조각 5) |
@@ -522,7 +522,7 @@ resources/mapper/member/MemberCommunityMapper.xml
 | H13 | 조회수 UPDATE가 게시글 행을 **먼저** 잠그고 중복까지 판단함. 창의 기준이 DB 시계(`NOW(6)`)이고 폭이 10분임. 이력 INSERT는 중복을 삼키지 않음 | `CommunityMapperXmlTests` +2 — SQL 형태 검사. 순서를 되돌리면 **교착**이 나는데, 동시 요청이 없으면 결과가 똑같아 단일 스레드로는 드러나지 않는다. 창을 파라미터 시각으로 바꾸면 서버가 여러 대일 때만 어긋나므로 로컬에서는 절대 안 보인다 | **적용** (조각 6, 2026-08-04 갱신) |
 | H14 | `posts.view_count`가 `post_views` 이력과 일치함. **동시 요청 뒤에도.** 6.2가 좋아요와 달리 증분을 택하면서 대신 약속한 것이 이것이다 | `CommunityViewCountConcurrencyTests`(3) — 8개 스레드를 배리어로 같은 순간에 출발시킨다. **이 클래스만 트랜잭션 롤백을 쓰지 않는다** — 테스트를 트랜잭션으로 감싸면 다른 스레드가 게시글을 아예 못 봐서 경쟁 자체가 일어나지 않고, 통과하지만 아무것도 검증하지 않는 테스트가 된다. **2026-08-04부터 이 클래스가 유일한 방어선이다** — 10분 창으로 바꾸면서 `uk_post_views_post_viewer_date`를 지웠고, 이제 잠금 순서가 깨져도 DB는 아무 말도 하지 않는다. 세 번째 테스트가 **창이 열린 직후**의 동시 요청을 본다(앞의 둘은 창을 한 번도 넘지 않아 창 조건을 통째로 지워도 통과한다) | **적용** (조각 6, 2026-08-04 강화) |
 | H19 | 창의 폭이 실제로 10분임. **양쪽 경계를 다 본다** — 9분 전 이력은 막고, 11분 전 이력은 통과 | `CommunityMapperTests` +2(실제 MariaDB). 한쪽만 보면 창이 1분이든 하루든 똑같이 통과한다. 값이 조용히 틀어지면 좁아진 쪽은 조회수가 부풀고 넓어진 쪽은 숫자가 멈춘 것처럼 보이는데, 둘 다 화면으로는 구분되지 않는다. DB의 `NOW(6)`를 쓰므로 시각을 주입할 자리가 없어 **이력을 과거로 미는 방식**으로 확인한다 | **적용** (2026-08-04) |
-| H34 | 커뮤니티 SQL이 `members`를 건드리지 않고, 커뮤니티 코드가 회원 도메인에서 **합의된 계약 둘**(`MemberCommunityQueryService`, `MemberCommunityView`)만 씀 | `CommunityDomainBoundaryTests`(3) — 주석을 걷어낸 형태 검사. JOIN만이 아니라 서브쿼리·`EXISTS` 우회도 잡고, 금지가 아니라 **허용 목록**이라 회원 쪽에 새로 생기는 것도 막힌다. 세 번째는 허용 목록이 **실제로 쓰이는 이름인지**를 본다 — 참조가 하나도 없어도 앞의 검사는 통과하므로, 계약 이름이 바뀌면 목록만 남고 초록불이 된다. JOIN을 되돌려 심어 무는 것을 확인했다 | **적용** (조각 10d) |
+| H34 | 커뮤니티 SQL이 `members`를 건드리지 않고, 커뮤니티 코드가 회원 도메인에서 **합의된 계약 둘**(`MemberCommunityQueryService`, `MemberCommunityView`)만 씀 | `CommunityDomainBoundaryTests`(2) — SQL의 회원 소유 테이블 참조를 막고, 자바 참조가 허용 계약과 정확히 일치하는지 확인한다 | **적용** (조각 10d) |
 | H35 | 탈퇴 회원의 글·댓글·신고가 목록에 남고 **표시명만** 가려짐. 고객·관리자 양쪽 | `CommunityMemberContractTests`(5) — 실제 MariaDB. 커뮤니티 조회와 회원 조회 **두 문장이 합쳐진 결과**는 여기서만 드러난다. 양쪽을 각각 보는 검사는 이미 있지만, `members.status`에 값이 늘거나 `nickname`이 옮겨 가면 화면의 작성자가 전부 "탈퇴한 회원"이 되는데도 그 검사들은 전부 통과한다(15.9 마지막 문단). **회원 행이 아예 없는 경우는 여기에 없다** — `posts.member_id`가 NOT NULL FK라 만들 수 없고, 그쪽은 Service 테스트가 mock으로 본다 | **적용** (조각 10d) |
 | H7 | 화면 명세 `screens/*.md`가 실제 화면과 어긋나지 않음. 고객·관리자 템플릿 6종 전부. 문서가 "이 테스트가 지킨다"고 적은 테스트가 **실행되며 그 문구를 실제로 확인하는지**, `계획` 화면이 아직 안 만들어졌는지, **`SCREENS.md` 인덱스 표가 명세 파일과 같은지**도 함께 | `CommunityScreenDocTests`(7) — 문서를 파싱해 템플릿 파일·문구와 대조하고, 참조된 테스트는 리플렉션으로 실행 여부를, 소스 본문의 `containsString` 인자로 그 문구를 있다고 단언하는지를 본다. 명세는 **화면 하나에 파일 하나**여서 문자열 표가 어느 화면 것인지가 줄 순서에 기대지 않는다. `build.gradle`에서 `docs/`와 `src/test/java`를 `test` 입력으로 등록해야 문서만·공백만 고쳐도 다시 돈다 | **적용** (조각 1) |
 

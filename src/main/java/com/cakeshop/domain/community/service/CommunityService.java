@@ -27,6 +27,7 @@ import com.cakeshop.domain.community.dto.view.PostListView;
 import com.cakeshop.domain.community.dto.view.PostLockView;
 import com.cakeshop.domain.community.dto.view.PostSort;
 import com.cakeshop.domain.community.entity.Comment;
+import com.cakeshop.domain.community.entity.CommentStatus;
 import com.cakeshop.domain.community.entity.Post;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
@@ -246,7 +247,8 @@ public class CommunityService {
     @Transactional
     public void deleteComment(long postId, long commentId, long memberId) {
         requireCommentablePost(postId, memberId);
-        requireOwnComment(postId, commentId, memberId);
+        requireOwnCommentTransition(
+                postId, commentId, memberId, CommentStatus.DELETED);
 
         requireCommentApplied(
                 communityMapper.deleteComment(commentId, postId, memberId),
@@ -334,7 +336,8 @@ public class CommunityService {
         }
 
         requireCommentablePost(postId, memberId);
-        requireOwnComment(postId, commentId, memberId);
+        requireOwnCommentTransition(
+                postId, commentId, memberId, CommentStatus.DELETED);
 
         throw new BusinessException(CommunityErrorCode.COMMENT_NOT_FOUND);
     }
@@ -349,14 +352,18 @@ public class CommunityService {
         return post;
     }
 
-    private void requireOwnComment(long postId, long commentId, long memberId) {
+    private void requireOwnCommentTransition(
+            long postId,
+            long commentId,
+            long memberId,
+            CommentStatus next) {
         // 소유권 판단에만 쓰므로 작성자 표기가 필요 없고, 그래서 회원 조회도 붙지 않는다.
         CommentRow comment = communityMapper.findCommentById(commentId);
 
         if (comment == null
                 || !comment.postId().equals(postId)
                 || !comment.memberId().equals(memberId)
-                || comment.isDeleted()) {
+                || !comment.status().canTransitionTo(next)) {
             throw new BusinessException(CommunityErrorCode.COMMENT_NOT_FOUND);
         }
     }

@@ -13,7 +13,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import com.cakeshop.domain.community.entity.PostStatus;
-import com.cakeshop.domain.community.mapper.CommunityMapper;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 
 import org.junit.jupiter.api.AfterEach;
@@ -23,27 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-/**
- * 같은 조회자의 <b>동시</b> 조회가 조회수를 부풀리지 않는지 확인한다.
- *
- * <p>이 설계의 핵심이 여기 있다. "이미 봤는가"를 애플리케이션이 판단하면 동시 요청 두 개가
- * 그 판단을 <b>함께</b> 통과할 수 있고, 그러면 둘 다 조회수를 올린다. 판단을
- * {@code increaseViewCount} 안에 두어 게시글 행의 배타 잠금을 쥔 채로 평가해야 하나만
- * 살아남는다(docs/community/DOMAIN.md 6.2).
- *
- * <p><b>이 클래스가 유일한 방어선이다.</b> 창이 날짜 칸이던 시절에는
- * {@code uk_post_views_post_viewer_date}가 마지막으로 한 번 더 걸렀지만, 굴러가는 10분
- * 창은 UNIQUE로 표현할 수 없어 제약을 지웠다(V20260804_102934). 잠금 순서가 깨져도
- * 이제 DB는 아무 말도 하지 않는다 — 여기서 잡지 못하면 조회수가 조용히 부푼다.
- *
- * <p>단일 스레드 테스트로는 절대 드러나지 않는 종류의 어긋남이고, 화면에는 숫자가 조금
- * 큰 모습으로만 나타나서 눈으로도 찾을 수 없다.
- *
- * <p><b>이 클래스만 트랜잭션 롤백을 쓰지 않는다.</b> {@code @MybatisTest}처럼 테스트를
- * 트랜잭션으로 감싸면 다른 스레드가 이 테스트의 게시글을 <b>아예 볼 수 없어</b> 경쟁 자체가
- * 일어나지 않는다. 통과하지만 아무것도 검증하지 않는 테스트가 된다. 대신 넣은 행을
- * {@link #cleanUp()}에서 직접 지운다.
- */
+/** 동시 조회가 조회수를 잃거나 부풀리지 않는지 확인한다. */
 @SpringBootTest
 @MariaDbIntegrationTest
 class CommunityViewCountConcurrencyTests {
@@ -53,9 +32,6 @@ class CommunityViewCountConcurrencyTests {
 
     @Autowired
     private CommunityService communityService;
-
-    @Autowired
-    private CommunityMapper communityMapper;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -98,7 +74,7 @@ class CommunityViewCountConcurrencyTests {
         postId = jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
     }
 
-    /** 롤백이 없으므로 직접 지운다. 자식 → 부모 순이다. */
+    /** 픽스처를 자식부터 정리한다. */
     @AfterEach
     void cleanUp() {
         jdbcTemplate.update("DELETE FROM post_views WHERE post_id = ?", postId);
@@ -116,15 +92,10 @@ class CommunityViewCountConcurrencyTests {
                 .isEqualTo(1);
         assertThat(viewCount())
                 .as("view_count는 post_views에서 파생된 캐시다. 어긋나면 순위에 쓸 수 없다")
-                .isEqualTo(communityMapper.countViews(postId));
+                .isEqualTo(viewHistoryCount());
     }
 
-    /**
-     * 서로 다른 조회자의 동시 요청은 모두 세어지는지 확인한다.
-     *
-     * <p>위 테스트만 있으면 "무조건 1"로 만들어도 통과한다. 중복을 막는 것과 조회를 잃는
-     * 것은 다르다.
-     */
+    /** 서로 다른 조회자의 동시 요청을 모두 반영한다. */
     @Test
     void getPostDetail_concurrentViewsByDifferentViewers_countEach() throws Exception {
         List<String> keys = new ArrayList<>();
@@ -136,18 +107,10 @@ class CommunityViewCountConcurrencyTests {
         runConcurrentlyWith(keys);
 
         assertThat(viewCount()).isEqualTo(THREADS);
-        assertThat(viewCount()).isEqualTo(communityMapper.countViews(postId));
+        assertThat(viewCount()).isEqualTo(viewHistoryCount());
     }
 
-    /**
-     * 창을 벗어난 뒤의 동시 재조회가 <b>정확히 한 번만</b> 더 세어지는지 확인한다.
-     *
-     * <p>위의 두 테스트는 창을 한 번도 넘지 않으므로, 창 조건을 통째로 지워도(즉 같은
-     * 조회자를 영영 한 번만 세도) 그대로 통과한다. 창이 열린 <b>직후</b>가 이 설계에서
-     * 가장 위험한 순간이다 — 그 순간 8개 요청이 모두 "10분 전 이력밖에 없다"를 함께
-     * 읽으면 조회수가 한 번에 8 오른다. 날짜 칸 시절에는 UNIQUE가 그것까지 막았지만
-     * 지금은 게시글 행의 배타 잠금뿐이다.
-     */
+    /** 조회 창 이후 동시 재조회는 한 번만 추가 반영한다. */
     @Test
     void getPostDetail_concurrentViewsAfterWindow_countOnlyOnceMore() throws Exception {
         runConcurrently(() -> communityService.getPostDetail(postId, null, "S:racer"));
@@ -158,10 +121,10 @@ class CommunityViewCountConcurrencyTests {
         assertThat(viewCount())
                 .as("창이 열린 순간에도 동시 요청은 한 번만 세어야 한다")
                 .isEqualTo(2);
-        assertThat(viewCount()).isEqualTo(communityMapper.countViews(postId));
+        assertThat(viewCount()).isEqualTo(viewHistoryCount());
     }
 
-    /** 시계를 기다릴 수 없으므로 이력을 과거로 민다. 창 판단이 DB의 {@code NOW(6)}를 쓴다. */
+    /** 조회 이력을 창 밖으로 이동한다. */
     private void ageViews(int minutes) {
         jdbcTemplate.update(
                 "UPDATE post_views SET created_at = created_at - INTERVAL ? MINUTE"
@@ -183,12 +146,7 @@ class CommunityViewCountConcurrencyTests {
         execute(viewerKeys, key -> communityService.getPostDetail(postId, null, key));
     }
 
-    /**
-     * 모든 스레드를 같은 순간에 출발시킨다.
-     *
-     * <p>배리어가 없으면 스레드가 순서대로 실행되어 경쟁이 일어나지 않고, 그러면 이 테스트는
-     * 통과하지만 아무것도 검증하지 못한다.
-     */
+    /** 모든 작업을 같은 시점에 시작한다. */
     private void execute(List<String> arguments, java.util.function.Consumer<String> action)
             throws Exception {
         CyclicBarrier startLine = new CyclicBarrier(arguments.size());
@@ -206,7 +164,7 @@ class CommunityViewCountConcurrencyTests {
             }
 
             for (Future<Void> done : pool.invokeAll(calls)) {
-                // 예외가 있었다면 여기서 드러난다. 삼키면 실패가 통과로 보인다.
+                // 작업 스레드의 예외를 전달한다.
                 done.get(30, TimeUnit.SECONDS);
             }
         } finally {
@@ -218,5 +176,10 @@ class CommunityViewCountConcurrencyTests {
     private long viewCount() {
         return jdbcTemplate.queryForObject(
                 "SELECT view_count FROM posts WHERE id = ?", Long.class, postId);
+    }
+
+    private long viewHistoryCount() {
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM post_views WHERE post_id = ?", Long.class, postId);
     }
 }

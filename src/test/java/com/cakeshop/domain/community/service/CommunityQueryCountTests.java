@@ -31,25 +31,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-/**
- * H1b — 목록 조회가 게시글 수와 무관하게 정해진 횟수의 쿼리만 실행하는지 확인한다.
- *
- * <p>목록 1회 + 총 개수 1회 + 작성자 1회, 합쳐서 3회다. 여기서 잡으려는 것은 댓글 수·작성자·
- * 카테고리를 게시글마다 따로 조회하는 형태(N+1)로 바뀌는 변경이다. 화면 결과가 같아 눈으로는
- * 드러나지 않고, 게시글이 늘어야 느려지므로 개발 데이터에서는 멀쩡해 보인다.
- *
- * <p><b>조각 10b에서 한 회씩 늘었다.</b> members JOIN을 걷어내고 작성자를 회원 도메인
- * 계약으로 받으면서 쿼리가 한 번 더 붙는다. 늘어난 것은 <b>고정된 1회</b>이고, 이 검사가
- * 지키려는 것은 여전히 "게시글 수와 무관하다"는 쪽이다 — 적은 글과 많은 글의 횟수가 같은지를
- * 함께 단언하므로 회원을 게시글마다 조회하는 형태로 바뀌면 그대로 깨진다.
- *
- * <p>쿼리 <b>형태</b>가 {@code GROUP BY}로 바뀌는 것은 이 테스트로 잡히지 않는다.
- * 그때도 쿼리는 여전히 2회다(PLAN.md R2). 그쪽은 H1a가 맡는다.
- */
+/** 주요 조회의 쿼리 수가 데이터 건수에 따라 증가하지 않는지 확인한다. */
 @MybatisTest
 @MariaDbIntegrationTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-// CommunityService가 Clock을 주입받으므로 슬라이스에도 시계 설정을 함께 올린다.
 @Import({
         CommunityService.class,
         CommunityAdminService.class,
@@ -59,13 +44,13 @@ class CommunityQueryCountTests {
 
     private static final LocalDateTime BASE_TIME = LocalDateTime.of(2026, 3, 1, 10, 0);
 
-    /** 목록 조회 한 번에 실행되어야 하는 쿼리 수. 목록 1 + 총 개수 1 + 작성자 1. */
+    /** 목록, 개수, 작성자 조회 횟수다. */
     private static final int EXPECTED_QUERY_COUNT = 3;
 
-    /** 댓글 구역 한 번에 실행되어야 하는 쿼리 수. 댓글 목록 1 + 개수 1 + 작성자 1. */
+    /** 댓글 목록, 개수, 작성자 조회 횟수다. */
     private static final int EXPECTED_COMMENT_QUERY_COUNT = 3;
 
-    /** 관리자 목록 한 번에 실행되어야 하는 쿼리 수. 목록 1 + 총 개수 1 + 작성자 1. */
+    /** 관리자 목록, 개수, 작성자 조회 횟수다. */
     private static final int EXPECTED_ADMIN_QUERY_COUNT = 3;
 
     @Autowired
@@ -96,14 +81,7 @@ class CommunityQueryCountTests {
 
     }
 
-    /**
-     * 게시글·댓글마다 <b>서로 다른</b> 작성자를 만든다.
-     *
-     * <p>전부 같은 회원으로 두면 작성자 ID를 {@code distinct()}한 뒤 <b>작성자마다</b> 단건
-     * 조회하는 구현으로 되돌아가도 조회가 한 번뿐이라 이 검사가 그대로 통과한다. 실제 목록은
-     * 작성자가 제각각이라 그 구현이 곧 N+1인데, 데이터가 그것을 구분하지 못한다
-     * (PR #144 Codex 리뷰).
-     */
+    /** N+1 조회를 드러내도록 서로 다른 작성자를 만든다. */
     private long newMember() {
         String suffix = Long.toString(System.nanoTime());
 
@@ -145,21 +123,10 @@ class CommunityQueryCountTests {
         queryCounter.reset();
         communityService.getPostDetail(postId, null, "M:1");
 
-        // 조회 기록(INSERT)과 조회수 UPDATE는 query가 아니라 update로 실행되므로
-        // SELECT는 상세 1회 + 작성자 1회다(작성자는 조각 10b에서 붙었다).
-        //
-        // 중복 판단을 "이미 봤는지 SELECT로 확인" 하는 형태로 바꾸면 이 수가 늘어난다.
-        // DB의 UNIQUE가 판단하게 두면 늘지 않는다 — 그게 6.2가 제약을 쓰는 이유이기도 하다.
+        // 상세와 작성자를 한 번씩 조회한다.
         assertThat(queryCounter.count()).isEqualTo(2);
     }
 
-    /**
-     * 댓글 구역이 댓글 수와 무관하게 정해진 횟수의 쿼리만 실행하는지 확인한다.
-     *
-     * <p>목록 1회 + 개수 1회 + 작성자 1회, 합쳐서 3회다. 개수를 "전체 행"과 "노출 중"으로 따로
-     * 세느라 쿼리를 하나 더 날리거나, 작성자를 댓글마다 조회하는 형태(N+1)로 바뀌는 것을 잡는다.
-     * 둘 다 화면 결과가 같아서 눈으로는 드러나지 않는다.
-     */
     @Test
     void getComments_queryCount_doesNotGrowWithCommentCount() {
         long postId = insertPost();
@@ -179,16 +146,6 @@ class CommunityQueryCountTests {
         assertThat(withManyComments).isEqualTo(EXPECTED_COMMENT_QUERY_COUNT);
     }
 
-    /**
-     * 관리자 목록도 게시글 수와 무관하게 정해진 횟수만 실행하는지 확인한다(조각 10d).
-     *
-     * <p>조각 10c에서 관리자 쪽 작성자도 회원 계약으로 받게 되면서 고객 목록과 같은 N+1
-     * 위험이 생겼다. 배치 조회로 막아 뒀지만 <b>막아 둔 것과 고정한 것은 다르다</b> — 이
-     * 검사가 없으면 행마다 조회하는 형태로 바뀌어도 화면이 똑같아 드러나지 않는다.
-     *
-     * <p>관리자 목록은 다른 테스트가 남긴 글까지 함께 세지만, 여기서 보는 것은 결과가 아니라
-     * <b>쿼리 횟수</b>라 섞여도 상관없다. 오히려 글이 많을수록 N+1이 잘 드러난다.
-     */
     @Test
     void adminGetPosts_queryCount_doesNotGrowWithPostCount() {
         insertPosts(3, 0);
@@ -255,7 +212,7 @@ class CommunityQueryCountTests {
         }
     }
 
-    /** MyBatis Executor를 통과하는 SELECT 실행 횟수를 센다. */
+    /** MyBatis SELECT 실행 횟수를 센다. */
     @Intercepts(@Signature(
             type = Executor.class,
             method = "query",

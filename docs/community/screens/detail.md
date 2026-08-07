@@ -134,7 +134,7 @@
 | `아직 댓글이 없습니다.` | 댓글이 하나도 없을 때 | `CommunityScreenRenderingTests.communityDetail_withoutComments_showsEmptyMessage` |
 | `댓글 등록` | 로그인 회원 + `PUBLISHED` 글일 때만 | `CommunityScreenRenderingTests.communityDetail_authenticated_showsCommentForm` |
 | `등록한 댓글은 수정할 수 없습니다.` | 위와 같은 조건 (댓글에는 수정이 없다 — DOMAIN.md 6.4) | 없음 |
-| `댓글 삭제` | 그 댓글의 작성자에게만 + `PUBLISHED` 글에만 | `CommunityScreenRenderingTests.communityDetail_ownComment_showsDeleteButton`, `CommunityScreenRenderingTests.communityDetail_blockedPostAuthor_hasNoDeadCommentDeleteButton` |
+| `댓글 삭제` | 그 댓글의 작성자에게만 + `PUBLISHED` 글에만 | `CommunityScreenRenderingTests.communityDetail_ownComment_showsDeleteButton`, `CommunityScreenRenderingTests.communityDetail_blockedPostAuthor_showsReasonAndHidesActions` |
 | `이 게시글 신고` | 로그인 회원 + `PUBLISHED` 글 + 작성자가 아니고 아직 신고하지 않았을 때 | `CommunityScreenRenderingTests.communityDetail_otherMember_rendersReportForm` |
 | `접수된 신고는 취소할 수 없습니다.` | 위와 같은 조건 (신고에는 취소가 없다 — DOMAIN.md 6.6) | `CommunityScreenRenderingTests.communityDetail_otherMember_rendersReportForm` |
 | `이미 신고한 게시글입니다.` | 이미 신고한 사람에게만. 폼 대신 나온다 | `CommunityScreenRenderingTests.communityDetail_alreadyReported_showsNoticeInsteadOfForm` |
@@ -143,9 +143,9 @@
 | `남은 댓글` | 위와 같은 조건 | `CommunityScreenRenderingTests.communityDetail_manyComments_showsLoadMoreForOlderComments` |
 | `오래된 댓글 일부는 표시하지 않습니다.` | 상한(200건)에 막혀 더 못 보여줄 때 | `CommunityScreenRenderingTests.communityDetail_beyondMaxComments_saysSoInsteadOfHidingSilently` |
 | `white-space:pre-wrap` | 본문 영역. 사용자에게는 **줄바꿈이 살아난 본문**으로 보인다 | `CommunityScreenRenderingTests.communityDetail_rendersContent` |
-| `(수정됨)` | `post.edited`, 즉 `updatedAt > createdAt`일 때 | `CommunityScreenRenderingTests.communityDetail_editedPost_showsEditedMark`, `CommunityMapperTests.increaseViewCount_doesNotMarkPostAsEdited` |
-| `관리자가 차단한 게시글입니다.` | `BLOCKED` + 작성자 본인일 때만 | `CommunityScreenRenderingTests.communityDetail_blockedPost_author_showsBlockedReason` |
-| `이 글은 다른 회원에게 보이지 않습니다.` | 위와 같은 조건 | `CommunityScreenRenderingTests.communityDetail_blockedPost_author_showsBlockedReason` |
+| `(수정됨)` | `post.edited`, 즉 `updatedAt > createdAt`일 때 | `CommunityScreenRenderingTests.communityDetail_editedPost_showsEditedMark`, `CommunityViewCountTests.getPostDetail_doesNotMarkPostAsEdited` |
+| `관리자가 차단한 게시글입니다.` | `BLOCKED` + 작성자 본인일 때만 | `CommunityScreenRenderingTests.communityDetail_blockedPostAuthor_showsReasonAndHidesActions` |
+| `이 글은 다른 회원에게 보이지 않습니다.` | 위와 같은 조건 | `CommunityScreenRenderingTests.communityDetail_blockedPostAuthor_showsReasonAndHidesActions` |
 
 ## 눈으로는 안 잡히는 것
 
@@ -162,7 +162,7 @@
 - **상한에 막힌 상태는 감추지 않고 적는다.** 링크만 사라지면 "댓글이 여기까지"로 보이는데, 그 화면은 200건이 넘어야 나오므로 사람 눈으로는 영원히 발견되지 않는다.
 - **좋아요를 눌러도 `(수정됨)`이 켜지면 안 된다.** `like_count` 재계산이 `posts.updated_at`을 건드리기 때문인데, SQL에서 명시적으로 보존한다 (DOMAIN.md 6.5). 조회수와 같은 자리이고, 시드에 실제로 이 버그가 있어서 좋아요를 받은 글마다 `(수정됨)`이 붙어 있었다. → `CommunityMapperTests.recalculateLikeCount_doesNotMarkPostAsEdited`
 - **비로그인에게는 버튼이 없고 숫자만 있다.** 그리고 "내가 눌렀는지"를 **묻지도 않는다** — 버튼이 없으므로 물어볼 것이 없고, 물으면 비로그인 상세마다 쿼리가 하나 는다. → `CommunityScreenRenderingTests.communityDetail_anonymous_showsLikeCountWithoutButton`
-- **차단된 글에는 작성자에게도 좋아요 버튼이 없다.** 댓글 폼·댓글 삭제 버튼과 같은 조건이고 같은 이유다 — 남겨 두면 눌러도 403만 나오는 죽은 버튼이 된다. → `CommunityScreenRenderingTests.communityDetail_blockedPostAuthor_hasNoDeadLikeButton`
+- **차단된 글에는 작성자에게도 좋아요 버튼이 없다.** 댓글 폼·댓글 삭제 버튼과 같은 조건이고 같은 이유다 — 남겨 두면 눌러도 403만 나오는 죽은 버튼이 된다. → `CommunityScreenRenderingTests.communityDetail_blockedPostAuthor_showsReasonAndHidesActions`
 - **같은 버튼을 두 번 눌러도 숫자가 두 번 오르지 않는다.** 양쪽이 멱등이라 그렇고, 재계산이 실제 행 수를 다시 세므로 어긋날 자리가 없다. 화면에서는 정상 동작과 구분되지 않는다.
 
 ## 상세에 앞으로 붙는 것

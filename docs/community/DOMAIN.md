@@ -217,7 +217,7 @@ LIMIT #{size} OFFSET #{offset}
 
 ### 6.4 댓글
 
-- 1단계만. **`parent_comment_id`는 엔티티·DTO·SQL 어디에도 등장시키지 않는다.** 컬럼은 V0에 존재하지만 값을 넣는 코드가 없으면 값이 들어갈 수 없다. 2차에 정식으로 대댓글을 구현할 예정이므로 `CHECK` 제약은 걸지 않는다(곧 떼야 할 제약이다). 제약 대신 **테스트로 고정**한다 — `CommunityCommentScopeTests`가 커뮤니티 소스·매퍼 XML·템플릿에서 이 식별자를 찾고, `CommunitySeedTests`가 시드를 본다.
+- 1단계만. **댓글 SQL에 `parent_comment_id`를 사용하지 않는다.** 컬럼은 V0에 존재하지만 2차 대댓글 전까지 값을 넣지 않는다. `CommunityCommentScopeTests`가 모든 커뮤니티 Mapper SQL을 검사하고, `CommunitySeedTests`가 시드를 검사한다.
 - 작성·삭제만. **수정 없음.** 이것도 같은 테스트가 고정한다(본문을 바꾸는 UPDATE가 없는지).
 - 삭제는 soft delete + 자리 표시 (4.4). 지울 수 있는 사람은 **댓글 작성자 본인뿐**이다. 게시글 작성자에게도, 관리자에게도 댓글 삭제 권한은 없다 — 관리자의 조치는 게시글 차단뿐이다(6.7).
 - 댓글 작성·삭제 모두 대상 게시글이 `PUBLISHED`여야 한다 (4.5). 차단된 글을 보고 있는 작성자에게도 댓글은 열리지 않는다.

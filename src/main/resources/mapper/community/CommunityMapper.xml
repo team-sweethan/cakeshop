@@ -82,13 +82,6 @@
         WHERE p.id = #{postId}
     </select>
 
-    <select id="countViews" resultType="long">
-
-        SELECT COUNT(*)
-        FROM post_views pv
-        WHERE pv.post_id = #{postId}
-    </select>
-
     <update id="increaseViewCount">
 
         UPDATE posts p
@@ -269,13 +262,6 @@
         WHERE pl.post_id = #{postId}
         AND pl.member_id = #{memberId}
         )
-    </select>
-
-    <select id="countLikes" resultType="long">
-
-        SELECT COUNT(*)
-        FROM post_likes pl
-        WHERE pl.post_id = #{postId}
     </select>
 
     <insert id="insertReport">

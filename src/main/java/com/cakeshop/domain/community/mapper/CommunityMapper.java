@@ -54,10 +54,6 @@ public interface CommunityMapper {
             @Param("viewerKey") String viewerKey
     );
 
-    long countViews(
-            @Param("postId") long postId
-    );
-
     List<PostCategoryView> findActiveCategories();
 
     boolean existsActiveCategory(
@@ -115,10 +111,6 @@ public interface CommunityMapper {
     boolean existsLike(
             @Param("postId") long postId,
             @Param("memberId") long memberId
-    );
-
-    long countLikes(
-            @Param("postId") long postId
     );
 
     int insertReport(
