@@ -10,6 +10,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
 import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.order.entity.OrderItem;
 import com.cakeshop.domain.order.entity.OrderStatus;
@@ -62,6 +63,9 @@ class RefundServiceTests {
     @Mock
     private MemberService memberService;
 
+    @Mock
+    private CouponOrderCommandService couponOrderCommandService;
+
     private RefundService refundService;
 
     @BeforeEach
@@ -71,6 +75,7 @@ class RefundServiceTests {
                 paymentMapper,
                 productStockService,
                 memberService,
+                couponOrderCommandService,
                 CLOCK
         );
         lenient().when(memberService.isActiveMember(anyLong())).thenReturn(true);
@@ -305,6 +310,7 @@ class RefundServiceTests {
 
         verify(productStockService).restoreStock(1L, 2);
         verify(orderMapper).markStockRestoredIfDeducted(100L, NOW.plusSeconds(2));
+        verify(couponOrderCommandService).restoreCouponForCanceledOrder(10L);
     }
 
     @Test
@@ -344,6 +350,7 @@ class RefundServiceTests {
         verify(productStockService, never()).restoreStock(1L, 2);
         verify(orderMapper, never()).findStockDeductedItemsForRestore(10L);
         verify(paymentMapper, never()).completeCancellationIfRequested(anyLong(), any(), any());
+        verify(couponOrderCommandService).restoreCouponForCanceledOrder(10L);
     }
 
     @Test

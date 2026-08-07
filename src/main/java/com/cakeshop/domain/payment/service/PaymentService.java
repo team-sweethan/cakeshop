@@ -1,6 +1,7 @@
 package com.cakeshop.domain.payment.service;
 
 import com.cakeshop.domain.order.service.OrderService;
+import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
 import com.cakeshop.domain.order.service.OrderService.GeneralPaymentOrder;
 import com.cakeshop.domain.order.service.OrderService.PaymentProduct;
 import com.cakeshop.domain.payment.entity.Payment;
@@ -24,6 +25,8 @@ public class PaymentService {
     private final ProductStockService productStockService;
     private final OrderService orderService;
     private final PaymentRecoveryService paymentRecoveryService;
+    // 쿠폰 담당자의 공개 계약으로 결제 성공 시 RESERVED 쿠폰을 USED로 확정한다.
+    private final CouponOrderCommandService couponOrderCommandService;
 
     /** 주문의 현재 READY 결제를 조회한다. */
     @Transactional(readOnly = true)
@@ -84,6 +87,8 @@ public class PaymentService {
                 order.orderId(),
                 approval.approvedAt()
         );
+        // 주문·결제 완료가 같은 트랜잭션에서 성공한 뒤에만 쿠폰 사용을 확정한다.
+        couponOrderCommandService.useReservedCouponForOrder(order.orderId());
         paymentRecoveryService.discardApprovalRecovery(payment);
     }
 

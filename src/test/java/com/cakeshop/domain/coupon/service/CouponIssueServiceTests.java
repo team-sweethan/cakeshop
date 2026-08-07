@@ -45,13 +45,14 @@ class CouponIssueServiceTests {
     void issueOnCouponCreated_allMembersFutureCouponAllowsIssuanceBeforeStart() {
         Coupon coupon = coupon(CouponTargetType.ALL_MEMBERS, LocalDateTime.now().plusDays(1));
         when(memberCouponQueryService.getActiveMemberIds()).thenReturn(List.of(2L));
+        when(memberCouponQueryService.isActiveCouponIssuableMember(2L)).thenReturn(true);
         when(couponMapper.findCouponByIdForUpdate(1L)).thenReturn(Optional.of(coupon));
-        when(couponMapper.insertMemberCouponIfAbsent(1L, 2L, true, false)).thenReturn(1);
+        when(couponMapper.insertMemberCouponIfAbsent(1L, 2L, true)).thenReturn(1);
         when(couponMapper.increaseIssuedQuantityIfAvailable(1L)).thenReturn(1);
 
         couponIssueService.issueOnCouponCreated(coupon);
 
-        verify(couponMapper).insertMemberCouponIfAbsent(1L, 2L, true, false);
+        verify(couponMapper).insertMemberCouponIfAbsent(1L, 2L, true);
         verify(couponMapper).increaseIssuedQuantityIfAvailable(1L);
     }
 
@@ -59,6 +60,7 @@ class CouponIssueServiceTests {
     void issueOnCouponCreated_firstOrderRechecksOrderHistoryBeforeIssuance() {
         Coupon coupon = coupon(CouponTargetType.FIRST_ORDER, LocalDateTime.now().plusDays(1));
         when(memberCouponQueryService.getActiveMemberIds()).thenReturn(List.of(2L));
+        when(memberCouponQueryService.isActiveCouponIssuableMember(2L)).thenReturn(true);
         when(orderCouponQueryService.getMemberIdsWithOrderHistory(List.of(2L))).thenReturn(List.of());
         when(couponMapper.findCouponByIdForUpdate(1L)).thenReturn(Optional.of(coupon));
         when(orderCouponQueryService.hasOrderHistory(2L)).thenReturn(true);
@@ -66,7 +68,7 @@ class CouponIssueServiceTests {
         couponIssueService.issueOnCouponCreated(coupon);
 
         verify(orderCouponQueryService).hasOrderHistory(2L);
-        verify(couponMapper, never()).insertMemberCouponIfAbsent(1L, 2L, true, true);
+        verify(couponMapper, never()).insertMemberCouponIfAbsent(1L, 2L, true);
     }
 
     private Coupon coupon(CouponTargetType targetType, LocalDateTime startsAt) {

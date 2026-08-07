@@ -23,6 +23,11 @@ public interface OrderMapper {
      */
     int insertOrder(Order order);
 
+    /** 쿠폰 예약이 완료된 PENDING_PAYMENT 주문에만 서버 계산 할인 금액을 반영한다. */
+    int updateAmountsIfPendingPayment(@Param("orderId") long orderId,
+                                      @Param("discountAmount") java.math.BigDecimal discountAmount,
+                                      @Param("finalAmount") java.math.BigDecimal finalAmount);
+
     /**
      * 주문 상품 스냅샷을 저장하고 생성된 식별자를 {@code orderItem.id}에 설정한다.
      *

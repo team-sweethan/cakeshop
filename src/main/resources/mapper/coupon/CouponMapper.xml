@@ -234,25 +234,15 @@
 
     <insert id="insertMemberCouponIfAbsent">
         INSERT INTO member_coupons (coupon_id, member_id)
-        SELECT #{couponId}, m.id
-        FROM members m
-        JOIN coupons c ON c.id = #{couponId}
-        WHERE m.id = #{memberId}
-          AND m.status = 'ACTIVE'
-          AND m.role = 'USER'
+        SELECT #{couponId}, #{memberId}
+        FROM coupons c
+        WHERE c.id = #{couponId}
           AND c.status = 'ACTIVE'
           <if test="allowBeforeStart == false">
               AND c.starts_at &lt;= NOW(6)
           </if>
           AND c.expires_at &gt; NOW(6)
           AND (c.total_quantity IS NULL OR c.issued_quantity &lt; c.total_quantity)
-          <if test="firstOrderOnly">
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM orders o
-                  WHERE o.member_id = m.id
-              )
-          </if>
           AND NOT EXISTS (
               SELECT 1
               FROM member_coupons mc
@@ -292,20 +282,30 @@
         </foreach>
     </select>
 
-    <select id="findIssuedMembers" resultType="com.cakeshop.domain.coupon.dto.view.CouponIssuedMemberView">
-        SELECT mc.member_id AS memberId, m.name, m.email, m.phone,
-               DATE_FORMAT(m.birth_date, '%m-%d') AS birthday,
-               mc.status, mc.used_at AS usedAt
-        FROM member_coupons mc JOIN members m ON m.id = mc.member_id
+    <select id="findIssuedMemberHistories" resultType="com.cakeshop.domain.coupon.dto.view.CouponIssuedMemberHistoryView">
+        SELECT mc.member_id AS memberId, mc.status, mc.issued_at AS issuedAt, mc.used_at AS usedAt
+        FROM member_coupons mc
         WHERE mc.coupon_id = #{couponId}
-          AND (m.name LIKE CONCAT('%', #{keyword}, '%') OR m.email LIKE CONCAT('%', #{keyword}, '%'))
-        ORDER BY mc.issued_at DESC, mc.id DESC LIMIT #{size} OFFSET #{offset}
+        <if test="memberIds != null">
+            AND mc.member_id IN
+            <foreach collection="memberIds" item="memberId" open="(" separator="," close=")">
+                #{memberId}
+            </foreach>
+        </if>
+        ORDER BY mc.issued_at DESC, mc.id DESC
+        LIMIT #{size} OFFSET #{offset}
     </select>
 
-    <select id="countIssuedMembers" resultType="long">
-        SELECT COUNT(*) FROM member_coupons mc JOIN members m ON m.id = mc.member_id
+    <select id="countIssuedMemberHistories" resultType="long">
+        SELECT COUNT(*)
+        FROM member_coupons mc
         WHERE mc.coupon_id = #{couponId}
-          AND (m.name LIKE CONCAT('%', #{keyword}, '%') OR m.email LIKE CONCAT('%', #{keyword}, '%'))
+        <if test="memberIds != null">
+            AND mc.member_id IN
+            <foreach collection="memberIds" item="memberId" open="(" separator="," close=")">
+                #{memberId}
+            </foreach>
+        </if>
     </select>
 
     <select id="findCouponsByTargetType" resultType="com.cakeshop.domain.coupon.entity.Coupon">

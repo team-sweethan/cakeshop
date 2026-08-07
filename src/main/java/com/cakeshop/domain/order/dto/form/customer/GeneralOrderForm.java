@@ -28,6 +28,10 @@ public class GeneralOrderForm extends CreateOrderForm {
     @Positive
     private Integer quantity;
 
+    /** 쿠폰 도메인이 발급한 회원 쿠폰 식별자다. 주문 생성 시 서버가 소유권·사용 가능 여부를 다시 검증한다. */
+    @Positive
+    private Long memberCouponId;
+
     @Size(max = 20)
     private List<@NotNull @Positive Long> optionIds = new ArrayList<>();
 }

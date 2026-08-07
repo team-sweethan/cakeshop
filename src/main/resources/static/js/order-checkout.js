@@ -86,9 +86,30 @@
     });
   }
 
+  function initializeCouponPreview() {
+    const select = document.getElementById("memberCouponId");
+    const total = document.querySelector("[data-order-total]");
+    const discount = document.querySelector("[data-coupon-discount]");
+    const finalAmount = document.querySelector("[data-final-amount]");
+    if (!select || !total || !discount || !finalAmount) return;
+    const original = total.dataset.originalAmount;
+    const format = value => Number(value).toLocaleString("ko-KR") + "원";
+    select.addEventListener("change", function () {
+      if (!select.value) { discount.textContent = "0원"; finalAmount.textContent = format(original); return; }
+      const form = select.form;
+      const params = new URLSearchParams(new FormData(form));
+      params.set("memberCouponId", select.value);
+      fetch("/orders/coupon-preview?" + params.toString())
+        .then(response => response.ok ? response.json() : Promise.reject())
+        .then(result => { discount.textContent = "-" + format(result.discountAmount); finalAmount.textContent = format(result.finalAmount); })
+        .catch(() => { discount.textContent = "적용할 수 없는 쿠폰"; finalAmount.textContent = format(original); });
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     initializePickupScheduler();
     initializeOrdererContact();
     initializeSingleSubmit();
+    initializeCouponPreview();
   });
 })();

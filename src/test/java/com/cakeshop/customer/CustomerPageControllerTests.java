@@ -12,6 +12,7 @@ import com.cakeshop.domain.cart.controller.CartController;
 import com.cakeshop.domain.cart.dto.view.CartView;
 import com.cakeshop.domain.cart.service.CartService;
 import com.cakeshop.domain.coupon.controller.CouponController;
+import com.cakeshop.domain.coupon.service.CouponOrderQueryService;
 import com.cakeshop.domain.home.controller.HomeController;
 import com.cakeshop.domain.home.service.HomeService;
 import com.cakeshop.domain.member.controller.AuthController;
@@ -95,7 +96,8 @@ class CustomerPageControllerTests {
                                 mock(OrderService.class),
                                 orderQueryService,
                                 memberService,
-                                mock(RefundFacade.class)
+                                mock(RefundFacade.class),
+                                mock(CouponOrderQueryService.class)
                         ),
                         new PaymentController(
                                 mock(PaymentFacade.class),

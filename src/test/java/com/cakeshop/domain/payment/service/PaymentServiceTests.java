@@ -1,6 +1,7 @@
 package com.cakeshop.domain.payment.service;
 
 import com.cakeshop.domain.order.service.OrderService;
+import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
 import com.cakeshop.domain.order.service.OrderService.GeneralPaymentOrder;
 import com.cakeshop.domain.order.service.OrderService.PaymentProduct;
 import com.cakeshop.domain.payment.entity.Payment;
@@ -43,6 +44,9 @@ class PaymentServiceTests {
     @Mock
     private PaymentRecoveryService paymentRecoveryService;
 
+    @Mock
+    private CouponOrderCommandService couponOrderCommandService;
+
     @InjectMocks
     private PaymentService paymentService;
 
@@ -66,6 +70,7 @@ class PaymentServiceTests {
                 productStockService,
                 paymentMapper,
                 orderService,
+                couponOrderCommandService,
                 paymentRecoveryService
         );
         inOrder.verify(orderService).lockGeneralOrderForPayment(1L);
@@ -85,6 +90,7 @@ class PaymentServiceTests {
                 1L,
                 approval.approvedAt()
         );
+        inOrder.verify(couponOrderCommandService).useReservedCouponForOrder(1L);
         inOrder.verify(paymentRecoveryService).discardApprovalRecovery(payment);
     }
 

@@ -1,6 +1,7 @@
 package com.cakeshop.domain.order.service;
 
 import com.cakeshop.domain.order.dto.form.customer.GeneralOrderForm;
+import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
 import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.order.entity.OrderItem;
@@ -80,6 +81,9 @@ class OrderServiceTests {
     @Mock
     private MemberService memberService;
 
+    @Mock
+    private CouponOrderCommandService couponOrderCommandService;
+
     private OrderService orderService;
 
     @BeforeEach
@@ -93,6 +97,7 @@ class OrderServiceTests {
                 orderMapper,
                 paymentPreparationService,
                 memberService,
+                couponOrderCommandService,
                 FIXED_CLOCK
         );
     }

@@ -1,6 +1,7 @@
 package com.cakeshop.domain.order.service;
 
 import com.cakeshop.domain.member.service.MemberService;
+import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
 import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.order.entity.OrderItem;
 import com.cakeshop.domain.order.entity.OrderStatus;
@@ -55,6 +56,9 @@ class OrderPaymentServiceTests {
     @Mock
     private MemberService memberService;
 
+    @Mock
+    private CouponOrderCommandService couponOrderCommandService;
+
     private OrderService orderService;
 
     @BeforeEach
@@ -67,6 +71,7 @@ class OrderPaymentServiceTests {
                 orderMapper,
                 paymentPreparationService,
                 memberService,
+                couponOrderCommandService,
                 Clock.fixed(
                         Instant.parse("2026-08-01T01:00:00Z"),
                         ZoneId.of("Asia/Seoul")

@@ -15,6 +15,7 @@ import com.cakeshop.domain.coupon.dto.form.CouponUpdateForm;
 import com.cakeshop.domain.coupon.dto.view.CouponView;
 import com.cakeshop.domain.coupon.dto.view.CouponDetailView;
 import com.cakeshop.domain.coupon.dto.view.CouponIssuedMemberView;
+import com.cakeshop.domain.coupon.dto.view.CouponIssuedMemberHistoryView;
 import com.cakeshop.domain.coupon.dto.view.CouponIssueCandidateView;
 import com.cakeshop.domain.coupon.entity.Coupon;
 import com.cakeshop.domain.coupon.entity.CouponTargetType;
@@ -28,6 +29,8 @@ import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.domain.member.dto.view.MemberCouponView;
 import com.cakeshop.domain.member.service.MemberCouponQueryService;
 import java.util.Set;
+import java.util.Map;
+import java.util.function.Function;
 
 /** 관리자 쿠폰의 등록·조회·수정 및 발급 상태 전환을 담당한다. */
 @Service
@@ -93,10 +96,31 @@ public class CouponAdminService {
     public PageResult<CouponIssuedMemberView> getIssuedMembers(Long couponId, String keyword, Integer page) {
         String normalizedKeyword = keyword == null ? "" : keyword.trim();
         PageRequest request = new PageRequest(page, 5);
+        List<Long> matchingMemberIds = normalizedKeyword.isBlank()
+                ? null
+                : memberCouponQueryService.getMemberIdsByKeyword(normalizedKeyword);
+        if (matchingMemberIds != null && matchingMemberIds.isEmpty()) {
+            return new PageResult<>(List.of(), request, 0);
+        }
+
+        long totalElements = couponMapper.countIssuedMemberHistories(couponId, matchingMemberIds);
+        List<CouponIssuedMemberHistoryView> histories = totalElements == 0
+                ? List.of()
+                : couponMapper.findIssuedMemberHistories(
+                        couponId, matchingMemberIds, request.getSize(), request.getOffset()
+                );
+        Map<Long, MemberCouponView> membersById = memberCouponQueryService.getMembersByIds(
+                        histories.stream().map(CouponIssuedMemberHistoryView::memberId).toList()
+                ).stream()
+                .collect(java.util.stream.Collectors.toMap(MemberCouponView::memberId, Function.identity()));
+
         return new PageResult<>(
-                couponMapper.findIssuedMembers(couponId, normalizedKeyword, request.getSize(), request.getOffset()),
+                histories.stream()
+                        .map(history -> toIssuedMemberView(history, membersById.get(history.memberId())))
+                        .filter(java.util.Objects::nonNull)
+                        .toList(),
                 request,
-                couponMapper.countIssuedMembers(couponId, normalizedKeyword)
+                totalElements
         );
     }
 
@@ -112,7 +136,8 @@ public class CouponAdminService {
         if (coupon.getTotalQuantity() == null || coupon.getIssuedQuantity() >= coupon.getTotalQuantity()) {
             throw new BusinessException(CouponErrorCode.ISSUED_QUANTITY_EXCEEDED);
         }
-        if (couponMapper.insertMemberCouponIfAbsent(couponId, memberId, false, false) != 1) {
+        if (!memberCouponQueryService.isActiveCouponIssuableMember(memberId)
+                || couponMapper.insertMemberCouponIfAbsent(couponId, memberId, false) != 1) {
             // 조회 시점 이후 회원 상태나 발급 이력이 달라졌으면 성공으로 처리하지 않는다.
             throw new BusinessException(CouponErrorCode.ISSUE_TARGET_UNAVAILABLE);
         }
@@ -380,6 +405,21 @@ public class CouponAdminService {
         String localPart = email.substring(0, atIndex);
         return localPart.substring(0, Math.min(2, localPart.length())) + "***" + email.substring(atIndex);
     }
+
+    /** 쿠폰 발급 이력과 회원 도메인 프로필을 관리자 목록에 필요한 View로 조합한다. */
+    private CouponIssuedMemberView toIssuedMemberView(
+            CouponIssuedMemberHistoryView history,
+            MemberCouponView member) {
+        if (member == null) {
+            return null;
+        }
+        return new CouponIssuedMemberView(
+                history.memberId(), member.name(), member.email(), member.phone(),
+                member.birthDate() == null ? null : member.birthDate().format(BIRTHDAY_FORMATTER),
+                history.status(), history.usedAt()
+        );
+    }
+
 
     private Coupon findCouponForUpdate(Long couponId) {
         return couponMapper.findCouponByIdForUpdate(couponId)

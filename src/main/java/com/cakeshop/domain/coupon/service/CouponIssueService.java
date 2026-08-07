@@ -97,12 +97,15 @@ public class CouponIssueService {
             if (remaining <= 0) {
                 return;
             }
+            if (!memberCouponQueryService.isActiveCouponIssuableMember(memberId)) {
+                continue;
+            }
             // 후보 조회 뒤 주문이 생성될 수 있으므로 INSERT 직전에 최신 주문 이력을 다시 확인한다.
             if (firstOrderOnly && orderCouponQueryService.hasOrderHistory(memberId)) {
                 continue;
             }
             if (couponMapper.insertMemberCouponIfAbsent(
-                    couponId, memberId, allowBeforeStart, firstOrderOnly) == 1) {
+                    couponId, memberId, allowBeforeStart) == 1) {
                 if (couponMapper.increaseIssuedQuantityIfAvailable(couponId) != 1) {
                     throw new BusinessException(CouponErrorCode.UPDATE_FAILED);
                 }

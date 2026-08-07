@@ -1,5 +1,6 @@
 package com.cakeshop.domain.order.service;
 
+import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
 import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.order.entity.OrderItem;
 import com.cakeshop.domain.order.entity.OrderStatus;
@@ -21,6 +22,8 @@ public class OrderPaymentRecoveryService {
 
     private final OrderMapper orderMapper;
     private final ProductStockService productStockService;
+    // 쿠폰 담당자의 공개 계약으로, PG 보상 취소 후 주문에 연결된 쿠폰을 복구한다.
+    private final CouponOrderCommandService couponOrderCommandService;
 
     @Transactional
     public void cancelAfterPaymentCompensation(
@@ -44,6 +47,8 @@ public class OrderPaymentRecoveryService {
                 canceledAt,
                 cancelReason
         ));
+        // 쿠폰 도메인 공개 계약: PG 보상 취소로 주문이 취소되면 사용 쿠폰도 함께 복구한다.
+        couponOrderCommandService.restoreCouponForCanceledOrder(orderId);
         if (previousStatus == OrderStatus.READY_FOR_PICKUP) {
             restoreDeductedStock(orderId, canceledAt);
         }

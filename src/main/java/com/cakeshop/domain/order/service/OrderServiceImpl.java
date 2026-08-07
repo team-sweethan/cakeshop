@@ -1,6 +1,7 @@
 package com.cakeshop.domain.order.service;
 
 import com.cakeshop.domain.order.dto.form.customer.GeneralOrderForm;
+import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
 import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.order.entity.OrderItem;
@@ -48,6 +49,8 @@ public class OrderServiceImpl implements OrderService {
     private final OrderMapper orderMapper;
     private final PaymentPreparationService paymentPreparationService;
     private final MemberService memberService;
+    // 쿠폰 담당자가 제공하는 공개 명령 계약이다. 주문 도메인은 쿠폰 Mapper를 직접 사용하지 않는다.
+    private final CouponOrderCommandService couponOrderCommandService;
     private final Clock clock;
 
     /** 일반 상품 주문, 주문 항목 스냅샷, READY 결제를 하나의 트랜잭션으로 생성한다. */
@@ -92,6 +95,19 @@ public class OrderServiceImpl implements OrderService {
             throw new BusinessException(OrderErrorCode.ORDER_SAVE_FAILED);
         }
         requireOneRow(insertedRows, OrderErrorCode.ORDER_SAVE_FAILED);
+
+        if (form.getMemberCouponId() != null) {
+            // 주문 저장 후 예약해야 applied_order_id에 실제 주문 ID를 기록할 수 있다.
+            BigDecimal discountAmount = couponOrderCommandService.reserveCouponForOrder(
+                    memberId, form.getMemberCouponId(), order.getId(), originalAmount
+            );
+            BigDecimal finalAmount = originalAmount.subtract(discountAmount);
+            requireOneRow(orderMapper.updateAmountsIfPendingPayment(
+                    order.getId(), discountAmount, finalAmount
+            ), OrderErrorCode.ORDER_SAVE_FAILED);
+            order.setDiscountAmount(discountAmount);
+            order.setFinalAmount(finalAmount);
+        }
 
         saveOrderItem(order.getId(), preparedItem);
 
