@@ -19,5 +19,5 @@ public class ChatMessageSendRequest {
     private Long chatRoomId; // 채팅방 id
     private String content; // 보내는 메시지 내용
     private Long productId; // 문의 대상 상품 id (선택)
-    private List<String> objectKeys; // 첨부 이미지 S3 객체 키 목록 (선택)
+    private List<ChatMessageAttachmentRequest> attachments; // 기존 objectKeys 대신 첨부 정보 목록 (선택)
 }
