@@ -26,7 +26,7 @@ class CommunityCommentScopeTests {
         for (Path mapperXml : mapperXmlFiles()) {
             assertThat(read(mapperXml))
                     .as("1차 댓글 SQL에는 parent_comment_id가 없어야 한다: " + mapperXml)
-                    .doesNotContain("parent_comment_id");
+                    .doesNotContainIgnoringCase("parent_comment_id");
         }
     }
 

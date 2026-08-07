@@ -134,7 +134,7 @@ public class CommunityAdminService {
 
         requireApplied(communityAdminMapper.blockPost(postId, reason, adminId));
 
-        communityAdminMapper.closePendingReports(postId, ReportStatus.RESOLVED);
+        closePendingReports(postId, ReportStatus.RESOLVED);
     }
 
     @Transactional
@@ -156,9 +156,17 @@ public class CommunityAdminService {
             throw new BusinessException(CommunityErrorCode.INVALID_POST_TRANSITION);
         }
 
-        if (communityAdminMapper.closePendingReports(postId, ReportStatus.REJECTED) == 0) {
+        if (closePendingReports(postId, ReportStatus.REJECTED) == 0) {
             throw new BusinessException(CommunityErrorCode.INVALID_POST_TRANSITION);
         }
+    }
+
+    private int closePendingReports(long postId, ReportStatus next) {
+        if (!ReportStatus.PENDING.canTransitionTo(next)) {
+            throw new BusinessException(CommunityErrorCode.INVALID_POST_TRANSITION);
+        }
+
+        return communityAdminMapper.closePendingReports(postId, next);
     }
 
     private void requireTransition(long postId, PostStatus next) {
