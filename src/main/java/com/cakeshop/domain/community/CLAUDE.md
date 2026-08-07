@@ -29,7 +29,7 @@
 - **매퍼는 회원 정보 없는 `*Row`를 돌려주고 회원 ID만 들고 나온다. 화면용 DTO는 `*View.of(row, ...)`가 만든다.** 조립에 필요한 회원은 화면마다 다르다 — 목록·상세·댓글은 작성자, 신고 목록은 **신고자**(`ReportView.of(row, reporter)`), 관리자 상세는 **작성자와 차단 관리자 둘**(`AdminPostDetailView.of(row, author, blockedByAdmin)`)이다. 작성자만 있다고 보고 고치면 나머지 회원 자리가 빈다. 회원 자리를 비워 둔 View를 들고 다니는 형태로는 되돌리지 않는다 — 비어 있어도 컴파일과 테스트가 통과한다.
 - **회원 조회는 ID를 모아 한 번에 한다.** 행마다도, 작성자마다도 아니다. `CommunityQueryCountTests`(H1b)가 고정한다.
 - **회원 행을 찾지 못해도 게시글은 목록에 남고 작성자만 가려진다.** `INNER JOIN`이던 때는 통째로 사라졌는데 그건 8절과 어긋난다.
-- `member` 폴더의 `MemberCommunity*` 세 파일은 팀 합의로 **만들 수 있지만, 회원 담당자의 기존 코드는 고치지 않는다.** 계약을 넓혀야 하면 담당자와 먼저 합의한다(15.8).
+- `member` 폴더의 `MemberCommunity*` **네 파일**(`MemberCommunityQueryService`·`MemberCommunityMapper`·`MemberCommunityView`와 `resources/mapper/member/MemberCommunityMapper.xml`)은 팀 합의로 **만들 수 있지만, 회원 담당자의 기존 코드는 고치지 않는다.** XML이 커뮤니티가 아니라 회원 폴더에 있는 것이 규칙의 핵심이다 — 연동 계약의 코드와 SQL은 **데이터를 소유한 도메인**에 둔다(15.1). 계약을 넓혀야 하면 담당자와 먼저 합의한다(15.8).
 
 **이 절을 무는 하네스는 항목마다 다르고, 무는 것이 아예 없는 항목도 있다.**
 
@@ -37,7 +37,8 @@
 |---|---|
 | 회원 테이블·패키지 참조 | `CommunityDomainBoundaryTests` (H34) |
 | 탈퇴 회원 조립 결과 | `CommunityMemberContractTests` (H35) |
-| 배치 조회 | `CommunityQueryCountTests` (H1b) |
+| 배치 조회 — 고객 목록·상세·댓글, 관리자 목록 | `CommunityQueryCountTests` (H1b) |
+| 배치 조회 — **신고 목록(`getReports`)** | **없다.** H1b 범위 밖이라 신고자별 단건 조회로 바꿔도 통과한다 |
 | 회원 행 누락 시 폴백 | `CommunityServiceTests`·`CommunityAdminServiceTests` (mock). 실제 DB로는 만들 수 없다 — `posts.member_id`가 NOT NULL FK다 |
 | **`*View.of(...)`를 거치는 형태** | **없다** |
 | **`member` 폴더 합의** | **없다** |

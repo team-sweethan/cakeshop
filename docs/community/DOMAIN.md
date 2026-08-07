@@ -138,7 +138,7 @@ ORDER BY p.created_at DESC, p.id DESC
 LIMIT #{size} OFFSET #{offset}
 ```
 
-**`members`를 JOIN하지 않는다.** 작성자는 `member_id`만 들고 나와 Service가 회원 계약으로 조립한다(8절, 조각 10b). 이 예제에서 JOIN을 되살리면 `CommunityDomainBoundaryTests`가 문다.
+**`members`를 JOIN하지 않는다.** 작성자는 `member_id`만 들고 나와 Service가 회원 계약으로 조립한다(8절, 조각 10b). **매퍼 XML에서** JOIN을 되살리면 `CommunityDomainBoundaryTests`가 문다. 다만 **이 예제 자체는 어느 검사도 읽지 않는다** — 매퍼를 그대로 둔 채 여기만 되돌려 놓으면 조용히 통과하고, 그게 이 문단이 한 번 겪은 드리프트다(`PLAN.md` R32).
 
 **`LEFT JOIN comments ... GROUP BY p.id`로 바꾸지 말 것.** `LIMIT`은 `GROUP BY` 이후에 적용되므로 전체 게시글 × 전체 댓글을 조인하고 전부 집계한 뒤 20개를 잘라낸다. 결과는 동일하지만 전체 스캔이 된다. 스칼라 서브쿼리는 최종 결과 20행에 대해서만 평가되며 `fk_comments_post` 인덱스를 탄다.
 
