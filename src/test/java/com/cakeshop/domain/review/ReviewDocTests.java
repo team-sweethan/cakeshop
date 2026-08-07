@@ -309,6 +309,11 @@ class ReviewDocTests {
      * <p>표에 적힌 클래스 이름이 낡는 경로는 평범하다 — 테스트를 나누거나 이름을 바꾸면 표는
      * 그대로 남는다. 그러면 "이건 무엇이 지키나"를 물은 사람이 없는 테스트를 찾아 헤맨다.
      *
+     * <p><b>행마다 참조가 하나 이상 있는지도 함께 본다.</b> 전체 건수만 세면 한 행의 클래스 이름이
+     * 망가져도 다른 행이 수를 채워 통과한다 — 이 검사를 처음 시험할 때 실제로 그렇게 빠져나갔다.
+     * 이름을 `ReviewDocTestsMissing`처럼 바꾸면 정규식에 걸리지 않아 <b>참조가 없는 행</b>이 되고,
+     * 없는 클래스를 가리키는 것보다 이쪽이 더 조용하다.
+     *
      * <p><b>보증하지 않는 것</b>: 그 테스트가 <b>적힌 대로 검사하는지</b>는 못 본다. 클래스와 메서드가
      * 있는지만 본다. 메서드 이름은 소스 본문에 그 낱말이 있는지로 확인하므로, 주석에만 있어도
      * 통과한다.
@@ -324,13 +329,14 @@ class ReviewDocTests {
         assertThat(harnessRows).as("하네스 표를 한 행도 읽지 못했다").hasSizeGreaterThanOrEqualTo(5);
 
         List<String> problems = new ArrayList<>();
-        int referenceCount = 0;
 
         for (String row : harnessRows) {
             String harnessId = firstGroup(HARNESS_ROW, row);
             Matcher matcher = QUOTED_TEST_REFERENCE.matcher(row);
+            int referencesInRow = 0;
+
             while (matcher.find()) {
-                referenceCount++;
+                referencesInRow++;
                 String className = matcher.group(1);
                 String methodName = matcher.group(2);
 
@@ -343,9 +349,14 @@ class ReviewDocTests {
                     problems.add(harnessId + ": " + className + " 에 " + methodName + " 가 없다");
                 }
             }
+
+            // 행마다 본다. 전체 건수만 세면 한 행의 이름이 망가져도 다른 행이 수를 채워
+            // 조용히 통과한다 — 실제로 이 검사를 처음 시험할 때 그렇게 빠져나갔다.
+            if (referencesInRow == 0) {
+                problems.add(harnessId + ": 이 행이 가리키는 테스트가 없다. 형 열에 클래스 이름을 적는다");
+            }
         }
 
-        assertThat(referenceCount).as("하네스 표에서 테스트 참조를 하나도 못 찾았다").isPositive();
         assertThat(problems).as("하네스 표가 없는 테스트를 가리킨다").isEmpty();
     }
 
