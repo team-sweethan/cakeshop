@@ -90,7 +90,7 @@
   없앨 수 없어야 한다. 그래서 **숨겨진 후기에 작성자가 할 수 있는 일은 없다.**
 - 삭제는 soft delete다. `uk_reviews_order_item` 때문에 **지우면 그 주문 상품에는
   다시 후기를 쓸 수 없다**(`docs/review/PLAN.md` R10).
-- 세부는 `docs/review/SPEC.md` 2.1이 정본이다.
+- 세부는 `docs/review/DOMAIN.md` 2.1이 정본이다.
 
 ### 이미 확정된 두 enum
 

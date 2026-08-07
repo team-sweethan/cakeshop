@@ -9,7 +9,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 class ReviewStatusTests {
 
     /**
-     * 후기 상태 전이 규칙을 한 표로 고정한다(docs/review/SPEC.md 2.1).
+     * 후기 상태 전이 규칙을 한 표로 고정한다(docs/review/DOMAIN.md 2.1).
      *
      * <p>표로 두는 편이 규칙을 통째로 읽기 쉽다. 규칙이 늘면 메서드가 아니라 줄을 추가한다.
      *
@@ -20,7 +20,7 @@ class ReviewStatusTests {
      * <p>다만 이 표는 <b>어느 전이가 허용되는지</b>만 정한다. 전이가 실제로 원자적으로
      * 일어나는지는 여기서 지켜지지 않는다 — 판단과 쓰기 사이에 상태가 바뀌면 금지된 전이가
      * 결과적으로 성립한다. 그쪽은 {@code UPDATE ... WHERE status = ?} 와 동시 요청 테스트가
-     * 맡는다(docs/review/SPEC.md 2.1). 조각 4·5 차례다.
+     * 맡는다(docs/review/DOMAIN.md 2.1). 조각 4·5 차례다.
      */
     @ParameterizedTest(name = "{0} -> {1} = {2}")
     @CsvSource({
