@@ -1,5 +1,6 @@
 package com.cakeshop.domain.payment.service;
 
+import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
 import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.order.entity.OrderStatus;
@@ -56,6 +57,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Transactional
 class PaymentCompletionIntegrationTests {
+
+    @MockitoBean
+    private CouponOrderCommandService couponOrderCommandService;
 
     private static final LocalDateTime APPROVED_AT =
             LocalDateTime.of(2026, 8, 1, 12, 0);

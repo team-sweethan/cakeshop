@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
 import com.cakeshop.domain.member.service.MemberService;
+import com.cakeshop.domain.coupon.service.CouponOrderQueryService;
 import com.cakeshop.domain.order.service.OrderService;
 import com.cakeshop.domain.order.service.customer.CustomerOrderQueryService;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
@@ -45,6 +46,9 @@ class OrderControllerSecurityTests {
 
     @MockitoBean
     private MemberService memberService;
+
+    @MockitoBean
+    private CouponOrderQueryService couponOrderQueryService;
 
     @Test
     void cancel_missingCsrf_isForbidden() throws Exception {

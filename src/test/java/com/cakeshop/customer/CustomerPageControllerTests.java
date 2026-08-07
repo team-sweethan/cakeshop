@@ -23,6 +23,7 @@ import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.notification.controller.NotificationUserController;
 import com.cakeshop.domain.order.controller.customer.OrderController;
 import com.cakeshop.domain.order.dto.view.OrderDetailView;
+import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
 import com.cakeshop.domain.order.service.customer.CustomerOrderQueryService;
 import com.cakeshop.domain.order.service.OrderService;
@@ -85,6 +86,20 @@ class CustomerPageControllerTests {
         CartService cartService = mock(CartService.class);
         when(cartService.getCart(1L)).thenReturn(new CartView(
                 List.of(), 0, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO));
+        CouponOrderQueryService couponOrderQueryService = mock(CouponOrderQueryService.class);
+        when(couponOrderQueryService.getAvailableCouponsForMember(
+                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any()
+        )).thenReturn(List.of());
+        OrderCheckoutService orderCheckoutService = mock(OrderCheckoutService.class);
+        when(orderCheckoutService.getGeneralCheckout(
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyList()
+        )).thenReturn(new GeneralOrderCheckoutView(
+                1L, "테스트 케이크", "일반 케이크", 1,
+                List.of(), BigDecimal.valueOf(30_000), BigDecimal.ZERO,
+                BigDecimal.valueOf(30_000), List.of()
+        ));
 
         mockMvc = MockMvcBuilders.standaloneSetup(
                         new HomeController(mock(HomeService.class)),
@@ -92,12 +107,12 @@ class CustomerPageControllerTests {
                         new ProductController(mock(ProductService.class)),
                         new CartController(cartService),
                         new OrderController(
-                                mock(OrderCheckoutService.class),
+                                orderCheckoutService,
                                 mock(OrderService.class),
                                 orderQueryService,
                                 memberService,
                                 mock(RefundFacade.class),
-                                mock(CouponOrderQueryService.class)
+                                couponOrderQueryService
                         ),
                         new PaymentController(
                                 mock(PaymentFacade.class),

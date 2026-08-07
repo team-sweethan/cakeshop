@@ -154,8 +154,9 @@ class CouponAdminServiceTests {
         MemberCouponView member = new MemberCouponView(
                 1L, "회원", "member@example.com", "010-1234-5678", LocalDate.of(2000, 1, 15)
         );
-        when(couponMapper.countIssuedMemberHistories(3L, null)).thenReturn(1L);
-        when(couponMapper.findIssuedMemberHistories(3L, null, 5, 0)).thenReturn(List.of(history));
+        when(memberCouponQueryService.getMemberIdsByKeyword("회원")).thenReturn(List.of(1L));
+        when(couponMapper.countIssuedMemberHistories(3L, List.of(1L))).thenReturn(1L);
+        when(couponMapper.findIssuedMemberHistories(3L, List.of(1L), 5, 0)).thenReturn(List.of(history));
         when(memberCouponQueryService.getMembersByIds(List.of(1L))).thenReturn(List.of(member));
 
         PageResult<CouponIssuedMemberView> result = couponAdminService.getIssuedMembers(3L, "회원", 1);

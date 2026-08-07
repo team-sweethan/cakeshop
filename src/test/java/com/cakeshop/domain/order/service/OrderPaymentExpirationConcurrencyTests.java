@@ -1,5 +1,6 @@
 package com.cakeshop.domain.order.service;
 
+import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
 import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.mapper.OrderMapper;
@@ -51,6 +52,9 @@ import static org.mockito.Mockito.when;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class OrderPaymentExpirationConcurrencyTests {
+
+    @MockitoBean
+    private CouponOrderCommandService couponOrderCommandService;
 
     private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 8, 3, 10, 0);

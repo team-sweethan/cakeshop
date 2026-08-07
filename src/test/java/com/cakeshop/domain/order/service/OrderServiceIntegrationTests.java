@@ -1,5 +1,6 @@
 package com.cakeshop.domain.order.service;
 
+import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
 import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.order.dto.form.customer.GeneralOrderForm;
 import com.cakeshop.domain.order.entity.Order;
@@ -55,6 +56,9 @@ import static org.mockito.Mockito.when;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Transactional
 class OrderServiceIntegrationTests {
+
+    @MockitoBean
+    private CouponOrderCommandService couponOrderCommandService;
 
     private static final ZoneId TEST_ZONE = ZoneId.of("Asia/Seoul");
     private static final LocalDateTime FIXED_NOW =
