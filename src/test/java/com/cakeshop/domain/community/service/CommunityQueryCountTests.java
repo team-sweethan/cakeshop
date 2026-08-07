@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.cakeshop.domain.community.entity.PostStatus;
+import com.cakeshop.domain.community.dto.view.AdminPostSort;
 import com.cakeshop.domain.community.dto.view.PostSort;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.domain.member.service.MemberCommunityQueryService;
@@ -49,7 +50,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @MariaDbIntegrationTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 // CommunityService가 Clock을 주입받으므로 슬라이스에도 시계 설정을 함께 올린다.
-@Import({CommunityService.class, MemberCommunityQueryService.class, ClockConfig.class})
+@Import({
+        CommunityService.class,
+        CommunityAdminService.class,
+        MemberCommunityQueryService.class,
+        ClockConfig.class})
 class CommunityQueryCountTests {
 
     private static final LocalDateTime BASE_TIME = LocalDateTime.of(2026, 3, 1, 10, 0);
@@ -60,8 +65,14 @@ class CommunityQueryCountTests {
     /** 댓글 구역 한 번에 실행되어야 하는 쿼리 수. 댓글 목록 1 + 개수 1 + 작성자 1. */
     private static final int EXPECTED_COMMENT_QUERY_COUNT = 3;
 
+    /** 관리자 목록 한 번에 실행되어야 하는 쿼리 수. 목록 1 + 총 개수 1 + 작성자 1. */
+    private static final int EXPECTED_ADMIN_QUERY_COUNT = 3;
+
     @Autowired
     private CommunityService communityService;
+
+    @Autowired
+    private CommunityAdminService communityAdminService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -153,6 +164,34 @@ class CommunityQueryCountTests {
 
         assertThat(withFewComments).isEqualTo(EXPECTED_COMMENT_QUERY_COUNT);
         assertThat(withManyComments).isEqualTo(EXPECTED_COMMENT_QUERY_COUNT);
+    }
+
+    /**
+     * 관리자 목록도 게시글 수와 무관하게 정해진 횟수만 실행하는지 확인한다(조각 10d).
+     *
+     * <p>조각 10c에서 관리자 쪽 작성자도 회원 계약으로 받게 되면서 고객 목록과 같은 N+1
+     * 위험이 생겼다. 배치 조회로 막아 뒀지만 <b>막아 둔 것과 고정한 것은 다르다</b> — 이
+     * 검사가 없으면 행마다 조회하는 형태로 바뀌어도 화면이 똑같아 드러나지 않는다.
+     *
+     * <p>관리자 목록은 다른 테스트가 남긴 글까지 함께 세지만, 여기서 보는 것은 결과가 아니라
+     * <b>쿼리 횟수</b>라 섞여도 상관없다. 오히려 글이 많을수록 N+1이 잘 드러난다.
+     */
+    @Test
+    void adminGetPosts_queryCount_doesNotGrowWithPostCount() {
+        insertPosts(3, 0);
+
+        queryCounter.reset();
+        communityAdminService.getPosts(null, AdminPostSort.LATEST, new PageRequest(1, 100));
+        int withFewPosts = queryCounter.count();
+
+        insertPosts(20, 0);
+
+        queryCounter.reset();
+        communityAdminService.getPosts(null, AdminPostSort.LATEST, new PageRequest(1, 100));
+        int withManyPosts = queryCounter.count();
+
+        assertThat(withFewPosts).isEqualTo(EXPECTED_ADMIN_QUERY_COUNT);
+        assertThat(withManyPosts).isEqualTo(EXPECTED_ADMIN_QUERY_COUNT);
     }
 
     private void insertComments(long postId, int count) {
