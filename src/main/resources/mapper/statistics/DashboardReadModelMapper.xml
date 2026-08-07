@@ -10,4 +10,12 @@
           AND payment.approved_at &gt;= #{start}
           AND payment.approved_at &lt; #{end}
     </select>
+
+    <select id="sumTodaySales" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(payment.amount), 0)
+        FROM payments AS payment
+        WHERE payment.status = 'DONE'
+          AND payment.approved_at &gt;= #{start}
+          AND payment.approved_at &lt; #{end}
+    </select>
 </mapper>

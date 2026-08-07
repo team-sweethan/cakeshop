@@ -74,6 +74,39 @@ class DashboardReadModelMapperTests {
         assertThat(count).isZero();
     }
 
+    @Test
+    void sumTodaySales_doneWithinRange_sumsOnlyDonePayments() {
+        insertPayment("SALES-DONE-FIRST", "DONE", START.plusHours(1));
+        insertPayment("SALES-DONE-SECOND", "DONE", START.plusHours(2));
+        insertPayment("SALES-READY", "READY", null);
+        insertPayment("SALES-CANCELED", "CANCELED", START.plusHours(3));
+        insertPayment("SALES-PARTIAL", "PARTIAL_CANCELED", START.plusHours(4));
+        insertPayment("SALES-ABORTED", "ABORTED", START.plusHours(5));
+        insertPayment("SALES-EXPIRED", "EXPIRED", START.plusHours(6));
+
+        var sales = dashboardReadModelMapper.sumTodaySales(START, END);
+
+        assertThat(sales).isEqualByComparingTo("80000");
+    }
+
+    @Test
+    void sumTodaySales_dateBoundary_includesStartAndExcludesEnd() {
+        insertPayment("SALES-AT-START", "DONE", START);
+        insertPayment("SALES-BEFORE-START", "DONE", START.minusNanos(1_000));
+        insertPayment("SALES-AT-END", "DONE", END);
+
+        var sales = dashboardReadModelMapper.sumTodaySales(START, END);
+
+        assertThat(sales).isEqualByComparingTo("40000");
+    }
+
+    @Test
+    void sumTodaySales_noMatchingPayments_returnsZero() {
+        var sales = dashboardReadModelMapper.sumTodaySales(START, END);
+
+        assertThat(sales).isZero();
+    }
+
     private long insertMember() {
         String email = "dashboard-read-model-" + suffix + "@example.com";
         jdbcTemplate.update(

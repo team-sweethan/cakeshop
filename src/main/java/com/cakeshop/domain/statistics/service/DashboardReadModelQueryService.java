@@ -2,6 +2,7 @@ package com.cakeshop.domain.statistics.service;
 
 import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
 import com.cakeshop.domain.statistics.mapper.DashboardReadModelMapper;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -23,8 +24,10 @@ public class DashboardReadModelQueryService {
         LocalDate today = LocalDate.now(clock);
         LocalDateTime start = today.atStartOfDay();
         LocalDateTime end = today.plusDays(1).atStartOfDay();
-        long todayOrderCount = dashboardReadModelMapper.countTodayOrders(start, end);
 
-        return new StatisticsDashboardView(todayOrderCount);
+        long todayOrderCount = dashboardReadModelMapper.countTodayOrders(start, end);
+        BigDecimal todaySalesAmount = dashboardReadModelMapper.sumTodaySales(start, end);
+
+        return new StatisticsDashboardView(todayOrderCount, todaySalesAmount);
     }
 }

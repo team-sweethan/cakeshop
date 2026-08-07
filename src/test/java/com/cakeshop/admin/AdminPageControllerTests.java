@@ -8,11 +8,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.time.LocalDate;
 
 import com.cakeshop.domain.coupon.dto.form.CouponSearchCondition;
 import com.cakeshop.domain.coupon.dto.view.CouponView;
@@ -115,7 +116,7 @@ class AdminPageControllerTests {
         when(communityService.getComments(anyLong(), any()))
                 .thenReturn(new CommentSectionView(List.of(), 0, 0, 20));
         when(dashboardReadModelQueryService.getDashboard())
-                .thenReturn(new StatisticsDashboardView(0L));
+                .thenReturn(new StatisticsDashboardView(0L, BigDecimal.ZERO));
 
         mockMvc = MockMvcBuilders.standaloneSetup(
                 new StatisticsAdminController(dashboardReadModelQueryService),

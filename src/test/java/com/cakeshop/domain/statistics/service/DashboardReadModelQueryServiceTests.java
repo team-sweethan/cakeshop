@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 
 import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
 import com.cakeshop.domain.statistics.mapper.DashboardReadModelMapper;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -28,16 +29,20 @@ class DashboardReadModelQueryServiceTests {
     private DashboardReadModelMapper dashboardReadModelMapper;
 
     @Test
-    void getDashboard_seoulDate_returnsTodayOrderCount() {
+    void getDashboard_seoulDate_returnsTodayMetrics() {
         LocalDateTime start = LocalDateTime.of(2026, 8, 7, 0, 0);
         LocalDateTime end = LocalDateTime.of(2026, 8, 8, 0, 0);
         when(dashboardReadModelMapper.countTodayOrders(start, end)).thenReturn(3L);
+        when(dashboardReadModelMapper.sumTodaySales(start, end))
+                .thenReturn(new BigDecimal("120000"));
         DashboardReadModelQueryService service =
                 new DashboardReadModelQueryService(dashboardReadModelMapper, CLOCK);
 
         StatisticsDashboardView dashboard = service.getDashboard();
 
         assertThat(dashboard.todayOrderCount()).isEqualTo(3L);
+        assertThat(dashboard.todaySalesAmount()).isEqualByComparingTo("120000");
         verify(dashboardReadModelMapper).countTodayOrders(start, end);
+        verify(dashboardReadModelMapper).sumTodaySales(start, end);
     }
 }
