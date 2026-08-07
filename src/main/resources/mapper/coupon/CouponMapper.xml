@@ -224,10 +224,12 @@
     </update>
 
     <update id="updateStatus">
-        <!-- 상태 전이는 Service에서 검증하고, SQL은 확정된 상태만 반영한다. -->
+        <!-- 조회 이후 상태가 달라지거나 만료되었으면 0건 갱신으로 전환을 거부한다. -->
         UPDATE coupons
-        SET status = #{status}
+        SET status = #{nextStatus}
         WHERE id = #{couponId}
+          AND status = #{expectedStatus}
+          AND expires_at &gt; NOW(6)
     </update>
 
     <insert id="insertMemberCouponIfAbsent">

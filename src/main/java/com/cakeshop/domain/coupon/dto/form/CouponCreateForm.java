@@ -5,6 +5,7 @@ import com.cakeshop.domain.coupon.entity.DiscountType;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -42,6 +43,7 @@ public class CouponCreateForm {
     private BigDecimal maximumDiscountAmount;
 
     @Positive(message = "총 발급 수량은 1개 이상이어야 합니다.")
+    @Max(value = Integer.MAX_VALUE, message = "총 발급 수량은 2,147,483,647 이하여야 합니다.")
     private Long totalQuantity;
 
     @NotNull(message = "사용 시작 일시를 입력해 주세요.")

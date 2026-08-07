@@ -26,8 +26,11 @@ import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -35,6 +38,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
@@ -48,6 +52,9 @@ class CouponAdminServiceTests {
 
     @Mock
     private MemberCouponQueryService memberCouponQueryService;
+
+    @Spy
+    private Clock clock = Clock.systemDefaultZone();
 
     @InjectMocks
     private CouponAdminService couponAdminService;
@@ -244,6 +251,24 @@ class CouponAdminServiceTests {
     }
 
     @Test
+    void getUpdateForm_seoulClockBeforeStartsAt_marksFullEdit() {
+        Clock seoulClock = Clock.fixed(Instant.parse("2026-08-06T15:30:00Z"), ZoneId.of("Asia/Seoul"));
+        CouponAdminService service = new CouponAdminService(
+                couponMapper, couponIssueService, memberCouponQueryService, seoulClock
+        );
+        Coupon coupon = coupon(
+                CouponStatus.ACTIVE, 10, 0, LocalDateTime.of(2026, 8, 8, 0, 0)
+        );
+        coupon.setStartsAt(LocalDateTime.of(2026, 8, 7, 1, 0));
+        when(couponMapper.findCouponById(1L)).thenReturn(Optional.of(coupon));
+
+        CouponUpdateForm form = service.getUpdateForm(1L);
+
+        assertThat(form.isFullEdit()).isTrue();
+        assertThat(form.getDisplayStatus()).isEqualTo(CouponDisplayStatus.SCHEDULED);
+    }
+
+    @Test
     void updateThrowsWhenCouponIsEnded() {
         Coupon coupon = coupon(CouponStatus.ACTIVE, 10, 0, LocalDateTime.now().minusDays(1));
         when(couponMapper.findCouponById(1L)).thenReturn(Optional.of(coupon));
@@ -424,11 +449,11 @@ class CouponAdminServiceTests {
         when(couponMapper.findCouponById(1L)).thenReturn(Optional.of(
             coupon(CouponStatus.ACTIVE, 10, 0, LocalDateTime.now().plusDays(1))
         ));
-        when(couponMapper.updateStatus(1L, CouponStatus.INACTIVE)).thenReturn(1);
+        when(couponMapper.updateStatus(1L, CouponStatus.ACTIVE, CouponStatus.INACTIVE)).thenReturn(1);
 
         couponAdminService.deactivateCoupon(1L);
 
-        verify(couponMapper).updateStatus(1L, CouponStatus.INACTIVE);
+        verify(couponMapper).updateStatus(1L, CouponStatus.ACTIVE, CouponStatus.INACTIVE);
     }
 
     @Test
@@ -442,7 +467,7 @@ class CouponAdminServiceTests {
             .extracting(exception -> ((BusinessException) exception).getErrorCode())
             .isEqualTo(CouponErrorCode.NOT_ACTIVE);
 
-        verify(couponMapper, never()).updateStatus(any(), any());
+        verify(couponMapper, never()).updateStatus(any(), any(), any());
     }
 
     @Test
@@ -450,11 +475,11 @@ class CouponAdminServiceTests {
         Coupon coupon = coupon(CouponStatus.ACTIVE, 10, 0, LocalDateTime.now().plusDays(1));
         coupon.setStartsAt(LocalDateTime.now().plusHours(1));
         when(couponMapper.findCouponById(1L)).thenReturn(Optional.of(coupon));
-        when(couponMapper.updateStatus(1L, CouponStatus.INACTIVE)).thenReturn(1);
+        when(couponMapper.updateStatus(1L, CouponStatus.ACTIVE, CouponStatus.INACTIVE)).thenReturn(1);
 
         couponAdminService.deactivateCoupon(1L);
 
-        verify(couponMapper).updateStatus(1L, CouponStatus.INACTIVE);
+        verify(couponMapper).updateStatus(1L, CouponStatus.ACTIVE, CouponStatus.INACTIVE);
     }
 
     @Test
@@ -468,7 +493,7 @@ class CouponAdminServiceTests {
             .extracting(exception -> ((BusinessException) exception).getErrorCode())
             .isEqualTo(CouponErrorCode.EXPIRED_COUPON);
 
-        verify(couponMapper, never()).updateStatus(any(), any());
+        verify(couponMapper, never()).updateStatus(any(), any(), any());
     }
 
     @Test
@@ -476,11 +501,11 @@ class CouponAdminServiceTests {
         when(couponMapper.findCouponById(1L)).thenReturn(Optional.of(
             coupon(CouponStatus.INACTIVE, 10, 0, LocalDateTime.now().plusDays(1))
         ));
-        when(couponMapper.updateStatus(1L, CouponStatus.ACTIVE)).thenReturn(1);
+        when(couponMapper.updateStatus(1L, CouponStatus.INACTIVE, CouponStatus.ACTIVE)).thenReturn(1);
 
         couponAdminService.activateCoupon(1L);
 
-        verify(couponMapper).updateStatus(1L, CouponStatus.ACTIVE);
+        verify(couponMapper).updateStatus(1L, CouponStatus.INACTIVE, CouponStatus.ACTIVE);
     }
 
     private CouponCreateForm createForm() {

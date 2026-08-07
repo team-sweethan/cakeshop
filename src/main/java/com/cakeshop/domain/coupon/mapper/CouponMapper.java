@@ -43,7 +43,9 @@ public interface CouponMapper {
     int updateCouponAfterStart(Coupon coupon);
 
     /** 관리자 명령에 따라 ACTIVE와 INACTIVE 상태를 전환한다. */
-    int updateStatus( @Param("couponId") Long couponId, @Param("status") CouponStatus status );
+    int updateStatus(@Param("couponId") Long couponId,
+                     @Param("expectedStatus") CouponStatus expectedStatus,
+                     @Param("nextStatus") CouponStatus nextStatus);
 
     /** 발급 시 회원 상태를 확인하고, 같은 쿠폰의 중복 발급은 무시한다. */
     int insertMemberCouponIfAbsent(@Param("couponId") Long couponId,

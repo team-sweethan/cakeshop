@@ -1,5 +1,6 @@
 package com.cakeshop.domain.coupon.service;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.time.format.DateTimeFormatter;
@@ -37,12 +38,14 @@ public class CouponAdminService {
     private final CouponMapper couponMapper;
     private final CouponIssueService couponIssueService;
     private final MemberCouponQueryService memberCouponQueryService;
+    private final Clock clock;
 
     public CouponAdminService(CouponMapper couponMapper, CouponIssueService couponIssueService,
-                              MemberCouponQueryService memberCouponQueryService) {
+                              MemberCouponQueryService memberCouponQueryService, Clock clock) {
         this.couponMapper = couponMapper;
         this.couponIssueService = couponIssueService;
         this.memberCouponQueryService = memberCouponQueryService;
+        this.clock = clock;
     }
 
     /**
@@ -102,8 +105,8 @@ public class CouponAdminService {
         Coupon coupon = findCouponForUpdate(couponId);
         if (coupon.getTargetType() != CouponTargetType.SPECIFIC_MEMBERS
                 || coupon.getStatus() != CouponStatus.ACTIVE
-                || coupon.getStartsAt().isAfter(LocalDateTime.now())
-                || !coupon.getExpiresAt().isAfter(LocalDateTime.now())) {
+                || coupon.getStartsAt().isAfter(now())
+                || !coupon.getExpiresAt().isAfter(now())) {
             throw new BusinessException(CouponErrorCode.UPDATE_FAILED);
         }
         if (coupon.getTotalQuantity() == null || coupon.getIssuedQuantity() >= coupon.getTotalQuantity()) {
@@ -124,7 +127,7 @@ public class CouponAdminService {
         if (coupon.getTargetType() != CouponTargetType.SPECIFIC_MEMBERS) {
             throw new BusinessException(CouponErrorCode.UPDATE_FAILED);
         }
-        if (!coupon.getExpiresAt().isAfter(LocalDateTime.now())) {
+        if (!coupon.getExpiresAt().isAfter(now())) {
             throw new BusinessException(CouponErrorCode.EXPIRED_COUPON);
         }
         if (couponMapper.deleteAvailableMemberCoupon(couponId, memberId) != 1) {
@@ -183,7 +186,7 @@ public class CouponAdminService {
         CouponUpdateForm form = CouponUpdateForm.from(coupon);
         form.setDisplayStatus(displayStatusOf(coupon));
         // 시작 전에는 정책을 자유롭게 바꿀 수 있고, 시작 후에는 발급 조건 변경을 막는다.
-        boolean isFullEdit = coupon.getStartsAt().isAfter(LocalDateTime.now());
+        boolean isFullEdit = coupon.getStartsAt().isAfter(now());
         form.setFullEdit(isFullEdit);
 
         return form;
@@ -221,12 +224,13 @@ public class CouponAdminService {
             throw new BusinessException(CouponErrorCode.NOT_ACTIVE);
         }
 
-        if (!coupon.getExpiresAt().isAfter(LocalDateTime.now())) {
+        if (!coupon.getExpiresAt().isAfter(now())) {
             throw new BusinessException(CouponErrorCode.NOT_ACTIVE);
         }
 
         if (couponMapper.updateStatus(
                 couponId,
+                CouponStatus.ACTIVE,
                 CouponStatus.INACTIVE
         ) != 1) {
             throw new BusinessException(
@@ -245,12 +249,13 @@ public class CouponAdminService {
         }
 
         // 스케줄러 실행 전이라도 만료 시각이 지났다면 재개를 막는다.
-        if (!coupon.getExpiresAt().isAfter(LocalDateTime.now())) {
+        if (!coupon.getExpiresAt().isAfter(now())) {
             throw new BusinessException(CouponErrorCode.EXPIRED_COUPON);
         }
 
         if (couponMapper.updateStatus(
                 couponId,
+                CouponStatus.INACTIVE,
                 CouponStatus.ACTIVE
         ) != 1) {
             throw new BusinessException(
@@ -281,7 +286,7 @@ public class CouponAdminService {
             throw new BusinessException(CouponErrorCode.QUANTITY_BELOW_ISSUED);
         }
 
-        boolean isFullEdit = coupon.getStartsAt().isAfter(LocalDateTime.now());
+        boolean isFullEdit = coupon.getStartsAt().isAfter(now());
         if (isFullEdit) {
             return true;
         }
@@ -390,7 +395,7 @@ public class CouponAdminService {
     public CouponUpdateForm getUpdateCoupon(Long couponId) {
         Coupon coupon = findCoupon(couponId);
         CouponUpdateForm form = CouponUpdateForm.from(coupon);
-        boolean isFullEdit = coupon.getStartsAt().isAfter(LocalDateTime.now());
+        boolean isFullEdit = coupon.getStartsAt().isAfter(now());
         form.setFullEdit(isFullEdit);
         form.setDisplayStatus(displayStatusOf(coupon));
         return form;
@@ -405,6 +410,11 @@ public class CouponAdminService {
 
     /** DB 상태와 시간·발급 수량을 조합한 읽기 전용 화면 상태를 계산한다. */
     private CouponDisplayStatus displayStatusOf(Coupon coupon) {
-        return CouponDisplayStatus.from(coupon, LocalDateTime.now());
+        return CouponDisplayStatus.from(coupon, now());
+    }
+
+    /** SQL의 NOW(6)와 같은 Asia/Seoul 기준 시각을 사용한다. */
+    private LocalDateTime now() {
+        return LocalDateTime.now(clock);
     }
 }
