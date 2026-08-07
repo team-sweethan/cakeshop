@@ -3,6 +3,7 @@ package com.cakeshop.domain.statistics.mapper;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.cakeshop.domain.order.entity.OrderStatus;
+import com.cakeshop.domain.statistics.dto.view.RecentOrderView;
 import com.cakeshop.domain.statistics.dto.view.TodayPickupScheduleView;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 import java.time.LocalDateTime;
@@ -324,6 +325,81 @@ class DashboardReadModelMapperTests {
         assertThat(schedules).isEmpty();
     }
 
+    @Test
+    void findRecentOrders_allStatuses_returnsLatestFiveInOrder() {
+        insertRecentOrder(
+                "RECENT-PENDING",
+                "PENDING_PAYMENT",
+                START.plusHours(1),
+                "결제 대기 상품"
+        );
+        insertRecentOrder(
+                "RECENT-REVIEW",
+                "UNDER_REVIEW",
+                START.plusHours(2),
+                "승인 대기 상품"
+        );
+        long ready = insertRecentOrder(
+                "RECENT-READY",
+                "READY_FOR_PICKUP",
+                START.plusHours(3),
+                "픽업 준비 상품"
+        );
+        long pickedUp = insertRecentOrder(
+                "RECENT-PICKED",
+                "PICKED_UP",
+                START.plusHours(4),
+                "픽업 완료 상품"
+        );
+        long rejected = insertRecentOrder(
+                "RECENT-REJECTED",
+                "REJECTED",
+                START.plusHours(5),
+                "반려 상품"
+        );
+        long canceled = insertRecentOrder(
+                "RECENT-CANCELED",
+                "CANCELED",
+                START.plusHours(6),
+                "취소 상품"
+        );
+        long expired = insertRecentOrder(
+                "RECENT-EXPIRED",
+                "EXPIRED",
+                START.plusHours(6),
+                "만료 상품",
+                "추가 상품"
+        );
+
+        List<RecentOrderView> allStatuses = dashboardReadModelMapper.findRecentOrders(10);
+        List<RecentOrderView> latestFive = dashboardReadModelMapper.findRecentOrders(5);
+
+        assertThat(allStatuses)
+                .extracting(RecentOrderView::status)
+                .containsExactly(
+                        OrderStatus.EXPIRED,
+                        OrderStatus.CANCELED,
+                        OrderStatus.REJECTED,
+                        OrderStatus.PICKED_UP,
+                        OrderStatus.READY_FOR_PICKUP,
+                        OrderStatus.UNDER_REVIEW,
+                        OrderStatus.PENDING_PAYMENT
+                );
+        assertThat(latestFive)
+                .extracting(RecentOrderView::orderId)
+                .containsExactly(expired, canceled, rejected, pickedUp, ready);
+        assertThat(latestFive.getFirst().productName()).isEqualTo("만료 상품 외 1개");
+        assertThat(latestFive.getFirst().finalAmount()).isEqualByComparingTo("40000");
+        assertThat(latestFive.getFirst().statusLabel()).isEqualTo("결제 만료");
+    }
+
+    @Test
+    void findRecentOrders_noOrders_returnsEmptyResult() {
+        List<RecentOrderView> recentOrders = dashboardReadModelMapper.findRecentOrders(5);
+
+        assertThat(recentOrders).isEmpty();
+    }
+
     private long insertMember() {
         String email = "dashboard-read-model-" + suffix + "@example.com";
         jdbcTemplate.update(
@@ -391,7 +467,8 @@ class DashboardReadModelMapperTests {
                 label,
                 "GENERAL",
                 "PENDING_PAYMENT",
-                END.plusDays(1)
+                END.plusDays(1),
+                START
         );
     }
 
@@ -401,7 +478,18 @@ class DashboardReadModelMapperTests {
             String status,
             LocalDateTime pickupAt
     ) {
+        return insertOrder(label, orderType, status, pickupAt, START);
+    }
+
+    private long insertOrder(
+            String label,
+            String orderType,
+            String status,
+            LocalDateTime pickupAt,
+            LocalDateTime createdAt
+    ) {
         String orderNumber = "DASHBOARD-" + label + "-" + suffix;
+        String rejectReason = "REJECTED".equals(status) ? "대시보드 테스트 반려" : null;
         jdbcTemplate.update(
                 """
                 INSERT INTO orders (
@@ -417,18 +505,22 @@ class DashboardReadModelMapperTests {
                     final_amount,
                     status,
                     pickup_at,
-                    payment_expires_at
+                    payment_expires_at,
+                    reject_reason,
+                    created_at
                 )
                 VALUES (?, ?, ?, '주문자', '010-1111-2222',
                         '수령자', '010-3333-4444', 40000, 0, 40000,
-                        ?, ?, ?)
+                        ?, ?, ?, ?, ?)
                 """,
                 orderNumber,
                 memberId,
                 orderType,
                 status,
                 pickupAt,
-                END
+                END,
+                rejectReason,
+                createdAt
         );
 
         return jdbcTemplate.queryForObject(
@@ -448,6 +540,25 @@ class DashboardReadModelMapperTests {
         long orderId = insertOrder(label, orderType, status, pickupAt);
         for (String productName : productNames) {
             insertOrderItem(orderId, orderType, productName);
+        }
+        return orderId;
+    }
+
+    private long insertRecentOrder(
+            String label,
+            String status,
+            LocalDateTime createdAt,
+            String... productNames
+    ) {
+        long orderId = insertOrder(
+                label,
+                "GENERAL",
+                status,
+                END.plusDays(1),
+                createdAt
+        );
+        for (String productName : productNames) {
+            insertOrderItem(orderId, "GENERAL", productName);
         }
         return orderId;
     }

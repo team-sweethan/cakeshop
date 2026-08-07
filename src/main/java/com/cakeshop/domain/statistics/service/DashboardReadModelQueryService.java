@@ -1,5 +1,6 @@
 package com.cakeshop.domain.statistics.service;
 
+import com.cakeshop.domain.statistics.dto.view.RecentOrderView;
 import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
 import com.cakeshop.domain.statistics.dto.view.TodayPickupScheduleView;
 import com.cakeshop.domain.statistics.mapper.DashboardReadModelMapper;
@@ -17,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class DashboardReadModelQueryService {
 
-    private static final int TODAY_PICKUP_SCHEDULE_LIMIT = 5;
+    private static final int DASHBOARD_LIST_LIMIT = 5;
 
     private final DashboardReadModelMapper dashboardReadModelMapper;
     private final Clock clock;
@@ -43,15 +44,19 @@ public class DashboardReadModelQueryService {
                 dashboardReadModelMapper.findTodayPickupSchedules(
                         start,
                         end,
-                        TODAY_PICKUP_SCHEDULE_LIMIT
+                        DASHBOARD_LIST_LIMIT
                 );
+        // 최근 주문
+        List<RecentOrderView> recentOrders =
+                dashboardReadModelMapper.findRecentOrders(DASHBOARD_LIST_LIMIT);
 
         return new StatisticsDashboardView(
                 todayOrderCount,
                 todaySalesAmount,
                 paymentAttentionCount,
                 todayPickupCount,
-                todayPickups
+                todayPickups,
+                recentOrders
         );
     }
 }

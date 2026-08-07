@@ -43,6 +43,7 @@ class StatisticsAdminControllerTests {
                         new BigDecimal("120000"),
                         2L,
                         0L,
+                        List.of(),
                         List.of()
                 );
         when(dashboardReadModelQueryService.getDashboard()).thenReturn(dashboard);

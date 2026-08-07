@@ -1,5 +1,6 @@
 package com.cakeshop.domain.statistics.mapper;
 
+import com.cakeshop.domain.statistics.dto.view.RecentOrderView;
 import com.cakeshop.domain.statistics.dto.view.TodayPickupScheduleView;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -37,4 +38,7 @@ public interface DashboardReadModelMapper {
             @Param("end") LocalDateTime end,
             @Param("limit") int limit
     );
+
+    /** 관리자 주문 목록과 같은 정렬 기준으로 최근 주문을 조회한다. */
+    List<RecentOrderView> findRecentOrders(@Param("limit") int limit);
 }

@@ -5,6 +5,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.cakeshop.domain.order.entity.OrderStatus;
+import com.cakeshop.domain.statistics.dto.view.RecentOrderView;
 import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
 import com.cakeshop.domain.statistics.dto.view.TodayPickupScheduleView;
 import com.cakeshop.domain.statistics.mapper.DashboardReadModelMapper;
@@ -49,6 +50,15 @@ class DashboardReadModelQueryServiceTests {
         when(dashboardReadModelMapper.countTodayPickups(start, end)).thenReturn(4L);
         when(dashboardReadModelMapper.findTodayPickupSchedules(start, end, 5))
                 .thenReturn(List.of(pickup));
+        RecentOrderView recentOrder = new RecentOrderView(
+                20L,
+                "ORDER-20",
+                "초코 케이크",
+                OrderStatus.PENDING_PAYMENT,
+                new BigDecimal("40000")
+        );
+        when(dashboardReadModelMapper.findRecentOrders(5))
+                .thenReturn(List.of(recentOrder));
         DashboardReadModelQueryService service =
                 new DashboardReadModelQueryService(dashboardReadModelMapper, CLOCK);
 
@@ -59,10 +69,12 @@ class DashboardReadModelQueryServiceTests {
         assertThat(dashboard.paymentAttentionCount()).isEqualTo(2L);
         assertThat(dashboard.todayPickupCount()).isEqualTo(4L);
         assertThat(dashboard.todayPickups()).containsExactly(pickup);
+        assertThat(dashboard.recentOrders()).containsExactly(recentOrder);
         verify(dashboardReadModelMapper).countTodayOrders(start, end);
         verify(dashboardReadModelMapper).sumTodaySales(start, end);
         verify(dashboardReadModelMapper).countPaymentsRequiringAttention();
         verify(dashboardReadModelMapper).countTodayPickups(start, end);
         verify(dashboardReadModelMapper).findTodayPickupSchedules(start, end, 5);
+        verify(dashboardReadModelMapper).findRecentOrders(5);
     }
 }

@@ -87,4 +87,45 @@
         ORDER BY pickup_order.pickup_at, pickup_order.id
         LIMIT #{limit}
     </select>
+
+    <select id="findRecentOrders"
+            resultType="com.cakeshop.domain.statistics.dto.view.RecentOrderView">
+        SELECT
+            recent_order.id AS order_id,
+            recent_order.order_number,
+            CONCAT(
+                COALESCE(
+                    (
+                        SELECT order_item.product_name
+                        FROM order_items AS order_item
+                        WHERE order_item.order_id = recent_order.id
+                        ORDER BY order_item.id
+                        LIMIT 1
+                    ),
+                    '주문 상품 없음'
+                ),
+                CASE
+                    WHEN (
+                        SELECT COUNT(*)
+                        FROM order_items AS order_item
+                        WHERE order_item.order_id = recent_order.id
+                    ) &gt; 1
+                    THEN CONCAT(
+                        ' 외 ',
+                        (
+                            SELECT COUNT(*) - 1
+                            FROM order_items AS order_item
+                            WHERE order_item.order_id = recent_order.id
+                        ),
+                        '개'
+                    )
+                    ELSE ''
+                END
+            ) AS product_name,
+            recent_order.status,
+            recent_order.final_amount
+        FROM orders AS recent_order
+        ORDER BY recent_order.created_at DESC, recent_order.id DESC
+        LIMIT #{limit}
+    </select>
 </mapper>

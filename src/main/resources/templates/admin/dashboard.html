@@ -41,10 +41,21 @@
       </section>
       <div class="grid grid--2">
         <section class="section"><h2 class="section-title">최근 주문</h2>
-          <div class="table-wrap"><table class="data-table"><thead><tr><th>주문번호</th><th>상품</th><th>상태</th><th>금액</th><th>관리</th></tr></thead>
-            <tbody><tr><td>ORD-001</td><td>레터링 케이크</td><td><span class="badge badge--warning">승인 대기</span></td><td>64,000원</td><td><a class="btn" th:href="@{/admin/orders/1}">상세</a></td></tr>
-            <tr><td>ORD-002</td><td>딸기 케이크</td><td><span class="badge badge--info">제작 중</span></td><td>35,000원</td><td><a class="btn" th:href="@{/admin/orders/2}">상세</a></td></tr>
-            <tr><td>ORD-003</td><td>초코 케이크</td><td><span class="badge">픽업 준비</span></td><td>40,000원</td><td><a class="btn" th:href="@{/admin/orders/3}">상세</a></td></tr></tbody></table></div>
+          <div class="table-wrap"><table class="data-table"><thead><tr><th>주문번호</th><th>상품</th><th>상태</th><th>금액</th></tr></thead>
+            <tbody>
+            <tr th:each="order : ${dashboard.recentOrders}">
+              <td>
+                <a th:href="@{/admin/orders/{orderId}(orderId=${order.orderId})}"
+                   th:text="${order.orderNumber}">주문번호</a>
+              </td>
+              <td th:text="${order.productName}">상품명</td>
+              <td><span class="badge" th:text="${order.statusLabel}">주문 상태</span></td>
+              <td th:text="|${#numbers.formatInteger(order.finalAmount, 0, 'COMMA')}원|">0원</td>
+            </tr>
+            <tr th:if="${#lists.isEmpty(dashboard.recentOrders)}">
+              <td colspan="4" class="text-muted">최근 주문이 없습니다.</td>
+            </tr>
+            </tbody></table></div>
           <a class="btn section-action" th:href="@{/admin/orders}">전체 주문 보기</a>
         </section>
         <section class="section"><h2 class="section-title">오늘 픽업 일정</h2>

@@ -121,6 +121,7 @@ class AdminPageControllerTests {
                         BigDecimal.ZERO,
                         0L,
                         0L,
+                        List.of(),
                         List.of()
                 ));
 

@@ -9,6 +9,7 @@ public record StatisticsDashboardView(
         BigDecimal todaySalesAmount,
         long paymentAttentionCount,
         long todayPickupCount,
-        List<TodayPickupScheduleView> todayPickups
+        List<TodayPickupScheduleView> todayPickups,
+        List<RecentOrderView> recentOrders
 ) {
 }
