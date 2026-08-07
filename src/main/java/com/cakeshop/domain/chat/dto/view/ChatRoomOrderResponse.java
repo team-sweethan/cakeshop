@@ -19,7 +19,7 @@ public class ChatRoomOrderResponse {
     private String productName;                   // 대표 상품명
     private String productType;                   // 상품 유형 ("CUSTOM": 주문제작, "GENERAL": 일반)
     
-    private Integer totalAmount;                  // 결제 금액
+    private BigDecimal totalAmount;                  // 결제 금액
     private String orderStatus;                   // 주문 상태 ("PAYMENT_COMPLETED", "APPROVED" 등)
     
     private LocalDateTime pickupDateTime;         // 픽업 예약 일시 (화면 작게 표시용)
