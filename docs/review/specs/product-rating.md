@@ -30,7 +30,7 @@
 
 - `ProductReviewMapper.xml`에 `SELECT ... products ... FOR UPDATE`를 따로 선언하지 않는다. 기존 `ProductMapper.findSalesInfoByIdForUpdate`를 재사용하고, `ProductReviewCommandService`가 **두 매퍼를 함께 주입받는다.** 같은 패키지 안이라 도메인 경계를 넘지 않는다.
 - 복제해도 당장은 똑같이 동작한다. 갈라지는 것이 문제다 — 한쪽에 `JOIN product_options`가 붙는 날 두 경로의 잠금 순서가 어긋나고, **두 파일을 함께 열어 본 사람이 없어 아무도 눈치채지 못한다.**
-- 선례: 커뮤니티는 `lockPost`를 관리자 매퍼에 복제하지 않고 `CommunityAdminService`가 고객 매퍼를 함께 주입받는다(`docs/community/CLAUDE.md`).
+- 선례: 커뮤니티는 `lockPost`를 관리자 매퍼에 복제하지 않고 `CommunityAdminService`가 고객 매퍼를 함께 주입받는다(`src/main/java/com/cakeshop/domain/community/CLAUDE.md`).
 - 결과적으로 `ProductReviewMapper.xml`에 들어가는 것은 **`UPDATE products` 하나뿐**이다.
 
 **리뷰 쪽에서 이미 정해진 것**
