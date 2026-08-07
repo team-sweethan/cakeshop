@@ -11,15 +11,6 @@ package com.cakeshop.domain.community.entity;
  */
 public enum CommentStatus {
     PUBLISHED,
-    DELETED;
+    DELETED
 
-    public boolean canTransitionTo(CommentStatus next) {
-        if (next == null) {
-            return false;
-        }
-        return switch (this) {
-            case PUBLISHED -> next == DELETED;
-            case DELETED -> false;
-        };
-    }
 }

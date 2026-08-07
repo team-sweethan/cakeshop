@@ -12,15 +12,5 @@ package com.cakeshop.domain.community.entity;
 public enum ReportStatus {
     PENDING,
     RESOLVED,
-    REJECTED;
-
-    public boolean canTransitionTo(ReportStatus next) {
-        if (next == null) {
-            return false;
-        }
-        return switch (this) {
-            case PENDING -> next == RESOLVED || next == REJECTED;
-            case RESOLVED, REJECTED -> false;
-        };
-    }
+    REJECTED
 }

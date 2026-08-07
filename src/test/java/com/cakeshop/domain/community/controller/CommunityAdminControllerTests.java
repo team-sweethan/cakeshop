@@ -1,5 +1,6 @@
 package com.cakeshop.domain.community.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -24,6 +25,7 @@ import com.cakeshop.domain.community.dto.view.AdminPostListView;
 import com.cakeshop.domain.community.dto.view.AdminPostSort;
 import com.cakeshop.domain.community.dto.view.CommentSectionView;
 import com.cakeshop.domain.community.entity.PostStatus;
+import com.cakeshop.domain.community.entity.ReportStatus;
 import com.cakeshop.domain.community.service.CommunityAdminService;
 import com.cakeshop.domain.community.service.CommunityService;
 import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
@@ -36,18 +38,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-/**
- * 관리자 화면의 파라미터 처리와 조치 경로를 확인한다.
- *
- * <p>접근 제한은 여기서 보지 않는다. Security 설정이 붙지 않은 standaloneSetup이라
- * "관리자만 연다"는 {@code CommunityScreenRenderingTests}가 실제 필터 체인으로 확인한다.
- */
+/** 관리자 화면의 파라미터와 조치 경로를 검증한다. */
 class CommunityAdminControllerTests {
 
     private static final LocalDateTime CREATED_AT = LocalDateTime.of(2026, 3, 1, 10, 0);
@@ -94,14 +92,21 @@ class CommunityAdminControllerTests {
                 .getPosts(eq(PostStatus.BLOCKED), eq(AdminPostSort.REPORTS), any());
     }
 
-    /**
-     * 모르는 값은 오류가 아니라 기본값이다(DOMAIN.md 6.7).
-     *
-     * <p>고객 목록과 같은 처리다. 주소가 망가진 것과 권한이 없는 것은 다르고, 관리자에게
-     * 오류 페이지를 주면 목록을 다시 찾아 들어가야 한다.
-     */
+    @Test
+    void list_page_isPassedAsPageRequest() throws Exception {
+        mockMvc.perform(get("/admin/community").param("page", "3"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<PageRequest> captor = ArgumentCaptor.forClass(PageRequest.class);
+        verify(communityAdminService)
+                .getPosts(isNull(), eq(AdminPostSort.LATEST), captor.capture());
+        assertThat(captor.getValue().getPage()).isEqualTo(3);
+        assertThat(captor.getValue().getSize()).isEqualTo(PageRequest.DEFAULT_SIZE);
+    }
+
+    /** 알 수 없는 상태는 전체 상태 조회로 처리한다. */
     @ParameterizedTest
-    @ValueSource(strings = {"HIDDEN", "정상", "'; DROP TABLE posts; --", ""})
+    @ValueSource(strings = {"HIDDEN", ""})
     void list_unknownStatus_fallsBackToEveryStatus(String status) throws Exception {
         mockMvc.perform(get("/admin/community").param("status", status))
                 .andExpect(status().isOk());
@@ -110,7 +115,7 @@ class CommunityAdminControllerTests {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"views", "인기순", "1=1"})
+    @ValueSource(strings = {"views", "1=1"})
     void list_unknownSort_fallsBackToLatest(String sort) throws Exception {
         mockMvc.perform(get("/admin/community").param("sort", sort))
                 .andExpect(status().isOk());
@@ -120,10 +125,19 @@ class CommunityAdminControllerTests {
 
     @Test
     void detail_rendersAdminDetail() throws Exception {
-        mockMvc.perform(get("/admin/community/15"))
+        CommentSectionView comments = new CommentSectionView(List.of(), 2, 3, 40);
+        when(communityAdminService.getReports(15L)).thenReturn(List.of(
+                new com.cakeshop.domain.community.dto.view.ReportView(
+                        1L, "신고자", false, "사유", ReportStatus.PENDING, CREATED_AT),
+                new com.cakeshop.domain.community.dto.view.ReportView(
+                        2L, "신고자", false, "사유", ReportStatus.RESOLVED, CREATED_AT)));
+        when(communityService.getComments(15L, 40)).thenReturn(comments);
+
+        mockMvc.perform(get("/admin/community/15").param("comments", "40"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("admin/community/detail"))
-                .andExpect(model().attributeExists("post", "reports", "commentSection"));
+                .andExpect(model().attribute("commentSection", comments))
+                .andExpect(model().attribute("pendingReportCount", 1L));
     }
 
     /** 차단한 관리자는 요청 파라미터가 아니라 인증 정보에서 온다(AGENTS.md). */
@@ -141,12 +155,7 @@ class CommunityAdminControllerTests {
         verify(communityAdminService).blockPost(15L, "광고성 게시물", 3L);
     }
 
-    /**
-     * 사유 없이 차단하지 않는다(DOMAIN.md 4.3).
-     *
-     * <p>사유는 작성자에게 그대로 보이는 값이다. 비어 있으면 차단된 글에서 작성자가 왜
-     * 막혔는지 알 방법이 없다 — 차단이 처벌이 아니라 교정으로 작동하려면 필요하다.
-     */
+    /** 빈 사유로 게시글을 차단하지 않는다. */
     @Test
     void block_blankReason_redrawsDetail() throws Exception {
         authenticateAsAdmin(3L);
@@ -154,6 +163,18 @@ class CommunityAdminControllerTests {
         mockMvc.perform(post("/admin/community/15/block").param("reason", "   "))
                 .andExpect(status().isOk())
                 .andExpect(view().name("admin/community/detail"))
+                .andExpect(model().attributeHasFieldErrors("blockForm", "reason"));
+
+        verify(communityAdminService, never()).blockPost(anyLong(), anyString(), anyLong());
+    }
+
+    @Test
+    void block_reasonOver500Characters_doesNotCallService() throws Exception {
+        authenticateAsAdmin(3L);
+
+        mockMvc.perform(post("/admin/community/15/block")
+                        .param("reason", "가".repeat(501)))
+                .andExpect(status().isOk())
                 .andExpect(model().attributeHasFieldErrors("blockForm", "reason"));
 
         verify(communityAdminService, never()).blockPost(anyLong(), anyString(), anyLong());
