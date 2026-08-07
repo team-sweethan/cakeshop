@@ -116,7 +116,13 @@ class AdminPageControllerTests {
         when(communityService.getComments(anyLong(), any()))
                 .thenReturn(new CommentSectionView(List.of(), 0, 0, 20));
         when(dashboardReadModelQueryService.getDashboard())
-                .thenReturn(new StatisticsDashboardView(0L, BigDecimal.ZERO, 0L));
+                .thenReturn(new StatisticsDashboardView(
+                        0L,
+                        BigDecimal.ZERO,
+                        0L,
+                        0L,
+                        List.of()
+                ));
 
         mockMvc = MockMvcBuilders.standaloneSetup(
                 new StatisticsAdminController(dashboardReadModelQueryService),

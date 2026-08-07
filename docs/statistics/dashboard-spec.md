@@ -133,14 +133,14 @@ OR payment_cancellations.status IN (REQUESTED, FAILED)
 
 | 항목 | 상태 | 내용 |
 |---|---|---|
-| 업무 정의 | 확정 | 픽업 예정 시각이 오늘이고 결제가 완료되었으며 아직 픽업이 끝나지 않은 주문 |
+| 업무 정의 | 확정 | 픽업 예정 시각이 오늘이고 현재 픽업 대기 상태인 주문 |
 | 데이터 소유 도메인 | 확정 | `order` |
 | 기준 시간 | 확정 | `pickup_at` 사용 |
 | 시간대 | 확정 | `Asia/Seoul` |
 | 날짜 범위 | 확정 | 오늘 00:00 이상, 내일 00:00 미만 |
 | 주문 유형 | 확정 | `GENERAL`, `CUSTOM` 모두 포함 |
-| 제외 상태 | 확정 | `PICKED_UP`, `CANCELED`, `REJECTED`, `EXPIRED` 제외 |
-| 결제 완료 판별 | 합의 필요 | 주문과 결제 테이블의 읽기 전용 JOIN 조건을 `order`·`payment` 담당자가 검토 |
+| 대상 상태 | 확정 | `OrderStatus.READY_FOR_PICKUP`만 포함 |
+| 결제 완료 판별 | 확정 | `READY_FOR_PICKUP` 상태 전이 규칙으로 보장하며 결제 테이블을 별도로 조회하지 않음 |
 | 정렬 | 확정 | `pickup_at` 오름차순, 주문 ID 오름차순 |
 | 요약 카드 | 확정 | 조건을 충족하는 전체 주문 건수 표시 |
 | 일정 목록 | 확정 | 정렬 결과 중 최대 5건 표시 |
@@ -149,12 +149,12 @@ OR payment_cancellations.status IN (REQUESTED, FAILED)
 | 지난 픽업 시각 | 확정 | 오늘 아직 픽업되지 않은 주문은 예정 시각이 지나도 유지하고 먼저 표시 |
 | 상세 이동 | 확정 | `/admin/orders/{orderId}` |
 | 빈 결과 | 확정 | 건수는 `0`, 일정은 빈 목록 반환 |
-| 조회 구현 | 확정 | `DashboardReadModelMapper`에서 주문·결제 테이블을 읽기 전용으로 조회 |
-| 조건 검토 | 합의 필요 | 주문 상태와 결제 완료 조건을 `order`·`payment` 담당자가 검토 |
+| 조회 구현 | 확정 | `DashboardReadModelMapper`에서 주문 테이블을 읽기 전용으로 조회 |
+| 조건 검토 | 합의 필요 | `READY_FOR_PICKUP` 상태 조건을 `order` 도메인 담당자가 검토 |
 
-오늘 픽업 예정은 `Asia/Seoul` 기준 `pickup_at`이 오늘이고 결제가 완료되었으며 아직 픽업
-완료·취소·반려되지 않은 주문으로 정의한다. 주문제작 상태 흐름이 바뀌더라도 이 업무 정의는
-유지하고, 구체적인 `OrderStatus` 조건은 `order` 도메인의 공개 계약에서 확정한다.
+오늘 픽업 예정은 `Asia/Seoul` 기준 `pickup_at`이 오늘이고 현재 `READY_FOR_PICKUP` 상태인
+주문으로 정의한다. 결제 완료 여부는 해당 상태의 전이 규칙으로 보장하므로 대시보드 조회에서
+결제 테이블을 별도로 조회하지 않는다.
 
 ### 3-7. 최근 주문
 

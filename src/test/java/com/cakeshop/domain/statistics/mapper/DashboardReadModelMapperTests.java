@@ -2,8 +2,11 @@ package com.cakeshop.domain.statistics.mapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.cakeshop.domain.order.entity.OrderStatus;
+import com.cakeshop.domain.statistics.dto.view.TodayPickupScheduleView;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 import java.time.LocalDateTime;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mybatis.spring.boot.test.autoconfigure.MybatisTest;
@@ -25,6 +28,7 @@ class DashboardReadModelMapperTests {
 
     private String suffix;
     private long memberId;
+    private long productId;
 
     @Autowired
     DashboardReadModelMapperTests(
@@ -39,6 +43,7 @@ class DashboardReadModelMapperTests {
     void setUp() {
         suffix = Long.toString(System.nanoTime());
         memberId = insertMember();
+        productId = insertProduct();
     }
 
     @Test
@@ -199,6 +204,126 @@ class DashboardReadModelMapperTests {
         assertThat(count).isZero();
     }
 
+    @Test
+    void countTodayPickups_dateAndStatus_countsOnlyReadyForPickupOrders() {
+        insertPickupOrder("PICKUP-START", "GENERAL", "READY_FOR_PICKUP", START, "시작 상품");
+        insertPickupOrder(
+                "PICKUP-CUSTOM",
+                "CUSTOM",
+                "READY_FOR_PICKUP",
+                START.plusHours(1),
+                "주문제작 상품"
+        );
+        insertPickupOrder(
+                "PICKUP-BEFORE",
+                "GENERAL",
+                "READY_FOR_PICKUP",
+                START.minusNanos(1_000),
+                "이전 상품"
+        );
+        insertPickupOrder("PICKUP-END", "GENERAL", "READY_FOR_PICKUP", END, "종료 상품");
+        insertPickupOrder(
+                "PICKUP-REVIEW",
+                "CUSTOM",
+                "UNDER_REVIEW",
+                START.plusHours(2),
+                "검토 상품"
+        );
+        insertPickupOrder(
+                "PICKUP-DONE",
+                "GENERAL",
+                "PICKED_UP",
+                START.plusHours(3),
+                "완료 상품"
+        );
+        insertPickupOrder(
+                "PICKUP-CANCELED",
+                "GENERAL",
+                "CANCELED",
+                START.plusHours(4),
+                "취소 상품"
+        );
+
+        long count = dashboardReadModelMapper.countTodayPickups(START, END);
+
+        assertThat(count).isEqualTo(2L);
+    }
+
+    @Test
+    void findTodayPickupSchedules_readyOrders_returnsSortedLimitedSummaries() {
+        long eleven = insertPickupOrder(
+                "SCHEDULE-11",
+                "GENERAL",
+                "READY_FOR_PICKUP",
+                START.plusHours(11),
+                "열한시 상품"
+        );
+        long nine = insertPickupOrder(
+                "SCHEDULE-09",
+                "GENERAL",
+                "READY_FOR_PICKUP",
+                START.plusHours(9),
+                "딸기 케이크",
+                "초코 케이크"
+        );
+        long tenFirst = insertPickupOrder(
+                "SCHEDULE-10-A",
+                "GENERAL",
+                "READY_FOR_PICKUP",
+                START.plusHours(10),
+                "열시 첫 상품"
+        );
+        long tenSecond = insertPickupOrder(
+                "SCHEDULE-10-B",
+                "CUSTOM",
+                "READY_FOR_PICKUP",
+                START.plusHours(10),
+                "열시 두 번째 상품"
+        );
+        long twelve = insertPickupOrder(
+                "SCHEDULE-12",
+                "GENERAL",
+                "READY_FOR_PICKUP",
+                START.plusHours(12),
+                "열두시 상품"
+        );
+        insertPickupOrder(
+                "SCHEDULE-13",
+                "GENERAL",
+                "READY_FOR_PICKUP",
+                START.plusHours(13),
+                "열세시 상품"
+        );
+
+        List<TodayPickupScheduleView> schedules =
+                dashboardReadModelMapper.findTodayPickupSchedules(START, END, 5);
+
+        assertThat(schedules)
+                .extracting(TodayPickupScheduleView::orderId)
+                .containsExactly(nine, tenFirst, tenSecond, eleven, twelve);
+        assertThat(schedules.getFirst().productName()).isEqualTo("딸기 케이크 외 1개");
+        assertThat(schedules.getFirst().status()).isEqualTo(OrderStatus.READY_FOR_PICKUP);
+        assertThat(schedules.getFirst().statusLabel()).isEqualTo("픽업 준비");
+    }
+
+    @Test
+    void findTodayPickupSchedules_noMatchingOrders_returnsEmptyResults() {
+        insertPickupOrder(
+                "NO-SCHEDULE",
+                "CUSTOM",
+                "UNDER_REVIEW",
+                START.plusHours(1),
+                "대상 아님"
+        );
+
+        long count = dashboardReadModelMapper.countTodayPickups(START, END);
+        List<TodayPickupScheduleView> schedules =
+                dashboardReadModelMapper.findTodayPickupSchedules(START, END, 5);
+
+        assertThat(count).isZero();
+        assertThat(schedules).isEmpty();
+    }
+
     private long insertMember() {
         String email = "dashboard-read-model-" + suffix + "@example.com";
         jdbcTemplate.update(
@@ -225,7 +350,57 @@ class DashboardReadModelMapperTests {
         );
     }
 
+    private long insertProduct() {
+        String categoryCode = "DASHBOARD_" + suffix;
+        jdbcTemplate.update(
+                "INSERT INTO categories (code, name, is_active) VALUES (?, '대시보드', 1)",
+                categoryCode
+        );
+        long categoryId = jdbcTemplate.queryForObject(
+                "SELECT id FROM categories WHERE code = ?",
+                Long.class,
+                categoryCode
+        );
+        String productName = "대시보드 상품 " + suffix;
+        jdbcTemplate.update(
+                """
+                INSERT INTO products (
+                    category_id,
+                    name,
+                    description,
+                    base_price,
+                    product_type,
+                    preparation_days,
+                    status
+                )
+                VALUES (?, ?, '', 40000, 'GENERAL', 0, 'ACTIVE')
+                """,
+                categoryId,
+                productName
+        );
+
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM products WHERE name = ?",
+                Long.class,
+                productName
+        );
+    }
+
     private long insertOrder(String label) {
+        return insertOrder(
+                label,
+                "GENERAL",
+                "PENDING_PAYMENT",
+                END.plusDays(1)
+        );
+    }
+
+    private long insertOrder(
+            String label,
+            String orderType,
+            String status,
+            LocalDateTime pickupAt
+    ) {
         String orderNumber = "DASHBOARD-" + label + "-" + suffix;
         jdbcTemplate.update(
                 """
@@ -244,13 +419,15 @@ class DashboardReadModelMapperTests {
                     pickup_at,
                     payment_expires_at
                 )
-                VALUES (?, ?, 'GENERAL', '주문자', '010-1111-2222',
+                VALUES (?, ?, ?, '주문자', '010-1111-2222',
                         '수령자', '010-3333-4444', 40000, 0, 40000,
-                        'PENDING_PAYMENT', ?, ?)
+                        ?, ?, ?)
                 """,
                 orderNumber,
                 memberId,
-                END.plusDays(1),
+                orderType,
+                status,
+                pickupAt,
                 END
         );
 
@@ -258,6 +435,48 @@ class DashboardReadModelMapperTests {
                 "SELECT id FROM orders WHERE order_number = ?",
                 Long.class,
                 orderNumber
+        );
+    }
+
+    private long insertPickupOrder(
+            String label,
+            String orderType,
+            String status,
+            LocalDateTime pickupAt,
+            String... productNames
+    ) {
+        long orderId = insertOrder(label, orderType, status, pickupAt);
+        for (String productName : productNames) {
+            insertOrderItem(orderId, orderType, productName);
+        }
+        return orderId;
+    }
+
+    private void insertOrderItem(
+            long orderId,
+            String productType,
+            String productName
+    ) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO order_items (
+                    order_id,
+                    product_id,
+                    product_name,
+                    product_type,
+                    quantity,
+                    base_price,
+                    option_amount,
+                    total_amount,
+                    preparation_days,
+                    cancellation_limit_days
+                )
+                VALUES (?, ?, ?, ?, 1, 40000, 0, 40000, 0, 0)
+                """,
+                orderId,
+                productId,
+                productName,
+                productType
         );
     }
 

@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
 import com.cakeshop.domain.statistics.service.DashboardReadModelQueryService;
 import java.math.BigDecimal;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,7 +38,13 @@ class StatisticsAdminControllerTests {
     @Test
     void dashboard_serviceReturnsView_addsDashboardToModel() throws Exception {
         StatisticsDashboardView dashboard =
-                new StatisticsDashboardView(3L, new BigDecimal("120000"), 2L);
+                new StatisticsDashboardView(
+                        3L,
+                        new BigDecimal("120000"),
+                        2L,
+                        0L,
+                        List.of()
+                );
         when(dashboardReadModelQueryService.getDashboard()).thenReturn(dashboard);
 
         mockMvc.perform(get("/admin"))
