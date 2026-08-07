@@ -70,6 +70,7 @@ class CommunityMemberContractTests {
     private long categoryId;
     private long activeMemberId;
     private long withdrawnMemberId;
+    private long adminMemberId;
 
     @BeforeEach
     void setUp() {
@@ -85,6 +86,7 @@ class CommunityMemberContractTests {
 
         activeMemberId = insertMember("활동회원", suffix + "-active", MemberStatus.ACTIVE);
         withdrawnMemberId = insertMember("탈퇴회원", suffix + "-gone", MemberStatus.WITHDRAWN);
+        adminMemberId = insertMember("차단관리자", suffix + "-admin", MemberStatus.ACTIVE);
     }
 
     /**
@@ -145,7 +147,14 @@ class CommunityMemberContractTests {
                 .satisfies(post -> assertThat(post.authorName()).isEqualTo("탈퇴한 회원"));
     }
 
-    /** 신고자와 차단 관리자도 같은 계약으로 채워진다(조각 10c). */
+    /**
+     * 신고자와 차단 관리자도 같은 계약으로 채워진다(조각 10c).
+     *
+     * <p>작성자와 차단 관리자를 <b>다른 회원</b>으로 둔다. 같은 회원으로 두면 두 자리를
+     * 뒤바꾸거나 {@code blockedBy} 대신 작성자 ID를 조회하는 회귀가 생겨도 두 단언이 모두
+     * 통과한다 — 관리자 상세가 두 회원을 <b>각각 제자리에</b> 합치는지가 이 검사의 전부인데,
+     * 데이터가 그것을 구분하지 못하게 된다 (PR #144 Codex 리뷰).</p>
+     */
     @Test
     void adminGetReportsAndDetail_fillReporterAndBlockingAdmin() {
         long postId = insertPost(activeMemberId, "신고된 글");
@@ -157,7 +166,7 @@ class CommunityMemberContractTests {
                 """,
                 postId, withdrawnMemberId);
 
-        communityAdminService.blockPost(postId, "광고성 게시물", activeMemberId);
+        communityAdminService.blockPost(postId, "광고성 게시물", adminMemberId);
 
         assertThat(communityAdminService.getReports(postId)).singleElement()
                 .satisfies(report ->
@@ -166,7 +175,7 @@ class CommunityMemberContractTests {
         AdminPostDetailView detail = communityAdminService.getPostDetail(postId);
 
         assertThat(detail.authorName()).isEqualTo("활동회원");
-        assertThat(detail.blockedByNickname()).isEqualTo("활동회원");
+        assertThat(detail.blockedByNickname()).isEqualTo("차단관리자");
     }
 
     private long insertMember(String nickname, String suffix, MemberStatus status) {

@@ -81,7 +81,6 @@ class CommunityQueryCountTests {
     private ExecutedQueryCounter queryCounter;
 
     private long categoryId;
-    private long memberId;
 
     @BeforeEach
     void setUp() {
@@ -95,6 +94,19 @@ class CommunityQueryCountTests {
                 "QUERY_COUNT_" + suffix, "쿼리 수 테스트");
         categoryId = jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
 
+    }
+
+    /**
+     * 게시글·댓글마다 <b>서로 다른</b> 작성자를 만든다.
+     *
+     * <p>전부 같은 회원으로 두면 작성자 ID를 {@code distinct()}한 뒤 <b>작성자마다</b> 단건
+     * 조회하는 구현으로 되돌아가도 조회가 한 번뿐이라 이 검사가 그대로 통과한다. 실제 목록은
+     * 작성자가 제각각이라 그 구현이 곧 N+1인데, 데이터가 그것을 구분하지 못한다
+     * (PR #144 Codex 리뷰).
+     */
+    private long newMember() {
+        String suffix = Long.toString(System.nanoTime());
+
         jdbcTemplate.update(
                 """
                 INSERT INTO members (
@@ -103,8 +115,9 @@ class CommunityQueryCountTests {
                 VALUES (?, ?, ?, ?, 'USER', 'ACTIVE', ?, ?, ?)
                 """,
                 "query-count-" + suffix + "@cakeshop.local", "encoded-password",
-                "쿼리수", "010-0000-0000", "쿼리수", BASE_TIME, BASE_TIME);
-        memberId = jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+                "쿼리수" + suffix, "010-0000-0000", "쿼리수", BASE_TIME, BASE_TIME);
+
+        return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
     }
 
     @Test
@@ -201,7 +214,7 @@ class CommunityQueryCountTests {
                     INSERT INTO comments (post_id, member_id, content, status)
                     VALUES (?, ?, '댓글', 'PUBLISHED')
                     """,
-                    postId, memberId);
+                    postId, newMember());
         }
     }
 
@@ -215,7 +228,7 @@ class CommunityQueryCountTests {
                         INSERT INTO comments (post_id, member_id, content, status)
                         VALUES (?, ?, '댓글', 'PUBLISHED')
                         """,
-                        postId, memberId);
+                        postId, newMember());
             }
         }
     }
@@ -228,7 +241,7 @@ class CommunityQueryCountTests {
                 )
                 VALUES (?, ?, '제목', '본문', ?, ?, ?)
                 """,
-                memberId, categoryId, PostStatus.PUBLISHED.name(), BASE_TIME, BASE_TIME);
+                newMember(), categoryId, PostStatus.PUBLISHED.name(), BASE_TIME, BASE_TIME);
 
         return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
     }
