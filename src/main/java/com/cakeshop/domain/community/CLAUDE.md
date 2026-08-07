@@ -26,12 +26,23 @@
 **커뮤니티 SQL은 `members`를 건드리지 않는다.** 작성자 닉네임과 탈퇴 여부는 회원 도메인의 계약에서 받아 Service가 조립한다. 근거는 `DOMAIN.md` 8절, 규칙 본문은 `conventions.md` 15.1이다.
 
 - **쓸 수 있는 것은 둘뿐이다** — `MemberCommunityQueryService.getMembersByIds(List<Long>)`와 `MemberCommunityView(id, nickname, withdrawn)`. `member.entity`(특히 `MemberStatus`)를 import하지 않는다. 탈퇴 판정은 회원 쪽 SQL이 한다.
-- **매퍼는 작성자 없는 `*Row`를 돌려주고, `*View.of(row, author)`를 거쳐야 화면용 DTO가 된다.** 작성자 자리를 비워 둔 View를 들고 다니는 형태로 되돌리지 않는다 — 비어 있어도 컴파일과 테스트가 통과한다.
+- **매퍼는 회원 정보 없는 `*Row`를 돌려주고 회원 ID만 들고 나온다. 화면용 DTO는 `*View.of(row, ...)`가 만든다.** 조립에 필요한 회원은 화면마다 다르다 — 목록·상세·댓글은 작성자, 신고 목록은 **신고자**(`ReportView.of(row, reporter)`), 관리자 상세는 **작성자와 차단 관리자 둘**(`AdminPostDetailView.of(row, author, blockedByAdmin)`)이다. 작성자만 있다고 보고 고치면 나머지 회원 자리가 빈다. 회원 자리를 비워 둔 View를 들고 다니는 형태로는 되돌리지 않는다 — 비어 있어도 컴파일과 테스트가 통과한다.
 - **회원 조회는 ID를 모아 한 번에 한다.** 행마다도, 작성자마다도 아니다. `CommunityQueryCountTests`(H1b)가 고정한다.
 - **회원 행을 찾지 못해도 게시글은 목록에 남고 작성자만 가려진다.** `INNER JOIN`이던 때는 통째로 사라졌는데 그건 8절과 어긋난다.
 - `member` 폴더의 `MemberCommunity*` 세 파일은 팀 합의로 **만들 수 있지만, 회원 담당자의 기존 코드는 고치지 않는다.** 계약을 넓혀야 하면 담당자와 먼저 합의한다(15.8).
 
-`CommunityDomainBoundaryTests`(H34)와 `CommunityMemberContractTests`(H35)가 이 절 전체를 문다. **JOIN 하나를 되돌려도 화면 결과는 똑같고 다른 테스트는 전부 통과하므로**, 초록불을 근거로 삼지 말고 이 절을 근거로 삼는다.
+**이 절을 무는 하네스는 항목마다 다르고, 무는 것이 아예 없는 항목도 있다.**
+
+| 항목 | 무는 것 |
+|---|---|
+| 회원 테이블·패키지 참조 | `CommunityDomainBoundaryTests` (H34) |
+| 탈퇴 회원 조립 결과 | `CommunityMemberContractTests` (H35) |
+| 배치 조회 | `CommunityQueryCountTests` (H1b) |
+| 회원 행 누락 시 폴백 | `CommunityServiceTests`·`CommunityAdminServiceTests` (mock). 실제 DB로는 만들 수 없다 — `posts.member_id`가 NOT NULL FK다 |
+| **`*View.of(...)`를 거치는 형태** | **없다** |
+| **`member` 폴더 합의** | **없다** |
+
+**JOIN 하나를 되돌려도 화면 결과는 똑같고 다른 테스트는 전부 통과한다.** 초록불을 근거로 삼지 말고 이 절을 근거로 삼는다. 특히 표의 마지막 두 줄은 검사가 없어 리뷰가 유일한 방어선이다.
 
 ## 작업 절차
 
