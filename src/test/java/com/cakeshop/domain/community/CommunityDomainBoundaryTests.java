@@ -27,6 +27,10 @@ import org.junit.jupiter.api.Test;
  * <p>형태 검사인 것은 다른 방법이 없기 때문이다. 조각 7a의 H28, 조각 1의 H1a와 같은 종류로,
  * <b>동작으로는 드러나지 않는 규칙</b>은 형태를 직접 적어 두는 것 말고 잡을 방법이 없다.
  *
+ * <p><b>코드만이 아니라 문서도 본다</b>(조각 11a). 매퍼를 그대로 둔 채 {@code DOMAIN.md}의
+ * SQL 예제에만 JOIN을 되살리면 코드 쪽 검사는 전부 통과하는데, <b>다음 사람이 코드보다 먼저
+ * 읽는 것은 문서다.</b> 조각 10b가 JOIN을 걷어낸 뒤에도 6.1 예제가 그 상태로 남아 있었다.
+ *
  * <p><b>여기서 다루지 않는 것</b>: "회원 행이 없는 게시글이 목록에서 빠지지 않는지"는 실제 DB로
  * 재현할 수 없다. {@code posts.member_id}가 members를 참조하는 NOT NULL FK라 그런 행을 만들
  * 수가 없다(DOMAIN.md 8). 탈퇴는 행을 지우는 것이 아니라 {@code WITHDRAWN} 상태로 두는 것이고,
@@ -44,6 +48,30 @@ class CommunityDomainBoundaryTests {
      */
     private static final Path MAPPER_DIRECTORY =
             Path.of("src", "main", "resources", "mapper", "community");
+
+    /**
+     * 커뮤니티 문서 전부와 도메인 진입점.
+     *
+     * <p>진입점({@code CLAUDE.md})이 {@code docs/}가 아니라 소스 트리에 있어 따로 붙인다.
+     * 둘 다 Gradle의 {@code test} 입력에 등록돼 있다(build.gradle).
+     */
+    private static final Path DOC_DIRECTORY = Path.of("docs", "community");
+
+    private static final Path DOMAIN_ENTRY_POINT = JAVA_ROOT.resolve("CLAUDE.md");
+
+    /**
+     * 마크다운 코드 블록. 언어 표시가 있든 없든 잡는다.
+     *
+     * <p>언어를 지우는 것만으로 검사를 비껴갈 수 있으면 안 된다. 여는 울타리 줄의 나머지를
+     * 버리고 닫는 울타리까지를 본문으로 삼는다.
+     *
+     * <p><b>울타리는 줄 첫머리에서만 인정한다.</b> 줄 가운데의 세 백틱은 코드 블록이 아니라
+     * 백틱을 글자로 보여 주려고 감싼 인라인 코드다 — 이 저장소 문서가 실제로 그렇게 쓴다.
+     * 줄 아무 데서나 인정하면 그 지점부터 다음 백틱까지의 <b>산문 전체가 코드 블록으로
+     * 둔갑</b>하고, 그 산문에는 규칙을 설명하느라 금지된 이름이 들어 있다.
+     */
+    private static final Pattern FENCED_CODE_BLOCK =
+            Pattern.compile("(?ms)^```[^\\n]*\\n(.*?)^```");
 
     /**
      * 커뮤니티가 회원 도메인에서 쓸 수 있는 것 전부.
@@ -98,6 +126,56 @@ class CommunityDomainBoundaryTests {
         assertThat(violations)
                 .as("커뮤니티 SQL은 회원 도메인 소유 테이블을 조회하지 않는다. 작성자는"
                         + " MemberCommunityQueryService 로 받는다 (conventions.md 15.1, 조각 10)")
+                .isEmpty();
+    }
+
+    /**
+     * 문서의 SQL 예제도 회원 도메인 소유 테이블을 건드리지 않는지 확인한다(조각 D-1).
+     *
+     * <p><b>매퍼만 보는 것으로는 부족하다.</b> 매퍼를 그대로 둔 채 {@code DOMAIN.md} 6.1의
+     * 예제에만 JOIN을 되살리면 위 검사는 통과한다 — 실제로 조각 10b가 JOIN을 걷어낸 뒤에도
+     * 그 예제가 {@code JOIN members}를 들고 남아 있었고, 정본이 8절과 정면으로 어긋난 채
+     * 아무 검사도 울리지 않았다(PR #146, PLAN.md R32). <b>다음 사람이 코드보다 먼저 읽는
+     * 것이 문서다</b> — 틀린 예제는 틀린 코드보다 오래 살아남는다.
+     *
+     * <p><b>산문이 아니라 코드 블록만 본다.</b> 규칙을 설명하려면 금지된 이름을 입에 올려야
+     * 한다 — 8절의 "커뮤니티 SQL이 {@code members}를 JOIN해 직접 판정하지 않는다"가 바로
+     * 그것이다. 산문까지 보면 <b>규칙을 적는 행위가 규칙 위반</b>이 되고, 그러면 다음 사람이
+     * 지우는 것은 JOIN이 아니라 설명이다. 주석을 걷어내고 보는 것과 같은 이유다.
+     */
+    @Test
+    void communityDocs_sqlExamplesDoNotTouchMemberOwnedTables() throws IOException {
+        List<String> violations = new ArrayList<>();
+        List<String> scannedBlocks = new ArrayList<>();
+
+        for (Path doc : documents()) {
+            Matcher blocks = FENCED_CODE_BLOCK.matcher(Files.readString(doc, StandardCharsets.UTF_8));
+
+            while (blocks.find()) {
+                String block = withoutSqlComments(blocks.group(1)).toUpperCase();
+                scannedBlocks.add(block);
+
+                Matcher matcher = MEMBER_OWNED_TABLE_REFERENCE.matcher(block);
+
+                while (matcher.find()) {
+                    violations.add(doc + " -> " + matcher.group());
+                }
+            }
+        }
+
+        assertThat(scannedBlocks)
+                .as("문서에서 코드 블록을 하나도 못 읽었다면 울타리 형식이 바뀐 것이다."
+                        + " 읽을 것이 없으면 이 검사는 영원히 초록불이다")
+                .isNotEmpty();
+
+        assertThat(scannedBlocks)
+                .as("SQL 예제까지 실제로 읽고 있는지 확인한다. 텍스트 블록만 읽고 있으면"
+                        + " 위 단언은 통과하지만 검사하는 것은 아무것도 없다")
+                .anyMatch(block -> block.contains("FROM POSTS"));
+
+        assertThat(violations)
+                .as("문서의 SQL 예제도 회원 도메인 소유 테이블을 조회하지 않는다. 예제가"
+                        + " 규칙보다 먼저 읽히므로 매퍼와 같은 기준으로 본다 (DOMAIN.md 8, R32)")
                 .isEmpty();
     }
 
@@ -161,6 +239,22 @@ class CommunityDomainBoundaryTests {
         assertThat(mappers).as("커뮤니티 매퍼 XML이 있어야 한다").isNotEmpty();
 
         return mappers;
+    }
+
+    /** 커뮤니티 문서 전부와 진입점. 디렉터리로 훑으므로 새 문서가 저절로 들어온다. */
+    private List<Path> documents() throws IOException {
+        List<Path> documents = new ArrayList<>();
+
+        try (Stream<Path> paths = Files.walk(DOC_DIRECTORY)) {
+            paths.filter(path -> path.toString().endsWith(".md")).sorted().forEach(documents::add);
+        }
+
+        assertThat(documents).as("커뮤니티 문서를 하나도 못 읽었다면 경로가 바뀐 것이다").isNotEmpty();
+        assertThat(DOMAIN_ENTRY_POINT).as("도메인 진입점이 있어야 한다").exists();
+
+        documents.add(DOMAIN_ENTRY_POINT);
+
+        return documents;
     }
 
     private List<Path> javaSources() throws IOException {

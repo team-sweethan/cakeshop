@@ -36,6 +36,7 @@
 | 항목 | 무는 것 |
 |---|---|
 | 회원 테이블·패키지 참조 | `CommunityDomainBoundaryTests` (H34) |
+| **문서·이 파일의 SQL 예제** | `CommunityDomainBoundaryTests` (H36). 산문은 보지 않는다 |
 | 탈퇴 회원 조립 결과 | `CommunityMemberContractTests` (H35) |
 | 배치 조회 — 고객 목록·상세·댓글, 관리자 목록 | `CommunityQueryCountTests` (H1b) |
 | 배치 조회 — **신고 목록(`getReports`)** | **없다.** H1b 범위 밖이라 신고자별 단건 조회로 바꿔도 통과한다 |
