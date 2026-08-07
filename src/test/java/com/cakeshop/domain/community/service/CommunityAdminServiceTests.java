@@ -1,7 +1,9 @@
 package com.cakeshop.domain.community.service;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -9,13 +11,27 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.cakeshop.domain.community.dto.view.AdminPostDetailRow;
+import com.cakeshop.domain.community.dto.view.AdminPostDetailView;
+import com.cakeshop.domain.community.dto.view.AdminPostListRow;
+import com.cakeshop.domain.community.dto.view.AdminPostListView;
+import com.cakeshop.domain.community.dto.view.AdminPostSort;
 import com.cakeshop.domain.community.dto.view.PostLockView;
+import com.cakeshop.domain.community.dto.view.ReportRow;
+import com.cakeshop.domain.community.dto.view.ReportView;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.entity.ReportStatus;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
 import com.cakeshop.domain.community.mapper.CommunityAdminMapper;
 import com.cakeshop.domain.community.mapper.CommunityMapper;
+import com.cakeshop.domain.member.dto.view.MemberCommunityView;
+import com.cakeshop.domain.member.service.MemberCommunityQueryService;
+import com.cakeshop.global.common.paging.PageRequest;
+import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
+
+import java.time.LocalDateTime;
+import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,6 +49,8 @@ class CommunityAdminServiceTests {
     private static final long AUTHOR_ID = 7L;
     private static final long ADMIN_ID = 1L;
 
+    private static final LocalDateTime CREATED_AT = LocalDateTime.of(2026, 3, 1, 10, 0);
+
     private CommunityAdminMapper communityAdminMapper;
 
     /**
@@ -42,14 +60,17 @@ class CommunityAdminServiceTests {
      */
     private CommunityMapper communityMapper;
 
+    private MemberCommunityQueryService memberCommunityQueryService;
+
     private CommunityAdminService communityAdminService;
 
     @BeforeEach
     void setUp() {
         communityAdminMapper = mock(CommunityAdminMapper.class);
         communityMapper = mock(CommunityMapper.class);
-        communityAdminService =
-                new CommunityAdminService(communityAdminMapper, communityMapper);
+        memberCommunityQueryService = mock(MemberCommunityQueryService.class);
+        communityAdminService = new CommunityAdminService(
+                communityAdminMapper, communityMapper, memberCommunityQueryService);
     }
 
     /**
@@ -253,6 +274,108 @@ class CommunityAdminServiceTests {
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(CommunityErrorCode.POST_NOT_FOUND);
+    }
+
+    /** 관리자 목록의 작성자도 members JOIN 이 아니라 회원 도메인 계약으로 채운다(조각 10c). */
+    @Test
+    void getPosts_fillsAuthorFromMemberContract() {
+        when(communityAdminMapper.findPostsForAdmin(null, AdminPostSort.LATEST, 20, 0))
+                .thenReturn(List.of(new AdminPostListRow(
+                        POST_ID, AUTHOR_ID, "질문", "제목", PostStatus.PUBLISHED, 0, CREATED_AT)));
+        when(communityAdminMapper.countPostsForAdmin(null)).thenReturn(1L);
+        givenMembers(new MemberCommunityView(AUTHOR_ID, "글쓴이", false));
+
+        PageResult<AdminPostListView> result =
+                communityAdminService.getPosts(null, AdminPostSort.LATEST, new PageRequest(1, 20));
+
+        assertThat(result.getContent()).singleElement()
+                .satisfies(post -> assertThat(post.authorName()).isEqualTo("글쓴이"));
+    }
+
+    /** 회원 행이 없어도 관리자 목록에서 글이 사라지지 않는다(DOMAIN.md 8). */
+    @Test
+    void getPosts_missingAuthor_keepsPostAndMasksAuthor() {
+        when(communityAdminMapper.findPostsForAdmin(null, AdminPostSort.LATEST, 20, 0))
+                .thenReturn(List.of(new AdminPostListRow(
+                        POST_ID, AUTHOR_ID, "질문", "제목", PostStatus.PUBLISHED, 0, CREATED_AT)));
+        when(communityAdminMapper.countPostsForAdmin(null)).thenReturn(1L);
+        givenMembers();
+
+        PageResult<AdminPostListView> result =
+                communityAdminService.getPosts(null, AdminPostSort.LATEST, new PageRequest(1, 20));
+
+        assertThat(result.getContent()).singleElement()
+                .satisfies(post -> assertThat(post.authorName()).isEqualTo("탈퇴한 회원"));
+    }
+
+    /** 신고자도 같은 계약으로 채운다. 탈퇴한 신고자는 표시명만 가려진다(조각 10c). */
+    @Test
+    void getReports_fillsReporterFromMemberContract() {
+        when(communityAdminMapper.findReportsByPost(POST_ID)).thenReturn(List.of(
+                new ReportRow(1L, AUTHOR_ID, "광고입니다", ReportStatus.PENDING, CREATED_AT),
+                new ReportRow(2L, ADMIN_ID, "욕설입니다", ReportStatus.PENDING, CREATED_AT)));
+        givenMembers(
+                new MemberCommunityView(AUTHOR_ID, "신고자", false),
+                new MemberCommunityView(ADMIN_ID, "탈퇴자", true));
+
+        assertThat(communityAdminService.getReports(POST_ID))
+                .extracting(ReportView::reporterName)
+                .containsExactly("신고자", "탈퇴한 회원");
+    }
+
+    /**
+     * 차단 관리자 닉네임도 회원 계약으로 채운다.
+     *
+     * <p>원래 SQL 이 {@code LEFT JOIN} 이었으므로 차단 기록이 없으면 비는 것이 정상이다.
+     * 그 경우 회원 조회 대상에서도 빠진다(조각 10c).</p>
+     */
+    @Test
+    void getPostDetail_blockedPost_fillsBothAuthorAndBlockingAdmin() {
+        when(communityAdminMapper.findPostByIdForAdmin(POST_ID))
+                .thenReturn(adminDetailRow(ADMIN_ID));
+        givenMembers(
+                new MemberCommunityView(AUTHOR_ID, "글쓴이", false),
+                new MemberCommunityView(ADMIN_ID, "관리자", false));
+
+        AdminPostDetailView post = communityAdminService.getPostDetail(POST_ID);
+
+        assertThat(post.authorName()).isEqualTo("글쓴이");
+        assertThat(post.blockedByNickname()).isEqualTo("관리자");
+    }
+
+    @Test
+    void getPostDetail_neverBlocked_leavesBlockingAdminEmpty() {
+        when(communityAdminMapper.findPostByIdForAdmin(POST_ID))
+                .thenReturn(adminDetailRow(null));
+        givenMembers(new MemberCommunityView(AUTHOR_ID, "글쓴이", false));
+
+        AdminPostDetailView post = communityAdminService.getPostDetail(POST_ID);
+
+        assertThat(post.blockedByNickname()).isNull();
+        assertThat(post.hasBlockRecord()).isFalse();
+    }
+
+    private AdminPostDetailRow adminDetailRow(Long blockedBy) {
+        return new AdminPostDetailRow(
+                POST_ID,
+                AUTHOR_ID,
+                "질문",
+                "제목",
+                "본문",
+                blockedBy == null ? PostStatus.PUBLISHED : PostStatus.BLOCKED,
+                blockedBy == null ? null : "광고성 게시물",
+                blockedBy == null ? null : CREATED_AT,
+                blockedBy,
+                10L,
+                2L,
+                CREATED_AT,
+                CREATED_AT
+        );
+    }
+
+    private void givenMembers(MemberCommunityView... members) {
+        when(memberCommunityQueryService.getMembersByIds(anyList()))
+                .thenReturn(List.of(members));
     }
 
     private void givenLockedPost(PostStatus status) {

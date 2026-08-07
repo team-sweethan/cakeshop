@@ -33,7 +33,7 @@ docs/community/DOMAIN.md와 기존 코드를 먼저 읽고 구현 계획을 보�
 | 7 | 조회수 정렬·인기글 | 완료 (7a·7b·7c) | 목록 `?sort=views`, 인기글 영역, 정렬 인덱스 |
 | 8 | (2차) 대댓글 | 범위 밖 | |
 | 9 | (2차) 무한 스크롤 | 범위 밖 | |
-| 10 | 회원 연동 계약 분리 | 진행 중 (10a·10b 완료) | `members` JOIN 8곳을 `MemberCommunityQueryService` 경유로 바꾼다 |
+| 10 | 회원 연동 계약 분리 | 진행 중 (10a·10b·10c 완료) | `members` JOIN 8곳을 `MemberCommunityQueryService` 경유로 바꾼다 |
 
 > **순서를 바꿨다 (2026-08-04).** 원래는 3 → 4 → 5 → 6 → 7이었고, 조각 6을 **4보다 먼저** 했다. 번호는 붙인 순서라 그대로 두고 표의 줄만 실제 진행 순서로 옮겼다.
 >
@@ -409,7 +409,7 @@ ALTER TABLE comments   ADD INDEX IF NOT EXISTS ix_comments_created   (created_at
 |---|---|---|
 | 10a | 회원 쪽 계약 신설 (`member` 폴더) | **완료** |
 | 10b | `CommunityMapper.xml` 4곳 (목록·상세·댓글 2) | **완료** |
-| 10c | `CommunityAdminMapper.xml` 4곳 (신고·관리자 목록·상세 작성자·차단 관리자) | |
+| 10c | `CommunityAdminMapper.xml` 4곳 (신고·관리자 목록·상세 작성자·차단 관리자) | **완료** |
 | 10d | 경계 회귀 테스트 | |
 
 **10a에서 만든 것** — 전부 새 파일이고 회원 담당자의 기존 코드는 고치지 않았다(팀 합의: `member` 폴더에 `MemberCommunity*`를 허락 없이 만들 수 있되 담당자 코드는 수정하지 않는다).
@@ -443,6 +443,12 @@ resources/mapper/member/MemberCommunityMapper.xml
 **H1b(쿼리 수)의 기대값이 한 회씩 늘었다**: 목록 2→3, 댓글 구역 2→3, 상세 1→2. 늘어난 것은 게시글·댓글 수와 무관한 **고정 1회**이고, "적은 글과 많은 글의 횟수가 같은지"를 함께 단언하므로 회원을 행마다 조회하는 형태로 바뀌면 여전히 깨진다.
 
 **매퍼 테스트에서 작성자 검사 3건을 덜어내고 Service 쪽으로 옮겼다.** 작성자 판정이 더 이상 커뮤니티 SQL의 책임이 아니기 때문이다. 지운 것이 아니라 자리를 옮긴 것이고, SQL 층의 탈퇴 판정은 `MemberCommunityMapperTests`가 맡는다.
+
+**10c는 10b의 형태를 그대로 따랐다** — `AdminPostListRow`·`AdminPostDetailRow`·`ReportRow`를 만들고 `CommunityAdminService`가 조립한다. **이제 커뮤니티 XML 두 벌 모두 `members` 참조가 0건이다.**
+
+한 자리만 모양이 달랐다. **차단 관리자는 `LEFT JOIN`이었다.** 상세는 작성자와 차단 관리자 **둘**을 봐야 하므로 두 ID를 한 번의 배치 조회로 함께 받는다. `blocked_by`가 null이면 조회 대상에서 빠지고 화면의 차단 관리자 자리도 그대로 빈다 — LEFT JOIN이던 때와 결과가 같다. `AdminPostDetailRow`가 닉네임이 아니라 `blockedBy` ID를 들고 있는 것이 그 때문이고, 매퍼 테스트의 차단 기록 검사도 닉네임이 아니라 ID를 보도록 바꿨다.
+
+**관리자 쪽에는 목록 조회의 쿼리 수 하네스가 없다.** H1b는 고객 목록만 본다. 관리자 목록도 같은 N+1 위험이 생겼으므로 10d에서 함께 볼지 정한다.
 
 ## 하네스 (누적)
 

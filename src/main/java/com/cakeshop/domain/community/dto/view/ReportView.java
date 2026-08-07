@@ -1,6 +1,7 @@
 package com.cakeshop.domain.community.dto.view;
 
 import com.cakeshop.domain.community.entity.ReportStatus;
+import com.cakeshop.domain.member.dto.view.MemberCommunityView;
 
 import java.time.LocalDateTime;
 
@@ -21,6 +22,18 @@ public record ReportView(
         ReportStatus status,
         LocalDateTime createdAt
 ) {
+
+    /** 신고 한 줄과 신고자를 합쳐 화면용 DTO를 만든다. 근거는 {@link PostListView#of}. */
+    public static ReportView of(ReportRow row, MemberCommunityView reporter) {
+        return new ReportView(
+                row.id(),
+                reporter == null ? null : reporter.nickname(),
+                reporter == null || reporter.withdrawn(),
+                row.reason(),
+                row.status(),
+                row.createdAt()
+        );
+    }
 
     public String reporterName() {
         return reporterWithdrawn ? PostListView.WITHDRAWN_AUTHOR_NAME : reporterNickname;

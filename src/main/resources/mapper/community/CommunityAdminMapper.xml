@@ -11,18 +11,16 @@
 -->
 <mapper namespace="com.cakeshop.domain.community.mapper.CommunityAdminMapper">
     <select id="findReportsByPost"
-            resultType="com.cakeshop.domain.community.dto.view.ReportView">
+            resultType="com.cakeshop.domain.community.dto.view.ReportRow">
 
         SELECT
         pr.id,
-        m.nickname AS reporter_nickname,
-        (m.status = 'WITHDRAWN') AS reporter_withdrawn,
+        pr.reporter_id,
         pr.reason,
         pr.status,
         pr.created_at
 
         FROM post_reports pr
-        JOIN members m ON m.id = pr.reporter_id
 
         WHERE pr.post_id = #{postId}
 
@@ -46,14 +44,13 @@
     </sql>
 
     <select id="findPostsForAdmin"
-            resultType="com.cakeshop.domain.community.dto.view.AdminPostListView">
+            resultType="com.cakeshop.domain.community.dto.view.AdminPostListRow">
 
         SELECT
         p.id,
+        p.member_id,
         pc.name AS category_name,
         p.title,
-        m.nickname AS author_nickname,
-        (m.status = 'WITHDRAWN') AS author_withdrawn,
         p.status,
         (SELECT COUNT(*)
         FROM post_reports pr
@@ -63,7 +60,6 @@
 
         FROM posts p
         JOIN post_categories pc ON pc.id = p.category_id
-        JOIN members m ON m.id = p.member_id
 
         <include refid="adminPostConditions"/>
 
@@ -88,7 +84,7 @@
     </select>
 
     <select id="findPostByIdForAdmin"
-            resultType="com.cakeshop.domain.community.dto.view.AdminPostDetailView">
+            resultType="com.cakeshop.domain.community.dto.view.AdminPostDetailRow">
 
         SELECT
         p.id,
@@ -96,12 +92,10 @@
         pc.name AS category_name,
         p.title,
         p.content,
-        m.nickname AS author_nickname,
-        (m.status = 'WITHDRAWN') AS author_withdrawn,
         p.status,
         p.blocked_reason,
         p.blocked_at,
-        b.nickname AS blocked_by_nickname,
+        p.blocked_by,
         p.view_count,
         p.like_count,
         p.created_at,
@@ -109,8 +103,6 @@
 
         FROM posts p
         JOIN post_categories pc ON pc.id = p.category_id
-        JOIN members m ON m.id = p.member_id
-        LEFT JOIN members b ON b.id = p.blocked_by
 
         WHERE p.id = #{postId}
     </select>

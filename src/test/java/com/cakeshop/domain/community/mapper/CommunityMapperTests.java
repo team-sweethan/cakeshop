@@ -9,11 +9,12 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.cakeshop.domain.community.dto.view.AdminPostDetailView;
-import com.cakeshop.domain.community.dto.view.AdminPostListView;
+import com.cakeshop.domain.community.dto.view.AdminPostDetailRow;
+import com.cakeshop.domain.community.dto.view.AdminPostListRow;
 import com.cakeshop.domain.community.dto.view.AdminPostSort;
 import com.cakeshop.domain.community.dto.view.CommentCountView;
 import com.cakeshop.domain.community.dto.view.CommentRow;
+import com.cakeshop.domain.community.dto.view.ReportRow;
 import com.cakeshop.domain.community.dto.view.PopularPostView;
 import com.cakeshop.domain.community.dto.view.PostCategoryView;
 import com.cakeshop.domain.community.dto.view.PostDetailRow;
@@ -1070,7 +1071,7 @@ class CommunityMapperTests {
                 .isEqualTo(1);
         assertThat(communityAdminMapper.countPendingReports(postId)).isZero();
         assertThat(communityAdminMapper.findReportsByPost(postId))
-                .extracting(ReportView::status)
+                .extracting(ReportRow::status)
                 .containsExactlyInAnyOrder(ReportStatus.REJECTED, ReportStatus.RESOLVED);
     }
 
@@ -1082,7 +1083,7 @@ class CommunityMapperTests {
         insertPost("삭제", PostStatus.DELETED, BASE_TIME);
 
         assertThat(adminPosts(null, AdminPostSort.LATEST))
-                .extracting(AdminPostListView::title)
+                .extracting(AdminPostListRow::title)
                 .contains("노출", "차단", "삭제");
     }
 
@@ -1092,7 +1093,7 @@ class CommunityMapperTests {
         insertPost("차단", PostStatus.BLOCKED, BASE_TIME);
 
         assertThat(adminPosts(PostStatus.BLOCKED, AdminPostSort.LATEST))
-                .extracting(AdminPostListView::title)
+                .extracting(AdminPostListRow::title)
                 .containsExactly("차단");
     }
 
@@ -1112,14 +1113,14 @@ class CommunityMapperTests {
         communityMapper.insertReport(closedPostId, insertReporter("c2"), "욕설입니다");
         communityAdminMapper.closePendingReports(closedPostId, ReportStatus.RESOLVED);
 
-        List<AdminPostListView> posts = adminPosts(null, AdminPostSort.REPORTS);
+        List<AdminPostListRow> posts = adminPosts(null, AdminPostSort.REPORTS);
 
         assertThat(posts).first()
-                .extracting(AdminPostListView::title)
+                .extracting(AdminPostListRow::title)
                 .isEqualTo("미처리 신고 1건");
         assertThat(posts).filteredOn(post -> post.id() == closedPostId)
                 .first()
-                .extracting(AdminPostListView::pendingReportCount)
+                .extracting(AdminPostListRow::pendingReportCount)
                 .isEqualTo(0L);
     }
 
@@ -1132,15 +1133,15 @@ class CommunityMapperTests {
 
         communityAdminMapper.blockPost(blockedId, "광고성 게시물", adminId);
 
-        AdminPostDetailView neverBlocked = communityAdminMapper.findPostByIdForAdmin(neverBlockedId);
+        AdminPostDetailRow neverBlocked = communityAdminMapper.findPostByIdForAdmin(neverBlockedId);
         assertThat(neverBlocked).isNotNull();
-        assertThat(neverBlocked.hasBlockRecord()).isFalse();
-        assertThat(neverBlocked.blockedByNickname()).isNull();
+        assertThat(neverBlocked.blockedAt()).isNull();
+        assertThat(neverBlocked.blockedBy()).isNull();
 
-        AdminPostDetailView blocked = communityAdminMapper.findPostByIdForAdmin(blockedId);
-        assertThat(blocked.hasBlockRecord()).isTrue();
+        AdminPostDetailRow blocked = communityAdminMapper.findPostByIdForAdmin(blockedId);
+        assertThat(blocked.blockedAt()).isNotNull();
         assertThat(blocked.blockedReason()).isEqualTo("광고성 게시물");
-        assertThat(blocked.blockedByNickname()).isNotNull();
+        assertThat(blocked.blockedBy()).isEqualTo(adminId);
     }
 
     /**
@@ -1273,7 +1274,7 @@ class CommunityMapperTests {
     }
 
     /** 이 테스트 카테고리의 글만 본다. 다른 테스트가 남긴 글과 섞이지 않게 한다. */
-    private List<AdminPostListView> adminPosts(PostStatus status, AdminPostSort sort) {
+    private List<AdminPostListRow> adminPosts(PostStatus status, AdminPostSort sort) {
         return communityAdminMapper.findPostsForAdmin(status, sort, 100, 0).stream()
                 .filter(post -> "커뮤니티 테스트".equals(post.categoryName()))
                 .toList();
