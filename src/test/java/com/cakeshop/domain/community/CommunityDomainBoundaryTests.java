@@ -59,27 +59,44 @@ class CommunityDomainBoundaryTests {
     private static final Pattern MEMBER_PACKAGE_REFERENCE =
             Pattern.compile("com\\.cakeshop\\.domain\\.member\\.[A-Za-z0-9_.]+");
 
+    /**
+     * 회원 도메인이 소유한 테이블 전부.
+     *
+     * <p>{@code members} 하나만 보면 부족하다. 회원 상태 이력을 관리자 조회에 직접 붙이는
+     * 변경은 JOIN 대상만 다를 뿐 소유권을 넘는 것은 똑같은데, 테이블 이름 하나만 보는 검사는
+     * 그대로 통과한다 (PR #144 Codex 리뷰).
+     *
+     * <p>{@code member_coupons}는 이름과 달리 <b>쿠폰 도메인 소유</b>라 여기에 넣지 않는다.
+     * 이 검사가 보는 것은 회원 도메인 경계 하나다. 다른 도메인 경계는 그 도메인 담당자와
+     * 합의해 따로 세운다(AGENTS.md 도메인 담당 표).
+     */
+    private static final List<String> MEMBER_OWNED_TABLES =
+            List.of("MEMBERS", "SOCIAL_ACCOUNTS", "MEMBER_STATUS_HISTORIES");
+
     /** 낱말 단위로 본다. {@code p.member_id}는 members 참조가 아니다. */
-    private static final Pattern MEMBERS_TABLE = Pattern.compile("\\bMEMBERS\\b");
+    private static final Pattern MEMBER_OWNED_TABLE_REFERENCE = Pattern.compile(
+            "\\b(" + String.join("|", MEMBER_OWNED_TABLES) + ")\\b");
 
     /**
-     * 커뮤니티 SQL이 members 테이블을 건드리지 않는지 확인한다.
+     * 커뮤니티 SQL이 회원 도메인 소유 테이블을 건드리지 않는지 확인한다.
      *
      * <p>JOIN만이 아니라 어떤 형태의 참조도 잡는다. 서브쿼리나 {@code EXISTS}로 우회하면
      * JOIN이라는 낱말은 없지만 소유권을 넘는 것은 똑같다.
      */
     @Test
-    void communityMapperXml_doesNotTouchMembersTable() throws IOException {
+    void communityMapperXml_doesNotTouchMemberOwnedTables() throws IOException {
         List<String> violations = new ArrayList<>();
 
         for (Path mapperXml : mapperXmlFiles()) {
-            if (MEMBERS_TABLE.matcher(strippedOf(mapperXml)).find()) {
-                violations.add(mapperXml.toString());
+            Matcher matcher = MEMBER_OWNED_TABLE_REFERENCE.matcher(strippedOf(mapperXml));
+
+            while (matcher.find()) {
+                violations.add(mapperXml + " -> " + matcher.group());
             }
         }
 
         assertThat(violations)
-                .as("커뮤니티 SQL은 members 를 조회하지 않는다. 작성자는"
+                .as("커뮤니티 SQL은 회원 도메인 소유 테이블을 조회하지 않는다. 작성자는"
                         + " MemberCommunityQueryService 로 받는다 (conventions.md 15.1, 조각 10)")
                 .isEmpty();
     }
@@ -167,15 +184,28 @@ class CommunityDomainBoundaryTests {
      *
      * <p>주석을 걷어내는 이유는 {@code CommunityCommentScopeTests}와 같다 — 규칙을 설명하는
      * 주석이 그 자체로 위반이 되면, 다음 사람은 설명을 지워서 초록불을 만든다.
+     *
+     * <p>XML은 XML 주석만이 아니라 <b>SQL 주석</b>({@literal --} 줄 주석과 블록 주석)도
+     * 걷어낸다. "여기서는 members 를 JOIN 하지 않고 회원 계약을 쓴다"고 SQL 옆에 적어 두는
+     * 것은 아주 자연스러운 일인데, 그것만으로 CI가 빨간불이 되면 다음 사람이 지우는 것은
+     * JOIN이 아니라 설명이다 (PR #144 Codex 리뷰). XML 주석을 먼저 걷어내야 한다 —
+     * {@code <!--} 안에 {@code --}가 들어 있어서 순서를 바꾸면 서로 잡아먹는다.</p>
      */
     private String strippedOf(Path source, boolean upperCase) throws IOException {
         String text = Files.readString(source, StandardCharsets.UTF_8);
 
         String withoutComments = source.toString().endsWith(".java")
                 ? withoutJavaComments(text)
-                : text.replaceAll("(?s)<!--.*?-->", " ");
+                : withoutSqlComments(text.replaceAll("(?s)<!--.*?-->", " "));
 
         return upperCase ? withoutComments.toUpperCase() : withoutComments;
+    }
+
+    /** SQL 주석을 걷어낸다. 줄 주석({@literal --} 부터 줄 끝까지)과 블록 주석 둘 다. */
+    private String withoutSqlComments(String sql) {
+        return sql
+                .replaceAll("(?s)/\\*.*?\\*/", " ")
+                .replaceAll("--[^\\n]*", " ");
     }
 
     /**

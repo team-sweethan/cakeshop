@@ -84,9 +84,9 @@ class CommunityMemberContractTests {
                 "CONTRACT_" + suffix, "계약 테스트");
         categoryId = jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
 
-        activeMemberId = insertMember("활동회원", suffix + "-active", MemberStatus.ACTIVE);
-        withdrawnMemberId = insertMember("탈퇴회원", suffix + "-gone", MemberStatus.WITHDRAWN);
-        adminMemberId = insertMember("차단관리자", suffix + "-admin", MemberStatus.ACTIVE);
+        activeMemberId = insertMember("활동회원", suffix + "-active", "USER", MemberStatus.ACTIVE);
+        withdrawnMemberId = insertMember("탈퇴회원", suffix + "-gone", "USER", MemberStatus.WITHDRAWN);
+        adminMemberId = insertMember("차단관리자", suffix + "-admin", "ADMIN", MemberStatus.ACTIVE);
     }
 
     /**
@@ -178,13 +178,26 @@ class CommunityMemberContractTests {
         assertThat(detail.blockedByNickname()).isEqualTo("차단관리자");
     }
 
-    private long insertMember(String nickname, String suffix, MemberStatus status) {
+    /**
+     * 회원 fixture. 세 가지를 일부러 갈라 둔다 (PR #144 Codex 리뷰).
+     *
+     * <p><b>실명과 닉네임을 다른 값으로 넣는다.</b> 같은 값이면
+     * {@code MemberCommunityMapper}가 {@code nickname} 대신 {@code name}을 조회하도록 바뀌어도
+     * 이 클래스의 표시명 단언이 전부 통과한다. 화면에 실명이 뜨는 회귀라 개인정보 문제다.
+     *
+     * <p><b>차단 관리자는 {@code ADMIN} 역할로 만든다.</b> 운영에서 {@code blocked_by}에 남는
+     * 회원은 관리자다({@code SecurityConfig}의 {@code /admin/**}). 전부 {@code USER}로 두면
+     * 회원 계약 조회에 {@code role = 'USER'} 조건이 붙어도 통과하는데, 실제 관리자 상세에서는
+     * 차단 관리자 자리가 빈다. 같은 폴더의 {@code MemberCouponQueryMapper}가 실제로 역할을
+     * 걸러 조회하므로 그 형태를 따라가는 변경은 충분히 있을 법하다.
+     */
+    private long insertMember(String nickname, String suffix, String role, MemberStatus status) {
         jdbcTemplate.update(
                 """
                 INSERT INTO members (email, password, name, nickname, phone, role, status)
-                VALUES (?, 'encoded-password', ?, ?, '010-0000-0000', 'USER', ?)
+                VALUES (?, 'encoded-password', ?, ?, '010-0000-0000', ?, ?)
                 """,
-                suffix + "@cakeshop.local", nickname, nickname, status.name());
+                suffix + "@cakeshop.local", nickname + "실명", nickname, role, status.name());
 
         return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
     }
