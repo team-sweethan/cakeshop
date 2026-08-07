@@ -24,7 +24,9 @@ UPDATE `comments` SET `parent_comment_id` = NULL;
 
 DELETE FROM `notification_deliveries`;
 DELETE FROM `notifications`;
-DELETE FROM `chat_message_reads`;
+DELETE FROM `customer_admin_notes`;
+DELETE FROM `chat_room_read_cursors`;
+DELETE FROM `chat_message_attachments`;
 DELETE FROM `chat_messages`;
 DELETE FROM `chat_room_orders`;
 DELETE FROM `chat_rooms`;
@@ -72,7 +74,9 @@ DELETE FROM `members`;
 -- 상품 id 가 밀려 /products/1 같은 경로가 깨진다. 매번 같은 id 가 나오도록 되돌린다.
 ALTER TABLE `notification_deliveries` AUTO_INCREMENT = 1;
 ALTER TABLE `notifications` AUTO_INCREMENT = 1;
-ALTER TABLE `chat_message_reads` AUTO_INCREMENT = 1;
+ALTER TABLE `customer_admin_notes` AUTO_INCREMENT = 1;
+ALTER TABLE `chat_room_read_cursors` AUTO_INCREMENT = 1;
+ALTER TABLE `chat_message_attachments` AUTO_INCREMENT = 1;
 ALTER TABLE `chat_messages` AUTO_INCREMENT = 1;
 ALTER TABLE `chat_room_orders` AUTO_INCREMENT = 1;
 ALTER TABLE `chat_rooms` AUTO_INCREMENT = 1;
