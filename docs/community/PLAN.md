@@ -1,4 +1,4 @@
-﻿# Community 진행 계획
+# Community 진행 계획
 
 > 도메인 규칙의 정본은 `docs/community/DOMAIN.md`, 화면 구성의 정본은 `docs/community/screens/*.md`다(인덱스와 형식 규약은 `docs/community/SCREENS.md`).
 > 이 문서는 **작업 순서, 진행 상태, 결정 로그, 위험**만 다룬다.
@@ -483,7 +483,7 @@ resources/mapper/member/MemberCommunityMapper.xml
 
 | # | 무엇을 고정하나 | 형태 | 상태 |
 |---|---|---|---|
-| H0a | 게시글 상태 전이 규칙과 게시글·댓글 상태값 제약 | `PostStatusTests`, `CommunitySchemaTests` | **적용** (조각 0) |
+| H0a | **게시글·댓글** 상태 전이 규칙과 게시글·댓글 상태값 제약 | `PostStatusTests`, `CommentStatusTests`, `CommunitySchemaTests` — 전이는 enum 표로 고정한다. 댓글에는 차단이 없고 지운 댓글은 되돌아오지 않는다 | **적용** (조각 0) |
 | H0b | `posts.status`·`comments.status`에 미정의 값이 저장되지 않음, 카테고리 3종이 활성 상태로 존재함 | `CommunitySchemaTests`(6), MariaDB Testcontainers로 CHECK 제약 검증 | **적용** (조각 0) |
 | H1a | 목록 SQL이 스칼라 서브쿼리 형태를 유지함. 정렬의 `id` tiebreaker, 노출 조건이 `status` 하나인 것도 함께 고정 | `CommunityMapperXmlTests` — `XMLMapperBuilder`로 XML 파싱 후 SQL 문자열 검사 (선례: `OrderMapperXmlTests`). ~~**조각 7에서 넓혀야 한다**~~ — **넓혔다 (조각 7a)**. 정렬 분기가 생기면서 `ORDER BY` 단언은 H28로 옮겨 분기마다 고정했고, 이 행은 스칼라 서브쿼리 형태와 노출 조건만 맡는다. **지워서 넘어가지 않았다** | **적용** (조각 1, 2026-08-04 분리) |
 | H1b | 목록 조회 시 실행 쿼리 수가 게시글 수와 무관. **고객 목록·댓글 구역·상세와 관리자 목록** | `CommunityQueryCountTests` — MyBatis `Interceptor`로 실행 statement 수 카운트. 조각 10b에서 작성자 조회가 붙어 기대값이 고정 1회씩 늘었고(목록 2→3, 댓글 2→3, 상세 1→2), 조각 10d에서 **관리자 목록**까지 넓혔다 — 10c에서 같은 N+1 위험이 생겼는데 배치 조회로 막아 뒀을 뿐 고정하지는 않은 상태였다. 조립을 행마다 조회하는 형태로 바꿔 무는 것을 확인했다 | **적용** (조각 1, 10b·10d 갱신) |
@@ -492,9 +492,9 @@ resources/mapper/member/MemberCommunityMapper.xml
 | H2d | 조건부 UPDATE·DELETE가 0행이면 성공으로 넘어가지 않음. 검증 통과 후 상태가 바뀐 순간을 잡는다 | `CommunityServiceTests` — 갱신 행 수 0을 돌려주게 하고, 그 사이 `BLOCKED`가 되면 403이 나오는지까지 본다 | **적용** (조각 2) |
 | H2b | 차단된 글에 작성자가 아무 조치도 못 함. 수정·삭제 모두 403이고 Mapper까지 내려가지 않음 | `CommunityServiceTests` — 버튼 숨김이 아니라 Service 거절을 본다. 화면 쪽은 `CommunityScreenRenderingTests.communityDetail_blockedPostAuthor_showsReasonAndHidesActions` | **적용** (조각 2) |
 | H2c | `like_count`와 실제 좋아요 수 일치. **동시 요청 뒤에도.** 그리고 그 동시 요청이 **교착 없이** 끝나는지 | `CommunityLikeConcurrencyTests`(3) — 8개 스레드를 배리어로 같은 순간에 출발시킨다. H14와 같이 **트랜잭션 롤백을 쓰지 않는다**(감싸면 다른 스레드가 게시글을 못 봐서 경쟁이 일어나지 않는다). 세 번째 테스트가 추가·취소를 섞는데, 두 경로가 서로 다른 순서로 잠그는 구현은 **같은 종류끼리는 멀쩡하고 섞였을 때만** 교착이라 앞의 둘로는 안 잡힌다 | **적용** (조각 4) |
-| H15 | 좋아요가 게시글 행을 **먼저** 잠그고 시작함. 잠금 조회가 다른 테이블을 조인하지 않음. 추가는 중복 키만 삼키고, 수는 증분이 아니라 재계산이며 `updated_at`을 보존함 | `CommunityMapperXmlTests` +3(SQL 형태), `CommunityServiceTests` +2(`InOrder`로 잠금 → 쓰기 → 재계산 순서), `CommunityMapperTests` +7(실제 MariaDB). 순서를 되돌리면 **교착**인데 동시 요청이 없으면 결과가 똑같다(H13과 같은 성질). 조인을 붙이면 교착이 아니라 **조용한 직렬화**라 더 안 보인다 | **적용** (조각 4) |
+| H15 | 좋아요가 게시글 행을 **먼저** 잠그고 시작함. 잠금 조회가 다른 테이블을 조인하지 않음. 추가는 중복 키만 삼키고, 수는 증분이 아니라 재계산이며 `updated_at`을 보존함 | `CommunityMapperXmlTests` +3(SQL 형태), `CommunityServiceTests` +2(`InOrder`로 잠금 → 쓰기 → 재계산 순서), `CommunityMapperTests` +7(실제 MariaDB). 순서를 되돌리면 **교착**인데 동시 요청이 없으면 결과가 똑같다(H13과 같은 성질). 조인을 붙이면 교착이 아니라 **조용한 직렬화**라 더 안 보인다. `CommunityTransactionTests`(2) — 재계산이 실패하면 좋아요 행이 남지도, 지운 행이 사라진 채로도 끝나지 않는다. 쓰기와 재계산이 한 트랜잭션인지는 정상 흐름에서 결과가 같아 드러나지 않는다 | **적용** (조각 4, 롤백은 2026-08-07) |
 | H16 | 신고가 좋아요의 반대편에 있음. 중복을 삼키지 않고(`IGNORE`·`ON DUPLICATE KEY` 부재), "이미 신고했는지"를 처리 상태와 무관하게 판단하며, 자기 글·비노출 글은 거절 | `CommunityMapperXmlTests` +2(SQL 형태), `CommunityMapperTests` +2(실제 UNIQUE 위반과 처리 후 재신고), `CommunityServiceTests` +6. **정상 흐름에서는 어느 쪽이든 똑같이 동작한다** — 갈리는 것은 두 번째 신고뿐이고, 그때 조용히 성공하면 신고자는 접수됐다고 믿는다 | **적용** (조각 5) |
-| H17 | 관리자 조치가 전이 규칙을 지킴. 이미 차단된 글 재차단·지운 글 차단·차단된 적 없는 글 해제가 전부 0행이고, 0행이 성공으로 넘어가지 않음. 차단이 `updated_at`을 보존함 | `CommunityMapperXmlTests` +3, `CommunityMapperTests` +6(실제 MariaDB), `CommunityAdminServiceTests`(11) — `InOrder`로 **잠그고 → 바꾸고 → 신고를 닫는** 순서까지 본다(H13·H15와 같은 자리). 재차단은 화면에 성공으로 보이고 사라지는 것은 첫 조치의 시각·사유라, 이 검사가 없으면 잃은 줄도 모른다 | **적용** (조각 5) |
+| H17 | 관리자 조치가 전이 규칙을 지킴. 이미 차단된 글 재차단·지운 글 차단·차단된 적 없는 글 해제가 전부 0행이고, 0행이 성공으로 넘어가지 않음. 차단이 `updated_at`을 보존함 | `CommunityMapperXmlTests` +3, `CommunityMapperTests` +6(실제 MariaDB), `CommunityAdminServiceTests`(11) — `InOrder`로 **잠그고 → 바꾸고 → 신고를 닫는** 순서까지 본다(H13·H15와 같은 자리). 재차단은 화면에 성공으로 보이고 사라지는 것은 첫 조치의 시각·사유라, 이 검사가 없으면 잃은 줄도 모른다. 전이 규칙 자체는 `ReportStatusTests`(2)가 enum 표로 고정한다 — 처리된 신고에서 나가는 전이가 전부 거짓인 것이 핵심이다(6.6). `CommunityTransactionTests`(1) — 신고를 닫다 실패하면 차단도 함께 되돌아간다 | **적용** (조각 5, 롤백은 2026-08-07) |
 | H18 | 관리자 목록이 상태로 거르지 않는 것을 기본으로 두고, 정렬 분기마다 id tiebreaker를 유지하며, **미처리 신고만** 셈. 관리자 조치 경로가 Security 뒤에 있음 | `CommunityMapperXmlTests` +4(분기마다 형태), `CommunityMapperTests` +4, `CommunityAdminControllerTests`(9), `CommunityScreenRenderingTests` +2(실제 필터 체인으로 403과 **DB가 안 바뀐 것**까지). 처리된 신고까지 세면 조치한 글이 목록 맨 위에 영원히 남아 진짜 처리할 글을 가리는데, 숫자만 다를 뿐 화면은 멀쩡하다 | **적용** (조각 5) |
 | H3 | Controller가 Mapper를 직접 호출하지 않음 | ArchUnit | 위반 발생 시 |
 | H4 | 본문·제목의 HTML이 이스케이프됨 (`th:utext` 미사용의 실제 결과) | `CommunityScreenRenderingTests` — 본문에 `<script>`를 넣고 렌더링 결과를 확인 | **적용** (조각 1) |
@@ -526,10 +526,11 @@ resources/mapper/member/MemberCommunityMapper.xml
 | H35 | 탈퇴 회원의 글·댓글·신고가 목록에 남고 **표시명만** 가려짐. 고객·관리자 양쪽 | `CommunityMemberContractTests`(5) — 실제 MariaDB. 커뮤니티 조회와 회원 조회 **두 문장이 합쳐진 결과**는 여기서만 드러난다. 양쪽을 각각 보는 검사는 이미 있지만, `members.status`에 값이 늘거나 `nickname`이 옮겨 가면 화면의 작성자가 전부 "탈퇴한 회원"이 되는데도 그 검사들은 전부 통과한다(15.9 마지막 문단). **회원 행이 아예 없는 경우는 여기에 없다** — `posts.member_id`가 NOT NULL FK라 만들 수 없고, 그쪽은 Service 테스트가 mock으로 본다 | **적용** (조각 10d) |
 | H7 | 화면 명세 `screens/*.md`가 실제 화면과 어긋나지 않음. 고객·관리자 템플릿 6종 전부. 문서가 "이 테스트가 지킨다"고 적은 테스트가 **실행되며 그 문구를 실제로 확인하는지**, `계획` 화면이 아직 안 만들어졌는지, **`SCREENS.md` 인덱스 표가 명세 파일과 같은지**도 함께 | `CommunityScreenDocTests`(7) — 문서를 파싱해 템플릿 파일·문구와 대조하고, 참조된 테스트는 리플렉션으로 실행 여부를, 소스 본문의 `containsString` 인자로 그 문구를 있다고 단언하는지를 본다. 명세는 **화면 하나에 파일 하나**여서 문자열 표가 어느 화면 것인지가 줄 순서에 기대지 않는다. `build.gradle`에서 `docs/`와 `src/test/java`를 `test` 입력으로 등록해야 문서만·공백만 고쳐도 다시 돈다 | **적용** (조각 1) |
 
+| H37 | 스케줄러가 **서울 기준 전날**을 배치에 넘김 | `PopularPostSchedulerTests` — `Clock`을 고정해 넘긴 날짜를 본다. 크론 표현식 자체는 안 본다(하루를 기다리는 테스트가 된다). 날짜가 하루 밀리면 **배치는 정상 종료하고 순위도 생긴다** — 어제 것이 그제 것으로 들어앉을 뿐이라 화면으로는 "활동이 뜸했나 보다"와 구분되지 않는다. 조각 7b부터 있었는데 표에 없었고, H36이 그것을 잡았다 | **적용** (조각 7b, 표에는 2026-08-07) |
+
 조각을 끝낼 때 **그 조각이 추가한 하네스를 여기 올리고 조각 표의 상태를 바꾼다.** 이 문서가 정본이므로, 여기가 현실과 어긋나면 다음 작업자가 끝난 일을 다시 한다.
 
 > 번호는 **붙인 순서**다. H0·H1·H2는 조각 번호와 맞지만 H3부터는 아니다 — H3–H7이 조각 1에서 한꺼번에 올라오면서 어긋났고, 그래서 조각 3의 하네스도 `H3x`가 아니라 H8부터다. **어느 조각의 것인지는 `상태` 칸이 정본이다.**
-
 ## 위험
 
 | # | 위험 | 상태 |
