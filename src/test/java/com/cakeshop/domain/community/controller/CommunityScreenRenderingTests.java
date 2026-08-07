@@ -350,6 +350,19 @@ class CommunityScreenRenderingTests {
     }
 
     @Test
+    void communityDetail_blockedPost_authenticatedOtherMember_returnsNotFound() throws Exception {
+        long postId = insertPost(memberId, "차단된 글", "본문", PostStatus.BLOCKED);
+        long otherId = insertMember(
+                "other-" + System.nanoTime() + "@cakeshop.local", "다른회원", "ACTIVE");
+        jdbcTemplate.update(
+                "UPDATE posts SET blocked_reason = ? WHERE id = ?", "광고성 게시물", postId);
+
+        mockMvc.perform(get("/community/" + postId).with(authentication(authorOf(otherId))))
+                .andExpect(status().isNotFound())
+                .andExpect(content().string(not(containsString("광고성 게시물"))));
+    }
+
+    @Test
     void communityDetail_unknownPost_returnsNotFound() throws Exception {
         mockMvc.perform(get("/community/99999999"))
                 .andExpect(status().isNotFound());

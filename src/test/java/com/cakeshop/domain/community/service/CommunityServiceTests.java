@@ -154,7 +154,11 @@ class CommunityServiceTests {
         givenPost(PostStatus.BLOCKED);
 
         assertThatThrownBy(() -> communityService.getPostDetail(POST_ID, OTHER_MEMBER_ID, VIEWER_KEY))
-                .isInstanceOf(BusinessException.class);
+                .isInstanceOfSatisfying(BusinessException.class, exception -> {
+                    assertThat(exception.getErrorCode())
+                            .isEqualTo(CommunityErrorCode.POST_NOT_FOUND);
+                    assertThat(exception.getErrorCode().status()).isEqualTo(404);
+                });
     }
 
     @Test
