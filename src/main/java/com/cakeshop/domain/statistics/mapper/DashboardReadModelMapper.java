@@ -1,5 +1,6 @@
 package com.cakeshop.domain.statistics.mapper;
 
+import com.cakeshop.domain.statistics.dto.view.LowStockProductView;
 import com.cakeshop.domain.statistics.dto.view.RecentOrderView;
 import com.cakeshop.domain.statistics.dto.view.TodayPickupScheduleView;
 import java.math.BigDecimal;
@@ -41,4 +42,10 @@ public interface DashboardReadModelMapper {
 
     /** 관리자 주문 목록과 같은 정렬 기준으로 최근 주문을 조회한다. */
     List<RecentOrderView> findRecentOrders(@Param("limit") int limit);
+
+    /** 판매 중인 일반 상품 가운데 재고가 2개 이하인 전체 상품 수를 조회한다. */
+    long countLowStockProducts();
+
+    /** 판매 중인 일반 상품 가운데 재고가 2개 이하인 상품을 재고 순서로 조회한다. */
+    List<LowStockProductView> findLowStockProducts(@Param("limit") int limit);
 }

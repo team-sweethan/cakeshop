@@ -194,7 +194,9 @@ OR payment_cancellations.status IN (REQUESTED, FAILED)
 | 요약 카드 | 확정 | 조건을 충족하는 전체 상품 수 표시 |
 | 목록 | 확정 | 정렬 결과 중 최대 5개 표시 |
 | 표시 필드 | 확정 | 상품명, 현재 재고, 상품 관리 이동에 필요한 상품 ID |
-| 이동 화면 | 확정 | `/admin/products` |
+| 이동 화면 | 확정 | `/admin/products/{productId}/edit` |
+| 제공 조치 | 확정 | 재고 수정, 판매 중지 |
+| 판매 중지 후 이동 | 확정 | 대시보드(`/admin`)로 복귀 |
 | 빈 결과 | 확정 | 건수는 `0`, 목록은 빈 목록 반환 |
 | 조회 구현 | 확정 | `DashboardReadModelMapper`에서 상품 테이블을 읽기 전용으로 조회 |
 | 조건 검토 | 확정 | `product` 담당자가 상품 유형, 상태와 재고 조건을 확정 |

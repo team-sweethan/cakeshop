@@ -128,4 +128,26 @@
         ORDER BY recent_order.created_at DESC, recent_order.id DESC
         LIMIT #{limit}
     </select>
+
+    <select id="countLowStockProducts" resultType="long">
+        SELECT COUNT(*)
+        FROM products AS low_stock_product
+        WHERE low_stock_product.status = 'ACTIVE'
+          AND low_stock_product.product_type = 'GENERAL'
+          AND low_stock_product.stock_quantity BETWEEN 0 AND 2
+    </select>
+
+    <select id="findLowStockProducts"
+            resultType="com.cakeshop.domain.statistics.dto.view.LowStockProductView">
+        SELECT
+            low_stock_product.id AS product_id,
+            low_stock_product.name AS product_name,
+            low_stock_product.stock_quantity
+        FROM products AS low_stock_product
+        WHERE low_stock_product.status = 'ACTIVE'
+          AND low_stock_product.product_type = 'GENERAL'
+          AND low_stock_product.stock_quantity BETWEEN 0 AND 2
+        ORDER BY low_stock_product.stock_quantity, low_stock_product.id
+        LIMIT #{limit}
+    </select>
 </mapper>

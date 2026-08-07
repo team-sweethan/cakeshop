@@ -3,6 +3,7 @@ package com.cakeshop.domain.statistics.mapper;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.cakeshop.domain.order.entity.OrderStatus;
+import com.cakeshop.domain.statistics.dto.view.LowStockProductView;
 import com.cakeshop.domain.statistics.dto.view.RecentOrderView;
 import com.cakeshop.domain.statistics.dto.view.TodayPickupScheduleView;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
@@ -28,6 +29,7 @@ class DashboardReadModelMapperTests {
     private final JdbcTemplate jdbcTemplate;
 
     private String suffix;
+    private long categoryId;
     private long memberId;
     private long productId;
 
@@ -400,6 +402,50 @@ class DashboardReadModelMapperTests {
         assertThat(recentOrders).isEmpty();
     }
 
+    @Test
+    void countLowStockProducts_conditions_countsOnlyActiveGeneralFiniteStockUpToTwo() {
+        insertInventoryProduct("OUT-OF-STOCK", "GENERAL", "ACTIVE", 0);
+        insertInventoryProduct("ONE-LEFT", "GENERAL", "ACTIVE", 1);
+        insertInventoryProduct("TWO-LEFT", "GENERAL", "ACTIVE", 2);
+        insertInventoryProduct("ENOUGH-STOCK", "GENERAL", "ACTIVE", 3);
+        insertInventoryProduct("UNLIMITED", "GENERAL", "ACTIVE", null);
+        insertInventoryProduct("CUSTOM", "CUSTOM", "ACTIVE", 1);
+        insertInventoryProduct("INACTIVE", "GENERAL", "INACTIVE", 1);
+
+        long count = dashboardReadModelMapper.countLowStockProducts();
+
+        assertThat(count).isEqualTo(3L);
+    }
+
+    @Test
+    void findLowStockProducts_matchingProducts_returnsSortedLimitedResults() {
+        long firstTwo = insertInventoryProduct("TWO-FIRST", "GENERAL", "ACTIVE", 2);
+        long firstZero = insertInventoryProduct("ZERO-FIRST", "GENERAL", "ACTIVE", 0);
+        long firstOne = insertInventoryProduct("ONE-FIRST", "GENERAL", "ACTIVE", 1);
+        long secondZero = insertInventoryProduct("ZERO-SECOND", "GENERAL", "ACTIVE", 0);
+        insertInventoryProduct("TWO-SECOND", "GENERAL", "ACTIVE", 2);
+        long secondOne = insertInventoryProduct("ONE-SECOND", "GENERAL", "ACTIVE", 1);
+
+        List<LowStockProductView> products =
+                dashboardReadModelMapper.findLowStockProducts(5);
+
+        assertThat(products)
+                .extracting(LowStockProductView::productId)
+                .containsExactly(firstZero, secondZero, firstOne, secondOne, firstTwo);
+        assertThat(products.getFirst().productName()).contains("ZERO-FIRST");
+        assertThat(products.getFirst().stockQuantity()).isZero();
+    }
+
+    @Test
+    void findLowStockProducts_noMatchingProducts_returnsZeroAndEmptyResult() {
+        long count = dashboardReadModelMapper.countLowStockProducts();
+        List<LowStockProductView> products =
+                dashboardReadModelMapper.findLowStockProducts(5);
+
+        assertThat(count).isZero();
+        assertThat(products).isEmpty();
+    }
+
     private long insertMember() {
         String email = "dashboard-read-model-" + suffix + "@example.com";
         jdbcTemplate.update(
@@ -432,7 +478,7 @@ class DashboardReadModelMapperTests {
                 "INSERT INTO categories (code, name, is_active) VALUES (?, '대시보드', 1)",
                 categoryCode
         );
-        long categoryId = jdbcTemplate.queryForObject(
+        categoryId = jdbcTemplate.queryForObject(
                 "SELECT id FROM categories WHERE code = ?",
                 Long.class,
                 categoryCode
@@ -453,6 +499,43 @@ class DashboardReadModelMapperTests {
                 """,
                 categoryId,
                 productName
+        );
+
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM products WHERE name = ?",
+                Long.class,
+                productName
+        );
+    }
+
+    private long insertInventoryProduct(
+            String label,
+            String productType,
+            String status,
+            Integer stockQuantity
+    ) {
+        String productName = "재고 상품 " + label + " " + suffix;
+        int preparationDays = "CUSTOM".equals(productType) ? 1 : 0;
+        jdbcTemplate.update(
+                """
+                INSERT INTO products (
+                    category_id,
+                    name,
+                    description,
+                    base_price,
+                    stock_quantity,
+                    product_type,
+                    preparation_days,
+                    status
+                )
+                VALUES (?, ?, '', 40000, ?, ?, ?, ?)
+                """,
+                categoryId,
+                productName,
+                stockQuantity,
+                productType,
+                preparationDays,
+                status
         );
 
         return jdbcTemplate.queryForObject(

@@ -5,6 +5,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.cakeshop.domain.order.entity.OrderStatus;
+import com.cakeshop.domain.statistics.dto.view.LowStockProductView;
 import com.cakeshop.domain.statistics.dto.view.RecentOrderView;
 import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
 import com.cakeshop.domain.statistics.dto.view.TodayPickupScheduleView;
@@ -59,6 +60,14 @@ class DashboardReadModelQueryServiceTests {
         );
         when(dashboardReadModelMapper.findRecentOrders(5))
                 .thenReturn(List.of(recentOrder));
+        LowStockProductView lowStockProduct = new LowStockProductView(
+                30L,
+                "재고 부족 케이크",
+                1
+        );
+        when(dashboardReadModelMapper.countLowStockProducts()).thenReturn(6L);
+        when(dashboardReadModelMapper.findLowStockProducts(5))
+                .thenReturn(List.of(lowStockProduct));
         DashboardReadModelQueryService service =
                 new DashboardReadModelQueryService(dashboardReadModelMapper, CLOCK);
 
@@ -68,13 +77,17 @@ class DashboardReadModelQueryServiceTests {
         assertThat(dashboard.todaySalesAmount()).isEqualByComparingTo("120000");
         assertThat(dashboard.paymentAttentionCount()).isEqualTo(2L);
         assertThat(dashboard.todayPickupCount()).isEqualTo(4L);
+        assertThat(dashboard.lowStockProductCount()).isEqualTo(6L);
         assertThat(dashboard.todayPickups()).containsExactly(pickup);
         assertThat(dashboard.recentOrders()).containsExactly(recentOrder);
+        assertThat(dashboard.lowStockProducts()).containsExactly(lowStockProduct);
         verify(dashboardReadModelMapper).countTodayOrders(start, end);
         verify(dashboardReadModelMapper).sumTodaySales(start, end);
         verify(dashboardReadModelMapper).countPaymentsRequiringAttention();
         verify(dashboardReadModelMapper).countTodayPickups(start, end);
         verify(dashboardReadModelMapper).findTodayPickupSchedules(start, end, 5);
         verify(dashboardReadModelMapper).findRecentOrders(5);
+        verify(dashboardReadModelMapper).countLowStockProducts();
+        verify(dashboardReadModelMapper).findLowStockProducts(5);
     }
 }

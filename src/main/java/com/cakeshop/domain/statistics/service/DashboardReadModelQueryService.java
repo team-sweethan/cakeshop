@@ -1,5 +1,6 @@
 package com.cakeshop.domain.statistics.service;
 
+import com.cakeshop.domain.statistics.dto.view.LowStockProductView;
 import com.cakeshop.domain.statistics.dto.view.RecentOrderView;
 import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
 import com.cakeshop.domain.statistics.dto.view.TodayPickupScheduleView;
@@ -49,14 +50,20 @@ public class DashboardReadModelQueryService {
         // 최근 주문
         List<RecentOrderView> recentOrders =
                 dashboardReadModelMapper.findRecentOrders(DASHBOARD_LIST_LIMIT);
+        // 재고 부족 상품
+        long lowStockProductCount = dashboardReadModelMapper.countLowStockProducts();
+        List<LowStockProductView> lowStockProducts =
+                dashboardReadModelMapper.findLowStockProducts(DASHBOARD_LIST_LIMIT);
 
         return new StatisticsDashboardView(
                 todayOrderCount,
                 todaySalesAmount,
                 paymentAttentionCount,
                 todayPickupCount,
+                lowStockProductCount,
                 todayPickups,
-                recentOrders
+                recentOrders,
+                lowStockProducts
         );
     }
 }
