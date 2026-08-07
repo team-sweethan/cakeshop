@@ -17,7 +17,7 @@
 - 대상 화면: `/admin`
 - 화면 역할: 당일 운영 현황과 관리자 처리 항목 제공
 - 담당자: 시은
-- 조회 방식: 집계 테이블 없이 `StatisticsMapper`의 읽기 전용 SQL로 실시간 조회
+- 조회 방식: 집계 테이블 없이 `DashboardReadModelMapper`의 읽기 전용 SQL로 실시간 조회
 - 제외 범위: `/admin/statistics` 기간별 분석 화면
 - 후속 범위: 일별·월별 통계와 자체 집계 테이블
 
@@ -46,7 +46,7 @@
 | 집계 단위 | 확정 | 중복 결제 시도를 제외한 `COUNT(DISTINCT order_id)` |
 | 취소·환불 주문 | 확정 | 결제 완료 후 취소·환불이 완료된 주문은 제외 |
 | 빈 결과 | 확정 | `0` 반환 |
-| 조회 구현 | 확정 | `StatisticsMapper`에서 `payment` 테이블을 읽기 전용으로 조회 |
+| 조회 구현 | 확정 | `DashboardReadModelMapper`에서 `payment` 테이블을 읽기 전용으로 조회 |
 | 조건 검토 | 합의 필요 | 결제 상태와 취소·환불 조건을 `payment` 도메인 담당자가 검토 |
 
 오늘 주문은 `Asia/Seoul` 기준 오늘 승인된 `DONE` 결제 중 취소·환불되지 않은 고유 주문의
@@ -67,7 +67,7 @@
 | 취소·환불 결제 | 확정 | 결제 완료 후 취소·환불이 완료된 결제는 제외 |
 | 과거 결제의 당일 환불 | 확정 | 이 지표에서 다루지 않고 기간별 분석 화면의 후속 범위로 분리 |
 | 빈 결과 | 확정 | `0원` 반환 |
-| 조회 구현 | 확정 | `StatisticsMapper`에서 `payment` 테이블을 읽기 전용으로 조회 |
+| 조회 구현 | 확정 | `DashboardReadModelMapper`에서 `payment` 테이블을 읽기 전용으로 조회 |
 | 조건 검토 | 합의 필요 | 매출 및 취소·환불 조건을 `payment` 도메인 담당자가 검토 |
 
 오늘 매출은 `Asia/Seoul` 기준 오늘 승인된 `DONE` 결제 중 취소·환불되지 않은 결제 금액의
@@ -82,7 +82,7 @@
 | 표시 이름 | 보류 | `승인 대기` 또는 `제작 승인 대기` 중 결정 |
 | 대상 주문 유형 | 보류 | `OrderType.CUSTOM` 사용 여부 |
 | 대상 상태 | 보류 | 주문제작의 승인·결제 순서가 확정된 후 `OrderStatus` 조건 결정 |
-| 조회 구현 | 보류 | 주문제작 흐름 확정 후 `StatisticsMapper` SQL과 DTO 정의 |
+| 조회 구현 | 보류 | 주문제작 흐름 확정 후 `DashboardReadModelMapper` SQL과 DTO 정의 |
 | 조건 검토 | 보류 | 주문제작 흐름 확정 후 `order` 도메인 담당자가 상태 조건 검토 |
 
 주문제작의 승인·결제 순서가 확정되기 전에는 이 지표의 SQL과 DTO 계약을 구현하지 않는다.
@@ -101,7 +101,7 @@
 | 집계 단위 | 확정 | 조건을 충족하는 결제 ID 기준 건수 |
 | 빈 결과 | 확정 | `0` 반환 |
 | 이동 화면 | 확정 | `/admin/payments` |
-| 조회 구현 | 확정 | `StatisticsMapper`에서 결제·취소 테이블을 읽기 전용으로 조회 |
+| 조회 구현 | 확정 | `DashboardReadModelMapper`에서 결제·취소 테이블을 읽기 전용으로 조회 |
 | 조건 검토 | 합의 필요 | 기존 관리자 결제 요약과 정의가 달라지지 않도록 `payment` 담당자가 검토 |
 
 확인 필요 결제는 다음 조건 중 하나를 충족하는 결제 건수로 정의한다.
@@ -124,7 +124,7 @@ OR payment_cancellations.status IN (REQUESTED, FAILED)
 | 대상 상태 | 보류 | 주문제작 상태 전이가 확정된 후 `OrderStatus` 조건 결정 |
 | 제작 완료 구분 | 보류 | 제작 중과 픽업 준비를 별도 상태로 구분할지 결정 |
 | 빈 결과 | 보류 | `0` 반환 여부 |
-| 조회 구현 | 보류 | 주문제작 흐름 확정 후 `StatisticsMapper` SQL과 DTO 정의 |
+| 조회 구현 | 보류 | 주문제작 흐름 확정 후 `DashboardReadModelMapper` SQL과 DTO 정의 |
 | 조건 검토 | 보류 | 주문제작 흐름 확정 후 `order` 도메인 담당자가 상태 조건 검토 |
 
 주문제작 상태 전이가 확정되기 전에는 이 지표의 SQL과 DTO 계약을 구현하지 않는다.
@@ -133,14 +133,14 @@ OR payment_cancellations.status IN (REQUESTED, FAILED)
 
 | 항목 | 상태 | 내용 |
 |---|---|---|
-| 업무 정의 | 확정 | 픽업 예정 시각이 오늘이고 결제가 완료되었으며 아직 픽업이 끝나지 않은 주문 |
+| 업무 정의 | 확정 | 픽업 예정 시각이 오늘이고 현재 픽업 대기 상태인 주문 |
 | 데이터 소유 도메인 | 확정 | `order` |
 | 기준 시간 | 확정 | `pickup_at` 사용 |
 | 시간대 | 확정 | `Asia/Seoul` |
 | 날짜 범위 | 확정 | 오늘 00:00 이상, 내일 00:00 미만 |
 | 주문 유형 | 확정 | `GENERAL`, `CUSTOM` 모두 포함 |
-| 제외 상태 | 확정 | `PICKED_UP`, `CANCELED`, `REJECTED`, `EXPIRED` 제외 |
-| 결제 완료 판별 | 합의 필요 | 주문과 결제 테이블의 읽기 전용 JOIN 조건을 `order`·`payment` 담당자가 검토 |
+| 대상 상태 | 확정 | `OrderStatus.READY_FOR_PICKUP`만 포함 |
+| 결제 완료 판별 | 확정 | `READY_FOR_PICKUP` 상태 전이 규칙으로 보장하며 결제 테이블을 별도로 조회하지 않음 |
 | 정렬 | 확정 | `pickup_at` 오름차순, 주문 ID 오름차순 |
 | 요약 카드 | 확정 | 조건을 충족하는 전체 주문 건수 표시 |
 | 일정 목록 | 확정 | 정렬 결과 중 최대 5건 표시 |
@@ -149,22 +149,22 @@ OR payment_cancellations.status IN (REQUESTED, FAILED)
 | 지난 픽업 시각 | 확정 | 오늘 아직 픽업되지 않은 주문은 예정 시각이 지나도 유지하고 먼저 표시 |
 | 상세 이동 | 확정 | `/admin/orders/{orderId}` |
 | 빈 결과 | 확정 | 건수는 `0`, 일정은 빈 목록 반환 |
-| 조회 구현 | 확정 | `StatisticsMapper`에서 주문·결제 테이블을 읽기 전용으로 조회 |
-| 조건 검토 | 합의 필요 | 주문 상태와 결제 완료 조건을 `order`·`payment` 담당자가 검토 |
+| 조회 구현 | 확정 | `DashboardReadModelMapper`에서 주문 테이블을 읽기 전용으로 조회 |
+| 조건 검토 | 합의 필요 | `READY_FOR_PICKUP` 상태 조건을 `order` 도메인 담당자가 검토 |
 
-오늘 픽업 예정은 `Asia/Seoul` 기준 `pickup_at`이 오늘이고 결제가 완료되었으며 아직 픽업
-완료·취소·반려되지 않은 주문으로 정의한다. 주문제작 상태 흐름이 바뀌더라도 이 업무 정의는
-유지하고, 구체적인 `OrderStatus` 조건은 `order` 도메인의 공개 계약에서 확정한다.
+오늘 픽업 예정은 `Asia/Seoul` 기준 `pickup_at`이 오늘이고 현재 `READY_FOR_PICKUP` 상태인
+주문으로 정의한다. 결제 완료 여부는 해당 상태의 전이 규칙으로 보장하므로 대시보드 조회에서
+결제 테이블을 별도로 조회하지 않는다.
 
 ### 3-7. 최근 주문
 
 | 항목 | 상태 | 내용 |
 |---|---|---|
-| 업무 정의 | 확정 | 결제가 완료되어 실제 주문으로 접수된 주문 중 가장 최근 주문 |
+| 업무 정의 | 확정 | 관리자 주문 목록과 같은 기준으로 조회한 가장 최근 주문 |
 | 데이터 소유 도메인 | 확정 | `order` |
-| 제외 상태 | 확정 | `PENDING_PAYMENT`, `EXPIRED` 제외 |
-| 취소·반려 주문 | 확정 | 최근 처리 결과 확인을 위해 `CANCELED`, `REJECTED` 포함 |
-| 결제 완료 판별 | 합의 필요 | 주문과 결제 테이블의 읽기 전용 JOIN 조건을 `order`·`payment` 담당자가 검토 |
+| 대상 상태 | 확정 | 모든 `OrderStatus` 포함 |
+| 제외 상태 | 확정 | 없음 |
+| 결제 완료 판별 | 확정 | 적용하지 않으며 결제 완료 여부와 관계없이 최근 주문을 조회 |
 | 표시 개수 | 확정 | 최대 5건 |
 | 정렬 기준 | 확정 | `created_at` 내림차순, 주문 ID 내림차순 |
 | 표시 필드 | 확정 | 주문번호, 대표 상품명, 주문 상태, 최종 주문 금액, 상세 링크용 주문 ID |
@@ -172,12 +172,12 @@ OR payment_cancellations.status IN (REQUESTED, FAILED)
 | 개인정보 | 확정 | 주문자 이름, 전화번호 등 대시보드에 불필요한 개인정보 제외 |
 | 상세 이동 | 확정 | `/admin/orders/{orderId}` |
 | 빈 결과 | 확정 | 빈 목록 반환 |
-| 조회 구현 | 확정 | `StatisticsMapper`에서 주문·결제·주문 항목 테이블을 읽기 전용으로 조회 |
-| 조건 검토 | 합의 필요 | 주문 상태와 결제 완료 조건을 `order`·`payment` 담당자가 검토 |
+| 조회 구현 | 확정 | `DashboardReadModelMapper`에서 주문·주문 항목 테이블을 읽기 전용으로 조회 |
+| 조건 검토 | 합의 필요 | `/admin/orders`와 조회 대상·정렬 기준이 같은지 `order` 도메인 담당자가 검토 |
 
-최근 주문은 결제를 완료해 실제 주문으로 접수된 주문을 대상으로 한다. 결제하지 않은 주문과
-결제 기한이 만료된 주문은 제외하고, 결제 후 취소·반려된 주문은 최근 처리 결과 확인을 위해
-포함한다.
+최근 주문은 `/admin/orders`와 동일하게 모든 주문 상태를 대상으로 `created_at`과 주문 ID의
+내림차순으로 조회한 최대 5건이다. 결제 완료 여부와 상태로 필터링하지 않으며, 대시보드에는
+주문자 이름·전화번호 같은 불필요한 개인정보를 표시하지 않는다.
 
 ### 3-8. 재고 부족 상품
 
@@ -194,9 +194,11 @@ OR payment_cancellations.status IN (REQUESTED, FAILED)
 | 요약 카드 | 확정 | 조건을 충족하는 전체 상품 수 표시 |
 | 목록 | 확정 | 정렬 결과 중 최대 5개 표시 |
 | 표시 필드 | 확정 | 상품명, 현재 재고, 상품 관리 이동에 필요한 상품 ID |
-| 이동 화면 | 확정 | `/admin/products` |
+| 이동 화면 | 확정 | `/admin/products/{productId}/edit` |
+| 제공 조치 | 확정 | 재고 수정, 판매 중지 |
+| 판매 중지 후 이동 | 확정 | 대시보드(`/admin`)로 복귀 |
 | 빈 결과 | 확정 | 건수는 `0`, 목록은 빈 목록 반환 |
-| 조회 구현 | 확정 | `StatisticsMapper`에서 상품 테이블을 읽기 전용으로 조회 |
+| 조회 구현 | 확정 | `DashboardReadModelMapper`에서 상품 테이블을 읽기 전용으로 조회 |
 | 조건 검토 | 확정 | `product` 담당자가 상품 유형, 상태와 재고 조건을 확정 |
 
 재고 부족 상품은 판매 중인 `GENERAL` 상품 중 유한 재고가 2개 이하인 상품으로 정의한다.
@@ -211,7 +213,7 @@ OR payment_cancellations.status IN (REQUESTED, FAILED)
 | 대상 상태 | 보류 | 후기 신고 기능과 상태 모델 구현 후 결정 |
 | 집계 단위 | 보류 | 후기 신고 처리 정책 확정 후 결정 |
 | 이동 화면 | 보류 | 후기 신고 관리자 화면 구현 후 결정 |
-| 조회 구현 | 보류 | 후기 신고 기능 구현 후 `StatisticsMapper` SQL과 DTO 정의 |
+| 조회 구현 | 보류 | 후기 신고 기능 구현 후 `DashboardReadModelMapper` SQL과 DTO 정의 |
 | 조건 검토 | 보류 | 후기 신고 기능 구현 후 `review` 도메인 담당자가 상태 조건 검토 |
 
 후기 신고 기능과 상태 모델이 구현되기 전에는 이 지표의 SQL과 DTO 계약을 구현하지 않는다.
@@ -228,16 +230,16 @@ OR payment_cancellations.status IN (REQUESTED, FAILED)
 | 중복 신고 | 확정 | 한 게시글에 미처리 신고가 여러 건이어도 게시글 1개로 계산 |
 | 빈 결과 | 확정 | `0` 반환 |
 | 이동 화면 | 확정 | `/admin/community?sort=REPORTS` |
-| 조회 구현 | 확정 | `StatisticsMapper`에서 게시글 신고 테이블을 읽기 전용으로 조회 |
+| 조회 구현 | 확정 | `DashboardReadModelMapper`에서 게시글 신고 테이블을 읽기 전용으로 조회 |
 | 조건 검토 | 합의 필요 | 신고 상태와 처리 단위를 `community` 도메인 담당자가 검토 |
 
 신고 처리 대기 게시글은 `PENDING` 신고가 하나 이상 있는 고유 게시글 수로 정의한다. 게시글을
 차단하거나 신고를 기각할 때 해당 게시글의 미처리 신고를 함께 처리하므로 신고 건수가 아닌
 게시글 수를 집계한다.
 
-## 4. 1차 구현 범위
+## 4. 구현 범위
 
-### 4-1. 구현 대상
+### 4-1. 1차 구현 대상
 
 | 지표 | 구현 상태 |
 |---|---|
@@ -247,9 +249,14 @@ OR payment_cancellations.status IN (REQUESTED, FAILED)
 | 오늘 픽업 예정 | 구현 대상 |
 | 최근 주문 | 구현 대상 |
 | 재고 부족 상품 | 구현 대상 |
-| 신고 처리 대기 게시글 | 구현 대상 |
 
-### 4-2. 보류 대상
+### 4-2. 후속 구현 대상
+
+| 지표 | 후속 구현 사유 |
+|---|---|
+| 신고 처리 대기 게시글 | 업무 정의와 조회 조건은 확정했으며 1차 구현 완료 후 별도 구현 |
+
+### 4-3. 보류 대상
 
 | 지표 | 보류 사유 |
 |---|---|
@@ -257,7 +264,7 @@ OR payment_cancellations.status IN (REQUESTED, FAILED)
 | 제작 중 | 주문제작 상태 전이 미확정 |
 | 신고 처리 대기 후기 | 후기 신고 기능과 상태 모델 미구현 |
 
-### 4-3. 보류 지표 표시
+### 4-4. 보류 지표 표시
 
 - 보류 지표의 카드와 작업 항목은 대시보드 화면에서 제거하지 않는다.
 - 목업 숫자를 표시하지 않고 숫자 위치에 `구현 예정` 문구를 표시한다.
@@ -278,17 +285,30 @@ OR payment_cancellations.status IN (REQUESTED, FAILED)
 
 ```text
 StatisticsAdminController
-→ StatisticsService
-→ StatisticsMapper
+→ DashboardReadModelQueryService
+→ DashboardReadModelMapper
 → 여러 도메인의 원본 테이블 읽기 전용 조회
 → StatisticsDashboardView
 → admin/dashboard.html
 ```
 
-- `StatisticsAdminController`는 `StatisticsService`만 호출한다.
-- `StatisticsService`는 대시보드 조회와 화면 DTO 조합을 담당한다.
-- `StatisticsMapper`는 대시보드와 통계 조회에 필요한 SQL을 실행한다.
-- `StatisticsService`의 대시보드 조회에는 읽기 전용 트랜잭션을 적용한다.
+향후 기간별 분석은 다음 구조로 분리한다.
+
+```text
+StatisticsAdminController
+→ StatisticsReportReadModelQueryService
+→ StatisticsReportReadModelMapper
+→ 원본 또는 집계 테이블 읽기 전용 조회
+→ StatisticsReportView
+→ admin/statistics.html
+```
+
+- `StatisticsAdminController`는 요청 화면에 해당하는 Service만 호출한다.
+- `DashboardReadModelQueryService`는 `/admin` 조회와 `StatisticsDashboardView` 조합만 담당한다.
+- `DashboardReadModelMapper`는 `/admin` 대시보드에 필요한 읽기 전용 SQL만 실행한다.
+- `StatisticsReportReadModelQueryService`는 `/admin/statistics` 조회와 `StatisticsReportView` 조합만 담당한다.
+- `StatisticsReportReadModelMapper`는 기간별 분석에 필요한 읽기 전용 SQL만 실행한다.
+- Dashboard와 Report Service의 조회 메서드에는 각각 읽기 전용 트랜잭션을 적용한다.
 
 ### 5-2. 실시간 조회 기준
 
@@ -304,7 +324,7 @@ StatisticsAdminController
 대시보드와 기간별 통계는 여러 도메인의 데이터를 함께 집계해야 하므로 예외적으로 도메인 간
 JOIN을 허용한다.
 
-- JOIN은 `statistics` 도메인의 Mapper와 MyBatis XML에서만 작성한다.
+- JOIN은 `statistics` 도메인의 화면 목적별 Mapper와 MyBatis XML에서만 작성한다.
 - `/admin` 대시보드와 `/admin/statistics` 통계 조회 목적에만 사용한다.
 - `SELECT` 읽기 작업만 허용한다.
 - JOIN 예외는 원본 데이터와 업무 규칙의 소유권이 `statistics`로 이전된다는 의미가 아니다.

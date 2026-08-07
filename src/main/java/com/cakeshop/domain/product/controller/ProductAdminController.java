@@ -411,8 +411,9 @@ public class ProductAdminController {
      *
      * @param productId 상태를 변경할 상품 식별자
      * @param status 변경할 판매 상태
+     * @param returnTo 상태 변경 후 돌아갈 관리자 화면 식별자
      * @param redirectAttributes 상태 변경 결과 메시지를 전달할 객체
-     * @return 관리자 상품 목록으로 이동하는 경로
+     * @return 요청 출처에 따른 관리자 화면으로 이동하는 경로
      */
     @PostMapping("/admin/products/{productId}/status")
     public String changeStatus(
@@ -422,8 +423,15 @@ public class ProductAdminController {
             @RequestParam("status")
             ProductStatus status,
 
+            @RequestParam(name = "returnTo", required = false)
+            String returnTo,
+
             RedirectAttributes redirectAttributes
     ) {
+        String redirectPath = "dashboard".equals(returnTo)
+                ? "redirect:/admin"
+                : "redirect:/admin/products";
+
         // 상품의 판매 상태를 변경한다.
         try {
             productAdminService.changeProductStatus(
@@ -441,7 +449,7 @@ public class ProductAdminController {
                     exception.getErrorCode().message()
             );
 
-            return "redirect:/admin/products";
+            return redirectPath;
         }
 
         // 변경된 상태에 맞는 완료 메시지를 만든다.
@@ -457,6 +465,6 @@ public class ProductAdminController {
         );
 
         // 새로고침으로 상태 변경 요청이 반복되지 않도록 목록으로 리다이렉트한다.
-        return "redirect:/admin/products";
+        return redirectPath;
     }
 }

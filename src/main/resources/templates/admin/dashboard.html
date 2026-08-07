@@ -13,34 +13,100 @@
       <div th:replace="~{fragments/admin/mock-notice :: notice}"></div>
       <h1 class="admin-page-title">대시보드</h1>
       <section class="grid grid--4 section">
-        <article class="metric-card"><p>오늘 주문</p><strong>12건</strong></article>
-        <article class="metric-card"><p>오늘 매출</p><strong>480,000원</strong></article>
-        <article class="metric-card"><p>승인 대기</p><strong>3건</strong></article>
-        <article class="metric-card"><p>확인 필요 결제</p><strong>1건</strong></article>
+        <article class="metric-card"><p>오늘 주문</p><strong th:text="|${dashboard.todayOrderCount}건|">0건</strong></article>
+        <article class="metric-card">
+          <p>오늘 매출</p>
+          <strong
+              th:text="|${#numbers.formatInteger(dashboard.todaySalesAmount, 0, 'COMMA')}원|">0원</strong>
+        </article>
+        <article class="metric-card">
+          <p>승인 대기</p>
+          <strong class="dashboard-metric-pending">구현 예정</strong>
+        </article>
+        <article class="metric-card">
+          <p>확인 필요 결제</p>
+          <strong th:text="|${dashboard.paymentAttentionCount}건|">0건</strong>
+        </article>
       </section>
       <section class="grid grid--3 section">
-        <article class="metric-card"><p>제작 중</p><strong>5건</strong></article>
-        <article class="metric-card"><p>오늘 픽업 예정</p><strong>4건</strong></article>
-        <article class="metric-card"><p>재고 부족 상품</p><strong>2개</strong></article>
+        <article class="metric-card">
+          <p>제작 중</p>
+          <strong class="dashboard-metric-pending">구현 예정</strong>
+        </article>
+        <article class="metric-card">
+          <p>오늘 픽업 예정</p>
+          <strong th:text="|${dashboard.todayPickupCount}건|">0건</strong>
+        </article>
+        <article class="metric-card">
+          <p>재고 부족 상품</p>
+          <strong th:text="|${dashboard.lowStockProductCount}개|">0개</strong>
+        </article>
       </section>
       <div class="grid grid--2">
         <section class="section"><h2 class="section-title">최근 주문</h2>
-          <div class="table-wrap"><table class="data-table"><thead><tr><th>주문번호</th><th>상품</th><th>상태</th><th>금액</th><th>관리</th></tr></thead>
-            <tbody><tr><td>ORD-001</td><td>레터링 케이크</td><td><span class="badge badge--warning">승인 대기</span></td><td>64,000원</td><td><a class="btn" th:href="@{/admin/orders/1}">상세</a></td></tr>
-            <tr><td>ORD-002</td><td>딸기 케이크</td><td><span class="badge badge--info">제작 중</span></td><td>35,000원</td><td><a class="btn" th:href="@{/admin/orders/2}">상세</a></td></tr>
-            <tr><td>ORD-003</td><td>초코 케이크</td><td><span class="badge">픽업 준비</span></td><td>40,000원</td><td><a class="btn" th:href="@{/admin/orders/3}">상세</a></td></tr></tbody></table></div>
+          <div class="table-wrap"><table class="data-table"><thead><tr><th>주문번호</th><th>상품</th><th>상태</th><th>금액</th></tr></thead>
+            <tbody>
+            <tr th:each="order : ${dashboard.recentOrders}">
+              <td>
+                <a th:href="@{/admin/orders/{orderId}(orderId=${order.orderId})}"
+                   th:text="${order.orderNumber}">주문번호</a>
+              </td>
+              <td th:text="${order.productName}">상품명</td>
+              <td><span class="badge" th:text="${order.statusLabel}">주문 상태</span></td>
+              <td th:text="|${#numbers.formatInteger(order.finalAmount, 0, 'COMMA')}원|">0원</td>
+            </tr>
+            <tr th:if="${#lists.isEmpty(dashboard.recentOrders)}">
+              <td colspan="4" class="text-muted">최근 주문이 없습니다.</td>
+            </tr>
+            </tbody></table></div>
           <a class="btn section-action" th:href="@{/admin/orders}">전체 주문 보기</a>
         </section>
         <section class="section"><h2 class="section-title">오늘 픽업 일정</h2>
           <div class="table-wrap"><table class="data-table"><thead><tr><th>시간</th><th>주문번호</th><th>상품</th><th>상태</th></tr></thead>
-            <tbody><tr><td>11:00</td><td>ORD-004</td><td>딸기 케이크</td><td><span class="badge">픽업 준비</span></td></tr>
-            <tr><td>14:00</td><td>ORD-002</td><td>레터링 케이크</td><td><span class="badge badge--info">제작 중</span></td></tr>
-            <tr><td>16:00</td><td>ORD-005</td><td>마카롱 케이크</td><td><span class="badge">픽업 준비</span></td></tr></tbody></table></div>
+            <tbody>
+            <tr th:each="pickup : ${dashboard.todayPickups}">
+              <td th:text="${#temporals.format(pickup.pickupAt, 'HH:mm')}">11:00</td>
+              <td>
+                <a th:href="@{/admin/orders/{orderId}(orderId=${pickup.orderId})}"
+                   th:text="${pickup.orderNumber}">주문번호</a>
+              </td>
+              <td th:text="${pickup.productName}">상품명</td>
+              <td><span class="badge badge--success" th:text="${pickup.statusLabel}">픽업 준비</span></td>
+            </tr>
+            <tr th:if="${#lists.isEmpty(dashboard.todayPickups)}">
+              <td colspan="4" class="text-muted">오늘 픽업 예정 주문이 없습니다.</td>
+            </tr>
+            </tbody></table></div>
         </section>
       </div>
       <div class="grid grid--2">
-        <section class="section"><h2 class="section-title">재고 부족 상품</h2><div class="table-wrap"><table class="data-table"><thead><tr><th>상품명</th><th>재고</th><th>조치</th></tr></thead><tbody><tr><td>딸기 생크림 케이크</td><td><span class="badge badge--danger">2개</span></td><td><a class="btn" th:href="@{/admin/products}">재고 수정</a></td></tr><tr><td>마카롱 케이크</td><td><span class="badge badge--danger">1개</span></td><td><a class="btn" th:href="@{/admin/products}">재고 수정</a></td></tr></tbody></table></div></section>
-        <section class="section"><h2 class="section-title">처리할 작업</h2><div class="stack"><div class="panel cluster cluster--between"><span>제작 승인 대기 3건</span><a class="btn" th:href="@{/admin/orders}">처리하기</a></div><div class="panel cluster cluster--between"><span>확인 필요 결제 1건</span><a class="btn" th:href="@{/admin/payments}">내역 보기</a></div><div class="panel cluster cluster--between"><span>신고 처리 대기 후기 2건</span><a class="btn" th:href="@{/admin/reviews}">처리하기</a></div></div></section>
+        <section class="section"><h2 class="section-title">재고 부족 상품</h2>
+          <div class="table-wrap"><table class="data-table"><thead><tr><th>상품명</th><th>재고</th><th>조치</th></tr></thead>
+            <tbody>
+            <tr th:each="product : ${dashboard.lowStockProducts}">
+              <td th:text="${product.productName}">상품명</td>
+              <td><span class="badge badge--danger" th:text="|${product.stockQuantity}개|">0개</span></td>
+              <td>
+                <div class="cluster">
+                  <a class="btn"
+                     th:href="@{/admin/products/{productId}/edit(productId=${product.productId})}">재고 수정</a>
+                  <form method="post"
+                        th:action="@{/admin/products/{productId}/status(productId=${product.productId})}">
+                    <input type="hidden" name="status" value="INACTIVE">
+                    <input type="hidden" name="returnTo" value="dashboard">
+                    <button class="btn btn--danger"
+                            type="submit"
+                            data-confirm="상품 판매를 중지하시겠습니까?">판매 중지</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            <tr th:if="${#lists.isEmpty(dashboard.lowStockProducts)}">
+              <td colspan="3" class="text-muted">재고 부족 상품이 없습니다.</td>
+            </tr>
+            </tbody></table></div>
+        </section>
+        <section class="section"><h2 class="section-title">처리할 작업</h2><div class="stack"><div class="panel cluster cluster--between"><span>제작 승인 대기 <strong class="dashboard-metric-pending">구현 예정</strong></span></div><div class="panel cluster cluster--between"><span>확인 필요 결제 <strong th:text="|${dashboard.paymentAttentionCount}건|">0건</strong></span><a class="btn" th:href="@{/admin/payments}">내역 보기</a></div><div class="panel cluster cluster--between"><span>신고 처리 대기 후기 <strong class="dashboard-metric-pending">구현 예정</strong></span></div></div></section>
       </div>
     </main>
   </div>

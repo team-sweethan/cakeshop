@@ -1,14 +1,23 @@
 package com.cakeshop.domain.statistics.controller;
 
+import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
+import com.cakeshop.domain.statistics.service.DashboardReadModelQueryService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 
 @Controller
+@RequiredArgsConstructor
 public class StatisticsAdminController {
 
-    // 데이터 집계 Service가 완성되기 전에는 샘플 화면만 반환한다.
+    private final DashboardReadModelQueryService dashboardReadModelQueryService;
+
     @GetMapping("/admin")
-    public String dashboard() {
+    public String dashboard(Model model) {
+        StatisticsDashboardView dashboard = dashboardReadModelQueryService.getDashboard();
+        model.addAttribute("dashboard", dashboard);
+
         return "admin/dashboard";
     }
 
