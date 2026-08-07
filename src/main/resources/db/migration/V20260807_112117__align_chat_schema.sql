@@ -141,25 +141,26 @@ ALTER TABLE `chat_messages`
         REFERENCES `products` (`id`)
         ON DELETE SET NULL,
 
-    ADD INDEX `idx_chat_messages_room_id`
-        (`chat_room_id`, `id`),
+    ADD CONSTRAINT `uk_chat_messages_room_id`
+        UNIQUE (`chat_room_id`, `id`),
 
     ADD INDEX `idx_chat_messages_room_product_id`
         (`chat_room_id`, `product_id`, `id`);
 
 
 -- =========================================================
--- 3. chat_rooms.last_message_id FK
+-- 3. chat_rooms.last_message_id FK (복합 FK: 동일 방 검증)
 -- =========================================================
 --
 -- chat_rooms와 chat_messages가 서로 참조하므로
 -- chat_messages 구조 변경 이후 FK를 추가한다.
+-- 동일한 채팅방의 메시지만 참조하도록 복합 FK로 구성한다.
 -- =========================================================
 
 ALTER TABLE `chat_rooms`
     ADD CONSTRAINT `fk_chat_rooms_last_message`
-        FOREIGN KEY (`last_message_id`)
-        REFERENCES `chat_messages` (`id`)
+        FOREIGN KEY (`id`, `last_message_id`)
+        REFERENCES `chat_messages` (`chat_room_id`, `id`)
         ON DELETE SET NULL;
 
 
@@ -177,6 +178,7 @@ ALTER TABLE `chat_rooms`
 --   → NULL
 --
 -- 이전 주문 카드를 클릭했을 때 해당 대화 위치로 이동하는 데 사용한다.
+-- 동일한 채팅방의 메시지만 참조하도록 복합 FK로 구성한다.
 -- =========================================================
 
 ALTER TABLE `chat_room_orders`
@@ -187,8 +189,8 @@ ALTER TABLE `chat_room_orders`
         AFTER `order_id`,
 
     ADD CONSTRAINT `fk_chat_room_orders_anchor_message`
-        FOREIGN KEY (`conversation_anchor_message_id`)
-        REFERENCES `chat_messages` (`id`)
+        FOREIGN KEY (`chat_room_id`, `conversation_anchor_message_id`)
+        REFERENCES `chat_messages` (`chat_room_id`, `id`)
         ON DELETE SET NULL,
 
     ADD INDEX `idx_chat_room_orders_room_created`
@@ -274,6 +276,7 @@ CREATE TABLE `chat_message_attachments` (
 -- * ADMIN
 --
 -- 두 개의 읽음 위치만 관리한다.
+-- 동일한 채팅방의 메시지만 참조하도록 복합 FK로 구성한다.
 -- =========================================================
 
 CREATE TABLE `chat_room_read_cursors` (
@@ -321,8 +324,8 @@ CREATE TABLE `chat_room_read_cursors` (
         ON DELETE CASCADE,
 
     CONSTRAINT `fk_chat_room_read_cursors_last_message`
-        FOREIGN KEY (`last_read_message_id`)
-        REFERENCES `chat_messages` (`id`)
+        FOREIGN KEY (`chat_room_id`, `last_read_message_id`)
+        REFERENCES `chat_messages` (`chat_room_id`, `id`)
         ON DELETE SET NULL,
 
     CONSTRAINT `chk_chat_room_read_cursors_side`
