@@ -171,6 +171,7 @@ class CouponAdminServiceTests {
     void issueSpecificMemberRejectsCouponBeforeStart() {
         Coupon coupon = coupon(CouponStatus.ACTIVE, 10, 0, LocalDateTime.now().plusDays(1));
         coupon.setStartsAt(LocalDateTime.now().plusHours(1));
+        when(memberCouponQueryService.lockActiveCouponIssuableMember(2L)).thenReturn(true);
         when(couponMapper.findCouponByIdForUpdate(1L)).thenReturn(Optional.of(coupon));
 
         assertThatThrownBy(() -> couponAdminService.issueSpecificMember(1L, 2L))
@@ -185,7 +186,7 @@ class CouponAdminServiceTests {
     void issueSpecificMemberThrowsWhenTargetIsNoLongerIssuable() {
         Coupon coupon = coupon(CouponStatus.ACTIVE, 10, 0, LocalDateTime.now().plusDays(1));
         when(couponMapper.findCouponByIdForUpdate(1L)).thenReturn(Optional.of(coupon));
-        when(memberCouponQueryService.isActiveCouponIssuableMember(2L)).thenReturn(true);
+        when(memberCouponQueryService.lockActiveCouponIssuableMember(2L)).thenReturn(true);
         when(couponMapper.insertMemberCouponIfAbsent(1L, 2L, false)).thenReturn(0);
 
         assertThatThrownBy(() -> couponAdminService.issueSpecificMember(1L, 2L))
