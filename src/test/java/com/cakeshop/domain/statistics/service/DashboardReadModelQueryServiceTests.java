@@ -29,12 +29,13 @@ class DashboardReadModelQueryServiceTests {
     private DashboardReadModelMapper dashboardReadModelMapper;
 
     @Test
-    void getDashboard_seoulDate_returnsTodayMetrics() {
+    void getDashboard_seoulDate_returnsDashboardMetrics() {
         LocalDateTime start = LocalDateTime.of(2026, 8, 7, 0, 0);
         LocalDateTime end = LocalDateTime.of(2026, 8, 8, 0, 0);
         when(dashboardReadModelMapper.countTodayOrders(start, end)).thenReturn(3L);
         when(dashboardReadModelMapper.sumTodaySales(start, end))
                 .thenReturn(new BigDecimal("120000"));
+        when(dashboardReadModelMapper.countPaymentsRequiringAttention()).thenReturn(2L);
         DashboardReadModelQueryService service =
                 new DashboardReadModelQueryService(dashboardReadModelMapper, CLOCK);
 
@@ -42,7 +43,9 @@ class DashboardReadModelQueryServiceTests {
 
         assertThat(dashboard.todayOrderCount()).isEqualTo(3L);
         assertThat(dashboard.todaySalesAmount()).isEqualByComparingTo("120000");
+        assertThat(dashboard.paymentAttentionCount()).isEqualTo(2L);
         verify(dashboardReadModelMapper).countTodayOrders(start, end);
         verify(dashboardReadModelMapper).sumTodaySales(start, end);
+        verify(dashboardReadModelMapper).countPaymentsRequiringAttention();
     }
 }

@@ -37,7 +37,7 @@ class StatisticsAdminControllerTests {
     @Test
     void dashboard_serviceReturnsView_addsDashboardToModel() throws Exception {
         StatisticsDashboardView dashboard =
-                new StatisticsDashboardView(3L, new BigDecimal("120000"));
+                new StatisticsDashboardView(3L, new BigDecimal("120000"), 2L);
         when(dashboardReadModelQueryService.getDashboard()).thenReturn(dashboard);
 
         mockMvc.perform(get("/admin"))

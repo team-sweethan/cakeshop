@@ -107,6 +107,98 @@ class DashboardReadModelMapperTests {
         assertThat(sales).isZero();
     }
 
+    @Test
+    void countPaymentsRequiringAttention_statusOrCancellation_countsDistinctPayments() {
+        insertPayment("ATTENTION-ABORTED", "ABORTED", null);
+        insertPayment("ATTENTION-EXPIRED", "EXPIRED", null);
+
+        long requestedPaymentId =
+                insertPayment("ATTENTION-REQUESTED", "DONE", START.plusHours(1));
+        insertCancellation(
+                requestedPaymentId,
+                "ATTENTION-REQUESTED",
+                "ADMIN",
+                "REQUESTED",
+                null
+        );
+
+        long failedPaymentId =
+                insertPayment("ATTENTION-FAILED", "DONE", START.plusHours(2));
+        insertCancellation(
+                failedPaymentId,
+                "ATTENTION-FAILED",
+                "ADMIN",
+                "FAILED",
+                "PROVIDER_ERROR"
+        );
+
+        long duplicatePaymentId =
+                insertPayment("ATTENTION-DUPLICATE", "DONE", START.plusHours(3));
+        insertCancellation(
+                duplicatePaymentId,
+                "ATTENTION-DUPLICATE-FAILED",
+                "ADMIN",
+                "FAILED",
+                "PROVIDER_ERROR"
+        );
+        insertCancellation(
+                duplicatePaymentId,
+                "ATTENTION-DUPLICATE-REQUESTED",
+                "ADMIN",
+                "REQUESTED",
+                null
+        );
+
+        insertPayment("NO-ATTENTION-DONE", "DONE", START.plusHours(4));
+        long completedCancellationPaymentId =
+                insertPayment("NO-ATTENTION-CANCELED", "DONE", START.plusHours(5));
+        insertCancellation(
+                completedCancellationPaymentId,
+                "NO-ATTENTION-CANCELED",
+                "ADMIN",
+                "DONE",
+                null
+        );
+
+        long count = dashboardReadModelMapper.countPaymentsRequiringAttention();
+
+        assertThat(count).isEqualTo(5L);
+    }
+
+    @Test
+    void countPaymentsRequiringAttention_completedCompensationFailure_excludesRecord() {
+        long excludedPaymentId =
+                insertPayment("COMP-EXCLUDED", "DONE", START.plusHours(1));
+        insertCancellation(
+                excludedPaymentId,
+                "COMP-EXCLUDED",
+                "SYSTEM_COMPENSATION",
+                "FAILED",
+                "PAYMENT_COMPLETED"
+        );
+
+        long includedPaymentId =
+                insertPayment("COMP-INCLUDED", "DONE", START.plusHours(2));
+        insertCancellation(
+                includedPaymentId,
+                "COMP-INCLUDED",
+                "SYSTEM_COMPENSATION",
+                "FAILED",
+                "PAYMENT_NOT_APPROVED"
+        );
+
+        long count = dashboardReadModelMapper.countPaymentsRequiringAttention();
+
+        assertThat(count).isEqualTo(1L);
+    }
+
+    @Test
+    void countPaymentsRequiringAttention_noMatchingPayments_returnsZero() {
+        long count = dashboardReadModelMapper.countPaymentsRequiringAttention();
+
+        assertThat(count).isZero();
+    }
+
     private long insertMember() {
         String email = "dashboard-read-model-" + suffix + "@example.com";
         jdbcTemplate.update(
@@ -169,12 +261,13 @@ class DashboardReadModelMapperTests {
         );
     }
 
-    private void insertPayment(
+    private long insertPayment(
             String label,
             String status,
             LocalDateTime approvedAt
     ) {
         long orderId = insertOrder(label);
+        String tossOrderId = "TOSS-" + label + "-" + suffix;
         jdbcTemplate.update(
                 """
                 INSERT INTO payments (
@@ -191,12 +284,46 @@ class DashboardReadModelMapperTests {
                 VALUES (?, ?, ?, ?, 'CARD', 40000, ?, ?, ?)
                 """,
                 orderId,
-                "TOSS-" + label + "-" + suffix,
+                tossOrderId,
                 "PAYMENT-KEY-" + label + "-" + suffix,
                 "IDEMPOTENCY-" + label + "-" + suffix,
                 status,
                 status,
                 approvedAt
+        );
+
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM payments WHERE toss_order_id = ?",
+                Long.class,
+                tossOrderId
+        );
+    }
+
+    private void insertCancellation(
+            long paymentId,
+            String label,
+            String requestType,
+            String status,
+            String failureCode
+    ) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO payment_cancellations (
+                    payment_id,
+                    idempotency_key,
+                    cancel_amount,
+                    cancel_reason,
+                    request_type,
+                    status,
+                    failure_code
+                )
+                VALUES (?, ?, 40000, '대시보드 테스트', ?, ?, ?)
+                """,
+                paymentId,
+                "CANCEL-" + label + "-" + suffix,
+                requestType,
+                status,
+                failureCode
         );
     }
 }

@@ -27,7 +27,13 @@ public class DashboardReadModelQueryService {
 
         long todayOrderCount = dashboardReadModelMapper.countTodayOrders(start, end);
         BigDecimal todaySalesAmount = dashboardReadModelMapper.sumTodaySales(start, end);
+        long paymentAttentionCount =
+                dashboardReadModelMapper.countPaymentsRequiringAttention();
 
-        return new StatisticsDashboardView(todayOrderCount, todaySalesAmount);
+        return new StatisticsDashboardView(
+                todayOrderCount,
+                todaySalesAmount,
+                paymentAttentionCount
+        );
     }
 }

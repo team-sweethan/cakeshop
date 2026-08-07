@@ -19,4 +19,7 @@ public interface DashboardReadModelMapper {
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end
     );
+
+    /** 현재 관리자의 확인이 필요한 전체 결제 건수를 조회한다. */
+    long countPaymentsRequiringAttention();
 }

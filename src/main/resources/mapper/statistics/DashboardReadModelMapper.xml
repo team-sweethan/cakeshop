@@ -18,4 +18,21 @@
           AND payment.approved_at &gt;= #{start}
           AND payment.approved_at &lt; #{end}
     </select>
+
+    <select id="countPaymentsRequiringAttention" resultType="long">
+        SELECT COUNT(*)
+        FROM payments AS payment
+        WHERE payment.status IN ('ABORTED', 'EXPIRED')
+           OR EXISTS (
+                SELECT 1
+                FROM payment_cancellations AS cancellation
+                WHERE cancellation.payment_id = payment.id
+                  AND cancellation.status IN ('REQUESTED', 'FAILED')
+                  AND NOT (
+                      cancellation.request_type = 'SYSTEM_COMPENSATION'
+                      AND cancellation.status = 'FAILED'
+                      AND cancellation.failure_code = 'PAYMENT_COMPLETED'
+                  )
+            )
+    </select>
 </mapper>
