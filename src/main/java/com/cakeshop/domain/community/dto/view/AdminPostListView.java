@@ -1,6 +1,7 @@
 package com.cakeshop.domain.community.dto.view;
 
 import com.cakeshop.domain.community.entity.PostStatus;
+import com.cakeshop.domain.member.dto.view.MemberCommunityView;
 
 import java.time.LocalDateTime;
 
@@ -23,6 +24,20 @@ public record AdminPostListView(
         long pendingReportCount,
         LocalDateTime createdAt
 ) {
+
+    /** 목록 한 줄과 작성자를 합쳐 화면용 DTO를 만든다. 근거는 {@link PostListView#of}. */
+    public static AdminPostListView of(AdminPostListRow row, MemberCommunityView author) {
+        return new AdminPostListView(
+                row.id(),
+                row.categoryName(),
+                row.title(),
+                author == null ? null : author.nickname(),
+                author == null || author.withdrawn(),
+                row.status(),
+                row.pendingReportCount(),
+                row.createdAt()
+        );
+    }
 
     public String authorName() {
         return authorWithdrawn ? PostListView.WITHDRAWN_AUTHOR_NAME : authorNickname;

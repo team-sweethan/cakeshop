@@ -2,10 +2,10 @@ package com.cakeshop.domain.community.mapper;
 
 import java.util.List;
 
-import com.cakeshop.domain.community.dto.view.AdminPostDetailView;
-import com.cakeshop.domain.community.dto.view.AdminPostListView;
+import com.cakeshop.domain.community.dto.view.AdminPostDetailRow;
+import com.cakeshop.domain.community.dto.view.AdminPostListRow;
 import com.cakeshop.domain.community.dto.view.AdminPostSort;
-import com.cakeshop.domain.community.dto.view.ReportView;
+import com.cakeshop.domain.community.dto.view.ReportRow;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.entity.ReportStatus;
 
@@ -24,7 +24,7 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 public interface CommunityAdminMapper {
 
-    List<AdminPostListView> findPostsForAdmin(
+    List<AdminPostListRow> findPostsForAdmin(
             @Param("status") PostStatus status,
             @Param("sort") AdminPostSort sort,
             @Param("size") int size,
@@ -35,11 +35,11 @@ public interface CommunityAdminMapper {
             @Param("status") PostStatus status
     );
 
-    AdminPostDetailView findPostByIdForAdmin(
+    AdminPostDetailRow findPostByIdForAdmin(
             @Param("postId") long postId
     );
 
-    List<ReportView> findReportsByPost(
+    List<ReportRow> findReportsByPost(
             @Param("postId") long postId
     );
 
