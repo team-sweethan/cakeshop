@@ -98,6 +98,21 @@ public class MemberCouponQueryService {
      * 작성자 : 이정후
      * 담당자 : 수민
      * 작성일 : 2026-08-07
+     * 기능 : 쿠폰 정책·주문 생성 회원 직렬화
+     * 설명 : 쿠폰 발급과 주문 생성이 같은 회원의 첫 주문 여부를 판단할 때 회원 행을 먼저 잠가
+     *       상태 변경과 주문 이력 생성을 같은 순서로 직렬화한다.
+     * ******************************
+     */
+    @Transactional
+    public boolean lockActiveCouponIssuableMember(Long memberId) {
+        return memberCouponMapper.findActiveCouponIssuableMemberIdForUpdate(memberId) != null;
+    }
+
+    /**
+     * ******************************
+     * 작성자 : 이정후
+     * 담당자 : 수민
+     * 작성일 : 2026-08-07
      * 기능 : 전체 회원 쿠폰 발급 대상 조회
      * 설명 : 전체 회원 대상 쿠폰 등록 시 발급할 활성 USER 회원 ID를 제공한다.
      * ******************************

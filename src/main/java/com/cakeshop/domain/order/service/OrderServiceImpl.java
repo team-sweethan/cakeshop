@@ -3,6 +3,7 @@ package com.cakeshop.domain.order.service;
 import com.cakeshop.domain.order.dto.form.customer.GeneralOrderForm;
 import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
 import com.cakeshop.domain.member.service.MemberService;
+import com.cakeshop.domain.member.service.MemberCouponQueryService;
 import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.order.entity.OrderItem;
 import com.cakeshop.domain.order.entity.OrderItemOption;
@@ -49,6 +50,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderMapper orderMapper;
     private final PaymentPreparationService paymentPreparationService;
     private final MemberService memberService;
+    private final MemberCouponQueryService memberCouponQueryService;
     // 쿠폰 담당자가 제공하는 공개 명령 계약이다. 주문 도메인은 쿠폰 Mapper를 직접 사용하지 않는다.
     private final CouponOrderCommandService couponOrderCommandService;
     private final Clock clock;
@@ -57,6 +59,9 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public long createGeneralOrder(long memberId, GeneralOrderForm form) {
+        if (!memberCouponQueryService.lockActiveCouponIssuableMember(memberId)) {
+            throw new BusinessException(CommonErrorCode.FORBIDDEN);
+        }
         validateActiveMember(memberId);
         validateForm(form);
 

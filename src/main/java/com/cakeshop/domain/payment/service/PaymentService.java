@@ -15,6 +15,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 /** READY 결제 조회와 승인 후 내부 결제 상태 확정을 담당한다. */
 @Service
@@ -90,6 +92,30 @@ public class PaymentService {
         // 주문·결제 완료가 같은 트랜잭션에서 성공한 뒤에만 쿠폰 사용을 확정한다.
         couponOrderCommandService.useReservedCouponForOrder(order.orderId());
         paymentRecoveryService.discardApprovalRecovery(payment);
+    }
+
+    /** PG 호출 없이 0원 주문의 재고·결제·주문·쿠폰 상태를 같은 트랜잭션에서 완료한다. */
+    @Transactional
+    public void completeZeroAmountGeneralPayment(
+            GeneralPaymentOrder order,
+            Payment payment,
+            LocalDateTime completedAt
+    ) {
+        if (order.amount().compareTo(BigDecimal.ZERO) != 0
+                || payment.getAmount() == null
+                || payment.getAmount().compareTo(BigDecimal.ZERO) != 0) {
+            throw new BusinessException(PaymentErrorCode.AMOUNT_MISMATCH);
+        }
+
+        orderService.lockGeneralOrderForPayment(order.orderId());
+        for (PaymentProduct product : order.products()) {
+            if (productStockService.decreaseStock(product.productId(), product.quantity())) {
+                orderService.recordGeneralStockDeduction(product.orderItemId(), completedAt);
+            }
+        }
+        requireOneRow(paymentMapper.completeZeroAmountIfReady(payment.getId(), completedAt));
+        orderService.completeGeneralOrderAfterPayment(order.orderId(), completedAt);
+        couponOrderCommandService.useReservedCouponForOrder(order.orderId());
     }
 
     private void requireOneRow(int affectedRows) {

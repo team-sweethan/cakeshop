@@ -33,6 +33,9 @@ public interface MemberCouponMapper {
 
     boolean existsActiveCouponIssuableMember(@Param("memberId") Long memberId);
 
+    /** 쿠폰 발급 정책과 주문 생성이 경합할 때 회원 행을 잠근다. */
+    Long findActiveCouponIssuableMemberIdForUpdate(@Param("memberId") Long memberId);
+
     List<Long> findActiveMemberIds();
 
     List<Long> findBirthdayMemberIds(@Param("month") int month);

@@ -2,6 +2,7 @@ package com.cakeshop.domain.order.service;
 
 import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
 import com.cakeshop.domain.member.service.MemberService;
+import com.cakeshop.domain.member.service.MemberCouponQueryService;
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.mapper.OrderMapper;
 import com.cakeshop.domain.order.service.OrderService.GeneralPaymentOrder;
@@ -83,6 +84,9 @@ class OrderPaymentExpirationConcurrencyTests {
 
     @MockitoBean
     private MemberService memberService;
+
+    @MockitoBean
+    private MemberCouponQueryService memberCouponQueryService;
 
     @MockitoBean
     private Clock clock;

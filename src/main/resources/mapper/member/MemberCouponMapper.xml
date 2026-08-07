@@ -42,6 +42,15 @@
         )
     </select>
 
+    <select id="findActiveCouponIssuableMemberIdForUpdate" resultType="long">
+        SELECT id
+        FROM members
+        WHERE id = #{memberId}
+          AND role = 'USER'
+          AND status = 'ACTIVE'
+        FOR UPDATE
+    </select>
+
     <select id="findActiveMemberIds" resultType="long">
         SELECT id FROM members WHERE role = 'USER' AND status = 'ACTIVE'
     </select>

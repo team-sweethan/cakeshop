@@ -113,6 +113,16 @@ public class PaymentFacade {
         }
     }
 
+    /** 0원 주문은 Toss 승인 요청 없이 서버가 READY 결제를 완료한다. */
+    public void completeZeroAmountGeneralPayment(long memberId, long orderId) {
+        GeneralPaymentOrder order = orderService.getGeneralPaymentOrder(memberId, orderId);
+        if (order.amount().signum() != 0) {
+            throw new BusinessException(PaymentErrorCode.AMOUNT_MISMATCH);
+        }
+        Payment payment = paymentService.getReadyPayment(orderId);
+        paymentService.completeZeroAmountGeneralPayment(order, payment, LocalDateTime.now(clock));
+    }
+
     /** 영속화된 미완료 보상 취소를 같은 멱등키로 다시 처리한다. */
     public void recoverPendingCompensations(int batchSize) {
         for (CompensationRequest request

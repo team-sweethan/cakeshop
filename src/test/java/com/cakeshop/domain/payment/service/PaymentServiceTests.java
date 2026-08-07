@@ -27,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -139,6 +140,27 @@ class PaymentServiceTests {
                 .getAnnotation(Transactional.class);
 
         assertThat(transactional).isNotNull();
+    }
+
+    @Test
+    void completeZeroAmountGeneralPayment_zeroAmount_completesWithoutPgApproval() {
+        GeneralPaymentOrder order = new GeneralPaymentOrder(
+                1L, BigDecimal.ZERO, LocalDateTime.of(2026, 8, 1, 10, 10),
+                List.of(new PaymentProduct(200L, 100L, 2))
+        );
+        Payment payment = payment();
+        payment.setAmount(BigDecimal.ZERO);
+        LocalDateTime completedAt = LocalDateTime.of(2026, 8, 1, 10, 1);
+        when(productStockService.decreaseStock(100L, 2)).thenReturn(true);
+        when(paymentMapper.completeZeroAmountIfReady(20L, completedAt)).thenReturn(1);
+
+        paymentService.completeZeroAmountGeneralPayment(order, payment, completedAt);
+
+        verify(orderService).lockGeneralOrderForPayment(1L);
+        verify(paymentMapper).completeZeroAmountIfReady(20L, completedAt);
+        verify(orderService).completeGeneralOrderAfterPayment(1L, completedAt);
+        verify(couponOrderCommandService).useReservedCouponForOrder(1L);
+        verifyNoInteractions(paymentRecoveryService);
     }
 
     private GeneralPaymentOrder order() {
