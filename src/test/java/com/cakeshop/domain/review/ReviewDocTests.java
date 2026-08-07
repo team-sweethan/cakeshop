@@ -207,6 +207,11 @@ class ReviewDocTests {
      * 돌아온다. <b>"정확히 한 번"이 중요하다</b> — 옮기다 남긴 사본이 두 곳에 있으면 한쪽만 고치는
      * 일이 반드시 생긴다.
      *
+     * <p><b>"한 번"은 `specs/` 전체에서 한 번이다.</b> 라우팅된 파일 안에서만 세면 같은 절을 다른
+     * spec에 복제해 둔 것을 못 잡는다 — 그쪽은 H3도 집합 비교라 중복을 잃어서 셋 다 통과한다(PR
+     * #154 Codex 2차). 그래서 절이 있는 곳을 전부 모은 뒤, 하나인지와 그 하나가 <b>라우팅된
+     * 파일인지</b>를 함께 본다.
+     *
      * <p><b>1절 표 자체의 중복도 함께 본다.</b> 라우팅을 `Map`으로 읽으므로 같은 ID 행이 두 번
      * 있으면 뒤 행이 앞 행을 조용히 덮어쓴다 — 그러면 H2는 뒤 행만 검사하고 H3는 집합 비교라
      * 중복을 아예 잃어서, 두 행이 <b>서로 다른 spec을 가리켜도</b> 셋 다 통과한다(PR #154 Codex
@@ -215,7 +220,7 @@ class ReviewDocTests {
      * <p><b>보증하지 않는 것</b>: 절의 내용은 보지 않는다. 제목만 있고 본문이 비어도 통과한다.
      */
     @Test
-    @DisplayName("H2. 기능 표의 모든 ID가 지정된 specs 파일에 정확히 한 번 있다")
+    @DisplayName("H2. 기능 표의 모든 ID가 specs/ 전체에 정확히 한 번, 그것도 지정된 파일에 있다")
     void everyFeatureId_hasExactlyOneSection_inItsSpecFile() {
         List<String> problems = new ArrayList<>();
 
@@ -228,6 +233,7 @@ class ReviewDocTests {
             }
         }
 
+        Map<String, List<String>> locations = featureHeadingLocations();
         Map<String, String> routing = featureRouting();
         for (Map.Entry<String, String> entry : routing.entrySet()) {
             String id = entry.getKey();
@@ -239,13 +245,23 @@ class ReviewDocTests {
                 continue;
             }
 
-            long count =
-                    read(specFile)
-                            .lines()
-                            .filter(line -> matchesFeatureHeading(line, id))
-                            .count();
-            if (count != 1) {
-                problems.add(id + ": " + specFileName + " 안의 `### " + id + ".` 절이 " + count + "개다");
+            List<String> found = locations.getOrDefault(id, List.of());
+            if (found.isEmpty()) {
+                problems.add(
+                        id + ": `### " + id + ".` 절이 specs/ 어디에도 없다. 1절은 " + specFileName + " 을 가리킨다");
+            } else if (found.size() > 1) {
+                problems.add(
+                        id
+                                + ": `### "
+                                + id
+                                + ".` 절이 specs/ 전체에 "
+                                + found.size()
+                                + "개다 — "
+                                + String.join(", ", found)
+                                + ". 옮기다 남긴 사본이면 한쪽만 고치게 된다");
+            } else if (!found.get(0).equals(specFileName)) {
+                problems.add(
+                        id + ": 절은 " + found.get(0) + " 에 있는데 1절 `spec` 열은 " + specFileName + " 을 가리킨다");
             }
         }
 
@@ -267,6 +283,11 @@ class ReviewDocTests {
      * <p>H2와 방향이 다르다. H2는 인벤토리 → specs 한 방향이라 <b>specs에만 있는 절</b>은 못
      * 잡는다. 여기서 반대쪽을 본다.
      *
+     * <p><b>조각 쪽도 양방향이다.</b> 처음에는 `containsAll`로 1절 → PLAN 한 방향만 봤는데, 그러면
+     * PLAN에 조각 행만 늘리고 1절과 specs를 안 고쳐도 통과한다 — "세 곳 중 하나를 빠뜨리는" 바로
+     * 그 실수를 PLAN → 1절 방향에서 놓쳤다(PR #154 Codex 2차). 기능 없는 조각을 예외로 두지
+     * 않는다: 조각 0은 스키마 준비였는데도 1절에 E1~E3를 받았다. 조각을 세우면 1절에 나타난다.
+     *
      * <p><b>보증하지 않는 것</b>: `현재` 열이 실제 코드와 맞는지는 보지 않는다. 조각 0이 머지된
      * 뒤에도 E1·E2·E3가 `없음`으로 남아 있던 자리가 정확히 그것이고, 그쪽은 조각 3의 문서↔코드
      * 검사가 맡는다.
@@ -285,8 +306,8 @@ class ReviewDocTests {
 
         assertThat(specIds).as("DOMAIN 1절 기능 표와 specs/ 의 기능 절 집합이 다르다").isEqualTo(inventoryIds);
         assertThat(planSlices)
-                .as("1절 `조각` 열이 PLAN 조각 표에 없는 조각을 가리킨다")
-                .containsAll(inventorySlices);
+                .as("PLAN 조각 표와 DOMAIN 1절 `조각` 열이 가리키는 조각 집합이 다르다")
+                .containsExactlyInAnyOrderElementsOf(inventorySlices);
     }
 
     // ------------------------------------------------------------------
@@ -457,16 +478,27 @@ class ReviewDocTests {
 
     /** specs/ 안의 모든 `### <ID>.` 절 제목. */
     private Set<String> featureIdsInSpecs() {
-        Set<String> ids = new LinkedHashSet<>();
+        return new LinkedHashSet<>(featureHeadingLocations().keySet());
+    }
+
+    /**
+     * `### <ID>.` 절이 실제로 있는 곳 — ID → spec 파일 이름 목록.
+     *
+     * <p>집합이 아니라 목록이다. 같은 절이 두 파일에 있으면 두 번, 한 파일에 두 번 있어도 두 번
+     * 들어간다 — H2가 세는 것이 그 개수다.
+     */
+    private Map<String, List<String>> featureHeadingLocations() {
+        Map<String, List<String>> locations = new LinkedHashMap<>();
         for (Path spec : markdownFilesUnder(SPECS_DIR)) {
+            String fileName = spec.getFileName().toString();
             for (String line : read(spec).lines().toList()) {
                 Matcher matcher = FEATURE_HEADING.matcher(line);
                 if (matcher.find()) {
-                    ids.add(matcher.group(1));
+                    locations.computeIfAbsent(matcher.group(1), key -> new ArrayList<>()).add(fileName);
                 }
             }
         }
-        return ids;
+        return locations;
     }
 
     /** 테스트 클래스 이름 → 소스 파일. 도메인을 가리지 않는다 — 표가 남의 도메인 테스트를 인용할 수 있다. */
@@ -477,11 +509,6 @@ class ReviewDocTests {
             index.put(fileName.substring(0, fileName.length() - ".java".length()), source);
         }
         return index;
-    }
-
-    private boolean matchesFeatureHeading(String line, String id) {
-        Matcher matcher = FEATURE_HEADING.matcher(line);
-        return matcher.find() && matcher.group(1).equals(id);
     }
 
     private String firstGroup(Pattern pattern, String text) {
