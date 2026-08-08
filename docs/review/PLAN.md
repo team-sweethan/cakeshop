@@ -44,7 +44,18 @@
 
 ### 조각 1 — 작성 (#109)
 
-**선행: 주문 도메인 계약 시그니처를 주환님과 합의한다.** 자격 검증과 A1 목록이 `order_items`·`orders`를 직접 JOIN하는 모양이라 `docs/conventions.md` 15절과 어긋난다. 시그니처가 정해지기 전에는 착수하지 않는다. 구현이 없으면 stub으로 진행한다(15절). 상세는 `specs/review-write.md` A1.
+**주문 데이터는 `domain/order/`에 두는 연동 계약으로 받는다.** 자격 검증과 A1 목록이 `order_items`·`orders`를 직접 JOIN하는 모양이라 `docs/conventions.md` 15절과 어긋난다. 상세는 `specs/review-write.md` A1.
+
+**합의를 기다리지 않는다.** 15.2가 `<소유 도메인><참조 도메인>` 이름을 지시하고, 15.8은 확인을 **사전 허락이 아니라 담당자 검토**로 정의한다. 그래서 순서가 "물어보고 만든다"가 아니라 **"만들고 PR에서 확인받는다"** 이다.
+
+| | |
+|---|---|
+| 만드는 것 | `domain/order/`에 `OrderReviewQueryService`·`OrderReviewMapper`·`mapper/order/OrderReviewMapper.xml` |
+| 지키는 조건 | **주환님 기존 파일을 수정하지 않는다.** `OrderMapper`에 메서드를 얹지 않고 새 파일만 만든다 |
+| 확인 방법 | AGENTS.md의 담당 외 도메인 헤더 주석 + PR 리뷰어로 주환님 지정 (15.8) |
+| 선례 | `OrderCouponQueryService`(정후님이 주문 폴더에 만든 것), `MemberCommunityQueryService` |
+
+**`CommandService`는 만들지 않는다** — 리뷰가 주문에 하는 것은 조회뿐이다. 쓸 수도 있으니 미리 만들지 않는다(15.8), 네 조합을 미리 만들지 않는다(15.5).
 
 - 자격 검증: 본인 주문인지, `orders.status == PICKED_UP`인지 — **주문 도메인 공개 계약으로 받는다**
 - `uk_reviews_order_item` UNIQUE로 주문상품당 1건. 중복은 `DuplicateKeyException`을 잡아 도메인 에러로 바꾼다(커뮤니티 신고 선례)
