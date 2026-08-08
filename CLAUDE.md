@@ -8,11 +8,11 @@ Java 21 · Spring Boot 4 · Spring MVC · Thymeleaf · Spring Security · MyBati
 
 | 하려는 일 | 읽을 것 |
 |---|---|
-| **community** 도메인 — java · mapper XML · 템플릿 · 테스트 전부 | `src/main/java/com/cakeshop/domain/community/CLAUDE.md` |
-| **review** 도메인 — java · mapper XML · 템플릿 · 테스트 전부 | `src/main/java/com/cakeshop/domain/review/CLAUDE.md` |
+| **community** 도메인 파일 전부 | `src/main/java/com/cakeshop/domain/community/CLAUDE.md` |
+| **review** 도메인 파일 전부 | `src/main/java/com/cakeshop/domain/review/CLAUDE.md` |
 | 그 밖의 도메인·공통 작업 | `AGENTS.md` |
 
-**`domain/` 아래 java 파일만이 아니다.** `mapper/<도메인>/*.xml`, `templates/{customer,admin}/<도메인>/**`, `src/test/**/<도메인>/**` 도 그 도메인의 작업이다. 각 문서가 자기 **파일 범위와 읽을 문서**를 지정하므로, 지정된 것만 읽는다.
+**`domain/` 아래 java 파일만이 아니다.** mapper XML·시드·템플릿·테스트, 그 도메인이 추가하는 새 Flyway migration도 그 도메인의 작업이다. **정확한 목록은 각 문서의 `이 도메인의 파일 범위` 절이 정본이다** — 여기 옮겨 적지 않는다. 그다음은 그 문서가 지정하는 것만 읽는다.
 
 ## 구조와 의존 방향
 
@@ -30,7 +30,7 @@ MyBatis XML은 `src/main/resources/mapper/<도메인>/`, 템플릿은 `templates
 
 ## 하지 않는 것
 
-- **다른 도메인의 테이블·Mapper·Entity를 직접 참조하거나 JOIN하지 않는다.** 연동 계약의 코드와 SQL은 쓰는 쪽이 아니라 **데이터를 소유한 도메인**에 둔다 (`docs/conventions.md` 15절)
+- **다른 도메인의 테이블·Mapper·Entity를 직접 참조하거나 JOIN하지 않는다.** 연동 계약의 코드와 SQL은 쓰는 쪽이 아니라 **데이터를 소유한 도메인**에 둔다 (`docs/conventions.md` 15절). **예외는 여러 도메인을 집계·요약하는 통계·대시보드 ReadModel 하나**다(15.9) — 관리자 화면이라는 것은 근거가 아니다
 - 사용자 입력에 `${}`를 쓰지 않는다. MyBatis 값은 `#{}`로 바인딩한다
 - **이미 공유된 Flyway migration은 고치지 않는다.** 머지 전이라도 팀원이 받아 적용했으면 checksum이 어긋나 그쪽 기동이 깨진다. 새 versioned migration을 `gradlew newMigration -Pdesc=<snake_case>`로 만든다
 - 권한을 화면 숨김으로 처리하지 않는다. Spring Security에서 `ADMIN`을 강제한다
@@ -46,7 +46,7 @@ MyBatis XML은 `src/main/resources/mapper/<도메인>/`, 템플릿은 `templates
 
 **협의 시점·승인 조건·branch protection 설정은 사본을 두지 않는다.** 최근에 바뀌었고 또 바뀐다 — 사본이 있으면 그게 다음 드리프트다. 그때 `AGENTS.md`와 `docs/pull-request.md` 4절을 읽는다.
 
-담당 외 도메인에 파일을 만들 때 다는 **헤더 주석 형식**도 `AGENTS.md`에 있다.
+담당 외 도메인에 **클래스나 공개 Service 메서드를 새로 만들 때** 다는 헤더 주석 형식도 `AGENTS.md`에 있다.
 
 ## 문서를 넓게 읽지 않는다
 
