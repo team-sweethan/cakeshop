@@ -23,9 +23,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * 설명 : 제외 목록을 SQL 안에서 적용하는 것과 소유 회원 판정을 MariaDB Testcontainers 로 고정한다.
  * ******************************
  *
- * <p><b>이 테스트는 {@code reviews} 에 한 행도 넣지 않는다.</b> 제외할 식별자를 인자로 받는 설계라
- * 주문 쪽 SQL 이 후기 테이블을 알 필요가 없다 — 그 사실 자체가 계약이 지키려는 것이고, 여기에
- * {@code reviews} INSERT 가 생기는 날이 경계가 무너진 날이다.</p>
+ * <p>이 테스트는 {@code reviews} 에 한 행도 넣지 않는다. 제외할 식별자를 인자로 받는 설계라
+ * 주문 쪽 SQL 이 후기 테이블을 알 필요가 없고, 여기에 {@code reviews} INSERT 가 생기는 날이
+ * 경계가 무너진 날이다.</p>
  */
 @MybatisTest
 @MariaDbIntegrationTest
@@ -51,13 +51,6 @@ class OrderReviewMapperTests {
         productId = insertProduct();
     }
 
-    /**
-     * <b>이 계약이 존재하는 이유를 그대로 고정한다.</b>
-     *
-     * <p>픽업 완료 3건 중 <b>최신 2건을 이미 작성</b>했고 페이지 크기가 2다. 계약이 페이지를 먼저
-     * 자르고 호출한 쪽이 뒤에서 걸렀다면 첫 페이지는 <b>통째로 비고</b> 남은 1건은 2페이지로
-     * 밀린다. 목록이 비는 것은 정상 상태라 오류로도 드러나지 않아 아무도 모른다.
-     */
     @Test
     void findWritableOrderItems_excludesInsideSql_soFirstPageIsNotEmpty() {
         long oldest = insertPickedUpOrderItem("오래된 케이크", PICKED_UP_AT);
@@ -74,20 +67,16 @@ class OrderReviewMapperTests {
                 .containsExactly(oldest);
     }
 
-    /** 건수도 같은 조건을 써야 한다. 갈리면 화면의 총 페이지 수가 실제와 다르다. */
     @Test
     void countWritableOrderItems_appliesSameExclusion() {
         insertPickedUpOrderItem("케이크1", PICKED_UP_AT);
         long written = insertPickedUpOrderItem("케이크2", PICKED_UP_AT.plusDays(1));
 
         assertThat(orderReviewMapper.countWritableOrderItems(memberId, List.of(written)))
+                .as("건수가 목록과 갈리면 화면의 총 페이지 수가 실제와 다르다")
                 .isEqualTo(1);
     }
 
-    /**
-     * 후기를 한 건도 안 쓴 회원은 제외 목록이 비어서 들어온다. {@code NOT IN ()} 은 문법 오류라
-     * 조건 자체를 빼지 않으면 <b>첫 방문에서 바로</b> 500 이다.
-     */
     @Test
     void findWritableOrderItems_emptyExclusion_doesNotBreakSql() {
         long item = insertPickedUpOrderItem("첫 주문 케이크", PICKED_UP_AT);
@@ -98,7 +87,6 @@ class OrderReviewMapperTests {
         assertThat(orderReviewMapper.countWritableOrderItems(memberId, List.of())).isEqualTo(1);
     }
 
-    /** 픽업 전 주문은 후기 대상이 아니다. 상태 조건이 빠지면 결제만 한 주문에 후기가 열린다. */
     @Test
     void findWritableOrderItems_notPickedUpOrder_isExcluded() {
         insertOrderItem(insertOrder(memberId, "PENDING_PAYMENT", null), "결제대기 케이크");
@@ -106,7 +94,6 @@ class OrderReviewMapperTests {
         assertThat(orderReviewMapper.findWritableOrderItems(memberId, List.of(), 0, 20)).isEmpty();
     }
 
-    /** 소유 조건이 빠지면 남의 주문에 후기를 쓸 수 있게 된다. */
     @Test
     void findWritableOrderItems_otherMembersOrder_isExcluded() {
         long otherMemberId = insertMember();
@@ -116,10 +103,7 @@ class OrderReviewMapperTests {
         assertThat(orderReviewMapper.findWritableOrderItems(memberId, List.of(), 0, 20)).isEmpty();
     }
 
-    /**
-     * <b>같은 주문의 상품들은 {@code picked_up_at} 이 전부 같다.</b> 정렬 키가 그것뿐이면 순서가
-     * 흔들려 같은 항목이 두 페이지에 나오거나 어느 페이지에도 안 나온다.
-     */
+    /** 한 주문의 상품들은 {@code picked_up_at} 이 전부 같아 정렬 키가 그것뿐이면 순서가 흔들린다. */
     @Test
     void findWritableOrderItems_samePickedUpAt_pagesDoNotOverlapOrSkip() {
         long orderId = insertOrder(memberId, "PICKED_UP", PICKED_UP_AT);
@@ -133,13 +117,10 @@ class OrderReviewMapperTests {
         assertThat(page1).hasSize(2);
         assertThat(page2).hasSize(1);
         assertThat(page1).doesNotContainAnyElementsOf(page2);
-        assertThat(page1)
-                .as("두 페이지를 합치면 세 건이 빠짐없이 나와야 한다")
-                .containsAll(List.of(third, second));
+        assertThat(page1).containsAll(List.of(third, second));
         assertThat(page2).containsExactly(first);
     }
 
-    /** 검증에 필요한 값이 실제로 채워져 오는지. product_id 는 요청값 대신 여기서 파생시킨다 (R4). */
     @Test
     void findReviewTarget_pickedUpItem_carriesProductIdAndPickedUpFlag() {
         long orderItemId = insertPickedUpOrderItem("픽업 케이크", PICKED_UP_AT);
@@ -154,10 +135,6 @@ class OrderReviewMapperTests {
         assertThat(target.pickedUpAt()).isEqualTo(PICKED_UP_AT);
     }
 
-    /**
-     * <b>픽업 전이어도 비우지 않고 돌려준다.</b> 픽업 전은 400 이고 없음·남의 것은 404 라 응답이
-     * 다르다. 여기서 함께 걸러 내면 호출한 쪽이 둘을 구분할 방법이 없어진다.
-     */
     @Test
     void findReviewTarget_notPickedUp_isReturnedWithFalseFlag() {
         long orderItemId =
@@ -170,7 +147,6 @@ class OrderReviewMapperTests {
         assertThat(target.pickedUpAt()).isNull();
     }
 
-    /** 남의 주문 상품은 존재 자체를 알려 주지 않는다 — 호출한 쪽에서 404 가 된다 (DOMAIN 2.5). */
     @Test
     void findReviewTarget_otherMembersItem_isNull() {
         long otherMemberId = insertMember();

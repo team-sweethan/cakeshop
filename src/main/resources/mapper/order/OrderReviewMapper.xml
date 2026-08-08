@@ -11,13 +11,8 @@
 -->
 <mapper namespace="com.cakeshop.domain.order.mapper.OrderReviewMapper">
 
-    <!--
-      제외 목록은 리뷰가 만들어 넘긴다. 여기서 reviews 를 JOIN 하면 주문이 리뷰 스키마를 알게
-      되어 의존 방향이 뒤집힌다. 주문 쪽에서 이것은 그냥 불투명한 id 묶음이다.
-
-      목록이 비어 있을 때 NOT IN () 은 문법 오류라 조건 자체를 넣지 않는다. 후기를 한 건도 쓰지
-      않은 회원이 정확히 그 경우다 — 즉 첫 방문에서 바로 걸린다.
-    -->
+    <!-- 목록이 비면 NOT IN () 이 문법 오류라 조건 자체를 넣지 않는다. 후기를 한 건도 쓰지 않은
+         회원이 그 경우다. -->
     <sql id="writableCondition">
         FROM order_items oi
         JOIN orders o ON o.id = oi.order_id
@@ -32,11 +27,8 @@
         </if>
     </sql>
 
-    <!--
-      정렬 키에 oi.id 를 함께 둔다. picked_up_at 은 한 주문의 상품들이 전부 같은 값이라
-      그것만으로는 순서가 정해지지 않고, 오프셋 페이징에서 순서가 흔들리면 같은 항목이 두 페이지에
-      나오거나 어느 페이지에도 안 나온다.
-    -->
+    <!-- 한 주문의 상품들은 picked_up_at 이 전부 같다. oi.id 를 함께 두지 않으면 오프셋 페이징에서
+         순서가 흔들려 같은 항목이 두 페이지에 나오거나 어느 페이지에도 안 나온다. -->
     <select id="findWritableOrderItems"
             resultType="com.cakeshop.domain.order.dto.view.OrderReviewItemView">
 
@@ -55,19 +47,15 @@
         <include refid="writableCondition"/>
     </select>
 
-    <!--
-      상태를 그대로 주지 않고 pickedUp 으로 계산해 넘긴다. 주문이 상태 어휘를 바꿔도 리뷰가
-      깨지지 않는다. member_id 조건이 여기 있으므로 남의 주문 상품은 결과가 비어서 돌아간다.
-    -->
     <select id="findReviewTarget"
             resultType="com.cakeshop.domain.order.dto.view.OrderReviewTargetView">
 
-        SELECT oi.id                       AS orderItemId,
-               oi.product_id               AS productId,
-               oi.product_name             AS productName,
-               o.order_number              AS orderNumber,
-               (o.status = 'PICKED_UP')    AS pickedUp,
-               o.picked_up_at              AS pickedUpAt
+        SELECT oi.id                    AS orderItemId,
+               oi.product_id            AS productId,
+               oi.product_name          AS productName,
+               o.order_number           AS orderNumber,
+               (o.status = 'PICKED_UP') AS pickedUp,
+               o.picked_up_at           AS pickedUpAt
           FROM order_items oi
           JOIN orders o ON o.id = oi.order_id
          WHERE oi.id = #{orderItemId}
