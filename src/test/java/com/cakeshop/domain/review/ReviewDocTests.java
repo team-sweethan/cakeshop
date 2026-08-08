@@ -22,7 +22,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * 리뷰 문서끼리 어긋나는 것을 잡는다(PLAN.md 하네스 H1~H5).
+ * 리뷰 문서끼리 어긋나는 것을 잡는다(`docs/review/HARNESS.md` H1~H6).
  *
  * <p>문서를 DOMAIN/specs/PLAN/decisions/history로 나누면서 <b>어긋날 자리가 늘었다.</b> 파일이
  * 3개에서 12개가 됐고, 기능 하나를 추가할 때 손대야 하는 곳이 최소 세 곳(DOMAIN 1절 인벤토리,
@@ -30,7 +30,8 @@ import org.junit.jupiter.api.Test;
  *
  * <p><b>이 테스트가 보증하지 않는 것</b>: 전부 형태 검사다. 낡은 참조는 잡지만 <b>틀린 설명</b>은
  * 못 잡는다. "D1이 4곳에서 불린다"(실제 5곳) 같은 문장은 여기를 전부 통과한다. 그쪽은 사람이
- * 하는 리뷰 몫이고, 각 검사가 무엇을 보증하지 않는지는 PLAN.md 하네스 표에 행마다 적혀 있다.
+ * 하는 리뷰 몫이고, 각 검사가 무엇을 보증하지 않는지는 `docs/review/HARNESS.md` 표에 행마다
+ * 적혀 있다.
  *
  * <p>코드와 문서를 대조하는 검사는 여기 없다. 리뷰는 문서가 코드보다 앞서 있어 "문서에 있는데
  * 코드에 없음"이 미구현이라 정상이고, 실제 드리프트는 <b>코드 → 문서</b> 쪽에서 난다. 그 방향은
@@ -41,6 +42,7 @@ class ReviewDocTests {
     private static final Path DOC_ROOT = Path.of("docs", "review");
     private static final Path DOMAIN_DOC = DOC_ROOT.resolve("DOMAIN.md");
     private static final Path PLAN_DOC = DOC_ROOT.resolve("PLAN.md");
+    private static final Path HARNESS_DOC = DOC_ROOT.resolve("HARNESS.md");
     private static final Path SPECS_DIR = DOC_ROOT.resolve("specs");
     private static final Path TEST_SOURCE_ROOT = Path.of("src", "test", "java");
 
@@ -77,7 +79,7 @@ class ReviewDocTests {
      * 없어진 문서를 <b>이름으로 불러도 되는 유일한 자리</b> — 이 migration을 설명하는 줄.
      *
      * <p>머지된 Flyway migration의 주석 세 곳이 지금은 없는 SPEC.md를 가리키는데, 체크섬 때문에
-     * 주석 한 글자도 고칠 수 없다(PLAN.md 하네스 절). 그 사실을 문서에 적으려면 없어진 이름을
+     * 주석 한 글자도 고칠 수 없다(HARNESS.md). 그 사실을 문서에 적으려면 없어진 이름을
      * 불러야 하고, <b>없앤 파일을 없앴다고 적는 것이 검사 위반이 되면 안 된다.</b>
      *
      * <p><b>이름 → 줄 → 짝으로 두 번 좁혔다.</b> 처음에는 그 두 이름을 <b>어디서 부르든</b>
@@ -110,8 +112,14 @@ class ReviewDocTests {
     /** PLAN.md 조각 표의 행. `| 0 | 준비 | ... |` */
     private static final Pattern SLICE_ROW = Pattern.compile("^\\|\\s*(\\d+)\\s*\\|");
 
-    /** PLAN.md 하네스 표의 행. `| H1 | ... |` */
+    /** HARNESS.md 하네스 표의 행. `| H1 | ... |` */
     private static final Pattern HARNESS_ROW = Pattern.compile("^\\|\\s*(H\\d+)\\s*\\|");
+
+    /** 산문·표 어디서든 하네스를 번호로 부르는 것. `H7을 세운다`, `H1~H6` */
+    private static final Pattern HARNESS_MENTION = Pattern.compile("\\bH(\\d+)\\b");
+
+    /** `상태` 열이 이 값이면 가리키는 테스트가 실재해야 한다. */
+    private static final String APPLIED = "적용";
 
     /** 백틱 안의 `XxxTests` 또는 `XxxTests.methodName`. */
     private static final Pattern QUOTED_TEST_REFERENCE =
@@ -153,7 +161,7 @@ class ReviewDocTests {
      * 줄임 표기도 검사 밖이다 — 실제 경로는 `src/main/java/...` 아래라 접두사 규칙에 걸리지 않는다.
      *
      * <p><b>일부러 보지 않는 곳</b>: 머지된 Flyway migration. 체크섬 때문에 주석 한 글자도 고칠 수
-     * 없어 검사 대상에 넣으면 영원히 빨간불이다. 근거는 PLAN.md 하네스 절. <b>그 migration을
+     * 없어 검사 대상에 넣으면 영원히 빨간불이다. 근거는 HARNESS.md. <b>그 migration을
      * 설명하는 줄에서는 없어진 문서 경로 하나를 봐준다</b> — 없어진 이름을 불러야 설명이 되기
      * 때문이다. 봐주는 범위는 줄이 아니라 <b>표식과 그 경로의 짝</b>이고, 같은 줄에 다른 경로가
      * 있으면 그것은 그대로 검사한다({@link #DEAD_REFERENCE_BESIDE_MIGRATION}).
@@ -211,7 +219,7 @@ class ReviewDocTests {
      * <p>이 저장소 문서가 세 표기를 섞어 쓴다. `docs/community/PLAN.md`(뿌리 기준),
      * `../DOMAIN.md`·`product-rating.md`(옆 기준), `specs/review-write.md`(docs/review 기준).
      * 셋 중 하나라도 있으면 통과다 — <b>넓게 잡는 대신 죽은 경로는 확실히 잡는다.</b> 오탐이
-     * 놓침보다 나쁘기 때문이다(PLAN.md 하네스 절).
+     * 놓침보다 나쁘기 때문이다(HARNESS.md).
      */
     private boolean resolves(Path referencingFile, String reference) {
         Path parent = referencingFile.getParent();
@@ -351,16 +359,21 @@ class ReviewDocTests {
     /**
      * H4. 문서가 서로의 역할을 침범하지 않는다.
      *
-     * <p>나눈 이유가 축을 가르는 것이었다 — specs는 <b>무엇을 보장하나</b>, PLAN은 <b>지금 어디까지</b>.
-     * 침범이 시작되면 같은 사실이 두 곳에 생기고, 그때부터 한쪽이 낡는다. 나누기 전 SPEC.md가
-     * 여섯 가지 일을 한꺼번에 하던 상태로 되돌아가는 경로가 이것이다.
+     * <p>나눈 이유가 축을 가르는 것이었다 — specs는 <b>무엇을 보장하나</b>, PLAN은 <b>지금 어디까지</b>,
+     * HARNESS는 <b>무엇이 그것을 붙잡나</b>. 침범이 시작되면 같은 사실이 두 곳에 생기고, 그때부터
+     * 한쪽이 낡는다. 나누기 전 SPEC.md가 여섯 가지 일을 한꺼번에 하던 상태로 되돌아가는 경로가
+     * 이것이다.
+     *
+     * <p><b>하네스 표를 HARNESS.md로 뺄 때 이 검사를 함께 넓혔다.</b> 장치 없는 분할은 이름
+     * 바꾸기다 — 표가 슬금슬금 PLAN.md로 돌아오는 것을 막는 것이 없으면 몇 달 뒤 원래대로다.
+     * 이 저장소에는 규칙만 있고 안 지켜진 기록이 있다(`docs/review/history/2026-08-slice-0-schema.md`).
      *
      * <p><b>보증하지 않는 것</b>: 형태만 본다. 결정 로그 표를 만들지 않고 <b>산문으로</b> 결정 경위를
      * 풀어 적는 것은 못 잡는다. 그리고 <b>결정 로그를 이름으로 부르는 것은 위반이 아니다</b> —
      * 어느 문서가 소유하는지 안내하는 문장이 막히면 안 된다({@link #DECISION_LOG_SHAPE}).
      */
     @Test
-    @DisplayName("H4. specs/ 에 결정 로그가 없고 PLAN.md 에 기능 절이 없다")
+    @DisplayName("H4. 문서가 서로의 역할을 침범하지 않는다 (결정 로그·기능 절·하네스 표·조각 표)")
     void documents_stayInTheirLane() {
         List<String> problems = new ArrayList<>();
 
@@ -376,6 +389,22 @@ class ReviewDocTests {
                 .lines()
                 .filter(line -> FEATURE_HEADING.matcher(line).find())
                 .forEach(line -> problems.add("PLAN.md: 기능 절은 specs/ 가 소유한다 -> " + line.trim()));
+
+        // 표를 옮기기만 하고 경계를 안 세우면 한 달 뒤 되돌아온다. 양쪽을 함께 막는다.
+        read(PLAN_DOC)
+                .lines()
+                .filter(line -> HARNESS_ROW.matcher(line).find())
+                .forEach(
+                        line ->
+                                problems.add(
+                                        "PLAN.md: 하네스 표는 HARNESS.md 가 소유한다. 번호만 부른다 -> " + line.trim()));
+
+        read(HARNESS_DOC)
+                .lines()
+                .filter(line -> SLICE_ROW.matcher(line).find())
+                .forEach(
+                        line ->
+                                problems.add("HARNESS.md: 조각 표는 PLAN.md 가 소유한다 -> " + line.trim()));
 
         assertThat(problems).as("문서가 서로의 역할을 침범했다").isEmpty();
     }
@@ -404,6 +433,9 @@ class ReviewDocTests {
      * <b>H5가 가장 막아야 할 회귀가 정확히 그것이다.</b> 검사 하나가 사라지는 것은 표가 낡는 것보다
      * 조용하다.
      *
+     * <p><b>`적용` 행만 본다.</b> 아직 안 만든 하네스가 가리킬 테스트가 없는 것은 정상이고, 그것까지
+     * 요구하면 <b>계획을 적는 행위가 위반이 된다.</b> 커뮤니티 H36a가 같은 이유로 같은 선을 그었다.
+     *
      * <p><b>보증하지 않는 것</b>: 그 테스트가 <b>적힌 대로 검사하는지</b>는 못 본다. 클래스와 메서드가
      * 있는지만 본다. 메서드 이름은 소스 본문에 그 낱말이 있는지로 확인하므로, 주석에만 있어도
      * 통과한다.
@@ -415,12 +447,15 @@ class ReviewDocTests {
         assertThat(testClasses).as("테스트 소스를 한 개도 못 찾았다").isNotEmpty();
 
         List<String> harnessRows =
-                read(PLAN_DOC).lines().filter(line -> HARNESS_ROW.matcher(line).find()).toList();
-        assertThat(harnessRows).as("하네스 표를 한 행도 읽지 못했다").hasSizeGreaterThanOrEqualTo(5);
+                read(HARNESS_DOC).lines().filter(line -> HARNESS_ROW.matcher(line).find()).toList();
+        assertThat(harnessRows).as("하네스 표를 한 행도 읽지 못했다").hasSizeGreaterThanOrEqualTo(6);
+
+        List<String> applied = harnessRows.stream().filter(this::isApplied).toList();
+        assertThat(applied).as("`적용` 행을 한 행도 읽지 못했다").hasSizeGreaterThanOrEqualTo(6);
 
         List<String> problems = new ArrayList<>();
 
-        for (String row : harnessRows) {
+        for (String row : applied) {
             String harnessId = firstGroup(HARNESS_ROW, row);
             Matcher matcher = QUOTED_TEST_REFERENCE.matcher(row);
             int referencesInRow = 0;
@@ -462,8 +497,73 @@ class ReviewDocTests {
     }
 
     // ------------------------------------------------------------------
+    // H6
+    // ------------------------------------------------------------------
+
+    /**
+     * H6. PLAN.md가 부르는 하네스 번호가 HARNESS.md에 실존한다.
+     *
+     * <p><b>표를 분리한 대가를 갚는 검사다.</b> 하네스 표가 PLAN.md에 있을 때는 번호와 설명이 같은
+     * 자리에 있어 어긋날 수가 없었다. 뺀 순간 PLAN.md의 번호는 <b>다른 파일을 가리키는 참조</b>가
+     * 되고, 참조는 낡는다 — 조각 절이 "H7을 세운다"고 적었는데 HARNESS.md에 H7이 없으면 그 문장은
+     * 거짓말이다. 그리고 이런 거짓말은 조용하다: 코드도 테스트도 초록불이고, 번호를 따라간 다음
+     * 사람만 빈손으로 돌아온다.
+     *
+     * <p><b>같은 번호가 두 행에 있는 것도 함께 본다.</b> H2가 1절 기능 표에서 겪은 것과 같은
+     * 모양이다 — 행을 복사해 새 하네스를 만들면서 번호를 안 고치면, 뒤 행이 앞 행을 덮는 것이
+     * 아니라 <b>둘 다 남아</b> 서로 다른 것을 보증한다고 주장한다.
+     *
+     * <p><b>보증하지 않는 것 — 역방향은 일부러 안 본다.</b> HARNESS.md의 모든 번호가 PLAN.md에
+     * 불릴 것을 요구하면 PLAN.md가 카탈로그를 다시 복사하게 되고, 그러면 <b>분리한 이유가
+     * 없어진다.</b> 하네스가 40행이 되어도 PLAN.md는 이번 조각의 번호만 부른다. 표가 PLAN.md로
+     * 다시 새어 들어오는 쪽은 H4가 막는다.
+     *
+     * <p>그리고 번호가 <b>맞는 하네스를 가리키는지</b>도 보지 않는다. 조각 3이 H7이라 적어 놓고
+     * 실제로는 H8을 만들어도 둘 다 실존하므로 통과한다.
+     */
+    @Test
+    @DisplayName("H6. PLAN.md 가 부르는 하네스 번호가 HARNESS.md 에 전부 있다")
+    void planHarnessIds_existInHarnessDoc() {
+        Set<String> defined = new LinkedHashSet<>();
+        List<String> duplicates = new ArrayList<>();
+        for (String line : read(HARNESS_DOC).lines().toList()) {
+            Matcher matcher = HARNESS_ROW.matcher(line);
+            if (matcher.find() && !defined.add(matcher.group(1))) {
+                duplicates.add(matcher.group(1));
+            }
+        }
+        assertThat(defined).as("HARNESS.md 하네스 표를 한 행도 읽지 못했다").hasSizeGreaterThanOrEqualTo(6);
+        assertThat(duplicates).as("HARNESS.md 에 같은 번호를 가진 행이 둘 이상 있다").isEmpty();
+
+        Set<String> called = new TreeSet<>();
+        for (String line : read(PLAN_DOC).lines().toList()) {
+            Matcher matcher = HARNESS_MENTION.matcher(line);
+            while (matcher.find()) {
+                called.add("H" + matcher.group(1));
+            }
+        }
+        assertThat(called).as("PLAN.md 가 하네스를 번호로 한 번도 부르지 않았다. 이 검사가 공허하다").isNotEmpty();
+
+        assertThat(defined)
+                .as("PLAN.md 가 HARNESS.md 에 없는 하네스 번호를 부른다")
+                .containsAll(called);
+    }
+
+    // ------------------------------------------------------------------
     // 파싱 도우미
     // ------------------------------------------------------------------
+
+    /** 하네스 표 행의 `상태` 열이 `적용`인가. 마지막 비어 있지 않은 열을 본다. */
+    private boolean isApplied(String row) {
+        String[] columns = row.split("\\|", -1);
+        for (int i = columns.length - 1; i >= 0; i--) {
+            String column = columns[i].replace("*", "").trim();
+            if (!column.isEmpty()) {
+                return column.equals(APPLIED);
+            }
+        }
+        return false;
+    }
 
     /**
      * DOMAIN.md 1절 기능 표의 ID를 <b>행 순서 그대로</b> 읽는다.
