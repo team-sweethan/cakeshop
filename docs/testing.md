@@ -445,13 +445,13 @@ Java 21 + Gradle Wrapper, Docker 확인 후 `./gradlew test`, 실패 시 test re
 | `@MybatisTest` | 사용 가능 확인됨 (Spring Boot 4.0.2 + mybatis-spring-boot-starter-test 4.0.1) |
 | Assertion | AssertJ |
 | CI | `.github/workflows/ci.yml` (Java 21, `./gradlew test`) |
+| required check·branch protection | `dev`에 적용 (2026-08-08). 설정 정본은 [PR 규칙 문서](pull-request.md) |
 
 ### 아직 안 한 것 (급하지 않음)
 
 - JaCoCo 도입과 초기 기준
 - 통합 테스트의 Gradle task 분리
 - flaky test 담당자 지정과 임시 격리 절차
-- required check·branch protection 적용 ([PR 규칙 문서](pull-request.md))
 
 ### 알려진 공백 (담당 미정, 지금 강제하지 않음)
 
