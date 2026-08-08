@@ -8,11 +8,11 @@ Java 21 · Spring Boot 4 · Spring MVC · Thymeleaf · Spring Security · MyBati
 
 | 하려는 일 | 읽을 것 |
 |---|---|
-| `domain/community/` 작업 | `src/main/java/com/cakeshop/domain/community/CLAUDE.md` |
-| `domain/review/` 작업 | `src/main/java/com/cakeshop/domain/review/CLAUDE.md` |
+| **community** 도메인 — java · mapper XML · 템플릿 · 테스트 전부 | `src/main/java/com/cakeshop/domain/community/CLAUDE.md` |
+| **review** 도메인 — java · mapper XML · 템플릿 · 테스트 전부 | `src/main/java/com/cakeshop/domain/review/CLAUDE.md` |
 | 그 밖의 도메인·공통 작업 | `AGENTS.md` |
 
-위 두 폴더에는 작업 단위별로 읽을 문서를 지정하는 표가 있다. 그 폴더를 작업할 때는 **표가 가리키는 것만** 읽는다.
+**`domain/` 아래 java 파일만이 아니다.** `mapper/<도메인>/*.xml`, `templates/{customer,admin}/<도메인>/**`, `src/test/**/<도메인>/**` 도 그 도메인의 작업이다. 각 문서가 자기 **파일 범위와 읽을 문서**를 지정하므로, 지정된 것만 읽는다.
 
 ## 구조와 의존 방향
 
@@ -32,13 +32,13 @@ MyBatis XML은 `src/main/resources/mapper/<도메인>/`, 템플릿은 `templates
 
 - **다른 도메인의 테이블·Mapper·Entity를 직접 참조하거나 JOIN하지 않는다.** 연동 계약의 코드와 SQL은 쓰는 쪽이 아니라 **데이터를 소유한 도메인**에 둔다 (`docs/conventions.md` 15절)
 - 사용자 입력에 `${}`를 쓰지 않는다. MyBatis 값은 `#{}`로 바인딩한다
-- **머지된 Flyway migration은 고치지 않는다.** 새 versioned migration을 `gradlew newMigration -Pdesc=<snake_case>`로 만든다
+- **이미 공유된 Flyway migration은 고치지 않는다.** 머지 전이라도 팀원이 받아 적용했으면 checksum이 어긋나 그쪽 기동이 깨진다. 새 versioned migration을 `gradlew newMigration -Pdesc=<snake_case>`로 만든다
 - 권한을 화면 숨김으로 처리하지 않는다. Spring Security에서 `ADMIN`을 강제한다
 - 회원 소유 자원은 요청으로 온 회원 ID를 믿지 않고 Service에서 인증 사용자 기준으로 검증한다
 
 ## 빌드와 커밋
 
-- `.\gradlew.bat test` · `bootRun` · `build` (Testcontainers 테스트에는 Docker 필요)
+- `.\gradlew.bat test`(Windows) 또는 `./gradlew test`(mac·Linux). `bootRun` · `build`도 같다. Testcontainers 테스트에는 Docker 필요
 - 커밋 제목은 `<type>: 한글 요약`. type은 `feat` `fix` `refactor` `test` `docs` `ci` `chore`
 - PR 하나에는 목적 하나. 상세는 `docs/pull-request.md`, 테스트 규약은 `docs/testing.md`
 
