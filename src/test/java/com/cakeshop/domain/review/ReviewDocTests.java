@@ -112,11 +112,38 @@ class ReviewDocTests {
     /** PLAN.md 조각 표의 행. `| 0 | 준비 | ... |` */
     private static final Pattern SLICE_ROW = Pattern.compile("^\\|\\s*(\\d+)\\s*\\|");
 
+    /**
+     * PLAN.md 조각 표를 <b>소유</b>하는 형태 — 그 표의 머리 행.
+     *
+     * <p>{@link #SLICE_ROW}는 첫 셀이 숫자인지만 본다. PLAN.md에서 조각 번호를 읽을 때는 그것으로
+     * 충분하지만, 다른 문서가 조각 표를 가졌는지 판정하는 데 쓰면 <b>숫자로 시작하는 평범한 표가
+     * 전부 조각 표가 된다.</b> HARNESS.md에는 이미 예외와 역사적 근거를 적은 표가 둘 있고, 거기에
+     * 순서를 매긴 표를 하나만 더하면 정상 확장이 빨간불이 된다(PR #156 Codex). <b>오탐은 놓침보다
+     * 나쁘다</b> — 그래서 결정 로그와 같은 방식으로 <b>머리 행</b>을 본다.
+     */
+    private static final Pattern SLICE_TABLE_HEADER =
+            Pattern.compile("^\\|\\s*#\\s*\\|\\s*조각\\s*\\|");
+
     /** HARNESS.md 하네스 표의 행. `| H1 | ... |` */
     private static final Pattern HARNESS_ROW = Pattern.compile("^\\|\\s*(H\\d+)\\s*\\|");
 
-    /** 산문·표 어디서든 하네스를 번호로 부르는 것. `H7을 세운다`, `H1~H6` */
-    private static final Pattern HARNESS_MENTION = Pattern.compile("\\bH(\\d+)\\b");
+    /**
+     * PLAN.md가 이번 조각의 하네스를 <b>선언</b>하는 줄에서, 번호가 나열된 부분.
+     *
+     * <p>`**이 조각이 세우는 하네스: H7 · H8 · H9**`에서 굵게 닫히기 전까지를 잡는다. 같은 줄 뒤에
+     * 붙는 근거 문장은 선언이 아니므로 보지 않는다.
+     */
+    private static final Pattern HARNESS_DECLARATION = Pattern.compile("세우는 하네스:([^*]*)");
+
+    /** 선언을 한 줄씩 푸는 항목. `- **H7** — DOMAIN.md 2.5 오류 코드 표 ↔ ...` */
+    private static final Pattern HARNESS_DECLARATION_ITEM =
+            Pattern.compile("^-\\s+\\*\\*(H\\d+)\\*\\*");
+
+    /** 선언 안의 범위 표기. `H7~H9`, `H1 ~ H6` */
+    private static final Pattern HARNESS_RANGE = Pattern.compile("H(\\d+)\\s*[~－-]\\s*H(\\d+)");
+
+    /** 선언 안의 낱개 번호. */
+    private static final Pattern HARNESS_NUMBER = Pattern.compile("H(\\d+)");
 
     /** `상태` 열이 이 값이면 가리키는 테스트가 실재해야 한다. */
     private static final String APPLIED = "적용";
@@ -371,6 +398,10 @@ class ReviewDocTests {
      * <p><b>보증하지 않는 것</b>: 형태만 본다. 결정 로그 표를 만들지 않고 <b>산문으로</b> 결정 경위를
      * 풀어 적는 것은 못 잡는다. 그리고 <b>결정 로그를 이름으로 부르는 것은 위반이 아니다</b> —
      * 어느 문서가 소유하는지 안내하는 문장이 막히면 안 된다({@link #DECISION_LOG_SHAPE}).
+     *
+     * <p><b>조각 표도 머리 행으로만 본다</b>({@link #SLICE_TABLE_HEADER}). 머리 행 없이 조각 행만
+     * 옮겨 붙이면 통과한다 — 결정 로그에서 이미 받아들인 것과 같은 거래다. 첫 셀이 숫자인 줄을
+     * 전부 조각 표로 보면 순서를 매긴 평범한 표까지 막힌다(PR #156 Codex).
      */
     @Test
     @DisplayName("H4. 문서가 서로의 역할을 침범하지 않는다 (결정 로그·기능 절·하네스 표·조각 표)")
@@ -401,7 +432,7 @@ class ReviewDocTests {
 
         read(HARNESS_DOC)
                 .lines()
-                .filter(line -> SLICE_ROW.matcher(line).find())
+                .filter(line -> SLICE_TABLE_HEADER.matcher(line).find())
                 .forEach(
                         line ->
                                 problems.add("HARNESS.md: 조각 표는 PLAN.md 가 소유한다 -> " + line.trim()));
@@ -448,10 +479,13 @@ class ReviewDocTests {
 
         List<String> harnessRows =
                 read(HARNESS_DOC).lines().filter(line -> HARNESS_ROW.matcher(line).find()).toList();
-        assertThat(harnessRows).as("하네스 표를 한 행도 읽지 못했다").hasSizeGreaterThanOrEqualTo(6);
+        assertThat(harnessRows).as("하네스 표를 한 행도 읽지 못했다").isNotEmpty();
 
+        // 현재 행 수를 하드코딩하지 않는다. `적용` 행이 정확히 여섯이던 시절에 하한을 6으로 두었더니,
+        // HARNESS.md 가 스스로 지시하는 폐기 절차(행을 지우지 말고 `상태`를 바꾼다)를 따르는 순간
+        // 이 단언이 실패했다 — 문서가 시키는 정상 절차에 빨간불이었다(PR #156 Codex).
         List<String> applied = harnessRows.stream().filter(this::isApplied).toList();
-        assertThat(applied).as("`적용` 행을 한 행도 읽지 못했다").hasSizeGreaterThanOrEqualTo(6);
+        assertThat(applied).as("`적용` 행을 한 행도 읽지 못했다").isNotEmpty();
 
         List<String> problems = new ArrayList<>();
 
@@ -520,6 +554,25 @@ class ReviewDocTests {
      *
      * <p>그리고 번호가 <b>맞는 하네스를 가리키는지</b>도 보지 않는다. 조각 3이 H7이라 적어 놓고
      * 실제로는 H8을 만들어도 둘 다 실존하므로 통과한다.
+     *
+     * <p><b>선언하는 자리만 읽는다</b>({@link #HARNESS_DECLARATION},
+     * {@link #HARNESS_DECLARATION_ITEM}). 처음에는 PLAN.md 전체를 {@code \bH\d+\b}로 훑었는데,
+     * 그 넓이가 양쪽으로 새는 원인이었다(PR #156 Codex).
+     *
+     * <ul>
+     *   <li><b>남의 도메인 번호를 주워 온다.</b> PLAN.md는 이미 근거로 `커뮤니티 H1b`를 인용하고,
+     *       커뮤니티 카탈로그에는 `H13`·`H36`처럼 접미사 없는 번호가 있다. 그것을 같은 식으로
+     *       인용하는 <b>정상적인 계획 보강</b>만으로 "리뷰 HARNESS.md에 H36이 없다"는 오탐이 난다.
+     *   <li><b>범위 표기의 사이를 놓친다.</b> `H1~H6`은 양 끝만 걸리므로 가운데 행이 지워져도
+     *       조용히 통과한다 — 검사가 공허해진다.
+     * </ul>
+     *
+     * <p>파서를 넓혀 범위를 펴면 첫 번째가 더 나빠진다(`커뮤니티 H1~H36`이 36행을 요구한다).
+     * 그래서 <b>파서가 아니라 입력을 좁혔다</b> — H1이 맨 이름을 아예 보지 않기로 한 것과 같은
+     * 수법이다. 선언 자리 안에서는 범위가 리뷰 하네스라는 것이 확실하므로 거기서만 편다.
+     *
+     * <p><b>그 대가</b>: 선언이 아닌 산문의 번호는 낡아도 안 잡힌다. 조각 5의 "H7~H9가 여기서
+     * 실제로 무는지 확인한다" 같은 <b>참조</b>가 그렇다. 놓침이지 오탐이 아니므로 이쪽을 택했다.
      */
     @Test
     @DisplayName("H6. PLAN.md 가 부르는 하네스 번호가 HARNESS.md 에 전부 있다")
@@ -532,17 +585,11 @@ class ReviewDocTests {
                 duplicates.add(matcher.group(1));
             }
         }
-        assertThat(defined).as("HARNESS.md 하네스 표를 한 행도 읽지 못했다").hasSizeGreaterThanOrEqualTo(6);
+        assertThat(defined).as("HARNESS.md 하네스 표를 한 행도 읽지 못했다").isNotEmpty();
         assertThat(duplicates).as("HARNESS.md 에 같은 번호를 가진 행이 둘 이상 있다").isEmpty();
 
-        Set<String> called = new TreeSet<>();
-        for (String line : read(PLAN_DOC).lines().toList()) {
-            Matcher matcher = HARNESS_MENTION.matcher(line);
-            while (matcher.find()) {
-                called.add("H" + matcher.group(1));
-            }
-        }
-        assertThat(called).as("PLAN.md 가 하네스를 번호로 한 번도 부르지 않았다. 이 검사가 공허하다").isNotEmpty();
+        Set<String> called = harnessIdsDeclaredInPlan();
+        assertThat(called).as("PLAN.md 가 하네스를 번호로 한 번도 선언하지 않았다. 이 검사가 공허하다").isNotEmpty();
 
         assertThat(defined)
                 .as("PLAN.md 가 HARNESS.md 에 없는 하네스 번호를 부른다")
@@ -552,6 +599,53 @@ class ReviewDocTests {
     // ------------------------------------------------------------------
     // 파싱 도우미
     // ------------------------------------------------------------------
+
+    /**
+     * PLAN.md가 <b>선언한</b> 하네스 번호. 산문에서 지나가듯 부른 번호는 보지 않는다.
+     *
+     * <p>왜 선언 자리로 좁혔는지는 {@link #planHarnessIds_existInHarnessDoc()}에 적었다.
+     */
+    private Set<String> harnessIdsDeclaredInPlan() {
+        Set<String> declared = new TreeSet<>();
+        for (String line : read(PLAN_DOC).lines().toList()) {
+            Matcher item = HARNESS_DECLARATION_ITEM.matcher(line);
+            if (item.find()) {
+                declared.add(item.group(1));
+            }
+
+            Matcher declaration = HARNESS_DECLARATION.matcher(line);
+            while (declaration.find()) {
+                declared.addAll(harnessIdsIn(declaration.group(1)));
+            }
+        }
+        return declared;
+    }
+
+    /**
+     * 선언 조각에서 번호를 뽑는다. <b>범위는 양 끝이 아니라 사이를 전부 편다.</b>
+     *
+     * <p>`H1~H6`을 {H1, H6}으로 읽는 것은 좁은 것이 아니라 <b>틀린 것</b>이다 — 사람이 읽는 뜻과
+     * 검사가 읽는 뜻이 갈리면, 가운데 행이 지워져도 초록불이 된다(PR #156 Codex).
+     */
+    private Set<String> harnessIdsIn(String declaration) {
+        Set<String> ids = new TreeSet<>();
+
+        Matcher range = HARNESS_RANGE.matcher(declaration);
+        while (range.find()) {
+            int from = Integer.parseInt(range.group(1));
+            int to = Integer.parseInt(range.group(2));
+            for (int number = Math.min(from, to); number <= Math.max(from, to); number++) {
+                ids.add("H" + number);
+            }
+        }
+
+        Matcher single = HARNESS_NUMBER.matcher(declaration);
+        while (single.find()) {
+            ids.add("H" + single.group(1));
+        }
+
+        return ids;
+    }
 
     /** 하네스 표 행의 `상태` 열이 `적용`인가. 마지막 비어 있지 않은 열을 본다. */
     private boolean isApplied(String row) {
