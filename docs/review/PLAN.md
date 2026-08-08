@@ -44,7 +44,18 @@
 
 ### 조각 1 — 작성 (#109)
 
-**선행: 주문 도메인 계약 시그니처를 주환님과 합의한다.** 자격 검증과 A1 목록이 `order_items`·`orders`를 직접 JOIN하는 모양이라 `docs/conventions.md` 15절과 어긋난다. 시그니처가 정해지기 전에는 착수하지 않는다. 구현이 없으면 stub으로 진행한다(15절). 상세는 `specs/review-write.md` A1.
+**주문 데이터는 `domain/order/`에 두는 연동 계약으로 받는다.** 자격 검증과 A1 목록이 `order_items`·`orders`를 직접 JOIN하는 모양이라 `docs/conventions.md` 15절과 어긋난다. 상세는 `specs/review-write.md` A1.
+
+**합의를 기다리지 않는다.** 15.8이 담당 외 도메인에 **새 파일로 추가하는 연동 계약**은 먼저 만들고 PR에서 확인받도록 정한다 — 깨질 남의 호출부가 없기 때문이다. 이름은 15.2의 `<소유 도메인><참조 도메인>` 규칙을 따른다. 그래서 순서가 "물어보고 만든다"가 아니라 **"만들고 PR에서 확인받는다"** 이다.
+
+| | |
+|---|---|
+| 만드는 것 | `domain/order/`에 `OrderReviewQueryService`·`OrderReviewMapper`·`mapper/order/OrderReviewMapper.xml` |
+| 지키는 조건 | **주환님 기존 파일을 수정하지 않는다.** `OrderMapper`에 메서드를 얹지 않고 새 파일만 만든다 |
+| 확인 방법 | AGENTS.md의 담당 외 도메인 헤더 주석 + PR 리뷰어로 주환님 지정 (15.8) |
+| 선례 | `OrderCouponQueryService`(정후님이 주문 폴더에 만든 것), `MemberCommunityQueryService` |
+
+**`CommandService`는 만들지 않는다** — 리뷰가 주문에 하는 것은 조회뿐이다. 쓸 수도 있으니 미리 만들지 않는다(15.8), 네 조합을 미리 만들지 않는다(15.5).
 
 - 자격 검증: 본인 주문인지, `orders.status == PICKED_UP`인지 — **주문 도메인 공개 계약으로 받는다**
 - `uk_reviews_order_item` UNIQUE로 주문상품당 1건. 중복은 `DuplicateKeyException`을 잡아 도메인 에러로 바꾼다(커뮤니티 신고 선례)
@@ -59,7 +70,10 @@
 
 > **이 조각은 이슈 #33 `feat(product): 리뷰 평점 및 후기 수 연동`(시은 담당)과 같은 일이다.**
 > 별도 이슈를 만들지 않고 #33에서 진행한다.
-> **`domain/product/`는 시은님 담당이므로 착수 전에 #33에 계약 시그니처를 올려 확인받는다**(`AGENTS.md` — 공개 Service 인터페이스는 먼저 협의).
+> **여기는 조각 1과 달리 착수 전에 #33에 계약 시그니처를 올려 확인받는다.** 같은 "새 파일"인데 순서가 반대인 이유가 둘이다.
+>
+> - **쓰기 계약이다.** `products` 컬럼을 UPDATE 하고 잠금 순서가 걸린다. `conventions.md` 15.8이 쓰기 계약을 **구현 전 합의** 쪽으로 가르고, 15.7이 잠금 순서와 중복 실행 방지를 그 대상으로 정한다 — 어긋나도 단일 요청에서는 결과가 같아 테스트가 통과한다.
+> - **#33이 같은 일이다.** 확인 없이 만들면 두 사람이 같은 것을 두 번 만든다. 이것은 허락 문제가 아니라 중복 작업 문제다.
 
 **방식은 2026-08-06에 정했다.** 상세는 `specs/product-rating.md`가 정본이고, 방향이 네 번 뒤집힌 경로는 `decisions/ADR-001-rating-aggregation-ownership.md`에 있다.
 
