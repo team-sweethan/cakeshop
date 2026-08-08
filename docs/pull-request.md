@@ -57,6 +57,24 @@ ci: PR Gradle 테스트 workflow 추가
 
 병합 전에는 전체 CI 성공, 최소 1명의 승인, 미해결 review conversation 정리를 원칙으로 한다. 긴급하게 예외 병합이 필요하면 사유와 후속 조치 이슈를 남기고 팀의 승인을 받는다.
 
+### branch protection — 무엇이 강제되고 무엇이 원칙인가
+
+위 세 가지 중 **CI 성공만 기계가 강제한다.** 나머지 둘은 문서에만 있다. 어느 쪽인지 헷갈리면 아래 표를 본다 — 강제되지 않는 것을 강제된다고 믿는 것이 이 절이 막으려는 것이다.
+
+`dev` 브랜치 (2026-08-08 적용)
+
+| | 설정 | 뜻 |
+|---|---|---|
+| required check | `Test` · `Migration immutability` | 둘 다 초록불이어야 머지 버튼이 열린다 |
+| strict (base 최신화 요구) | **끔** | 6명이 동시에 머지하는 동안 전원이 계속 리베이스하게 되어 껐다 |
+| force push · 브랜치 삭제 | **금지** | |
+| 승인 필수 인원 | **없음** | 위 "최소 1명의 승인"은 여전히 **원칙**이다 |
+| 관리자 우회 | **허용** | 막히면 저장소가 잠긴다. 우회하면 PR에 사유를 남긴다 |
+
+**`main`은 잠겨 있다**(`lock_branch`). 릴리스 시점에 관리자가 풀고 머지한다.
+
+**required check 이름은 `ci.yml`의 `name:` 값이다.** job 이름을 바꾸면 그 이름의 검사가 영영 오지 않아 **모든 PR이 조용히 머지 불가**가 된다. 워크플로의 `name:`을 고칠 때는 이 표도 함께 고친다.
+
 ### Codex 자동 리뷰 설정과 운영
 
 - 저장소 관리자는 [Codex Code Review 설정](https://chatgpt.com/codex/settings/code-review)에서 `team-sweethan/cakeshop`의 **Code review**와 **Automatic reviews**를 활성화한다.
