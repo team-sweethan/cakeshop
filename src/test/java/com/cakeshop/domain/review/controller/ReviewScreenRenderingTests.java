@@ -87,6 +87,21 @@ class ReviewScreenRenderingTests {
                 .andExpect(content().string(containsString("name=\"serviceRating\"")));
     }
 
+    @Test
+    @WithUserDetails(value = MEMBER_EMAIL, userDetailsServiceBeanName = "memberDetailsService")
+    void form_withoutOrderItemId_returnsBadRequest() throws Exception {
+        // 없으면 400 이다(A2). 처리하지 않으면 handleUnexpected 가 받아 500 이 나간다.
+        mockMvc.perform(get("/reviews/new"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithUserDetails(value = MEMBER_EMAIL, userDetailsServiceBeanName = "memberDetailsService")
+    void form_withNonNumericOrderItemId_returnsBadRequest() throws Exception {
+        mockMvc.perform(get("/reviews/new").param("orderItemId", "abc"))
+                .andExpect(status().isBadRequest());
+    }
+
     private long createPickedUpOrderItem() {
         long memberId = jdbcTemplate.queryForObject(
                 "SELECT id FROM members WHERE email = ?", Long.class, MEMBER_EMAIL);

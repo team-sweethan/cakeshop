@@ -7,8 +7,10 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @ControllerAdvice
@@ -25,6 +27,14 @@ public class GlobalExceptionHandler {
     // 검증 실패(@Valid) → 공통 INVALID_INPUT
     @ExceptionHandler({MethodArgumentNotValidException.class, BindException.class})
     public String handleValidation(Model model, HttpServletResponse response) {
+        return render(CommonErrorCode.INVALID_INPUT, model, response);
+    }
+
+    // 필수 파라미터 누락·타입 불일치 → 공통 INVALID_INPUT.
+    // 아래 handleUnexpected 로 떨어지면 500 이 나가는데, 이것은 클라이언트 잘못이다.
+    @ExceptionHandler({MissingServletRequestParameterException.class,
+                       MethodArgumentTypeMismatchException.class})
+    public String handleInvalidRequestParameter(Model model, HttpServletResponse response) {
         return render(CommonErrorCode.INVALID_INPUT, model, response);
     }
 

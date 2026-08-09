@@ -25,6 +25,8 @@
 | H11 | 평점 4종의 **1~5 범위와 미선택**, 본문 10~2000자와 공백만 입력을 **서버가** 거부함 | `ReviewWriteFormTests.validate_whenRatingAboveFive_reportsViolation` · `ReviewWriteFormTests.validate_whenRatingBelowOne_reportsViolation` · `ReviewWriteFormTests.validate_whenRatingMissing_reportsViolation` · `ReviewWriteFormTests.validate_whenContentIsOnlyWhitespace_reportsViolation` | 세 겹 중 **가운데만** 본다(`DOMAIN.md` 2.2). 화면이 별 5개만 그리는지, DB `CHECK` 가 살아 있는지는 보지 않는다. **컨트롤러가 `@Valid` 를 실제로 붙였는지도 보지 않는다** — 애노테이션을 떼면 이 검사는 그대로 통과하고 범위 밖 평점이 저장된다 | **적용** |
 | H12 | 작성 화면 둘이 **실제 데이터로 렌더링됨** — 목록에 픽업한 상품이 뜨고, 폼이 평점 4종 입력과 대상 정보를 그린다. **빈 목록 분기도 함께** | `ReviewScreenRenderingTests.writableList_withPickedUpOrder_showsItem` · `ReviewScreenRenderingTests.writableList_withoutPickedUpOrder_showsEmptyNotice` · `ReviewScreenRenderingTests.form_withWritableOrderItem_rendersFourRatings` | 문구가 `DOMAIN.md` 3절과 맞는지는 보지 않는다 — 화면 명세 대조는 H9(조각 3)가 맡는다. **평점 라디오의 `th:field` 가 옳은 필드를 가리키는지도 이름으로만 본다** | **적용** |
 
+| H13 | `orderItemId`가 **없거나 숫자가 아니면 400**임 — 명세가 약속한 상태 코드가 실제로 나가는지 | `ReviewScreenRenderingTests.form_withoutOrderItemId_returnsBadRequest` · `ReviewScreenRenderingTests.form_withNonNumericOrderItemId_returnsBadRequest` | **리뷰 경로에서만 본다.** `GlobalExceptionHandler`가 두 예외를 400으로 매핑하는 것은 저장소 전체에 걸리지만, 다른 도메인의 필수 파라미터가 그렇게 도는지는 이 검사 밖이다. **명세가 상태 코드를 약속한 다른 자리(404·409)는 아직 응답 수준에서 확인하지 않는다** — H10이 예외 타입까지만 본다 | **적용** |
+
 **번호는 재사용하지 않는다.** 검사를 걷어내면 행을 지우지 말고 `상태`를 바꾼다 — 비워 두면 다음 사람이 빠진 자리부터 찾는다.
 
 **H5를 처음부터 둔 이유**: 커뮤니티는 하네스를 36개 쌓고 나서야 표와 실제 테스트를 대조할 수단이 없다는 것을 발견했다(`docs/community/PLAN.md` 조각 11). 표가 자란 뒤에 붙이면 그때까지 쌓인 어긋남을 한꺼번에 갚아야 한다. **H6도 같은 판단이다** — 표를 옮기는 그 PR에서 함께 세웠다. 장치 없는 분할은 이름 바꾸기이고, 이 저장소에는 규칙만 있고 안 지켜진 기록이 있다(`history/2026-08-slice-0-schema.md`).
