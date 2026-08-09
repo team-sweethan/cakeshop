@@ -27,7 +27,7 @@ Spring Boot 4.0.2 · Java 21 · Gradle · Thymeleaf · MyBatis · MariaDB
 |---|---|
 | **JDK 21** | Gradle toolchain이 자동으로 받아오지만, 미리 설치돼 있으면 첫 빌드가 빠르다 |
 | **MariaDB 11.4** | 각 PC에 직접 설치한다 |
-| **Docker** | 애플리케이션 실행에는 필요 없다. `gradlew test`의 Testcontainers 통합 테스트에만 필요하다 |
+| **Docker** | 애플리케이션 실행에는 필요 없다. `.\gradlew.bat test`의 Testcontainers 통합 테스트에만 필요하다 |
 
 ```powershell
 git clone https://github.com/team-sweethan/cakeshop.git

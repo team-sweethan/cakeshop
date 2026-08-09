@@ -41,7 +41,7 @@
 - `src/main/resources/templates/customer/review/**`
 - `src/main/resources/templates/admin/review/**`
 - `src/test/java/com/cakeshop/domain/review/**`
-- 새 Flyway migration (`gradlew newMigration -Pdesc=<snake_case>`로 생성)
+- 새 Flyway migration (`.\gradlew.bat newMigration -Pdesc=<snake_case>` / mac·Linux는 `./gradlew newMigration -Pdesc=<snake_case>`로 생성)
 
 ### 범위 밖이지만 건드려야 하는 파일
 

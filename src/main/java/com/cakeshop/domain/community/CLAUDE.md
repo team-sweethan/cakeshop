@@ -98,4 +98,4 @@ DOMAIN.md 9절의 **보류 항목**은 아직 결정되지 않은 것이다. 임
 - **템플릿에서 `th:utext`를 쓰지 않는다.** 본문은 순수 텍스트이며 줄바꿈은 CSS로 처리한다. (7)
 - **Thymeleaf는 HTML 주석을 응답에 그대로 내보낸다.** 화면에 없어야 하는 문구를 주석에 적으면 "그 문구가 없다"를 단언하는 테스트가 주석 때문에 깨진다. 고객 상세와 관리자 상세에서 각각 한 번씩 밟았다.
 - **조건부로만 그려지는 블록은 렌더링 테스트로 고정한다.** 차단 안내, 빈 목록, 쪽 이동처럼 평소 화면에 없는 것은 표현식이 깨져도 아무도 모른 채 지나간다. (`SCREENS.md`)
-- **`V0__initial_schema.sql`을 비롯한 공유 migration을 수정하지 않는다.** 새 versioned migration을 `gradlew newMigration -Pdesc=<snake_case>`로 만든다.
+- **`V0__initial_schema.sql`을 비롯한 공유 migration을 수정하지 않는다.** 새 versioned migration을 `.\gradlew.bat newMigration -Pdesc=<snake_case>`(mac·Linux는 `./gradlew newMigration -Pdesc=<snake_case>`)로 만든다.
