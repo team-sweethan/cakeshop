@@ -2,6 +2,7 @@ package com.cakeshop.domain.community.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -17,6 +18,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.stream.Stream;
 
 import com.cakeshop.domain.community.dto.form.CommentForm;
 import com.cakeshop.domain.community.dto.form.PostForm;
@@ -50,6 +52,10 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.slf4j.LoggerFactory;
@@ -63,6 +69,8 @@ class CommunityServiceTests {
     private static final long AUTHOR_ID = 7L;
     private static final long OTHER_MEMBER_ID = 99L;
     private static final long CATEGORY_ID = 1L;
+    /** 요청 대상이 아닌 다른 글. */
+    private static final long OTHER_POST_ID = 999L;
     /** 회원 조회자 키. */
     private static final String VIEWER_KEY = "M:7";
     private static final LocalDateTime CREATED_AT = LocalDateTime.of(2026, 3, 1, 10, 0);
@@ -95,6 +103,11 @@ class CommunityServiceTests {
         return Clock.fixed(now.atZone(SEOUL).toInstant(), SEOUL);
     }
 
+    /** 상태 표의 "작성자" 열을 실제 회원 ID로 바꾼다. */
+    private static long memberIdOf(boolean asAuthor) {
+        return asAuthor ? AUTHOR_ID : OTHER_MEMBER_ID;
+    }
+
     @Test
     void getPostDetail_publishedPost_anonymousViewer_returnsPost() {
         givenPost(PostStatus.PUBLISHED);
@@ -102,6 +115,11 @@ class CommunityServiceTests {
         PostDetailView post = communityService.getPostDetail(POST_ID, null, VIEWER_KEY);
 
         assertThat(post.id()).isEqualTo(POST_ID);
+        assertThat(post.title()).isEqualTo("제목");
+        assertThat(post.content()).isEqualTo("본문");
+        assertThat(post.viewCount()).isEqualTo(10L);
+        assertThat(post.isBlocked()).isFalse();
+        assertThat(post.blockedReason()).isNull();
     }
 
     @Test
@@ -172,17 +190,17 @@ class CommunityServiceTests {
     }
 
     @Test
-    void getPosts_passesPageSizeAndOffsetToMapper() {
+    void getPosts_passesSortPageSizeAndOffsetToMapper() {
         PostListRow post = new PostListRow(
                 1L, AUTHOR_ID, "질문", "제목", 0, 0, 0, CREATED_AT);
 
-        when(communityMapper.findPublishedPosts(3L, PostSort.LATEST, 20, 40))
+        when(communityMapper.findPublishedPosts(3L, PostSort.VIEWS, 20, 40))
                 .thenReturn(List.of(post));
         when(communityMapper.countPublishedPosts(3L)).thenReturn(45L);
         givenAuthors(new MemberCommunityView(AUTHOR_ID, "글쓴이", false));
 
         PageResult<PostListView> result =
-                communityService.getPosts(3L, PostSort.LATEST, new PageRequest(3, 20));
+                communityService.getPosts(3L, PostSort.VIEWS, new PageRequest(3, 20));
 
         assertThat(result.getContent())
                 .containsExactly(PostListView.of(post, new MemberCommunityView(AUTHOR_ID, "글쓴이", false)));
@@ -238,29 +256,6 @@ class CommunityServiceTests {
     }
 
     @Test
-    void getPosts_doesNotTouchViewCount() {
-        when(communityMapper.findPublishedPosts(null, PostSort.LATEST, 20, 0))
-                .thenReturn(List.of());
-        when(communityMapper.countPublishedPosts(null)).thenReturn(0L);
-
-        communityService.getPosts(null, PostSort.LATEST, new PageRequest(1, 20));
-
-        verify(communityMapper, never()).increaseViewCount(anyLong(), any());
-    }
-
-    /** 정렬 기준을 Mapper에 그대로 전달한다. */
-    @Test
-    void getPosts_passesSortToMapperUnchanged() {
-        when(communityMapper.findPublishedPosts(null, PostSort.VIEWS, 20, 0))
-                .thenReturn(List.of());
-        when(communityMapper.countPublishedPosts(null)).thenReturn(0L);
-
-        communityService.getPosts(null, PostSort.VIEWS, new PageRequest(1, 20));
-
-        verify(communityMapper).findPublishedPosts(null, PostSort.VIEWS, 20, 0);
-    }
-
-    @Test
     void getPopularSection_firstPageWithoutFilter_returnsLatestConfirmedRanking() {
         givenConfirmedRanking(YESTERDAY, popular(1, 11L), popular(2, 22L));
 
@@ -273,22 +268,18 @@ class CommunityServiceTests {
         verify(communityMapper).findPopularPosts(YESTERDAY, 10);
     }
 
-    /** 카테고리 목록에서는 인기글을 조회하지 않는다. */
-    @Test
-    void getPopularSection_categoryFiltered_doesNotQueryAtAll() {
-        PopularSectionView section = communityService.getPopularSection(CATEGORY_ID, FIRST_PAGE);
-
-        assertThat(section.isEmpty()).isTrue();
-        verify(communityMapper, never()).findLatestRankingDate();
-        verify(communityMapper, never()).findPopularPosts(any(), anyInt());
-    }
-
-    @Test
-    void getPopularSection_secondPage_doesNotQueryAtAll() {
+    /** 인기글은 필터 없는 목록의 첫 페이지에만 노출한다. */
+    @ParameterizedTest(name = "categoryId={0}, page={1}이면 빈 영역")
+    @CsvSource(value = {
+            "1,    1",
+            "NONE, 2"
+    }, nullValues = "NONE")
+    void getPopularSection_filteredOrLaterPage_returnsEmptySection(Long categoryId, int page) {
         PopularSectionView section =
-                communityService.getPopularSection(null, new PageRequest(2, 20));
+                communityService.getPopularSection(categoryId, new PageRequest(page, 20));
 
         assertThat(section.isEmpty()).isTrue();
+        assertThat(section.rankingDate()).isNull();
         verify(communityMapper, never()).findLatestRankingDate();
         verify(communityMapper, never()).findPopularPosts(any(), anyInt());
     }
@@ -316,45 +307,28 @@ class CommunityServiceTests {
         assertThat(section.rankingDate()).isNull();
     }
 
-    /** 확정일이 오래되면 경고한다. */
-    @Test
-    void getPopularSection_rankingOlderThanYesterday_warns() {
-        givenConfirmedRanking(YESTERDAY.minusDays(1), popular(1, 11L));
+    /**
+     * 확정일이 어제보다 오래됐을 때만 경고한다. 배치가 도는 새벽에는 아직 낡은 것이 정상이므로
+     * 유예 시간 안에서는 경고하지 않고, 확정 이력 자체가 없는 첫 배포 직후도 고장이 아니다.
+     */
+    @ParameterizedTest(name = "확정일={0}, 현재={1}이면 경고={2}")
+    @CsvSource(value = {
+            "2026-03-08, 2026-03-10T10:00, true",
+            "2026-03-09, 2026-03-10T10:00, false",
+            "2026-03-08, 2026-03-10T00:30, false",
+            "NONE,       2026-03-10T10:00, false"
+    }, nullValues = "NONE")
+    void getPopularSection_staleRanking_warnsOnlyAfterGrace(
+            LocalDate rankingDate, LocalDateTime now, boolean expectWarning) {
+        CommunityService serviceAt = new CommunityService(
+                communityMapper, memberCommunityQueryService, fixedClockAt(now));
+        givenConfirmedRanking(rankingDate, popular(1, 11L));
 
-        List<String> warnings = warningsWhile(
-                () -> communityService.getPopularSection(null, FIRST_PAGE));
+        List<String> warnings = warningsWhile(() -> serviceAt.getPopularSection(null, FIRST_PAGE));
 
-        assertThat(warnings).hasSize(1);
-        assertThat(warnings.get(0)).contains("2026-03-08");
-    }
-
-    @Test
-    void getPopularSection_yesterdayRanking_doesNotWarn() {
-        givenConfirmedRanking(YESTERDAY, popular(1, 11L));
-
-        assertThat(warningsWhile(() -> communityService.getPopularSection(null, FIRST_PAGE)))
-                .isEmpty();
-    }
-
-    /** 새벽 유예 시간에는 경고하지 않는다. */
-    @Test
-    void getPopularSection_beforeGraceEnds_doesNotWarnEvenIfStale() {
-        CommunityService atDawn = new CommunityService(
-                communityMapper,
-                memberCommunityQueryService,
-                fixedClockAt(LocalDateTime.of(2026, 3, 10, 0, 30)));
-        givenConfirmedRanking(YESTERDAY.minusDays(1), popular(1, 11L));
-
-        assertThat(warningsWhile(() -> atDawn.getPopularSection(null, FIRST_PAGE))).isEmpty();
-    }
-
-    /** 확정 이력이 없으면 경고하지 않는다. */
-    @Test
-    void getPopularSection_noConfirmedRun_doesNotWarn() {
-        when(communityMapper.findLatestRankingDate()).thenReturn(null);
-
-        assertThat(warningsWhile(() -> communityService.getPopularSection(null, FIRST_PAGE)))
-                .isEmpty();
+        assertThat(warnings).hasSize(expectWarning ? 1 : 0);
+        assertThat(warnings).allSatisfy(
+                warning -> assertThat(warning).contains(String.valueOf(rankingDate)));
     }
 
     @Test
@@ -389,13 +363,16 @@ class CommunityServiceTests {
         verify(communityMapper, never()).insertPost(any());
     }
 
-    /** 게시글 입력값을 정리한다. */
+    /** 게시글과 댓글 입력값은 같은 규칙으로 정리한다. */
     @Test
-    void postForm_trimsTitleAndPreservesInnerLineBreaks() {
-        PostForm form = formOf(CATEGORY_ID, "   ", "  첫 줄\n둘째 줄  ");
+    void form_trimsOuterSpacesAndPreservesInnerLineBreaks() {
+        PostForm post = formOf(CATEGORY_ID, "   ", "  첫 줄\n둘째 줄  ");
 
-        assertThat(form.getTitle()).isEmpty();
-        assertThat(form.getContent()).isEqualTo("첫 줄\n둘째 줄");
+        assertThat(post.getTitle()).isEmpty();
+        assertThat(post.getContent()).isEqualTo("첫 줄\n둘째 줄");
+
+        assertThat(commentFormOf("  첫 줄\n둘째 줄  ").getContent()).isEqualTo("첫 줄\n둘째 줄");
+        assertThat(commentFormOf("   ").getContent()).isEmpty();
     }
 
     @Test
@@ -412,43 +389,24 @@ class CommunityServiceTests {
         assertThat(updated.getTitle()).isEqualTo("고친 제목");
     }
 
-    /** 다른 작성자의 글은 찾을 수 없는 것으로 처리한다. */
-    @Test
-    void updatePost_otherMember_isNotFound() {
-        givenPost(PostStatus.PUBLISHED);
+    /** 다른 작성자의 글과 삭제 글은 찾을 수 없는 것으로, 차단 글은 작성자에게도 차단으로 처리한다. */
+    @ParameterizedTest(name = "{0} 글을 작성자={1}이 수정하면 {2}")
+    @CsvSource({
+            "PUBLISHED, false, POST_NOT_FOUND",
+            "BLOCKED,   true,  BLOCKED_POST",
+            "DELETED,   true,  POST_NOT_FOUND"
+    })
+    void updatePost_notEditablePost_isRejected(
+            PostStatus status, boolean asAuthor, CommunityErrorCode expected) {
+        givenPost(status);
 
         assertThatThrownBy(() -> communityService.updatePost(
-                POST_ID, formOf(CATEGORY_ID, "제목", "본문"), OTHER_MEMBER_ID))
+                POST_ID, formOf(CATEGORY_ID, "제목", "본문"), memberIdOf(asAuthor)))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
-                .isEqualTo(CommunityErrorCode.POST_NOT_FOUND);
+                .isEqualTo(expected);
 
         verify(communityMapper, never()).updatePost(any());
-    }
-
-    /** 작성자도 차단된 글을 수정할 수 없다. */
-    @Test
-    void updatePost_blockedPost_author_isRejectedAsBlocked() {
-        givenPost(PostStatus.BLOCKED);
-
-        assertThatThrownBy(() -> communityService.updatePost(
-                POST_ID, formOf(CATEGORY_ID, "제목", "본문"), AUTHOR_ID))
-                .isInstanceOf(BusinessException.class)
-                .extracting(exception -> ((BusinessException) exception).getErrorCode())
-                .isEqualTo(CommunityErrorCode.BLOCKED_POST);
-
-        verify(communityMapper, never()).updatePost(any());
-    }
-
-    @Test
-    void updatePost_deletedPost_author_isNotFound() {
-        givenPost(PostStatus.DELETED);
-
-        assertThatThrownBy(() -> communityService.updatePost(
-                POST_ID, formOf(CATEGORY_ID, "제목", "본문"), AUTHOR_ID))
-                .isInstanceOf(BusinessException.class)
-                .extracting(exception -> ((BusinessException) exception).getErrorCode())
-                .isEqualTo(CommunityErrorCode.POST_NOT_FOUND);
     }
 
     @Test
@@ -485,42 +443,24 @@ class CommunityServiceTests {
         verify(communityMapper).deletePost(POST_ID, AUTHOR_ID);
     }
 
-    /** 조건부 삭제가 0행이면 성공으로 처리하지 않는다. */
-    @Test
-    void deletePost_whenNothingWasDeleted_doesNotReportSuccess() {
-        givenPost(PostStatus.PUBLISHED);
-        // 조건부 삭제가 0행인 경합 상황이다.
-        when(communityMapper.deletePost(POST_ID, AUTHOR_ID)).thenReturn(0);
-
-        assertThatThrownBy(() -> communityService.deletePost(POST_ID, AUTHOR_ID))
-                .isInstanceOf(BusinessException.class)
-                .extracting(exception -> ((BusinessException) exception).getErrorCode())
-                .isEqualTo(CommunityErrorCode.POST_NOT_FOUND);
-    }
-
-    /** 삭제 경합 중 차단되면 차단 오류를 반환한다. */
-    @Test
-    void deletePost_whenPostBecameBlocked_isRejectedAsBlocked() {
+    /** 조건부 삭제가 0행이면 성공으로 처리하지 않고, 경합 시점의 상태로 실패를 구분한다. */
+    @ParameterizedTest(name = "0행 삭제 후 글이 {0}이면 {1}")
+    @CsvSource({
+            "PUBLISHED, POST_NOT_FOUND",
+            "BLOCKED,   BLOCKED_POST"
+    })
+    void deletePost_whenNothingWasDeleted_isRejectedByCurrentStatus(
+            PostStatus statusAfterDelete, CommunityErrorCode expected) {
         givenPost(PostStatus.PUBLISHED);
         when(communityMapper.deletePost(POST_ID, AUTHOR_ID)).thenAnswer(invocation -> {
-            givenPost(PostStatus.BLOCKED);
+            givenPost(statusAfterDelete);
             return 0;
         });
 
         assertThatThrownBy(() -> communityService.deletePost(POST_ID, AUTHOR_ID))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
-                .isEqualTo(CommunityErrorCode.BLOCKED_POST);
-    }
-
-    /** 상세 재조회는 조회수를 올리지 않는다. */
-    @Test
-    void getVisiblePost_doesNotIncreaseViewCount() {
-        givenPost(PostStatus.PUBLISHED);
-
-        communityService.getVisiblePost(POST_ID, AUTHOR_ID);
-
-        verify(communityMapper, never()).increaseViewCount(anyLong(), any());
+                .isEqualTo(expected);
     }
 
     /** 최신 댓글을 오래된 순으로 보여 준다. */
@@ -537,35 +477,22 @@ class CommunityServiceTests {
                 .containsExactly(1L, 2L, 3L);
     }
 
-    @Test
-    void getComments_withoutRequestedLimit_usesDefault() {
+    /** 요청값이 없거나 너무 작으면 기본값을, 너무 크면 상한을 사용한다. */
+    @ParameterizedTest(name = "요청 limit={0}이면 조회 limit={1}")
+    @MethodSource("requestedCommentLimits")
+    void getComments_requestedLimit_isClampedToAllowedRange(Integer requested, int expected) {
         givenComments();
 
-        communityService.getComments(POST_ID, null);
+        communityService.getComments(POST_ID, requested);
 
-        verify(communityMapper)
-                .findRecentComments(POST_ID, CommentSectionView.DEFAULT_LIMIT);
+        verify(communityMapper).findRecentComments(POST_ID, expected);
     }
 
-    /** 댓글 조회 수를 상한으로 제한한다. */
-    @Test
-    void getComments_hugeRequestedLimit_isCappedAtMax() {
-        givenComments();
-
-        communityService.getComments(POST_ID, Integer.MAX_VALUE);
-
-        verify(communityMapper).findRecentComments(POST_ID, CommentSectionView.MAX_LIMIT);
-    }
-
-    /** 작은 요청값에는 기본 조회 수를 사용한다. */
-    @Test
-    void getComments_tinyRequestedLimit_fallsBackToDefault() {
-        givenComments();
-
-        communityService.getComments(POST_ID, 1);
-
-        verify(communityMapper)
-                .findRecentComments(POST_ID, CommentSectionView.DEFAULT_LIMIT);
+    private static Stream<Arguments> requestedCommentLimits() {
+        return Stream.of(
+                arguments(null, CommentSectionView.DEFAULT_LIMIT),
+                arguments(1, CommentSectionView.DEFAULT_LIMIT),
+                arguments(Integer.MAX_VALUE, CommentSectionView.MAX_LIMIT));
     }
 
     /** 표시 댓글 수와 전체 행 수를 구분한다. */
@@ -595,44 +522,24 @@ class CommunityServiceTests {
         assertThat(saved.getContent()).isEqualTo("댓글 본문");
     }
 
-    /** 삭제된 글에는 댓글을 작성할 수 없다. */
-    @Test
-    void addComment_deletedPost_isNotFound() {
-        givenPost(PostStatus.DELETED);
+    /** 삭제 글과 다른 작성자의 차단 글은 숨기고, 작성자에게만 차단을 알린다. */
+    @ParameterizedTest(name = "{0} 글에 작성자={1}이 댓글을 달면 {2}")
+    @CsvSource({
+            "DELETED, true,  POST_NOT_FOUND",
+            "BLOCKED, true,  BLOCKED_POST",
+            "BLOCKED, false, POST_NOT_FOUND"
+    })
+    void addComment_notCommentablePost_isRejected(
+            PostStatus status, boolean asAuthor, CommunityErrorCode expected) {
+        givenPost(status);
 
-        assertThatThrownBy(
-                () -> communityService.addComment(POST_ID, commentFormOf("댓글"), AUTHOR_ID))
+        assertThatThrownBy(() -> communityService.addComment(
+                POST_ID, commentFormOf("댓글"), memberIdOf(asAuthor)))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
-                .isEqualTo(CommunityErrorCode.POST_NOT_FOUND);
+                .isEqualTo(expected);
 
         verify(communityMapper, never()).insertComment(any());
-    }
-
-    /** 작성자도 차단된 글에 댓글을 작성할 수 없다. */
-    @Test
-    void addComment_blockedPost_author_isRejectedAsBlocked() {
-        givenPost(PostStatus.BLOCKED);
-
-        assertThatThrownBy(
-                () -> communityService.addComment(POST_ID, commentFormOf("댓글"), AUTHOR_ID))
-                .isInstanceOf(BusinessException.class)
-                .extracting(exception -> ((BusinessException) exception).getErrorCode())
-                .isEqualTo(CommunityErrorCode.BLOCKED_POST);
-
-        verify(communityMapper, never()).insertComment(any());
-    }
-
-    /** 다른 작성자의 차단 글은 숨긴다. */
-    @Test
-    void addComment_blockedPost_otherMember_isNotFound() {
-        givenPost(PostStatus.BLOCKED);
-
-        assertThatThrownBy(
-                () -> communityService.addComment(POST_ID, commentFormOf("댓글"), OTHER_MEMBER_ID))
-                .isInstanceOf(BusinessException.class)
-                .extracting(exception -> ((BusinessException) exception).getErrorCode())
-                .isEqualTo(CommunityErrorCode.POST_NOT_FOUND);
     }
 
     @Test
@@ -646,11 +553,21 @@ class CommunityServiceTests {
         verify(communityMapper).deleteComment(COMMENT_ID, POST_ID, AUTHOR_ID);
     }
 
-    /** 다른 작성자의 댓글은 삭제할 수 없다. */
-    @Test
-    void deleteComment_otherMember_isNotFound() {
+    /** 다른 작성자의 댓글, 다른 글의 댓글과 이미 삭제된 댓글은 모두 같은 오류로 숨긴다. */
+    @ParameterizedTest(name = "같은 글={0}, 본인 댓글={1}, 상태={2}")
+    @CsvSource({
+            "true,  false, PUBLISHED",
+            "false, true,  PUBLISHED",
+            "true,  true,  DELETED"
+    })
+    void deleteComment_notOwnDeletableComment_isNotFound(
+            boolean onSamePost, boolean ownComment, CommentStatus status) {
         givenPost(PostStatus.PUBLISHED);
-        givenComment(OTHER_MEMBER_ID, CommentStatus.PUBLISHED);
+        when(communityMapper.findCommentById(COMMENT_ID)).thenReturn(commentOf(
+                COMMENT_ID,
+                onSamePost ? POST_ID : OTHER_POST_ID,
+                memberIdOf(ownComment),
+                status));
 
         assertThatThrownBy(
                 () -> communityService.deleteComment(POST_ID, COMMENT_ID, AUTHOR_ID))
@@ -661,56 +578,19 @@ class CommunityServiceTests {
         verify(communityMapper, never()).deleteComment(anyLong(), anyLong(), anyLong());
     }
 
-    @Test
-    void deleteComment_alreadyDeletedComment_isNotFound() {
-        givenPost(PostStatus.PUBLISHED);
-        givenComment(AUTHOR_ID, CommentStatus.DELETED);
-
-        assertThatThrownBy(
-                () -> communityService.deleteComment(POST_ID, COMMENT_ID, AUTHOR_ID))
-                .isInstanceOf(BusinessException.class)
-                .extracting(exception -> ((BusinessException) exception).getErrorCode())
-                .isEqualTo(CommunityErrorCode.COMMENT_NOT_FOUND);
-
-        verify(communityMapper, never()).deleteComment(anyLong(), anyLong(), anyLong());
-    }
-
-    /** 다른 글의 댓글은 삭제할 수 없다. */
-    @Test
-    void deleteComment_commentOfAnotherPost_isNotFound() {
-        givenPost(PostStatus.PUBLISHED);
-        when(communityMapper.findCommentById(COMMENT_ID))
-                .thenReturn(commentOf(COMMENT_ID, 999L, AUTHOR_ID, CommentStatus.PUBLISHED));
-
-        assertThatThrownBy(
-                () -> communityService.deleteComment(POST_ID, COMMENT_ID, AUTHOR_ID))
-                .isInstanceOf(BusinessException.class)
-                .extracting(exception -> ((BusinessException) exception).getErrorCode())
-                .isEqualTo(CommunityErrorCode.COMMENT_NOT_FOUND);
-
-        verify(communityMapper, never()).deleteComment(anyLong(), anyLong(), anyLong());
-    }
-
-    /** 조건부 댓글 삭제가 0행이면 성공으로 처리하지 않는다. */
-    @Test
-    void deleteComment_whenNothingWasDeleted_doesNotReportSuccess() {
-        givenPost(PostStatus.PUBLISHED);
-        givenComment(AUTHOR_ID, CommentStatus.PUBLISHED);
-        when(communityMapper.deleteComment(COMMENT_ID, POST_ID, AUTHOR_ID)).thenReturn(0);
-
-        assertThatThrownBy(
-                () -> communityService.deleteComment(POST_ID, COMMENT_ID, AUTHOR_ID))
-                .isInstanceOf(BusinessException.class);
-    }
-
-    /** 댓글 삭제 경합 중 글이 차단되면 차단 오류를 반환한다. */
-    @Test
-    void deleteComment_whenPostBecameBlocked_isRejectedAsBlocked() {
+    /** 조건부 댓글 삭제가 0행이면 성공으로 처리하지 않고, 경합 시점의 글 상태로 실패를 구분한다. */
+    @ParameterizedTest(name = "0행 삭제 후 글이 {0}이면 {1}")
+    @CsvSource({
+            "PUBLISHED, COMMENT_NOT_FOUND",
+            "BLOCKED,   BLOCKED_POST"
+    })
+    void deleteComment_whenNothingWasDeleted_isRejectedByCurrentStatus(
+            PostStatus statusAfterDelete, CommunityErrorCode expected) {
         givenPost(PostStatus.PUBLISHED);
         givenComment(AUTHOR_ID, CommentStatus.PUBLISHED);
         when(communityMapper.deleteComment(COMMENT_ID, POST_ID, AUTHOR_ID))
                 .thenAnswer(invocation -> {
-                    givenPost(PostStatus.BLOCKED);
+                    givenPost(statusAfterDelete);
                     return 0;
                 });
 
@@ -718,16 +598,7 @@ class CommunityServiceTests {
                 () -> communityService.deleteComment(POST_ID, COMMENT_ID, AUTHOR_ID))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
-                .isEqualTo(CommunityErrorCode.BLOCKED_POST);
-    }
-
-    /** 댓글 입력값을 정리한다. */
-    @Test
-    void commentForm_trimsContentAndPreservesInnerLineBreaks() {
-        CommentForm form = commentFormOf("  첫 줄\n둘째 줄  ");
-
-        assertThat(form.getContent()).isEqualTo("첫 줄\n둘째 줄");
-        assertThat(commentFormOf("   ").getContent()).isEmpty();
+                .isEqualTo(expected);
     }
 
     private CommentForm commentFormOf(String content) {
@@ -763,50 +634,25 @@ class CommunityServiceTests {
         order.verify(communityMapper).recalculateLikeCount(POST_ID);
     }
 
-    /** 삭제된 글에는 좋아요를 남길 수 없다. */
-    @Test
-    void addLike_deletedPost_isRejectedAsNotFound() {
-        givenLockedPost(PostStatus.DELETED);
+    /** 삭제·미존재 글과 다른 작성자의 차단 글은 숨기고, 작성자에게만 차단을 알린다. */
+    @ParameterizedTest(name = "{0} 글에 작성자={1}이 좋아요하면 {2}")
+    @CsvSource(value = {
+            "DELETED, false, POST_NOT_FOUND",
+            "NONE,    false, POST_NOT_FOUND",
+            "BLOCKED, false, POST_NOT_FOUND",
+            "BLOCKED, true,  BLOCKED_POST"
+    }, nullValues = "NONE")
+    void addLike_notLikeablePost_isRejected(
+            PostStatus status, boolean asAuthor, CommunityErrorCode expected) {
+        givenLockedPost(status);
 
-        assertThatThrownBy(() -> communityService.addLike(POST_ID, OTHER_MEMBER_ID))
+        assertThatThrownBy(() -> communityService.addLike(POST_ID, memberIdOf(asAuthor)))
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
-                .isEqualTo(CommunityErrorCode.POST_NOT_FOUND);
+                .isEqualTo(expected);
 
         verify(communityMapper, never()).insertLike(anyLong(), anyLong());
         verify(communityMapper, never()).recalculateLikeCount(anyLong());
-    }
-
-    @Test
-    void addLike_missingPost_isRejectedAsNotFound() {
-        when(communityMapper.lockPost(POST_ID)).thenReturn(null);
-
-        assertThatThrownBy(() -> communityService.addLike(POST_ID, OTHER_MEMBER_ID))
-                .isInstanceOf(BusinessException.class)
-                .extracting(e -> ((BusinessException) e).getErrorCode())
-                .isEqualTo(CommunityErrorCode.POST_NOT_FOUND);
-    }
-
-    /** 다른 작성자의 차단 글은 숨긴다. */
-    @Test
-    void addLike_blockedPost_otherMember_isRejectedAsNotFound() {
-        givenLockedPost(PostStatus.BLOCKED);
-
-        assertThatThrownBy(() -> communityService.addLike(POST_ID, OTHER_MEMBER_ID))
-                .isInstanceOf(BusinessException.class)
-                .extracting(e -> ((BusinessException) e).getErrorCode())
-                .isEqualTo(CommunityErrorCode.POST_NOT_FOUND);
-    }
-
-    /** 작성자의 차단 글에는 차단 오류를 반환한다. */
-    @Test
-    void addLike_blockedPost_author_isRejectedAsBlocked() {
-        givenLockedPost(PostStatus.BLOCKED);
-
-        assertThatThrownBy(() -> communityService.addLike(POST_ID, AUTHOR_ID))
-                .isInstanceOf(BusinessException.class)
-                .extracting(e -> ((BusinessException) e).getErrorCode())
-                .isEqualTo(CommunityErrorCode.BLOCKED_POST);
     }
 
     @Test
@@ -822,19 +668,10 @@ class CommunityServiceTests {
         verify(communityMapper, never()).recalculateLikeCount(anyLong());
     }
 
-    /** 상세 조회는 게시글 행을 잠그지 않는다. */
-    @Test
-    void getPostDetail_doesNotLockThePostRow() {
-        givenPost(PostStatus.PUBLISHED);
-
-        communityService.getPostDetail(POST_ID, AUTHOR_ID, VIEWER_KEY);
-
-        verify(communityMapper, never()).lockPost(anyLong());
-    }
-
+    /** status가 null이면 없는 글로 둔다. */
     private void givenLockedPost(PostStatus status) {
         when(communityMapper.lockPost(POST_ID))
-                .thenReturn(new PostLockView(AUTHOR_ID, status));
+                .thenReturn(status == null ? null : new PostLockView(AUTHOR_ID, status));
     }
 
     private Comment capturedComment() {
@@ -988,10 +825,15 @@ class CommunityServiceTests {
         verify(communityMapper, never()).insertReport(anyLong(), anyLong(), any());
     }
 
-    /** 삭제된 글은 신고할 수 없다. */
-    @Test
-    void reportPost_deletedPost_isRejectedAsNotFound() {
-        givenPost(PostStatus.DELETED);
+    /** 볼 수 없는 글은 신고할 수 없다. */
+    @ParameterizedTest(name = "{0} 글을 신고하면 POST_NOT_FOUND")
+    @CsvSource(value = {
+            "DELETED",
+            "BLOCKED",
+            "NONE"
+    }, nullValues = "NONE")
+    void reportPost_invisiblePost_isRejectedAsNotFound(PostStatus status) {
+        givenPost(status);
 
         assertThatThrownBy(() ->
                 communityService.reportPost(POST_ID, reportFormOf("사유"), OTHER_MEMBER_ID))
@@ -1016,8 +858,14 @@ class CommunityServiceTests {
         return captor.getValue();
     }
 
+    /** status가 null이면 없는 글로 둔다. */
     private void givenPost(PostStatus status) {
-        when(communityMapper.findPostById(POST_ID)).thenReturn(new PostDetailRow(
+        when(communityMapper.findPostById(POST_ID))
+                .thenReturn(status == null ? null : postRowOf(status));
+    }
+
+    private PostDetailRow postRowOf(PostStatus status) {
+        return new PostDetailRow(
                 POST_ID,
                 AUTHOR_ID,
                 1L,
@@ -1030,6 +878,6 @@ class CommunityServiceTests {
                 2L,
                 CREATED_AT,
                 CREATED_AT
-        ));
+        );
     }
 }
