@@ -36,7 +36,7 @@ C1의 요청 파라미터다. 목업의 검색 폼을 그대로 산다.
 | `product` | 상품명 검색 | 주문 상품명 부분 일치 — **order 계약 경유**(`DOMAIN 2.7`) |
 | `rating` | 평점 전체 / 5점 / 4점 / 3점 이하 | `overall_rating` 기준 — 리뷰 자체 컬럼 |
 
-**`writer`·`product`는 조각 5 착수 전에 계약을 합의한다.** `members`·`order_items`를 JOIN하지 않는다(`DOMAIN 2.7`).
+**`writer`·`product`는 조각 5 착수 시 계약을 설계하고 PR에서 확인받는다.** `members`·`order_items`를 JOIN하지 않는다(`DOMAIN 2.7`).
 
 - **관리자 화면이지만 ReadModel이 아니다.** `docs/conventions.md` 12절의 ReadModel 예외는 집계·요약하는 통계·대시보드에만 열린다. 이건 조건이 다른 도메인에서 올 뿐 결국 후기 목록이다.
 - **후기를 먼저 페이지한 뒤 이름을 보강해 거르면 안 된다.** 20건을 떠서 그중 이름이 맞는 3건만 남기면 화면에 3건이 뜨고 전체 건수는 20건 기준으로 나온다. **A1(`review-write.md`)의 페이징 문제와 같은 모양이다.**

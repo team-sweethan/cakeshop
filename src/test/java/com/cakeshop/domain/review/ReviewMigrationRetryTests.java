@@ -16,21 +16,8 @@ import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 import org.testcontainers.mariadb.MariaDBContainer;
 import org.testcontainers.utility.DockerImageName;
 
-/**
- * 조각 0 migration 이 실패한 뒤 다시 실행될 수 있는지 확인한다.
- *
- * <p>상태와 평점을 각각 다른 {@code ALTER} 로 나누면 migration 이 재시도 불가능해진다. DDL 은
- * 문장 단위로 암시적 커밋되므로, 범위 밖 평점 때문에 뒤쪽 문장이 실패해도 앞쪽 status 변경과
- * {@code chk_reviews_status} 는 남는다. 그 상태에서 데이터를 고쳐 다시 실행하면 이번에는 제약
- * 중복으로 실패한다 — <b>데이터를 고쳐도 배포가 복구되지 않는다.</b>
- *
- * <p>그래서 두 변경을 한 문장에 담았고, 이 테스트가 그것을 고정한다. 문장을 다시 쪼개면
- * {@link #migrate_outOfRangeRatingExists_leavesNoPartialSchemaChange()} 가 깨진다.
- *
- * <p>Spring context 를 띄우지 않고 컨테이너와 Flyway 를 직접 다룬다. 필요한 상태가 "직전
- * 버전까지만 적용되고 범위 밖 데이터가 들어 있는 DB" 라서 {@code @MariaDbIntegrationTest} 로는
- * 만들 수 없다. 선례는 {@code FlywayLegacyDatabaseTests} 다.
- */
+// 조각 0 migration 의 두 변경을 다시 다른 ALTER 로 쪼개면 이 테스트가 깨진다. DDL 은 문장 단위로
+// 암시적 커밋되어, 절반만 적용된 스키마가 남으면 데이터를 고쳐도 재실행이 제약 중복으로 막힌다.
 class ReviewMigrationRetryTests {
 
     private static final DockerImageName MARIA_DB_IMAGE = DockerImageName.parse("mariadb:11.4.10");
@@ -67,12 +54,6 @@ class ReviewMigrationRetryTests {
         }
     }
 
-    /**
-     * 범위 밖 평점이 있으면 migration 이 실패하되, 스키마에는 아무것도 남기지 않아야 한다.
-     *
-     * <p>여기서 확인하는 것은 "실패했다" 가 아니라 <b>실패가 절반만 적용된 스키마를 남기지
-     * 않는다</b> 는 것이다. 그래야 데이터만 고치고 다시 실행할 수 있다.
-     */
     @Test
     void migrate_outOfRangeRatingExists_leavesNoPartialSchemaChange() {
         migrateTo(VERSION_BEFORE_REVIEW_CONSTRAINTS);
@@ -151,12 +132,6 @@ class ReviewMigrationRetryTests {
                 String.class);
     }
 
-    /**
-     * 제약이 걸리기 전에만 넣을 수 있는 후기 한 건을 만든다.
-     *
-     * <p>{@code reviews} 가 {@code order_items} · {@code products} · {@code members} 에 FK 를 걸고
-     * 있어 앞의 사슬이 없으면 아무것도 넣을 수 없다. 사슬은 {@code ReviewSchemaTests} 와 같다.
-     */
     private static void insertReviewWithRating(int overallRating) {
         jdbcTemplate.update(
                 """
