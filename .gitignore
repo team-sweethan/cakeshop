@@ -9,3 +9,8 @@ application-prod.yml
 uploads/
 .DS_Store
 bin/
+
+# .claude/ 는 공유하는 것(skills, agents)과 개인 것이 섞이는 자리다.
+# 개인 설정과 로컬 실행 설정만 제외하고 나머지는 커밋한다.
+.claude/settings.local.json
+.claude/launch.json
