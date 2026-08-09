@@ -14,13 +14,14 @@
     <h1>작성할 후기</h1>
 
     <section class="section">
+      <!-- totalElements 로 판단하면 범위 밖 페이지에서 안내도 목록도 없는 화면이 된다. -->
       <p class="text-muted"
-         th:if="${writableItems.totalElements == 0}">
+         th:if="${writableItems.content.isEmpty()}">
         작성할 후기가 없습니다.
       </p>
 
       <div class="stack"
-           th:unless="${writableItems.totalElements == 0}">
+           th:unless="${writableItems.content.isEmpty()}">
 
         <div class="panel cluster"
              th:each="item : ${writableItems.content}"

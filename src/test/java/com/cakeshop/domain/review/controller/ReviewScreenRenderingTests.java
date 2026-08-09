@@ -87,6 +87,27 @@ class ReviewScreenRenderingTests {
     }
 
     @Test
+    void writableList_pageBeyondLastPage_stillShowsEmptyNotice() throws Exception {
+        insertPickedUpOrderItem("딸기 생크림 케이크");
+
+        mockMvc.perform(get("/mypage/reviews/writable")
+                        .param("page", "2")
+                        .with(authentication(login())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("작성할 후기가 없습니다.")));
+    }
+
+    @Test
+    void screenCatalog_reviewEntry_pointsToWritableListNotTheFormWithoutParameter()
+            throws Exception {
+
+        mockMvc.perform(get("/screens"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("/mypage/reviews/writable")))
+                .andExpect(content().string(not(containsString("\"/reviews/new\""))));
+    }
+
+    @Test
     void writableList_alreadyReviewedOrderItem_disappearsFromList() throws Exception {
         long orderItemId = insertPickedUpOrderItem("이미 쓴 케이크");
         insertReview(orderItemId);
