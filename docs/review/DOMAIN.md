@@ -96,7 +96,7 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 | **C4** | 후기 숨김 | 관리자 | `POST /admin/reviews/{id}/block` | 목업 버튼만 | 5 | `review-admin.md` |
 | **C5** | 답글 작성 | 관리자 | `POST /admin/reviews/{id}/replies` | **없음** | 6 | `review-reply.md` |
 | **C6** | 답글 수정 | 관리자 | `POST /admin/reviews/{id}/replies/edit` | **없음** | 6 | `review-reply.md` |
-| **D1** | 상품 평점 집계 | — | (Service 계약) | 없음 | 2 (#33) | `product-rating.md` |
+| **D1** | 상품 평점 집계 | — | (Service 계약) | **완료** | 2 (#33) | `product-rating.md` |
 | **D2** | 알림 발송 | — | (Service 계약) | 없음 | 7 | `review-notification.md` |
 | **E1** | `ReviewStatus` enum + `CHECK` | — | — | **완료** (#125) | 0 | `history/2026-08-slice-0-schema.md` |
 | **E2** | 평점 범위 `CHECK` | — | — | **완료** (#125) | 0 | `history/2026-08-slice-0-schema.md` |
@@ -285,7 +285,6 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 |---|---|
 | **member 계약 시그니처** — 작성자 표시명, ID 묶음 조회 | 조각 3 착수 시 설계 확정, **PR에서 수민님 확인** (2.6·2.7) |
 | **관리자 검색 계약**(`writer`·`product`) | 조각 5 착수 시 설계 확정, **PR에서 수민·주환님 확인** (C2·2.7) |
-| **D1 계약 시그니처** — `lockForRating(productId)` 외에 **평균·건수를 받아 반영하는 메서드의 이름과 인자가 아직 없다** | 조각 2 착수 시 설계 확정, **PR에서 시은님 확인** (방식은 `ADR-001`) |
 | **후기 목록용 주문 스냅샷 계약** — B3·C1·C3가 `order_items.product_name`과 주문번호를 쓰는데, `OrderReviewQueryService`는 *미작성* 항목만, C2 계약은 검색용 ID만 돌려준다. 이미 쓴 후기(`BLOCKED`·`DELETED` 포함)의 `orderItemId` 묶음을 받을 자리가 없다 | 조각 3 착수 시 설계 확정, **PR에서 주환님 확인** (2.7) |
 | **A4 수정 시 재집계 조건** — `overall_rating`이 바뀔 때만 부르면, 두 요청이 같은 값을 읽고 하나가 먼저 바꾼 뒤 다른 하나가 옛 값으로 되돌릴 때 집계가 누락된다. 잠금 아래에서 최신 값과 비교하거나 조건 없이 항상 재집계하는 쪽 | 조각 4 착수 전 (A4·D1) |
 | D2 `event_key` 규격 | 조각 7 |

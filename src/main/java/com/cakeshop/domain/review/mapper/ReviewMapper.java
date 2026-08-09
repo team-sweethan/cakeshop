@@ -5,6 +5,7 @@ import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import com.cakeshop.domain.review.dto.view.ProductRatingAggregate;
 import com.cakeshop.domain.review.entity.Review;
 
 @Mapper
@@ -17,4 +18,8 @@ public interface ReviewMapper {
     boolean existsByOrderItemId(@Param("orderItemId") long orderItemId);
 
     int insert(Review review);
+
+    // FOR UPDATE 를 빼면 REPEATABLE READ 스냅샷이 자격 검증 시점에 굳어 먼저 커밋된 후기를
+    // 못 본다 (D1).
+    ProductRatingAggregate aggregateForUpdate(@Param("productId") long productId);
 }

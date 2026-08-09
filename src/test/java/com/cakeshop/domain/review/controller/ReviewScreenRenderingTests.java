@@ -30,14 +30,6 @@ import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 import com.cakeshop.global.security.MemberDetails;
 
-/**
- * 후기 작성 화면을 실제 Thymeleaf로 렌더링한다.
- *
- * <p>이 클래스가 소유하는 것은 템플릿별 대표 렌더링, 사용자 입력 escaping, 그리고 화면 결과가
- * 실질적으로 달라지는 상태(A1의 빈 목록과 한 건)다. 자격 검증 규칙은
- * {@code ReviewServiceTests}, 요청 바인딩과 검증 거부는 {@code ReviewControllerTests},
- * SQL 결과는 {@code ReviewMapperTests}가 본다.
- */
 @SpringBootTest
 @MariaDbIntegrationTest
 @Transactional

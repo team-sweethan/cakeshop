@@ -66,12 +66,23 @@
 - 후기는 좋아요보다 훨씬 적게 쌓여 증분의 이점이 없고, 호출 지점이 5곳이나 되어 증분은 "여기서도 조정해야 하나"를 매번 판단해야 한다. 평균의 증분 갱신은 특히 어긋나기 쉽다.
 - **`updated_at = updated_at` 보존.** 넣지 않으면 집계가 바뀔 때마다 상품에 수정 흔적이 남는다. 커뮤니티에서 같은 자리를 두 번 빠뜨려 화면에 `(수정됨)`이 붙는 버그가 실제로 났다.
 
+**시그니처 (2026-08-10 확정)**
+
+```java
+void lockForRating(long productId);
+void applyReviewAggregate(long productId, BigDecimal averageRating, long reviewCount);
+```
+
+- `averageRating`이 `BigDecimal`인 것은 `products.average_rating`이 `DECIMAL(3,2)`이기 때문이다. `double`로 받으면 계약 경계에서 반올림이 한 번 더 일어난다.
+- `reviewCount`가 `long`인 것은 리뷰 쪽 `COUNT(*)`가 `long`이라서다. 컬럼은 `INT UNSIGNED`로 더 좁다.
+- 둘 다 상품이 없으면 `PRODUCT_002`(404)다. `applyReviewAggregate`는 `affectedRows == 0`으로 판정한다.
+
 **시은님을 PR 리뷰어로 지정해 확인받을 것**
 
-- 계약 시그니처(`ProductReviewCommandService`의 메서드 이름과 인자)
+- 위 시그니처
 - 전용 매퍼(`ProductReviewMapper`)를 두는 것 — 이 저장소 첫 사례라 PR 본문에 이유를 남긴다
 - 위 잠금 순서가 재고 경로와 어긋나지 않는지
 - **리뷰가 계산한 평균·건수를 상품이 그대로 쓰는 것.** 상품 쪽에 검증할 방법이 없다
 - **기존 `ProductMapper.findSalesInfoByIdForUpdate`에 새 호출부가 생긴다.** 파일을 고치지 않으므로 12절의 사전 협의 대상은 아니지만, 그 메서드가 바뀌면 이 계약이 따라 깨진다는 사실은 알려야 한다
 
-**시그니처는 아직 절반만 정해져 있다.** `lockForRating(productId)`은 위에서 이름·인자가 정해졌지만, **평균·건수를 받아 `UPDATE products`를 수행하는 메서드는 이름도 인자도 없다**(`DOMAIN.md` 4). 방향이 뒤집히기 전 안에서는 상품이 직접 세어 인자가 필요 없었고, 개정이 "누가 세느냐"만 고치면서 남은 공백이다. **인자가 생겼다는 것 자체가 이 설계의 대가**(상품이 받은 값을 검증할 수 없다)이므로, 조각 2 착수 시 여기서 확정하고 PR 본문에 그 대가를 함께 적는다.
+**`applyReviewAggregate`에 인자가 있다는 것 자체가 이 설계의 대가다.** 방향이 뒤집히기 전에는 상품이 직접 세어 인자가 필요 없었다. 지금은 상품이 값을 받기만 하므로 **받은 값을 검증할 수 없다.** PR 본문에 이 대가를 함께 적는다.
