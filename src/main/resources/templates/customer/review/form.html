@@ -27,15 +27,12 @@
           th:object="${reviewWriteForm}"
           method="post">
 
-      <!-- 상품 식별자는 넘기지 않는다. 서버가 order_items 에서 파생시킨다 (R4). -->
       <input type="hidden" th:field="*{orderItemId}">
 
       <section class="section">
         <h2 class="section-title">평점 선택</h2>
 
         <div class="panel stack">
-          <!-- 기본 선택을 두지 않는다. 손대지 않은 값이 그대로 저장되면 상품 평균에 섞인다
-               (DOMAIN 2.2). -->
           <div class="form-group">
             <label class="form-label" for="overall-rating">
               전체 <span class="required">*</span>

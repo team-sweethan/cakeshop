@@ -130,7 +130,8 @@ class ReviewScreenRenderingTests {
                 .andExpect(content().string(containsString("id=\"service-rating\"")))
                 .andExpect(content().string(not(containsString("포장"))))
                 .andExpect(content().string(not(containsString("이미지 첨부"))))
-                .andExpect(content().string(not(containsString("삭제하기"))));
+                .andExpect(content().string(not(containsString("삭제하기"))))
+                .andExpect(content().string(not(containsString("order_items"))));
     }
 
     @Test
