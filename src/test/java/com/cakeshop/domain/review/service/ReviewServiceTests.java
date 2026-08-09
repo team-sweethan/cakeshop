@@ -4,11 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -16,11 +18,14 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.dao.DuplicateKeyException;
 
 import com.cakeshop.domain.order.dto.view.OrderReviewTargetView;
 import com.cakeshop.domain.order.service.OrderReviewQueryService;
+import com.cakeshop.domain.product.service.ProductReviewCommandService;
 import com.cakeshop.domain.review.dto.form.ReviewWriteForm;
+import com.cakeshop.domain.review.dto.view.ProductRatingAggregate;
 import com.cakeshop.domain.review.entity.Review;
 import com.cakeshop.domain.review.error.ReviewErrorCode;
 import com.cakeshop.domain.review.mapper.ReviewMapper;
@@ -36,13 +41,16 @@ class ReviewServiceTests {
 
     private ReviewMapper reviewMapper;
     private OrderReviewQueryService orderReviewQueryService;
+    private ProductReviewCommandService productReviewCommandService;
     private ReviewService reviewService;
 
     @BeforeEach
     void setUp() {
         reviewMapper = mock(ReviewMapper.class);
         orderReviewQueryService = mock(OrderReviewQueryService.class);
-        reviewService = new ReviewService(reviewMapper, orderReviewQueryService);
+        productReviewCommandService = mock(ProductReviewCommandService.class);
+        reviewService = new ReviewService(
+                reviewMapper, orderReviewQueryService, productReviewCommandService);
     }
 
     @Test
@@ -130,10 +138,39 @@ class ReviewServiceTests {
         verify(reviewMapper).existsByOrderItemId(ORDER_ITEM_ID);
     }
 
+    @Test
+    void write_ratingAggregate_isAppliedAfterLockAndInsertInThatOrder() {
+        givenWritableTarget();
+
+        reviewService.write(form(), MEMBER_ID);
+
+        InOrder order = inOrder(productReviewCommandService, reviewMapper);
+        order.verify(productReviewCommandService).lockForRating(PRODUCT_ID);
+        order.verify(reviewMapper).insert(any());
+        order.verify(reviewMapper).aggregateForUpdate(PRODUCT_ID);
+        order.verify(productReviewCommandService)
+                .applyReviewAggregate(PRODUCT_ID, new BigDecimal("4.50"), 2L);
+    }
+
+    @Test
+    void write_duplicateKey_skipsAggregateSoProductKeepsItsValue() {
+        givenWritableTarget();
+        when(reviewMapper.insert(any()))
+                .thenThrow(new DuplicateKeyException("uk_reviews_order_item"));
+
+        assertThatThrownBy(() -> reviewService.write(form(), MEMBER_ID))
+                .isInstanceOf(BusinessException.class);
+
+        verify(productReviewCommandService, never())
+                .applyReviewAggregate(anyLong(), any(), anyLong());
+    }
+
     private void givenWritableTarget() {
         when(orderReviewQueryService.findReviewTarget(ORDER_ITEM_ID, MEMBER_ID))
                 .thenReturn(Optional.of(target(true)));
         when(reviewMapper.existsByOrderItemId(ORDER_ITEM_ID)).thenReturn(false);
+        when(reviewMapper.aggregateForUpdate(PRODUCT_ID))
+                .thenReturn(new ProductRatingAggregate(new BigDecimal("4.50"), 2L));
     }
 
     private OrderReviewTargetView target(boolean pickedUp) {

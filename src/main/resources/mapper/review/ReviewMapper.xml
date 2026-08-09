@@ -29,4 +29,17 @@
                 #{overallRating}, #{tasteRating}, #{designRating}, #{serviceRating},
                 #{content}, 'PUBLISHED')
     </insert>
+
+    <!-- COALESCE 가 없으면 마지막 공개 후기를 지웠을 때 AVG 가 NULL 을 돌려주는데
+         products.average_rating 은 NOT NULL 이다. 후기가 쌓이는 동안에는 드러나지 않는다. -->
+    <select id="aggregateForUpdate"
+            resultType="com.cakeshop.domain.review.dto.view.ProductRatingAggregate">
+
+        SELECT COALESCE(AVG(overall_rating), 0) AS averageRating,
+               COUNT(*)                         AS reviewCount
+          FROM reviews
+         WHERE product_id = #{productId}
+           AND status = 'PUBLISHED'
+           FOR UPDATE
+    </select>
 </mapper>

@@ -96,7 +96,7 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 | **C4** | 후기 숨김 | 관리자 | `POST /admin/reviews/{id}/block` | 목업 버튼만 | 5 | `review-admin.md` |
 | **C5** | 답글 작성 | 관리자 | `POST /admin/reviews/{id}/replies` | **없음** | 6 | `review-reply.md` |
 | **C6** | 답글 수정 | 관리자 | `POST /admin/reviews/{id}/replies/edit` | **없음** | 6 | `review-reply.md` |
-| **D1** | 상품 평점 집계 | — | (Service 계약) | 없음 | 2 (#33) | `product-rating.md` |
+| **D1** | 상품 평점 집계 | — | (Service 계약) | **완료** | 2 (#33) | `product-rating.md` |
 | **D2** | 알림 발송 | — | (Service 계약) | 없음 | 7 | `review-notification.md` |
 | **E1** | `ReviewStatus` enum + `CHECK` | — | — | **완료** (#125) | 0 | `history/2026-08-slice-0-schema.md` |
 | **E2** | 평점 범위 `CHECK` | — | — | **완료** (#125) | 0 | `history/2026-08-slice-0-schema.md` |

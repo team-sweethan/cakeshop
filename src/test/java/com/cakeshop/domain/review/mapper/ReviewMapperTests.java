@@ -14,6 +14,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import com.cakeshop.domain.review.dto.view.ProductRatingAggregate;
 import com.cakeshop.domain.review.entity.Review;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 
@@ -113,6 +114,49 @@ class ReviewMapperTests {
         assertThat(reviewMapper.existsByOrderItemId(orderItemId)).isTrue();
     }
 
+    @Test
+    void aggregateForUpdate_noPublishedReview_returnsZeroAverageNotNull() {
+        long orderItemId = insertPickedUpOrderItem();
+        reviewMapper.insert(Review.create(
+                orderItemId, productId, memberId, 5, 5, 4, 4, "곧 숨겨질 후기입니다."));
+        jdbcTemplate.update(
+                "UPDATE reviews SET status = 'BLOCKED' WHERE order_item_id = ?", orderItemId);
+
+        ProductRatingAggregate aggregate = reviewMapper.aggregateForUpdate(productId);
+
+        assertThat(aggregate.averageRating()).isEqualByComparingTo("0");
+        assertThat(aggregate.reviewCount()).isZero();
+    }
+
+    @Test
+    void aggregateForUpdate_blockedAndDeletedReviews_areExcludedFromAverage() {
+        insertReviewWithStatus(5, "PUBLISHED");
+        insertReviewWithStatus(3, "PUBLISHED");
+        insertReviewWithStatus(1, "BLOCKED");
+        insertReviewWithStatus(1, "DELETED");
+
+        ProductRatingAggregate aggregate = reviewMapper.aggregateForUpdate(productId);
+
+        assertThat(aggregate.averageRating()).isEqualByComparingTo("4");
+        assertThat(aggregate.reviewCount()).isEqualTo(2);
+    }
+
+    @Test
+    void aggregateForUpdate_otherProductReviews_areNotCounted() {
+        insertReviewWithStatus(5, "PUBLISHED");
+        long otherProductId = insertProduct();
+
+        assertThat(reviewMapper.aggregateForUpdate(otherProductId).reviewCount()).isZero();
+    }
+
+    private void insertReviewWithStatus(int overallRating, String status) {
+        long orderItemId = insertPickedUpOrderItem();
+        reviewMapper.insert(Review.create(
+                orderItemId, productId, memberId, overallRating, 5, 4, 4, "후기 본문입니다."));
+        jdbcTemplate.update(
+                "UPDATE reviews SET status = ? WHERE order_item_id = ?", status, orderItemId);
+    }
+
     private long insertMember() {
         String email = "review-mapper-" + System.nanoTime() + "@example.com";
         jdbcTemplate.update(
@@ -127,7 +171,8 @@ class ReviewMapperTests {
     }
 
     private long insertProduct() {
-        String categoryCode = "REVIEW_MAPPER_" + suffix;
+        String unique = String.valueOf(System.nanoTime());
+        String categoryCode = "REVIEW_MAPPER_" + unique;
         jdbcTemplate.update(
                 "INSERT INTO categories (code, name, sort_order, is_active) VALUES (?, ?, 999, 1)",
                 categoryCode,
@@ -135,7 +180,7 @@ class ReviewMapperTests {
         long categoryId = jdbcTemplate.queryForObject(
                 "SELECT id FROM categories WHERE code = ?", Long.class, categoryCode);
 
-        String productName = "후기 대상 상품 " + suffix;
+        String productName = "후기 대상 상품 " + unique;
         jdbcTemplate.update(
                 """
                 INSERT INTO products (
