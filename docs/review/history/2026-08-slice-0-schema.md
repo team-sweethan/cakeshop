@@ -12,7 +12,7 @@
 - 새 migration: 평점 4종에 `CHECK (rating BETWEEN 1 AND 5)`
   - **`status`와 달리 사전 보정 UPDATE를 두지 않았다.** 근거는 `../DOMAIN.md` 2.2
 - migration 파일명은 직접 짓지 않고 `gradlew newMigration -Pdesc=<snake_case>`로 생성
-- **`docs/status-design.md`의 `reviews.status` 행을 확정으로 갱신한다.** 그 문서가 상태값 인벤토리의 정본이고 당시 `VISIBLE / HIDDEN ?` · `☐ 열림`으로 남아 있었다. 154절이 "☐ 항목을 확정하면 인벤토리 행을 갱신하고 **enum + DDL을 함께 커밋한다**"고 못 박고 있다
+- **당시 중앙 상태 인벤토리의 `reviews.status` 행도 함께 갱신한다.** 당시에는 `VISIBLE / HIDDEN ?` · `☐ 열림`으로 남아 있었고, 상태를 확정하면 **enum + DDL을 함께 커밋한다**는 기준을 사용했다. 중앙 인벤토리는 이후 폐지했으며 현재 공통 규칙은 `docs/conventions.md` 11절, 리뷰 정책은 `docs/review/DOMAIN.md` 2.1절이 정본이다
 
 **검증**: 전이 규칙 단위 테스트(허용/금지 각 케이스), Testcontainers로 `CHECK`가 잘못된 상태값·평점을 거부하는지, 기본값이 `PUBLISHED`인지.
 

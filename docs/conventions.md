@@ -37,7 +37,6 @@
 | 항목 | 정본 |
 |---|---|
 | 테스트 범위·작성법·실행 환경 | [testing.md](testing.md) |
-| 상태 전이와 도메인별 상태 목록 | [status-design.md](status-design.md) |
 | 브랜치·커밋·PR·리뷰·병합 절차 | [pull-request.md](pull-request.md) |
 | 미결정 업무 규칙과 도메인 협업 안건 | [team-plan.md](team-plan.md) |
 | Thymeleaf 화면의 상세 형식 | [frontend-template-format.md](frontend-template-format.md) |
@@ -185,8 +184,7 @@ Service는 업무 규칙과 트랜잭션 경계를 소유한다.
   `ON UPDATE CURRENT_TIMESTAMP(6)`로 DB가 관리한다.
 - enum은 이름을 `VARCHAR`로 저장한다. ordinal 숫자와 한글 라벨을 저장하지 않는다.
 - 소프트 삭제는 이력 보존이나 복구 요구가 있는 데이터에만 도입한다.
-- 제약조건 이름은 목적과 대상을 알 수 있게 작성한다. 상태 컬럼의 상세 규칙은
-  [status-design.md](status-design.md)를 따른다.
+- 제약조건 이름은 목적과 대상을 알 수 있게 작성한다. 상태 컬럼은 11절의 규칙을 따른다.
 
 ## 8. Flyway와 seed
 
@@ -230,14 +228,25 @@ migration의 변경 단위, 기존 데이터 처리, MariaDB DDL의 부분 실�
 
 ## 11. 상태값
 
-상태값의 저장 표현, 허용 값과 전이 규칙은 [status-design.md](status-design.md)를 정본으로 한다.
-이 문서에서는 구현 경계만 정한다.
+상태의 저장값과 전이 정책은 그 데이터를 소유한 도메인이 관리한다. 저장 가능한 값은 Java enum과
+Flyway migration, 실제 전이는 Service와 테스트를 함께 바꿔 일치시킨다. 상태 변경의 업무 의미와
+부수효과를 사람이 읽을 설명으로 남겨야 할 때는 해당 도메인의 `DOMAIN.md`에 둔다.
 
-- DB에는 Java enum 이름과 같은 `UPPER_SNAKE_CASE` 값을 `VARCHAR`로 저장한다.
-- 사용자용 라벨은 enum 또는 View DTO에서 만들고 DB에 저장하지 않는다.
-- DB `CHECK`는 허용 값 집합을, Service는 현재 상태에서 목표 상태로의 전이를 검증한다.
-- 수량, boolean, type·category와 다른 도메인의 상태를 편의상 새 status enum으로 만들지 않는다.
-- 다른 도메인의 상태를 복제 저장하지 않는다. 필요한 값은 소유 도메인의 공개 계약으로 조회한다.
+- DB에는 Java enum 이름과 같은 `UPPER_SNAKE_CASE` 값을 `VARCHAR`로 저장한다. ordinal 숫자와
+  사용자용 한글 라벨은 저장하지 않는다.
+- `VARCHAR` 길이는 실제 enum 이름을 수용하도록 정한다. 저장소 전체에 하나의 고정 길이를 강제하지 않는다.
+- 시작 상태가 하나로 명확하면 DB `DEFAULT`를 지정한다.
+- DB에는 `chk_<table>_status` 이름의 `CHECK`로 허용 값 집합을 제한한다. enum 값을 추가·삭제할 때는
+  새 Flyway migration과 DB 테스트를 함께 추가한다.
+- 사용자용 라벨은 enum 또는 View DTO가 만든다. 화면 템플릿에 상태별 한글 문구를 중복 하드코딩하지 않는다.
+- Service는 요청 주체, 현재 상태, 목표 상태와 상태 변경에 따른 쓰기·외부 호출을 검증한다. 상태 머신이
+  필요한 도메인은 enum의 `canTransitionTo()` 같은 메서드로 순수 전이 규칙을 표현할 수 있다.
+- Mapper의 조건부 `UPDATE ... WHERE status = <expected>`는 Service 판단 뒤 발생할 수 있는 동시 변경을
+  막는 최종 방어다. SQL이 업무 정책의 유일한 구현이 되어서는 안 된다.
+- 수량에서 계산되는 품절, 읽음 여부 같은 boolean, `type`·`category`와 다른 도메인의 상태를 편의상
+  새 status enum이나 중복 컬럼으로 만들지 않는다.
+- 다른 도메인의 상태가 필요하면 저장값을 복제하지 않고 소유 도메인의 공개 Service 계약으로 조회한다.
+- 기존 상태값, 허용 전이, 변경 주체와 상태 변경의 부수효과를 바꿀 때는 영향을 받는 담당자와 먼저 협의한다.
 
 ## 12. 도메인 경계와 연동
 

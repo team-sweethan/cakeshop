@@ -225,7 +225,7 @@ src/
 - 🧭 **[코드 컨벤션과 아키텍처](docs/conventions.md)**: 기술 기준, 수직 슬라이스, 네이밍, DB·MyBatis·트랜잭션·인증 규칙과 도메인 연동 경계
 - 🧪 **[테스트 작성 가이드](docs/testing.md)**: 계층별 테스트 전략, MariaDB Testcontainers, 테스트 대역, 명명과 검증 기준
 - 🗃️ **[Flyway migration 작성 가이드](docs/flyway_make_sample.md)**: 변경 단위, 기존 데이터 영향, MariaDB DDL 실패·복구와 검증 기준
-- 🔄 **[상태 설계 규칙](docs/status-design.md)**: 도메인 상태값, Enum·DB 제약·Service 상태 전이의 공통 기준
-- 🤝 **[팀 미결정 항목과 협업 경계](docs/team-plan.md)**: 도메인 간 연결, 핵심 비즈니스 정책, 파일 저장 등 합의가 필요한 항목
+- 🔄 **[상태값 규칙](docs/conventions.md#11-상태값)**: Enum 저장값, DB 제약, Service 전이와 동시성 검증의 공통 기준
+- 🤝 **[팀 미결정 항목](docs/team-plan.md)**: 여러 담당자가 함께 결정해야 하는 도메인 연동과 운영 환경 질문
 - 🔀 **[Pull Request 가이드](docs/pull-request.md)**: PR 크기·제목·본문, 리뷰 요청과 브랜치별 병합 기준
 - 🎨 **[프론트엔드 템플릿 규격](docs/frontend-template-format.md)**: 고객·관리자 Thymeleaf 화면과 공통 클래스 규칙
