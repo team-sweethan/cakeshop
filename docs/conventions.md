@@ -39,7 +39,7 @@
 | 테스트 범위·작성법·실행 환경 | [testing.md](testing.md) |
 | 브랜치·커밋·PR·리뷰·병합 절차 | [pull-request.md](pull-request.md) |
 | 미결정 업무 규칙과 도메인 협업 안건 | [team-plan.md](team-plan.md) |
-| Thymeleaf 화면의 상세 형식 | [frontend-template-format.md](frontend-template-format.md) |
+| Thymeleaf 화면 구조·프래그먼트·정적 자원 | [frontend-template-format.md](frontend-template-format.md) |
 
 새 코드와 수정하는 코드에는 현재 규칙을 적용한다. 규칙 정리만을 위한 대규모 이동이나 이름 변경은
 기능 변경과 분리한다. 규칙과 구현이 충돌하고 규칙이 현실에 맞지 않는다면 우회 코드를 추가하지 말고
@@ -299,7 +299,9 @@ Spring·MyBatis·Web·Security 설정, 공통 오류 처리 기반과 외부 시
 - Controller는 Entity 대신 View DTO와 화면에 필요한 선택 목록을 Model에 제공한다.
 - Thymeleaf에서 DB 구조를 탐색하거나 업무 규칙을 계산하지 않는다.
 - URL은 `th:href`, `th:action`으로 만들고 POST 폼에는 Spring Security의 CSRF 정책을 적용한다.
-- 관리자와 고객 템플릿은 각각 `templates/admin`, `templates/customer`에 둔다.
-- header, footer, alert 같은 공통 UI는 fragment를 재사용한다.
+- 관리자와 고객 기능 화면은 각각 `templates/admin`, `templates/customer`에 둔다. 로그인·홈·오류 화면은
+  `templates/auth`, `templates/home`, `templates/error`에 둔다.
+- header, footer, alert 같은 공통 UI는 `templates/fragments`의 프래그먼트를 재사용한다.
 
-HTML 구조와 CSS 클래스의 상세 규칙은 [frontend-template-format.md](frontend-template-format.md)를 따른다.
+Thymeleaf 화면 구조, 프래그먼트 계약, 정적 자원과 렌더링 검증 기준은
+[frontend-template-format.md](frontend-template-format.md)를 따른다.

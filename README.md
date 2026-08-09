@@ -198,7 +198,7 @@ src/
 │   └── resources/
 │       ├── db/{migration,seed}/
 │       ├── mapper/<domain>/
-│       └── templates/{admin,customer}/
+│       └── templates/{admin,customer,auth,home,error,fragments}/
 └── test/
     ├── java/
     └── resources/
@@ -228,4 +228,4 @@ src/
 - 🔄 **[상태값 규칙](docs/conventions.md#11-상태값)**: Enum 저장값, DB 제약, Service 전이와 동시성 검증의 공통 기준
 - 🤝 **[팀 미결정 항목](docs/team-plan.md)**: 여러 담당자가 함께 결정해야 하는 도메인 연동과 운영 환경 질문
 - 🔀 **[Pull Request 가이드](docs/pull-request.md)**: PR 크기·제목·본문, 리뷰 요청과 브랜치별 병합 기준
-- 🎨 **[프론트엔드 템플릿 규격](docs/frontend-template-format.md)**: 고객·관리자 Thymeleaf 화면과 공통 클래스 규칙
+- 🎨 **[Thymeleaf 화면 작성 규칙](docs/frontend-template-format.md)**: 고객·관리자 화면 구조, 프래그먼트 계약, 정적 자원과 렌더링 검증 기준
