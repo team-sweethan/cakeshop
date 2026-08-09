@@ -49,6 +49,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 class CommunityControllerTests {
@@ -92,58 +93,46 @@ class CommunityControllerTests {
                 .andExpect(model().attribute("selectedCategoryId", (Object) null));
     }
 
-    @Test
-    void list_categoryFilter_isPassedToService() throws Exception {
-        mockMvc.perform(get("/community").param("categoryId", "5"))
+    /**
+     * 목록 파라미터는 잘못된 값에도 오류 대신 기본값으로 떨어진다. 잘못된 카테고리는 무시하고,
+     * 정렬값은 대소문자를 구분하지 않으며 모르는 값은 최신순, 잘못된 페이지는 1쪽이 된다.
+     */
+    @ParameterizedTest(name = "categoryId={0}, sort={1}, page={2}")
+    @CsvSource(nullValues = "-", value = {
+            "5, -, -, 5, LATEST, 1",
+            "전체, -, -, -, LATEST, 1",
+            "-, VIEWS, -, -, VIEWS, 1",
+            "-, views, -, -, VIEWS, 1",
+            "-, 'id; DROP TABLE posts', -, -, LATEST, 1",
+            "-, -, abc, -, LATEST, 1"
+    })
+    void list_requestParameters_arePassedToServiceOrFallBackToDefaults(
+            String categoryId,
+            String sort,
+            String page,
+            Long expectedCategoryId,
+            PostSort expectedSort,
+            int expectedPage
+    ) throws Exception {
+        MockHttpServletRequestBuilder request = get("/community");
+
+        if (categoryId != null) {
+            request = request.param("categoryId", categoryId);
+        }
+        if (sort != null) {
+            request = request.param("sort", sort);
+        }
+        if (page != null) {
+            request = request.param("page", page);
+        }
+
+        mockMvc.perform(request)
                 .andExpect(status().isOk())
-                .andExpect(model().attribute("selectedCategoryId", 5L));
+                .andExpect(model().attribute("selectedCategoryId", expectedCategoryId))
+                .andExpect(model().attribute("selectedSort", expectedSort));
 
-        verify(communityService).getPosts(eq(5L), any(), any());
-    }
-
-    /** 잘못된 카테고리는 무시한다. */
-    @Test
-    void list_invalidCategoryId_ignoresFilterInsteadOfFailing() throws Exception {
-        mockMvc.perform(get("/community").param("categoryId", "전체"))
-                .andExpect(status().isOk())
-                .andExpect(model().attribute("selectedCategoryId", (Object) null));
-
-        verify(communityService).getPosts(isNull(), any(), any());
-    }
-
-    @Test
-    void list_sortOption_isPassedToService() throws Exception {
-        mockMvc.perform(get("/community").param("sort", "VIEWS"))
-                .andExpect(status().isOk())
-                .andExpect(model().attribute("selectedSort", PostSort.VIEWS));
-
-        verify(communityService).getPosts(any(), eq(PostSort.VIEWS), any());
-    }
-
-    /** 정렬값은 대소문자를 구분하지 않는다. */
-    @Test
-    void list_lowerCaseSortOption_isAccepted() throws Exception {
-        mockMvc.perform(get("/community").param("sort", "views"))
-                .andExpect(status().isOk())
-                .andExpect(model().attribute("selectedSort", PostSort.VIEWS));
-    }
-
-    /** 잘못된 정렬값에는 최신순을 사용한다. */
-    @Test
-    void list_invalidSortOption_fallsBackToLatestInsteadOfFailing() throws Exception {
-        mockMvc.perform(get("/community").param("sort", "id; DROP TABLE posts"))
-                .andExpect(status().isOk())
-                .andExpect(model().attribute("selectedSort", PostSort.LATEST));
-
-        verify(communityService).getPosts(any(), eq(PostSort.LATEST), any());
-    }
-
-    @Test
-    void list_invalidPage_fallsBackToFirstPage() throws Exception {
-        mockMvc.perform(get("/community").param("page", "abc"))
-                .andExpect(status().isOk());
-
-        assertThat(capturedPageRequest().getPage()).isEqualTo(1);
+        verify(communityService).getPosts(eq(expectedCategoryId), eq(expectedSort), any());
+        assertThat(capturedPageRequest().getPage()).isEqualTo(expectedPage);
     }
 
     /** 페이지 크기는 20으로 고정한다. */
@@ -512,7 +501,7 @@ class CommunityControllerTests {
         verify(communityService, never()).addComment(anyLong(), any(), anyLong());
     }
 
-    /** 댓글 검증 실패 후에도 펼친 범위를 유지한다. */
+    /** 검증 실패는 리다이렉트가 아니라 재렌더링이므로 Service에 전달하는 범위로 확인한다. */
     @Test
     void addComment_invalidForm_keepsExpandedCommentLimit() throws Exception {
         authenticateAs(7L);
@@ -537,18 +526,33 @@ class CommunityControllerTests {
         verify(communityService).deleteComment(15L, 8L, 7L);
     }
 
-    /** 댓글 삭제 후에도 펼친 범위를 유지한다. */
-    @Test
-    void deleteComment_keepsExpandedCommentLimit() throws Exception {
+    /**
+     * 상세로 돌아가는 모든 경로가 펼친 댓글 범위를 유지한다. 신고 경로만 사유가 필요하고
+     * 나머지 경로는 넘긴 사유 파라미터를 무시한다.
+     */
+    @ParameterizedTest(name = "{0} 후에도 펼친 댓글 범위를 유지한다")
+    @CsvSource({
+            "/community/15/comments/8/delete",
+            "/community/15/likes",
+            "/community/15/likes/delete",
+            "/community/15/reports"
+    })
+    void detailRedirect_expandedCommentLimit_isKeptOnEveryPath(String path) throws Exception {
         authenticateAs(7L);
+        when(communityService.getReportablePost(15L, 7L)).thenReturn(publishedPost());
 
-        mockMvc.perform(post("/community/15/comments/8/delete").param("comments", "60"))
+        mockMvc.perform(post(path)
+                        .param("comments", "60")
+                        .param("reason", "광고입니다"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/community/15?comments=60"));
     }
 
-    /** 댓글 조회 수를 정규화해 리다이렉트한다. */
-    @ParameterizedTest
+    /**
+     * 리다이렉트 주소의 댓글 조회 수를 정수 범위로 정규화한다. 정규화는 경로마다 같은 코드가
+     * 하므로 대표 경로 하나로 확인하고, 경로별 적용 여부는 위 표가 확인한다.
+     */
+    @ParameterizedTest(name = "comments={0} -> {1}")
     @CsvSource({
             "abc, /community/15",
             "-1, /community/15",
@@ -556,7 +560,7 @@ class CommunityControllerTests {
             "99999999, /community/15?comments=200",
             "'40 OR 1=1', /community/15"
     })
-    void deleteComment_rewritesCommentLimitAsInteger(String requested, String expectedUrl)
+    void detailRedirect_commentLimit_isRewrittenAsInteger(String requested, String expectedUrl)
             throws Exception {
         authenticateAs(7L);
 
@@ -613,6 +617,8 @@ class CommunityControllerTests {
                 .andExpect(redirectedUrl("/community/15"));
 
         verify(communityService).addLike(15L, 7L);
+        // 좋아요 추가와 취소 경로는 분리돼 있어 서로를 토글하지 않는다.
+        verify(communityService, never()).removeLike(anyLong(), anyLong());
     }
 
     @Test
@@ -624,51 +630,7 @@ class CommunityControllerTests {
                 .andExpect(redirectedUrl("/community/15"));
 
         verify(communityService).removeLike(15L, 7L);
-    }
-
-    /** 좋아요 추가와 취소 경로를 분리한다. */
-    @Test
-    void likeRoutes_areSplitSoNeitherPathTogglesTheOther() throws Exception {
-        authenticateAs(7L);
-
-        mockMvc.perform(post("/community/15/likes"));
-        verify(communityService).addLike(15L, 7L);
-        verify(communityService, never()).removeLike(anyLong(), anyLong());
-
-        mockMvc.perform(post("/community/15/likes/delete"));
-        verify(communityService).removeLike(15L, 7L);
-    }
-
-    /** 좋아요 처리 후에도 펼친 댓글 범위를 유지한다. */
-    @ParameterizedTest
-    @CsvSource({
-            "/community/15/likes",
-            "/community/15/likes/delete"
-    })
-    void likeRoutes_keepExpandedCommentLimit(String path) throws Exception {
-        authenticateAs(7L);
-
-        mockMvc.perform(post(path).param("comments", "60"))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/community/15?comments=60"));
-    }
-
-    /** 좋아요 리다이렉트의 댓글 수를 정규화한다. */
-    @ParameterizedTest
-    @CsvSource({
-            "abc, /community/15",
-            "-1, /community/15",
-            "20, /community/15",
-            "99999999, /community/15?comments=200",
-            "'40 OR 1=1', /community/15"
-    })
-    void addLike_rewritesCommentLimitAsInteger(String requested, String expectedUrl)
-            throws Exception {
-        authenticateAs(7L);
-
-        mockMvc.perform(post("/community/15/likes").param("comments", requested))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl(expectedUrl));
+        verify(communityService, never()).addLike(anyLong(), anyLong());
     }
 
     private void authenticateAs(long memberId) {
@@ -735,19 +697,6 @@ class CommunityControllerTests {
                 .hasRootCauseInstanceOf(BusinessException.class);
 
         verify(communityService, never()).reportPost(anyLong(), any(), anyLong());
-    }
-
-    /** 신고 후에도 펼친 댓글 범위를 유지한다. */
-    @Test
-    void report_keepsExpandedComments() throws Exception {
-        authenticateAs(9L);
-        when(communityService.getReportablePost(15L, 9L)).thenReturn(publishedPost());
-
-        mockMvc.perform(post("/community/15/reports")
-                        .param("reason", "광고입니다")
-                        .param("comments", "60"))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/community/15?comments=60"));
     }
 
     private PostDetailView publishedPost() {
