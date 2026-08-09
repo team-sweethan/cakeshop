@@ -19,6 +19,7 @@ import com.cakeshop.domain.community.dto.view.CommentSectionView;
 import com.cakeshop.domain.community.entity.CommentStatus;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
+import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 import com.cakeshop.global.security.MemberDetails;
 
@@ -40,11 +41,12 @@ import org.springframework.web.context.WebApplicationContext;
  * <p>이 클래스가 소유하는 것은 네 가지다. 템플릿별 대표 렌더링(템플릿명과 Model 연결), 사용자 입력
  * escaping, 화면 결과가 실질적으로 달라지는 상태, 그리고 커뮤니티 고유의 인가 거절과 그 뒤의 DB 상태다.
  *
- * <p>업무 규칙은 다른 테스트가 소유한다. 상태별 노출·인기글 판정·댓글 상한은 {@code CommunityServiceTests},
- * Model 계약과 요청 파라미터 처리는 {@code CommunityControllerTests}, 조회수는
+ * <p>업무 규칙은 다른 테스트가 소유한다. 상태별 노출·인기글 판정·댓글 상한 계산은
+ * {@code CommunityServiceTests}, Model 계약과 요청 파라미터 처리는 {@code CommunityControllerTests}, 조회수는
  * {@code CommunityViewCountTests}, 탈퇴 회원 마스킹은 {@code CommunityMemberContractTests},
  * SQL 결과는 {@code CommunityMapperTests}가 본다. docs/testing.md 8절에 따라 권한별 버튼, 안내 문구,
- * 집계 포맷과 HTML 조각은 여기에서 고정하지 않는다.
+ * 집계 포맷과 HTML 조각은 여기에서 고정하지 않는다. 다만 페이지 링크의 조건 보존과 댓글 상한 도달
+ * 안내처럼 템플릿에서만 확인할 수 있는 계약은 대표 상태로 검증한다.
  */
 @SpringBootTest
 @MariaDbIntegrationTest
@@ -96,6 +98,22 @@ class CommunityScreenRenderingTests {
         mockMvc.perform(get("/community").param("categoryId", String.valueOf(emptyCategoryId)))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("아직 등록된 글이 없습니다.")));
+    }
+
+    /** 페이지를 이동해도 현재 카테고리와 정렬 조건을 함께 유지한다. */
+    @Test
+    void communityList_paginationLink_preservesCategoryAndSort() throws Exception {
+        for (int i = 0; i < PageRequest.DEFAULT_SIZE + 1; i++) {
+            insertPost(memberId, "페이지 글 " + i, "본문", PostStatus.PUBLISHED);
+        }
+
+        mockMvc.perform(get("/community")
+                        .param("categoryId", String.valueOf(categoryId))
+                        .param("sort", "VIEWS"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(
+                        "/community?categoryId=" + categoryId
+                                + "&amp;sort=VIEWS&amp;page=2")));
     }
 
     /** 확정된 인기글이 있으면 목록 위에 별도 영역을 렌더링한다. */
@@ -244,6 +262,24 @@ class CommunityScreenRenderingTests {
         mockMvc.perform(get("/community/" + postId).param("comments", String.valueOf(nextLimit)))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("댓글 0")));
+    }
+
+    /** 댓글 상한에 도달하면 더 펼칠 수 없는 과거 댓글이 있음을 알린다. */
+    @Test
+    void communityDetail_beyondMaxComments_showsCappedNotice() throws Exception {
+        long postId = insertPost(memberId, "댓글 아주 많은 글", "본문", PostStatus.PUBLISHED);
+
+        for (int i = 0; i < CommentSectionView.MAX_LIMIT + 1; i++) {
+            insertComment(postId, memberId, "상한 댓글 " + i,
+                    CommentStatus.PUBLISHED, BASE_TIME.plusMinutes(i));
+        }
+
+        mockMvc.perform(get("/community/" + postId)
+                        .param("comments", String.valueOf(CommentSectionView.MAX_LIMIT)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(
+                        containsString("오래된 댓글 일부는 표시하지 않습니다.")))
+                .andExpect(content().string(not(containsString("이전 댓글 더 보기"))));
     }
 
     /** 관리자 목록에 실제 게시글을 렌더링한다. */
