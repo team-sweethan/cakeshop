@@ -80,9 +80,9 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 
 | ID | 기능 | 액터 | 경로 | 현재 | 조각 | spec |
 |---|---|---|---|---|---|---|
-| **A1** | 작성할 후기 목록 | 고객 | `GET /mypage/reviews/writable` | 링크만 | 1 | `review-write.md` |
-| **A2** | 후기 작성 폼 | 고객 | `GET /reviews/new` | 목업 | 1 | `review-write.md` |
-| **A3** | 후기 등록 | 고객 | `POST /reviews` | 없음 | 1 | `review-write.md` |
+| **A1** | 작성할 후기 목록 | 고객 | `GET /mypage/reviews/writable` | **완료** | 1 | `review-write.md` |
+| **A2** | 후기 작성 폼 | 고객 | `GET /reviews/new?orderItemId={N}` | **완료** | 1 | `review-write.md` |
+| **A3** | 후기 등록 | 고객 | `POST /reviews` | **완료** | 1 | `review-write.md` |
 | **A4** | 후기 수정 | 고객 | `GET·POST /reviews/{id}/edit` | 목업 버튼만 | 4 | `review-edit-delete.md` |
 | **A5** | 후기 삭제 | 고객 | `POST /reviews/{id}/delete` | 목업 버튼만 | 4 | `review-edit-delete.md` |
 | **A6** | 이미지 첨부 | 고객 | (A2·A3에 포함) | 목업 입력만 | 8 (2차) | `review-write.md` |
@@ -198,7 +198,7 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 | 코드 | 이름 | 메시지 | HTTP | 조각 |
 |---|---|---|---|---|
 | `REVIEW_001` | `NOT_PICKED_UP` | 픽업 완료된 주문만 후기를 작성할 수 있습니다. | 400 | (기존) |
-| `REVIEW_002` | `REVIEW_NOT_FOUND` | 후기를 찾을 수 없습니다. | 404 | 1 |
+| `REVIEW_002` | `REVIEW_NOT_FOUND` | 후기를 찾을 수 없습니다. | 404 | 4 |
 | `REVIEW_003` | `ORDER_ITEM_NOT_FOUND` | 주문 상품을 찾을 수 없습니다. | 404 | 1 |
 | `REVIEW_004` | `ALREADY_REVIEWED` | 이미 후기를 작성한 주문 상품입니다. | 409 | 1 |
 | `REVIEW_005` | `BLOCKED_REVIEW` | 숨김 처리된 후기입니다. | 403 | 4 |
