@@ -7,6 +7,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import com.cakeshop.domain.order.dto.view.OrderReviewItemView;
+import com.cakeshop.domain.order.dto.view.OrderReviewSnapshotView;
 import com.cakeshop.domain.order.dto.view.OrderReviewTargetView;
 
 /**
@@ -35,4 +36,8 @@ public interface OrderReviewMapper {
     /** 소유 회원이 아니면 {@code null}. 픽업 여부와 무관하게 돌려준다. */
     OrderReviewTargetView findReviewTarget(
             @Param("orderItemId") long orderItemId, @Param("memberId") long memberId);
+
+    /** 주문 상태를 거르지 않는다. 이미 쓴 후기가 가리키는 항목이라 자격은 작성 시점에 끝났다. */
+    List<OrderReviewSnapshotView> findSnapshotsByOrderItemIds(
+            @Param("orderItemIds") Collection<Long> orderItemIds);
 }

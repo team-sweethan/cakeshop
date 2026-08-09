@@ -42,4 +42,51 @@
            AND status = 'PUBLISHED'
            FOR UPDATE
     </select>
+
+    <sql id="reviewRowColumns">
+        id, order_item_id AS orderItemId, product_id AS productId, member_id AS memberId,
+        overall_rating AS overallRating, taste_rating AS tasteRating,
+        design_rating AS designRating, service_rating AS serviceRating,
+        content, status, created_at AS createdAt
+    </sql>
+
+    <!-- id tiebreaker 를 반드시 붙인다. 같은 초에 들어온 후기가 두 페이지에 겹쳐 나오거나
+         어느 페이지에도 안 나온다 (B1). -->
+    <select id="findPublishedByProductId"
+            resultType="com.cakeshop.domain.review.dto.view.ReviewRow">
+
+        SELECT <include refid="reviewRowColumns"/>
+          FROM reviews
+         WHERE product_id = #{productId}
+           AND status = 'PUBLISHED'
+         ORDER BY created_at DESC, id DESC
+         LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="countPublishedByProductId" resultType="long">
+        SELECT COUNT(*)
+          FROM reviews
+         WHERE product_id = #{productId}
+           AND status = 'PUBLISHED'
+    </select>
+
+    <!-- 상태를 status = 'PUBLISHED' 로 좁히지 않는다. 숨겨진 후기는 본인에게만 보이고, 지워진
+         것만 감춘다 (B3). -->
+    <select id="findByMemberId"
+            resultType="com.cakeshop.domain.review.dto.view.ReviewRow">
+
+        SELECT <include refid="reviewRowColumns"/>
+          FROM reviews
+         WHERE member_id = #{memberId}
+           AND status &lt;&gt; 'DELETED'
+         ORDER BY created_at DESC, id DESC
+         LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="countByMemberId" resultType="long">
+        SELECT COUNT(*)
+          FROM reviews
+         WHERE member_id = #{memberId}
+           AND status &lt;&gt; 'DELETED'
+    </select>
 </mapper>

@@ -36,6 +36,7 @@ import com.cakeshop.global.security.MemberDetails;
 class ReviewScreenRenderingTests {
 
     private static final LocalDateTime PICKED_UP_AT = LocalDateTime.of(2026, 8, 1, 10, 0);
+    private static final LocalDateTime WRITTEN_AT = LocalDateTime.of(2026, 8, 5, 9, 0);
 
     @Autowired
     private WebApplicationContext context;
@@ -175,6 +176,143 @@ class ReviewScreenRenderingTests {
                 .isEqualTo(productId);
     }
 
+    @Test
+    void productDetail_moreThanThreeReviews_rendersOnlyTheLatestThreeWithFullListLink()
+            throws Exception {
+
+        insertReviewWithContent("가장 오래된 후기입니다.", "PUBLISHED", WRITTEN_AT);
+        insertReviewWithContent("세 번째 후기입니다.", "PUBLISHED", WRITTEN_AT.plusDays(1));
+        insertReviewWithContent("두 번째 후기입니다.", "PUBLISHED", WRITTEN_AT.plusDays(2));
+        insertReviewWithContent("가장 최신 후기입니다.", "PUBLISHED", WRITTEN_AT.plusDays(3));
+
+        mockMvc.perform(get("/products/{id}", productId))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("가장 최신 후기입니다.")))
+                .andExpect(content().string(containsString("두 번째 후기입니다.")))
+                .andExpect(content().string(containsString("세 번째 후기입니다.")))
+                .andExpect(content().string(not(containsString("가장 오래된 후기입니다."))))
+                .andExpect(content().string(
+                        containsString("/products/" + productId + "/reviews")));
+    }
+
+    @Test
+    void productDetail_noPublishedReview_hidesTheFullListLink() throws Exception {
+        insertReviewWithContent("숨겨진 후기입니다.", "BLOCKED", WRITTEN_AT);
+
+        mockMvc.perform(get("/products/{id}", productId))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("아직 등록된 후기가 없습니다.")))
+                .andExpect(content().string(not(containsString("숨겨진 후기입니다."))))
+                .andExpect(content().string(not(containsString("전체 리뷰 확인"))));
+    }
+
+    @Test
+    void productReviews_anonymousVisitor_seesPublishedReviewsAndAuthorNickname()
+            throws Exception {
+
+        insertReviewWithContent("공개된 후기입니다.", "PUBLISHED", WRITTEN_AT);
+        insertReviewWithContent("숨겨진 후기입니다.", "BLOCKED", WRITTEN_AT);
+        insertReviewWithContent("지워진 후기입니다.", "DELETED", WRITTEN_AT);
+
+        mockMvc.perform(get("/products/{id}/reviews", productId))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("공개된 후기입니다.")))
+                .andExpect(content().string(containsString("닉" + suffix)))
+                .andExpect(content().string(not(containsString("숨겨진 후기입니다."))))
+                .andExpect(content().string(not(containsString("지워진 후기입니다."))));
+    }
+
+    @Test
+    void productReviews_noPublishedReview_rendersEmptyNotice() throws Exception {
+        mockMvc.perform(get("/products/{id}/reviews", productId))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("아직 등록된 후기가 없습니다.")));
+    }
+
+    @Test
+    void productReviews_withdrawnAuthor_isMaskedButTheReviewRemains() throws Exception {
+        insertReviewWithContent("탈퇴한 사람의 후기입니다.", "PUBLISHED", WRITTEN_AT);
+        jdbcTemplate.update("UPDATE members SET status = 'WITHDRAWN' WHERE id = ?", memberId);
+
+        mockMvc.perform(get("/products/{id}/reviews", productId))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("탈퇴한 사람의 후기입니다.")))
+                .andExpect(content().string(containsString("탈퇴한 회원")))
+                .andExpect(content().string(not(containsString("닉" + suffix))));
+    }
+
+    @Test
+    void productReviews_inactiveProduct_is404LikeAMissingOne() throws Exception {
+        insertReviewWithContent("내린 상품의 후기입니다.", "PUBLISHED", WRITTEN_AT);
+        jdbcTemplate.update("UPDATE products SET status = 'INACTIVE' WHERE id = ?", productId);
+
+        mockMvc.perform(get("/products/{id}/reviews", productId))
+                .andExpect(status().isNotFound())
+                .andExpect(content().string(not(containsString("내린 상품의 후기입니다."))));
+
+        mockMvc.perform(get("/products/{id}/reviews", Long.MAX_VALUE))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void productReviews_scriptInContent_isEscaped() throws Exception {
+        insertReviewWithContent(
+                "<script>alert('xss')</script> 맛있게 먹었습니다.", "PUBLISHED", WRITTEN_AT);
+
+        mockMvc.perform(get("/products/{id}/reviews", productId))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("<script>alert('xss')</script>"))))
+                .andExpect(content().string(containsString("&lt;script&gt;")));
+    }
+
+    @Test
+    void myReviews_blockedReviewIsShownWithProductNameAndDeletedIsHidden() throws Exception {
+        insertReviewWithContent("공개된 내 후기입니다.", "PUBLISHED", WRITTEN_AT);
+        insertReviewWithContent("숨겨진 내 후기입니다.", "BLOCKED", WRITTEN_AT);
+        insertReviewWithContent("지워진 내 후기입니다.", "DELETED", WRITTEN_AT);
+
+        mockMvc.perform(get("/mypage/reviews").with(authentication(login())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("공개된 내 후기입니다.")))
+                .andExpect(content().string(containsString("숨겨진 내 후기입니다.")))
+                .andExpect(content().string(containsString("숨김")))
+                .andExpect(content().string(containsString("딸기 생크림 케이크")))
+                .andExpect(content().string(
+                        containsString("/products/" + productId + "/reviews")))
+                .andExpect(content().string(not(containsString("지워진 내 후기입니다."))));
+    }
+
+    @Test
+    void myReviews_otherMembersReview_isNotListed() throws Exception {
+        insertReviewWithContent("남의 후기입니다.", "PUBLISHED", WRITTEN_AT);
+        memberId = insertOtherMember();
+
+        mockMvc.perform(get("/mypage/reviews").with(authentication(login())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("작성한 후기가 없습니다.")))
+                .andExpect(content().string(not(containsString("남의 후기입니다."))));
+    }
+
+    private void insertReviewWithContent(
+            String content, String status, LocalDateTime createdAt) {
+
+        long orderItemId = insertPickedUpOrderItem("딸기 생크림 케이크");
+        jdbcTemplate.update(
+                """
+                INSERT INTO reviews (
+                    order_item_id, product_id, member_id,
+                    overall_rating, taste_rating, design_rating, service_rating,
+                    content, status, created_at
+                ) VALUES (?, ?, ?, 5, 5, 4, 4, ?, ?, ?)
+                """,
+                orderItemId,
+                productId,
+                memberId,
+                content,
+                status,
+                createdAt);
+    }
+
     private Authentication login() {
         MemberDetails memberDetails = new MemberDetails(new MemberAuthenticationView(
                 memberId, "review-screen-" + suffix + "@example.com", "encoded", "USER", true));
@@ -192,6 +330,19 @@ class ReviewScreenRenderingTests {
                 """,
                 email,
                 "닉" + suffix);
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM members WHERE email = ?", Long.class, email);
+    }
+
+    private long insertOtherMember() {
+        String email = "review-screen-other-" + System.nanoTime() + "@example.com";
+        jdbcTemplate.update(
+                """
+                INSERT INTO members (email, password, name, nickname, phone, role, status)
+                VALUES (?, 'encoded-password', '다른사람', ?, '010-0000-0000', 'USER', 'ACTIVE')
+                """,
+                email,
+                "다른닉" + System.nanoTime());
         return jdbcTemplate.queryForObject(
                 "SELECT id FROM members WHERE email = ?", Long.class, email);
     }

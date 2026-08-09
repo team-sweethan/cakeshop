@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+******************************
+작성자 : HyunGyu-Cho
+담당자 : 수민
+작성일 : 2026-08-10
+기능 : 후기 작성자 표기용 회원 조회 SQL
+설명 : MemberReviewQueryService 가 쓰는 읽기 전용 조회만 둔다.
+******************************
+-->
+<mapper namespace="com.cakeshop.domain.member.mapper.MemberReviewMapper">
+
+    <!--
+      탈퇴 여부를 리뷰가 아니라 여기서 계산한다. 리뷰가 members.status 를 읽어 판단하지 않게
+      하려는 것이다(docs/review/DOMAIN.md 2.6). 탈퇴 회원도 닉네임을 그대로 반환하고,
+      표기 마스킹은 리뷰 View 가 맡는다.
+    -->
+    <select id="findMembersByIds"
+            resultType="com.cakeshop.domain.member.dto.view.MemberReviewView">
+
+        SELECT id,
+               nickname,
+               (status = 'WITHDRAWN') AS withdrawn
+          FROM members
+         WHERE id IN
+        <foreach collection="memberIds" item="memberId" open="(" separator="," close=")">
+            #{memberId}
+        </foreach>
+    </select>
+</mapper>

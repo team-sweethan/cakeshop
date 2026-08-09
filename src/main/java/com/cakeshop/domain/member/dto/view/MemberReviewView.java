@@ -1,0 +1,22 @@
+package com.cakeshop.domain.member.dto.view;
+
+/**
+ * ******************************
+ * 작성자 : HyunGyu-Cho
+ * 담당자 : 수민
+ * 작성일 : 2026-08-10
+ * 기능 : 후기 작성자 표기용 회원 조회 계약
+ * 설명 : 리뷰가 members 를 직접 JOIN 하지 않도록 작성자 표기에 필요한 최소 필드만 제공한다.
+ * ******************************
+ *
+ * <p>탈퇴 판정은 회원 도메인의 업무 규칙이므로 {@code MemberStatus} 를 그대로 노출하지 않고
+ * {@code withdrawn} 으로 계산해 넘긴다. 리뷰가 회원 상태 모델을 알 필요가 없다.</p>
+ *
+ * <p>탈퇴 회원의 닉네임도 그대로 반환한다. "탈퇴한 회원" 표기는 화면의 일이라 리뷰 View 가 맡는다.</p>
+ */
+public record MemberReviewView(
+        Long id,
+        String nickname,
+        boolean withdrawn
+) {
+}

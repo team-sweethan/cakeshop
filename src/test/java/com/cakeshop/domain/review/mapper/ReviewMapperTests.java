@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,7 +18,9 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.cakeshop.domain.review.dto.view.ProductRatingAggregate;
+import com.cakeshop.domain.review.dto.view.ReviewRow;
 import com.cakeshop.domain.review.entity.Review;
+import com.cakeshop.domain.review.entity.ReviewStatus;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 
 @MybatisTest
@@ -24,6 +29,7 @@ import com.cakeshop.global.config.MariaDbIntegrationTest;
 class ReviewMapperTests {
 
     private static final LocalDateTime PICKED_UP_AT = LocalDateTime.of(2026, 8, 1, 10, 0);
+    private static final LocalDateTime WRITTEN_AT = LocalDateTime.of(2026, 8, 9, 12, 0);
 
     @Autowired
     private ReviewMapper reviewMapper;
@@ -147,6 +153,97 @@ class ReviewMapperTests {
         long otherProductId = insertProduct();
 
         assertThat(reviewMapper.aggregateForUpdate(otherProductId).reviewCount()).isZero();
+    }
+
+    @Test
+    void findPublishedByProductId_blockedAndDeletedReviews_areNotListed() {
+        insertReviewWithStatus(5, "PUBLISHED");
+        insertReviewWithStatus(1, "BLOCKED");
+        insertReviewWithStatus(1, "DELETED");
+
+        List<ReviewRow> rows = reviewMapper.findPublishedByProductId(productId, 0, 20);
+
+        assertThat(rows).singleElement()
+                .extracting(ReviewRow::status)
+                .isEqualTo(ReviewStatus.PUBLISHED);
+        assertThat(reviewMapper.countPublishedByProductId(productId)).isEqualTo(1L);
+    }
+
+    @Test
+    void findPublishedByProductId_sameCreatedAt_isSplitAcrossPagesWithoutOverlap() {
+        List<Long> insertedIds = insertPublishedReviewsAtSameInstant(3);
+
+        List<Long> firstPage = idsOf(reviewMapper.findPublishedByProductId(productId, 0, 2));
+        List<Long> secondPage = idsOf(reviewMapper.findPublishedByProductId(productId, 2, 2));
+
+        assertThat(firstPage).hasSize(2);
+        assertThat(secondPage).hasSize(1);
+        assertThat(firstPage).doesNotContainAnyElementsOf(secondPage);
+        assertThat(firstPage).containsExactlyElementsOf(
+                insertedIds.stream().sorted(Comparator.reverseOrder()).limit(2).toList());
+    }
+
+    @Test
+    void findPublishedByProductId_otherProductReviews_areNotListed() {
+        insertReviewWithStatus(5, "PUBLISHED");
+        long otherProductId = insertProduct();
+
+        assertThat(reviewMapper.findPublishedByProductId(otherProductId, 0, 20)).isEmpty();
+        assertThat(reviewMapper.countPublishedByProductId(otherProductId)).isZero();
+    }
+
+    @Test
+    void findByMemberId_blockedReviewIsKeptAndDeletedIsHidden() {
+        insertReviewWithStatus(5, "PUBLISHED");
+        insertReviewWithStatus(4, "BLOCKED");
+        insertReviewWithStatus(3, "DELETED");
+
+        List<ReviewRow> rows = reviewMapper.findByMemberId(memberId, 0, 20);
+
+        assertThat(rows).extracting(ReviewRow::status)
+                .containsExactlyInAnyOrder(ReviewStatus.PUBLISHED, ReviewStatus.BLOCKED);
+        assertThat(reviewMapper.countByMemberId(memberId)).isEqualTo(2L);
+    }
+
+    @Test
+    void findByMemberId_otherMemberReview_isNotListed() {
+        insertReviewWithStatus(5, "PUBLISHED");
+        long otherMemberId = insertMember();
+
+        assertThat(reviewMapper.findByMemberId(otherMemberId, 0, 20)).isEmpty();
+        assertThat(reviewMapper.countByMemberId(otherMemberId)).isZero();
+    }
+
+    @Test
+    void findByMemberId_sameCreatedAt_isSplitAcrossPagesWithoutOverlap() {
+        insertPublishedReviewsAtSameInstant(3);
+
+        List<Long> firstPage = idsOf(reviewMapper.findByMemberId(memberId, 0, 2));
+        List<Long> secondPage = idsOf(reviewMapper.findByMemberId(memberId, 2, 2));
+
+        assertThat(firstPage).hasSize(2);
+        assertThat(secondPage).hasSize(1);
+        assertThat(firstPage).doesNotContainAnyElementsOf(secondPage);
+    }
+
+    private List<Long> idsOf(List<ReviewRow> rows) {
+        return rows.stream().map(ReviewRow::id).toList();
+    }
+
+    private List<Long> insertPublishedReviewsAtSameInstant(int count) {
+        List<Long> ids = new ArrayList<>();
+        for (int index = 0; index < count; index++) {
+            long orderItemId = insertPickedUpOrderItem();
+            Review review = Review.create(
+                    orderItemId, productId, memberId, 5, 5, 4, 4, "같은 시각 후기입니다.");
+            reviewMapper.insert(review);
+            ids.add(review.getId());
+        }
+        jdbcTemplate.update(
+                "UPDATE reviews SET created_at = ? WHERE product_id = ?",
+                WRITTEN_AT,
+                productId);
+        return ids;
     }
 
     private void insertReviewWithStatus(int overallRating, String status) {

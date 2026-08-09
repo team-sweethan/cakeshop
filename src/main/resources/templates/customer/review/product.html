@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>상품 후기 | 케이크 쇼핑몰</title>
+  <link rel="stylesheet" th:href="@{/css/app.css}">
+  <script defer th:src="@{/js/app.js}"></script>
+</head>
+<body data-page-title="상품 후기">
+  <header th:replace="~{fragments/common/header :: header}"></header>
+
+  <main class="page-container">
+    <h1>상품 후기</h1>
+
+    <div class="cluster section">
+      <a class="btn" th:href="@{/products/{id}(id=${productId})}">상품으로 돌아가기</a>
+    </div>
+
+    <section class="section">
+      <p class="text-muted" th:if="${reviews.content.isEmpty()}">
+        아직 등록된 후기가 없습니다.
+      </p>
+
+      <div th:unless="${reviews.content.isEmpty()}"
+           th:replace="~{fragments/customer/product-review :: reviewList(${reviews.content})}">
+      </div>
+    </section>
+
+    <nav th:if="${reviews.totalPages > 1}"
+         class="cluster section"
+         aria-label="페이지 이동"
+         style="justify-content:center">
+
+      <a class="btn"
+         th:if="${pageNavigation.hasPreviousBlock}"
+         th:href="@{/products/{id}/reviews(id=${productId},page=${pageNavigation.previousPage})}">
+        이전
+      </a>
+
+      <span class="btn btn--disabled"
+            th:unless="${pageNavigation.hasPreviousBlock}">
+        이전
+      </span>
+
+      <a class="btn"
+         th:each="pageNumber : ${#numbers.sequence(pageNavigation.startPage, pageNavigation.endPage)}"
+         th:classappend="${pageNumber == reviews.page} ? ' btn--primary' : ''"
+         th:href="@{/products/{id}/reviews(id=${productId},page=${pageNumber})}"
+         th:text="${pageNumber}">1</a>
+
+      <a class="btn"
+         th:if="${pageNavigation.hasNextBlock}"
+         th:href="@{/products/{id}/reviews(id=${productId},page=${pageNavigation.nextPage})}">
+        다음
+      </a>
+
+      <span class="btn btn--disabled"
+            th:unless="${pageNavigation.hasNextBlock}">
+        다음
+      </span>
+    </nav>
+  </main>
+
+  <footer th:replace="~{fragments/common/footer :: footer(${store})}"></footer>
+</body>
+</html>

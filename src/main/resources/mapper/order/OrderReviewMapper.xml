@@ -61,4 +61,21 @@
          WHERE oi.id = #{orderItemId}
            AND o.member_id = #{memberId}
     </select>
+
+    <!-- 회원 조건을 두지 않는다. 관리자 후기 목록(C1·C3)도 같은 조회를 쓰는데, 그쪽은 남의 후기를
+         보는 것이 정상이다. 소유권은 호출한 쪽이 후기를 고르는 자리에서 이미 판정한다. -->
+    <select id="findSnapshotsByOrderItemIds"
+            resultType="com.cakeshop.domain.order.dto.view.OrderReviewSnapshotView">
+
+        SELECT oi.id           AS orderItemId,
+               oi.product_name AS productName,
+               o.order_number  AS orderNumber
+          FROM order_items oi
+          JOIN orders o ON o.id = oi.order_id
+         WHERE oi.id IN
+        <foreach collection="orderItemIds" item="orderItemId"
+                 open="(" separator="," close=")">
+            #{orderItemId}
+        </foreach>
+    </select>
 </mapper>

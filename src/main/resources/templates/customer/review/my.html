@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>내 후기 | 케이크 쇼핑몰</title>
+  <link rel="stylesheet" th:href="@{/css/app.css}">
+  <script defer th:src="@{/js/app.js}"></script>
+</head>
+<body data-page-title="내 후기">
+  <header th:replace="~{fragments/common/header :: header}"></header>
+
+  <main class="page-container">
+    <h1>내 후기</h1>
+
+    <div class="cluster section">
+      <a class="btn" th:href="@{/mypage/reviews/writable}">작성할 후기</a>
+    </div>
+
+    <section class="section">
+      <p class="text-muted" th:if="${reviews.content.isEmpty()}">
+        작성한 후기가 없습니다.
+      </p>
+
+      <div class="stack" th:unless="${reviews.content.isEmpty()}">
+        <!--/*
+          카드 전체가 그 상품의 후기 목록으로 가는 링크다. 커뮤니티 인기글이 같은 모양이다.
+          상품이 내려간 뒤에는 그 목록이 404 라, 내 후기에서 눌러도 404 를 만난다 (spec B3).
+        */-->
+        <!--/*
+          display:block 이 없으면 앵커가 인라인으로 남아 .panel 의 테두리가 조각난다.
+          커뮤니티 인기글은 .cluster 의 display:flex 가 그 자리를 대신하고 있다.
+        */-->
+        <a class="panel stack"
+           th:each="review : ${reviews.content}"
+           th:href="@{/products/{id}/reviews(id=${review.productId})}"
+           style="display:block">
+          <div class="cluster" style="justify-content:space-between">
+            <div>
+              <strong th:text="${review.productName}">상품명</strong>
+              <p class="text-muted" th:text="${review.orderNumber}">주문번호</p>
+            </div>
+            <div class="cluster">
+              <!--/*
+                숨겨진 사실은 본인에게 알린다. 수정·삭제가 닫히는 이유이기도 하다 (DOMAIN 2.1).
+              */-->
+              <span class="badge badge--warning" th:if="${review.blocked}">숨김</span>
+              <span class="text-muted"
+                    th:text="${#temporals.format(review.createdAt, 'yyyy-MM-dd')}">2026-08-10</span>
+            </div>
+          </div>
+
+          <p class="text-muted">
+            전체 <span th:text="${review.overallRating}">5</span>점 ·
+            맛 <span th:text="${review.tasteRating}">5</span>점 ·
+            디자인 <span th:text="${review.designRating}">5</span>점 ·
+            응대 <span th:text="${review.serviceRating}">5</span>점
+          </p>
+
+          <p style="white-space:pre-wrap" th:text="${review.content}">후기 본문</p>
+        </a>
+      </div>
+    </section>
+
+    <nav th:if="${reviews.totalPages > 1}"
+         class="cluster section"
+         aria-label="페이지 이동"
+         style="justify-content:center">
+
+      <a class="btn"
+         th:if="${pageNavigation.hasPreviousBlock}"
+         th:href="@{/mypage/reviews(page=${pageNavigation.previousPage})}">
+        이전
+      </a>
+
+      <span class="btn btn--disabled"
+            th:unless="${pageNavigation.hasPreviousBlock}">
+        이전
+      </span>
+
+      <a class="btn"
+         th:each="pageNumber : ${#numbers.sequence(pageNavigation.startPage, pageNavigation.endPage)}"
+         th:classappend="${pageNumber == reviews.page} ? ' btn--primary' : ''"
+         th:href="@{/mypage/reviews(page=${pageNumber})}"
+         th:text="${pageNumber}">1</a>
+
+      <a class="btn"
+         th:if="${pageNavigation.hasNextBlock}"
+         th:href="@{/mypage/reviews(page=${pageNavigation.nextPage})}">
+        다음
+      </a>
+
+      <span class="btn btn--disabled"
+            th:unless="${pageNavigation.hasNextBlock}">
+        다음
+      </span>
+    </nav>
+  </main>
+
+  <footer th:replace="~{fragments/common/footer :: footer(${store})}"></footer>
+</body>
+</html>

@@ -9,6 +9,7 @@ import com.cakeshop.domain.product.dto.view.ProductDetailView;
 import com.cakeshop.domain.product.dto.view.ProductListView;
 import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.service.ProductService;
+import com.cakeshop.domain.review.service.ReviewProductQueryService;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 
@@ -32,12 +33,29 @@ public class ProductController {
     private final ProductService productService;
 
     /**
-     * 상품 조회 Service를 주입받는다.
+     * ******************************
+     * 작성자 : HyunGyu-Cho
+     * 담당자 : 시은
+     * 작성일 : 2026-08-10
+     * 기능 : 상품 상세 후기 미리보기 주입
+     * 설명 : 상품 상세에 붙일 최신 후기 3건을 리뷰 도메인 계약으로 받는다.
+     *        상품이 reviews 를 직접 조회하지 않는다. 붙이는 방식은 2026-08-06 합의를 따른다.
+     * ******************************
+     */
+    private final ReviewProductQueryService reviewProductQueryService;
+
+    /**
+     * 상품 조회 Service와 후기 조회 계약을 주입받는다.
      *
      * @param productService 고객 상품 조회 Service
+     * @param reviewProductQueryService 상품 상세에 붙일 후기 조회 계약
      */
-    public ProductController(ProductService productService) {
+    public ProductController(
+            ProductService productService,
+            ReviewProductQueryService reviewProductQueryService
+    ) {
         this.productService = productService;
+        this.reviewProductQueryService = reviewProductQueryService;
     }
 
     /**
@@ -181,6 +199,13 @@ public class ProductController {
         model.addAttribute(
                 "optionGroups",
                 productService.getPublicOptionGroups(productId)
+        );
+
+        // ProductController 수정: HyunGyu-Cho
+        // 판매 중이 아닌 상품은 위 조회가 이미 끝내므로 후기가 함께 가려진다.
+        model.addAttribute(
+                "reviewPreviews",
+                reviewProductQueryService.getPreview(productId)
         );
 
         return "customer/product/detail";

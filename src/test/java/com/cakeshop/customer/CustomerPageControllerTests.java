@@ -31,6 +31,7 @@ import com.cakeshop.domain.payment.service.PaymentQueryService;
 import com.cakeshop.domain.payment.service.RefundFacade;
 import com.cakeshop.domain.product.controller.ProductController;
 import com.cakeshop.domain.product.service.ProductService;
+import com.cakeshop.domain.review.service.ReviewProductQueryService;
 import com.cakeshop.global.security.MemberDetails;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -87,7 +88,9 @@ class CustomerPageControllerTests {
         mockMvc = MockMvcBuilders.standaloneSetup(
                         new HomeController(mock(HomeService.class)),
                         new AuthController(memberService),
-                        new ProductController(mock(ProductService.class)),
+                        new ProductController(
+                                mock(ProductService.class),
+                                mock(ReviewProductQueryService.class)),
                         new CartController(cartService),
                         new OrderController(
                                 mock(OrderCheckoutService.class),
