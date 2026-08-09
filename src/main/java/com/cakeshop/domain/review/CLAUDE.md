@@ -27,7 +27,7 @@
 | 도메인 간 계약·표시명·상품 집계 | `DOMAIN.md` 2.6~2.7절, 4절과 `docs/conventions.md` 12절 |
 | 상태·권한·오류 처리 | `DOMAIN.md` 2.1~2.5절의 필요한 절 |
 | 화면 변경 | `DOMAIN.md` 3절과 해당 기능 spec |
-| 테스트·하네스 추가 또는 실패 분석 | `docs/review/HARNESS.md`와 `docs/testing.md` 관련 절 |
+| 테스트 추가 또는 실패 분석 | `docs/testing.md` 관련 절 |
 | 결정의 이유가 구현 선택을 바꾸는 경우 | 관련 `docs/review/decisions/*.md` 한 파일 |
 | 완료된 조각의 회귀를 추적해야 하는 경우 | 관련 `docs/review/history/*`만 |
 
@@ -46,4 +46,3 @@
 
 - 업무 결정이 바뀌었으면 `DOMAIN.md` 또는 해당 spec을 갱신한다.
 - `PLAN.md`의 조각 상태와, 결정을 내렸다면 결정 로그를 갱신한다.
-- 자동 검증을 추가했으면 `docs/review/HARNESS.md`에 등록한다.

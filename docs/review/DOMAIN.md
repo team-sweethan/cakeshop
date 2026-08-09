@@ -13,7 +13,6 @@
 | 화면 인벤토리 | 이 문서 3절 |
 | 아직 안 정해진 것 | 이 문서 4절 |
 | 조각 순서, 진행 상태, 위험, 결정 로그 | `PLAN.md` |
-| 자동 검증 체계 — 무엇이 어떤 규칙을 붙잡는가 | `HARNESS.md` |
 | 왜 그렇게 정했나 — PLAN 한 줄로 재구성이 안 되는 것 | `decisions/` |
 | 머지되었고 더 이상 구속하지 않는 것 | `history/` |
 | 도메인 작업 규칙 (구현 시작 전) | `src/main/java/com/cakeshop/domain/review/CLAUDE.md` |
@@ -281,7 +280,7 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 
 진입점 수정: `customer/member/mypage.html`(A1·B3 링크 2개), `customer/order/detail.html`(`orderItemId` 전달), `customer/product/detail.html`(작성 버튼 → A1)
 
-**화면 명세를 `screens/`로 나누는 것은 조각 3이다.** 실제 화면이 처음 생기는 시점이고, 그때 커뮤니티 `CommunityScreenDocTests`에 해당하는 문구 대조 하네스를 함께 세운다. 지금은 이 표가 화면 인벤토리의 정본이다.
+**화면 명세를 `screens/`로 나눌지는 실제 화면이 처음 생기는 조각 3에서 판단한다.** 화면 문구를 테스트로 고정하는 하네스는 세우지 않는다(`docs/testing.md` 8절). 지금은 이 표가 화면 인벤토리의 정본이다.
 
 ## 4. 미정
 
