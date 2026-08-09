@@ -62,13 +62,17 @@ LIMIT #{size} OFFSET #{offset}
 
 **`orderItemId`는 필수다.** 없거나 숫자가 아니면 400이다.
 
-- 진입점 3곳이 모두 파라미터 없는 `/reviews/new`로 가고 있다. 셋 다 고쳐야 한다.
+- 파라미터 없는 `/reviews/new`로 가는 진입점을 고친다. **`orderItemId` 없이 열면 400이므로 남겨 두면 죽은 링크가 된다.**
 
 | 진입점 | 현재 | 바꿀 것 |
 |---|---|---|
-| 주문 상세 `후기 작성` | `/reviews/new` | `/reviews/new?orderItemId={N}` |
 | 마이페이지 `작성할 후기` | `/reviews/new` | `/mypage/reviews/writable` (A1) |
 | 상품 상세 `후기 작성` | `/reviews/new` | `/mypage/reviews/writable` (A1) |
+| 화면 인덱스 `C16 후기 작성` | `/reviews/new` | `/mypage/reviews/writable` (A1) |
+
+> **주문 상세에는 `후기 작성` 링크가 없다.** 2026-08-09에 확인했다 — `customer/order/detail.html`에 `reviews` 문자열이 하나도 없다. 예전에 있었다고 적혀 있었으나 지금 `dev` 기준으로는 사실이 아니다.
+>
+> 있어야 하는 자리인 것은 맞다. 주문 상세는 그 주문의 `orderItemId`를 이미 알고 있어 A1을 거치지 않고 곧바로 폼으로 보낼 수 있는 **유일한 진입점**이다. 다만 목록 반복 안에 링크를 넣는 일이라 **링크 한 줄 수정을 넘어서므로**(`domain/review/CLAUDE.md`), 주환님께 알리고 별도로 진행한다. 조각 1은 A1을 통한 경로만으로 완결된다.
 
 - **상품 상세에서 곧바로 폼으로 보내지 않는 이유**: 그 상품을 픽업한 주문이 여러 건일 수 있어 어느 주문 상품인지 화면이 정할 수 없다. 고르는 중간 화면을 새로 만드느니 A1이 대신한다.
 

@@ -2,4 +2,33 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.cakeshop.domain.review.mapper.ReviewMapper">
     <!-- 사용자 입력은 #{} 만 사용 (${} 금지) -->
+
+    <select id="findReviewedOrderItemIds" resultType="long">
+        SELECT order_item_id
+        FROM reviews
+        WHERE member_id = #{memberId}
+    </select>
+
+    <select id="existsByOrderItemId" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM reviews
+            WHERE order_item_id = #{orderItemId}
+        )
+    </select>
+
+    <!-- status 를 컬럼 기본값에 맡기지 않는다. rds 는 flyway.enabled=false 라
+         기본값을 PUBLISHED 로 바꾼 조각 0 migration 이 반영됐다는 보장이 없고,
+         안 됐으면 V0 의 'VISIBLE' 이 그대로 들어간다(PLAN.md R11). -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO reviews (
+            order_item_id, product_id, member_id,
+            overall_rating, taste_rating, design_rating, service_rating,
+            content, status
+        ) VALUES (
+            #{orderItemId}, #{productId}, #{memberId},
+            #{overallRating}, #{tasteRating}, #{designRating}, #{serviceRating},
+            #{content}, 'PUBLISHED'
+        )
+    </insert>
 </mapper>

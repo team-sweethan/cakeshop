@@ -200,7 +200,9 @@ class ScreenRenderingTests {
         String[] paths = {
             "/cart", "/orders/checkout?productId=1&quantity=1&optionIds=1",
             "/mypage",
-            "/orders", "/notifications", "/reviews/new", "/mypage/coupons",
+            // /reviews/new 는 orderItemId 와 주문 자격이 있어야 열린다(조각 1).
+            // 맨 주소가 아니라 A1 목록을 훑고, 폼 렌더링은 ReviewScreenRenderingTests 가 맡는다.
+            "/orders", "/notifications", "/mypage/reviews/writable", "/mypage/coupons",
             "/mypage/profile"
         };
 

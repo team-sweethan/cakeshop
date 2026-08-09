@@ -1,4 +1,13 @@
-﻿<!doctype html>
+<!--/*
+******************************
+작성자 : HyunGyu-Cho
+담당자 : 현규
+작성일 : 2026-08-09
+기능 : 후기 작성 화면
+설명 : 평점 4종과 본문을 받는다. 기본 선택을 두지 않아 미선택은 서버 검증에서 걸린다.
+******************************
+*/-->
+<!doctype html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
   <meta charset="UTF-8">
@@ -12,10 +21,90 @@
 <body data-page-title="후기 작성">
   <header th:replace="~{fragments/common/header :: header}"></header>
   <main class="page-container page-container--form">
-    <div th:replace="~{fragments/customer/mock-notice :: notice}"></div>
-    <h1>후기 작성</h1><section class="section"><h2 class="section-title">주문 상품</h2><div class="panel cluster"><div class="placeholder-image placeholder-image--sm">상품 이미지</div><div><strong>딸기 생크림 케이크</strong><p class="text-muted">ORD-20250110-003 | 픽업 완료</p></div></div></section><form data-mock-form data-success-url="/orders/1"><section class="section"><h2 class="section-title">평점 선택</h2><div class="panel stack" data-select-group><div class="cluster"><span style="width:45px">맛</span><button class="btn" data-select type="button">1점</button><button class="btn" data-select type="button">2점</button><button class="btn" data-select type="button">3점</button><button class="btn" data-select type="button">4점</button><button class="btn" data-select type="button">5점</button></div><div class="cluster"><span style="width:45px">디자인</span><button class="btn" type="button">1점</button><button class="btn" type="button">2점</button><button class="btn" type="button">3점</button><button class="btn" type="button">4점</button><button class="btn" type="button">5점</button></div><div class="cluster"><span style="width:45px">포장</span><button class="btn" type="button">1점</button><button class="btn" type="button">2점</button><button class="btn" type="button">3점</button><button class="btn" type="button">4점</button><button class="btn" type="button">5점</button></div><div class="cluster"><span style="width:45px">응대</span><button class="btn" type="button">1점</button><button class="btn" type="button">2점</button><button class="btn" type="button">3점</button><button class="btn" type="button">4점</button><button class="btn" type="button">5점</button></div></div></section><section class="section"><h2 class="section-title">후기 내용</h2><div class="panel"><div class="form-group"><label class="form-label" for="review-content">내용 <span class="required">*</span></label><textarea class="form-control form-control--textarea" id="review-content" minlength="10" placeholder="후기를 작성해 주세요 (최소 10자 이상)" required></textarea></div><div class="form-group"><label class="form-label" for="review-image">이미지 첨부 (선택, 최대 3장)</label><input class="form-control" id="review-image" type="file" accept="image/*" multiple></div></div></section><div class="cluster"><button class="btn btn--primary" type="submit">후기 등록</button><button class="btn" type="button">수정하기</button><button class="btn btn--danger" type="button" data-confirm="후기를 삭제하시겠습니까?">삭제하기</button></div></form>
+    <h1>후기 작성</h1>
+
+    <section class="section">
+      <h2 class="section-title">주문 상품</h2>
+      <div class="panel">
+        <strong th:text="${target.productName()}">상품명</strong>
+        <p class="text-muted">
+          <span th:text="${target.orderNumber()}">주문번호</span> ·
+          <span th:text="${#temporals.format(target.pickedUpAt(), 'yyyy.MM.dd')} + ' 픽업 완료'">2026.01.01 픽업 완료</span>
+        </p>
+      </div>
+    </section>
+
+    <form method="post" th:object="${reviewWriteForm}" th:action="@{/reviews}">
+      <input type="hidden" th:field="*{orderItemId}">
+
+      <section class="section">
+        <h2 class="section-title">평점 선택</h2>
+        <div class="panel stack">
+          <div class="form-group">
+            <span class="form-label">전체 <span class="required">*</span></span>
+            <span class="cluster">
+              <label th:each="score : ${#numbers.sequence(1, 5)}">
+                <input type="radio" th:field="*{overallRating}" th:value="${score}">
+                <span th:text="${score} + '점'">1점</span>
+              </label>
+            </span>
+            <p class="field-error" th:errors="*{overallRating}"></p>
+          </div>
+
+          <div class="form-group">
+            <span class="form-label">맛 <span class="required">*</span></span>
+            <span class="cluster">
+              <label th:each="score : ${#numbers.sequence(1, 5)}">
+                <input type="radio" th:field="*{tasteRating}" th:value="${score}">
+                <span th:text="${score} + '점'">1점</span>
+              </label>
+            </span>
+            <p class="field-error" th:errors="*{tasteRating}"></p>
+          </div>
+
+          <div class="form-group">
+            <span class="form-label">디자인 <span class="required">*</span></span>
+            <span class="cluster">
+              <label th:each="score : ${#numbers.sequence(1, 5)}">
+                <input type="radio" th:field="*{designRating}" th:value="${score}">
+                <span th:text="${score} + '점'">1점</span>
+              </label>
+            </span>
+            <p class="field-error" th:errors="*{designRating}"></p>
+          </div>
+
+          <div class="form-group">
+            <span class="form-label">응대 <span class="required">*</span></span>
+            <span class="cluster">
+              <label th:each="score : ${#numbers.sequence(1, 5)}">
+                <input type="radio" th:field="*{serviceRating}" th:value="${score}">
+                <span th:text="${score} + '점'">1점</span>
+              </label>
+            </span>
+            <p class="field-error" th:errors="*{serviceRating}"></p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-title">후기 내용</h2>
+        <div class="panel">
+          <div class="form-group">
+            <label class="form-label" for="content">내용 <span class="required">*</span></label>
+            <textarea class="form-control form-control--textarea" id="content" th:field="*{content}"
+                      style="min-height:220px" placeholder="후기를 작성해 주세요 (최소 10자 이상)"
+                      minlength="10" maxlength="2000" required></textarea>
+            <p class="field-error" th:errors="*{content}"></p>
+          </div>
+        </div>
+      </section>
+
+      <div class="cluster cluster--between section">
+        <a class="btn" th:href="@{/mypage/reviews/writable}">취소</a>
+        <button class="btn btn--primary" type="submit">후기 등록</button>
+      </div>
+    </form>
   </main>
   <footer th:replace="~{fragments/common/footer :: footer(${store})}"></footer>
 </body>
 </html>
-

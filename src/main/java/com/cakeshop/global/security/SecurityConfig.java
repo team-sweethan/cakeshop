@@ -68,10 +68,11 @@ public class SecurityConfig {
                     // 관리자 화면은 preview에서도 열지 않는다 — 아래 /admin/** 규칙에 따라 관리자 로그인이 필요하다.
                     // /community/new는 목업이 아니게 되면서 뺐다. 저장 경로가 생긴 화면을 비로그인에게
                     // 열어 두면 폼을 다 채우고 등록에서야 로그인으로 튕긴다.
+                    // /reviews/**도 조각 1에서 같은 이유로 뺐다 — 작성 폼이 주문 소유권을 검증한다.
                     auth.requestMatchers(
                             HttpMethod.GET,
                             "/orders/**", "/notifications", "/api/notifications", "/api/notifications/**",
-                            "/reviews/**", "/chat")
+                            "/chat")
                             .permitAll();
                 }
 

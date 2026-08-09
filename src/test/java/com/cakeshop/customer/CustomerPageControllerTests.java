@@ -32,6 +32,7 @@ import com.cakeshop.domain.payment.service.RefundFacade;
 import com.cakeshop.domain.product.controller.ProductController;
 import com.cakeshop.domain.product.service.ProductService;
 import com.cakeshop.domain.review.controller.ReviewController;
+import com.cakeshop.domain.review.service.ReviewService;
 import com.cakeshop.global.security.MemberDetails;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -106,7 +107,7 @@ class CustomerPageControllerTests {
                                 mock(SessionRegistry.class)),
                         new NotificationUserController(),
                         new CouponController(),
-                        new ReviewController())
+                        new ReviewController(mock(ReviewService.class)))
                 .setCustomArgumentResolvers(
                         new AuthenticationPrincipalArgumentResolver())
                 .build();
@@ -127,7 +128,8 @@ class CustomerPageControllerTests {
         pages.put("/mypage", "customer/member/mypage");
         pages.put("/orders/1", "customer/order/detail");
         pages.put("/notifications", "customer/notification/list");
-        pages.put("/reviews/new", "customer/review/form");
+        // /reviews/new 는 목업이 아니게 되어 빠졌다. orderItemId 와 주문 자격이 있어야 열리므로
+        // 맨 주소로 200 을 기대할 수 없다. 검증은 review 도메인 테스트가 한다(조각 1).
         pages.put("/mypage/coupons", "customer/coupon/list");
         pages.put("/mypage/profile", "customer/member/profile-edit");
     }

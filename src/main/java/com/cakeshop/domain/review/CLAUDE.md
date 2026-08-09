@@ -17,20 +17,22 @@
 
 ## 지금 상태
 
-**조각 0(#125)만 머지됐다.** 스키마와 상태 어휘는 굳었고, 그 위에서 동작하는 기능은 아직 없다.
+**조각 0(#125) 머지 완료, 조각 1 진행 중.** 작성 흐름이 실동작으로 들어왔고, 조회·수정·관리자 기능은 아직 없다.
 
 | 파일 | 상태 |
 |---|---|
 | `entity/ReviewStatus.java` | **완료** — `PUBLISHED`/`DELETED`/`BLOCKED` + `canTransitionTo` |
 | `entity/Review.java`, `entity/ReviewReply.java` | **완료** — 스키마에 맞춰 필드가 채워져 있다 |
 | migration | **완료** — `V20260806_075114__add_review_status_and_rating_constraints.sql` (`status` 기본값·`CHECK`, 평점 범위 `CHECK`) |
-| `service/ReviewService.java` | TODO 주석만 |
-| `mapper/ReviewMapper.java`, `mapper/review/ReviewMapper.xml` | 비어 있음 |
-| `controller/ReviewController.java` | `GET /reviews/new` 목업 반환만 |
+| `service/ReviewService.java` | 조각 1 — A1 목록, A2 대상 조회, A3 등록 |
+| `mapper/ReviewMapper.java`, `mapper/review/ReviewMapper.xml` | 조각 1 — 제외 목록 조회·중복 확인·INSERT. **`reviews` 외 테이블을 JOIN하지 않는다** |
+| `dto/form/ReviewWriteForm.java` | 조각 1 — 평점 4종·본문. `productId` 자리는 **일부러 없다**(R4) |
+| `controller/ReviewController.java` | 조각 1 — `GET /mypage/reviews/writable`, `GET /reviews/new`, `POST /reviews` |
 | `controller/ReviewAdminController.java` | `GET /admin/reviews` 목업 반환만 |
-| `error/ReviewErrorCode.java` | `REVIEW_001` 하나 |
+| `error/ReviewErrorCode.java` | `REVIEW_001`~`004` (조각 1까지) |
+| `templates/customer/review/` | `writable.html` 신규, `form.html` 실동작 전환 |
 
-즉 **조각 1부터는 기존 구현에 맞출 것이 거의 없다.** 판단 기준은 코드가 아니라 위 문서들이다.
+**조각 2를 아직 안 했다.** 상품 행 잠금과 평점 집계가 붙지 않아 `products.average_rating`은 여전히 움직이지 않는다. 그래서 **조각 1만 `dev`에 머지하지 않는다**(아래 R2).
 
 > `rds` 프로파일은 `flyway.enabled: false`라 **migration이 자동 적용되지 않는다.** 조각 1은 `status` 기본값과 `CHECK`를 전제하므로 착수 전에 반영 여부를 확인한다(`PLAN.md` R11).
 
