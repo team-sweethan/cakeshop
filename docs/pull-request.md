@@ -39,7 +39,7 @@ ci: PR Gradle 테스트 workflow 추가
 - GitHub가 자동으로 불러오는 [PR 템플릿](../.github/pull_request_template.md)의 항목을 삭제하지 않고 작성한다.
 - 실행한 테스트 명령과 결과를 기록한다. 실행하지 못한 테스트는 사유와 후속 계획을 남긴다.
 - DB 변경이 있으면 새 migration 파일명, 기존 데이터 영향, 적용·복구 방법을 기록한다.
-- 공유된 versioned migration은 수정하지 않고 `.\gradlew.bat newMigration -Pdesc=<snake_case>`(Windows) 또는 `./gradlew newMigration -Pdesc=<snake_case>`(mac·Linux)로 새 파일을 만든다.
+- 공유된 versioned migration은 수정하지 않고 새 파일을 만든다. 파일명은 직접 짓지 않으며, 생성 명령과 규약은 `docs/conventions.md` 6-1절이 정본이다.
 - 로컬 seed 변경 시 팀원이 다시 실행해야 하는지 명시한다. `rds` 반영은 별도 검토와 승인을 거친다.
 - 해당하지 않는 체크리스트 항목은 사유를 남긴다.
 

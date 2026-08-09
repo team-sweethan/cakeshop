@@ -147,6 +147,10 @@ Controller → Service → Mapper → DB
   .\gradlew.bat newMigration -Pdesc=add_coupon_table
   ```
 
+  ```bash
+  ./gradlew newMigration -Pdesc=add_coupon_table
+  ```
+
   `src/main/resources/db/migration/V<yyyyMMdd>_<HHmmss>__<snake_case>.sql`이 만들어진다. `-Pdesc`는 소문자 `snake_case`만 받는다. 같은 초에 만들어진 파일이 있으면 자동으로 1초 밀어서 생성한다.
 - **분 단위 버전(`V20260729_1015__x.sql`)은 [금지].** Flyway는 버전 조각을 숫자로 비교하므로 초 단위와 섞이면 `1015 < 101542`가 되어 나중에 만든 파일이 먼저 실행된다. `MigrationNamingTests`가 CI에서 잡는다.
 - **머지된 migration은 수정하지 않는다. [금지]** checksum이 바뀌면 팀원 전원이 로컬 DB를 다시 만들어야 한다. 변경이 필요하면 새 migration을 만든다.
