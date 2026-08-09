@@ -8,7 +8,7 @@
 
 > **이 기능은 이슈 #33 `feat(product): 리뷰 평점 및 후기 수 연동`(시은 담당)과 같은 일이다.**
 > 별도 이슈를 만들지 않고 #33에서 진행한다. 상세는 `PLAN.md` 조각 2와 R9.
-> `domain/product/`는 시은님 담당이므로 **착수 전에 #33에 계약 시그니처를 올려 확인받는다**(`AGENTS.md` — 공개 Service 인터페이스는 먼저 협의).
+> `domain/product/`는 시은님 담당이지만 **여기서 만드는 것은 전부 새 파일이고 기존 파일은 한 줄도 고치지 않는다.** 그래서 조각 1과 같은 순서다 — **만들고 PR에서 확인받는다**(`DOMAIN.md` 2.7, `docs/conventions.md` 12절). **#33에는 착수 사실만 알린다**(허락이 아니라 중복 작업 방지).
 
 **방식: `products` 컬럼 갱신. 집계는 리뷰가, 쓰기는 상품이** (2026-08-06 개정)
 
@@ -77,9 +77,12 @@ void applyReviewAggregate(long productId, BigDecimal averageRating, long reviewC
 - `reviewCount`가 `long`인 것은 리뷰 쪽 `COUNT(*)`가 `long`이라서다. 컬럼은 `INT UNSIGNED`로 더 좁다.
 - 둘 다 상품이 없으면 `PRODUCT_002`(404)다. `applyReviewAggregate`는 `affectedRows == 0`으로 판정한다.
 
-**#33에서 확인받을 것**
+**시은님을 PR 리뷰어로 지정해 확인받을 것**
 
 - 위 시그니처
-- 전용 매퍼(`ProductReviewMapper`)를 두는 것에 대한 상품 담당자 동의
+- 전용 매퍼(`ProductReviewMapper`)를 두는 것 — 이 저장소 첫 사례라 PR 본문에 이유를 남긴다
 - 위 잠금 순서가 재고 경로와 어긋나지 않는지
-- **리뷰가 계산한 평균·건수를 상품이 그대로 쓰는 것**에 대한 동의. 상품 쪽에 검증할 방법이 없다
+- **리뷰가 계산한 평균·건수를 상품이 그대로 쓰는 것.** 상품 쪽에 검증할 방법이 없다
+- **기존 `ProductMapper.findSalesInfoByIdForUpdate`에 새 호출부가 생긴다.** 파일을 고치지 않으므로 12절의 사전 협의 대상은 아니지만, 그 메서드가 바뀌면 이 계약이 따라 깨진다는 사실은 알려야 한다
+
+**`applyReviewAggregate`에 인자가 있다는 것 자체가 이 설계의 대가다.** 방향이 뒤집히기 전에는 상품이 직접 세어 인자가 필요 없었다. 지금은 상품이 값을 받기만 하므로 **받은 값을 검증할 수 없다.** PR 본문에 이 대가를 함께 적는다.
