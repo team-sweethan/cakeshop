@@ -4,7 +4,8 @@
 확정된 정책, 구현 진행률과 개인별 TODO는 적지 않는다. 결정이 끝나면 소유 도메인의 `DOMAIN.md`,
 [`conventions.md`](conventions.md), [`README.md`](../README.md) 중 알맞은 정본으로 옮기고 여기서 지운다.
 
-도메인 담당과 사전 협의·리뷰 기준은 [`AGENTS.md`](../AGENTS.md)가 정본이다.
+도메인 담당 배정은 [`AGENTS.md`](../AGENTS.md), 사전 협의와 리뷰어 지정 기준은
+[`conventions.md`](conventions.md) 12절과 [`pull-request.md`](pull-request.md) 1절이 정본이다.
 
 ## 0. 공용 통합 환경
 
