@@ -32,7 +32,7 @@ MyBatis XML은 `src/main/resources/mapper/<도메인>/`, 템플릿은 `templates
 
 - **다른 도메인의 테이블·Mapper·Entity를 직접 참조하거나 JOIN하지 않는다.** 연동 계약의 코드와 SQL은 쓰는 쪽이 아니라 **데이터를 소유한 도메인**에 둔다 (`docs/conventions.md` 15절). **예외는 여러 도메인을 집계·요약하는 통계·대시보드 ReadModel 하나**다(15.9) — 관리자 화면이라는 것은 근거가 아니다
 - 사용자 입력에 `${}`를 쓰지 않는다. MyBatis 값은 `#{}`로 바인딩한다
-- **이미 공유된 Flyway migration은 고치지 않는다.** 머지 전이라도 팀원이 받아 적용했으면 checksum이 어긋나 그쪽 기동이 깨진다. 새 versioned migration을 `gradlew newMigration -Pdesc=<snake_case>`로 만든다
+- **이미 공유된 Flyway migration은 고치지 않는다.** 머지 전이라도 팀원이 받아 적용했으면 checksum이 어긋나 그쪽 기동이 깨진다. 새 versioned migration을 `.\gradlew.bat newMigration -Pdesc=<snake_case>`(Windows) 또는 `./gradlew newMigration -Pdesc=<snake_case>`(mac·Linux)로 만든다
 - 권한을 화면 숨김으로 처리하지 않는다. Spring Security에서 `ADMIN`을 강제한다
 - 회원 소유 자원은 요청으로 온 회원 ID를 믿지 않고 Service에서 인증 사용자 기준으로 검증한다
 
