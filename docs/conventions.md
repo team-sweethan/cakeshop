@@ -190,27 +190,23 @@ Service는 업무 규칙과 트랜잭션 경계를 소유한다.
 
 ## 8. Flyway와 seed
 
-- migration 파일은 직접 만들지 않고 아래 명령으로 생성한다.
-
-  ```powershell
-  .\gradlew.bat newMigration -Pdesc=add_coupon_table
-  ```
-
-  ```bash
-  ./gradlew newMigration -Pdesc=add_coupon_table
-  ```
-
+- migration 파일은 직접 만들지 않고 Gradle의 `newMigration` 태스크로 생성한다. 운영체제별 명령은
+  [Flyway migration 작성 가이드의 파일 생성](flyway_make_sample.md#2-파일-생성)을 따른다.
 - 생성된 `V<yyyyMMdd>_<HHmmss>__<snake_case>.sql` 이름을 임의로 바꾸지 않는다.
 - 공유 브랜치에 반영된 versioned migration은 수정하지 않는다. 변경은 새 migration으로 추가한다.
-- 함께 적용되어야 성공하는 DDL과 기준 데이터는 한 migration에 둔다.
+- 한 migration은 하나의 배포 가능한 스키마 전환을 표현한다. SQL 문장 수만으로 파일을 합치거나
+  나누지 않는다.
+- 서로 의존하는 여러 migration은 같은 PR에서 version 순서를 확인한다. 단계별로 나누는 경우 각 단계만
+  반영된 상태에서도 애플리케이션이 정상 동작해야 한다.
 - 모든 환경에서 필요한 기준 데이터는 versioned migration으로 관리한다.
 - 로컬 확인용 샘플 데이터는 `src/main/resources/db/seed`에 두고 migration에 넣지 않는다.
 - seed는 반복 실행해도 같은 결과가 되도록 작성하며 Flyway 이력 테이블을 변경하지 않는다.
 - 애플리케이션의 Flyway 자동 실행은 `local`, `test`에서만 허용한다. 공용 DB는 검토된 별도 절차로
   반영한다.
 
-DDL과 기준 데이터 예시는 [flyway_make_sample.md](flyway_make_sample.md)를 따른다. 스키마 변경 PR은
-기존 데이터 영향과 실패 시 복구 방법을 설명한다.
+migration의 변경 단위, 기존 데이터 처리, MariaDB DDL의 부분 실패·복구와 검증 방법은
+[Flyway migration 작성 가이드](flyway_make_sample.md)를 따른다. 스키마 변경 PR은 기존 데이터 영향과
+실패 시 복구 방법을 설명한다.
 
 ## 9. 오류 처리
 

@@ -211,11 +211,8 @@ src/
 1. 하나의 브랜치와 PR에는 하나의 목적만 담습니다.
 2. 구현 전에 [`docs/conventions.md`](docs/conventions.md)의 계층·명명·도메인 경계 규칙을 확인합니다.
 3. 테스트는 [`docs/testing.md`](docs/testing.md)의 이름과 범위 규칙을 따릅니다.
-4. 새 Flyway migration은 파일명을 직접 만들지 않고 다음 명령으로 생성합니다.
-
-   ```powershell
-   .\gradlew.bat newMigration -Pdesc=add_coupon_table
-   ```
+4. 새 Flyway migration은 파일명을 직접 만들지 않고
+   [Flyway migration 작성 가이드의 파일 생성](docs/flyway_make_sample.md#2-파일-생성)을 따릅니다.
 
 5. 이미 공유된 versioned migration은 수정하지 않습니다. 변경이 필요하면 새 migration을 추가합니다.
 6. 커밋 제목은 `<type>: 한글 요약` 형식을 사용합니다. 예: `feat: 후기 작성 기능 추가`.
@@ -227,7 +224,7 @@ src/
 
 - 🧭 **[코드 컨벤션과 아키텍처](docs/conventions.md)**: 기술 기준, 수직 슬라이스, 네이밍, DB·MyBatis·트랜잭션·인증 규칙과 도메인 연동 경계
 - 🧪 **[테스트 작성 가이드](docs/testing.md)**: 계층별 테스트 전략, MariaDB Testcontainers, 테스트 대역, 명명과 검증 기준
-- 🗃️ **[Flyway migration 작성 예시](docs/flyway_make_sample.md)**: migration 생성 명령, DDL·기준 데이터 작성 예시와 머지 후 불변 규칙
+- 🗃️ **[Flyway migration 작성 가이드](docs/flyway_make_sample.md)**: 변경 단위, 기존 데이터 영향, MariaDB DDL 실패·복구와 검증 기준
 - 🔄 **[상태 설계 규칙](docs/status-design.md)**: 도메인 상태값, Enum·DB 제약·Service 상태 전이의 공통 기준
 - 🤝 **[팀 미결정 항목과 협업 경계](docs/team-plan.md)**: 도메인 간 연결, 핵심 비즈니스 정책, 파일 저장 등 합의가 필요한 항목
 - 🔀 **[Pull Request 가이드](docs/pull-request.md)**: PR 크기·제목·본문, 리뷰 요청과 브랜치별 병합 기준
