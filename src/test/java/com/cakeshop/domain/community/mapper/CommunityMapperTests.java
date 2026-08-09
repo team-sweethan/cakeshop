@@ -30,7 +30,10 @@ import com.cakeshop.domain.community.entity.ReportStatus;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mybatis.spring.boot.test.autoconfigure.MybatisTest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
@@ -86,33 +89,27 @@ class CommunityMapperTests {
         assertThat(posts).extracting(PostListRow::title).containsExactly("노출");
     }
 
-    @Test
-    void findPublishedPosts_latestSort_ordersByCreatedAtThenIdDescending() {
-        long first = insertPost("첫 번째", PostStatus.PUBLISHED, BASE_TIME);
-        long second = insertPost("두 번째", PostStatus.PUBLISHED, BASE_TIME);
-        long newest = insertPost("최신", PostStatus.PUBLISHED, BASE_TIME.plusDays(1));
+    /**
+     * 정렬 기준마다 순서가 갈리고 값이 같으면 id 내림차순으로 이어진다. 세 글은 작성 시각과
+     * 조회수 순서가 서로 반대라 두 기준이 같은 결과로 통과하지 않는다.
+     */
+    @ParameterizedTest(name = "{0} 정렬은 {1}, {2}, {3} 순서다")
+    @CsvSource({
+            "LATEST, 적게 본 최신 글, 많이 본 오래된 글, 적게 본 오래된 글",
+            "VIEWS, 많이 본 오래된 글, 적게 본 최신 글, 적게 본 오래된 글"
+    })
+    void findPublishedPosts_sort_ordersByRequestedKeyThenIdDescending(
+            PostSort sort, String first, String second, String third) {
+        long fewOld = insertPost("적게 본 오래된 글", PostStatus.PUBLISHED, BASE_TIME);
+        long manyOld = insertPost("많이 본 오래된 글", PostStatus.PUBLISHED, BASE_TIME);
+        long fewNew = insertPost("적게 본 최신 글", PostStatus.PUBLISHED, BASE_TIME.plusDays(1));
 
-        List<PostListRow> posts = findPage(1, 20);
+        setViewCount(fewOld, 3);
+        setViewCount(manyOld, 100);
+        setViewCount(fewNew, 3);
 
-        assertThat(posts).extracting(PostListRow::id)
-                .containsExactly(newest, second, first);
-    }
-
-    /** 작성 시각과 반대인 조회수 순서를 검증한다. */
-    @Test
-    void findPublishedPosts_viewSort_ordersByViewCountThenIdDescending() {
-        long fewFirst = insertPost("적게 본 글 1", PostStatus.PUBLISHED, BASE_TIME);
-        long fewSecond = insertPost("적게 본 글 2", PostStatus.PUBLISHED, BASE_TIME.plusDays(1));
-        long many = insertPost("많이 본 글", PostStatus.PUBLISHED, BASE_TIME.minusDays(1));
-
-        setViewCount(fewFirst, 3);
-        setViewCount(fewSecond, 3);
-        setViewCount(many, 100);
-
-        List<PostListRow> posts = findPage(1, 20, PostSort.VIEWS);
-
-        assertThat(posts).extracting(PostListRow::id)
-                .containsExactly(many, fewSecond, fewFirst);
+        assertThat(findPage(1, 20, sort)).extracting(PostListRow::title)
+                .containsExactly(first, second, third);
     }
 
     /** 같은 작성 시각의 페이지 경계에서 중복과 누락을 확인한다. */
@@ -158,27 +155,26 @@ class CommunityMapperTests {
         assertThat(communityMapper.countPublishedPosts(categoryId)).isEqualTo(1);
     }
 
-    @Test
-    void findPostById_blockedPost_isReturnedWithReason() {
-        long postId = insertPost("차단된 글", PostStatus.BLOCKED, BASE_TIME);
-        jdbcTemplate.update(
-                "UPDATE posts SET blocked_reason = ?, blocked_at = ? WHERE id = ?",
-                "광고성 게시물", BASE_TIME, postId);
+    /** 노출 여부는 Service가 판단하므로 숨겨진 글도 상태와 차단 사유를 그대로 반환한다. */
+    @ParameterizedTest(name = "{1} 게시글도 그대로 반환한다")
+    @CsvSource(nullValues = "-", value = {
+            "차단된 글, BLOCKED, 광고성 게시물",
+            "삭제된 글, DELETED, -"
+    })
+    void findPostById_hiddenPost_isStillReturnedWithItsStatus(
+            String title, PostStatus status, String blockedReason) {
+        long postId = insertPost(title, status, BASE_TIME);
+        if (blockedReason != null) {
+            jdbcTemplate.update(
+                    "UPDATE posts SET blocked_reason = ?, blocked_at = ? WHERE id = ?",
+                    blockedReason, BASE_TIME, postId);
+        }
 
         PostDetailRow post = communityMapper.findPostById(postId);
 
-        // 노출 상태는 Service가 판단한다.
-        assertThat(post.status()).isEqualTo(PostStatus.BLOCKED);
-        assertThat(post.blockedReason()).isEqualTo("광고성 게시물");
-    }
-
-    @Test
-    void findPostById_deletedPost_isStillReturnedToService() {
-        long postId = insertPost("삭제된 글", PostStatus.DELETED, BASE_TIME);
-
-        assertThat(communityMapper.findPostById(postId)).isNotNull()
-                .extracting(PostDetailRow::status)
-                .isEqualTo(PostStatus.DELETED);
+        assertThat(post).isNotNull();
+        assertThat(post.status()).isEqualTo(status);
+        assertThat(post.blockedReason()).isEqualTo(blockedReason);
     }
 
     @Test
@@ -260,19 +256,20 @@ class CommunityMapperTests {
         assertThat(saved.isEdited()).isTrue();
     }
 
-    @Test
-    void updatePost_wrongOwnerOrBlockedPost_updatesNothing() {
-        long otherMemberPostId = insertPost("남의 글", PostStatus.PUBLISHED, BASE_TIME);
-        long blockedPostId = insertPost("차단된 글", PostStatus.BLOCKED, BASE_TIME);
-        Post otherMemberEdit = editOf(
-                otherMemberPostId, withdrawnMemberId, categoryId, "가로챈 제목", "본문");
-        Post blockedPostEdit = editOf(
-                blockedPostId, memberId, categoryId, "고친 제목", "본문");
+    /** 소유자와 상태 조건은 UPDATE 문 안에 있으므로 갱신 행 수와 남은 값을 함께 확인한다. */
+    @ParameterizedTest(name = "{0}은 수정되지 않는다")
+    @CsvSource({
+            "남의 글, PUBLISHED, false",
+            "차단된 글, BLOCKED, true"
+    })
+    void updatePost_wrongOwnerOrBlockedPost_updatesNothing(
+            String title, PostStatus status, boolean asAuthor) {
+        long postId = insertPost(title, status, BASE_TIME);
+        long editorId = asAuthor ? memberId : withdrawnMemberId;
 
-        assertThat(communityMapper.updatePost(otherMemberEdit)).isZero();
-        assertThat(communityMapper.updatePost(blockedPostEdit)).isZero();
-        assertThat(communityMapper.findPostById(otherMemberPostId).title()).isEqualTo("남의 글");
-        assertThat(communityMapper.findPostById(blockedPostId).title()).isEqualTo("차단된 글");
+        assertThat(communityMapper.updatePost(
+                editOf(postId, editorId, categoryId, "가로챈 제목", "본문"))).isZero();
+        assertThat(communityMapper.findPostById(postId).title()).isEqualTo(title);
     }
 
     @Test
@@ -287,17 +284,18 @@ class CommunityMapperTests {
         assertThat(comments).isEqualTo(1L);
     }
 
-    @Test
-    void deletePost_wrongOwnerOrBlockedPost_deletesNothing() {
-        long otherMemberPostId = insertPost("남의 글", PostStatus.PUBLISHED, BASE_TIME);
-        long blockedPostId = insertPost("차단된 글", PostStatus.BLOCKED, BASE_TIME);
+    @ParameterizedTest(name = "{0}은 삭제되지 않는다")
+    @CsvSource({
+            "남의 글, PUBLISHED, false",
+            "차단된 글, BLOCKED, true"
+    })
+    void deletePost_wrongOwnerOrBlockedPost_deletesNothing(
+            String title, PostStatus status, boolean asAuthor) {
+        long postId = insertPost(title, status, BASE_TIME);
+        long requesterId = asAuthor ? memberId : withdrawnMemberId;
 
-        assertThat(communityMapper.deletePost(otherMemberPostId, withdrawnMemberId)).isZero();
-        assertThat(communityMapper.deletePost(blockedPostId, memberId)).isZero();
-        assertThat(communityMapper.findPostById(otherMemberPostId).status())
-                .isEqualTo(PostStatus.PUBLISHED);
-        assertThat(communityMapper.findPostById(blockedPostId).status())
-                .isEqualTo(PostStatus.BLOCKED);
+        assertThat(communityMapper.deletePost(postId, requesterId)).isZero();
+        assertThat(communityMapper.findPostById(postId).status()).isEqualTo(status);
     }
 
     @Test
@@ -391,22 +389,28 @@ class CommunityMapperTests {
         assertThat(communityMapper.findCommentById(commentId).isDeleted()).isTrue();
     }
 
-    @Test
-    void deleteComment_wrongOwnerStatusOrPost_deletesNothing() {
+    /** 댓글·글·작성자와 상태가 모두 맞아야 하므로 조건마다 갱신 행 수를 확인한다. */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({
+            "남의 댓글은 지울 수 없다, PUBLISHED, false, false",
+            "다른 글로는 지울 수 없다, PUBLISHED, true, true",
+            "이미 지운 댓글은 다시 지워지지 않는다, DELETED, true, false"
+    })
+    void deleteComment_wrongOwnerStatusOrPost_deletesNothing(
+            String caseName,
+            CommentStatus status,
+            boolean asAuthor,
+            boolean fromOtherPost) {
         long postId = insertPost("이 글", PostStatus.PUBLISHED, BASE_TIME);
         long otherPostId = insertPost("다른 글", PostStatus.PUBLISHED, BASE_TIME);
-        long publishedCommentId = insertComment(
-                postId, "댓글", CommentStatus.PUBLISHED, BASE_TIME);
-        long deletedCommentId = insertComment(
-                postId, "지운 댓글", CommentStatus.DELETED, BASE_TIME);
+        long commentId = insertComment(postId, "댓글", status, BASE_TIME);
+        long requesterId = asAuthor ? memberId : withdrawnMemberId;
+        long requestedPostId = fromOtherPost ? otherPostId : postId;
 
-        assertThat(communityMapper.deleteComment(
-                publishedCommentId, postId, withdrawnMemberId)).isZero();
-        assertThat(communityMapper.deleteComment(
-                publishedCommentId, otherPostId, memberId)).isZero();
-        assertThat(communityMapper.deleteComment(
-                deletedCommentId, postId, memberId)).isZero();
-        assertThat(communityMapper.findCommentById(publishedCommentId).isDeleted()).isFalse();
+        assertThat(communityMapper.deleteComment(commentId, requestedPostId, requesterId))
+                .isZero();
+        assertThat(communityMapper.findCommentById(commentId).isDeleted())
+                .isEqualTo(status == CommentStatus.DELETED);
     }
 
     /** 잠금 조회는 작성자와 상태를 반환한다. */
@@ -539,137 +543,6 @@ class CommunityMapperTests {
         communityAdminMapper.closePendingReports(postId, ReportStatus.RESOLVED);
 
         assertThat(communityMapper.existsReport(postId, reporterId)).isTrue();
-    }
-
-    @Test
-    void blockPost_publishedPost_recordsBlockWithoutMarkingPostAsEdited() {
-        long postId = insertPost("차단 대상", PostStatus.PUBLISHED, BASE_TIME);
-        long adminId = insertReporter("admin");
-
-        assertThat(communityAdminMapper.blockPost(postId, "광고성 게시물", adminId)).isEqualTo(1);
-
-        PostDetailRow post = communityMapper.findPostById(postId);
-        assertThat(post.status()).isEqualTo(PostStatus.BLOCKED);
-        assertThat(post.blockedReason()).isEqualTo("광고성 게시물");
-        assertThat(blockedBy(postId)).isEqualTo(adminId);
-        assertThat(post.isEdited()).isFalse();
-    }
-
-    @Test
-    void blockPost_nonPublishedPost_changesNothing() {
-        long blockedId = insertPost("이미 차단", PostStatus.PUBLISHED, BASE_TIME);
-        long deletedId = insertPost("지워진 글", PostStatus.DELETED, BASE_TIME);
-        long firstAdminId = insertReporter("first-admin");
-        long secondAdminId = insertReporter("second-admin");
-
-        communityAdminMapper.blockPost(blockedId, "첫 번째 사유", firstAdminId);
-
-        assertThat(communityAdminMapper.blockPost(
-                blockedId, "두 번째 사유", secondAdminId)).isZero();
-        assertThat(communityAdminMapper.blockPost(deletedId, "사유", secondAdminId)).isZero();
-        assertThat(communityMapper.findPostById(blockedId).blockedReason())
-                .isEqualTo("첫 번째 사유");
-        assertThat(blockedBy(blockedId)).isEqualTo(firstAdminId);
-        assertThat(communityMapper.findPostById(deletedId).status()).isEqualTo(PostStatus.DELETED);
-    }
-
-    @Test
-    void unblockPost_keepsBlockRecord() {
-        long postId = insertPost("해제 대상", PostStatus.PUBLISHED, BASE_TIME);
-        long adminId = insertReporter("unblock-admin");
-
-        communityAdminMapper.blockPost(postId, "광고성 게시물", adminId);
-
-        assertThat(communityAdminMapper.unblockPost(postId)).isEqualTo(1);
-
-        PostDetailRow post = communityMapper.findPostById(postId);
-        assertThat(post.status()).isEqualTo(PostStatus.PUBLISHED);
-        assertThat(post.blockedReason()).isEqualTo("광고성 게시물");
-        assertThat(blockedBy(postId)).isEqualTo(adminId);
-    }
-
-    @Test
-    void unblockPost_nonBlockedPost_changesNothing() {
-        long publishedId = insertPost("노출 중", PostStatus.PUBLISHED, BASE_TIME);
-        long deletedId = insertPost("지워진 글", PostStatus.DELETED, BASE_TIME);
-
-        assertThat(communityAdminMapper.unblockPost(publishedId)).isZero();
-        assertThat(communityAdminMapper.unblockPost(deletedId)).isZero();
-        assertThat(communityMapper.findPostById(deletedId).status())
-                .isEqualTo(PostStatus.DELETED);
-    }
-
-    @Test
-    void closePendingReports_leavesAlreadyClosedReportsUntouched() {
-        long postId = insertPost("신고 여럿", PostStatus.PUBLISHED, BASE_TIME);
-        long firstReporterId = insertReporter("r1");
-        long secondReporterId = insertReporter("r2");
-
-        communityMapper.insertReport(postId, firstReporterId, "광고입니다");
-        communityAdminMapper.closePendingReports(postId, ReportStatus.REJECTED);
-
-        communityMapper.insertReport(postId, secondReporterId, "욕설입니다");
-
-        assertThat(communityAdminMapper.closePendingReports(postId, ReportStatus.RESOLVED))
-                .isEqualTo(1);
-        assertThat(communityAdminMapper.countPendingReports(postId)).isZero();
-        assertThat(communityAdminMapper.findReportsByPost(postId))
-                .extracting(ReportRow::status)
-                .containsExactlyInAnyOrder(ReportStatus.REJECTED, ReportStatus.RESOLVED);
-    }
-
-    @Test
-    void findPostsForAdmin_optionalStatus_filtersOnlyWhenProvided() {
-        insertPost("노출", PostStatus.PUBLISHED, BASE_TIME);
-        insertPost("차단", PostStatus.BLOCKED, BASE_TIME);
-        insertPost("삭제", PostStatus.DELETED, BASE_TIME);
-
-        assertThat(adminPosts(null, AdminPostSort.LATEST))
-                .extracting(AdminPostListRow::title)
-                .contains("노출", "차단", "삭제");
-        assertThat(adminPosts(PostStatus.BLOCKED, AdminPostSort.LATEST))
-                .extracting(AdminPostListRow::title)
-                .containsExactly("차단");
-    }
-
-    @Test
-    void findPostsForAdmin_sortedByReports_countsOnlyPendingOnes() {
-        long pendingPostId = insertPost("미처리 신고 1건", PostStatus.PUBLISHED, BASE_TIME);
-        long closedPostId = insertPost("처리된 신고 2건", PostStatus.PUBLISHED, BASE_TIME);
-
-        communityMapper.insertReport(pendingPostId, insertReporter("p1"), "광고입니다");
-        communityMapper.insertReport(closedPostId, insertReporter("c1"), "광고입니다");
-        communityMapper.insertReport(closedPostId, insertReporter("c2"), "욕설입니다");
-        communityAdminMapper.closePendingReports(closedPostId, ReportStatus.RESOLVED);
-
-        List<AdminPostListRow> posts = adminPosts(null, AdminPostSort.REPORTS);
-
-        assertThat(posts).first()
-                .extracting(AdminPostListRow::title)
-                .isEqualTo("미처리 신고 1건");
-        assertThat(posts).filteredOn(post -> post.id() == closedPostId)
-                .first()
-                .extracting(AdminPostListRow::pendingReportCount)
-                .isEqualTo(0L);
-    }
-
-    @Test
-    void findPostByIdForAdmin_readsBlockRecordAndSurvivesWithoutIt() {
-        long neverBlockedId = insertPost("차단된 적 없음", PostStatus.PUBLISHED, BASE_TIME);
-        long blockedId = insertPost("차단됨", PostStatus.PUBLISHED, BASE_TIME);
-        long adminId = insertReporter("detail-admin");
-
-        communityAdminMapper.blockPost(blockedId, "광고성 게시물", adminId);
-
-        AdminPostDetailRow neverBlocked = communityAdminMapper.findPostByIdForAdmin(neverBlockedId);
-        assertThat(neverBlocked).isNotNull();
-        assertThat(neverBlocked.blockedAt()).isNull();
-        assertThat(neverBlocked.blockedBy()).isNull();
-
-        AdminPostDetailRow blocked = communityAdminMapper.findPostByIdForAdmin(blockedId);
-        assertThat(blocked.blockedAt()).isNotNull();
-        assertThat(blocked.blockedReason()).isEqualTo("광고성 게시물");
-        assertThat(blocked.blockedBy()).isEqualTo(adminId);
     }
 
     @Test
@@ -844,5 +717,161 @@ class CommunityMapperTests {
                 postId, authorId, content, status.name(), createdAt, createdAt);
 
         return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+    }
+
+    /**
+     * 관리자 Mapper는 대상 클래스가 다르지만 게시글·회원·신고 픽스처를 그대로 쓴다. 준비 코드를
+     * 복제하지 않으려고 별도 클래스 대신 이 클래스 안에서 관심사만 나눈다(docs/testing.md 5절).
+     */
+    @Nested
+    class CommunityAdminMapperTests {
+
+        @Test
+        void blockPost_publishedPost_recordsBlockWithoutMarkingPostAsEdited() {
+            long postId = insertPost("차단 대상", PostStatus.PUBLISHED, BASE_TIME);
+            long adminId = insertReporter("admin");
+
+            assertThat(communityAdminMapper.blockPost(postId, "광고성 게시물", adminId))
+                    .isEqualTo(1);
+
+            PostDetailRow post = communityMapper.findPostById(postId);
+            assertThat(post.status()).isEqualTo(PostStatus.BLOCKED);
+            assertThat(post.blockedReason()).isEqualTo("광고성 게시물");
+            assertThat(blockedBy(postId)).isEqualTo(adminId);
+            assertThat(post.isEdited()).isFalse();
+        }
+
+        /**
+         * 두 조건의 준비가 서로 다르고 이미 차단된 글에는 기록을 덮어쓰지 않는다는 확인이
+         * 더 붙으므로 한 테스트에서 조건을 이어서 확인한다.
+         */
+        @Test
+        void blockPost_nonPublishedPost_changesNothing() {
+            long blockedId = insertPost("이미 차단", PostStatus.PUBLISHED, BASE_TIME);
+            long deletedId = insertPost("지워진 글", PostStatus.DELETED, BASE_TIME);
+            long firstAdminId = insertReporter("first-admin");
+            long secondAdminId = insertReporter("second-admin");
+
+            communityAdminMapper.blockPost(blockedId, "첫 번째 사유", firstAdminId);
+
+            assertThat(communityAdminMapper.blockPost(
+                    blockedId, "두 번째 사유", secondAdminId)).isZero();
+            assertThat(communityAdminMapper.blockPost(deletedId, "사유", secondAdminId)).isZero();
+            assertThat(communityMapper.findPostById(blockedId).blockedReason())
+                    .isEqualTo("첫 번째 사유");
+            assertThat(blockedBy(blockedId)).isEqualTo(firstAdminId);
+            assertThat(communityMapper.findPostById(deletedId).status())
+                    .isEqualTo(PostStatus.DELETED);
+        }
+
+        @Test
+        void unblockPost_keepsBlockRecord() {
+            long postId = insertPost("해제 대상", PostStatus.PUBLISHED, BASE_TIME);
+            long adminId = insertReporter("unblock-admin");
+
+            communityAdminMapper.blockPost(postId, "광고성 게시물", adminId);
+
+            assertThat(communityAdminMapper.unblockPost(postId)).isEqualTo(1);
+
+            PostDetailRow post = communityMapper.findPostById(postId);
+            assertThat(post.status()).isEqualTo(PostStatus.PUBLISHED);
+            assertThat(post.blockedReason()).isEqualTo("광고성 게시물");
+            assertThat(blockedBy(postId)).isEqualTo(adminId);
+        }
+
+        @ParameterizedTest(name = "{0} 게시글의 차단은 해제되지 않는다")
+        @CsvSource({
+                "노출 중, PUBLISHED",
+                "지워진 글, DELETED"
+        })
+        void unblockPost_nonBlockedPost_changesNothing(String title, PostStatus status) {
+            long postId = insertPost(title, status, BASE_TIME);
+
+            assertThat(communityAdminMapper.unblockPost(postId)).isZero();
+            assertThat(communityMapper.findPostById(postId).status()).isEqualTo(status);
+        }
+
+        @Test
+        void closePendingReports_leavesAlreadyClosedReportsUntouched() {
+            long postId = insertPost("신고 여럿", PostStatus.PUBLISHED, BASE_TIME);
+            long firstReporterId = insertReporter("r1");
+            long secondReporterId = insertReporter("r2");
+
+            communityMapper.insertReport(postId, firstReporterId, "광고입니다");
+            communityAdminMapper.closePendingReports(postId, ReportStatus.REJECTED);
+
+            communityMapper.insertReport(postId, secondReporterId, "욕설입니다");
+
+            assertThat(communityAdminMapper.closePendingReports(postId, ReportStatus.RESOLVED))
+                    .isEqualTo(1);
+            assertThat(communityAdminMapper.countPendingReports(postId)).isZero();
+            assertThat(communityAdminMapper.findReportsByPost(postId))
+                    .extracting(ReportRow::status)
+                    .containsExactlyInAnyOrder(ReportStatus.REJECTED, ReportStatus.RESOLVED);
+        }
+
+        @Test
+        void findPostsForAdmin_optionalStatus_filtersOnlyWhenProvided() {
+            insertPost("노출", PostStatus.PUBLISHED, BASE_TIME);
+            insertPost("차단", PostStatus.BLOCKED, BASE_TIME);
+            insertPost("삭제", PostStatus.DELETED, BASE_TIME);
+
+            assertThat(adminPosts(null, AdminPostSort.LATEST))
+                    .extracting(AdminPostListRow::title)
+                    .contains("노출", "차단", "삭제");
+            assertThat(adminPosts(PostStatus.BLOCKED, AdminPostSort.LATEST))
+                    .extracting(AdminPostListRow::title)
+                    .containsExactly("차단");
+        }
+
+        /**
+         * 정렬 기준마다 첫 글이 갈린다. 최근 글에는 처리된 신고 2건만 있어 신고순에서 밀려야
+         * 하므로 순서 검증이 미처리 신고만 센다는 확인도 함께 한다.
+         */
+        @ParameterizedTest(name = "{0} 정렬은 {1}이 먼저다")
+        @CsvSource({
+                "LATEST, 최근 글",
+                "REPORTS, 미처리 신고 1건"
+        })
+        void findPostsForAdmin_sort_ordersByRequestedKey(
+                AdminPostSort sort, String expectedFirstTitle) {
+            long pendingPostId = insertPost("미처리 신고 1건", PostStatus.PUBLISHED, BASE_TIME);
+            long closedPostId = insertPost("최근 글", PostStatus.PUBLISHED, BASE_TIME.plusDays(1));
+
+            communityMapper.insertReport(pendingPostId, insertReporter("p1"), "광고입니다");
+            communityMapper.insertReport(closedPostId, insertReporter("c1"), "광고입니다");
+            communityMapper.insertReport(closedPostId, insertReporter("c2"), "욕설입니다");
+            communityAdminMapper.closePendingReports(closedPostId, ReportStatus.RESOLVED);
+
+            List<AdminPostListRow> posts = adminPosts(null, sort);
+
+            assertThat(posts).first()
+                    .extracting(AdminPostListRow::title)
+                    .isEqualTo(expectedFirstTitle);
+            assertThat(posts).filteredOn(post -> post.id() == closedPostId)
+                    .first()
+                    .extracting(AdminPostListRow::pendingReportCount)
+                    .isEqualTo(0L);
+        }
+
+        @Test
+        void findPostByIdForAdmin_readsBlockRecordAndSurvivesWithoutIt() {
+            long neverBlockedId = insertPost("차단된 적 없음", PostStatus.PUBLISHED, BASE_TIME);
+            long blockedId = insertPost("차단됨", PostStatus.PUBLISHED, BASE_TIME);
+            long adminId = insertReporter("detail-admin");
+
+            communityAdminMapper.blockPost(blockedId, "광고성 게시물", adminId);
+
+            AdminPostDetailRow neverBlocked =
+                    communityAdminMapper.findPostByIdForAdmin(neverBlockedId);
+            assertThat(neverBlocked).isNotNull();
+            assertThat(neverBlocked.blockedAt()).isNull();
+            assertThat(neverBlocked.blockedBy()).isNull();
+
+            AdminPostDetailRow blocked = communityAdminMapper.findPostByIdForAdmin(blockedId);
+            assertThat(blocked.blockedAt()).isNotNull();
+            assertThat(blocked.blockedReason()).isEqualTo("광고성 게시물");
+            assertThat(blocked.blockedBy()).isEqualTo(adminId);
+        }
     }
 }
