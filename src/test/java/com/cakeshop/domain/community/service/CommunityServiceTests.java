@@ -190,17 +190,17 @@ class CommunityServiceTests {
     }
 
     @Test
-    void getPosts_passesPageSizeAndOffsetToMapper() {
+    void getPosts_passesSortPageSizeAndOffsetToMapper() {
         PostListRow post = new PostListRow(
                 1L, AUTHOR_ID, "질문", "제목", 0, 0, 0, CREATED_AT);
 
-        when(communityMapper.findPublishedPosts(3L, PostSort.LATEST, 20, 40))
+        when(communityMapper.findPublishedPosts(3L, PostSort.VIEWS, 20, 40))
                 .thenReturn(List.of(post));
         when(communityMapper.countPublishedPosts(3L)).thenReturn(45L);
         givenAuthors(new MemberCommunityView(AUTHOR_ID, "글쓴이", false));
 
         PageResult<PostListView> result =
-                communityService.getPosts(3L, PostSort.LATEST, new PageRequest(3, 20));
+                communityService.getPosts(3L, PostSort.VIEWS, new PageRequest(3, 20));
 
         assertThat(result.getContent())
                 .containsExactly(PostListView.of(post, new MemberCommunityView(AUTHOR_ID, "글쓴이", false)));
@@ -280,6 +280,8 @@ class CommunityServiceTests {
 
         assertThat(section.isEmpty()).isTrue();
         assertThat(section.rankingDate()).isNull();
+        verify(communityMapper, never()).findLatestRankingDate();
+        verify(communityMapper, never()).findPopularPosts(any(), anyInt());
     }
 
     /** 확정일이 없으면 인기글을 조회하지 않는다. */
