@@ -21,7 +21,7 @@
 
 | 조건 | 추가 컨텍스트 |
 |---|---|
-| 화면·문구·Thymeleaf 변경 | `docs/community/SCREENS.md`와 해당 `docs/community/screens/*.md` 한 파일 |
+| 화면·문구·Thymeleaf 변경 | `docs/community/DOMAIN.md`의 해당 기능 절과 `docs/frontend-template-format.md` |
 | 회원 정보·탈퇴 회원·도메인 경계 | `docs/community/DOMAIN.md` 8절, `docs/conventions.md` 12절 |
 | 조회수·잠금·동시성 | `docs/community/DOMAIN.md` 6.2절과 `PLAN.md`의 관련 하네스·위험 |
 | 인기글 | `docs/community/DOMAIN.md` 6.9절과 현재 관련 조각 |
