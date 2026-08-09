@@ -200,7 +200,7 @@ class ScreenRenderingTests {
         String[] paths = {
             "/cart", "/orders/checkout?productId=1&quantity=1&optionIds=1",
             "/mypage",
-            "/orders", "/notifications", "/reviews/new", "/mypage/coupons",
+            "/orders", "/notifications", "/mypage/reviews/writable", "/mypage/coupons",
             "/mypage/profile"
         };
 

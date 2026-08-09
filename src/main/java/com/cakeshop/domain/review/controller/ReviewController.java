@@ -1,13 +1,87 @@
 package com.cakeshop.domain.review.controller;
 
+import jakarta.validation.Valid;
+
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+
+import com.cakeshop.domain.order.dto.view.OrderReviewItemView;
+import com.cakeshop.domain.order.dto.view.OrderReviewTargetView;
+import com.cakeshop.domain.review.dto.form.ReviewWriteForm;
+import com.cakeshop.domain.review.service.ReviewService;
+import com.cakeshop.global.common.paging.PageNavigation;
+import com.cakeshop.global.common.paging.PageRequest;
+import com.cakeshop.global.common.paging.PageResult;
+import com.cakeshop.global.security.MemberDetails;
 
 @Controller
 public class ReviewController {
 
+    private final ReviewService reviewService;
+
+    public ReviewController(ReviewService reviewService) {
+        this.reviewService = reviewService;
+    }
+
+    @GetMapping("/mypage/reviews/writable")
+    public String writableList(
+            @RequestParam(name = "page", required = false) Integer page,
+            @AuthenticationPrincipal MemberDetails memberDetails,
+            Model model
+    ) {
+        PageResult<OrderReviewItemView> writableItems = reviewService.getWritableOrderItems(
+                memberDetails.getMemberId(), new PageRequest(page, null));
+
+        model.addAttribute("writableItems", writableItems);
+        model.addAttribute(
+                "pageNavigation",
+                PageNavigation.of(writableItems.getPage(), writableItems.getTotalPages()));
+
+        return "customer/review/writable";
+    }
+
     @GetMapping("/reviews/new")
-    public String form() {
+    public String form(
+            @RequestParam("orderItemId") long orderItemId,
+            @AuthenticationPrincipal MemberDetails memberDetails,
+            @ModelAttribute("reviewWriteForm") ReviewWriteForm reviewWriteForm,
+            Model model
+    ) {
+        OrderReviewTargetView target =
+                reviewService.getWriteTarget(orderItemId, memberDetails.getMemberId());
+
+        reviewWriteForm.setOrderItemId(target.orderItemId());
+        model.addAttribute("target", target);
+
         return "customer/review/form";
+    }
+
+    @PostMapping("/reviews")
+    public String write(
+            @Valid @ModelAttribute("reviewWriteForm") ReviewWriteForm reviewWriteForm,
+            BindingResult bindingResult,
+            @AuthenticationPrincipal MemberDetails memberDetails,
+            Model model
+    ) {
+        long memberId = memberDetails.getMemberId();
+
+        if (bindingResult.hasErrors()) {
+            // 다시 그릴 때도 Service 를 거친다. 폼에서 온 orderItemId 는 그 자체로 신뢰할 수 없다.
+            model.addAttribute(
+                    "target",
+                    reviewService.getWriteTarget(reviewWriteForm.getOrderItemId(), memberId));
+
+            return "customer/review/form";
+        }
+
+        reviewService.write(reviewWriteForm, memberId);
+
+        return "redirect:/mypage/reviews/writable";
     }
 }
