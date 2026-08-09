@@ -12,7 +12,7 @@ Java 21 · Spring Boot 4 · Spring MVC · Thymeleaf · Spring Security · MyBati
 | **review** 도메인 파일 전부 | `src/main/java/com/cakeshop/domain/review/CLAUDE.md` |
 | 그 밖의 도메인·공통 작업 | `AGENTS.md` |
 
-**`domain/` 아래 java 파일만이 아니다.** mapper XML·시드·템플릿·테스트, 그 도메인이 추가하는 새 Flyway migration도 그 도메인의 작업이다. **정확한 목록은 각 문서의 `이 도메인의 파일 범위` 절이 정본이다** — 여기 옮겨 적지 않는다. 그다음은 그 문서가 지정하는 것만 읽는다.
+**고르는 기준은 어떤 파일을 여느냐가 아니라 무슨 일을 하느냐다.** 리뷰 기능을 만드는 중이면 그 작업이 `domain/order/`에 연동 계약을 만들든, 남의 화면에서 링크 한 줄을 고치든, migration을 더하든 `review/CLAUDE.md`가 함께 적용된다. 각 문서가 **자기 파일 범위와 범위 밖이지만 건드려야 하는 파일을 함께 지정**하므로, 그다음은 그 문서가 가리키는 것만 읽는다.
 
 ## 구조와 의존 방향
 
