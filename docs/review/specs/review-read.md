@@ -24,7 +24,7 @@
 **처리**
 
 - **먼저 그 상품이 고객에게 공개되는 상품인지 확인한다.** 아니면 `404`다.
-  - `ProductQueryService.getSalesInfo(productId)`가 이미 있다(`docs/conventions.md` 15절의 최소 공개 계약). 리뷰가 `products`를 직접 조회하지 않는다.
+  - `ProductQueryService.getSalesInfo(productId)`가 이미 있다(`docs/conventions.md` 12절의 최소 공개 계약). 리뷰가 `products`를 직접 조회하지 않는다.
   - **`NOT_ON_SALE`을 그대로 흘리지 않고 404로 바꾼다.** 그 계약은 없는 상품에는 `NOT_FOUND` 404를, `INACTIVE` 상품에는 `NOT_ON_SALE` 400을 던진다. 두 응답이 갈리면 주소를 훑어 **"있지만 판매 중지된 상품"을 골라낼 수 있어** 가리려던 것이 그대로 드러난다. 리뷰 쪽에서 두 경우 모두 `REVIEW_NOT_FOUND` 404로 잡는다. `DOMAIN 2.5`의 소유권 판정과 같은 이유다.
   - **없으면 판매 중지 상품의 후기가 계속 공개된다.** `ProductMapper.xml`은 상품 상세를 `p.status = 'ACTIVE'`로 거르는데 후기 목록은 후기의 `status`만 본다. 상품 화면에서는 사라진 상품인데 `/products/{id}/reviews`를 직접 부르면 후기 본문과 작성자 닉네임이 그대로 나온다.
   - 화면 안에서는 드러나지 않는다. 상세가 이미 404라 후기 영역까지 갈 일이 없고, **주소를 직접 넣는 경로에서만 보인다.**

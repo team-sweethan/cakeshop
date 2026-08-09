@@ -21,7 +21,7 @@
 | 리뷰 쪽 SQL | 집계 SELECT는 `ReviewMapper`에 둔다 |
 | 형판 | `ProductStockService` — 주문·결제에 재고 변경을 공개하는 기존 쓰기 계약과 같은 모양 |
 
-- **`ProductQueryService`가 아니다.** 그쪽은 `@Transactional(readOnly = true)`인 읽기 전용 계약이고(`docs/conventions.md` 15.3), 평점 갱신은 `products`에 쓴다. 쓰기 계약의 선례는 `ProductStockService`다.
+- **`ProductQueryService`가 아니다.** 그쪽은 `@Transactional(readOnly = true)`인 읽기 전용 계약이고(`docs/conventions.md` 12절), 평점 갱신은 `products`에 쓴다. 쓰기 계약의 선례는 `ProductStockService`다.
 - **`reviews`를 세는 것은 리뷰다.** 평균과 건수를 계산해 `ProductReviewCommandService`에 넘긴다. 상품 매퍼가 `reviews`를 읽는 안은 2026-08-06에 한 번 택했다가 되돌렸다 — 규칙에서 그 예외를 걷었기 때문이다(`DOMAIN 2.7`, `ADR-001`).
   - **대가를 알고 택한다.** 상품은 자기 컬럼인데도 받은 값을 검증할 수 없다. 리뷰가 잘못 세면 상품은 그대로 쓴다. 이건 규칙으로 못 막고 **D1 검증의 집계 테스트가 유일한 방어선**이다.
 - **전용 매퍼를 새로 만드는 것은 이 저장소에서 첫 사례다.** `MemberQueryService`(PR #119)는 기존 `MemberMapper.xml`에 문장을 더했다. `ProductMapper.xml`이 700줄을 넘어 나누는 것이지만, PR 본문에 그 이유를 남겨 다음 사람이 판단 기준을 갖게 한다.

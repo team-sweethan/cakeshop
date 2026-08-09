@@ -1,12 +1,15 @@
 # 조각 0 — 준비 (#108, PR #125 머지 완료)
 
 > **끝난 조각의 기록이다. 지금 구속하지 않는다.**
-> 이 조각이 만든 규칙 자체는 `../DOMAIN.md` 2.1·2.2와 `../specs/review-schema.md`가 정본이다.
+> 이 조각이 만든 규칙 자체는 `../DOMAIN.md` 2.1·2.2가 정본이다. (조각 0 전용 spec이었던
+> `specs/review-schema.md`는 2026-08-09에 이 파일로 흡수했다 — 머지되어 더 이상 구속하지 않는 것은
+> `history/`에 둔다는 기준 그대로다.)
 > 머지: PR #125, 커밋 `5f6f7e7`. migration `V20260806_075114__add_review_status_and_rating_constraints.sql`.
 
-착수 시점에 적어 두었던 항목은 아래와 같다.
+착수 시점에 적어 두었던 항목은 아래와 같다(기능 ID: E1 enum+CHECK, E2 평점 CHECK, E3 엔티티).
 
 - `ReviewStatus { PUBLISHED, DELETED, BLOCKED }` + `canTransitionTo` (`PostStatus` 선례를 그대로 따름, `null` 방어 포함)
+- `Review`·`ReviewReply` 엔티티는 필드가 하나도 없는 빈 클래스였고, 스키마에 맞춰 채웠다
 - 새 migration: `reviews.status` 기본값을 `'VISIBLE'` → `'PUBLISHED'`로 바꾸고 `CHECK (status IN ('PUBLISHED','DELETED','BLOCKED'))` 추가
   - **`CHECK`를 걸기 전에 기존 `'VISIBLE'` 행을 `'PUBLISHED'`로 변환한다.** 남아 있으면 제약 추가가 배포 중 실패한다. 당시 `reviews`는 비어 있고 INSERT 경로도 없었지만, 한 줄로 막을 수 있는 것을 환경 상태에 맡기지 않았다. 선례: `V20260730_123931__apply_product_preparation_policy.sql`(보정 UPDATE 후 CHECK)
 - 새 migration: 평점 4종에 `CHECK (rating BETWEEN 1 AND 5)`

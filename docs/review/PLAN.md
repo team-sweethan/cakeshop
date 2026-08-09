@@ -42,25 +42,21 @@
 
 ### 조각 1 — 작성 (#109)
 
-**주문 데이터는 `domain/order/`에 두는 연동 계약으로 받는다.** 자격 검증과 A1 목록이 `order_items`·`orders`를 직접 JOIN하는 모양이라 `docs/conventions.md` 15절과 어긋난다. 상세는 `specs/review-write.md` A1.
+**주문 데이터는 `domain/order/`에 두는 연동 계약으로 받는다.** 자격 검증과 A1 목록이 `order_items`·`orders`를 직접 JOIN하는 모양이라 `docs/conventions.md` 12절과 어긋난다. 상세는 `specs/review-write.md` A1.
 
-**합의를 기다리지 않는다.** 15.8이 담당 외 도메인에 **새 파일로 추가하는 연동 계약**은 먼저 만들고 PR에서 확인받도록 정한다 — 깨질 남의 호출부가 없기 때문이다. 이름은 15.2의 `<소유 도메인><참조 도메인>` 규칙을 따른다. 그래서 순서가 "물어보고 만든다"가 아니라 **"만들고 PR에서 확인받는다"** 이다.
+**합의를 기다리지 않는다.** 12절이 담당 외 도메인에 **새 파일로 추가하는 연동 계약**은 사전 협의 없이 만들고 PR에서 확인받도록 정한다 — 깨질 남의 호출부가 없기 때문이다. 이름은 같은 절의 `<소유 도메인><사용 목적><역할>` 규칙을 따른다. 그래서 순서가 "물어보고 만든다"가 아니라 **"만들고 PR에서 확인받는다"** 이다.
 
 | | |
 |---|---|
 | 만드는 것 | `domain/order/`에 `OrderReviewQueryService`·`OrderReviewMapper`·`mapper/order/OrderReviewMapper.xml` |
 | 지키는 조건 | **주환님 기존 파일을 수정하지 않는다.** `OrderMapper`에 메서드를 얹지 않고 새 파일만 만든다 |
-| 확인 방법 | AGENTS.md의 담당 외 도메인 헤더 주석 + PR 리뷰어로 주환님 지정 (15.8) |
+| 확인 방법 | `docs/pull-request.md` 1절의 담당 외 도메인 헤더 주석 + PR 리뷰어로 주환님 지정 |
 | 선례 | `OrderCouponQueryService`(정후님이 주문 폴더에 만든 것), `MemberCommunityQueryService` |
 
-**`CommandService`는 만들지 않는다** — 리뷰가 주문에 하는 것은 조회뿐이다. 쓸 수도 있으니 미리 만들지 않는다(15.8), 네 조합을 미리 만들지 않는다(15.5).
+**`CommandService`는 만들지 않는다** — 리뷰가 주문에 하는 것은 조회뿐이다. 필요한 계약만 만들고 Query·Command 조합을 예상만으로 미리 만들지 않는다(12절).
 
-- 자격 검증: 본인 주문인지, `orders.status == PICKED_UP`인지 — **주문 도메인 공개 계약으로 받는다**
-- `uk_reviews_order_item` UNIQUE로 주문상품당 1건. 중복은 `DuplicateKeyException`을 잡아 도메인 에러로 바꾼다(커뮤니티 신고 선례)
-- `reviews.product_id`는 요청값을 믿지 않고 `order_items.product_id`에서 파생시킨다 (R4)
-- `ReviewErrorCode`에 `REVIEW_NOT_FOUND`·`ORDER_ITEM_NOT_FOUND`·`ALREADY_REVIEWED` 추가(`DOMAIN.md` 2.5의 번호를 그대로). **소유권 전용 코드는 만들지 않는다** — 404다
+- 자격 검증·등록 처리·오류 코드·화면 전환의 내용은 `specs/review-write.md` A1~A3가 정본이다
 - `SecurityConfig`의 local preview 목록에서 `/reviews/**`를 뺀다(`DOMAIN.md` 2.3)
-- `POST /reviews` 핸들러와 `form.html` 실동작 전환
 
 **검증**: 남의 주문에 작성 거부, `PICKED_UP`이 아닌 주문 거부, 같은 주문상품에 두 번 작성 거부, 평점 범위 밖 거부.
 
@@ -70,26 +66,12 @@
 > 별도 이슈를 만들지 않고 #33에서 진행한다.
 > **여기는 조각 1과 달리 착수 전에 #33에 계약 시그니처를 올려 확인받는다.** 같은 "새 파일"인데 순서가 반대인 이유가 둘이다.
 >
-> - **쓰기 계약이다.** `products` 컬럼을 UPDATE 하고 잠금 순서가 걸린다. `conventions.md` 15.8이 쓰기 계약을 **구현 전 합의** 쪽으로 가르고, 15.7이 잠금 순서와 중복 실행 방지를 그 대상으로 정한다 — 어긋나도 단일 요청에서는 결과가 같아 테스트가 통과한다.
+> - **쓰기 계약이다.** `products` 컬럼을 UPDATE 하고 잠금 순서가 걸린다. `conventions.md` 6절이 잠금 순서, rollback 범위와 중복 실행 방식을 **구현 전에** 정하도록 한다 — 어긋나도 단일 요청에서는 결과가 같아 테스트가 통과한다.
 > - **#33이 같은 일이다.** 확인 없이 만들면 두 사람이 같은 것을 두 번 만든다. 이것은 허락 문제가 아니라 중복 작업 문제다.
 
-**방식은 2026-08-06에 정했다.** 상세는 `specs/product-rating.md`가 정본이고, 방향이 네 번 뒤집힌 경로는 `decisions/ADR-001-rating-aggregation-ownership.md`에 있다.
-
-- `products` **컬럼 갱신**, **재계산**. 집계는 리뷰가 계산하고 쓰기만 상품이 맡는다
-- 계약 `ProductReviewCommandService`, SQL은 신규 `ProductReviewMapper` + `mapper/product/ProductReviewMapper.xml`
-- 형판은 `ProductStockService`(주문·결제에 재고 변경을 공개하는 기존 쓰기 계약)
-- **잠금 문장은 새 매퍼에 복제하지 않는다.** 기존 `ProductMapper.findSalesInfoByIdForUpdate`를 재사용하고 Service가 두 매퍼를 함께 주입받는다
-- 호출 순서는 **잠금 → `reviews` 쓰기 → 집계**. 뒤집으면 FK 공유 잠금이 배타 잠금으로 승격되어 교착이다
-
-**만드는 것**
-
-| 위치 | 무엇 |
-|---|---|
-| `domain/product/service/ProductReviewCommandService.java` | 공개 계약 (**신규**) |
-| `domain/product/mapper/ProductReviewMapper.java` | 매퍼 인터페이스 (**신규**) |
-| `mapper/product/ProductReviewMapper.xml` | `UPDATE products` (**신규**) |
-| `mapper/review/ReviewMapper.xml` | 집계 SELECT (`FOR UPDATE`) |
-| 리뷰 Service | A3의 호출 5곳 중 등록 자리 |
+**방식은 2026-08-06에 정했다** — `products` 컬럼 갱신·재계산, 집계는 리뷰가 계산하고 쓰기만 상품이
+맡는다. 계약·매퍼 구성, 잠금 순서와 그 근거는 `specs/product-rating.md`가 정본이고, 방향이 네 번
+뒤집힌 경로는 `decisions/ADR-001-rating-aggregation-ownership.md`에 있다.
 
 **검증**: 작성 후 집계 일치, **동시 요청 후 `review_count == reviews 실제 개수`**, 집계 갱신이 `products.updated_at`을 건드리지 않는지, **마지막 공개 후기를 지웠을 때 평균이 0**(`COALESCE`), 후기 저장과 집계가 한 트랜잭션인지(rollback).
 
@@ -119,7 +101,7 @@
 
 **선행: 검색 계약(`writer`·`product`)을 수민·주환님과 합의한다.** `members`·`order_items`를 JOIN하지 않는다(`DOMAIN.md` 2.7, `specs/review-admin.md` C2). 후기를 먼저 페이지한 뒤 이름으로 거르면 **화면의 건수와 실제 건수가 갈린다.**
 
-**관리자 화면이지만 ReadModel이 아니다.** 15.9는 집계·요약하는 통계·대시보드에만 열린다.
+**관리자 화면이지만 ReadModel이 아니다.** 12절의 ReadModel 예외는 집계·요약하는 통계·대시보드에만 열린다.
 
 - 관리자 목록(`GET /admin/reviews`)과 검색·필터, 관리자 상세 화면(C3)
 - **숨김과 해제를 함께 만든다** — `POST .../block`(`PUBLISHED → BLOCKED`), `POST .../unblock`(`BLOCKED → PUBLISHED`). **집계 재호출도 양쪽 다.**
@@ -193,7 +175,7 @@
 | 08-06 | 도메인 경계에 **예외 하나**를 열었다 — 자기 소유 파생 컬럼을 유지하기 위한 집계 읽기는 전용 매퍼에서 허용 | `ADR-001` (**같은 날 걷힘**) |
 | 08-06 | **위 예외를 걷었다.** 갈리는 기준이 "무엇을 위해 읽느냐"에서 **"읽기 전용이냐"**로 바뀌었다 | `docs/conventions.md` 15 |
 | 08-06 | 그 결과 **D1의 방향이 뒤집혔다** — 리뷰가 평균·건수를 계산해 상품에 넘긴다. 08-06 오전에 기각했던 안이다 | `ADR-001` |
-| 08-06 | **ReadModel을 열었다** — 여러 도메인을 **집계·요약**하는 통계·대시보드는 JOIN해도 된다. **관리자 화면이라는 것은 근거가 아니다** — 관리자 후기 검색은 조건이 남의 도메인에서 올 뿐 결국 후기 목록이라 대상이 아니고, 조각 5의 선행 합의도 그대로다 | `docs/conventions.md` 15.9 |
+| 08-06 | **ReadModel을 열었다** — 여러 도메인을 **집계·요약**하는 통계·대시보드는 JOIN해도 된다. **관리자 화면이라는 것은 근거가 아니다** — 관리자 후기 검색은 조건이 남의 도메인에서 올 뿐 결국 후기 목록이라 대상이 아니고, 조각 5의 선행 합의도 그대로다 | `docs/conventions.md` 12절 |
 | 08-06 | 그 결과 **집계 SQL은 리뷰가 소유**로 확정. 평점 집계는 ReadModel 예외에 해당하지 않는다 — 쓰기의 근거가 되는 읽기이기 때문이다. **대가는 상품이 자기 컬럼인데도 받은 값을 검증할 수 없다는 것** | `ADR-001` |
 | 08-07 | 문서를 `DOMAIN`/`specs`/`PLAN`/`decisions`/`history`로 나누고 `FLOW.md`·`SPEC.md`를 없앴다. 동시에 `ReviewDocTests`(H1~H5)를 세웠다 | `HARNESS.md` |
 | 08-08 | 하네스 표를 `HARNESS.md`로 뺐다. **표가 다섯 줄일 때 옮긴다** — 44행이 된 뒤에는 이동 diff를 아무도 안 읽는다(커뮤니티 PR #146에서 틀린 문장 여섯 건이 그렇게 통과했다). 경계를 지킬 H4 확장과 H6을 같은 PR에 넣었다 | `HARNESS.md` |
