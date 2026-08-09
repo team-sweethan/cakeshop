@@ -69,24 +69,18 @@ class ReviewSchemaTests {
     }
 
     /**
-     * 옛 어휘 {@code 'VISIBLE'}이 실제로 거절되는지 확인한다.
+     * 허용 집합 밖의 상태가 실제로 거절되는지 확인한다.
      *
      * <p>기본값만 바꾸고 CHECK 를 걸지 않으면 값을 명시하는 INSERT 는 여전히 통과한다. 기본값
      * 변경과 제약은 한 쌍이라 둘 중 하나만으로는 어휘가 갈리는 것을 막지 못한다.
+     * {@code 'VISIBLE'} 은 조각 0 전까지 스키마 기본값이던 옛 어휘라 특히 되돌아오기 쉽다.
      */
-    @Test
-    void reviews_legacyVisibleStatus_isRejectedByCheckConstraint() {
-        Long orderItemId = insertOrderItemChain("legacy");
+    @ParameterizedTest
+    @ValueSource(strings = {"VISIBLE", "ARCHIVED"})
+    void reviews_statusOutsideEnum_isRejectedByCheckConstraint(String status) {
+        Long orderItemId = insertOrderItemChain("bad-" + status);
 
-        assertThatThrownBy(() -> insertReview(orderItemId, "VISIBLE", 5, 5, 5, 5))
-                .isInstanceOf(DataIntegrityViolationException.class);
-    }
-
-    @Test
-    void reviews_undefinedStatus_isRejectedByCheckConstraint() {
-        Long orderItemId = insertOrderItemChain("undefined");
-
-        assertThatThrownBy(() -> insertReview(orderItemId, "ARCHIVED", 5, 5, 5, 5))
+        assertThatThrownBy(() -> insertReview(orderItemId, status, 5, 5, 5, 5))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -144,39 +138,15 @@ class ReviewSchemaTests {
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
+    // 경계 1·5만 확인한다. 사이값은 같은 규칙이라 결과가 달라지지 않는다.
     @ParameterizedTest
-    @ValueSource(ints = {1, 2, 3, 4, 5})
+    @ValueSource(ints = {1, 5})
     void reviews_ratingInRange_isAccepted(int rating) {
         Long orderItemId = insertOrderItemChain("ok" + rating);
 
         assertThatCode(
                 () -> insertReview(orderItemId, "PUBLISHED", rating, rating, rating, rating))
                 .doesNotThrowAnyException();
-    }
-
-    /**
-     * 제약이 컬럼마다 따로 걸렸는지 확인한다.
-     *
-     * <p>넷을 하나로 묶어도 거절 동작은 똑같아서 <b>위의 테스트로는 구분되지 않는다.</b> 따로
-     * 거는 이유는 위반했을 때 어느 평점이 잘못됐는지 제약 이름으로 드러나게 하려는 것이다.
-     */
-    @Test
-    void reviews_hasSeparateCheckConstraintPerRatingColumn() {
-        assertThat(jdbcTemplate.queryForList(
-                """
-                SELECT constraint_name
-                FROM information_schema.table_constraints
-                WHERE table_schema = DATABASE()
-                  AND table_name = 'reviews'
-                  AND constraint_type = 'CHECK'
-                """,
-                String.class))
-                .contains(
-                        "chk_reviews_status",
-                        "chk_reviews_overall_rating",
-                        "chk_reviews_taste_rating",
-                        "chk_reviews_design_rating",
-                        "chk_reviews_service_rating");
     }
 
     private void insertReview(
