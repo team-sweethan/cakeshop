@@ -234,6 +234,14 @@ src/
 
 ## 🏛️ Architecture & Developer Playbook
 
+### 기술 선택 배경
+
+- 🔐 **[세션 기반 인증을 선택한 이유](docs/decisions/session-authentication.md)**: SSR과 세션의 관계, 폼 로그인·강제 세션 만료를 선택한 근거, JWT를 다시 검토할 조건
+- 🧩 **[도메인 중심 수직 슬라이스 구조를 선택한 이유](docs/decisions/domain-oriented-architecture.md)**: DDD에서 채택한 경계와 계약, 전술적 DDD 전체를 적용하지 않은 이유와 비용
+- 🗄️ **[Flyway로 데이터베이스 변경을 관리하는 이유](docs/decisions/flyway-migrations.md)**: 스키마 재현·이력·검증의 근거, 수동 SQL·자동 생성과의 비교, MariaDB와 RDS에서의 한계
+
+### 개발 규칙과 가이드
+
 - 🧭 **[코드 컨벤션과 아키텍처](docs/conventions.md)**: 기술 기준, 수직 슬라이스, 네이밍, DB·MyBatis·트랜잭션·인증 규칙과 도메인 연동 경계
 - 🧪 **[테스트 작성 가이드](docs/testing.md)**: 계층별 테스트 전략, MariaDB Testcontainers, 테스트 대역, 명명과 검증 기준
 - 🗃️ **[Flyway migration 작성 가이드](docs/flyway_make_sample.md)**: 변경 단위, 기존 데이터 영향, MariaDB DDL 실패·복구와 검증 기준
@@ -242,76 +250,10 @@ src/
 - 🤝 **[팀 미결정 항목](docs/team-plan.md)**: 여러 담당자가 함께 결정해야 하는 도메인 연동과 운영 환경 질문
 - 🔀 **[Pull Request 가이드](docs/pull-request.md)**: PR 크기·제목·본문, 리뷰 요청과 브랜치별 병합 기준
 - 🎨 **[Thymeleaf 화면 작성 규칙](docs/frontend-template-format.md)**: 고객·관리자 화면 구조, 프래그먼트 계약, 정적 자원과 렌더링 검증 기준
+- 🖼️ **[파일 업로드 저장소 가이드](docs/file-upload-storage.md)**: 프로필별 로컬·S3 저장소 선택, 자격 증명·prefix 설정과 환경 간 이관 주의사항
 
 ## File Upload Storage
 
-업로드 호출부는 공통 `FileStorageClient`만 사용하며 활성 프로필에 따라 저장소 구현체가 선택됩니다.
-
-| 활성 프로필 | 저장소 | 용도 |
-|---|---|---|
-| `local,s3` | `S3StorageService` | 기본 개발 환경: 로컬 DB와 공용 S3 사용 |
-| `local` | `LocalFileStorageClient` | 필요할 때 로컬 DB와 PC 외부 디렉터리 사용 |
-| `rds` | `LocalFileStorageClient` | RDS와 실행 PC의 로컬 저장소 사용 |
-| `rds,s3` | `S3StorageService` | RDS와 S3를 함께 사용하는 배포 환경 |
-
-RDS는 데이터베이스이고 S3는 파일 저장소이므로 서로 독립적으로 선택합니다.
-
-### 로컬 디스크 사용
-
-공용 S3를 사용하지 않는 예외적인 경우에만 `.env`의 `FILE_UPLOAD_DIR`에 프로젝트 밖의 저장 경로를 지정하고
-`local` 프로필을 명시해 실행합니다.
-값을 생략하면 `<user home>/cakeshop-uploads`가 사용됩니다.
-
-```powershell
-.\gradlew.bat bootRun --args="--spring.profiles.active=local"
-```
-
-### 기본 개발 환경: 로컬 DB와 S3
-
-`.env_sample`을 복사한 로컬 `.env`에서 다음 설정을 확인합니다. 공용 버킷명과 URL은 비밀 값이 아니지만,
-실제 Access Key와 Secret Key는 Git에 추적되지 않는 로컬 `.env`에만 입력합니다.
-
-```dotenv
-AWS_REGION=ap-northeast-2
-AWS_ACCESS_KEY_ID=your-local-access-key
-AWS_SECRET_ACCESS_KEY=your-local-secret-key
-AWS_SESSION_TOKEN=
-AWS_S3_BUCKET=sweethan-cakeshop-images
-AWS_S3_BASE_URL=https://sweethan-cakeshop-images.s3.ap-northeast-2.amazonaws.com
-AWS_S3_KEY_PREFIX=local-your-name
-```
-
-로컬 Access Key와 Secret Key는 반드시 함께 설정합니다. STS나 IAM Identity Center의 임시 자격 증명을
-사용하면 `AWS_SESSION_TOKEN`도 함께 설정합니다. Access Key와 Secret Key가 모두 비어 있으면
-`aws configure`, 현재 프로세스의 AWS 환경 변수, IAM Role 같은 AWS SDK 기본 자격 증명 체인을 사용합니다.
-`AWS_S3_KEY_PREFIX`는 `local-본인GitHub아이디`처럼 영문·숫자·점·밑줄·하이픈만 사용해 개발자마다
-고유하게 설정하고, RDS 환경은 `rds-dev`처럼 별도 값을
-사용합니다. 저장소는 현재 prefix로 만든 객체만 삭제하므로 로컬 DB가 다른 환경의 URL을 갖고 있어도 해당
-S3 객체를 삭제하지 않습니다. prefix 도입 전에 생성한 S3 객체는 새 환경에서 자동 삭제하지 않으므로 필요하면
-참조 여부를 확인한 뒤 버킷에서 별도로 정리합니다.
-기본 프로필이 `local,s3`이므로 별도 실행 인수 없이 관리자 상품·매장 이미지 업로드로 확인합니다.
-
-```powershell
-.\gradlew.bat bootRun
-```
-
-### RDS와 S3 함께 사용
-
-애플리케이션 코드를 바꾸지 않고 기존 `RDS_*` 설정과 S3 설정을 준비한 뒤 프로필만 조합합니다.
-
-```powershell
-.\gradlew.bat bootRun --args="--spring.profiles.active=rds,s3"
-```
-
-배포 환경은 장기 액세스 키 대신 EC2 Instance Profile 또는 ECS Task Role 같은 IAM Role을 사용합니다.
-업로드 대상 prefix에 필요한 `s3:PutObject`, `s3:DeleteObject` 등 최소 권한만 부여하고, 운영 환경에서는
-CloudFront와 비공개 S3 조합을 우선 검토합니다.
-
-현재 이미지 URL 컬럼은 `VARCHAR(500)`이므로 S3 URL 저장만을 위한 migration은 필요하지 않습니다.
-기존 `/uploads/...` 파일은 자동 이전되지 않으므로 S3 복사와 DB URL 변경을 별도 이관 작업으로 진행해야
-하며, 공유 RDS 데이터 변경은 백업과 팀 승인 후 수행합니다.
-
-프로필 변경은 로컬 DB와 RDS의 데이터를 자동으로 동기화하지 않습니다. 같은 S3 버킷을 사용하더라도 각 DB에
-상품·매장 정보와 `image_url`이 존재해야 화면에서 조회할 수 있습니다. RDS에 S3 URL을 저장하기 시작한 뒤에는
-로컬 경로와 S3 URL이 섞이지 않도록 `rds,s3` 조합을 사용합니다. 버킷이나 CloudFront 기본 URL을 변경하면 기존
-전체 URL 데이터는 자동으로 바뀌지 않으므로 별도 이관 계획이 필요합니다.
+업로드 호출부는 공통 `FileStorageClient`를 사용하며, 기본 개발 환경인 `local,s3`에서는 로컬 DB와 S3를
+함께 사용합니다. 프로필 조합, 로컬 디스크 설정, AWS 자격 증명과 환경 간 파일 이관 방법은
+[`파일 업로드 저장소 가이드`](docs/file-upload-storage.md)를 참고합니다.
