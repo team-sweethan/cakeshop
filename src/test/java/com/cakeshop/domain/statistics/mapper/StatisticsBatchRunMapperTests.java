@@ -7,6 +7,7 @@ import com.cakeshop.domain.statistics.entity.StatisticsBatchRun;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import org.junit.jupiter.api.Test;
 import org.mybatis.spring.boot.test.autoconfigure.MybatisTest;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +20,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 class StatisticsBatchRunMapperTests {
 
+    private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
     private static final LocalDate TARGET_DATE = LocalDate.of(2026, 8, 9);
     private static final LocalDateTime WINDOW_START = LocalDateTime.of(2026, 8, 9, 0, 10);
     private static final LocalDateTime WINDOW_END = LocalDateTime.of(2026, 8, 10, 0, 10);
@@ -144,11 +146,11 @@ class StatisticsBatchRunMapperTests {
 
     @Test
     void findCurrentDateTime_returnsDatabaseCurrentTime() {
-        LocalDateTime before = LocalDateTime.now().minusSeconds(1);
+        LocalDateTime before = LocalDateTime.now(SEOUL).minusSeconds(5);
 
         LocalDateTime databaseNow = mapper.findCurrentDateTime();
 
-        assertThat(databaseNow).isAfter(before).isBefore(LocalDateTime.now().plusSeconds(1));
+        assertThat(databaseNow).isAfter(before).isBefore(LocalDateTime.now(SEOUL).plusSeconds(5));
     }
 
     private StatisticsBatchRun newDailyRun(
