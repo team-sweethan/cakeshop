@@ -54,6 +54,7 @@ class ReviewNotificationTests {
     private long firstAdminId;
     private long secondAdminId;
     private long suspendedAdminId;
+    private long categoryId;
     private long productId;
 
     @BeforeEach
@@ -76,8 +77,15 @@ class ReviewNotificationTests {
                 memberId);
         jdbcTemplate.update("DELETE FROM reviews WHERE member_id = ?", memberId);
         jdbcTemplate.update(
-                "DELETE FROM members WHERE id IN (?, ?, ?)",
-                firstAdminId, secondAdminId, suspendedAdminId);
+                "DELETE FROM order_items WHERE order_id IN"
+                        + " (SELECT id FROM orders WHERE member_id = ?)",
+                memberId);
+        jdbcTemplate.update("DELETE FROM orders WHERE member_id = ?", memberId);
+        jdbcTemplate.update("DELETE FROM products WHERE id = ?", productId);
+        jdbcTemplate.update("DELETE FROM categories WHERE id = ?", categoryId);
+        jdbcTemplate.update(
+                "DELETE FROM members WHERE id IN (?, ?, ?, ?)",
+                memberId, firstAdminId, secondAdminId, suspendedAdminId);
     }
 
     @Test
@@ -274,7 +282,7 @@ class ReviewNotificationTests {
                 "INSERT INTO categories (code, name, sort_order, is_active) VALUES (?, ?, 999, 1)",
                 categoryCode,
                 "후기 대상");
-        long categoryId = jdbcTemplate.queryForObject(
+        categoryId = jdbcTemplate.queryForObject(
                 "SELECT id FROM categories WHERE code = ?", Long.class, categoryCode);
 
         String productName = "후기 대상 상품 " + unique;
