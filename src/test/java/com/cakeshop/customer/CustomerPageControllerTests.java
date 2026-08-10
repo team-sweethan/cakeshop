@@ -11,7 +11,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.cakeshop.domain.cart.controller.CartController;
 import com.cakeshop.domain.cart.dto.view.CartView;
 import com.cakeshop.domain.cart.service.CartService;
-import com.cakeshop.domain.coupon.controller.CouponController;
+import com.cakeshop.domain.coupon.service.CouponMemberQueryService;
+import com.cakeshop.domain.coupon.dto.view.CustomerCouponView;
+import com.cakeshop.global.common.paging.PageRequest;
+import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.domain.coupon.service.CouponOrderQueryService;
 import com.cakeshop.domain.home.controller.HomeController;
 import com.cakeshop.domain.home.service.HomeService;
@@ -89,6 +92,11 @@ class CustomerPageControllerTests {
         when(couponOrderQueryService.getAvailableCouponsForMember(
                 org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any()
         )).thenReturn(List.of());
+        CouponMemberQueryService couponMemberQueryService = mock(CouponMemberQueryService.class);
+        when(couponMemberQueryService.getMemberCoupons(
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.any(PageRequest.class)
+        )).thenReturn(new PageResult<>(List.<CustomerCouponView>of(), new PageRequest(1, 10), 0));
         OrderCheckoutService orderCheckoutService = mock(OrderCheckoutService.class);
         when(orderCheckoutService.getGeneralCheckout(
                 org.mockito.ArgumentMatchers.anyLong(),
@@ -119,9 +127,9 @@ class CustomerPageControllerTests {
                         ),
                         new MyPageController(
                                 memberService,
+                                couponMemberQueryService,
                                 mock(SessionRegistry.class)),
-                        new NotificationUserController(),
-                        new CouponController())
+                        new NotificationUserController())
                 .setCustomArgumentResolvers(
                         new AuthenticationPrincipalArgumentResolver())
                 .build();

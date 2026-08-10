@@ -5,6 +5,9 @@ import com.cakeshop.domain.member.dto.form.WithdrawForm;
 import com.cakeshop.domain.member.dto.view.MemberProfileView;
 import com.cakeshop.domain.member.error.MemberErrorCode;
 import com.cakeshop.domain.member.service.MemberService;
+import com.cakeshop.domain.coupon.service.CouponMemberQueryService;
+import com.cakeshop.global.common.paging.PageNavigation;
+import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.security.MemberDetails;
 import jakarta.servlet.http.HttpServletRequest;
@@ -28,6 +31,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class MyPageController {
 
     private final MemberService memberService;
+    private final CouponMemberQueryService couponMemberQueryService;
     private final SessionRegistry sessionRegistry;
 
     // 마이페이지 조회
@@ -39,6 +43,19 @@ public class MyPageController {
         model.addAttribute("member", memberService.getMemberProfile(email));
 
         return "customer/member/mypage";
+    }
+
+    /** 인증 회원의 보유 쿠폰을 쿠폰 도메인 공개 조회 계약으로 조회한다. */
+    @GetMapping("/mypage/coupons")
+    public String coupons(
+            @AuthenticationPrincipal MemberDetails memberDetails,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer page,
+            Model model) {
+        PageRequest pageRequest = new PageRequest(page, 10);
+        var coupons = couponMemberQueryService.getMemberCoupons(memberDetails.getMemberId(), pageRequest);
+        model.addAttribute("coupons", coupons);
+        model.addAttribute("pageNavigation", PageNavigation.of(coupons.getPage(), coupons.getTotalPages()));
+        return "customer/coupon/list";
     }
 
     // 회원정보 수정 화면

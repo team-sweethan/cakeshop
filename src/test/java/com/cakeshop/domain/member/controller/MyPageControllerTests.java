@@ -13,6 +13,11 @@ import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
 import com.cakeshop.domain.member.dto.view.MemberProfileView;
 import com.cakeshop.domain.member.error.MemberErrorCode;
 import com.cakeshop.domain.member.service.MemberService;
+import com.cakeshop.domain.coupon.service.CouponMemberQueryService;
+import com.cakeshop.domain.coupon.dto.view.CustomerCouponView;
+import com.cakeshop.domain.coupon.entity.CustomerCouponStatus;
+import com.cakeshop.global.common.paging.PageRequest;
+import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.security.MemberDetails;
 import jakarta.servlet.http.HttpServletRequest;
@@ -37,6 +42,9 @@ class MyPageControllerTests {
 
     @Mock
     private MemberService memberService;
+
+    @Mock
+    private CouponMemberQueryService couponMemberQueryService;
 
     @Mock
     private HttpServletRequest request;
@@ -116,6 +124,29 @@ class MyPageControllerTests {
 
         assertThat(viewName).isEqualTo("redirect:/login");
         verifyNoInteractions(memberService);
+    }
+
+    @Test
+    void coupons_authenticatedMember_usesAuthenticatedMemberIdForCouponQuery() {
+        MemberDetails memberDetails = memberDetails();
+        PageResult<CustomerCouponView> coupons = new PageResult<>(
+                java.util.List.of(new CustomerCouponView(
+                        10L, "신규 가입 쿠폰", "5,000원 할인", "최소 주문 금액 없음",
+                        CustomerCouponStatus.AVAILABLE, java.time.LocalDateTime.now(), java.time.LocalDateTime.now())),
+                new PageRequest(1, 10),
+                1
+        );
+        when(couponMemberQueryService.getMemberCoupons(
+                org.mockito.ArgumentMatchers.eq(1L),
+                org.mockito.ArgumentMatchers.any(PageRequest.class))).thenReturn(coupons);
+
+        String viewName = myPageController.coupons(memberDetails, 1, model);
+
+        assertThat(viewName).isEqualTo("customer/coupon/list");
+        verify(couponMemberQueryService).getMemberCoupons(
+                org.mockito.ArgumentMatchers.eq(1L),
+                org.mockito.ArgumentMatchers.any(PageRequest.class));
+        verify(model).addAttribute("coupons", coupons);
     }
 
     @Test
