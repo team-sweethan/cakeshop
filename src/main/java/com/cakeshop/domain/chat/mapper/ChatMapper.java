@@ -79,6 +79,9 @@ public interface ChatMapper {
     // 특정 메시지에 딸린 모든 첨부파일 조회
     List<ChatMessageAttachment> findAttachmentsByChatMessageId(Long chatMessageId);
 
+    // 메시지 목록 ID들에 대한 첨부파일 일괄 조회 (N+1 방지 배치)
+    List<ChatMessageAttachment> findAttachmentsByMessageIds(@Param("messageIds") List<Long> messageIds);
+
 
     // ==========================================
     // 4. 읽음 커서 (chat_room_read_cursors)

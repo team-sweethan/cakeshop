@@ -159,6 +159,17 @@
         ORDER BY display_order ASC, id ASC
     </select>
 
+    <!-- 메시지 목록 ID들에 대한 첨부파일 일괄 조회 (N+1 방지 배치) -->
+    <select id="findAttachmentsByMessageIds" resultType="ChatMessageAttachment">
+        SELECT *
+        FROM chat_message_attachments
+        WHERE chat_message_id IN
+        <foreach item="msgId" collection="messageIds" open="(" separator="," close=")">
+            #{msgId}
+        </foreach>
+        ORDER BY chat_message_id ASC, display_order ASC, id ASC
+    </select>
+
     <!-- ==========================================
     // 4. 읽음 커서 (chat_room_read_cursors)
     // ======================================== -->

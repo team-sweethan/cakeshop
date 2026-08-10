@@ -33,6 +33,9 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Collectors;
 
 
@@ -261,7 +264,7 @@ public class ChatService {
     // ==========================================
     
     // 채팅 목록 조회
-    // 관리자 좌측 배너 채팅방 목록 조회 (탭 필터링 + 페이징) // 고객 매퍼 사용
+    // 관리자 좌측 배너 채팅방 목록 조회 (탭 필터링 + 페이징)
     @Transactional(readOnly = true)
     public List<ChatRoomListResponse> getAdminChatRooms(ChatResponseStatus responseStatus, int page, int size) {
         int offset = Math.max(0, (page - 1) * size);
@@ -272,12 +275,37 @@ public class ChatService {
             return Collections.emptyList();
         }
 
-        // 2. 각 채팅방을 ChatRoomListResponse DTO로 변환
+        // 2. 고객 이름 배치 조회 (중복 customerId 조회를 최소화하여 N+1 방지)
+        Set<Long> uniqueCustomerIds = rooms.stream().map(ChatRoom::getCustomerId).collect(Collectors.toSet());
+        Map<Long, String> customerNameMap = uniqueCustomerIds.stream().collect(Collectors.toMap(
+            id -> id,
+            id -> {
+                try {
+                    MemberAdminDetailView memberDetail = memberAdminService.getMemberDetail(id);
+                    return (memberDetail != null && memberDetail.name() != null) ? memberDetail.name() : "고객";
+                } catch (Exception e) {
+                    return "고객";
+                }
+            },
+            (a, b) -> a
+        ));
+
+        // 3. 각 채팅방을 ChatRoomListResponse DTO로 변환
         return rooms.stream().map(room -> {
             // 마지막 메시지 정보 조회
             ChatMessage lastMessage = room.getLastMessageId() != null 
                     ? chatMapper.findChatMessageById(room.getLastMessageId()) 
                     : null;
+
+            // 이미지만 올린 메시지의 경우 미리보기 대체 문구("(사진)") 적용
+            String previewContent = "";
+            if (lastMessage != null) {
+                if (lastMessage.getContent() != null && !lastMessage.getContent().isBlank()) {
+                    previewContent = lastMessage.getContent();
+                } else {
+                    previewContent = "(사진)";
+                }
+            }
 
             // 관리자의 읽음 커서 위치 조회 및 안 읽은 메시지 개수 계산
             ChatRoomReadCursor adminCursor = chatMapper.findReadCursor(room.getId(), ChatReaderSide.ADMIN);
@@ -286,14 +314,7 @@ public class ChatService {
                     : 0L;
             
             int unreadCount = chatMapper.countUnreadMessages(room.getId(), lastReadMessageId, room.getCustomerId());
-
-            String customerName;
-            try {
-                MemberAdminDetailView memberDetail = memberAdminService.getMemberDetail(room.getCustomerId());
-                customerName = memberDetail != null ? memberDetail.name() : "고객";
-            } catch (Exception e) {
-                customerName = "고객";
-            }
+            String customerName = customerNameMap.getOrDefault(room.getCustomerId(), "고객");
 
             // DTO 조립
             return ChatRoomListResponse.builder()
@@ -301,7 +322,7 @@ public class ChatService {
                     .customerId(room.getCustomerId())
                     .customerName(customerName)
                     .responseStatus(room.getResponseStatus())
-                    .lastMessageContent(lastMessage != null ? lastMessage.getContent() : "")
+                    .lastMessageContent(previewContent)
                     .lastMessageCreatedAt(lastMessage != null ? lastMessage.getCreatedAt() : room.getCreatedAt())
                     .unreadCount(unreadCount)
                     .build();
@@ -368,11 +389,18 @@ public class ChatService {
             return Collections.emptyList();
         }
 
+        // 메시지 ID 목록으로 첨부파일 일괄 배치 조회 (N+1 쿼리 완벽 해소)
+        List<Long> messageIds = messages.stream().map(ChatMessage::getId).collect(Collectors.toList());
+        List<ChatMessageAttachment> allAttachments = chatMapper.findAttachmentsByMessageIds(messageIds);
+        Map<Long, List<ChatMessageAttachment>> attachmentMap = (allAttachments != null && !allAttachments.isEmpty())
+                ? allAttachments.stream().collect(Collectors.groupingBy(ChatMessageAttachment::getChatMessageId))
+                : Collections.emptyMap();
+
         return messages.stream().map(msg -> {
-            // 메시지 첨부 이미지 S3 Object Key 목록 조회
-            List<ChatMessageAttachment> attachments = chatMapper.findAttachmentsByChatMessageId(msg.getId());
+            List<ChatMessageAttachment> attachments = attachmentMap.getOrDefault(msg.getId(), Collections.emptyList());
+            
             // 메시지 첨부 이미지 S3 URL 목록 변환
-            List<String> imageUrls = (attachments != null && !attachments.isEmpty())
+            List<String> imageUrls = !attachments.isEmpty()
                     ? attachments.stream()
                             .map(att -> {
                                 String key = att.getObjectKey();
@@ -387,10 +415,17 @@ public class ChatService {
 
             boolean isRead = (msg.getId() <= opponentLastReadId);
 
+            // 발신자 유형 및 이름 명시적 매핑
+            boolean isCustomerSender = msg.getSenderId() != null && msg.getSenderId().equals(chatRoom.getCustomerId());
+            String senderType = isCustomerSender ? "CUSTOMER" : "ADMIN";
+            String senderName = isCustomerSender ? "고객" : "관리자";
+
             return ChatMessageResponse.builder()
                     .id(msg.getId())
                     .chatRoomId(msg.getChatRoomId())
                     .senderId(msg.getSenderId())
+                    .senderName(senderName)
+                    .senderType(senderType)
                     .productId(msg.getProductId())
                     .content(msg.getContent())
                     .imageUrls(imageUrls)
