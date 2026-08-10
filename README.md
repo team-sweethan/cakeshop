@@ -14,6 +14,7 @@
 - [Project Structure](#project-structure)
 - [Contributing](#contributing)
 - [Architecture & Developer Playbook](#architecture--developer-playbook)
+- [File Upload Storage](#file-upload-storage)
 
 ## Overview
 
@@ -230,3 +231,69 @@ src/
 - 🤝 **[팀 미결정 항목](docs/team-plan.md)**: 여러 담당자가 함께 결정해야 하는 도메인 연동과 운영 환경 질문
 - 🔀 **[Pull Request 가이드](docs/pull-request.md)**: PR 크기·제목·본문, 리뷰 요청과 브랜치별 병합 기준
 - 🎨 **[Thymeleaf 화면 작성 규칙](docs/frontend-template-format.md)**: 고객·관리자 화면 구조, 프래그먼트 계약, 정적 자원과 렌더링 검증 기준
+
+## File Upload Storage
+
+업로드 호출부는 공통 `FileStorageClient`만 사용하며 활성 프로필에 따라 저장소 구현체가 선택됩니다.
+
+| 활성 프로필 | 저장소 | 용도 |
+|---|---|---|
+| `local` | `LocalFileStorageClient` | 로컬 DB와 PC 외부 디렉터리 사용 |
+| `local,s3` | `S3StorageService` | 로컬 DB에서 실제 S3 업로드 확인 |
+| `rds` | `LocalFileStorageClient` | RDS와 실행 PC의 로컬 저장소 사용 |
+| `rds,s3` | `S3StorageService` | RDS와 S3를 함께 사용하는 배포 환경 |
+
+RDS는 데이터베이스이고 S3는 파일 저장소이므로 서로 독립적으로 선택합니다.
+
+### 로컬 디스크 사용
+
+`.env`의 `FILE_UPLOAD_DIR`에 프로젝트 밖의 저장 경로를 지정하고 `local` 프로필로 실행합니다.
+값을 생략하면 `<user home>/cakeshop-uploads`가 사용됩니다.
+
+```powershell
+.\gradlew.bat bootRun --args="--spring.profiles.active=local"
+```
+
+### 로컬 DB에서 S3 확인
+
+`.env_sample`을 복사한 로컬 `.env`에서 다음 설정을 확인합니다. 공용 버킷명과 URL은 비밀 값이 아니지만,
+실제 Access Key와 Secret Key는 Git에 추적되지 않는 로컬 `.env`에만 입력합니다.
+
+```dotenv
+AWS_REGION=ap-northeast-2
+AWS_ACCESS_KEY_ID=your-local-access-key
+AWS_SECRET_ACCESS_KEY=your-local-secret-key
+AWS_S3_BUCKET=sweethan-cakeshop-images
+AWS_S3_BASE_URL=https://sweethan-cakeshop-images.s3.ap-northeast-2.amazonaws.com
+```
+
+로컬 키 두 값은 반드시 함께 설정합니다. 둘 다 비어 있으면 `aws configure`, 현재 프로세스의 AWS 환경 변수,
+IAM Role 같은 AWS SDK 기본 자격 증명 체인을 사용합니다. 다음 프로필 조합으로 실행한 뒤 관리자 상품·매장
+이미지 업로드로 확인합니다.
+
+```powershell
+.\gradlew.bat bootRun --args="--spring.profiles.active=local,s3"
+```
+
+단순 연결 확인용 API는 `local,s3` 프로필에서만 생성되고 현재 PC의 loopback 요청만 허용됩니다.
+
+```powershell
+curl.exe -X POST -F "file=@C:\temp\cake.jpg" `
+  http://localhost:8080/api/local/s3-test/upload
+```
+
+### RDS와 S3 함께 사용
+
+애플리케이션 코드를 바꾸지 않고 기존 `RDS_*` 설정과 S3 설정을 준비한 뒤 프로필만 조합합니다.
+
+```powershell
+.\gradlew.bat bootRun --args="--spring.profiles.active=rds,s3"
+```
+
+배포 환경은 장기 액세스 키 대신 EC2 Instance Profile 또는 ECS Task Role 같은 IAM Role을 사용합니다.
+업로드 대상 prefix에 필요한 `s3:PutObject`, `s3:DeleteObject` 등 최소 권한만 부여하고, 운영 환경에서는
+CloudFront와 비공개 S3 조합을 우선 검토합니다.
+
+현재 이미지 URL 컬럼은 `VARCHAR(500)`이므로 S3 URL 저장만을 위한 migration은 필요하지 않습니다.
+기존 `/uploads/...` 파일은 자동 이전되지 않으므로 S3 복사와 DB URL 변경을 별도 이관 작업으로 진행해야
+하며, 공유 RDS 데이터 변경은 백업과 팀 승인 후 수행합니다.
