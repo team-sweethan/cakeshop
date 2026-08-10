@@ -49,7 +49,7 @@
             last_message_at = #{lastMessageAt},
             response_status = #{responseStatus},
             updated_at = CURRENT_TIMESTAMP(6)
-        WHERE id = #{chatRoomId}
+        WHERE id = #{chatRoomId} AND (last_message_id IS NULL OR last_message_id &lt;= #{lastMessageId})
     </update>
 
     <!-- 관리자 좌측 배너 목록 조회 (동적 쿼리 적용) -->
@@ -62,7 +62,7 @@
                 AND response_status = #{responseStatus}
             </if>
         </where>
-        ORDER BY updated_at DESC
+        ORDER BY updated_at DESC, id DESC
         LIMIT #{size} OFFSET #{offset}
     </select>
 
@@ -165,7 +165,7 @@
             CURRENT_TIMESTAMP(6)
         )
         ON DUPLICATE KEY UPDATE
-            last_read_message_id = VALUES(last_read_message_id),
+            last_read_message_id = GREATEST(COALESCE(last_read_message_id, 0), VALUES(last_read_message_id)),
             last_read_at = CURRENT_TIMESTAMP(6),
             updated_at = CURRENT_TIMESTAMP(6)
     </insert>
