@@ -40,10 +40,15 @@ public class DailyStatisticsAggregationService {
             log.warn("일별 통계 집계를 건너뜁니다. 성공한 초기 백필이 없습니다.");
             return false;
         }
+        LocalDate latestSuccessfulTargetEndDate = batchRunMapper.findLatestSuccessfulTargetEndDate();
+        if (latestSuccessfulTargetEndDate == null) {
+            throw new IllegalStateException("마지막 성공 집계의 대상 종료일을 찾을 수 없습니다.");
+        }
 
         List<LocalDate> targetDates = findTargetDates(
                 sourceWindowStartedAt,
                 sourceWindowEndedAt,
+                latestSuccessfulTargetEndDate,
                 latestStatisticsDate
         );
         StatisticsBatchRun batchRun = StatisticsBatchRun.daily(
@@ -90,6 +95,7 @@ public class DailyStatisticsAggregationService {
     private List<LocalDate> findTargetDates(
             LocalDateTime sourceWindowStartedAt,
             LocalDateTime sourceWindowEndedAt,
+            LocalDate latestSuccessfulTargetEndDate,
             LocalDate latestStatisticsDate
     ) {
         TreeSet<LocalDate> targetDates = new TreeSet<>(
@@ -99,6 +105,11 @@ public class DailyStatisticsAggregationService {
                         latestStatisticsDate
                 )
         );
+        if (latestSuccessfulTargetEndDate.isBefore(latestStatisticsDate)) {
+            latestSuccessfulTargetEndDate.plusDays(1)
+                    .datesUntil(latestStatisticsDate.plusDays(1))
+                    .forEach(targetDates::add);
+        }
         targetDates.add(latestStatisticsDate);
         return List.copyOf(targetDates);
     }

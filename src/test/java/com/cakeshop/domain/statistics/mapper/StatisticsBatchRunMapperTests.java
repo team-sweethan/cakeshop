@@ -145,6 +145,24 @@ class StatisticsBatchRunMapperTests {
     }
 
     @Test
+    void findLatestSuccessfulTargetEndDate_failedNewerRun_returnsLatestSuccessTargetEnd() {
+        StatisticsBatchRun successfulRun = newBackfillRun();
+        mapper.insertRunningBatch(successfulRun);
+        assertThat(mapper.completeSucceeded(successfulRun.getId())).isOne();
+
+        StatisticsBatchRun failedRun = StatisticsBatchRun.daily(
+                WINDOW_START,
+                WINDOW_END,
+                TARGET_DATE.plusDays(1),
+                TARGET_DATE.plusDays(1)
+        );
+        mapper.insertRunningBatch(failedRun);
+        assertThat(mapper.completeFailed(failedRun.getId())).isOne();
+
+        assertThat(mapper.findLatestSuccessfulTargetEndDate()).isEqualTo(TARGET_DATE);
+    }
+
+    @Test
     void findCurrentDateTime_returnsDatabaseCurrentTime() {
         LocalDateTime before = LocalDateTime.now(SEOUL).minusSeconds(5);
 

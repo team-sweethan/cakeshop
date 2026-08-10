@@ -89,6 +89,24 @@ class DailyStatisticsAggregationServiceTests {
     }
 
     @Test
+    void aggregateDailyStatistics_missedEmptyDates_fillsEveryDateThroughYesterday() {
+        LocalDate yesterday = findYesterday();
+        LocalDate latestSuccessfulDate = yesterday.minusDays(3);
+        insertSuccessfulBackfill(latestSuccessfulDate);
+
+        boolean executed = service.aggregateDailyStatistics();
+
+        assertThat(executed).isTrue();
+        for (LocalDate date = latestSuccessfulDate.plusDays(1);
+                !date.isAfter(yesterday);
+                date = date.plusDays(1)) {
+            assertThat(findDailyStatistics(date)).isEqualTo(
+                    new DailyStatisticsRow(0, 0, 0, BigDecimal.ZERO)
+            );
+        }
+    }
+
+    @Test
     void aggregateDailyStatistics_runningRunExists_skipsNewRun() {
         LocalDate yesterday = findYesterday();
         insertSuccessfulBackfill(yesterday);

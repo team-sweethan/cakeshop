@@ -36,6 +36,9 @@ public interface StatisticsBatchRunMapper {
     /** 마지막 성공 일별 집계의 변경 탐색 종료 시각을 조회한다. */
     LocalDateTime findLatestSuccessfulDailyWindowEnd();
 
+    /** 마지막 성공 집계가 완료한 대상 종료일을 조회한다. */
+    LocalDate findLatestSuccessfulTargetEndDate();
+
     /** 첫 일별 집계의 변경 탐색 기준이 되는 마지막 성공 백필 시작 시각을 조회한다. */
     LocalDateTime findLatestSuccessfulBackfillStartedAt();
 
