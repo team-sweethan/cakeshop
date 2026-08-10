@@ -23,19 +23,12 @@
       <input type="hidden" th:field="*{productId}">
       <input type="hidden" th:field="*{quantity}">
       <input type="hidden" th:field="*{requestKey}">
-      <input type="hidden" th:field="*{displayedOriginalAmount}">
       <input th:each="option : ${checkout.selectedOptions}"
              type="hidden"
              name="optionIds"
              th:value="${option.id}">
 
       <div class="stack">
-        <p class="form-error"
-           th:if="${#fields.hasGlobalErrors()}"
-           th:errors="*{global}">
-          상품 가격이 변경되었습니다. 주문 금액을 다시 확인해 주세요.
-        </p>
-
         <section>
           <h2 class="section-title">주문 상품</h2>
           <div class="panel stack" data-order-items>
@@ -215,9 +208,9 @@
 
       <aside class="order-summary">
         <h2 class="section-title">결제 금액</h2>
-        <div class="data-row">
+        <div class="data-row" data-order-total th:attr="data-original-amount=${checkout.totalAmount}">
           <span class="data-row__label">쿠폰 할인</span>
-          <span>주문 생성 시 확정</span>
+          <span data-coupon-discount>0원</span>
         </div>
         <div class="data-row">
           <span class="data-row__label">상품 금액</span>
@@ -232,8 +225,8 @@
           </span>
         </div>
         <div class="data-row">
-          <span class="data-row__label">상품·옵션 합계</span>
-          <strong th:text="|${#numbers.formatInteger(checkout.totalAmount, 1, 'COMMA')}원|">
+          <span class="data-row__label">최종 결제 금액</span>
+          <strong data-final-amount th:text="|${#numbers.formatInteger(checkout.totalAmount, 1, 'COMMA')}원|">
             0원
           </strong>
         </div>

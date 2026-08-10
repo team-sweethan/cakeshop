@@ -1,6 +1,9 @@
 package com.cakeshop.domain.coupon.service;
 
 import com.cakeshop.domain.coupon.dto.view.CouponOrderAvailableView;
+import com.cakeshop.domain.coupon.dto.view.CouponOrderDiscount;
+import com.cakeshop.domain.coupon.error.CouponErrorCode;
+import com.cakeshop.global.error.BusinessException;
 import java.math.BigDecimal;
 import com.cakeshop.domain.coupon.mapper.CouponOrderMapper;
 import java.util.List;
@@ -25,4 +28,14 @@ public class CouponOrderQueryService {
         return couponOrderMapper.findAvailableCouponsForMember(memberId, orderAmount);
     }
 
+    /** 현재 상품·옵션 기준 금액으로 쿠폰 정책을 검증하고 예상 할인 금액을 계산한다. */
+    @Transactional(readOnly = true)
+    public CouponPricePreview previewDiscount(long memberId, long memberCouponId, BigDecimal originalAmount) {
+        CouponOrderDiscount coupon = couponOrderMapper.findAvailableCouponForOrder(memberCouponId, memberId)
+                .orElseThrow(() -> new BusinessException(CouponErrorCode.ORDER_COUPON_UNAVAILABLE));
+        BigDecimal discount = CouponDiscountCalculator.calculate(coupon, originalAmount);
+        return new CouponPricePreview(discount, originalAmount.subtract(discount));
+    }
+
+    public record CouponPricePreview(BigDecimal discountAmount, BigDecimal finalAmount) { }
 }
