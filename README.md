@@ -102,6 +102,7 @@ AWS_ACCESS_KEY_ID=your-access-key
 AWS_SECRET_ACCESS_KEY=your-secret-key
 AWS_S3_BUCKET=sweethan-cakeshop-images
 AWS_S3_BASE_URL=https://sweethan-cakeshop-images.s3.ap-northeast-2.amazonaws.com
+AWS_S3_KEY_PREFIX=local-your-name
 ```
 
 `.env_sample`의 기본 포트는 `3307`입니다. 로컬 MariaDB가 기본 포트 `3306`을 사용한다면 반드시 수정합니다.
@@ -277,11 +278,17 @@ AWS_SECRET_ACCESS_KEY=your-local-secret-key
 AWS_SESSION_TOKEN=
 AWS_S3_BUCKET=sweethan-cakeshop-images
 AWS_S3_BASE_URL=https://sweethan-cakeshop-images.s3.ap-northeast-2.amazonaws.com
+AWS_S3_KEY_PREFIX=local-your-name
 ```
 
 로컬 Access Key와 Secret Key는 반드시 함께 설정합니다. STS나 IAM Identity Center의 임시 자격 증명을
 사용하면 `AWS_SESSION_TOKEN`도 함께 설정합니다. Access Key와 Secret Key가 모두 비어 있으면
 `aws configure`, 현재 프로세스의 AWS 환경 변수, IAM Role 같은 AWS SDK 기본 자격 증명 체인을 사용합니다.
+`AWS_S3_KEY_PREFIX`는 `local-본인GitHub아이디`처럼 영문·숫자·점·밑줄·하이픈만 사용해 개발자마다
+고유하게 설정하고, RDS 환경은 `rds-dev`처럼 별도 값을
+사용합니다. 저장소는 현재 prefix로 만든 객체만 삭제하므로 로컬 DB가 다른 환경의 URL을 갖고 있어도 해당
+S3 객체를 삭제하지 않습니다. prefix 도입 전에 생성한 S3 객체는 새 환경에서 자동 삭제하지 않으므로 필요하면
+참조 여부를 확인한 뒤 버킷에서 별도로 정리합니다.
 기본 프로필이 `local,s3`이므로 별도 실행 인수 없이 관리자 상품·매장 이미지 업로드로 확인합니다.
 
 ```powershell

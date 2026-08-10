@@ -1,8 +1,10 @@
 package com.cakeshop.domain.store.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -133,6 +135,28 @@ class StoreServiceTests {
                         TransactionSynchronization.STATUS_ROLLED_BACK));
 
         verify(fileStorageClient, never()).delete("/uploads/store/202601/old.jpg");
+        verify(fileStorageClient).delete("/uploads/store/202607/new.jpg");
+    }
+
+    @Test
+    void updateStore_previousImageCleanupFails_keepsSuccessfulResult() {
+        Store existing = store();
+        existing.setImageUrl("/uploads/store/202601/old.jpg");
+        when(storeMapper.findStoreById(StoreService.DEFAULT_STORE_ID)).thenReturn(Optional.of(existing));
+        when(storeMapper.updateStore(any(Store.class))).thenReturn(1);
+        when(fileStorageClient.store(any(), org.mockito.ArgumentMatchers.eq("store")))
+            .thenReturn("/uploads/store/202607/new.jpg");
+        doThrow(new IllegalStateException("S3 delete failed"))
+            .when(fileStorageClient).delete("/uploads/store/202601/old.jpg");
+        MultipartFile image = new MockMultipartFile(
+            "image", "cake.jpg", "image/jpeg", new byte[] {1, 2, 3});
+        TransactionSynchronizationManager.initSynchronization();
+
+        storeService.updateStore(validForm(), image);
+
+        assertThatCode(() -> TransactionSynchronizationManager.getSynchronizations().forEach(
+                TransactionSynchronization::afterCommit))
+            .doesNotThrowAnyException();
     }
 
     @Test

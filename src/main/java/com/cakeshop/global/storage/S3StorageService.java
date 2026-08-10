@@ -30,6 +30,7 @@ public class S3StorageService implements FileStorageClient {
     private final S3Client s3Client;
     private final String bucket;
     private final String baseUrl;
+    private final String keyPrefix;
     private final Clock clock;
 
     // S3 클라이언트와 저장 대상 버킷·공개 URL 설정
@@ -37,6 +38,7 @@ public class S3StorageService implements FileStorageClient {
             S3Client s3Client,
             @Value("${aws.s3.bucket}") String bucket,
             @Value("${aws.s3.base-url}") String baseUrl,
+            @Value("${aws.s3.key-prefix}") String keyPrefix,
             Clock clock) {
         if (!StringUtils.hasText(bucket)) {
             throw new IllegalArgumentException("aws.s3.bucket 설정이 비어 있습니다.");
@@ -44,9 +46,14 @@ public class S3StorageService implements FileStorageClient {
         if (!StringUtils.hasText(baseUrl)) {
             throw new IllegalArgumentException("aws.s3.base-url 설정이 비어 있습니다.");
         }
+        if (!StringUtils.hasText(keyPrefix)
+                || !keyPrefix.matches("[A-Za-z0-9][A-Za-z0-9._-]*")) {
+            throw new IllegalArgumentException("aws.s3.key-prefix 설정이 올바르지 않습니다.");
+        }
         this.s3Client = s3Client;
         this.bucket = bucket.trim();
         this.baseUrl = stripTrailingSlash(baseUrl.trim());
+        this.keyPrefix = keyPrefix.trim();
         this.clock = clock;
     }
 
@@ -117,7 +124,9 @@ public class S3StorageService implements FileStorageClient {
     // 도메인·연월·UUID를 조합한 중복 없는 S3 객체 키 생성
     private String createObjectKey(MultipartFile file, String directory) {
         String extension = extension(file.getOriginalFilename());
-        return directory
+        return keyPrefix
+                + "/"
+                + directory
                 + "/"
                 + LocalDate.now(clock).format(MONTH)
                 + "/"
@@ -133,7 +142,7 @@ public class S3StorageService implements FileStorageClient {
         }
 
         String objectKey = path.substring(prefix.length());
-        return StringUtils.hasText(objectKey) ? objectKey : null;
+        return objectKey.startsWith(keyPrefix + "/") ? objectKey : null;
     }
 
     // 원본 파일명의 확장자를 소문자로 정규화

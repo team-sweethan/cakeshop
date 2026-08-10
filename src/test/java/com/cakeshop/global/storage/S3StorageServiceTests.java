@@ -31,6 +31,7 @@ class S3StorageServiceTests {
 
     private static final String BUCKET = "cakeshop-test";
     private static final String BASE_URL = "https://cdn.example.com";
+    private static final String KEY_PREFIX = "local-test";
     private static final Clock FIXED_CLOCK = Clock.fixed(
             Instant.parse("2026-08-10T00:00:00Z"),
             ZoneId.of("Asia/Seoul"));
@@ -46,6 +47,7 @@ class S3StorageServiceTests {
                 s3Client,
                 BUCKET,
                 BASE_URL + "/",
+                KEY_PREFIX,
                 FIXED_CLOCK);
     }
 
@@ -68,7 +70,7 @@ class S3StorageServiceTests {
         verify(s3Client).putObject(requestCaptor.capture(), any(RequestBody.class));
         assertThat(requestCaptor.getValue().bucket()).isEqualTo(BUCKET);
         assertThat(requestCaptor.getValue().key())
-                .startsWith("product/202608/")
+                .startsWith(KEY_PREFIX + "/product/202608/")
                 .endsWith(".jpg");
         assertThat(result).isEqualTo(BASE_URL + "/" + requestCaptor.getValue().key());
     }
@@ -90,14 +92,14 @@ class S3StorageServiceTests {
         when(s3Client.deleteObject(any(DeleteObjectRequest.class)))
                 .thenReturn(DeleteObjectResponse.builder().build());
 
-        storageService.delete(BASE_URL + "/product/202608/image.jpg");
+        storageService.delete(BASE_URL + "/" + KEY_PREFIX + "/product/202608/image.jpg");
 
         ArgumentCaptor<DeleteObjectRequest> requestCaptor =
                 ArgumentCaptor.forClass(DeleteObjectRequest.class);
         verify(s3Client).deleteObject(requestCaptor.capture());
         assertThat(requestCaptor.getValue().bucket()).isEqualTo(BUCKET);
         assertThat(requestCaptor.getValue().key())
-                .isEqualTo("product/202608/image.jpg");
+                .isEqualTo(KEY_PREFIX + "/product/202608/image.jpg");
     }
 
     @Test
@@ -105,5 +107,23 @@ class S3StorageServiceTests {
         storageService.delete("https://other.example.com/product/image.jpg");
 
         verify(s3Client, never()).deleteObject(any(DeleteObjectRequest.class));
+    }
+
+    @Test
+    void delete_differentEnvironmentPrefix_ignoresRequest() {
+        storageService.delete(BASE_URL + "/rds/product/202608/image.jpg");
+
+        verify(s3Client, never()).deleteObject(any(DeleteObjectRequest.class));
+    }
+
+    @Test
+    void constructor_invalidKeyPrefix_rejectsConfiguration() {
+        assertThatThrownBy(() -> new S3StorageService(
+                s3Client,
+                BUCKET,
+                BASE_URL,
+                "../rds",
+                FIXED_CLOCK))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

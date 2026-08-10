@@ -89,6 +89,8 @@ aws:
     bucket: ${AWS_S3_BUCKET}
     # S3 또는 CloudFront의 공개 기본 URL이며 끝의 슬래시는 제외한다.
     base-url: ${AWS_S3_BASE_URL}
+    # 로컬 개발자와 RDS가 서로의 객체를 삭제하지 않도록 환경마다 고유한 prefix를 사용한다.
+    key-prefix: ${AWS_S3_KEY_PREFIX}
 
 ---
 # 기본 개발 환경: 각 PC에 직접 설치한 MariaDB
