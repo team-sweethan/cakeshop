@@ -67,9 +67,9 @@ class InitialStatisticsBackfillServiceTests {
     void backfillInitialStatistics_noSourceData_createsRecentSevenZeroRows() {
         LocalDate yesterday = findYesterday();
 
-        boolean executed = service.backfillInitialStatistics();
+        StatisticsBackfillResult result = service.backfillInitialStatistics();
 
-        assertThat(executed).isTrue();
+        assertThat(result).isEqualTo(StatisticsBackfillResult.SUCCEEDED);
         assertThat(countDailyStatistics()).isEqualTo(7);
         assertThat(countDailyStatisticsBetween(yesterday.minusDays(6), yesterday)).isEqualTo(7);
         BatchRunRow run = findLatestBackfillRun();
@@ -88,9 +88,9 @@ class InitialStatisticsBackfillServiceTests {
                 .when(aggregationMapper)
                 .findEarliestApprovedPaymentDate();
 
-        boolean executed = service.backfillInitialStatistics();
+        StatisticsBackfillResult result = service.backfillInitialStatistics();
 
-        assertThat(executed).isTrue();
+        assertThat(result).isEqualTo(StatisticsBackfillResult.SUCCEEDED);
         BatchRunRow run = findLatestBackfillRun();
         assertThat(run.targetStartDate()).isEqualTo(earliestOrderDate);
         assertThat(run.targetEndDate()).isEqualTo(yesterday);
@@ -102,9 +102,9 @@ class InitialStatisticsBackfillServiceTests {
         LocalDate yesterday = findYesterday();
         insertCompletedBackfill(yesterday, "SUCCEEDED");
 
-        boolean executed = service.backfillInitialStatistics();
+        StatisticsBackfillResult result = service.backfillInitialStatistics();
 
-        assertThat(executed).isFalse();
+        assertThat(result).isEqualTo(StatisticsBackfillResult.ALREADY_COMPLETED);
         assertThat(countBatchRuns()).isOne();
     }
 
@@ -114,9 +114,9 @@ class InitialStatisticsBackfillServiceTests {
         LocalDate lastCompletedDate = yesterday.minusDays(3);
         insertCompletedBackfill(lastCompletedDate, "FAILED");
 
-        boolean executed = service.backfillInitialStatistics();
+        StatisticsBackfillResult result = service.backfillInitialStatistics();
 
-        assertThat(executed).isTrue();
+        assertThat(result).isEqualTo(StatisticsBackfillResult.SUCCEEDED);
         BatchRunRow run = findLatestBackfillRun();
         assertThat(run.status()).isEqualTo("SUCCEEDED");
         assertThat(run.targetStartDate()).isEqualTo(lastCompletedDate.plusDays(1));
@@ -134,9 +134,9 @@ class InitialStatisticsBackfillServiceTests {
         );
         batchRunMapper.insertRunningBatch(running);
 
-        boolean executed = service.backfillInitialStatistics();
+        StatisticsBackfillResult result = service.backfillInitialStatistics();
 
-        assertThat(executed).isFalse();
+        assertThat(result).isEqualTo(StatisticsBackfillResult.SKIPPED_RUNNING);
         assertThat(countBatchRuns()).isOne();
         assertThat(findLatestBackfillRun().status()).isEqualTo("RUNNING");
     }

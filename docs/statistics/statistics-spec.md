@@ -230,6 +230,18 @@
 
 - Flyway migration은 집계 테이블과 실행 기록 테이블 구조만 관리하고 원본 데이터 집계를 수행하지 않는다.
 - 초기 적재는 Flyway와 분리한 일회성 백필 작업으로 실행한다.
+- 백필은 일반 애플리케이션 시작 시 자동 실행하지 않고 운영자가 CLI 명령으로 명시적으로 실행한다.
+- `app.statistics.backfill.enabled=true`일 때만 백필 Runner를 활성화하며 기본값은 비활성화한다.
+- 운영자는 웹 서버 없이 아래 명령으로 백필을 실행하고 종료 결과와 `statistics_batch_runs`를 확인한다.
+
+```bash
+java -jar cakeshop.jar \
+  --spring.main.web-application-type=none \
+  --app.statistics.backfill.enabled=true
+```
+
+- 백필 성공 또는 이미 완료된 경우 종료 코드 `0`, 다른 집계 실행 중이거나 백필 실패인 경우
+  `0`이 아닌 종료 코드를 반환한다.
 - 성공한 백필 실행이 이미 있으면 초기 백필을 다시 시작하지 않는다.
 - 백필 시작일은 가장 이른 `orders.created_at` 날짜, 가장 이른 `payments.approved_at` 날짜,
   어제에서 6일 전 가운데 가장 이른 날짜로 한다.
