@@ -12,12 +12,15 @@ public record ProductReviewView(
         Integer designRating,
         Integer serviceRating,
         String content,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        ReviewReplyView reply
 ) {
 
     public static final String WITHDRAWN_AUTHOR_NAME = "탈퇴한 회원";
 
-    public static ProductReviewView of(ReviewRow row, MemberReviewView author) {
+    public static ProductReviewView of(
+            ReviewRow row, MemberReviewView author, ReviewReplyView reply) {
+
         return new ProductReviewView(
                 row.id(),
                 author == null || author.withdrawn()
@@ -28,6 +31,7 @@ public record ProductReviewView(
                 row.designRating(),
                 row.serviceRating(),
                 row.content(),
-                row.createdAt());
+                row.createdAt(),
+                reply);
     }
 }

@@ -40,6 +40,7 @@ import com.cakeshop.domain.review.entity.Review;
 import com.cakeshop.domain.review.entity.ReviewStatus;
 import com.cakeshop.domain.review.error.ReviewErrorCode;
 import com.cakeshop.domain.review.mapper.ReviewMapper;
+import com.cakeshop.domain.review.mapper.ReviewReplyMapper;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
@@ -53,6 +54,7 @@ class ReviewServiceTests {
     private static final LocalDateTime WRITTEN_AT = LocalDateTime.of(2026, 8, 9, 12, 0);
 
     private ReviewMapper reviewMapper;
+    private ReviewReplyMapper reviewReplyMapper;
     private OrderReviewQueryService orderReviewQueryService;
     private ProductReviewCommandService productReviewCommandService;
     private ProductQueryService productQueryService;
@@ -62,12 +64,14 @@ class ReviewServiceTests {
     @BeforeEach
     void setUp() {
         reviewMapper = mock(ReviewMapper.class);
+        reviewReplyMapper = mock(ReviewReplyMapper.class);
         orderReviewQueryService = mock(OrderReviewQueryService.class);
         productReviewCommandService = mock(ProductReviewCommandService.class);
         productQueryService = mock(ProductQueryService.class);
         memberReviewQueryService = mock(MemberReviewQueryService.class);
         reviewService = new ReviewService(
                 reviewMapper,
+                reviewReplyMapper,
                 orderReviewQueryService,
                 productReviewCommandService,
                 productQueryService,

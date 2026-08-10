@@ -6,6 +6,7 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,15 +15,19 @@ import com.cakeshop.domain.member.service.MemberReviewQueryService;
 import com.cakeshop.domain.order.dto.view.OrderReviewSnapshotView;
 import com.cakeshop.domain.order.service.OrderReviewQueryService;
 import com.cakeshop.domain.product.service.ProductReviewCommandService;
+import com.cakeshop.domain.review.dto.form.ReviewReplyForm;
 import com.cakeshop.domain.review.dto.view.AdminReviewDetailView;
 import com.cakeshop.domain.review.dto.view.AdminReviewFilter;
 import com.cakeshop.domain.review.dto.view.AdminReviewListView;
 import com.cakeshop.domain.review.dto.view.AdminReviewRating;
+import com.cakeshop.domain.review.dto.view.ReviewReplyView;
 import com.cakeshop.domain.review.dto.view.ReviewRow;
+import com.cakeshop.domain.review.entity.ReviewReply;
 import com.cakeshop.domain.review.entity.ReviewStatus;
 import com.cakeshop.domain.review.error.ReviewErrorCode;
 import com.cakeshop.domain.review.mapper.ReviewAdminMapper;
 import com.cakeshop.domain.review.mapper.ReviewMapper;
+import com.cakeshop.domain.review.mapper.ReviewReplyMapper;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
@@ -32,6 +37,7 @@ public class ReviewAdminService {
 
     private final ReviewAdminMapper reviewAdminMapper;
     private final ReviewMapper reviewMapper;
+    private final ReviewReplyMapper reviewReplyMapper;
     private final ReviewService reviewService;
     private final ProductReviewCommandService productReviewCommandService;
     private final MemberReviewQueryService memberReviewQueryService;
@@ -40,12 +46,14 @@ public class ReviewAdminService {
     public ReviewAdminService(
             ReviewAdminMapper reviewAdminMapper,
             ReviewMapper reviewMapper,
+            ReviewReplyMapper reviewReplyMapper,
             ReviewService reviewService,
             ProductReviewCommandService productReviewCommandService,
             MemberReviewQueryService memberReviewQueryService,
             OrderReviewQueryService orderReviewQueryService) {
         this.reviewAdminMapper = reviewAdminMapper;
         this.reviewMapper = reviewMapper;
+        this.reviewReplyMapper = reviewReplyMapper;
         this.reviewService = reviewService;
         this.productReviewCommandService = productReviewCommandService;
         this.memberReviewQueryService = memberReviewQueryService;
@@ -88,7 +96,51 @@ public class ReviewAdminService {
         return AdminReviewDetailView.of(
                 review,
                 findAuthors(rows).get(review.memberId()),
-                findOrderSnapshots(rows).get(review.orderItemId()));
+                findOrderSnapshots(rows).get(review.orderItemId()),
+                reviewReplyMapper.findByReviewId(reviewId));
+    }
+
+    @Transactional
+    public void reply(long reviewId, ReviewReplyForm form, long adminId) {
+        int inserted;
+
+        try {
+            inserted = reviewReplyMapper.insertForPublishedReview(
+                    ReviewReply.create(reviewId, adminId, form.getContent()));
+        } catch (DuplicateKeyException e) {
+            throw new BusinessException(ReviewErrorCode.ALREADY_REPLIED);
+        }
+
+        if (inserted == 0) {
+            requirePublished(reviewId);
+
+            throw new BusinessException(ReviewErrorCode.INVALID_REVIEW_TRANSITION);
+        }
+    }
+
+    @Transactional
+    public void editReply(long reviewId, ReviewReplyForm form) {
+        if (reviewReplyMapper.updateContentForPublishedReview(reviewId, form.getContent()) > 0) {
+            return;
+        }
+
+        requirePublished(reviewId);
+
+        throw new BusinessException(ReviewErrorCode.REPLY_NOT_FOUND);
+    }
+
+    // 0행의 원인을 최신 행으로 다시 읽는다. 조건이 저장 문장 안에 있어 잠금을 기다리는 동안
+    // 커밋된 숨김·삭제는 검증 시점의 스냅샷에 없다 (조각 4·5와 같은 자리).
+    private void requirePublished(long reviewId) {
+        ReviewRow review = reviewMapper.findByIdForUpdate(reviewId);
+
+        if (review == null || review.status() == ReviewStatus.DELETED) {
+            throw new BusinessException(ReviewErrorCode.REVIEW_NOT_FOUND);
+        }
+
+        if (review.status() == ReviewStatus.BLOCKED) {
+            throw new BusinessException(ReviewErrorCode.BLOCKED_REVIEW);
+        }
     }
 
     @Transactional

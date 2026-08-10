@@ -19,11 +19,15 @@ public record AdminReviewDetailView(
         String content,
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
-        ReviewStatus status
+        ReviewStatus status,
+        ReviewReplyView reply
 ) {
 
     public static AdminReviewDetailView of(
-            ReviewRow row, MemberReviewView author, OrderReviewSnapshotView snapshot) {
+            ReviewRow row,
+            MemberReviewView author,
+            OrderReviewSnapshotView snapshot,
+            ReviewReplyView reply) {
 
         return new AdminReviewDetailView(
                 row.id(),
@@ -40,7 +44,8 @@ public record AdminReviewDetailView(
                 row.content(),
                 row.createdAt(),
                 row.updatedAt(),
-                row.status());
+                row.status(),
+                reply);
     }
 
     public boolean isPublished() {

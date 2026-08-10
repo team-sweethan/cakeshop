@@ -86,6 +86,54 @@
               </p>
             </div>
           </section>
+
+          <section class="section">
+            <h2 class="section-title">사장님 답글</h2>
+
+            <div class="panel stack">
+              <div th:if="${review.reply != null}" class="stack">
+                <p style="white-space:pre-wrap" th:text="${review.reply.content}">답글 본문</p>
+                <p class="text-muted"
+                   th:text="'등록일 ' + ${#temporals.format(review.reply.createdAt, 'yyyy.MM.dd HH:mm')}">
+                  등록일 2026.01.01 00:00
+                </p>
+              </div>
+
+              <p class="text-muted" th:if="${review.reply == null}">
+                아직 답글이 없습니다. 후기당 답글은 한 개입니다.
+              </p>
+
+              <form method="post"
+                    th:if="${review.published}"
+                    th:object="${reviewReplyForm}"
+                    th:action="${review.reply == null}
+                               ? @{/admin/reviews/{reviewId}/replies(reviewId=${review.id})}
+                               : @{/admin/reviews/{reviewId}/replies/edit(reviewId=${review.id})}">
+
+                <div class="form-group">
+                  <label class="form-label" for="reply-content">
+                    답글 내용 <span class="required">*</span>
+                  </label>
+                  <textarea class="form-control form-control--textarea"
+                            id="reply-content"
+                            th:field="*{content}"
+                            maxlength="1000"
+                            placeholder="고객에게 보일 답글을 작성해 주세요 (1000자 이하)"
+                            required></textarea>
+                  <p class="form-error" th:if="${#fields.hasErrors('content')}"
+                     th:errors="*{content}">내용 오류</p>
+                </div>
+
+                <button class="btn btn--primary" type="submit"
+                        th:text="${review.reply == null} ? '답글 등록' : '답글 수정'">답글 등록</button>
+              </form>
+
+              <p class="note" th:unless="${review.published}">
+                노출 중인 후기에만 답글을 달거나 고칠 수 있습니다. 숨긴 후기의 답글은 고객 화면에서도
+                함께 가려집니다.
+              </p>
+            </div>
+          </section>
         </div>
       </div>
     </main>
