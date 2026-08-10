@@ -6,7 +6,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import com.cakeshop.domain.member.dto.view.MemberCouponView;
-import com.cakeshop.domain.member.dto.view.MemberCouponIssuedHistoryView;
+import com.cakeshop.domain.member.dto.form.MemberCouponSearchType;
 
 /**
  * ******************************
@@ -21,23 +21,16 @@ import com.cakeshop.domain.member.dto.view.MemberCouponIssuedHistoryView;
 public interface MemberCouponMapper {
 
     List<MemberCouponView> findActiveMembers(
+            @Param("searchType") MemberCouponSearchType searchType,
             @Param("keyword") String keyword,
             @Param("size") int size,
             @Param("offset") int offset
     );
 
-    long countActiveMembers(@Param("keyword") String keyword);
+    long countActiveMembers(@Param("searchType") MemberCouponSearchType searchType,
+                            @Param("keyword") String keyword);
 
     List<MemberCouponView> findMembersByIds(@Param("memberIds") List<Long> memberIds);
-
-    List<MemberCouponIssuedHistoryView> findCouponIssuedMembers(
-            @Param("couponId") Long couponId,
-            @Param("keyword") String keyword,
-            @Param("size") int size,
-            @Param("offset") int offset
-    );
-
-    long countCouponIssuedMembers(@Param("couponId") Long couponId, @Param("keyword") String keyword);
 
     boolean existsActiveCouponIssuableMember(@Param("memberId") Long memberId);
 

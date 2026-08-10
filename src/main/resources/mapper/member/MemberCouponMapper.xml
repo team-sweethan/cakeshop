@@ -5,7 +5,13 @@
         SELECT id AS memberId, name, email, phone, birth_date AS birthDate
         FROM members
         WHERE role = 'USER' AND status = 'ACTIVE'
-          AND (name LIKE CONCAT('%', #{keyword}, '%') OR email LIKE CONCAT('%', #{keyword}, '%'))
+          AND
+        <choose>
+            <when test="searchType.name() == 'MEMBER_ID'">id = #{keyword}</when>
+            <when test="searchType.name() == 'NAME'">name LIKE CONCAT('%', #{keyword}, '%')</when>
+            <when test="searchType.name() == 'EMAIL'">email LIKE CONCAT('%', #{keyword}, '%')</when>
+            <when test="searchType.name() == 'PHONE'">phone LIKE CONCAT('%', #{keyword}, '%')</when>
+        </choose>
         ORDER BY name, id
         LIMIT #{size} OFFSET #{offset}
     </select>
@@ -13,7 +19,13 @@
     <select id="countActiveMembers" resultType="long">
         SELECT COUNT(*) FROM members
         WHERE role = 'USER' AND status = 'ACTIVE'
-          AND (name LIKE CONCAT('%', #{keyword}, '%') OR email LIKE CONCAT('%', #{keyword}, '%'))
+          AND
+        <choose>
+            <when test="searchType.name() == 'MEMBER_ID'">id = #{keyword}</when>
+            <when test="searchType.name() == 'NAME'">name LIKE CONCAT('%', #{keyword}, '%')</when>
+            <when test="searchType.name() == 'EMAIL'">email LIKE CONCAT('%', #{keyword}, '%')</when>
+            <when test="searchType.name() == 'PHONE'">phone LIKE CONCAT('%', #{keyword}, '%')</when>
+        </choose>
     </select>
 
     <select id="findMembersByIds" resultType="com.cakeshop.domain.member.dto.view.MemberCouponView">
@@ -23,37 +35,6 @@
         <foreach collection="memberIds" item="memberId" open="(" separator="," close=")">
             #{memberId}
         </foreach>
-    </select>
-
-    <!--
-      ReadModel 예외: 관리자 쿠폰 상세의 발급 회원 목록은 회원 검색 조건과 쿠폰 발급 이력의
-      정렬·페이징을 함께 처리해야 하므로 members와 member_coupons를 JOIN한다.
-      조회 전용이며, 회원·쿠폰 담당자가 합의한 범위에서만 사용한다.
-    -->
-    <select id="findCouponIssuedMembers"
-            resultType="com.cakeshop.domain.member.dto.view.MemberCouponIssuedHistoryView">
-        SELECT m.id AS memberId,
-               m.name,
-               m.email,
-               m.phone,
-               DATE_FORMAT(m.birth_date, '%m-%d') AS birthday,
-               mc.status AS couponStatus,
-               mc.used_at AS usedAt
-        FROM member_coupons mc
-        INNER JOIN members m ON m.id = mc.member_id
-        WHERE mc.coupon_id = #{couponId}
-          AND (m.name LIKE CONCAT('%', #{keyword}, '%') OR m.email LIKE CONCAT('%', #{keyword}, '%'))
-        ORDER BY mc.issued_at DESC, mc.id DESC
-        LIMIT #{size} OFFSET #{offset}
-    </select>
-
-    <!-- 위 ReadModel 목록과 동일한 검색 조건으로 전체 건수를 조회한다. -->
-    <select id="countCouponIssuedMembers" resultType="long">
-        SELECT COUNT(*)
-        FROM member_coupons mc
-        INNER JOIN members m ON m.id = mc.member_id
-        WHERE mc.coupon_id = #{couponId}
-          AND (m.name LIKE CONCAT('%', #{keyword}, '%') OR m.email LIKE CONCAT('%', #{keyword}, '%'))
     </select>
 
     <select id="existsActiveCouponIssuableMember" resultType="boolean">

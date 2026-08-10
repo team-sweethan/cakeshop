@@ -24,7 +24,7 @@ import com.cakeshop.domain.coupon.error.CouponErrorCode;
 import com.cakeshop.domain.coupon.mapper.CouponMapper;
 import com.cakeshop.domain.member.service.MemberCouponQueryService;
 import com.cakeshop.domain.member.dto.view.MemberCouponView;
-import com.cakeshop.domain.member.dto.view.MemberCouponIssuedHistoryView;
+import com.cakeshop.domain.coupon.dto.view.CouponIssuedMemberHistoryView;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
@@ -133,12 +133,12 @@ class CouponAdminServiceTests {
                 1L, "홍길동", "member@example.com", "010-1234-5678", LocalDate.of(2000, 1, 15)
         );
         PageRequest request = new PageRequest(1, 5);
-        when(memberCouponQueryService.searchActiveMembers(any(), any())).thenReturn(
+        when(memberCouponQueryService.searchActiveMembers(any(), any(), any())).thenReturn(
                 new PageResult<>(List.of(member), request, 1)
         );
         when(couponMapper.findIssuedMemberIds(3L, List.of(1L))).thenReturn(List.of());
 
-        PageResult<CouponIssueCandidateView> result = couponAdminService.searchTargetMembers(3L, "홍", 1);
+        PageResult<CouponIssueCandidateView> result = couponAdminService.searchTargetMembers(3L, "NAME", "홍길", 1);
 
         CouponIssueCandidateView candidate = result.getContent().getFirst();
         assertThat(candidate.email()).isEqualTo("me***@example.com");
@@ -147,15 +147,18 @@ class CouponAdminServiceTests {
     }
 
     @Test
-    void getIssuedMembers_returnsMemberContractPage() {
-        MemberCouponIssuedHistoryView history = new MemberCouponIssuedHistoryView(
-                1L, "회원", "member@example.com", "010-1234-5678", "01-15", "AVAILABLE", null
+    void getIssuedMembers_combinesCouponHistoryWithMemberProfile() {
+        CouponIssuedMemberHistoryView history = new CouponIssuedMemberHistoryView(
+                1L, CustomerCouponStatus.AVAILABLE, LocalDateTime.of(2026, 8, 7, 10, 0), null
         );
-        when(memberCouponQueryService.getCouponIssuedMemberHistories(any(), any(), any())).thenReturn(
-                new PageResult<>(List.of(history), new PageRequest(1, 5), 1)
+        MemberCouponView member = new MemberCouponView(
+                1L, "회원", "member@example.com", "010-1234-5678", LocalDate.of(2000, 1, 15)
         );
+        when(couponMapper.countIssuedMemberHistories(3L, null)).thenReturn(1L);
+        when(couponMapper.findIssuedMemberHistories(3L, null, 5, 0)).thenReturn(List.of(history));
+        when(memberCouponQueryService.getMembersByIds(List.of(1L))).thenReturn(List.of(member));
 
-        PageResult<CouponIssuedMemberView> result = couponAdminService.getIssuedMembers(3L, "회원", 1);
+        PageResult<CouponIssuedMemberView> result = couponAdminService.getIssuedMembers(3L, null, 1);
 
         assertThat(result.getTotalElements()).isEqualTo(1);
         assertThat(result.getContent()).containsExactly(new CouponIssuedMemberView(

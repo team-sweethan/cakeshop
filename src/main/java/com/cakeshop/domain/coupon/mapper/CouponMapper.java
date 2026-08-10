@@ -8,6 +8,7 @@ import org.apache.ibatis.annotations.Param;
 
 import com.cakeshop.domain.coupon.dto.form.CouponSearchCondition;
 import com.cakeshop.domain.coupon.dto.view.CouponView;
+import com.cakeshop.domain.coupon.dto.view.CouponIssuedMemberHistoryView;
 import com.cakeshop.domain.coupon.entity.Coupon;
 import com.cakeshop.domain.coupon.entity.CouponStatus;
 import com.cakeshop.domain.coupon.entity.CouponTargetType;
@@ -55,6 +56,10 @@ public interface CouponMapper {
     int decreaseIssuedQuantity(@Param("couponId") Long couponId);
     /** 회원 조회 결과 중 이미 발급된 회원을 표시하기 위한 식별자 목록이다. */
     List<Long> findIssuedMemberIds(@Param("couponId") Long couponId, @Param("memberIds") List<Long> memberIds);
+    List<CouponIssuedMemberHistoryView> findIssuedMemberHistories(
+            @Param("couponId") Long couponId, @Param("memberId") Long memberId,
+            @Param("size") int size, @Param("offset") int offset);
+    long countIssuedMemberHistories(@Param("couponId") Long couponId, @Param("memberId") Long memberId);
     /** 대상 정책별로 발급 후보 쿠폰을 조회한다. */
     List<Coupon> findCouponsByTargetType(@Param("targetType") CouponTargetType targetType);
 

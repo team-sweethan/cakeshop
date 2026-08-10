@@ -76,6 +76,9 @@
 - 쿠폰 INSERT·수량 증가 SQL은 현재 관리 상태·기간·수량·중복 발급 여부를 조건으로 다시 검증한다.
 - `FIRST_ORDER` 발급과 일반 주문 생성은 같은 활성 회원 행을 `FOR UPDATE`로 잠가,
   잠금 획득 뒤의 주문 이력으로 첫 주문 여부를 판단한다.
+- 대량 자동 발급은 회원별 독립 트랜잭션으로 처리한다. `ALL_MEMBERS`, `BIRTHDAY`는 회원 행 잠금을
+  잡지 않고 조건부 INSERT만 수행하며, `FIRST_ORDER`만 회원 한 명의 짧은 트랜잭션에서 행 잠금 후
+  주문 이력을 재검증한다.
 
 ## 4. 관리자 흐름
 
@@ -96,10 +99,12 @@
 - 발급 취소는 종료 전이며 아직 `AVAILABLE`인 회원 쿠폰만 가능하다.
 - 발급·취소 대상이 조회 이후 변경되어 INSERT 또는 DELETE가 0건이면 성공 메시지를 보여 주지 않고 최신 상태 오류를 반환한다.
 - 회원 검색·발급 회원 목록 응답은 이메일과 휴대폰 번호를 서버에서 마스킹하고, 생일은 월·일만 제공한다.
-- 발급 회원 목록의 이름·이메일 검색과 페이징은 `MemberCouponQueryService`의 공개 조회 계약에서 한 번에 처리한다.
-  쿠폰 서비스는 검색 결과 전체 회원 ID를 수집해 `IN (...)` 조건으로 다시 조회하지 않는다.
-- 이 조회는 `members`와 `member_coupons`를 JOIN하는 **조회 전용 ReadModel 예외**다. 대상은 관리자 쿠폰 상세의
-  발급 회원 목록으로 한정하며, 상태 변경을 포함하지 않는다. 회원·쿠폰 담당자의 합의 및 주요 변경 시 리뷰를 전제로 한다.
+- 발급 회원 목록의 발급 이력 조건·정렬·페이징은 쿠폰 도메인이 소유한다. 이름·이메일·휴대폰 번호를 이용한
+  전체 발급 이력 검색은 여러 도메인의 ID 목록을 펼쳐야 하므로 제공하지 않는다.
+- 쿠폰 개별 발급 대상 검색은 회원 ID·이름·이메일·휴대폰 번호를 지원한다. 빈 검색은 전체 회원을 조회하지 않고
+  입력 안내를 표시하며, 최소 입력 길이는 회원 ID 1자리, 이름·이메일 2자리, 휴대폰 번호 4자리다.
+- 발급 회원 목록은 회원 ID 정확 검색 또는 전체 발급 이력 조회만 지원한다. 현재 페이지의 회원 프로필은
+  `MemberCouponQueryService` 공개 계약으로 조회하며, 쿠폰 도메인이 회원 Mapper를 직접 사용하지 않는다.
 
 ### 4.3 수정
 
@@ -120,7 +125,8 @@
 
 ```text
 ALL_MEMBERS / FIRST_ORDER
-관리자 등록 -> CouponAdminService -> CouponIssueService -> member_coupons
+관리자 등록 트랜잭션 커밋 -> CouponIssueRequestedEvent -> CouponIssueService
+  -> 회원별 CouponMemberIssueService 독립 트랜잭션 -> member_coupons
 
 NEW_MEMBERS
 회원가입 완료 -> member 도메인 -> CouponIssueService.issueNewMemberCoupons(memberId)
@@ -213,11 +219,11 @@ SPECIFIC_MEMBERS
 
 ```text
 FIRST_ORDER 후보 회원 조회
-  -> members의 대상 회원 행 FOR UPDATE
+  -> 회원별 독립 트랜잭션 시작 -> members의 대상 회원 행 FOR UPDATE
   -> OrderCouponQueryService로 해당 회원의 최신 주문 이력 재확인
   -> 주문 이력이 없으면 member_coupons INSERT
   -> issued_quantity 조건부 증가
-  -> 트랜잭션 종료 후 회원 행 잠금 해제
+  -> 해당 회원 발급 트랜잭션 종료 후 회원 행 잠금 해제
 ```
 
 일반 주문 생성도 주문 INSERT 전에 같은 회원 행을 `FOR UPDATE`로 잠근다. 두 작업이 동시에 같은 회원을

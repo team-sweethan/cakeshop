@@ -4,10 +4,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.time.LocalDateTime;
 import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,6 +14,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import com.cakeshop.domain.coupon.entity.Coupon;
 import com.cakeshop.domain.coupon.entity.CouponStatus;
@@ -35,6 +35,12 @@ class CouponIssueServiceTests {
     @Mock
     private OrderCouponQueryService orderCouponQueryService;
 
+    @Mock
+    private CouponMemberIssueService couponMemberIssueService;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     @Spy
     private Clock clock = Clock.systemDefaultZone();
 
@@ -42,31 +48,38 @@ class CouponIssueServiceTests {
     private CouponIssueService couponIssueService;
 
     @Test
-    void issueOnCouponCreated_allMembersFutureCouponAllowsIssuanceBeforeStart() {
+    void issueOnCouponCreated_allMembers_publishesAfterCommitEvent() {
         Coupon coupon = coupon(CouponTargetType.ALL_MEMBERS, LocalDateTime.now().plusDays(1));
-        when(memberCouponQueryService.getActiveMemberIds()).thenReturn(List.of(2L));
-        when(memberCouponQueryService.lockActiveCouponIssuableMember(2L)).thenReturn(true);
-        when(couponMapper.insertMemberCouponIfAbsent(1L, 2L, true)).thenReturn(1);
-        when(couponMapper.increaseIssuedQuantityIfAvailable(1L)).thenReturn(1);
 
         couponIssueService.issueOnCouponCreated(coupon);
 
-        verify(couponMapper).insertMemberCouponIfAbsent(1L, 2L, true);
-        verify(couponMapper).increaseIssuedQuantityIfAvailable(1L);
+        verify(eventPublisher).publishEvent(new CouponIssueRequestedEvent(1L, CouponTargetType.ALL_MEMBERS));
     }
 
     @Test
-    void issueOnCouponCreated_firstOrderRechecksOrderHistoryBeforeIssuance() {
-        Coupon coupon = coupon(CouponTargetType.FIRST_ORDER, LocalDateTime.now().plusDays(1));
-        when(memberCouponQueryService.getActiveMemberIds()).thenReturn(List.of(2L));
-        when(memberCouponQueryService.lockActiveCouponIssuableMember(2L)).thenReturn(true);
-        when(orderCouponQueryService.getMemberIdsWithOrderHistory(List.of(2L))).thenReturn(List.of());
-        when(orderCouponQueryService.hasOrderHistory(2L)).thenReturn(true);
+    void handleCouponIssueRequested_allMembers_delegatesEachMemberWithoutMemberLock() {
+        when(memberCouponQueryService.getActiveMemberIds()).thenReturn(List.of(2L, 3L));
 
-        couponIssueService.issueOnCouponCreated(coupon);
+        couponIssueService.handleCouponIssueRequested(
+                new CouponIssueRequestedEvent(1L, CouponTargetType.ALL_MEMBERS)
+        );
 
-        verify(orderCouponQueryService).hasOrderHistory(2L);
-        verify(couponMapper, never()).insertMemberCouponIfAbsent(1L, 2L, true);
+        verify(couponMemberIssueService).issueAutomatically(1L, 2L, true, false);
+        verify(couponMemberIssueService).issueAutomatically(1L, 3L, true, false);
+        verify(memberCouponQueryService, never()).lockActiveCouponIssuableMember(2L);
+    }
+
+    @Test
+    void handleCouponIssueRequested_firstOrder_excludesKnownOrderHistoryThenDelegatesRecheck() {
+        when(memberCouponQueryService.getActiveMemberIds()).thenReturn(List.of(2L, 3L));
+        when(orderCouponQueryService.getMemberIdsWithOrderHistory(List.of(2L, 3L))).thenReturn(List.of(3L));
+
+        couponIssueService.handleCouponIssueRequested(
+                new CouponIssueRequestedEvent(1L, CouponTargetType.FIRST_ORDER)
+        );
+
+        verify(couponMemberIssueService).issueAutomatically(1L, 2L, true, true);
+        verify(couponMemberIssueService, never()).issueAutomatically(1L, 3L, true, true);
     }
 
     private Coupon coupon(CouponTargetType targetType, LocalDateTime startsAt) {

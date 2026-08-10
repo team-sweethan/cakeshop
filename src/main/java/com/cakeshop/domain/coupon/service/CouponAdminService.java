@@ -14,6 +14,7 @@ import com.cakeshop.domain.coupon.dto.form.CouponSearchCondition;
 import com.cakeshop.domain.coupon.dto.form.CouponUpdateForm;
 import com.cakeshop.domain.coupon.dto.view.CouponView;
 import com.cakeshop.domain.coupon.dto.view.CouponDetailView;
+import com.cakeshop.domain.coupon.dto.view.CouponIssuedMemberHistoryView;
 import com.cakeshop.domain.coupon.dto.view.CouponIssuedMemberView;
 import com.cakeshop.domain.coupon.dto.view.CouponIssueCandidateView;
 import com.cakeshop.domain.coupon.entity.Coupon;
@@ -26,9 +27,10 @@ import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.domain.member.dto.view.MemberCouponView;
-import com.cakeshop.domain.member.dto.view.MemberCouponIssuedHistoryView;
 import com.cakeshop.domain.member.service.MemberCouponQueryService;
 import java.util.Set;
+import java.util.Map;
+import java.util.function.Function;
 
 /** 관리자 쿠폰의 등록·조회·수정 및 발급 상태 전환을 담당한다. */
 @Service
@@ -71,9 +73,12 @@ public class CouponAdminService {
     }
 
     @Transactional(readOnly = true)
-    public PageResult<CouponIssueCandidateView> searchTargetMembers(Long couponId, String keyword, Integer page) {
+    public PageResult<CouponIssueCandidateView> searchTargetMembers(
+            Long couponId, String searchType, String keyword, Integer page
+    ) {
         PageRequest request = new PageRequest(page, 5);
-        PageResult<MemberCouponView> memberPage = memberCouponQueryService.searchActiveMembers(keyword, request);
+        PageResult<MemberCouponView> memberPage = memberCouponQueryService
+                .searchActiveMembers(searchType, keyword, request);
         List<Long> memberIds = memberPage.getContent().stream().map(MemberCouponView::memberId).toList();
         Set<Long> issuedMemberIds = memberIds.isEmpty()
                 ? Set.of()
@@ -91,17 +96,24 @@ public class CouponAdminService {
     }
 
     @Transactional(readOnly = true)
-    public PageResult<CouponIssuedMemberView> getIssuedMembers(Long couponId, String keyword, Integer page) {
+    public PageResult<CouponIssuedMemberView> getIssuedMembers(Long couponId, Long memberId, Integer page) {
         PageRequest request = new PageRequest(page, 5);
-        PageResult<MemberCouponIssuedHistoryView> memberPage = memberCouponQueryService
-                .getCouponIssuedMemberHistories(couponId, keyword, request);
+        long totalElements = couponMapper.countIssuedMemberHistories(couponId, memberId);
+        List<CouponIssuedMemberHistoryView> histories = totalElements == 0
+                ? List.of()
+                : couponMapper.findIssuedMemberHistories(couponId, memberId, request.getSize(), request.getOffset());
+        Map<Long, MemberCouponView> membersById = memberCouponQueryService.getMembersByIds(
+                        histories.stream().map(CouponIssuedMemberHistoryView::memberId).toList())
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(MemberCouponView::memberId, Function.identity()));
 
         return new PageResult<>(
-                memberPage.getContent().stream()
-                        .map(this::toIssuedMemberView)
+                histories.stream()
+                        .map(history -> toIssuedMemberView(history, membersById.get(history.memberId())))
+                        .filter(java.util.Objects::nonNull)
                         .toList(),
                 request,
-                memberPage.getTotalElements()
+                totalElements
         );
     }
 
@@ -390,10 +402,16 @@ public class CouponAdminService {
     }
 
     /** 쿠폰 발급 이력과 회원 도메인 프로필을 관리자 목록에 필요한 View로 조합한다. */
-    private CouponIssuedMemberView toIssuedMemberView(MemberCouponIssuedHistoryView history) {
+    private CouponIssuedMemberView toIssuedMemberView(
+            CouponIssuedMemberHistoryView history, MemberCouponView member
+    ) {
+        if (member == null) {
+            return null;
+        }
         return new CouponIssuedMemberView(
-                history.memberId(), history.name(), history.email(), history.phone(), history.birthday(),
-                com.cakeshop.domain.coupon.entity.CustomerCouponStatus.valueOf(history.couponStatus()), history.usedAt()
+                history.memberId(), member.name(), member.email(), member.phone(),
+                member.birthDate() == null ? null : member.birthDate().format(BIRTHDAY_FORMATTER),
+                history.status(), history.usedAt()
         );
     }
 
