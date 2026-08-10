@@ -2,6 +2,8 @@ package com.cakeshop.domain.review.service;
 
 import java.util.List;
 
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,17 +21,11 @@ import com.cakeshop.domain.notification.service.NotificationService;
 // NotificationRequest.targetUrl 은 저장되지 않는다. 링크는 NotificationResponse 가 타입별 ID 로
 // 되돌려 주며, 후기는 아직 "/mypage" 하나다 (D2 의 남은 위험).
 @Service
+@RequiredArgsConstructor
 public class ReviewNotificationSender {
 
     private final NotificationService notificationService;
     private final MemberReviewQueryService memberReviewQueryService;
-
-    public ReviewNotificationSender(
-            NotificationService notificationService,
-            MemberReviewQueryService memberReviewQueryService) {
-        this.notificationService = notificationService;
-        this.memberReviewQueryService = memberReviewQueryService;
-    }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void sendNewReview(long reviewId, long authorId) {

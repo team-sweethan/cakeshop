@@ -117,8 +117,8 @@ class ReviewServiceTests {
                 reviewService.getProductReviews(PRODUCT_ID, new PageRequest(1, null));
 
         assertThat(reviews.getContent()).singleElement().satisfies(review -> {
-            assertThat(review.authorName()).isEqualTo(ProductReviewView.WITHDRAWN_AUTHOR_NAME);
-            assertThat(review.content()).isEqualTo("맛있게 잘 먹었습니다.");
+            assertThat(review.getAuthorName()).isEqualTo(ProductReviewView.WITHDRAWN_AUTHOR_NAME);
+            assertThat(review.getContent()).isEqualTo("맛있게 잘 먹었습니다.");
         });
     }
 
@@ -133,7 +133,7 @@ class ReviewServiceTests {
                 reviewService.getProductReviews(PRODUCT_ID, new PageRequest(1, null));
 
         assertThat(reviews.getContent()).singleElement()
-                .extracting(ProductReviewView::authorName)
+                .extracting(ProductReviewView::getAuthorName)
                 .isEqualTo(ProductReviewView.WITHDRAWN_AUTHOR_NAME);
     }
 
@@ -174,9 +174,9 @@ class ReviewServiceTests {
 
         assertThat(reviews.getContent()).singleElement().satisfies(review -> {
             assertThat(review.isBlocked()).isTrue();
-            assertThat(review.productId()).isEqualTo(PRODUCT_ID);
-            assertThat(review.productName()).isEqualTo("딸기 생크림 케이크");
-            assertThat(review.orderNumber()).isEqualTo("ORD-0001");
+            assertThat(review.getProductId()).isEqualTo(PRODUCT_ID);
+            assertThat(review.getProductName()).isEqualTo("딸기 생크림 케이크");
+            assertThat(review.getOrderNumber()).isEqualTo("ORD-0001");
         });
     }
 
@@ -192,11 +192,11 @@ class ReviewServiceTests {
                 reviewService.getMyReviews(MEMBER_ID, new PageRequest(1, null));
 
         assertThat(reviews.getContent()).singleElement().satisfies(review -> {
-            assertThat(review.productName()).isNull();
-            assertThat(review.productId())
+            assertThat(review.getProductName()).isNull();
+            assertThat(review.getProductId())
                     .as("상품 링크는 후기가 가진 값이라 스냅샷이 비어도 살아 있어야 한다")
                     .isEqualTo(PRODUCT_ID);
-            assertThat(review.content()).isEqualTo("맛있게 잘 먹었습니다.");
+            assertThat(review.getContent()).isEqualTo("맛있게 잘 먹었습니다.");
         });
     }
 

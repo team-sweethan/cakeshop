@@ -6,6 +6,8 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -36,6 +38,7 @@ import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
 
 @Service
+@RequiredArgsConstructor
 public class ReviewService {
 
     public static final int PRODUCT_PREVIEW_SIZE = 3;
@@ -47,23 +50,6 @@ public class ReviewService {
     private final ProductQueryService productQueryService;
     private final MemberReviewQueryService memberReviewQueryService;
     private final ReviewNotificationService reviewNotificationService;
-
-    public ReviewService(
-            ReviewMapper reviewMapper,
-            ReviewReplyMapper reviewReplyMapper,
-            OrderReviewQueryService orderReviewQueryService,
-            ProductReviewCommandService productReviewCommandService,
-            ProductQueryService productQueryService,
-            MemberReviewQueryService memberReviewQueryService,
-            ReviewNotificationService reviewNotificationService) {
-        this.reviewMapper = reviewMapper;
-        this.reviewReplyMapper = reviewReplyMapper;
-        this.orderReviewQueryService = orderReviewQueryService;
-        this.productReviewCommandService = productReviewCommandService;
-        this.productQueryService = productQueryService;
-        this.memberReviewQueryService = memberReviewQueryService;
-        this.reviewNotificationService = reviewNotificationService;
-    }
 
     @Transactional(readOnly = true)
     public PageResult<OrderReviewItemView> getWritableOrderItems(
@@ -120,8 +106,8 @@ public class ReviewService {
         Map<Long, ReviewReplyView> replies = findReplies(rows);
 
         List<MyReviewView> content = rows.stream()
-                .map(row -> MyReviewView.of(
-                        row, snapshots.get(row.orderItemId()), replies.get(row.id())))
+                .map(row -> MyReviewView.from(
+                        row, snapshots.get(row.getOrderItemId()), replies.get(row.getId())))
                 .toList();
 
         return new PageResult<>(content, pageRequest, total);
@@ -131,9 +117,9 @@ public class ReviewService {
     public MyReviewView getEditableReview(long reviewId, long memberId) {
         ReviewRow review = requireEditableReview(reviewId, memberId);
 
-        return MyReviewView.of(
+        return MyReviewView.from(
                 review,
-                findOrderSnapshots(List.of(review)).get(review.orderItemId()),
+                findOrderSnapshots(List.of(review)).get(review.getOrderItemId()),
                 null);
     }
 
@@ -173,7 +159,7 @@ public class ReviewService {
     public void edit(long reviewId, ReviewEditForm form, long memberId) {
         ReviewRow review = requireEditableReview(reviewId, memberId);
 
-        productReviewCommandService.lockForRating(review.productId());
+        productReviewCommandService.lockForRating(review.getProductId());
 
         requireApplied(
                 reviewMapper.update(Review.edit(
@@ -187,18 +173,18 @@ public class ReviewService {
                 reviewId,
                 memberId);
 
-        recalculateRating(review.productId());
+        recalculateRating(review.getProductId());
     }
 
     @Transactional
     public void delete(long reviewId, long memberId) {
         ReviewRow review = requireEditableReview(reviewId, memberId);
 
-        productReviewCommandService.lockForRating(review.productId());
+        productReviewCommandService.lockForRating(review.getProductId());
 
         requireApplied(reviewMapper.deleteByAuthor(reviewId, memberId), reviewId, memberId);
 
-        recalculateRating(review.productId());
+        recalculateRating(review.getProductId());
     }
 
     private ReviewRow requireEditableReview(long reviewId, long memberId) {
@@ -207,12 +193,12 @@ public class ReviewService {
 
     private ReviewRow requireEditable(ReviewRow review, long memberId) {
         if (review == null
-                || !Objects.equals(review.memberId(), memberId)
-                || review.status() == ReviewStatus.DELETED) {
+                || !Objects.equals(review.getMemberId(), memberId)
+                || review.getStatus() == ReviewStatus.DELETED) {
             throw new BusinessException(ReviewErrorCode.REVIEW_NOT_FOUND);
         }
 
-        if (review.status() == ReviewStatus.BLOCKED) {
+        if (review.getStatus() == ReviewStatus.BLOCKED) {
             throw new BusinessException(ReviewErrorCode.BLOCKED_REVIEW);
         }
 
@@ -237,7 +223,7 @@ public class ReviewService {
         ProductRatingAggregate aggregate = reviewMapper.aggregateForUpdate(productId);
 
         productReviewCommandService.applyReviewAggregate(
-                productId, aggregate.averageRating(), aggregate.reviewCount());
+                productId, aggregate.getAverageRating(), aggregate.getReviewCount());
     }
 
     private void requireVisibleProduct(long productId) {
@@ -253,14 +239,14 @@ public class ReviewService {
         Map<Long, ReviewReplyView> replies = findReplies(rows);
 
         return rows.stream()
-                .map(row -> ProductReviewView.of(
-                        row, authors.get(row.memberId()), replies.get(row.id())))
+                .map(row -> ProductReviewView.from(
+                        row, authors.get(row.getMemberId()), replies.get(row.getId())))
                 .toList();
     }
 
     private Map<Long, ReviewReplyView> findReplies(List<ReviewRow> rows) {
         List<Long> reviewIds = rows.stream()
-                .map(ReviewRow::id)
+                .map(ReviewRow::getId)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
@@ -270,12 +256,12 @@ public class ReviewService {
         }
 
         return reviewReplyMapper.findByReviewIds(reviewIds).stream()
-                .collect(Collectors.toMap(ReviewReplyView::reviewId, Function.identity()));
+                .collect(Collectors.toMap(ReviewReplyView::getReviewId, Function.identity()));
     }
 
     private Map<Long, MemberReviewView> findAuthors(List<ReviewRow> rows) {
         List<Long> memberIds = rows.stream()
-                .map(ReviewRow::memberId)
+                .map(ReviewRow::getMemberId)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
@@ -286,7 +272,7 @@ public class ReviewService {
 
     private Map<Long, OrderReviewSnapshotView> findOrderSnapshots(List<ReviewRow> rows) {
         List<Long> orderItemIds = rows.stream()
-                .map(ReviewRow::orderItemId)
+                .map(ReviewRow::getOrderItemId)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();

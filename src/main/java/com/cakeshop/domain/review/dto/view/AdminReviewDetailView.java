@@ -2,49 +2,52 @@ package com.cakeshop.domain.review.dto.view;
 
 import java.time.LocalDateTime;
 
+import lombok.Value;
+
 import com.cakeshop.domain.member.dto.view.MemberReviewView;
 import com.cakeshop.domain.order.dto.view.OrderReviewSnapshotView;
 import com.cakeshop.domain.review.entity.ReviewStatus;
 
-public record AdminReviewDetailView(
-        Long id,
-        Long productId,
-        String authorName,
-        String productName,
-        String orderNumber,
-        Integer overallRating,
-        Integer tasteRating,
-        Integer designRating,
-        Integer serviceRating,
-        String content,
-        LocalDateTime createdAt,
-        LocalDateTime updatedAt,
-        ReviewStatus status,
-        ReviewReplyView reply
-) {
+@Value
+public class AdminReviewDetailView {
 
-    public static AdminReviewDetailView of(
+    Long id;
+    Long productId;
+    String authorName;
+    String productName;
+    String orderNumber;
+    Integer overallRating;
+    Integer tasteRating;
+    Integer designRating;
+    Integer serviceRating;
+    String content;
+    LocalDateTime createdAt;
+    LocalDateTime updatedAt;
+    ReviewStatus status;
+    ReviewReplyView reply;
+
+    public static AdminReviewDetailView from(
             ReviewRow row,
             MemberReviewView author,
             OrderReviewSnapshotView snapshot,
             ReviewReplyView reply) {
 
         return new AdminReviewDetailView(
-                row.id(),
-                row.productId(),
+                row.getId(),
+                row.getProductId(),
                 author == null || author.withdrawn()
                         ? ProductReviewView.WITHDRAWN_AUTHOR_NAME
                         : author.nickname(),
                 snapshot == null ? null : snapshot.productName(),
                 snapshot == null ? null : snapshot.orderNumber(),
-                row.overallRating(),
-                row.tasteRating(),
-                row.designRating(),
-                row.serviceRating(),
-                row.content(),
-                row.createdAt(),
-                row.updatedAt(),
-                row.status(),
+                row.getOverallRating(),
+                row.getTasteRating(),
+                row.getDesignRating(),
+                row.getServiceRating(),
+                row.getContent(),
+                row.getCreatedAt(),
+                row.getUpdatedAt(),
+                row.getStatus(),
                 reply);
     }
 

@@ -122,7 +122,7 @@ class ReviewAdminMapperTests {
         long first = insertReview(5, ReviewStatus.PUBLISHED);
         insertReview(5, ReviewStatus.PUBLISHED);
 
-        long orderItemId = reviewMapper.findById(first).orderItemId();
+        long orderItemId = reviewMapper.findById(first).getOrderItemId();
 
         List<ReviewRow> rows =
                 findAll(mine(List.of(orderItemId), AdminReviewRating.ALL, null));
@@ -153,7 +153,7 @@ class ReviewAdminMapperTests {
 
         assertThat(reviewAdminMapper.updateStatus(
                 reviewId, ReviewStatus.PUBLISHED, ReviewStatus.BLOCKED)).isEqualTo(1);
-        assertThat(reviewMapper.findById(reviewId).status()).isEqualTo(ReviewStatus.BLOCKED);
+        assertThat(reviewMapper.findById(reviewId).getStatus()).isEqualTo(ReviewStatus.BLOCKED);
     }
 
     @Test
@@ -162,7 +162,7 @@ class ReviewAdminMapperTests {
 
         assertThat(reviewAdminMapper.updateStatus(
                 reviewId, ReviewStatus.PUBLISHED, ReviewStatus.BLOCKED)).isZero();
-        assertThat(reviewMapper.findById(reviewId).status()).isEqualTo(ReviewStatus.DELETED);
+        assertThat(reviewMapper.findById(reviewId).getStatus()).isEqualTo(ReviewStatus.DELETED);
     }
 
     @Test
@@ -183,7 +183,7 @@ class ReviewAdminMapperTests {
     }
 
     private List<Long> idsOf(List<ReviewRow> rows) {
-        return rows.stream().map(ReviewRow::id).toList();
+        return rows.stream().map(ReviewRow::getId).toList();
     }
 
     private long insertReview(int overallRating, ReviewStatus status) {

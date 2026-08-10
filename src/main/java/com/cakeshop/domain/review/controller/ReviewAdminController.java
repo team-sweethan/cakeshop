@@ -2,6 +2,8 @@ package com.cakeshop.domain.review.controller;
 
 import jakarta.validation.Valid;
 
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -25,13 +27,10 @@ import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.security.MemberDetails;
 
 @Controller
+@RequiredArgsConstructor
 public class ReviewAdminController {
 
     private final ReviewAdminService reviewAdminService;
-
-    public ReviewAdminController(ReviewAdminService reviewAdminService) {
-        this.reviewAdminService = reviewAdminService;
-    }
 
     @GetMapping("/admin/reviews")
     public String list(
@@ -68,8 +67,8 @@ public class ReviewAdminController {
     ) {
         AdminReviewDetailView review = reviewAdminService.getReviewDetail(reviewId);
 
-        if (review.reply() != null) {
-            reviewReplyForm.setContent(review.reply().content());
+        if (review.getReply() != null) {
+            reviewReplyForm.setContent(review.getReply().getContent());
         }
 
         model.addAttribute("review", review);
