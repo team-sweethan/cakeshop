@@ -25,7 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class PeriodStatisticsReadModelQueryService {
 
-    private static final long DEFAULT_RANGE_DAYS = 30;
+    private static final long DEFAULT_RANGE_DAYS = 7;
     private static final long MAX_RANGE_DAYS = 366;
 
     private final PeriodStatisticsReadModelMapper mapper;

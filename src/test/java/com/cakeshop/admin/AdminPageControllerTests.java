@@ -132,7 +132,7 @@ class AdminPageControllerTests {
                 ));
         when(periodStatisticsReadModelQueryService.getStatistics(null, null))
                 .thenReturn(new PeriodStatisticsView(
-                        LocalDate.of(2026, 7, 5),
+                        LocalDate.of(2026, 7, 28),
                         LocalDate.of(2026, 8, 3),
                         0L,
                         0L,

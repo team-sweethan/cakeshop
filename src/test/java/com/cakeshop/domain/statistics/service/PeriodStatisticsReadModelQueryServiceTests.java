@@ -38,8 +38,8 @@ class PeriodStatisticsReadModelQueryServiceTests {
     private PeriodStatisticsReadModelMapper mapper;
 
     @Test
-    void getStatistics_noDateRange_returnsRecentThirtyDaysFilledWithZeros() {
-        LocalDate startDate = LocalDate.of(2026, 7, 12);
+    void getStatistics_noDateRange_returnsRecentSevenDaysFilledWithZeros() {
+        LocalDate startDate = LocalDate.of(2026, 8, 4);
         LocalDate endDate = LocalDate.of(2026, 8, 10);
         LocalDateTime start = startDate.atStartOfDay();
         LocalDateTime end = endDate.plusDays(1).atStartOfDay();
@@ -54,7 +54,7 @@ class PeriodStatisticsReadModelQueryServiceTests {
         assertThat(statistics.totalOrderCount()).isZero();
         assertThat(statistics.totalSalesAmount()).isZero();
         assertThat(statistics.dailyStatistics())
-                .hasSize(30)
+                .hasSize(7)
                 .first()
                 .isEqualTo(new DailyStatisticsView(startDate, 0, BigDecimal.ZERO));
         assertThat(statistics.dailyStatistics())

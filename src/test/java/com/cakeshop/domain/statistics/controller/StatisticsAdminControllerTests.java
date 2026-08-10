@@ -96,7 +96,7 @@ class StatisticsAdminControllerTests {
 
     @Test
     void statistics_noPeriod_appliesResolvedDefaultPeriodToSearchForm() throws Exception {
-        LocalDate startDate = LocalDate.of(2026, 7, 12);
+        LocalDate startDate = LocalDate.of(2026, 8, 4);
         LocalDate endDate = LocalDate.of(2026, 8, 10);
         PeriodStatisticsView statistics = statistics(startDate, endDate);
         when(periodStatisticsReadModelQueryService.getStatistics(null, null)).thenReturn(statistics);
