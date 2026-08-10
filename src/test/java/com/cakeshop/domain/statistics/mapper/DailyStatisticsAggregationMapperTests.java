@@ -24,6 +24,7 @@ class DailyStatisticsAggregationMapperTests {
     private static final LocalDateTime END = START.plusDays(1);
 
     private final DailyStatisticsAggregationMapper mapper;
+    private final DailyStatisticsSourceReadModelMapper sourceReadModelMapper;
     private final JdbcTemplate jdbcTemplate;
 
     private String suffix;
@@ -32,9 +33,11 @@ class DailyStatisticsAggregationMapperTests {
     @Autowired
     DailyStatisticsAggregationMapperTests(
             DailyStatisticsAggregationMapper mapper,
+            DailyStatisticsSourceReadModelMapper sourceReadModelMapper,
             JdbcTemplate jdbcTemplate
     ) {
         this.mapper = mapper;
+        this.sourceReadModelMapper = sourceReadModelMapper;
         this.jdbcTemplate = jdbcTemplate;
     }
 
@@ -61,7 +64,7 @@ class DailyStatisticsAggregationMapperTests {
         );
         insertPayment("AT-END", "DONE", new BigDecimal("30000"), END, END);
 
-        mapper.replaceDailyStatistics(STATISTICS_DATE, START, END);
+        replaceDailyStatistics();
 
         assertThat(findDailyStatistics()).isEqualTo(
                 new DailyStatisticsRow(4, 1, 2, new BigDecimal("10000"))
@@ -70,7 +73,7 @@ class DailyStatisticsAggregationMapperTests {
 
     @Test
     void replaceDailyStatistics_noSourceData_writesZeroRow() {
-        mapper.replaceDailyStatistics(STATISTICS_DATE, START, END);
+        replaceDailyStatistics();
 
         assertThat(findDailyStatistics()).isEqualTo(
                 new DailyStatisticsRow(0, 0, 0, BigDecimal.ZERO)
@@ -92,7 +95,7 @@ class DailyStatisticsAggregationMapperTests {
                 START.plusHours(2),
                 START.plusHours(2)
         );
-        mapper.replaceDailyStatistics(STATISTICS_DATE, START, END);
+        replaceDailyStatistics();
 
         jdbcTemplate.update(
                 "UPDATE orders SET status = 'PICKED_UP' WHERE id = ?",
@@ -102,7 +105,7 @@ class DailyStatisticsAggregationMapperTests {
                 "UPDATE payments SET amount = 20000 WHERE id = ?",
                 paymentId
         );
-        mapper.replaceDailyStatistics(STATISTICS_DATE, START, END);
+        replaceDailyStatistics();
 
         assertThat(findDailyStatistics()).isEqualTo(
                 new DailyStatisticsRow(1, 1, 0, new BigDecimal("20000"))
@@ -138,7 +141,7 @@ class DailyStatisticsAggregationMapperTests {
                 sourceStart.plusMinutes(30)
         );
 
-        List<LocalDate> dates = mapper.findChangedStatisticsDates(
+        List<LocalDate> dates = sourceReadModelMapper.findChangedStatisticsDates(
                 sourceStart,
                 sourceEnd,
                 latestStatisticsDate
@@ -163,8 +166,16 @@ class DailyStatisticsAggregationMapperTests {
                 START
         );
 
-        assertThat(mapper.findEarliestOrderDate()).isEqualTo(LocalDate.of(2026, 7, 1));
-        assertThat(mapper.findEarliestApprovedPaymentDate()).isEqualTo(LocalDate.of(2026, 6, 1));
+        assertThat(sourceReadModelMapper.findEarliestOrderDate()).isEqualTo(LocalDate.of(2026, 7, 1));
+        assertThat(sourceReadModelMapper.findEarliestApprovedPaymentDate())
+                .isEqualTo(LocalDate.of(2026, 6, 1));
+    }
+
+    private void replaceDailyStatistics() {
+        mapper.upsertDailyStatistics(
+                STATISTICS_DATE,
+                sourceReadModelMapper.findDailyStatistics(START, END)
+        );
     }
 
     private DailyStatisticsRow findDailyStatistics() {

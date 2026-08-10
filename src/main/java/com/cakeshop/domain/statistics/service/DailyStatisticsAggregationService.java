@@ -1,7 +1,7 @@
 package com.cakeshop.domain.statistics.service;
 
 import com.cakeshop.domain.statistics.entity.StatisticsBatchRun;
-import com.cakeshop.domain.statistics.mapper.DailyStatisticsAggregationMapper;
+import com.cakeshop.domain.statistics.mapper.DailyStatisticsSourceReadModelMapper;
 import com.cakeshop.domain.statistics.mapper.StatisticsBatchRunMapper;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -17,16 +17,16 @@ public class DailyStatisticsAggregationService {
 
     private static final Logger log = LoggerFactory.getLogger(DailyStatisticsAggregationService.class);
 
-    private final DailyStatisticsAggregationMapper aggregationMapper;
+    private final DailyStatisticsSourceReadModelMapper sourceReadModelMapper;
     private final StatisticsBatchRunMapper batchRunMapper;
     private final StatisticsAggregationTransactionService transactionService;
 
     public DailyStatisticsAggregationService(
-            DailyStatisticsAggregationMapper aggregationMapper,
+            DailyStatisticsSourceReadModelMapper sourceReadModelMapper,
             StatisticsBatchRunMapper batchRunMapper,
             StatisticsAggregationTransactionService transactionService
     ) {
-        this.aggregationMapper = aggregationMapper;
+        this.sourceReadModelMapper = sourceReadModelMapper;
         this.batchRunMapper = batchRunMapper;
         this.transactionService = transactionService;
     }
@@ -93,7 +93,7 @@ public class DailyStatisticsAggregationService {
             LocalDate latestStatisticsDate
     ) {
         TreeSet<LocalDate> targetDates = new TreeSet<>(
-                aggregationMapper.findChangedStatisticsDates(
+                sourceReadModelMapper.findChangedStatisticsDates(
                         sourceWindowStartedAt,
                         sourceWindowEndedAt,
                         latestStatisticsDate

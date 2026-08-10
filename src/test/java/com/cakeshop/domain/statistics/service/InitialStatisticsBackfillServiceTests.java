@@ -9,6 +9,7 @@ import static org.mockito.Mockito.doThrow;
 
 import com.cakeshop.domain.statistics.entity.StatisticsBatchRun;
 import com.cakeshop.domain.statistics.mapper.DailyStatisticsAggregationMapper;
+import com.cakeshop.domain.statistics.mapper.DailyStatisticsSourceReadModelMapper;
 import com.cakeshop.domain.statistics.mapper.StatisticsBatchRunMapper;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 import java.math.BigDecimal;
@@ -41,6 +42,9 @@ class InitialStatisticsBackfillServiceTests {
 
     @MockitoSpyBean
     private DailyStatisticsAggregationMapper aggregationMapper;
+
+    @MockitoSpyBean
+    private DailyStatisticsSourceReadModelMapper sourceReadModelMapper;
 
     @Autowired
     InitialStatisticsBackfillServiceTests(
@@ -83,9 +87,9 @@ class InitialStatisticsBackfillServiceTests {
     void backfillInitialStatistics_sourceDataOlderThanSevenDays_startsAtEarliestSourceDate() {
         LocalDate yesterday = findYesterday();
         LocalDate earliestOrderDate = yesterday.minusDays(9);
-        doReturn(earliestOrderDate).when(aggregationMapper).findEarliestOrderDate();
+        doReturn(earliestOrderDate).when(sourceReadModelMapper).findEarliestOrderDate();
         doReturn(yesterday.minusDays(3))
-                .when(aggregationMapper)
+                .when(sourceReadModelMapper)
                 .findEarliestApprovedPaymentDate();
 
         StatisticsBackfillResult result = service.backfillInitialStatistics();
@@ -149,7 +153,7 @@ class InitialStatisticsBackfillServiceTests {
         insertDailyStatistics(failedDate);
         doThrow(new IllegalStateException("백필 실패 테스트"))
                 .when(aggregationMapper)
-                .replaceDailyStatistics(eq(failedDate), any(), any());
+                .upsertDailyStatistics(eq(failedDate), any());
 
         assertThatThrownBy(service::backfillInitialStatistics)
                 .isInstanceOf(IllegalStateException.class)

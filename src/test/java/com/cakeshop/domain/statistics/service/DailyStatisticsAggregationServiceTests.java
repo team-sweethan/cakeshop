@@ -135,7 +135,7 @@ class DailyStatisticsAggregationServiceTests {
         insertDailyStatistics(yesterday);
         doThrow(new IllegalStateException("집계 실패 테스트"))
                 .when(aggregationMapper)
-                .replaceDailyStatistics(any(), any(), any());
+                .upsertDailyStatistics(any(), any());
 
         assertThatThrownBy(service::aggregateDailyStatistics)
                 .isInstanceOf(IllegalStateException.class)

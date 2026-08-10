@@ -2,6 +2,7 @@ package com.cakeshop.domain.statistics.service;
 
 import com.cakeshop.domain.statistics.entity.StatisticsBatchRun;
 import com.cakeshop.domain.statistics.mapper.DailyStatisticsAggregationMapper;
+import com.cakeshop.domain.statistics.mapper.DailyStatisticsSourceReadModelMapper;
 import com.cakeshop.domain.statistics.mapper.StatisticsBatchRunMapper;
 import java.time.LocalDate;
 import org.springframework.stereotype.Service;
@@ -13,13 +14,16 @@ import org.springframework.transaction.annotation.Transactional;
 public class StatisticsAggregationTransactionService {
 
     private final DailyStatisticsAggregationMapper aggregationMapper;
+    private final DailyStatisticsSourceReadModelMapper sourceReadModelMapper;
     private final StatisticsBatchRunMapper batchRunMapper;
 
     public StatisticsAggregationTransactionService(
             DailyStatisticsAggregationMapper aggregationMapper,
+            DailyStatisticsSourceReadModelMapper sourceReadModelMapper,
             StatisticsBatchRunMapper batchRunMapper
     ) {
         this.aggregationMapper = aggregationMapper;
+        this.sourceReadModelMapper = sourceReadModelMapper;
         this.batchRunMapper = batchRunMapper;
     }
 
@@ -45,10 +49,12 @@ public class StatisticsAggregationTransactionService {
     /** 한 날짜의 집계 결과 교체와 heartbeat 갱신을 원자적으로 처리한다. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void replaceDate(long batchRunId, LocalDate statisticsDate) {
-        aggregationMapper.replaceDailyStatistics(
+        aggregationMapper.upsertDailyStatistics(
                 statisticsDate,
-                statisticsDate.atStartOfDay(),
-                statisticsDate.plusDays(1).atStartOfDay()
+                sourceReadModelMapper.findDailyStatistics(
+                        statisticsDate.atStartOfDay(),
+                        statisticsDate.plusDays(1).atStartOfDay()
+                )
         );
         if (batchRunMapper.updateHeartbeat(batchRunId) != 1) {
             throw new IllegalStateException("실행 중인 통계 집계를 찾을 수 없습니다.");
@@ -58,10 +64,12 @@ public class StatisticsAggregationTransactionService {
     /** 한 날짜의 백필 결과 교체와 진행일 갱신을 원자적으로 처리한다. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void replaceBackfillDate(long batchRunId, LocalDate statisticsDate) {
-        aggregationMapper.replaceDailyStatistics(
+        aggregationMapper.upsertDailyStatistics(
                 statisticsDate,
-                statisticsDate.atStartOfDay(),
-                statisticsDate.plusDays(1).atStartOfDay()
+                sourceReadModelMapper.findDailyStatistics(
+                        statisticsDate.atStartOfDay(),
+                        statisticsDate.plusDays(1).atStartOfDay()
+                )
         );
         if (batchRunMapper.updateBackfillProgress(batchRunId, statisticsDate) != 1) {
             throw new IllegalStateException("실행 중인 통계 백필을 찾을 수 없습니다.");

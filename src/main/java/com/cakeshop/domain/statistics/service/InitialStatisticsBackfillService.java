@@ -1,7 +1,7 @@
 package com.cakeshop.domain.statistics.service;
 
 import com.cakeshop.domain.statistics.entity.StatisticsBatchRun;
-import com.cakeshop.domain.statistics.mapper.DailyStatisticsAggregationMapper;
+import com.cakeshop.domain.statistics.mapper.DailyStatisticsSourceReadModelMapper;
 import com.cakeshop.domain.statistics.mapper.StatisticsBatchRunMapper;
 import java.time.LocalDate;
 import java.util.stream.Stream;
@@ -15,16 +15,16 @@ public class InitialStatisticsBackfillService {
 
     private static final Logger log = LoggerFactory.getLogger(InitialStatisticsBackfillService.class);
 
-    private final DailyStatisticsAggregationMapper aggregationMapper;
+    private final DailyStatisticsSourceReadModelMapper sourceReadModelMapper;
     private final StatisticsBatchRunMapper batchRunMapper;
     private final StatisticsAggregationTransactionService transactionService;
 
     public InitialStatisticsBackfillService(
-            DailyStatisticsAggregationMapper aggregationMapper,
+            DailyStatisticsSourceReadModelMapper sourceReadModelMapper,
             StatisticsBatchRunMapper batchRunMapper,
             StatisticsAggregationTransactionService transactionService
     ) {
-        this.aggregationMapper = aggregationMapper;
+        this.sourceReadModelMapper = sourceReadModelMapper;
         this.batchRunMapper = batchRunMapper;
         this.transactionService = transactionService;
     }
@@ -75,8 +75,8 @@ public class InitialStatisticsBackfillService {
 
     private LocalDate findInitialStartDate(LocalDate targetEndDate) {
         return Stream.of(
-                        aggregationMapper.findEarliestOrderDate(),
-                        aggregationMapper.findEarliestApprovedPaymentDate(),
+                        sourceReadModelMapper.findEarliestOrderDate(),
+                        sourceReadModelMapper.findEarliestApprovedPaymentDate(),
                         targetEndDate.minusDays(6)
                 )
                 .filter(date -> date != null)
