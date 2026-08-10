@@ -36,6 +36,13 @@
          WHERE id = #{id}
     </select>
 
+    <select id="findByIdForUpdate" resultType="com.cakeshop.domain.review.dto.view.ReviewRow">
+        SELECT <include refid="reviewRowColumns"/>
+          FROM reviews
+         WHERE id = #{id}
+           FOR UPDATE
+    </select>
+
     <update id="update">
         UPDATE reviews
            SET overall_rating = #{overallRating},

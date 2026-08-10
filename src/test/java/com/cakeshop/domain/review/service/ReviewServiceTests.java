@@ -392,8 +392,8 @@ class ReviewServiceTests {
 
     @Test
     void edit_blockedBetweenCheckAndUpdate_throwsBlockedReviewAndSkipsAggregate() {
-        when(reviewMapper.findById(REVIEW_ID))
-                .thenReturn(row(ReviewStatus.PUBLISHED), row(ReviewStatus.BLOCKED));
+        when(reviewMapper.findById(REVIEW_ID)).thenReturn(row(ReviewStatus.PUBLISHED));
+        when(reviewMapper.findByIdForUpdate(REVIEW_ID)).thenReturn(row(ReviewStatus.BLOCKED));
         when(reviewMapper.update(any())).thenReturn(0);
 
         assertThatThrownBy(() -> reviewService.edit(REVIEW_ID, editForm(3), MEMBER_ID))
@@ -408,6 +408,7 @@ class ReviewServiceTests {
     @Test
     void edit_updateAppliedToNoRowWithNoVisibleCause_throwsInvalidTransition() {
         when(reviewMapper.findById(REVIEW_ID)).thenReturn(row(ReviewStatus.PUBLISHED));
+        when(reviewMapper.findByIdForUpdate(REVIEW_ID)).thenReturn(row(ReviewStatus.PUBLISHED));
         when(reviewMapper.update(any())).thenReturn(0);
 
         assertThatThrownBy(() -> reviewService.edit(REVIEW_ID, editForm(3), MEMBER_ID))
@@ -469,8 +470,8 @@ class ReviewServiceTests {
 
     @Test
     void delete_deletedBetweenCheckAndUpdate_throwsReviewNotFoundAndSkipsAggregate() {
-        when(reviewMapper.findById(REVIEW_ID))
-                .thenReturn(row(ReviewStatus.PUBLISHED), row(ReviewStatus.DELETED));
+        when(reviewMapper.findById(REVIEW_ID)).thenReturn(row(ReviewStatus.PUBLISHED));
+        when(reviewMapper.findByIdForUpdate(REVIEW_ID)).thenReturn(row(ReviewStatus.DELETED));
         when(reviewMapper.deleteByAuthor(REVIEW_ID, MEMBER_ID)).thenReturn(0);
 
         assertThatThrownBy(() -> reviewService.delete(REVIEW_ID, MEMBER_ID))

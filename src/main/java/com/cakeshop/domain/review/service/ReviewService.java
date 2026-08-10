@@ -186,8 +186,10 @@ public class ReviewService {
     }
 
     private ReviewRow requireEditableReview(long reviewId, long memberId) {
-        ReviewRow review = reviewMapper.findById(reviewId);
+        return requireEditable(reviewMapper.findById(reviewId), memberId);
+    }
 
+    private ReviewRow requireEditable(ReviewRow review, long memberId) {
         if (review == null
                 || !Objects.equals(review.memberId(), memberId)
                 || review.status() == ReviewStatus.DELETED) {
@@ -206,7 +208,7 @@ public class ReviewService {
             return;
         }
 
-        requireEditableReview(reviewId, memberId);
+        requireEditable(reviewMapper.findByIdForUpdate(reviewId), memberId);
 
         throw new BusinessException(ReviewErrorCode.INVALID_REVIEW_TRANSITION);
     }

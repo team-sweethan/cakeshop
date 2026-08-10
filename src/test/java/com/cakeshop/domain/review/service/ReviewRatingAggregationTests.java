@@ -4,16 +4,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,6 +30,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import com.cakeshop.domain.product.service.ProductReviewCommandService;
 import com.cakeshop.domain.review.dto.form.ReviewEditForm;
 import com.cakeshop.domain.review.dto.form.ReviewWriteForm;
+import com.cakeshop.domain.review.error.ReviewErrorCode;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 import com.cakeshop.global.error.BusinessException;
 
@@ -195,6 +200,44 @@ class ReviewRatingAggregationTests {
                 productId);
 
         assertThat(reviewCount()).isEqualTo(storedRows);
+    }
+
+    @Test
+    void edit_waitingBehindDelete_reportsTheLatestDeletedState() throws Exception {
+        long orderItemId = insertPickedUpOrderItem();
+        reviewService.write(form(orderItemId, 5), memberId);
+        long reviewId = reviewIdOf(orderItemId);
+        CountDownLatch editReachedProductLock = new CountDownLatch(1);
+        CountDownLatch deletionCommitted = new CountDownLatch(1);
+        AtomicBoolean pauseFirstLock = new AtomicBoolean(true);
+        doAnswer(invocation -> {
+            if (pauseFirstLock.compareAndSet(true, false)) {
+                editReachedProductLock.countDown();
+                if (!deletionCommitted.await(30, TimeUnit.SECONDS)) {
+                    throw new AssertionError("삭제 커밋을 기다리는 동안 시간 초과");
+                }
+            }
+            return invocation.callRealMethod();
+        }).when(productReviewCommandService).lockForRating(productId);
+
+        Future<Void> editResult = executor.submit(() -> {
+            reviewService.edit(reviewId, editForm(1), memberId);
+            return null;
+        });
+        assertThat(editReachedProductLock.await(30, TimeUnit.SECONDS)).isTrue();
+
+        try {
+            reviewService.delete(reviewId, memberId);
+        } finally {
+            deletionCommitted.countDown();
+        }
+
+        assertThatThrownBy(() -> editResult.get(30, TimeUnit.SECONDS))
+                .isInstanceOfSatisfying(ExecutionException.class, exception ->
+                        assertThat(exception.getCause())
+                                .isInstanceOfSatisfying(BusinessException.class, businessException ->
+                                        assertThat(businessException.getErrorCode())
+                                                .isEqualTo(ReviewErrorCode.REVIEW_NOT_FOUND)));
     }
 
     private Callable<Void> rejectableTask(Runnable action) {
