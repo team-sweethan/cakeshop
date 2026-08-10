@@ -75,6 +75,7 @@ public class OrderServiceImpl implements OrderService {
         // 클라이언트가 전달한 가격을 사용하지 않고 현재 상품·옵션 정보로 금액을 다시 계산한다.
         PreparedOrderItem preparedItem = prepareItem(form);
         BigDecimal originalAmount = preparedItem.totalAmount();
+        validateDisplayedOriginalAmount(form.getDisplayedOriginalAmount(), originalAmount);
 
         // 주문과 하위 스냅샷 중 하나라도 저장에 실패하면 전체 트랜잭션을 rollback한다.
         Order order = createOrder(memberId, form, originalAmount, now);
@@ -229,6 +230,17 @@ public class OrderServiceImpl implements OrderService {
         }
         if (form.getProductId() == null) {
             throw new BusinessException(OrderErrorCode.EMPTY_ORDER_ITEMS);
+        }
+    }
+
+    /** 표시 시점 이후 가격이 바뀌면 주문을 저장하지 않고 최신 주문서를 다시 보여준다. */
+    private void validateDisplayedOriginalAmount(
+            BigDecimal displayedOriginalAmount,
+            BigDecimal currentOriginalAmount
+    ) {
+        if (displayedOriginalAmount != null
+                && displayedOriginalAmount.compareTo(currentOriginalAmount) != 0) {
+            throw new BusinessException(OrderErrorCode.ORDER_AMOUNT_CHANGED);
         }
     }
 
