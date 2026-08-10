@@ -21,10 +21,13 @@ import com.cakeshop.domain.member.dto.view.MemberAdminDetailView;
 import com.cakeshop.domain.member.service.MemberAdminService;
 import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.order.service.OrderViewAssembler;
+import com.cakeshop.global.infra.FileStorageClient;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -41,6 +44,7 @@ public class ChatService {
     private final ChatMapper chatMapper;
     private final MemberAdminService memberAdminService;
     private final OrderViewAssembler orderViewAssembler;
+    private final FileStorageClient fileStorageClient;
 
     // ==========================================
     // 0. 검증 헬퍼 메서드
@@ -50,7 +54,7 @@ public class ChatService {
             throw new IllegalArgumentException("존재하지 않는 채팅방입니다.");
         }
         if (!isAdmin && currentUserId != null && !currentUserId.equals(room.getCustomerId())) {
-            throw new SecurityException("해당 채팅방에 대한 접근 권한이 없습니다.");
+            throw new AccessDeniedException("해당 채팅방에 대한 접근 권한이 없습니다.");
         }
     }
 
@@ -127,6 +131,14 @@ public class ChatService {
             return message;
         }
 
+    // S3 저장소에 이미지 파일 직접 업로드 (프론트가 파일 객체 직접 보낼 때)
+    public String uploadChatImageToS3(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("업로드할 파일이 존재하지 않습니다.");
+        }
+        return fileStorageClient.store(file, "chat");
+    }
+
     // 해당 고객 주문 내역 조회
     // 채팅방 우측 패널 연동 주문 목록 조회 (공통)
     @Transactional(readOnly = true) // 주문 매퍼 사용함
@@ -175,12 +187,14 @@ public class ChatService {
         }
 
         // 1. 주문 소유권 검증 (해당 채팅방 고객의 주문인지 확인)
+        Order order = null;
         try {
-            Order order = orderViewAssembler.findOrder(orderId);
-            if (order != null && !chatRoom.getCustomerId().equals(order.getMemberId())) {
-                throw new SecurityException("해당 채팅방 고객의 주문만 연동할 수 있습니다.");
-            }
+            order = orderViewAssembler.findOrder(orderId);
         } catch (Exception ignored) {}
+
+        if (order != null && !chatRoom.getCustomerId().equals(order.getMemberId())) {
+            throw new AccessDeniedException("해당 채팅방 고객의 주문만 연동할 수 있습니다.");
+        }
 
         // 2. 대화 앵커 메시지가 해당 채팅방의 메시지인지 검증
         if (anchorMessageId != null && anchorMessageId > 0) {
@@ -206,17 +220,22 @@ public class ChatService {
         ChatRoom chatRoom = chatMapper.findChatRoomById(chatRoomId);
         validateRoomAccess(chatRoom, currentUserId, isAdmin);
 
-        // 읽은 메시지 ID가 해당 채팅방 메시지인지 검증
-        if (lastReadMessageId != null && lastReadMessageId > 0) {
-            ChatMessage message = chatMapper.findChatMessageById(lastReadMessageId);
-            if (message == null || !message.getChatRoomId().equals(chatRoomId)) {
-                throw new IllegalArgumentException("해당 채팅방의 메시지가 아닙니다.");
-            }
+        if (lastReadMessageId == null || lastReadMessageId <= 0) {
+            throw new IllegalArgumentException("읽은 메시지 ID는 양수여야 합니다.");
         }
+
+        // 읽은 메시지 ID가 해당 채팅방 메시지인지 검증
+        ChatMessage message = chatMapper.findChatMessageById(lastReadMessageId);
+        if (message == null || !message.getChatRoomId().equals(chatRoomId)) {
+            throw new IllegalArgumentException("해당 채팅방의 메시지가 아닙니다.");
+        }
+
+        // readerSide는 클라이언트 파라미터를 신뢰하지 않고 인증 권한(isAdmin)에서 강제로 확정
+        ChatReaderSide derivedSide = isAdmin ? ChatReaderSide.ADMIN : ChatReaderSide.CUSTOMER;
 
         ChatRoomReadCursor cursor = ChatRoomReadCursor.builder()
                 .chatRoomId(chatRoomId)
-                .readerSide(readerSide)
+                .readerSide(derivedSide)
                 .lastReadMessageId(lastReadMessageId)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
@@ -346,8 +365,18 @@ public class ChatService {
         return messages.stream().map(msg -> {
             // 메시지 첨부 이미지 S3 Object Key 목록 조회
             List<ChatMessageAttachment> attachments = chatMapper.findAttachmentsByChatMessageId(msg.getId());
+            // 메시지 첨부 이미지 S3 URL 목록 변환
             List<String> imageUrls = (attachments != null && !attachments.isEmpty())
-                    ? attachments.stream().map(ChatMessageAttachment::getObjectKey).collect(Collectors.toList())
+                    ? attachments.stream()
+                            .map(att -> {
+                                String key = att.getObjectKey();
+                                if (key == null || key.isBlank()) return "";
+                                return key.startsWith("http")
+                                        ? key
+                                        : "https://sweethan-cakeshop-images.s3.ap-northeast-2.amazonaws.com/" + key;
+                            })
+                            .filter(url -> !url.isBlank())
+                            .collect(Collectors.toList())
                     : Collections.emptyList();
 
             boolean isRead = (msg.getId() <= opponentLastReadId);
