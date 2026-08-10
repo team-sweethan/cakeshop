@@ -201,6 +201,28 @@ class OrderServiceTests {
     }
 
     @Test
+    void createGeneralOrder_changedDisplayedAmount_doesNotCreateOrder() {
+        when(productQueryService.getSalesInfo(1L)).thenReturn(
+                product(1L, ProductType.GENERAL, "딸기 케이크", 30_000, 2)
+        );
+        when(orderOptionValidator.validate(1L, List.of())).thenReturn(List.of());
+        GeneralOrderForm form = form(1L, 1, List.of());
+        form.setDisplayedOriginalAmount(BigDecimal.valueOf(29_000));
+
+        assertThatThrownBy(() -> orderService.createGeneralOrder(10L, form))
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        error -> assertThat(error.getErrorCode())
+                                .isEqualTo(OrderErrorCode.ORDER_AMOUNT_CHANGED)
+                );
+
+        verify(orderMapper, never()).insertOrder(any(Order.class));
+        verify(couponOrderCommandService, never()).reserveCouponForOrder(
+                anyLong(), anyLong(), anyLong(), any()
+        );
+    }
+
+    @Test
     void createGeneralOrderRejectsInvalidMemberIdBeforeProductLookup() {
         when(memberService.isActiveMember(0L)).thenReturn(false);
         assertThatThrownBy(() -> orderService.createGeneralOrder(
