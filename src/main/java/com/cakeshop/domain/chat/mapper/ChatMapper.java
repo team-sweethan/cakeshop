@@ -60,7 +60,7 @@ public interface ChatMapper {
 
 
     // ==========================================
-    // 3. 첨부파일 (chat_message_attachments)
+    // 3. xmr
     // ==========================================
 
     // 첨부파일 저장
@@ -103,5 +103,5 @@ public interface ChatMapper {
     void upsertChatRoomOrder(ChatRoomOrder chatRoomOrder);
 
     // 특정 채팅방에 연결된 모든 주문 조회
-    List<ChatRoomOrder> findChatRoomOrdersByChatRoomId(Long chatRoomId);
+    List<ChatRoomOrder> findChatRoomOrderByChatRoomId(Long chatRoomId);
 }
