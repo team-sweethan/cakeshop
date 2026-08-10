@@ -9,7 +9,9 @@ public enum ReviewErrorCode implements ErrorCode {
     ORDER_ITEM_NOT_FOUND("REVIEW_003", "주문 상품을 찾을 수 없습니다.", 404),
     ALREADY_REVIEWED("REVIEW_004", "이미 후기를 작성한 주문 상품입니다.", 409),
     BLOCKED_REVIEW("REVIEW_005", "숨김 처리된 후기입니다.", 403),
-    INVALID_REVIEW_TRANSITION("REVIEW_006", "지금 상태에서 할 수 없는 조치입니다.", 400);
+    INVALID_REVIEW_TRANSITION("REVIEW_006", "지금 상태에서 할 수 없는 조치입니다.", 400),
+    ALREADY_REPLIED("REVIEW_007", "이미 답글이 달린 후기입니다.", 409),
+    REPLY_NOT_FOUND("REVIEW_008", "답글을 찾을 수 없습니다.", 404);
 
     private final String code;
     private final String message;

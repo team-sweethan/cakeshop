@@ -46,6 +46,8 @@
 
           <p style="white-space:pre-wrap" th:text="${review.content}">후기 본문</p>
 
+          <div th:replace="~{fragments/customer/product-review :: reply(${review.reply})}"></div>
+
           <div class="cluster" th:unless="${review.blocked}">
             <a class="btn" th:href="@{/reviews/{id}/edit(id=${review.id})}">수정</a>
 

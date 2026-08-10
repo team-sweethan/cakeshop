@@ -33,6 +33,7 @@ import com.cakeshop.domain.review.entity.ReviewStatus;
 import com.cakeshop.domain.review.error.ReviewErrorCode;
 import com.cakeshop.domain.review.mapper.ReviewAdminMapper;
 import com.cakeshop.domain.review.mapper.ReviewMapper;
+import com.cakeshop.domain.review.mapper.ReviewReplyMapper;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
@@ -47,6 +48,7 @@ class ReviewAdminServiceTests {
 
     private ReviewAdminMapper reviewAdminMapper;
     private ReviewMapper reviewMapper;
+    private ReviewReplyMapper reviewReplyMapper;
     private ReviewService reviewService;
     private ProductReviewCommandService productReviewCommandService;
     private MemberReviewQueryService memberReviewQueryService;
@@ -57,6 +59,7 @@ class ReviewAdminServiceTests {
     void setUp() {
         reviewAdminMapper = mock(ReviewAdminMapper.class);
         reviewMapper = mock(ReviewMapper.class);
+        reviewReplyMapper = mock(ReviewReplyMapper.class);
         reviewService = mock(ReviewService.class);
         productReviewCommandService = mock(ProductReviewCommandService.class);
         memberReviewQueryService = mock(MemberReviewQueryService.class);
@@ -65,6 +68,7 @@ class ReviewAdminServiceTests {
         reviewAdminService = new ReviewAdminService(
                 reviewAdminMapper,
                 reviewMapper,
+                reviewReplyMapper,
                 reviewService,
                 productReviewCommandService,
                 memberReviewQueryService,

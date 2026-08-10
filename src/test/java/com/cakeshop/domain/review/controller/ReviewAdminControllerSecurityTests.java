@@ -104,6 +104,42 @@ class ReviewAdminControllerSecurityTests {
     }
 
     @Test
+    @WithMockUser(roles = "USER")
+    void reply_isForbidden_forCustomerRole() throws Exception {
+        mockMvc.perform(post("/admin/reviews/1/replies").with(csrf()).param("content", "답글"))
+                .andExpect(status().isForbidden());
+
+        verify(reviewAdminService, never()).reply(anyLong(), any(), anyLong());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void reply_isForbidden_whenCsrfTokenIsMissing() throws Exception {
+        mockMvc.perform(post("/admin/reviews/1/replies").param("content", "답글"))
+                .andExpect(status().isForbidden());
+
+        verify(reviewAdminService, never()).reply(anyLong(), any(), anyLong());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void editReply_isForbidden_forCustomerRole() throws Exception {
+        mockMvc.perform(post("/admin/reviews/1/replies/edit").with(csrf()).param("content", "답글"))
+                .andExpect(status().isForbidden());
+
+        verify(reviewAdminService, never()).editReply(anyLong(), any());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void editReply_isForbidden_whenCsrfTokenIsMissing() throws Exception {
+        mockMvc.perform(post("/admin/reviews/1/replies/edit").param("content", "답글"))
+                .andExpect(status().isForbidden());
+
+        verify(reviewAdminService, never()).editReply(anyLong(), any());
+    }
+
+    @Test
     @WithMockUser(roles = "ADMIN")
     void unblock_redirectsBackToTheDetail_forAdminRole() throws Exception {
         mockMvc.perform(post("/admin/reviews/1/unblock").with(csrf()))

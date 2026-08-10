@@ -115,7 +115,7 @@ class AdminPageControllerTests {
         when(reviewAdminService.getReviewDetail(anyLong()))
                 .thenReturn(new AdminReviewDetailView(
                         1L, 9L, "작성자", "상품명", "20260101-0001", 5, 5, 4, 4, "본문",
-                        LocalDateTime.now(), LocalDateTime.now(), ReviewStatus.PUBLISHED));
+                        LocalDateTime.now(), LocalDateTime.now(), ReviewStatus.PUBLISHED, null));
 
         when(communityAdminService.getPosts(any(), any(), any(PageRequest.class)))
                 .thenReturn(new PageResult<AdminPostListView>(

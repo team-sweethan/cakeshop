@@ -1,13 +1,20 @@
 package com.cakeshop.domain.review.controller;
 
+import jakarta.validation.Valid;
+
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import com.cakeshop.domain.review.dto.form.ReviewReplyForm;
+import com.cakeshop.domain.review.dto.view.AdminReviewDetailView;
 import com.cakeshop.domain.review.dto.view.AdminReviewListView;
 import com.cakeshop.domain.review.dto.view.AdminReviewRating;
 import com.cakeshop.domain.review.entity.ReviewStatus;
@@ -15,6 +22,7 @@ import com.cakeshop.domain.review.service.ReviewAdminService;
 import com.cakeshop.global.common.paging.PageNavigation;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
+import com.cakeshop.global.security.MemberDetails;
 
 @Controller
 public class ReviewAdminController {
@@ -53,10 +61,63 @@ public class ReviewAdminController {
     }
 
     @GetMapping("/admin/reviews/{reviewId:\\d+}")
-    public String detail(@PathVariable("reviewId") long reviewId, Model model) {
-        model.addAttribute("review", reviewAdminService.getReviewDetail(reviewId));
+    public String detail(
+            @PathVariable("reviewId") long reviewId,
+            @ModelAttribute("reviewReplyForm") ReviewReplyForm reviewReplyForm,
+            Model model
+    ) {
+        AdminReviewDetailView review = reviewAdminService.getReviewDetail(reviewId);
+
+        if (review.reply() != null) {
+            reviewReplyForm.setContent(review.reply().content());
+        }
+
+        model.addAttribute("review", review);
 
         return "admin/review/detail";
+    }
+
+    @PostMapping("/admin/reviews/{reviewId:\\d+}/replies")
+    public String reply(
+            @PathVariable("reviewId") long reviewId,
+            @Valid @ModelAttribute("reviewReplyForm") ReviewReplyForm reviewReplyForm,
+            BindingResult bindingResult,
+            @AuthenticationPrincipal MemberDetails memberDetails,
+            RedirectAttributes redirectAttributes,
+            Model model
+    ) {
+        if (bindingResult.hasErrors()) {
+            model.addAttribute("review", reviewAdminService.getReviewDetail(reviewId));
+
+            return "admin/review/detail";
+        }
+
+        reviewAdminService.reply(reviewId, reviewReplyForm, memberDetails.getMemberId());
+
+        redirectAttributes.addFlashAttribute("successMessage", "답글을 등록했습니다.");
+
+        return "redirect:/admin/reviews/" + reviewId;
+    }
+
+    @PostMapping("/admin/reviews/{reviewId:\\d+}/replies/edit")
+    public String editReply(
+            @PathVariable("reviewId") long reviewId,
+            @Valid @ModelAttribute("reviewReplyForm") ReviewReplyForm reviewReplyForm,
+            BindingResult bindingResult,
+            RedirectAttributes redirectAttributes,
+            Model model
+    ) {
+        if (bindingResult.hasErrors()) {
+            model.addAttribute("review", reviewAdminService.getReviewDetail(reviewId));
+
+            return "admin/review/detail";
+        }
+
+        reviewAdminService.editReply(reviewId, reviewReplyForm);
+
+        redirectAttributes.addFlashAttribute("successMessage", "답글을 수정했습니다.");
+
+        return "redirect:/admin/reviews/" + reviewId;
     }
 
     @PostMapping("/admin/reviews/{reviewId:\\d+}/block")

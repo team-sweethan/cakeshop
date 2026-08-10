@@ -24,11 +24,13 @@ import com.cakeshop.domain.review.dto.form.ReviewWriteForm;
 import com.cakeshop.domain.review.dto.view.MyReviewView;
 import com.cakeshop.domain.review.dto.view.ProductRatingAggregate;
 import com.cakeshop.domain.review.dto.view.ProductReviewView;
+import com.cakeshop.domain.review.dto.view.ReviewReplyView;
 import com.cakeshop.domain.review.dto.view.ReviewRow;
 import com.cakeshop.domain.review.entity.Review;
 import com.cakeshop.domain.review.entity.ReviewStatus;
 import com.cakeshop.domain.review.error.ReviewErrorCode;
 import com.cakeshop.domain.review.mapper.ReviewMapper;
+import com.cakeshop.domain.review.mapper.ReviewReplyMapper;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
@@ -39,6 +41,7 @@ public class ReviewService {
     public static final int PRODUCT_PREVIEW_SIZE = 3;
 
     private final ReviewMapper reviewMapper;
+    private final ReviewReplyMapper reviewReplyMapper;
     private final OrderReviewQueryService orderReviewQueryService;
     private final ProductReviewCommandService productReviewCommandService;
     private final ProductQueryService productQueryService;
@@ -46,11 +49,13 @@ public class ReviewService {
 
     public ReviewService(
             ReviewMapper reviewMapper,
+            ReviewReplyMapper reviewReplyMapper,
             OrderReviewQueryService orderReviewQueryService,
             ProductReviewCommandService productReviewCommandService,
             ProductQueryService productQueryService,
             MemberReviewQueryService memberReviewQueryService) {
         this.reviewMapper = reviewMapper;
+        this.reviewReplyMapper = reviewReplyMapper;
         this.orderReviewQueryService = orderReviewQueryService;
         this.productReviewCommandService = productReviewCommandService;
         this.productQueryService = productQueryService;
@@ -109,9 +114,11 @@ public class ReviewService {
                 memberId, pageRequest.getOffset(), pageRequest.getSize());
 
         Map<Long, OrderReviewSnapshotView> snapshots = findOrderSnapshots(rows);
+        Map<Long, ReviewReplyView> replies = findReplies(rows);
 
         List<MyReviewView> content = rows.stream()
-                .map(row -> MyReviewView.of(row, snapshots.get(row.orderItemId())))
+                .map(row -> MyReviewView.of(
+                        row, snapshots.get(row.orderItemId()), replies.get(row.id())))
                 .toList();
 
         return new PageResult<>(content, pageRequest, total);
@@ -121,7 +128,10 @@ public class ReviewService {
     public MyReviewView getEditableReview(long reviewId, long memberId) {
         ReviewRow review = requireEditableReview(reviewId, memberId);
 
-        return MyReviewView.of(review, findOrderSnapshots(List.of(review)).get(review.orderItemId()));
+        return MyReviewView.of(
+                review,
+                findOrderSnapshots(List.of(review)).get(review.orderItemId()),
+                null);
     }
 
     @Transactional
@@ -235,10 +245,27 @@ public class ReviewService {
 
     private List<ProductReviewView> toProductReviewViews(List<ReviewRow> rows) {
         Map<Long, MemberReviewView> authors = findAuthors(rows);
+        Map<Long, ReviewReplyView> replies = findReplies(rows);
 
         return rows.stream()
-                .map(row -> ProductReviewView.of(row, authors.get(row.memberId())))
+                .map(row -> ProductReviewView.of(
+                        row, authors.get(row.memberId()), replies.get(row.id())))
                 .toList();
+    }
+
+    private Map<Long, ReviewReplyView> findReplies(List<ReviewRow> rows) {
+        List<Long> reviewIds = rows.stream()
+                .map(ReviewRow::id)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        if (reviewIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return reviewReplyMapper.findByReviewIds(reviewIds).stream()
+                .collect(Collectors.toMap(ReviewReplyView::reviewId, Function.identity()));
     }
 
     private Map<Long, MemberReviewView> findAuthors(List<ReviewRow> rows) {

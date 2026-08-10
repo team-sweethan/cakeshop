@@ -230,11 +230,140 @@ class ReviewAdminScreenRenderingTests {
     }
 
     @Test
+    void reply_publishedReview_isStoredAndShownOnTheDetail() throws Exception {
+        long reviewId = insertReview("답글을 받을 후기입니다.", "PUBLISHED", 5);
+
+        mockMvc.perform(post("/admin/reviews/{id}/replies", reviewId)
+                        .with(authentication(admin()))
+                        .with(csrf())
+                        .param("content", "찾아 주셔서 감사합니다."))
+                .andExpect(status().is3xxRedirection());
+
+        assertThat(replyContentOf(reviewId)).isEqualTo("찾아 주셔서 감사합니다.");
+
+        mockMvc.perform(get("/admin/reviews/{id}", reviewId).with(authentication(admin())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("찾아 주셔서 감사합니다.")))
+                .andExpect(content().string(containsString("답글 수정")));
+    }
+
+    @Test
+    void reply_secondReplyOnTheSameReview_isConflict() throws Exception {
+        long reviewId = insertReview("답글은 하나뿐인 후기입니다.", "PUBLISHED", 5);
+        insertReply(reviewId, "첫 번째 답글입니다.");
+
+        mockMvc.perform(post("/admin/reviews/{id}/replies", reviewId)
+                        .with(authentication(admin()))
+                        .with(csrf())
+                        .param("content", "두 번째 답글입니다."))
+                .andExpect(status().isConflict());
+
+        assertThat(replyContentOf(reviewId)).isEqualTo("첫 번째 답글입니다.");
+    }
+
+    @Test
+    void reply_blockedReview_isForbiddenAndStoresNothing() throws Exception {
+        long reviewId = insertReview("숨겨진 후기입니다.", "BLOCKED", 5);
+
+        mockMvc.perform(post("/admin/reviews/{id}/replies", reviewId)
+                        .with(authentication(admin()))
+                        .with(csrf())
+                        .param("content", "숨긴 후기에는 달 수 없습니다."))
+                .andExpect(status().isForbidden());
+
+        assertThat(replyCountOf(reviewId)).isZero();
+    }
+
+    @Test
+    void reply_deletedReview_isNotFound() throws Exception {
+        long reviewId = insertReview("작성자가 지운 후기입니다.", "DELETED", 5);
+
+        mockMvc.perform(post("/admin/reviews/{id}/replies", reviewId)
+                        .with(authentication(admin()))
+                        .with(csrf())
+                        .param("content", "지운 후기에는 달 수 없습니다."))
+                .andExpect(status().isNotFound());
+
+        assertThat(replyCountOf(reviewId)).isZero();
+    }
+
+    @Test
+    void editReply_replacesTheStoredContent() throws Exception {
+        long reviewId = insertReview("답글을 고칠 후기입니다.", "PUBLISHED", 5);
+        insertReply(reviewId, "처음 쓴 답글입니다.");
+
+        mockMvc.perform(post("/admin/reviews/{id}/replies/edit", reviewId)
+                        .with(authentication(admin()))
+                        .with(csrf())
+                        .param("content", "고쳐 쓴 답글입니다."))
+                .andExpect(status().is3xxRedirection());
+
+        assertThat(replyContentOf(reviewId)).isEqualTo("고쳐 쓴 답글입니다.");
+    }
+
+    @Test
+    void editReply_withoutAnyReply_isNotFound() throws Exception {
+        long reviewId = insertReview("답글이 없는 후기입니다.", "PUBLISHED", 5);
+
+        mockMvc.perform(post("/admin/reviews/{id}/replies/edit", reviewId)
+                        .with(authentication(admin()))
+                        .with(csrf())
+                        .param("content", "없는 답글은 고칠 수 없습니다."))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void editReply_blockedReview_isForbiddenAndKeepsTheStoredContent() throws Exception {
+        long reviewId = insertReview("답글째로 숨겨진 후기입니다.", "PUBLISHED", 5);
+        insertReply(reviewId, "숨기기 전에 쓴 답글입니다.");
+        jdbcTemplate.update("UPDATE reviews SET status = 'BLOCKED' WHERE id = ?", reviewId);
+
+        mockMvc.perform(post("/admin/reviews/{id}/replies/edit", reviewId)
+                        .with(authentication(admin()))
+                        .with(csrf())
+                        .param("content", "숨긴 동안에는 고칠 수 없습니다."))
+                .andExpect(status().isForbidden());
+
+        assertThat(replyContentOf(reviewId)).isEqualTo("숨기기 전에 쓴 답글입니다.");
+    }
+
+    @Test
+    void detail_blockedReview_showsTheReplyWithoutTheForm() throws Exception {
+        long reviewId = insertReview("숨김 상태의 후기입니다.", "PUBLISHED", 5);
+        insertReply(reviewId, "숨기기 전에 단 답글입니다.");
+        jdbcTemplate.update("UPDATE reviews SET status = 'BLOCKED' WHERE id = ?", reviewId);
+
+        mockMvc.perform(get("/admin/reviews/{id}", reviewId).with(authentication(admin())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("숨기기 전에 단 답글입니다.")))
+                .andExpect(content().string(not(containsString("답글 수정"))))
+                .andExpect(content().string(not(containsString("답글 등록"))));
+    }
+
+    @Test
     void screenCatalog_listsTheAdminReviewDetail() throws Exception {
         mockMvc.perform(get("/screens"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("A15 후기 상세")))
                 .andExpect(content().string(containsString("관리자 화면 15개")));
+    }
+
+    private void insertReply(long reviewId, String content) {
+        jdbcTemplate.update(
+                "INSERT INTO review_replies (review_id, admin_id, content) VALUES (?, ?, ?)",
+                reviewId,
+                adminId,
+                content);
+    }
+
+    private String replyContentOf(long reviewId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT content FROM review_replies WHERE review_id = ?", String.class, reviewId);
+    }
+
+    private long replyCountOf(long reviewId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM review_replies WHERE review_id = ?", Long.class, reviewId);
     }
 
     private String statusOf(long reviewId) {

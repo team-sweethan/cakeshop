@@ -16,10 +16,15 @@ public record MyReviewView(
         Integer serviceRating,
         String content,
         LocalDateTime createdAt,
-        ReviewStatus status
+        ReviewStatus status,
+        ReviewReplyView reply
 ) {
 
-    public static MyReviewView of(ReviewRow row, OrderReviewSnapshotView snapshot) {
+    // 숨겨진 후기의 답글은 여기서 떨어뜨린다. 화면마다 조건을 적으면 한 곳을 빠뜨렸을 때
+    // 가려진 후기에 사장님 답글만 남는다 (specs/review-reply.md B4).
+    public static MyReviewView of(
+            ReviewRow row, OrderReviewSnapshotView snapshot, ReviewReplyView reply) {
+
         return new MyReviewView(
                 row.id(),
                 row.productId(),
@@ -31,7 +36,8 @@ public record MyReviewView(
                 row.serviceRating(),
                 row.content(),
                 row.createdAt(),
-                row.status());
+                row.status(),
+                row.status() == ReviewStatus.BLOCKED ? null : reply);
     }
 
     public boolean isBlocked() {

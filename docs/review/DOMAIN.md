@@ -89,20 +89,20 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 | **B1** | 상품 후기 목록 | 누구나 | 미리보기 3개(상품 상세 안) · 전체 `GET /products/{id}/reviews` | **완료** | 3 | `review-read.md` |
 | **B2** | 상품 평균 평점·후기 수 | 누구나 | (상품 상세에 포함) | **완료** | 2 | `review-read.md` |
 | **B3** | 내가 쓴 후기 목록 | 고객 | `GET /mypage/reviews` | **완료** | 3 | `review-read.md` |
-| **B4** | 후기에 달린 답글 노출 | 누구나 | (B1·B3에 포함) | 없음 | 6 | `review-reply.md` |
+| **B4** | 후기에 달린 답글 노출 | 누구나 | (B1·B3에 포함) | **완료** | 6 | `review-reply.md` |
 | **C1** | 관리자 후기 목록 | 관리자 | `GET /admin/reviews` | **완료** | 5 | `review-admin.md` |
 | **C2** | 관리자 검색·필터 | 관리자 | (C1의 파라미터) | **완료** | 5 | `review-admin.md` |
 | **C3** | 관리자 후기 상세 | 관리자 | `GET /admin/reviews/{id}` | **완료** | 5 | `review-admin.md` |
 | **C4** | 후기 숨김·해제 | 관리자 | `POST /admin/reviews/{id}/block` · `/unblock` | **완료** | 5 | `review-admin.md` |
-| **C5** | 답글 작성 | 관리자 | `POST /admin/reviews/{id}/replies` | **없음** | 6 | `review-reply.md` |
-| **C6** | 답글 수정 | 관리자 | `POST /admin/reviews/{id}/replies/edit` | **없음** | 6 | `review-reply.md` |
+| **C5** | 답글 작성 | 관리자 | `POST /admin/reviews/{id}/replies` | **완료** | 6 | `review-reply.md` |
+| **C6** | 답글 수정 | 관리자 | `POST /admin/reviews/{id}/replies/edit` | **완료** | 6 | `review-reply.md` |
 | **D1** | 상품 평점 집계 | — | (Service 계약) | **완료** | 2 (#33) | `product-rating.md` |
 | **D2** | 알림 발송 | — | (Service 계약) | 없음 | 7 | `review-notification.md` |
 | **E1** | `ReviewStatus` enum + `CHECK` | — | — | **완료** (#125) | 0 | `history/2026-08-slice-0-schema.md` |
 | **E2** | 평점 범위 `CHECK` | — | — | **완료** (#125) | 0 | `history/2026-08-slice-0-schema.md` |
 | **E3** | `Review`·`ReviewReply` 엔티티 | — | — | **완료** (#125) | 0 | `history/2026-08-slice-0-schema.md` |
 
-**신규 화면 5개가 전부 났다** — A1(`customer/review/writable.html`, 조각 1), **B1 전체 목록**(`customer/review/product.html`, 조각 3), B3(`customer/review/my.html`, 조각 3), A4(`customer/review/edit.html`, 조각 4), C3(`admin/review/detail.html`, 조각 5). C5·C6의 답글 영역은 C3 화면 안에 들어간다. 화면 인벤토리의 정본은 3절이다.
+**신규 화면 5개가 전부 났다** — A1(`customer/review/writable.html`, 조각 1), **B1 전체 목록**(`customer/review/product.html`, 조각 3), B3(`customer/review/my.html`, 조각 3), A4(`customer/review/edit.html`, 조각 4), C3(`admin/review/detail.html`, 조각 5). C5·C6의 답글 영역은 조각 6에서 C3 화면 안에 들어갔다. 화면 인벤토리의 정본은 3절이다.
 
 ## 2. 공통 규칙
 
@@ -286,8 +286,8 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 | 후기 작성 폼 (A2) | `customer/review/form.html` | 완료 (조각 1) |
 | 후기 수정 폼 (A4) | `customer/review/edit.html` | 완료 (조각 4) |
 | 내 후기 목록 (B3) | `customer/review/my.html` | 완료 (조각 3. 조각 4에서 수정·삭제 버튼) |
-| 상품 후기 미리보기 3개 (B1·B2·B4) | `customer/product/detail.html` | 후기 영역 교체 + `전체 리뷰 확인` 버튼 완료 (조각 3) |
-| 상품 후기 전체 목록 (B1·B4) | `customer/review/product.html` | 완료 (조각 3) |
+| 상품 후기 미리보기 3개 (B1·B2·B4) | `customer/product/detail.html` | 후기 영역 교체 + `전체 리뷰 확인` 버튼 완료 (조각 3. 답글은 조각 6) |
+| 상품 후기 전체 목록 (B1·B4) | `customer/review/product.html` | 완료 (조각 3. 답글은 조각 6) |
 | 관리자 목록 (C1·C2) | `admin/review/list.html` | 완료 (조각 5. `삭제` 제거, 상태 필터 추가) |
 | 관리자 상세 (C3) | `admin/review/detail.html` | 완료 (조각 5. C5·C6 답글 영역은 조각 6) |
 
@@ -296,7 +296,8 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 **화면 카탈로그(`home/screens.html`)도 진입점이다.** 새 화면을 내고 여기를 빠뜨리면 팀이 그 화면의 존재를 모른다. `specs/review-write.md`가 조각 1에서 같은 자리를 한 번 놓쳤다.
 
 상품 후기 한 건의 표시는 미리보기와 전체 목록이 `fragments/customer/product-review.html`을 함께 쓴다.
-두 자리의 모양이 갈리면 상세에서 본 후기가 전체 목록에서 달라 보인다.
+두 자리의 모양이 갈리면 상세에서 본 후기가 전체 목록에서 달라 보인다. **B4 답글은 B3(`customer/review/my.html`)까지
+같은 파일의 `reply` 프래그먼트를 쓴다** — 세 자리에 붙는 같은 덩어리다.
 
 **화면 문구를 문서로 따로 관리하지 않는다.** 커뮤니티가 그 방식(`screens/*.md` + 문구 대조 하네스)을 먼저 세웠다가 2026-08-09에 걷어냈다 — 문구를 문서에 복사하면 템플릿과 갈라지고, 그것을 잡던 검사는 `docs/testing.md` 4절의 삭제 대상이었다. 이 표가 화면 인벤토리의 정본이고, 무엇이 언제 보이는지는 2절과 각 spec이, 실제 출력은 렌더링 테스트가 맡는다.
 
