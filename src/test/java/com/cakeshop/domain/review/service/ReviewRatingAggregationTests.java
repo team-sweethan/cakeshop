@@ -44,6 +44,9 @@ class ReviewRatingAggregationTests {
     private ReviewService reviewService;
 
     @Autowired
+    private ReviewAdminService reviewAdminService;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @MockitoSpyBean
@@ -200,6 +203,97 @@ class ReviewRatingAggregationTests {
                 productId);
 
         assertThat(reviewCount()).isEqualTo(storedRows);
+    }
+
+    @Test
+    void block_publishedReview_dropsItFromTheAggregate() {
+        long firstOrderItemId = insertPickedUpOrderItem();
+        long secondOrderItemId = insertPickedUpOrderItem();
+        reviewService.write(form(firstOrderItemId, 5), memberId);
+        reviewService.write(form(secondOrderItemId, 3), memberId);
+
+        reviewAdminService.block(reviewIdOf(firstOrderItemId));
+
+        assertThat(averageRating()).isEqualByComparingTo("3.00");
+        assertThat(reviewCount()).isEqualTo(1);
+    }
+
+    @Test
+    void unblock_blockedReview_bringsItBackIntoTheAggregate() {
+        long orderItemId = insertPickedUpOrderItem();
+        reviewService.write(form(orderItemId, 5), memberId);
+        long reviewId = reviewIdOf(orderItemId);
+        reviewAdminService.block(reviewId);
+
+        reviewAdminService.unblock(reviewId);
+
+        assertThat(averageRating()).isEqualByComparingTo("5.00");
+        assertThat(reviewCount()).isEqualTo(1);
+    }
+
+    @Test
+    void deleteAndBlockAtTheSameTime_applyOnlyOneAndLeaveTheAggregateMatching() throws Exception {
+        long orderItemId = insertPickedUpOrderItem();
+        reviewService.write(form(orderItemId, 5), memberId);
+        long reviewId = reviewIdOf(orderItemId);
+
+        List<Future<Void>> results = executor.invokeAll(List.of(
+                rejectableTask(() -> reviewService.delete(reviewId, memberId)),
+                rejectableTask(() -> reviewAdminService.block(reviewId))));
+
+        for (Future<Void> result : results) {
+            result.get(30, TimeUnit.SECONDS);
+        }
+
+        String finalStatus = jdbcTemplate.queryForObject(
+                "SELECT status FROM reviews WHERE id = ?", String.class, reviewId);
+
+        assertThat(finalStatus)
+                .as("나중 쓰기가 앞의 조치를 덮으면 안 된다 (DOMAIN.md 2.1)")
+                .isIn("DELETED", "BLOCKED");
+        assertThat(reviewCount()).isEqualTo(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM reviews WHERE product_id = ? AND status = 'PUBLISHED'",
+                Long.class,
+                productId));
+    }
+
+    @Test
+    void block_waitingBehindDelete_reportsTheLatestDeletedState() throws Exception {
+        long orderItemId = insertPickedUpOrderItem();
+        reviewService.write(form(orderItemId, 5), memberId);
+        long reviewId = reviewIdOf(orderItemId);
+        CountDownLatch blockReachedProductLock = new CountDownLatch(1);
+        CountDownLatch deletionCommitted = new CountDownLatch(1);
+        AtomicBoolean pauseFirstLock = new AtomicBoolean(true);
+        doAnswer(invocation -> {
+            if (pauseFirstLock.compareAndSet(true, false)) {
+                blockReachedProductLock.countDown();
+                if (!deletionCommitted.await(30, TimeUnit.SECONDS)) {
+                    throw new AssertionError("삭제 커밋을 기다리는 동안 시간 초과");
+                }
+            }
+            return invocation.callRealMethod();
+        }).when(productReviewCommandService).lockForRating(productId);
+
+        Future<Void> blockResult = executor.submit(() -> {
+            reviewAdminService.block(reviewId);
+            return null;
+        });
+        assertThat(blockReachedProductLock.await(30, TimeUnit.SECONDS)).isTrue();
+
+        try {
+            reviewService.delete(reviewId, memberId);
+        } finally {
+            deletionCommitted.countDown();
+        }
+
+        assertThatThrownBy(() -> blockResult.get(30, TimeUnit.SECONDS))
+                .isInstanceOfSatisfying(ExecutionException.class, exception ->
+                        assertThat(exception.getCause())
+                                .isInstanceOfSatisfying(BusinessException.class, businessException ->
+                                        assertThat(businessException.getErrorCode())
+                                                .isEqualTo(
+                                                        ReviewErrorCode.INVALID_REVIEW_TRANSITION)));
     }
 
     @Test

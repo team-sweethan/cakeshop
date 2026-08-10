@@ -8,6 +8,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.cakeshop.domain.member.dto.view.MemberReviewView;
@@ -214,8 +215,10 @@ public class ReviewService {
     }
 
     // 후기를 바꾼 쓰기와 같은 트랜잭션이어야 한다. 후기만 커밋되고 집계가 실패하면 그 상품에
-    // 다음 쓰기가 올 때까지 아무도 모르는 채 틀린 평점과 정렬이 나간다 (D1).
-    private void recalculateRating(long productId) {
+    // 다음 쓰기가 올 때까지 아무도 모르는 채 틀린 평점과 정렬이 나간다 (D1). MANDATORY 가
+    // 그 요구를 관리자 숨김(C4)처럼 바깥에서 부르는 자리에서도 강제한다.
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void recalculateRating(long productId) {
         ProductRatingAggregate aggregate = reviewMapper.aggregateForUpdate(productId);
 
         productReviewCommandService.applyReviewAggregate(

@@ -90,10 +90,10 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 | **B2** | 상품 평균 평점·후기 수 | 누구나 | (상품 상세에 포함) | **완료** | 2 | `review-read.md` |
 | **B3** | 내가 쓴 후기 목록 | 고객 | `GET /mypage/reviews` | **완료** | 3 | `review-read.md` |
 | **B4** | 후기에 달린 답글 노출 | 누구나 | (B1·B3에 포함) | 없음 | 6 | `review-reply.md` |
-| **C1** | 관리자 후기 목록 | 관리자 | `GET /admin/reviews` | 목업 | 5 | `review-admin.md` |
-| **C2** | 관리자 검색·필터 | 관리자 | (C1의 파라미터) | 목업 폼만 | 5 | `review-admin.md` |
-| **C3** | 관리자 후기 상세 | 관리자 | `GET /admin/reviews/{id}` | **없음** | 5 | `review-admin.md` |
-| **C4** | 후기 숨김 | 관리자 | `POST /admin/reviews/{id}/block` | 목업 버튼만 | 5 | `review-admin.md` |
+| **C1** | 관리자 후기 목록 | 관리자 | `GET /admin/reviews` | **완료** | 5 | `review-admin.md` |
+| **C2** | 관리자 검색·필터 | 관리자 | (C1의 파라미터) | **완료** | 5 | `review-admin.md` |
+| **C3** | 관리자 후기 상세 | 관리자 | `GET /admin/reviews/{id}` | **완료** | 5 | `review-admin.md` |
+| **C4** | 후기 숨김·해제 | 관리자 | `POST /admin/reviews/{id}/block` · `/unblock` | **완료** | 5 | `review-admin.md` |
 | **C5** | 답글 작성 | 관리자 | `POST /admin/reviews/{id}/replies` | **없음** | 6 | `review-reply.md` |
 | **C6** | 답글 수정 | 관리자 | `POST /admin/reviews/{id}/replies/edit` | **없음** | 6 | `review-reply.md` |
 | **D1** | 상품 평점 집계 | — | (Service 계약) | **완료** | 2 (#33) | `product-rating.md` |
@@ -102,7 +102,7 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 | **E2** | 평점 범위 `CHECK` | — | — | **완료** (#125) | 0 | `history/2026-08-slice-0-schema.md` |
 | **E3** | `Review`·`ReviewReply` 엔티티 | — | — | **완료** (#125) | 0 | `history/2026-08-slice-0-schema.md` |
 
-**신규 화면 5개 중 4개가 났다** — A1(`customer/review/writable.html`, 조각 1), **B1 전체 목록**(`customer/review/product.html`, 조각 3), B3(`customer/review/my.html`, 조각 3), A4(`customer/review/edit.html`, 조각 4). 남은 하나는 C3(`admin/review/detail.html`, 조각 5)다. C5·C6의 답글 영역은 C3 화면 안에 들어간다. 화면 인벤토리의 정본은 3절이다.
+**신규 화면 5개가 전부 났다** — A1(`customer/review/writable.html`, 조각 1), **B1 전체 목록**(`customer/review/product.html`, 조각 3), B3(`customer/review/my.html`, 조각 3), A4(`customer/review/edit.html`, 조각 4), C3(`admin/review/detail.html`, 조각 5). C5·C6의 답글 영역은 C3 화면 안에 들어간다. 화면 인벤토리의 정본은 3절이다.
 
 ## 2. 공통 규칙
 
@@ -229,14 +229,17 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 
 필요한 값은 **그 도메인의 전용 QueryService가 DTO로 돌려준다.** 없으면 만든다.
 
-**만드는 순서는 "물어보고 만든다"가 아니라 "만들고 PR에서 확인받는다"이다**(`docs/conventions.md` 12절). 12절이 사전 협의를 요구하는 것은 **기존** 공개 Service 인터페이스나 상태 전이를 **변경**할 때다. 담당자가 쓴 파일을 한 줄도 고치지 않고 **새 파일로만** 계약을 추가한다면 깨질 남의 호출부가 없으므로 사전 협의 없이 만들고, 담당자를 PR 리뷰어로 지정해 확인받는다. 계약이 상대 도메인에 **쓰기**를 하더라도 이 기준은 같다 — 갈리는 지점은 읽기·쓰기가 아니라 **남의 호출부가 따라 움직이느냐**다.
+**만드는 순서는 "물어보고 만든다"가 아니라 "만들고 PR에서 확인받는다"이다**(`docs/conventions.md` 12절). 12절이 사전 협의를 요구하는 것은 **기존** 공개 Service 인터페이스나 상태 전이를 **변경**할 때다. 담당자가 쓴 코드를 한 줄도 고치지 않는다면 깨질 남의 호출부가 없으므로 사전 협의 없이 만들고, 담당자를 PR 리뷰어로 지정해 확인받는다.
+
+**내가 만든 계약 파일에 메서드를 더하는 것도 여기에 든다.** `MemberReviewQueryService`·`OrderReviewQueryService`는 담당자의 도메인 폴더에 있지만 내가 쓴 파일이고, 메서드가 하나 느는 것만으로는 따라 움직일 호출부가 없다. 조각 3의 `findOrderItemSnapshots`와 조각 5의 검색 계약 둘이 그 자리다. 계약이 상대 도메인에 **쓰기**를 하더라도 이 기준은 같다 — 갈리는 지점은 읽기·쓰기도, 파일이 새 것이냐도 아니라 **남의 호출부가 따라 움직이느냐**다.
 
 | 필요한 것 | 쓰는 곳 | 도메인 | 담당 | 계약 |
 |---|---|---|---|---|
 | 후기 쓸 수 있는 주문 상품 목록 + 단건 자격 검증 | A1·A2·A3 | `order` | 주환 | `OrderReviewQueryService.findWritableOrderItems` · `findReviewTarget` (PR #158) |
 | 이미 쓴 후기의 상품명·주문번호 스냅샷 | B3·C1·C3 | `order` | 주환 | `OrderReviewQueryService.findOrderItemSnapshots(Collection<Long>)` → `List<OrderReviewSnapshotView>` |
 | 작성자 표시명(`nickname`, 탈퇴 여부) | B1·C1·C3 | `member` | 수민 | `MemberReviewQueryService.getMembersByIds(Collection<Long>)` → `List<MemberReviewView>` |
-| 관리자 검색의 작성자명·상품명 조건 | C2 | `member`·`order` | 수민·주환 | 조각 5에서 설계 (4절) |
+| 관리자 검색의 작성자명 조건 | C2 | `member` | 수민 | `MemberReviewQueryService.findMemberIdsByNickname(String)` → `List<Long>` |
+| 관리자 검색의 상품명 조건 | C2 | `order` | 주환 | `OrderReviewQueryService.findOrderItemIdsByProductName(String)` → `List<Long>` |
 | 상품 판매 여부 | B1 | `product` | 시은 | `ProductQueryService.getSalesInfo` (기존) |
 | 평점 갱신 | D1(`specs/product-rating.md`) | `product` | 시은 | `ProductReviewCommandService` |
 
@@ -269,6 +272,10 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 
 **검색 조건은 리뷰가 뒤에서 거르지 않는다.** 후기를 먼저 페이지하고 이름을 나중에 맞추면 **일치 행과 전체 건수가 둘 다 틀어진다**(C2, A1이 같은 모양이다). 조건을 계약에 넘겨 ID 목록이나 페이지 결과를 받는다.
 
+**ID 목록을 받는 계약에서는 `null`과 빈 목록의 뜻이 다르다.** `null`은 그 조건을 걸지 않는 것이고, 빈 목록은 계약이 "일치하는 것이 없다"고 답한 것이라 결과가 0건이어야 한다. 둘을 같게 다루면 **검색어에 아무도 안 걸렸을 때 전체 목록이 나온다.** `IN ()`은 문법 오류라 빈 목록은 `1 = 0`으로 받는다(`ReviewAdminMapper.xml`).
+
+**부분 일치 검색어는 계약을 가진 도메인이 이스케이프한다.** `%`·`_`를 그대로 넘기면 `%` 한 글자로 전체가 조회된다. 이스케이프 문자는 `!`이고 SQL이 `ESCAPE '!'`로 받는다 — 기본값인 역슬래시는 문자열 리터럴 단계에서도 특수 문자라 이스케이프가 두 겹이 되고, 어느 겹이 빠졌는지 SQL만 보고는 드러나지 않는다.
+
 > 선을 하나로 두는 이유: 표시용 조인까지 허용하면 어디까지가 표시용인지를 매번 판단해야 하고, 그 판단이 한 번 느슨해지는 순간 자격 검증 같은 업무 규칙도 같은 문으로 들어온다 — 실제로 A1·A2·A3가 그렇게 들어와 있었다. ReadModel 예외는 이 판단을 되살리지 않는다. 갈리는 지점이 **"표시용이냐"가 아니라 "읽기 전용이냐"**라서, 쓰기 SQL을 담을 수 없는 ReadModel로는 업무 규칙이 같은 문으로 들어올 수가 없다.
 
 ## 3. 화면
@@ -281,10 +288,10 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 | 내 후기 목록 (B3) | `customer/review/my.html` | 완료 (조각 3. 조각 4에서 수정·삭제 버튼) |
 | 상품 후기 미리보기 3개 (B1·B2·B4) | `customer/product/detail.html` | 후기 영역 교체 + `전체 리뷰 확인` 버튼 완료 (조각 3) |
 | 상품 후기 전체 목록 (B1·B4) | `customer/review/product.html` | 완료 (조각 3) |
-| 관리자 목록 (C1·C2) | `admin/review/list.html` | 목업 → 전환 (조각 5. `삭제` 제거, 상태 필터 추가) |
-| 관리자 상세 (C3·C5·C6) | `admin/review/detail.html` | **신규** (조각 5) |
+| 관리자 목록 (C1·C2) | `admin/review/list.html` | 완료 (조각 5. `삭제` 제거, 상태 필터 추가) |
+| 관리자 상세 (C3) | `admin/review/detail.html` | 완료 (조각 5. C5·C6 답글 영역은 조각 6) |
 
-진입점 수정: `customer/member/mypage.html`(A1·B3 링크 2개 — 완료), `customer/product/detail.html`(작성 버튼 → A1, `전체 리뷰 확인` → B1 — 완료), `home/screens.html`(화면 카탈로그 C16·C22·C23·C24 — 완료), `customer/order/detail.html`(`orderItemId` 전달 — **아직 안 함**. 지금 작성 진입은 A1 목록 하나뿐이다)
+진입점 수정: `customer/member/mypage.html`(A1·B3 링크 2개 — 완료), `customer/product/detail.html`(작성 버튼 → A1, `전체 리뷰 확인` → B1 — 완료), `home/screens.html`(화면 카탈로그 C16·C22·C23·C24와 관리자 A11·A15 — 완료), `customer/order/detail.html`(`orderItemId` 전달 — **아직 안 함**. 지금 작성 진입은 A1 목록 하나뿐이다)
 
 **화면 카탈로그(`home/screens.html`)도 진입점이다.** 새 화면을 내고 여기를 빠뜨리면 팀이 그 화면의 존재를 모른다. `specs/review-write.md`가 조각 1에서 같은 자리를 한 번 놓쳤다.
 
@@ -297,7 +304,6 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 
 | 항목 | 결정 시점 |
 |---|---|
-| **관리자 검색 계약**(`writer`·`product`) | 조각 5 착수 시 설계 확정, **PR에서 수민·주환님 확인** (C2·2.7) |
 | D2 `event_key` 규격 | 조각 7 |
 | D2 `NEW_REVIEW` 수신 관리자 | 조각 7, 민정님과 합의 |
 | 관리자 숨김 사유·조치 이력 기록 여부 | 필요해지면 새 migration (C1) |

@@ -80,7 +80,7 @@
         id, order_item_id AS orderItemId, product_id AS productId, member_id AS memberId,
         overall_rating AS overallRating, taste_rating AS tasteRating,
         design_rating AS designRating, service_rating AS serviceRating,
-        content, status, created_at AS createdAt
+        content, status, created_at AS createdAt, updated_at AS updatedAt
     </sql>
 
     <select id="findPublishedByProductId"

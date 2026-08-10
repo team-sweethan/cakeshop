@@ -15,6 +15,7 @@ public record ReviewRow(
         Integer serviceRating,
         String content,
         ReviewStatus status,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        LocalDateTime updatedAt
 ) {
 }

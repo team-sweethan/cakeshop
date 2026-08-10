@@ -66,6 +66,33 @@ class MemberReviewMapperTests {
         assertThat(members).extracting(MemberReviewView::id).containsExactly(existingId);
     }
 
+    @Test
+    void findMemberIdsByNickname_matchesPartOfTheNickname() {
+        Long matching = insertMember("케이크사랑", MemberStatus.ACTIVE);
+        Long other = insertMember("빵순이", MemberStatus.ACTIVE);
+
+        List<Long> ids = memberReviewMapper.findMemberIdsByNickname("이크사");
+
+        assertThat(ids).contains(matching).doesNotContain(other);
+    }
+
+    @Test
+    void findMemberIdsByNickname_escapedWildcard_matchesTheLiteralCharacter() {
+        Long literal = insertMember("100%만족", MemberStatus.ACTIVE);
+        Long other = insertMember("보통만족", MemberStatus.ACTIVE);
+
+        List<Long> ids = memberReviewMapper.findMemberIdsByNickname("!%만족");
+
+        assertThat(ids).contains(literal).doesNotContain(other);
+    }
+
+    @Test
+    void findMemberIdsByNickname_withdrawnMember_isStillSearchable() {
+        Long withdrawnId = insertMember("떠난회원", MemberStatus.WITHDRAWN);
+
+        assertThat(memberReviewMapper.findMemberIdsByNickname("떠난회원")).contains(withdrawnId);
+    }
+
     private Long insertMember(String nickname, MemberStatus status) {
         String email = "review-author-" + System.nanoTime() + "@example.com";
         jdbcTemplate.update(
