@@ -46,6 +46,13 @@ class StatisticsAdminScreenRenderingTests {
 
     @Test
     @WithMockUser(roles = "ADMIN")
+    void statisticsCssAsset_request_isServed() throws Exception {
+        mockMvc.perform(get("/css/statistics.css"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
     void statistics_statisticsReturned_rendersSummaryAndDailyTrend() throws Exception {
         LocalDate startDate = LocalDate.of(2026, 8, 9);
         LocalDate endDate = LocalDate.of(2026, 8, 10);
@@ -82,10 +89,11 @@ class StatisticsAdminScreenRenderingTests {
                 .andExpect(content().string(containsString("일별 매출 추이")))
                 .andExpect(content().string(containsString("id=\"daily-order-chart\"")))
                 .andExpect(content().string(containsString("id=\"daily-sales-chart\"")))
-                .andExpect(content().string(containsString("data-axis-label=\"08.09\"")))
+                .andExpect(content().string(containsString("data-axis-label=\"2026.08.09\"")))
                 .andExpect(content().string(containsString("data-order-count=\"5\"")))
                 .andExpect(content().string(containsString("data-sales-amount=\"45678\"")))
                 .andExpect(content().string(containsString("/webjars/chart.js/4.5.1/dist/chart.umd.js")))
+                .andExpect(content().string(containsString("/css/statistics.css")))
                 .andExpect(content().string(containsString("/js/statistics-chart.js")))
                 .andExpect(content().string(not(containsString("data-date-label"))))
                 .andExpect(content().string(not(containsString("data-statistics-metric"))))

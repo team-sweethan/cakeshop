@@ -1,0 +1,14 @@
+.statistics-chart-grid {
+    align-items: start
+}
+
+.statistics-chart {
+    height: 320px;
+    position: relative
+}
+
+@media (max-width: 767px) {
+    .statistics-chart {
+        height: 280px
+    }
+}
