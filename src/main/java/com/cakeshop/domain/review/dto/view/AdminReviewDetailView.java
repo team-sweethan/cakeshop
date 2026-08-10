@@ -1,0 +1,57 @@
+package com.cakeshop.domain.review.dto.view;
+
+import java.time.LocalDateTime;
+
+import com.cakeshop.domain.member.dto.view.MemberReviewView;
+import com.cakeshop.domain.order.dto.view.OrderReviewSnapshotView;
+import com.cakeshop.domain.review.entity.ReviewStatus;
+
+public record AdminReviewDetailView(
+        Long id,
+        Long productId,
+        String authorName,
+        String productName,
+        String orderNumber,
+        Integer overallRating,
+        Integer tasteRating,
+        Integer designRating,
+        Integer serviceRating,
+        String content,
+        LocalDateTime createdAt,
+        LocalDateTime updatedAt,
+        ReviewStatus status
+) {
+
+    public static AdminReviewDetailView of(
+            ReviewRow row, MemberReviewView author, OrderReviewSnapshotView snapshot) {
+
+        return new AdminReviewDetailView(
+                row.id(),
+                row.productId(),
+                author == null || author.withdrawn()
+                        ? ProductReviewView.WITHDRAWN_AUTHOR_NAME
+                        : author.nickname(),
+                snapshot == null ? null : snapshot.productName(),
+                snapshot == null ? null : snapshot.orderNumber(),
+                row.overallRating(),
+                row.tasteRating(),
+                row.designRating(),
+                row.serviceRating(),
+                row.content(),
+                row.createdAt(),
+                row.updatedAt(),
+                row.status());
+    }
+
+    public boolean isPublished() {
+        return status == ReviewStatus.PUBLISHED;
+    }
+
+    public boolean isBlocked() {
+        return status == ReviewStatus.BLOCKED;
+    }
+
+    public boolean isDeleted() {
+        return status == ReviewStatus.DELETED;
+    }
+}

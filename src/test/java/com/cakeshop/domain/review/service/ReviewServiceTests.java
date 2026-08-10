@@ -503,7 +503,7 @@ class ReviewServiceTests {
     private ReviewRow rowOf(long memberId, ReviewStatus status) {
         return new ReviewRow(
                 REVIEW_ID, ORDER_ITEM_ID, PRODUCT_ID, memberId,
-                5, 5, 4, 4, "맛있게 잘 먹었습니다.", status, WRITTEN_AT);
+                5, 5, 4, 4, "맛있게 잘 먹었습니다.", status, WRITTEN_AT, WRITTEN_AT);
     }
 
     private void givenWritableTarget() {
