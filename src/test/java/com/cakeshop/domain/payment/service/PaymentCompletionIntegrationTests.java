@@ -1,7 +1,9 @@
 package com.cakeshop.domain.payment.service;
 
+import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
 import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.member.service.MemberService;
+import com.cakeshop.domain.member.service.MemberCouponQueryService;
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.mapper.OrderMapper;
 import com.cakeshop.domain.order.service.OrderOptionValidator;
@@ -57,6 +59,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Transactional
 class PaymentCompletionIntegrationTests {
 
+    @MockitoBean
+    private CouponOrderCommandService couponOrderCommandService;
+
     private static final LocalDateTime APPROVED_AT =
             LocalDateTime.of(2026, 8, 1, 12, 0);
 
@@ -80,6 +85,9 @@ class PaymentCompletionIntegrationTests {
 
     @MockitoBean
     private MemberService memberService;
+
+    @MockitoBean
+    private MemberCouponQueryService memberCouponQueryService;
 
     private String suffix;
     private long memberId;

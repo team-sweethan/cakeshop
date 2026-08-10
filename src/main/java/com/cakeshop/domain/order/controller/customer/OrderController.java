@@ -2,6 +2,7 @@ package com.cakeshop.domain.order.controller.customer;
 
 import com.cakeshop.domain.member.dto.view.MemberProfileView;
 import com.cakeshop.domain.member.service.MemberService;
+import com.cakeshop.domain.coupon.service.CouponOrderQueryService;
 import com.cakeshop.domain.order.dto.form.CancelForm;
 import com.cakeshop.domain.order.dto.form.customer.GeneralOrderForm;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
@@ -22,8 +23,11 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.util.UUID;
+import java.util.List;
 
 @Controller
 @RequestMapping("/orders")
@@ -35,6 +39,21 @@ public class OrderController {
     private final CustomerOrderQueryService orderQueryService;
     private final MemberService memberService;
     private final RefundFacade refundFacade;
+    private final CouponOrderQueryService couponOrderQueryService;
+
+    /** 주문서에서 선택한 쿠폰의 예상 할인 금액을 서버 기준으로 다시 계산한다. */
+    @GetMapping("/coupon-preview")
+    @ResponseBody
+    public CouponOrderQueryService.CouponPricePreview couponPreview(
+            @AuthenticationPrincipal MemberDetails member,
+            @RequestParam long memberCouponId,
+            @RequestParam Long productId,
+            @RequestParam Integer quantity,
+            @RequestParam(required = false) List<Long> optionIds
+    ) {
+        var checkout = orderCheckoutService.getGeneralCheckout(productId, quantity, optionIds == null ? List.of() : optionIds);
+        return couponOrderQueryService.previewDiscount(requireMemberId(member), memberCouponId, checkout.totalAmount());
+    }
 
     /** 장바구니 항목의 픽업 일시 수정용 목업 경로다. 일반 주문은 checkout에서 선택한다. */
     @GetMapping(value = "/pickup", params = "intent=cart-edit")
@@ -61,7 +80,7 @@ public class OrderController {
     ) {
         prefillMemberContact(form, member);
         form.setRequestKey(UUID.randomUUID().toString());
-        return renderCheckout(form, model);
+        return renderCheckout(form, model, requireMemberId(member));
     }
 
     // 일반 상품 주문 생성
@@ -76,7 +95,7 @@ public class OrderController {
             if (hasInvalidOrderItem(bindingResult)) {
                 throw new BusinessException(CommonErrorCode.INVALID_INPUT);
             }
-            return renderCheckout(form, model);
+            return renderCheckout(form, model, requireMemberId(member));
         }
         long memberId = requireMemberId(member);
 
@@ -124,14 +143,14 @@ public class OrderController {
 
 
     /** 클라이언트 값을 통해 DB정보를 활용해 주문서 화면용 데이터 구성.**/
-    private String renderCheckout(GeneralOrderForm form, Model model) {
+    private String renderCheckout(GeneralOrderForm form, Model model, long memberId) {
+        var checkout = orderCheckoutService.getGeneralCheckout(
+                form.getProductId(), form.getQuantity(), form.getOptionIds()
+        );
+        model.addAttribute("checkout", checkout);
         model.addAttribute(
-                "checkout",
-                orderCheckoutService.getGeneralCheckout(
-                        form.getProductId(),
-                        form.getQuantity(),
-                        form.getOptionIds()
-                )
+                "availableCoupons",
+                couponOrderQueryService.getAvailableCouponsForMember(memberId, checkout.totalAmount())
         );
         return "customer/order/form";
     }

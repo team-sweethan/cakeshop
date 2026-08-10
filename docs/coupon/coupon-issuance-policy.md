@@ -22,8 +22,9 @@
 ## 현재 구현 범위
 
 - 관리자 쿠폰 등록·목록·상세·수정과 특정 회원 수동 발급 화면을 우선 제공한다.
-- `NEW_MEMBERS` 회원가입 연동, `FIRST_ORDER` 주문 이력 연동, 생일 자동 발급은
-  member·order 공개 Service 계약을 추가한 뒤 구현한다.
+- `FIRST_ORDER` 주문 이력 조회와 생일 자동 발급은 공개 Service 계약을 통해 구현한다.
+- `NEW_MEMBERS`는 쿠폰 도메인의 `issueNewMemberCoupons(memberId)` 진입점까지 제공하며,
+  회원가입 완료 흐름에서 호출하는 연결은 후속 작업이다.
 
 ## 도메인 연동 계약
 

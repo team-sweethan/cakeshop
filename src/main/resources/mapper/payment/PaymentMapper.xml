@@ -213,6 +213,24 @@
           AND current_order.status = 'PENDING_PAYMENT'
     </update>
 
+    <update id="completeZeroAmountIfReady">
+        UPDATE payments AS payment
+        INNER JOIN orders AS current_order
+            ON current_order.id = payment.order_id
+        SET payment.status = 'DONE',
+            payment.payment_key = CONCAT('ZERO-', payment.id),
+            payment.method = 'ZERO_AMOUNT',
+            payment.provider_status = 'ZERO_AMOUNT',
+            payment.approved_at = #{approvedAt},
+            payment.failure_code = NULL,
+            payment.failure_message = NULL
+        WHERE payment.id = #{paymentId}
+          AND payment.status = 'READY'
+          AND payment.amount = 0
+          AND current_order.status = 'PENDING_PAYMENT'
+          AND current_order.final_amount = 0
+    </update>
+
     <update id="abortIfReady">
         UPDATE payments
         SET status = 'ABORTED',

@@ -47,6 +47,12 @@ public interface PaymentMapper {
             @Param("approvedAt") LocalDateTime approvedAt
     );
 
+    /** 0원 주문의 READY 결제를 PG 승인 없이 내부 완료로 전환한다. */
+    int completeZeroAmountIfReady(
+            @Param("paymentId") long paymentId,
+            @Param("approvedAt") LocalDateTime approvedAt
+    );
+
     // READY 결제를 중단 처리하고 PG 상태와 실패 정보를 함께 기록한다.
     int abortIfReady(
             @Param("paymentId") long paymentId,

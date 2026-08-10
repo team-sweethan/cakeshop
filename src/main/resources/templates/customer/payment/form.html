@@ -93,13 +93,20 @@
       </div>
     </section>
 
-    <div class="panel panel--danger"
+    <div th:if="${payment.amount.signum() > 0}"
+         class="panel panel--danger"
          th:unless="${payment.paymentAvailable}">
       Toss 테스트 키가 설정되지 않아 결제를 요청할 수 없습니다.
     </div>
     <p class="form-error" id="payment-error" role="alert" hidden></p>
 
-    <button class="btn btn--primary btn--block"
+    <form th:if="${payment.amount.signum() == 0}"
+          th:action="@{/orders/{id}/payment/zero(id=${payment.orderId})}"
+          method="post">
+      <button class="btn btn--primary btn--block" type="submit">0원 주문 완료</button>
+    </form>
+    <button th:unless="${payment.amount.signum() == 0}"
+            class="btn btn--primary btn--block"
             id="request-payment"
             type="button"
             th:disabled="${!payment.paymentAvailable}"

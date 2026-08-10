@@ -50,6 +50,16 @@ class RefundFacadeTests {
     }
 
     @Test
+    void cancelCustomerOrder_zeroAmount_completesWithoutTossCancellation() {
+        when(refundService.cancelCustomerZeroAmountOrder(3L, 10L, "단순 변심")).thenReturn(true);
+
+        refundFacade.cancelCustomerOrder(3L, 10L, "단순 변심");
+
+        verify(refundService, never()).prepareCustomerCancellation(3L, 10L, "단순 변심");
+        verify(tossPaymentClient, never()).cancel(any(), any(), any());
+    }
+
+    @Test
     void cancelCustomerOrder_tossAndLookupFailure_keepsRequestRequested() {
         RefundRequest request = request();
         when(refundService.prepareCustomerCancellation(3L, 10L, "단순 변심")).thenReturn(request);

@@ -11,17 +11,39 @@
     function bindSearch(prefix, endpoint, canIssue, requiresKeyword) {
         const input = document.querySelector(`#${prefix}Search`);
         const button = document.querySelector(`#${prefix}SearchButton`);
+        const resetButton = document.querySelector(`#${prefix}ResetButton`);
+        const searchType = document.querySelector(`#${prefix}SearchType`);
         const results = document.querySelector(`#${prefix}Results`);
         const pagination = document.querySelector(`#${prefix}Pagination`);
         if (!input || !button || !results || !pagination) return;
 
+        if (requiresKeyword) {
+            updateTargetPlaceholder(searchType, input);
+            searchType?.addEventListener('change', () => updateTargetPlaceholder(searchType, input));
+        }
+
         const load = async (targetPage = 1) => {
-            if (requiresKeyword && !input.value.trim()) {
-                results.innerHTML = '<tr><td colspan="7">검색어를 입력해주세요.</td></tr>';
+            const value = input.value.trim();
+            const validationMessage = requiresKeyword
+                ? getTargetValidationMessage(searchType?.value, value)
+                : null;
+            if (validationMessage) {
+                results.innerHTML = `<tr><td colspan="7">${validationMessage}</td></tr>`;
                 pagination.replaceChildren();
                 return;
             }
-            const params = new URLSearchParams({ keyword: input.value.trim(), page: targetPage });
+            const params = new URLSearchParams({ page: targetPage });
+            if (requiresKeyword) {
+                params.set('searchType', searchType?.value ?? 'NAME');
+                params.set('keyword', value);
+            } else if (value) {
+                if (!/^\d+$/.test(value)) {
+                    results.innerHTML = '<tr><td colspan="7">회원 ID는 숫자로 입력해주세요.</td></tr>';
+                    pagination.replaceChildren();
+                    return;
+                }
+                params.set('memberId', value);
+            }
             const response = await fetch(`${endpoint}?${params}`);
             const result = await response.json();
             renderRows(results, result.content, canIssue);
@@ -34,6 +56,42 @@
         } else {
             load();
         }
+        resetButton?.addEventListener('click', () => {
+            input.value = '';
+            if (requiresKeyword) {
+                results.innerHTML = '<tr><td colspan="7">검색어를 입력해주세요.</td></tr>';
+                pagination.replaceChildren();
+                return;
+            }
+            load();
+        });
+    }
+
+    function updateTargetPlaceholder(searchType, input) {
+        const placeholders = {
+            MEMBER_ID: '회원 ID를 입력해주세요',
+            NAME: '이름을 2자 이상 입력해주세요',
+            EMAIL: '이메일을 2자 이상 입력해주세요',
+            PHONE: '휴대폰 번호를 4자 이상 입력해주세요'
+        };
+        input.placeholder = placeholders[searchType?.value] ?? placeholders.NAME;
+    }
+
+    function getTargetValidationMessage(searchType, value) {
+        const messages = {
+            MEMBER_ID: '회원 ID를 입력해주세요.',
+            NAME: '이름을 2자 이상 입력해주세요.',
+            EMAIL: '이메일을 2자 이상 입력해주세요.',
+            PHONE: '휴대폰 번호를 4자 이상 입력해주세요.'
+        };
+        const type = searchType ?? 'NAME';
+        if (!value || value.length < ({ MEMBER_ID: 1, NAME: 2, EMAIL: 2, PHONE: 4 }[type] ?? 2)) {
+            return messages[type] ?? messages.NAME;
+        }
+        if (type === 'MEMBER_ID' && !/^\d+$/.test(value)) {
+            return '회원 ID는 숫자로 입력해주세요.';
+        }
+        return null;
     }
 
     function renderRows(container, members, canIssue) {

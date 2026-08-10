@@ -1,6 +1,8 @@
 package com.cakeshop.domain.order.service;
 
+import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
 import com.cakeshop.domain.member.service.MemberService;
+import com.cakeshop.domain.member.service.MemberCouponQueryService;
 import com.cakeshop.domain.order.dto.form.customer.GeneralOrderForm;
 import com.cakeshop.domain.payment.error.PaymentErrorCode;
 import com.cakeshop.domain.payment.service.PaymentPreparationService;
@@ -53,6 +55,9 @@ import static org.mockito.Mockito.when;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class OrderServiceRollbackIntegrationTests {
 
+    @MockitoBean
+    private CouponOrderCommandService couponOrderCommandService;
+
     private static final ZoneId TEST_ZONE = ZoneId.of("Asia/Seoul");
     private static final LocalDateTime FIXED_NOW =
             LocalDateTime.of(2026, 7, 31, 10, 0);
@@ -78,6 +83,9 @@ class OrderServiceRollbackIntegrationTests {
     @MockitoBean
     private MemberService memberService;
 
+    @MockitoBean
+    private MemberCouponQueryService memberCouponQueryService;
+
     private String suffix;
     private long memberId;
     private long productId;
@@ -97,6 +105,7 @@ class OrderServiceRollbackIntegrationTests {
         suffix = Long.toString(System.nanoTime());
         memberId = insertMember();
         when(memberService.isActiveMember(memberId)).thenReturn(true);
+        when(memberCouponQueryService.lockActiveCouponIssuableMember(memberId)).thenReturn(true);
         productId = insertProduct();
         productOptionId = insertProductOption();
 

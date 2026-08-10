@@ -1,7 +1,9 @@
 package com.cakeshop.domain.order.service;
 
 import com.cakeshop.domain.order.dto.form.customer.GeneralOrderForm;
+import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
 import com.cakeshop.domain.member.service.MemberService;
+import com.cakeshop.domain.member.service.MemberCouponQueryService;
 import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.order.entity.OrderItem;
 import com.cakeshop.domain.order.entity.OrderItemOption;
@@ -80,12 +82,19 @@ class OrderServiceTests {
     @Mock
     private MemberService memberService;
 
+    @Mock
+    private MemberCouponQueryService memberCouponQueryService;
+
+    @Mock
+    private CouponOrderCommandService couponOrderCommandService;
+
     private OrderService orderService;
 
     @BeforeEach
     void setUp() {
         lenient().when(storeService.getStoreView()).thenReturn(storeView());
         lenient().when(memberService.isActiveMember(anyLong())).thenReturn(true);
+        lenient().when(memberCouponQueryService.lockActiveCouponIssuableMember(anyLong())).thenReturn(true);
         orderService = new OrderServiceImpl(
                 storeService,
                 productQueryService,
@@ -93,6 +102,8 @@ class OrderServiceTests {
                 orderMapper,
                 paymentPreparationService,
                 memberService,
+                memberCouponQueryService,
+                couponOrderCommandService,
                 FIXED_CLOCK
         );
     }

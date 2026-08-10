@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.cakeshop.domain.order.mapper.OrderCouponQueryMapper">
+<mapper namespace="com.cakeshop.domain.order.mapper.OrderCouponMapper">
     <select id="findMemberIdsWithOrderHistory" resultType="long">
         SELECT DISTINCT member_id FROM orders WHERE member_id IN
         <foreach collection="memberIds" item="memberId" open="(" separator="," close=")">

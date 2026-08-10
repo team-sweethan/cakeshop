@@ -42,6 +42,11 @@
                )
         ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)
     </insert>
+
+    <update id="updateAmountsIfPendingPayment">
+        UPDATE orders SET discount_amount = #{discountAmount}, final_amount = #{finalAmount}
+        WHERE id = #{orderId} AND status = 'PENDING_PAYMENT'
+    </update>
     <insert id="insertOrderItem" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO order_items (
             order_id,
