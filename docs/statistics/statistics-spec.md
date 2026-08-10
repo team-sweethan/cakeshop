@@ -190,13 +190,21 @@
 | `target_end_date` | 집계 대상 종료일 |
 | `last_completed_date` | 백필이 마지막으로 완료한 날짜 |
 | `started_at` | 실행 시작 시각 |
+| `heartbeat_at` | 실행 생존 확인 시각 |
 | `completed_at` | 실행 완료 시각 |
+| `running_lock` | 단일 실행을 강제하는 DB 생성 컬럼 |
 
 - `source_window_started_at`과 `source_window_ended_at`은 `DAILY` 실행에만 사용하고
   `BACKFILL` 실행에서는 `NULL`을 허용한다.
 - `last_completed_date`는 `BACKFILL` 실행에만 사용하고 `DAILY` 실행에서는 `NULL`로 둔다.
 - 성공한 `DAILY` 실행의 `source_window_ended_at`을 다음 변경 탐색의 기준으로 사용한다.
 - 실패한 실행은 성공 기준 시각을 갱신하지 않는다.
+- `running_lock`은 `RUNNING`이면 `1`, 그 외에는 `NULL`이며 UNIQUE 제약으로
+  `RUNNING` 실행을 하나만 허용한다.
+- 실행 중에는 날짜별 처리가 완료될 때마다 `heartbeat_at`을 DB 현재 시각으로 갱신한다.
+- 새 실행 시작 시 DB 현재 시각을 기준으로 `heartbeat_at`이 1시간 이상 지난 `RUNNING`은
+  비정상 종료된 것으로 판단하여 `FAILED`로 전환하고 `completed_at`을 기록한다.
+- 만료되지 않은 `RUNNING`이 있으면 새 실행을 시작하지 않는다.
 - 오류 상세나 SQL을 실행 기록에 저장하지 않고 별도 로그로 남긴다.
 - 화면의 최신 집계일은 백필 시작일부터 `daily_statistics` 행이 끊기지 않고 연속으로 존재하는
   마지막 날짜로 판단한다.
