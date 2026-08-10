@@ -3,6 +3,7 @@ package com.cakeshop.domain.order.mapper;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.cakeshop.domain.order.dto.view.OrderReviewItemView;
+import com.cakeshop.domain.order.dto.view.OrderReviewSnapshotView;
 import com.cakeshop.domain.order.dto.view.OrderReviewTargetView;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 import java.time.LocalDateTime;
@@ -154,6 +155,36 @@ class OrderReviewMapperTests {
                 insertOrderItem(insertOrder(otherMemberId, "PICKED_UP", PICKED_UP_AT), "남의 케이크");
 
         assertThat(orderReviewMapper.findReviewTarget(orderItemId, memberId)).isNull();
+    }
+
+    @Test
+    void findSnapshotsByOrderItemIds_carriesProductNameSnapshotAndOrderNumber() {
+        long orderId = insertOrder(memberId, "PICKED_UP", PICKED_UP_AT);
+        long orderItemId = insertOrderItem(orderId, "주문 시점 케이크");
+        jdbcTemplate.update("UPDATE products SET name = ? WHERE id = ?", "이름 바뀐 케이크", productId);
+        String orderNumber = jdbcTemplate.queryForObject(
+                "SELECT order_number FROM orders WHERE id = ?", String.class, orderId);
+
+        List<OrderReviewSnapshotView> snapshots =
+                orderReviewMapper.findSnapshotsByOrderItemIds(List.of(orderItemId, Long.MAX_VALUE));
+
+        assertThat(snapshots).singleElement().satisfies(snapshot -> {
+            assertThat(snapshot.orderItemId()).isEqualTo(orderItemId);
+            assertThat(snapshot.productName()).isEqualTo("주문 시점 케이크");
+            assertThat(snapshot.orderNumber()).isEqualTo(orderNumber);
+        });
+    }
+
+    @Test
+    void findSnapshotsByOrderItemIds_otherMembersItem_isStillReturnedForAdminUse() {
+        long otherMemberId = insertMember();
+        long orderItemId =
+                insertOrderItem(insertOrder(otherMemberId, "PICKED_UP", PICKED_UP_AT), "남의 케이크");
+
+        assertThat(orderReviewMapper.findSnapshotsByOrderItemIds(List.of(orderItemId)))
+                .as("소유권 판정은 후기를 고르는 자리에 있고 이 조회는 관리자 목록도 쓴다")
+                .extracting(OrderReviewSnapshotView::productName)
+                .containsExactly("남의 케이크");
     }
 
     private List<Long> idsOf(List<OrderReviewItemView> items) {

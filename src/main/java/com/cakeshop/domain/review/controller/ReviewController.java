@@ -8,12 +8,15 @@ import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import com.cakeshop.domain.order.dto.view.OrderReviewItemView;
 import com.cakeshop.domain.order.dto.view.OrderReviewTargetView;
 import com.cakeshop.domain.review.dto.form.ReviewWriteForm;
+import com.cakeshop.domain.review.dto.view.MyReviewView;
+import com.cakeshop.domain.review.dto.view.ProductReviewView;
 import com.cakeshop.domain.review.service.ReviewService;
 import com.cakeshop.global.common.paging.PageNavigation;
 import com.cakeshop.global.common.paging.PageRequest;
@@ -44,6 +47,41 @@ public class ReviewController {
                 PageNavigation.of(writableItems.getPage(), writableItems.getTotalPages()));
 
         return "customer/review/writable";
+    }
+
+    @GetMapping("/products/{productId:\\d+}/reviews")
+    public String productReviews(
+            @PathVariable("productId") long productId,
+            @RequestParam(name = "page", required = false) Integer page,
+            Model model
+    ) {
+        PageResult<ProductReviewView> reviews =
+                reviewService.getProductReviews(productId, new PageRequest(page, null));
+
+        model.addAttribute("productId", productId);
+        model.addAttribute("reviews", reviews);
+        model.addAttribute(
+                "pageNavigation",
+                PageNavigation.of(reviews.getPage(), reviews.getTotalPages()));
+
+        return "customer/review/product";
+    }
+
+    @GetMapping("/mypage/reviews")
+    public String myList(
+            @RequestParam(name = "page", required = false) Integer page,
+            @AuthenticationPrincipal MemberDetails memberDetails,
+            Model model
+    ) {
+        PageResult<MyReviewView> reviews = reviewService.getMyReviews(
+                memberDetails.getMemberId(), new PageRequest(page, null));
+
+        model.addAttribute("reviews", reviews);
+        model.addAttribute(
+                "pageNavigation",
+                PageNavigation.of(reviews.getPage(), reviews.getTotalPages()));
+
+        return "customer/review/my";
     }
 
     @GetMapping("/reviews/new")
@@ -82,6 +120,6 @@ public class ReviewController {
 
         reviewService.write(reviewWriteForm, memberId);
 
-        return "redirect:/mypage/reviews/writable";
+        return "redirect:/mypage/reviews";
     }
 }

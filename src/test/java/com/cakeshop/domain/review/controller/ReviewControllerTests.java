@@ -1,5 +1,6 @@
 package com.cakeshop.domain.review.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -22,6 +23,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -79,6 +81,37 @@ class ReviewControllerTests {
     }
 
     @Test
+    void productReviews_pageParameter_reachesTheServiceAsRequestedPage() throws Exception {
+        when(reviewService.getProductReviews(anyLong(), any()))
+                .thenReturn(new PageResult<>(List.of(), new PageRequest(3, null), 0));
+
+        mockMvc.perform(get("/products/{id}/reviews", 903L).param("page", "3"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("customer/review/product"))
+                .andExpect(model().attributeExists("reviews", "pageNavigation"))
+                .andExpect(model().attribute("productId", 903L));
+
+        ArgumentCaptor<PageRequest> pageRequest = ArgumentCaptor.forClass(PageRequest.class);
+        verify(reviewService).getProductReviews(eq(903L), pageRequest.capture());
+        assertThat(pageRequest.getValue().getPage()).isEqualTo(3);
+    }
+
+    @Test
+    void myReviews_authenticatedMember_rendersListForTheAuthenticatedMemberOnly()
+            throws Exception {
+
+        when(reviewService.getMyReviews(anyLong(), any()))
+                .thenReturn(new PageResult<>(List.of(), new PageRequest(1, null), 0));
+
+        mockMvc.perform(get("/mypage/reviews"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("customer/review/my"))
+                .andExpect(model().attributeExists("reviews", "pageNavigation"));
+
+        verify(reviewService).getMyReviews(eq(MEMBER_ID), any());
+    }
+
+    @Test
     void form_withOrderItemId_rendersFormWithTarget() throws Exception {
         when(reviewService.getWriteTarget(ORDER_ITEM_ID, MEMBER_ID)).thenReturn(target());
 
@@ -101,7 +134,7 @@ class ReviewControllerTests {
     }
 
     @Test
-    void write_validForm_redirectsToWritableList() throws Exception {
+    void write_validForm_redirectsToMyReviewsSoTheAuthorSeesWhatWasSaved() throws Exception {
         mockMvc.perform(post("/reviews")
                         .param("orderItemId", String.valueOf(ORDER_ITEM_ID))
                         .param("overallRating", "5")
@@ -110,7 +143,7 @@ class ReviewControllerTests {
                         .param("serviceRating", "4")
                         .param("content", "맛있게 잘 먹었습니다. 다음에도 주문할게요."))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/mypage/reviews/writable"));
+                .andExpect(redirectedUrl("/mypage/reviews"));
 
         verify(reviewService).write(any(ReviewWriteForm.class), eq(MEMBER_ID));
     }

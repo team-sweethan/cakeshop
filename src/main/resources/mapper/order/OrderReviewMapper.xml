@@ -61,4 +61,19 @@
          WHERE oi.id = #{orderItemId}
            AND o.member_id = #{memberId}
     </select>
+
+    <select id="findSnapshotsByOrderItemIds"
+            resultType="com.cakeshop.domain.order.dto.view.OrderReviewSnapshotView">
+
+        SELECT oi.id           AS orderItemId,
+               oi.product_name AS productName,
+               o.order_number  AS orderNumber
+          FROM order_items oi
+          JOIN orders o ON o.id = oi.order_id
+         WHERE oi.id IN
+        <foreach collection="orderItemIds" item="orderItemId"
+                 open="(" separator="," close=")">
+            #{orderItemId}
+        </foreach>
+    </select>
 </mapper>

@@ -42,4 +42,47 @@
            AND status = 'PUBLISHED'
            FOR UPDATE
     </select>
+
+    <sql id="reviewRowColumns">
+        id, order_item_id AS orderItemId, product_id AS productId, member_id AS memberId,
+        overall_rating AS overallRating, taste_rating AS tasteRating,
+        design_rating AS designRating, service_rating AS serviceRating,
+        content, status, created_at AS createdAt
+    </sql>
+
+    <select id="findPublishedByProductId"
+            resultType="com.cakeshop.domain.review.dto.view.ReviewRow">
+
+        SELECT <include refid="reviewRowColumns"/>
+          FROM reviews
+         WHERE product_id = #{productId}
+           AND status = 'PUBLISHED'
+         ORDER BY created_at DESC, id DESC
+         LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="countPublishedByProductId" resultType="long">
+        SELECT COUNT(*)
+          FROM reviews
+         WHERE product_id = #{productId}
+           AND status = 'PUBLISHED'
+    </select>
+
+    <select id="findByMemberId"
+            resultType="com.cakeshop.domain.review.dto.view.ReviewRow">
+
+        SELECT <include refid="reviewRowColumns"/>
+          FROM reviews
+         WHERE member_id = #{memberId}
+           AND status &lt;&gt; 'DELETED'
+         ORDER BY created_at DESC, id DESC
+         LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="countByMemberId" resultType="long">
+        SELECT COUNT(*)
+          FROM reviews
+         WHERE member_id = #{memberId}
+           AND status &lt;&gt; 'DELETED'
+    </select>
 </mapper>

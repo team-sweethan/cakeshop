@@ -6,6 +6,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import com.cakeshop.domain.review.dto.view.ProductRatingAggregate;
+import com.cakeshop.domain.review.dto.view.ReviewRow;
 import com.cakeshop.domain.review.entity.Review;
 
 @Mapper
@@ -22,4 +23,18 @@ public interface ReviewMapper {
     // FOR UPDATE 를 빼면 REPEATABLE READ 스냅샷이 자격 검증 시점에 굳어 먼저 커밋된 후기를
     // 못 본다 (D1).
     ProductRatingAggregate aggregateForUpdate(@Param("productId") long productId);
+
+    List<ReviewRow> findPublishedByProductId(
+            @Param("productId") long productId,
+            @Param("offset") int offset,
+            @Param("size") int size);
+
+    long countPublishedByProductId(@Param("productId") long productId);
+
+    List<ReviewRow> findByMemberId(
+            @Param("memberId") long memberId,
+            @Param("offset") int offset,
+            @Param("size") int size);
+
+    long countByMemberId(@Param("memberId") long memberId);
 }

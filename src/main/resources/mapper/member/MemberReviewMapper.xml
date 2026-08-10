@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+******************************
+작성자 : HyunGyu-Cho
+담당자 : 수민
+작성일 : 2026-08-10
+기능 : 후기 작성자 표기용 회원 조회 SQL
+설명 : MemberReviewQueryService 가 쓰는 읽기 전용 조회만 둔다.
+******************************
+-->
+<mapper namespace="com.cakeshop.domain.member.mapper.MemberReviewMapper">
+
+    <select id="findMembersByIds"
+            resultType="com.cakeshop.domain.member.dto.view.MemberReviewView">
+
+        SELECT id,
+               nickname,
+               (status = 'WITHDRAWN') AS withdrawn
+          FROM members
+         WHERE id IN
+        <foreach collection="memberIds" item="memberId" open="(" separator="," close=")">
+            #{memberId}
+        </foreach>
+    </select>
+</mapper>

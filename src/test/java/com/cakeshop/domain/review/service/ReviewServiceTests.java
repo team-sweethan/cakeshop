@@ -3,6 +3,7 @@ package com.cakeshop.domain.review.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -21,12 +22,21 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.springframework.dao.DuplicateKeyException;
 
+import com.cakeshop.domain.member.dto.view.MemberReviewView;
+import com.cakeshop.domain.member.service.MemberReviewQueryService;
+import com.cakeshop.domain.order.dto.view.OrderReviewSnapshotView;
 import com.cakeshop.domain.order.dto.view.OrderReviewTargetView;
 import com.cakeshop.domain.order.service.OrderReviewQueryService;
+import com.cakeshop.domain.product.error.ProductErrorCode;
+import com.cakeshop.domain.product.service.ProductQueryService;
 import com.cakeshop.domain.product.service.ProductReviewCommandService;
 import com.cakeshop.domain.review.dto.form.ReviewWriteForm;
+import com.cakeshop.domain.review.dto.view.MyReviewView;
 import com.cakeshop.domain.review.dto.view.ProductRatingAggregate;
+import com.cakeshop.domain.review.dto.view.ProductReviewView;
+import com.cakeshop.domain.review.dto.view.ReviewRow;
 import com.cakeshop.domain.review.entity.Review;
+import com.cakeshop.domain.review.entity.ReviewStatus;
 import com.cakeshop.domain.review.error.ReviewErrorCode;
 import com.cakeshop.domain.review.mapper.ReviewMapper;
 import com.cakeshop.global.common.paging.PageRequest;
@@ -38,10 +48,14 @@ class ReviewServiceTests {
     private static final long MEMBER_ID = 7L;
     private static final long ORDER_ITEM_ID = 41L;
     private static final long PRODUCT_ID = 903L;
+    private static final long REVIEW_ID = 5001L;
+    private static final LocalDateTime WRITTEN_AT = LocalDateTime.of(2026, 8, 9, 12, 0);
 
     private ReviewMapper reviewMapper;
     private OrderReviewQueryService orderReviewQueryService;
     private ProductReviewCommandService productReviewCommandService;
+    private ProductQueryService productQueryService;
+    private MemberReviewQueryService memberReviewQueryService;
     private ReviewService reviewService;
 
     @BeforeEach
@@ -49,8 +63,150 @@ class ReviewServiceTests {
         reviewMapper = mock(ReviewMapper.class);
         orderReviewQueryService = mock(OrderReviewQueryService.class);
         productReviewCommandService = mock(ProductReviewCommandService.class);
+        productQueryService = mock(ProductQueryService.class);
+        memberReviewQueryService = mock(MemberReviewQueryService.class);
         reviewService = new ReviewService(
-                reviewMapper, orderReviewQueryService, productReviewCommandService);
+                reviewMapper,
+                orderReviewQueryService,
+                productReviewCommandService,
+                productQueryService,
+                memberReviewQueryService);
+    }
+
+    @Test
+    void getProductReviews_productNotOnSale_throwsReviewNotFoundNotNotOnSale() {
+        when(productQueryService.getSalesInfo(PRODUCT_ID))
+                .thenThrow(new BusinessException(ProductErrorCode.NOT_ON_SALE));
+
+        assertThatThrownBy(() -> reviewService.getProductReviews(PRODUCT_ID, new PageRequest(1, null)))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ReviewErrorCode.REVIEW_NOT_FOUND));
+
+        verify(reviewMapper, never()).countPublishedByProductId(anyLong());
+    }
+
+    @Test
+    void getProductReviews_missingProduct_throwsTheSameReviewNotFound() {
+        when(productQueryService.getSalesInfo(PRODUCT_ID))
+                .thenThrow(new BusinessException(ProductErrorCode.NOT_FOUND));
+
+        assertThatThrownBy(() -> reviewService.getProductReviews(PRODUCT_ID, new PageRequest(1, null)))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ReviewErrorCode.REVIEW_NOT_FOUND));
+    }
+
+    @Test
+    void getProductReviews_withdrawnAuthor_isMaskedButReviewRemains() {
+        when(reviewMapper.countPublishedByProductId(PRODUCT_ID)).thenReturn(1L);
+        when(reviewMapper.findPublishedByProductId(PRODUCT_ID, 0, PageRequest.DEFAULT_SIZE))
+                .thenReturn(List.of(row(ReviewStatus.PUBLISHED)));
+        when(memberReviewQueryService.getMembersByIds(List.of(MEMBER_ID)))
+                .thenReturn(List.of(new MemberReviewView(MEMBER_ID, "떠난사람", true)));
+
+        PageResult<ProductReviewView> reviews =
+                reviewService.getProductReviews(PRODUCT_ID, new PageRequest(1, null));
+
+        assertThat(reviews.getContent()).singleElement().satisfies(review -> {
+            assertThat(review.authorName()).isEqualTo(ProductReviewView.WITHDRAWN_AUTHOR_NAME);
+            assertThat(review.content()).isEqualTo("맛있게 잘 먹었습니다.");
+        });
+    }
+
+    @Test
+    void getProductReviews_authorMissingFromContract_stillRendersTheReview() {
+        when(reviewMapper.countPublishedByProductId(PRODUCT_ID)).thenReturn(1L);
+        when(reviewMapper.findPublishedByProductId(PRODUCT_ID, 0, PageRequest.DEFAULT_SIZE))
+                .thenReturn(List.of(row(ReviewStatus.PUBLISHED)));
+        when(memberReviewQueryService.getMembersByIds(List.of(MEMBER_ID))).thenReturn(List.of());
+
+        PageResult<ProductReviewView> reviews =
+                reviewService.getProductReviews(PRODUCT_ID, new PageRequest(1, null));
+
+        assertThat(reviews.getContent()).singleElement()
+                .extracting(ProductReviewView::authorName)
+                .isEqualTo(ProductReviewView.WITHDRAWN_AUTHOR_NAME);
+    }
+
+    @Test
+    void getProductReviews_pageBeyondLastPage_skipsTheListQuery() {
+        when(reviewMapper.countPublishedByProductId(PRODUCT_ID)).thenReturn(2L);
+
+        PageResult<ProductReviewView> reviews =
+                reviewService.getProductReviews(PRODUCT_ID, new PageRequest(2, null));
+
+        assertThat(reviews.getContent()).isEmpty();
+        assertThat(reviews.getTotalElements()).isEqualTo(2L);
+        verify(reviewMapper, never()).findPublishedByProductId(anyLong(), anyInt(), anyInt());
+    }
+
+    @Test
+    void getProductReviewPreview_takesLatestThreeWithoutCheckingTheProductAgain() {
+        when(reviewMapper.findPublishedByProductId(PRODUCT_ID, 0, 3))
+                .thenReturn(List.of(row(ReviewStatus.PUBLISHED)));
+
+        assertThat(reviewService.getProductReviewPreview(PRODUCT_ID)).hasSize(1);
+
+        verify(reviewMapper).findPublishedByProductId(PRODUCT_ID, 0, 3);
+        verify(productQueryService, never()).getSalesInfo(anyLong());
+    }
+
+    @Test
+    void getMyReviews_blockedReview_isShownToTheAuthorWithTheProductSnapshot() {
+        when(reviewMapper.countByMemberId(MEMBER_ID)).thenReturn(1L);
+        when(reviewMapper.findByMemberId(MEMBER_ID, 0, PageRequest.DEFAULT_SIZE))
+                .thenReturn(List.of(row(ReviewStatus.BLOCKED)));
+        when(orderReviewQueryService.findOrderItemSnapshots(List.of(ORDER_ITEM_ID)))
+                .thenReturn(List.of(new OrderReviewSnapshotView(
+                        ORDER_ITEM_ID, "딸기 생크림 케이크", "ORD-0001")));
+
+        PageResult<MyReviewView> reviews =
+                reviewService.getMyReviews(MEMBER_ID, new PageRequest(1, null));
+
+        assertThat(reviews.getContent()).singleElement().satisfies(review -> {
+            assertThat(review.isBlocked()).isTrue();
+            assertThat(review.productId()).isEqualTo(PRODUCT_ID);
+            assertThat(review.productName()).isEqualTo("딸기 생크림 케이크");
+            assertThat(review.orderNumber()).isEqualTo("ORD-0001");
+        });
+    }
+
+    @Test
+    void getMyReviews_snapshotMissing_stillRendersTheReview() {
+        when(reviewMapper.countByMemberId(MEMBER_ID)).thenReturn(1L);
+        when(reviewMapper.findByMemberId(MEMBER_ID, 0, PageRequest.DEFAULT_SIZE))
+                .thenReturn(List.of(row(ReviewStatus.PUBLISHED)));
+        when(orderReviewQueryService.findOrderItemSnapshots(List.of(ORDER_ITEM_ID)))
+                .thenReturn(List.of());
+
+        PageResult<MyReviewView> reviews =
+                reviewService.getMyReviews(MEMBER_ID, new PageRequest(1, null));
+
+        assertThat(reviews.getContent()).singleElement().satisfies(review -> {
+            assertThat(review.productName()).isNull();
+            assertThat(review.productId())
+                    .as("상품 링크는 후기가 가진 값이라 스냅샷이 비어도 살아 있어야 한다")
+                    .isEqualTo(PRODUCT_ID);
+            assertThat(review.content()).isEqualTo("맛있게 잘 먹었습니다.");
+        });
+    }
+
+    @Test
+    void getMyReviews_neverAsksTheMemberContractForItsOwnAuthor() {
+        when(reviewMapper.countByMemberId(MEMBER_ID)).thenReturn(1L);
+        when(reviewMapper.findByMemberId(MEMBER_ID, 0, PageRequest.DEFAULT_SIZE))
+                .thenReturn(List.of(row(ReviewStatus.PUBLISHED)));
+
+        reviewService.getMyReviews(MEMBER_ID, new PageRequest(1, null));
+
+        verify(memberReviewQueryService, never()).getMembersByIds(any());
+    }
+
+    private ReviewRow row(ReviewStatus status) {
+        return new ReviewRow(
+                REVIEW_ID, ORDER_ITEM_ID, PRODUCT_ID, MEMBER_ID,
+                5, 5, 4, 4, "맛있게 잘 먹었습니다.", status, WRITTEN_AT);
     }
 
     @Test

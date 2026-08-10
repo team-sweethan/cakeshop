@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.cakeshop.domain.order.dto.view.OrderReviewItemView;
+import com.cakeshop.domain.order.dto.view.OrderReviewSnapshotView;
 import com.cakeshop.domain.order.dto.view.OrderReviewTargetView;
 import com.cakeshop.domain.order.mapper.OrderReviewMapper;
 import com.cakeshop.global.common.paging.PageRequest;
@@ -66,5 +67,23 @@ public class OrderReviewQueryService {
     @Transactional(readOnly = true)
     public Optional<OrderReviewTargetView> findReviewTarget(long orderItemId, long memberId) {
         return Optional.ofNullable(orderReviewMapper.findReviewTarget(orderItemId, memberId));
+    }
+
+    /**
+     * ******************************
+     * 작성자 : HyunGyu-Cho
+     * 담당자 : 주환
+     * 작성일 : 2026-08-10
+     * 기능 : 이미 쓴 후기의 주문 상품 스냅샷 묶음 조회
+     * 설명 : 후기 목록(B3·C1·C3)이 order_items·orders 를 직접 JOIN 하지 않도록 추가한다.
+     *        계약의 근거는 docs/review/DOMAIN.md 2.7.
+     * ******************************
+     */
+    @Transactional(readOnly = true)
+    public List<OrderReviewSnapshotView> findOrderItemSnapshots(Collection<Long> orderItemIds) {
+        if (orderItemIds == null || orderItemIds.isEmpty()) {
+            return List.of();
+        }
+        return orderReviewMapper.findSnapshotsByOrderItemIds(orderItemIds);
     }
 }
