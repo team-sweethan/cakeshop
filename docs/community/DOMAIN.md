@@ -262,6 +262,8 @@ Cakeshop 커뮤니티는 고객이 케이크 관련 질문과 후기를 공유�
 
 **H0b — `posts.status`·`comments.status`에 미정의 값이 저장되지 않음.** 카테고리 3종이 활성 상태로 존재하는 것까지. `CommunitySchemaTests`(6)가 MariaDB Testcontainers로 CHECK 제약을 검증한다.
 
+**H1b — 실행 쿼리 수가 행 수와 무관함.** 고객 목록·댓글 구역·상세와 관리자 목록 **네 화면 전부**. `CommunityQueryCountTests`가 MyBatis `Interceptor`로 실행 statement 수를 센다. 조각 10b에서 작성자 조회가 붙어 기대값이 고정 1회씩 늘었고(목록 2→3, 댓글 2→3, 상세 1→2), 10d에서 관리자 목록까지 넓혔다 — 10c에서 같은 N+1 위험이 생겼는데 배치 조회로 막아 뒀을 뿐 고정하지는 않은 상태였다. **기능 하나가 아니라 네 화면에 걸려 있어 여기 있다** — `community-read.md`·`community-comment.md`·`community-admin.md`가 각각 이 행을 가리킨다. 어느 한 화면의 조회를 고치다 기대값이 움직이면 나머지 셋의 기대값도 같은 파일에 있다.
+
 **H3 — Controller가 Mapper를 직접 호출하지 않음.** ArchUnit. **아직 적용하지 않았다** — 위반이 발생하면 그때 세운다.
 
 **H4 — 본문·제목의 HTML이 이스케이프됨.** `th:utext`를 쓰지 않은 것의 실제 결과다. `CommunityScreenRenderingTests`가 본문에 `<script>`를 넣고 렌더링 결과를 확인한다.

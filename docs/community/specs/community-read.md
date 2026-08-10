@@ -1,7 +1,7 @@
 # 목록·상세 — B1·B2·B3
 
 > 공통 규칙(상태 모델·권한·입력 검증·탈퇴 회원·카테고리)은 `../DOMAIN.md`가 정본이다.
-> 조각 순서와 진행 상태는 `../PLAN.md`. 기능 ID와 spec 라우팅 표는 `../DOMAIN.md` 1절.
+> 조각 순서와 진행 상태는 `../PLAN.md`. 기능 ID와 spec 라우팅 표는 `../DOMAIN.md` 0.1절.
 > 조각: 1, 6, 7a
 
 ## B1. 게시글 목록 (`GET /community`)
@@ -129,7 +129,7 @@ LIMIT #{size} OFFSET #{offset}
 
 **H1a — 목록 SQL이 스칼라 서브쿼리 형태를 유지함.** `CommunityMapperXmlTests`가 `XMLMapperBuilder`로 XML을 파싱해 SQL 문자열을 검사한다(선례: `OrderMapperXmlTests`). 정렬의 `id` tiebreaker와 노출 조건이 `status` 하나인 것도 함께 고정했는데, 조각 7a에서 정렬 분기가 생기면서 `ORDER BY` 단언은 H28로 옮겼다. 이 행은 스칼라 서브쿼리 형태와 노출 조건만 맡는다. **지워서 넘어가지 않았다.**
 
-**H1b — 목록 조회 시 실행 쿼리 수가 게시글 수와 무관함.** 고객 목록·댓글 구역·상세와 관리자 목록 전부. `CommunityQueryCountTests`가 MyBatis `Interceptor`로 실행 statement 수를 센다. 조각 10b에서 작성자 조회가 붙어 기대값이 고정 1회씩 늘었고(목록 2→3, 댓글 2→3, 상세 1→2), 10d에서 관리자 목록까지 넓혔다 — 10c에서 같은 N+1 위험이 생겼는데 배치 조회로 막아 뒀을 뿐 고정하지는 않은 상태였다.
+**H1b — 실행 쿼리 수가 행 수와 무관함.** B1 목록과 B2 상세가 여기 걸린다. **네 화면에 함께 걸리는 검사라 `../DOMAIN.md` 11절이 소유한다** — 기대값을 바꾸려면 그쪽을 본다.
 
 **H1c — 조회수 증가가 게시글을 "수정됨"으로 만들지 않음.** `CommunityViewCountTests.getPostDetail_doesNotMarkPostAsEdited`.
 

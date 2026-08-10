@@ -1,7 +1,7 @@
 # 게시글 작성·수정·삭제 — A1·A2·A3·A4
 
 > 공통 규칙(상태 모델·전이·권한·입력 검증)은 `../DOMAIN.md`가 정본이다.
-> 조각 순서와 진행 상태는 `../PLAN.md`. 기능 ID와 spec 라우팅 표는 `../DOMAIN.md` 1절.
+> 조각 순서와 진행 상태는 `../PLAN.md`. 기능 ID와 spec 라우팅 표는 `../DOMAIN.md` 0.1절.
 > 조각: 2
 
 작성과 수정은 같은 `templates/customer/community/form.html`을 쓴다.

@@ -1,7 +1,7 @@
 # 관리자 차단·기각 — C1·C2·C3·C4
 
 > 공통 규칙(상태 전이·접근 규칙·권한·입력 검증)은 `../DOMAIN.md`가 정본이다.
-> 조각 순서와 진행 상태는 `../PLAN.md`. 기능 ID와 spec 라우팅 표는 `../DOMAIN.md` 1절.
+> 조각 순서와 진행 상태는 `../PLAN.md`. 기능 ID와 spec 라우팅 표는 `../DOMAIN.md` 0.1절.
 > 조각: 5
 
 관리자가 조치하는 경로는 차단(C3)·해제(C3)·신고 기각(C4) 셋이다. 그 밖의 것은 관리자 권한이 아니다 — 아래 C3의 마지막 항목이 정본이다.
@@ -40,5 +40,7 @@
 이 spec이 소유하는 하네스다. 인덱스는 `../PLAN.md`에 있다.
 
 **H17 — 관리자 조치가 전이 규칙을 지킴.** 이미 차단된 글 재차단·지운 글 차단·차단된 적 없는 글 해제가 전부 0행이고, 0행이 성공으로 넘어가지 않으며, 차단이 `updated_at`을 보존한다. `CommunityMapperXmlTests` +3, `CommunityMapperTests` +6(실제 MariaDB), `CommunityAdminServiceTests`(11) — `InOrder`로 **잠그고 → 바꾸고 → 신고를 닫는** 순서까지 본다(`community-reaction.md` H15와 같은 자리). **재차단은 화면에 성공으로 보이고 사라지는 것은 첫 조치의 시각·사유라, 이 검사가 없으면 잃은 줄도 모른다.** 전이 규칙 자체는 `ReportStatusTests`(2)가 enum 표로 고정한다 — 처리된 신고에서 나가는 전이가 전부 거짓인 것이 핵심이다. `CommunityTransactionTests`(1)가 신고를 닫다 실패하면 차단도 함께 되돌아가는지 본다.
+
+> **관리자 목록은 H1b에도 걸린다.** 조각 10d에서 넓힌 자리다 — 10c에서 같은 N+1 위험이 생겼는데 배치 조회로 막아 뒀을 뿐 고정하지는 않은 상태였다. 근거와 기대값은 `../DOMAIN.md` 11절이 소유한다.
 
 **H18 — 관리자 목록이 상태로 거르지 않는 것을 기본으로 두고, 정렬 분기마다 `id` tiebreaker를 유지하며, 미처리 신고만 셈.** 관리자 조치 경로가 Security 뒤에 있는 것까지. `CommunityMapperXmlTests` +4(분기마다 형태), `CommunityMapperTests` +4, `CommunityAdminControllerTests`(9), `CommunityScreenRenderingTests` +2(실제 필터 체인으로 403과 **DB가 안 바뀐 것**까지). **처리된 신고까지 세면 조치한 글이 목록 맨 위에 영원히 남아 진짜 처리할 글을 가리는데, 숫자만 다를 뿐 화면은 멀쩡하다.**
