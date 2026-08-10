@@ -41,7 +41,7 @@ public class NotificationResponse {
             if (orderId != null) return "/admin/orders/" + orderId;
             if (postId != null) return "/admin/community/" + postId;
             if (reviewId != null) return "/admin/reviews";
-            return "/admin/dashboard";
+            return "/admin";
         }
 
         // 💡 고객 알림인 경우 /... URL 반환

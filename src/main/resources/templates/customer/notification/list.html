@@ -133,9 +133,12 @@
 
       // 4. 개별 알림 클릭 시 읽음 처리 이벤트
       function attachItemClickEvents() {
-        // [상세] 버튼 클릭 시 읽음 처리 API 호출 후 페이지 이동
+        // [상세] 버튼 클릭 시 미읽음 알림에만 읽음 API 전송 후 targetUrl 이동 (이미 읽은 알림은 덮어쓰지 않음)
         document.querySelectorAll("a[data-noti-id]").forEach(link => {
           link.addEventListener("click", function (e) {
+            const isUnread = this.closest(".is-unread") !== null;
+            if (!isUnread) return; // 💡 이미 읽은 알림은 read_at을 덮어쓰지 않고 바로 이동!
+
             e.preventDefault();
             const targetHref = this.href;
             const notiId = this.getAttribute("data-noti-id");

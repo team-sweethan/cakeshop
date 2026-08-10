@@ -7,9 +7,7 @@
   <meta name="_csrf_header" th:content="${_csrf?.headerName}"/>
   <title>알림 관리 | 관리자</title>
   <link rel="stylesheet" th:href="@{/css/app.css}">
-  <link rel="stylesheet" th:href="@{/css/admin-mockup.css}">
   <script defer th:src="@{/js/app.js}"></script>
-  <script defer th:src="@{/js/admin-mockup.js}"></script>
 </head>
 <body>
   <div class="admin-layout">
@@ -100,7 +98,7 @@
               const displayDate = item.lastEventAt || item.createdAt;
               const formattedDate = displayDate ? displayDate.replace("T", " ").substring(0, 16) : "";
 
-              // 💡 상세 링크 버튼 (data-noti-id 추가로 읽음 처리 후 이동 연동)
+              // 상세 링크 버튼 (data-noti-id 추가로 읽음 처리 연동)
               const detailBtn = item.targetUrl
                 ? `<a class="btn btn--sm" data-noti-id="${item.id}" href="${escapeHtml(item.targetUrl)}">상세</a>`
                 : "";
@@ -148,9 +146,12 @@
 
       // 3. 개별 행 및 [상세] 버튼 클릭 시 읽음 처리 이벤트
       function attachRowEvents() {
-        // [상세] 버튼 클릭 시 백엔드 읽음 API 전송 후 targetUrl 페이지 이동
+        // [상세] 버튼 클릭 시 미읽음 알림에만 읽음 API 전송 후 targetUrl 이동 (이미 읽은 알림은 덮어쓰지 않음)
         document.querySelectorAll("a[data-noti-id]").forEach(link => {
           link.addEventListener("click", function (e) {
+            const isUnread = this.closest(".is-unread") !== null;
+            if (!isUnread) return; // 💡 이미 읽은 알림은 read_at을 덮어쓰지 않고 바로 이동!
+
             e.preventDefault();
             const targetHref = this.href;
             const notiId = this.getAttribute("data-noti-id");
