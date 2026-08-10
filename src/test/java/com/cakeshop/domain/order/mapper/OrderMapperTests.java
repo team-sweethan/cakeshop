@@ -240,6 +240,7 @@ class OrderMapperTests {
                 OrderStatus.READY_FOR_PICKUP,
                 "CUSTOMER",
                 "승인 후 취소 시도",
+                readyAt.plusMinutes(1),
                 readyAt.plusMinutes(1)
         )).isZero();
     }
@@ -433,6 +434,7 @@ class OrderMapperTests {
                 OrderStatus.PENDING_PAYMENT,
                 "CUSTOMER",
                 "단순 변심",
+                canceledAt,
                 canceledAt
         )).isZero();
 
@@ -447,6 +449,7 @@ class OrderMapperTests {
                 OrderStatus.UNDER_REVIEW,
                 "CUSTOMER",
                 "단순 변심",
+                canceledAt,
                 canceledAt
         )).isZero();
         cancelPayment(paymentId, canceledAt);
@@ -455,6 +458,7 @@ class OrderMapperTests {
                 OrderStatus.UNDER_REVIEW,
                 "CUSTOMER",
                 "단순 변심",
+                canceledAt,
                 canceledAt
         )).isZero();
 
@@ -467,14 +471,15 @@ class OrderMapperTests {
     }
 
     @Test
-    void cancelIfCurrent_allowsGeneralOrderOnlyAfterPayment() {
+    void cancelIfCurrent_usesRequestedAtForCutoffAndStoresCompletionTime() {
         Order order = newOrder();
         order.setOrderType(OrderType.GENERAL);
         orderMapper.insertOrder(order);
         LocalDateTime readyAt =
                 LocalDateTime.of(2026, 8, 1, 12, 1);
-        LocalDateTime canceledAt =
+        LocalDateTime requestedAt =
                 LocalDateTime.of(2026, 8, 1, 12, 5);
+        LocalDateTime canceledAt = order.getPickupAt().plusMinutes(1);
 
         long paymentId =
                 insertPayment(order.getId(), "DONE", "GENERAL-CANCELLATION");
@@ -487,6 +492,7 @@ class OrderMapperTests {
                 OrderStatus.READY_FOR_PICKUP,
                 "CUSTOMER",
                 "환불 전 취소 시도",
+                requestedAt,
                 canceledAt
         )).isZero();
         cancelPayment(paymentId, canceledAt);
@@ -495,6 +501,7 @@ class OrderMapperTests {
                 OrderStatus.READY_FOR_PICKUP,
                 "CUSTOMER",
                 "픽업 전 취소",
+                requestedAt,
                 canceledAt
         )).isEqualTo(1);
 
@@ -526,6 +533,7 @@ class OrderMapperTests {
                 OrderStatus.READY_FOR_PICKUP,
                 "CUSTOMER",
                 "픽업 시각 취소",
+                order.getPickupAt(),
                 order.getPickupAt()
         )).isZero();
         assertThat(orderMapper.cancelIfCurrent(
@@ -533,6 +541,7 @@ class OrderMapperTests {
                 OrderStatus.READY_FOR_PICKUP,
                 "CUSTOMER",
                 "픽업 이후 취소",
+                order.getPickupAt().plusSeconds(1),
                 order.getPickupAt().plusSeconds(1)
         )).isZero();
 

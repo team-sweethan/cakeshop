@@ -10,6 +10,7 @@ import com.cakeshop.domain.payment.dto.view.PaymentCheckoutView;
 import com.cakeshop.domain.payment.dto.view.PaymentCompletionView;
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.entity.PaymentStatus;
+import com.cakeshop.domain.payment.infra.TossPaymentAvailability;
 import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.store.dto.view.StoreView;
 import com.cakeshop.domain.store.service.StoreService;
@@ -57,6 +58,9 @@ class PaymentQueryServiceTests {
     @Mock
     private StoreService storeService;
 
+    @Mock
+    private TossPaymentAvailability tossPaymentAvailability;
+
     private PaymentQueryService paymentQueryService;
 
     @BeforeEach
@@ -67,10 +71,11 @@ class PaymentQueryServiceTests {
                 paymentService,
                 storeService,
                 CLOCK,
-                "test-client-key",
-                "test-secret-key"
+                tossPaymentAvailability
         );
         lenient().when(memberService.isActiveMember(10L)).thenReturn(true);
+        lenient().when(tossPaymentAvailability.clientKey()).thenReturn("test-client-key");
+        lenient().when(tossPaymentAvailability.isEnabled()).thenReturn(true);
     }
 
     @Test
@@ -117,20 +122,12 @@ class PaymentQueryServiceTests {
     }
 
     @Test
-    void getCheckout_missingSecretKey_disablesPayment() {
-        PaymentQueryService serviceWithoutSecretKey = new PaymentQueryService(
-                orderQueryService,
-                memberService,
-                paymentService,
-                storeService,
-                CLOCK,
-                "test-client-key",
-                ""
-        );
+    void getCheckout_paymentConfigurationDisabled_disablesPayment() {
+        when(tossPaymentAvailability.isEnabled()).thenReturn(false);
         when(orderQueryService.getMemberOrder(10L, 1L)).thenReturn(order(OrderStatus.PENDING_PAYMENT));
         when(paymentService.getReadyPayment(1L)).thenReturn(payment(PaymentStatus.READY, null));
 
-        PaymentCheckoutView checkout = serviceWithoutSecretKey.getCheckout(10L, "member@example.com", 1L);
+        PaymentCheckoutView checkout = paymentQueryService.getCheckout(10L, "member@example.com", 1L);
 
         assertThat(checkout.paymentAvailable()).isFalse();
     }

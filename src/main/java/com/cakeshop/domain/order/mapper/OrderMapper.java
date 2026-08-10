@@ -198,6 +198,7 @@ public interface OrderMapper {
             @Param("expectedStatus") OrderStatus expectedStatus,
             @Param("canceledBy") String canceledBy,
             @Param("cancelReason") String cancelReason,
+            @Param("requestedAt") LocalDateTime requestedAt,
             @Param("canceledAt") LocalDateTime canceledAt
     );
 }

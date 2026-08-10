@@ -320,7 +320,8 @@ class RefundServiceTests {
         when(paymentMapper.completeCancellationIfRequested(30L, "transaction-key", NOW.plusSeconds(2)))
                 .thenReturn(1);
         when(orderMapper.cancelIfCurrent(
-                10L, OrderStatus.READY_FOR_PICKUP, "CUSTOMER", "단순 변심", NOW
+                10L, OrderStatus.READY_FOR_PICKUP, "CUSTOMER", "단순 변심",
+                NOW, NOW.plusSeconds(2)
         )).thenReturn(1);
         when(orderMapper.findStockDeductedItemsForRestore(10L)).thenReturn(List.of(item));
         when(orderMapper.markStockRestoredIfDeducted(100L, NOW.plusSeconds(2))).thenReturn(1);
@@ -328,6 +329,10 @@ class RefundServiceTests {
         refundService.completeCancellation(request, result);
 
         verify(productStockService).restoreStock(1L, 2);
+        verify(orderMapper).cancelIfCurrent(
+                10L, OrderStatus.READY_FOR_PICKUP, "CUSTOMER", "단순 변심",
+                NOW, NOW.plusSeconds(2)
+        );
         verify(orderMapper).markStockRestoredIfDeducted(100L, NOW.plusSeconds(2));
         verify(couponOrderCommandService).restoreCouponForCanceledOrder(10L);
     }
@@ -368,6 +373,9 @@ class RefundServiceTests {
 
         verify(productStockService, never()).restoreStock(1L, 2);
         verify(orderMapper, never()).findStockDeductedItemsForRestore(10L);
+        verify(orderMapper, never()).cancelIfCurrent(
+                anyLong(), any(OrderStatus.class), any(), any(), any(), any()
+        );
         verify(paymentMapper, never()).completeCancellationIfRequested(anyLong(), any(), any());
         verify(couponOrderCommandService).restoreCouponForCanceledOrder(10L);
     }
@@ -396,7 +404,8 @@ class RefundServiceTests {
                 OrderStatus.READY_FOR_PICKUP,
                 "ADMIN",
                 "단순 변심",
-                NOW
+                NOW,
+                NOW.plusSeconds(2)
         )).thenReturn(1);
         when(orderMapper.findStockDeductedItemsForRestore(10L)).thenReturn(List.of());
 
@@ -407,7 +416,8 @@ class RefundServiceTests {
                 OrderStatus.READY_FOR_PICKUP,
                 "ADMIN",
                 "단순 변심",
-                NOW
+                NOW,
+                NOW.plusSeconds(2)
         );
     }
 

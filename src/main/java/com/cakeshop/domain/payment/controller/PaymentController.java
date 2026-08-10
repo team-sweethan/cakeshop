@@ -39,8 +39,8 @@ public class PaymentController {
                 )
         );
         return "customer/payment/form";
-    }
 
+    }
     /** Toss 인증 성공 값을 검증한 뒤 CSRF가 적용되는 내부 POST 화면을 반환한다. */
     @GetMapping("/orders/{orderId:\\d+}/payment/success")
     public String success(

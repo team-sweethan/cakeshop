@@ -11,10 +11,11 @@ import com.cakeshop.domain.payment.dto.view.PaymentCompletionView;
 import com.cakeshop.domain.payment.dto.view.PaymentFailureView;
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.error.PaymentErrorCode;
+import com.cakeshop.domain.payment.infra.TossPaymentAvailability;
 import com.cakeshop.domain.store.service.StoreService;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.error.CommonErrorCode;
-import org.springframework.beans.factory.annotation.Value;
+import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +26,7 @@ import java.util.List;
 
 /** 회원 소유권과 결제 상태를 검증해 결제 화면용 조회 결과를 구성한다. */
 @Service
+@AllArgsConstructor
 public class PaymentQueryService {
 
     private static final int TOSS_ORDER_NAME_MAX_LENGTH = 100;
@@ -34,26 +36,7 @@ public class PaymentQueryService {
     private final PaymentService paymentService;
     private final StoreService storeService;
     private final Clock clock;
-    private final String clientKey;
-    private final String secretKey;
-
-    public PaymentQueryService(
-            CustomerOrderQueryService orderQueryService,
-            MemberService memberService,
-            PaymentService paymentService,
-            StoreService storeService,
-            Clock clock,
-            @Value("${app.payment.toss.client-key:}") String clientKey,
-            @Value("${app.payment.toss.secret-key:}") String secretKey
-    ) {
-        this.orderQueryService = orderQueryService;
-        this.memberService = memberService;
-        this.paymentService = paymentService;
-        this.storeService = storeService;
-        this.clock = clock;
-        this.clientKey = clientKey;
-        this.secretKey = secretKey;
-    }
+    private final TossPaymentAvailability tossPaymentAvailability;
 
     /** 결제 기한 및 정보 검증 -> 일반 주믄용 Toss 결제 화면 데이터 구성**/
     @Transactional(readOnly = true)
@@ -99,14 +82,10 @@ public class PaymentQueryService {
                 order.ordererName(),
                 memberEmail,
                 order.ordererPhone(),
-                clientKey,
-                hasText(clientKey) && hasText(secretKey),
+                tossPaymentAvailability.clientKey(),
+                tossPaymentAvailability.isEnabled(),
                 items
         );
-    }
-
-    private boolean hasText(String value) {
-        return value != null && !value.isBlank();
     }
 
     /**

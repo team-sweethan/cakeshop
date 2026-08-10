@@ -619,7 +619,7 @@
           )
           AND order_type = 'GENERAL'
           AND status = 'READY_FOR_PICKUP'
-          AND #{canceledAt} &lt; pickup_at
+          AND #{requestedAt} &lt; pickup_at
     </update>
 
 </mapper>

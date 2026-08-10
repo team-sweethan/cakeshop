@@ -243,7 +243,8 @@ public class RefundService {
                 currentExpectedStatus,
                 request.canceledBy(),
                 cancellation.getCancelReason(),
-                request.requestedAt()
+                request.requestedAt(),
+                canceledAt
         ));
         // 쿠폰 도메인 공개 계약: 취소가 확정된 주문에 사용한 쿠폰만 복구한다.
         couponOrderCommandService.restoreCouponForCanceledOrder(order.getId());
