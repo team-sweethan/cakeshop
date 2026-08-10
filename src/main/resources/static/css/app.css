@@ -1835,6 +1835,21 @@ body > main {
     text-align: center
 }
 
+.statistics-chart-grid {
+    align-items: start
+}
+
+.statistics-chart {
+    height: 320px;
+    position: relative
+}
+
+@media (max-width: 767px) {
+    .statistics-chart {
+        height: 280px
+    }
+}
+
 /* 관리자 폼 래퍼: 폼 가독성을 위해 너비 제한 (프론트는 인라인 style 사용) */
 .admin-form {
     max-width: 720px
