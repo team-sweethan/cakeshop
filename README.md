@@ -14,6 +14,7 @@
 - [Project Structure](#project-structure)
 - [Contributing](#contributing)
 - [Architecture & Developer Playbook](#architecture--developer-playbook)
+- [File Upload Storage](#file-upload-storage)
 
 ## Overview
 
@@ -88,7 +89,7 @@ Copy-Item .env_sample .env
 cp .env_sample .env
 ```
 
-최소한 다음 값을 확인해야 합니다.
+기본 개발 환경은 로컬 MariaDB와 공용 S3를 함께 사용합니다. 최소한 다음 값을 확인해야 합니다.
 
 ```dotenv
 LOCAL_DB_HOST=localhost
@@ -96,9 +97,18 @@ LOCAL_DB_PORT=3306
 LOCAL_DB_DATABASE=cakeshop
 LOCAL_DB_USERNAME=your-username
 LOCAL_DB_PASSWORD=your-password
+AWS_REGION=ap-northeast-2
+AWS_ACCESS_KEY_ID=your-access-key
+AWS_SECRET_ACCESS_KEY=your-secret-key
+AWS_S3_BUCKET=sweethan-cakeshop-images
+AWS_S3_BASE_URL=https://sweethan-cakeshop-images.s3.ap-northeast-2.amazonaws.com
+AWS_S3_KEY_PREFIX=local-your-name
 ```
 
-`.env_sample`의 기본 포트는 `3307`입니다. 로컬 MariaDB가 기본 포트 `3306`을 사용한다면 반드시 수정합니다. 실제 비밀 값이 들어간 `.env`는 커밋하지 않습니다.
+`.env_sample`의 기본 포트는 `3307`입니다. 로컬 MariaDB가 기본 포트 `3306`을 사용한다면 반드시 수정합니다.
+Access Key와 Secret Key는 팀 공용 S3 전용 IAM 자격 증명을 별도로 전달받아 입력하며, 실제 비밀 값이 들어간
+`.env`는 커밋하지 않습니다. 일반 IAM Access Key는 `AWS_SESSION_TOKEN`이 필요하지 않고, STS 임시 자격 증명을
+사용할 때만 세션 토큰을 함께 입력합니다.
 
 ### 3. 로컬 데이터베이스 생성
 
@@ -116,12 +126,12 @@ CREATE DATABASE `cakeshop`
 
 ```powershell
 # Windows
-.\gradlew.bat bootRun --args="--spring.profiles.active=local"
+.\gradlew.bat bootRun
 ```
 
 ```bash
 # macOS / Linux
-./gradlew bootRun --args="--spring.profiles.active=local"
+./gradlew bootRun
 ```
 
 `http://localhost:8080`에 접속해 화면이 열리는지 확인합니다.
@@ -157,8 +167,10 @@ SOURCE src/main/resources/db/seed/seed-community.sql;
 
 | 프로필 | 용도 | Flyway |
 |---|---|---|
-| `local` | 개인 PC의 MariaDB를 사용하는 기본 개발 환경 | 활성화 |
+| `local,s3` | 개인 PC의 MariaDB와 공용 S3를 사용하는 기본 개발 환경 | 활성화 |
+| `local` | 개인 PC의 MariaDB와 로컬 디스크를 사용하는 대체 개발 환경 | 활성화 |
 | `rds` | 팀 공용 AWS RDS 연결 | 비활성화 |
+| `rds,s3` | 팀 공용 AWS RDS와 공용 S3 연결 | 비활성화 |
 
 공용 RDS 스키마는 애플리케이션 시작으로 변경하지 않습니다. `rds` 프로필은 접속 정보와 별도의 스키마 반영 절차가 준비된 경우에만 사용합니다.
 
@@ -230,3 +242,76 @@ src/
 - 🤝 **[팀 미결정 항목](docs/team-plan.md)**: 여러 담당자가 함께 결정해야 하는 도메인 연동과 운영 환경 질문
 - 🔀 **[Pull Request 가이드](docs/pull-request.md)**: PR 크기·제목·본문, 리뷰 요청과 브랜치별 병합 기준
 - 🎨 **[Thymeleaf 화면 작성 규칙](docs/frontend-template-format.md)**: 고객·관리자 화면 구조, 프래그먼트 계약, 정적 자원과 렌더링 검증 기준
+
+## File Upload Storage
+
+업로드 호출부는 공통 `FileStorageClient`만 사용하며 활성 프로필에 따라 저장소 구현체가 선택됩니다.
+
+| 활성 프로필 | 저장소 | 용도 |
+|---|---|---|
+| `local,s3` | `S3StorageService` | 기본 개발 환경: 로컬 DB와 공용 S3 사용 |
+| `local` | `LocalFileStorageClient` | 필요할 때 로컬 DB와 PC 외부 디렉터리 사용 |
+| `rds` | `LocalFileStorageClient` | RDS와 실행 PC의 로컬 저장소 사용 |
+| `rds,s3` | `S3StorageService` | RDS와 S3를 함께 사용하는 배포 환경 |
+
+RDS는 데이터베이스이고 S3는 파일 저장소이므로 서로 독립적으로 선택합니다.
+
+### 로컬 디스크 사용
+
+공용 S3를 사용하지 않는 예외적인 경우에만 `.env`의 `FILE_UPLOAD_DIR`에 프로젝트 밖의 저장 경로를 지정하고
+`local` 프로필을 명시해 실행합니다.
+값을 생략하면 `<user home>/cakeshop-uploads`가 사용됩니다.
+
+```powershell
+.\gradlew.bat bootRun --args="--spring.profiles.active=local"
+```
+
+### 기본 개발 환경: 로컬 DB와 S3
+
+`.env_sample`을 복사한 로컬 `.env`에서 다음 설정을 확인합니다. 공용 버킷명과 URL은 비밀 값이 아니지만,
+실제 Access Key와 Secret Key는 Git에 추적되지 않는 로컬 `.env`에만 입력합니다.
+
+```dotenv
+AWS_REGION=ap-northeast-2
+AWS_ACCESS_KEY_ID=your-local-access-key
+AWS_SECRET_ACCESS_KEY=your-local-secret-key
+AWS_SESSION_TOKEN=
+AWS_S3_BUCKET=sweethan-cakeshop-images
+AWS_S3_BASE_URL=https://sweethan-cakeshop-images.s3.ap-northeast-2.amazonaws.com
+AWS_S3_KEY_PREFIX=local-your-name
+```
+
+로컬 Access Key와 Secret Key는 반드시 함께 설정합니다. STS나 IAM Identity Center의 임시 자격 증명을
+사용하면 `AWS_SESSION_TOKEN`도 함께 설정합니다. Access Key와 Secret Key가 모두 비어 있으면
+`aws configure`, 현재 프로세스의 AWS 환경 변수, IAM Role 같은 AWS SDK 기본 자격 증명 체인을 사용합니다.
+`AWS_S3_KEY_PREFIX`는 `local-본인GitHub아이디`처럼 영문·숫자·점·밑줄·하이픈만 사용해 개발자마다
+고유하게 설정하고, RDS 환경은 `rds-dev`처럼 별도 값을
+사용합니다. 저장소는 현재 prefix로 만든 객체만 삭제하므로 로컬 DB가 다른 환경의 URL을 갖고 있어도 해당
+S3 객체를 삭제하지 않습니다. prefix 도입 전에 생성한 S3 객체는 새 환경에서 자동 삭제하지 않으므로 필요하면
+참조 여부를 확인한 뒤 버킷에서 별도로 정리합니다.
+기본 프로필이 `local,s3`이므로 별도 실행 인수 없이 관리자 상품·매장 이미지 업로드로 확인합니다.
+
+```powershell
+.\gradlew.bat bootRun
+```
+
+### RDS와 S3 함께 사용
+
+애플리케이션 코드를 바꾸지 않고 기존 `RDS_*` 설정과 S3 설정을 준비한 뒤 프로필만 조합합니다.
+
+```powershell
+.\gradlew.bat bootRun --args="--spring.profiles.active=rds,s3"
+```
+
+배포 환경은 장기 액세스 키 대신 EC2 Instance Profile 또는 ECS Task Role 같은 IAM Role을 사용합니다.
+업로드 대상 prefix에 필요한 `s3:PutObject`, `s3:DeleteObject` 등 최소 권한만 부여하고, 운영 환경에서는
+CloudFront와 비공개 S3 조합을 우선 검토합니다.
+
+현재 이미지 URL 컬럼은 `VARCHAR(500)`이므로 S3 URL 저장만을 위한 migration은 필요하지 않습니다.
+기존 `/uploads/...` 파일은 자동 이전되지 않으므로 S3 복사와 DB URL 변경을 별도 이관 작업으로 진행해야
+하며, 공유 RDS 데이터 변경은 백업과 팀 승인 후 수행합니다.
+
+프로필 변경은 로컬 DB와 RDS의 데이터를 자동으로 동기화하지 않습니다. 같은 S3 버킷을 사용하더라도 각 DB에
+상품·매장 정보와 `image_url`이 존재해야 화면에서 조회할 수 있습니다. RDS에 S3 URL을 저장하기 시작한 뒤에는
+로컬 경로와 S3 URL이 섞이지 않도록 `rds,s3` 조합을 사용합니다. 버킷이나 CloudFront 기본 URL을 변경하면 기존
+전체 URL 데이터는 자동으로 바뀌지 않으므로 별도 이관 계획이 필요합니다.
