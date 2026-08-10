@@ -75,11 +75,18 @@
             <div class="panel" style="margin-top: 24px;"
                  th:if="${couponDetail.targetType.name() == 'SPECIFIC_MEMBERS'}">
                 <h2 class="section-title" style="margin: 0 0 16px; font-size: 1.25rem;">쿠폰 개별 발급</h2>
-                <div class="cluster" style="gap: 8px; margin-top: 8px;"><input id="targetMemberSearch"
-                                                                               class="form-control"
-                                                                               style="flex: 1; max-width: 400px;"
-                                                                               placeholder="회원 이름 또는 이메일 입력">
+                <div class="cluster" style="gap: 8px; margin-top: 8px;">
+                    <select id="targetMemberSearchType" class="form-select" style="max-width: 130px;height: 37px;">
+                    <option value="MEMBER_ID">회원 ID</option>
+                    <option value="NAME" selected>이름</option>
+                    <option value="EMAIL">이메일</option>
+                    <option value="PHONE">휴대폰 번호</option>
+                </select><input id="targetMemberSearch"
+                                class="form-control"
+                                style="flex: 1; max-width: 400px;"
+                                placeholder="회원 이름 또는 이메일 입력">
                     <button class="btn" type="button" id="targetMemberSearchButton">검색</button>
+                    <button class="btn" type="button" id="targetMemberResetButton">초기화</button>
                 </div>
                 <div class="table-wrap" style="margin-top: 16px;">
                     <table class="data-table">
@@ -106,8 +113,9 @@
                 <div class="cluster" style="gap: 8px; margin-bottom: 12px;"><input id="issuedMemberSearch"
                                                                                    class="form-control"
                                                                                    style="flex: 1; max-width: 400px;"
-                                                                                   placeholder="회원 이름 또는 이메일 입력">
+                                                                                   placeholder="회원 ID 입력">
                     <button class="btn" type="button" id="issuedMemberSearchButton">검색</button>
+                    <button class="btn" type="button" id="issuedMemberResetButton">초기화</button>
                 </div>
                 <div class="table-wrap">
                     <table class="data-table">

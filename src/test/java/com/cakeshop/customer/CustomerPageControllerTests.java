@@ -12,6 +12,7 @@ import com.cakeshop.domain.cart.controller.CartController;
 import com.cakeshop.domain.cart.dto.view.CartView;
 import com.cakeshop.domain.cart.service.CartService;
 import com.cakeshop.domain.coupon.controller.CouponController;
+import com.cakeshop.domain.coupon.service.CouponOrderQueryService;
 import com.cakeshop.domain.home.controller.HomeController;
 import com.cakeshop.domain.home.service.HomeService;
 import com.cakeshop.domain.member.controller.AuthController;
@@ -22,6 +23,7 @@ import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.notification.controller.NotificationUserController;
 import com.cakeshop.domain.order.controller.customer.OrderController;
 import com.cakeshop.domain.order.dto.view.OrderDetailView;
+import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
 import com.cakeshop.domain.order.service.customer.CustomerOrderQueryService;
 import com.cakeshop.domain.order.service.OrderService;
@@ -31,6 +33,7 @@ import com.cakeshop.domain.payment.service.PaymentQueryService;
 import com.cakeshop.domain.payment.service.RefundFacade;
 import com.cakeshop.domain.product.controller.ProductController;
 import com.cakeshop.domain.product.service.ProductService;
+import com.cakeshop.domain.review.service.ReviewProductQueryService;
 import com.cakeshop.global.security.MemberDetails;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -83,18 +86,35 @@ class CustomerPageControllerTests {
         CartService cartService = mock(CartService.class);
         when(cartService.getCart(1L)).thenReturn(new CartView(
                 List.of(), 0, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO));
+        CouponOrderQueryService couponOrderQueryService = mock(CouponOrderQueryService.class);
+        when(couponOrderQueryService.getAvailableCouponsForMember(
+                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any()
+        )).thenReturn(List.of());
+        OrderCheckoutService orderCheckoutService = mock(OrderCheckoutService.class);
+        when(orderCheckoutService.getGeneralCheckout(
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyList()
+        )).thenReturn(new GeneralOrderCheckoutView(
+                1L, "테스트 케이크", "일반 케이크", 1,
+                List.of(), BigDecimal.valueOf(30_000), BigDecimal.ZERO,
+                BigDecimal.valueOf(30_000), List.of()
+        ));
 
         mockMvc = MockMvcBuilders.standaloneSetup(
                         new HomeController(mock(HomeService.class)),
                         new AuthController(memberService),
-                        new ProductController(mock(ProductService.class)),
+                        new ProductController(
+                                mock(ProductService.class),
+                                mock(ReviewProductQueryService.class)),
                         new CartController(cartService),
                         new OrderController(
-                                mock(OrderCheckoutService.class),
+                                orderCheckoutService,
                                 mock(OrderService.class),
                                 orderQueryService,
                                 memberService,
-                                mock(RefundFacade.class)
+                                mock(RefundFacade.class),
+                                couponOrderQueryService
                         ),
                         new PaymentController(
                                 mock(PaymentFacade.class),

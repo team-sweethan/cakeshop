@@ -30,6 +30,39 @@
                 #{content}, 'PUBLISHED')
     </insert>
 
+    <select id="findById" resultType="com.cakeshop.domain.review.dto.view.ReviewRow">
+        SELECT <include refid="reviewRowColumns"/>
+          FROM reviews
+         WHERE id = #{id}
+    </select>
+
+    <select id="findByIdForUpdate" resultType="com.cakeshop.domain.review.dto.view.ReviewRow">
+        SELECT <include refid="reviewRowColumns"/>
+          FROM reviews
+         WHERE id = #{id}
+           FOR UPDATE
+    </select>
+
+    <update id="update">
+        UPDATE reviews
+           SET overall_rating = #{overallRating},
+               taste_rating   = #{tasteRating},
+               design_rating  = #{designRating},
+               service_rating = #{serviceRating},
+               content        = #{content}
+         WHERE id = #{id}
+           AND member_id = #{memberId}
+           AND status = 'PUBLISHED'
+    </update>
+
+    <update id="deleteByAuthor">
+        UPDATE reviews
+           SET status = 'DELETED'
+         WHERE id = #{reviewId}
+           AND member_id = #{memberId}
+           AND status = 'PUBLISHED'
+    </update>
+
     <!-- COALESCE 가 없으면 마지막 공개 후기를 지웠을 때 AVG 가 NULL 을 돌려주는데
          products.average_rating 은 NOT NULL 이다. 후기가 쌓이는 동안에는 드러나지 않는다. -->
     <select id="aggregateForUpdate"
@@ -41,5 +74,48 @@
          WHERE product_id = #{productId}
            AND status = 'PUBLISHED'
            FOR UPDATE
+    </select>
+
+    <sql id="reviewRowColumns">
+        id, order_item_id AS orderItemId, product_id AS productId, member_id AS memberId,
+        overall_rating AS overallRating, taste_rating AS tasteRating,
+        design_rating AS designRating, service_rating AS serviceRating,
+        content, status, created_at AS createdAt
+    </sql>
+
+    <select id="findPublishedByProductId"
+            resultType="com.cakeshop.domain.review.dto.view.ReviewRow">
+
+        SELECT <include refid="reviewRowColumns"/>
+          FROM reviews
+         WHERE product_id = #{productId}
+           AND status = 'PUBLISHED'
+         ORDER BY created_at DESC, id DESC
+         LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="countPublishedByProductId" resultType="long">
+        SELECT COUNT(*)
+          FROM reviews
+         WHERE product_id = #{productId}
+           AND status = 'PUBLISHED'
+    </select>
+
+    <select id="findByMemberId"
+            resultType="com.cakeshop.domain.review.dto.view.ReviewRow">
+
+        SELECT <include refid="reviewRowColumns"/>
+          FROM reviews
+         WHERE member_id = #{memberId}
+           AND status &lt;&gt; 'DELETED'
+         ORDER BY created_at DESC, id DESC
+         LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="countByMemberId" resultType="long">
+        SELECT COUNT(*)
+          FROM reviews
+         WHERE member_id = #{memberId}
+           AND status &lt;&gt; 'DELETED'
     </select>
 </mapper>

@@ -1,6 +1,7 @@
 package com.cakeshop.domain.payment.service;
 
 import com.cakeshop.domain.order.service.OrderService;
+import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
 import com.cakeshop.domain.order.service.OrderService.GeneralPaymentOrder;
 import com.cakeshop.domain.order.service.OrderService.PaymentProduct;
 import com.cakeshop.domain.payment.entity.Payment;
@@ -26,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -42,6 +44,9 @@ class PaymentServiceTests {
 
     @Mock
     private PaymentRecoveryService paymentRecoveryService;
+
+    @Mock
+    private CouponOrderCommandService couponOrderCommandService;
 
     @InjectMocks
     private PaymentService paymentService;
@@ -66,6 +71,7 @@ class PaymentServiceTests {
                 productStockService,
                 paymentMapper,
                 orderService,
+                couponOrderCommandService,
                 paymentRecoveryService
         );
         inOrder.verify(orderService).lockGeneralOrderForPayment(1L);
@@ -85,6 +91,7 @@ class PaymentServiceTests {
                 1L,
                 approval.approvedAt()
         );
+        inOrder.verify(couponOrderCommandService).useReservedCouponForOrder(1L);
         inOrder.verify(paymentRecoveryService).discardApprovalRecovery(payment);
     }
 
@@ -133,6 +140,27 @@ class PaymentServiceTests {
                 .getAnnotation(Transactional.class);
 
         assertThat(transactional).isNotNull();
+    }
+
+    @Test
+    void completeZeroAmountGeneralPayment_zeroAmount_completesWithoutPgApproval() {
+        GeneralPaymentOrder order = new GeneralPaymentOrder(
+                1L, BigDecimal.ZERO, LocalDateTime.of(2026, 8, 1, 10, 10),
+                List.of(new PaymentProduct(200L, 100L, 2))
+        );
+        Payment payment = payment();
+        payment.setAmount(BigDecimal.ZERO);
+        LocalDateTime completedAt = LocalDateTime.of(2026, 8, 1, 10, 1);
+        when(productStockService.decreaseStock(100L, 2)).thenReturn(true);
+        when(paymentMapper.completeZeroAmountIfReady(20L, completedAt)).thenReturn(1);
+
+        paymentService.completeZeroAmountGeneralPayment(order, payment, completedAt);
+
+        verify(orderService).lockGeneralOrderForPayment(1L);
+        verify(paymentMapper).completeZeroAmountIfReady(20L, completedAt);
+        verify(orderService).completeGeneralOrderAfterPayment(1L, completedAt);
+        verify(couponOrderCommandService).useReservedCouponForOrder(1L);
+        verifyNoInteractions(paymentRecoveryService);
     }
 
     private GeneralPaymentOrder order() {

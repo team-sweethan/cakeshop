@@ -18,6 +18,7 @@ import com.cakeshop.domain.product.dto.form.StockFilter;
 import com.cakeshop.domain.product.dto.view.ProductListView;
 import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.service.ProductService;
+import com.cakeshop.domain.review.service.ReviewProductQueryService;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 
@@ -45,7 +46,9 @@ class ProductControllerTests {
 
         MockMvc mockMvc = MockMvcBuilders
                 .standaloneSetup(
-                        new ProductController(productService)
+                        new ProductController(
+                                productService,
+                                mock(ReviewProductQueryService.class))
                 )
                 .build();
 
@@ -113,7 +116,9 @@ class ProductControllerTests {
 
         MockMvc mockMvc = MockMvcBuilders
                 .standaloneSetup(
-                        new ProductController(productService)
+                        new ProductController(
+                                productService,
+                                mock(ReviewProductQueryService.class))
                 )
                 .build();
 

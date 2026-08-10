@@ -3,6 +3,7 @@ package com.cakeshop.domain.order.controller.customer;
 import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
 import com.cakeshop.domain.member.dto.view.MemberProfileView;
 import com.cakeshop.domain.member.service.MemberService;
+import com.cakeshop.domain.coupon.service.CouponOrderQueryService;
 import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
 import com.cakeshop.domain.order.controller.customer.OrderController;
@@ -59,6 +60,9 @@ class OrderControllerTests {
     @Mock
     private RefundFacade refundFacade;
 
+    @Mock
+    private CouponOrderQueryService couponOrderQueryService;
+
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -69,7 +73,8 @@ class OrderControllerTests {
                                 orderService,
                                 orderQueryService,
                                 memberService,
-                                refundFacade
+                                refundFacade,
+                                couponOrderQueryService
                         )
                 )
                 .setCustomArgumentResolvers(
