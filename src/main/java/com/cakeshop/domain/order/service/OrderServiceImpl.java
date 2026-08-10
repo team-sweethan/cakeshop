@@ -35,7 +35,6 @@ import java.util.UUID;
 public class OrderServiceImpl implements OrderService {
 
     private static final BigDecimal ZERO = BigDecimal.ZERO;
-    private static final BigDecimal MAX_ORDER_AMOUNT = new BigDecimal("999999999999");
     private static final int MAX_UNLIMITED_STOCK_QUANTITY = 10;
     private static final long PAYMENT_EXPIRATION_MINUTES = 10L;
 
@@ -259,26 +258,19 @@ public class OrderServiceImpl implements OrderService {
                         form.getOptionIds()
                 );
 
-        BigDecimal optionAmount = selectedOptions.stream()
-                .map(ValidatedOption::additionalPrice)
-                .reduce(ZERO, BigDecimal::add);
-
-        BigDecimal totalAmount = product.basePrice()
-                .add(optionAmount)
-                .multiply(BigDecimal.valueOf(form.getQuantity()));
-        if (totalAmount.signum() <= 0) {
+        OrderAmountCalculator.OrderAmounts amounts = OrderAmountCalculator.calculate(
+                product.basePrice(), form.getQuantity(), selectedOptions
+        );
+        if (amounts.totalAmount().signum() <= 0) {
             throw new BusinessException(OrderErrorCode.INVALID_ORDER_AMOUNT);
-        }
-        if (totalAmount.compareTo(MAX_ORDER_AMOUNT) > 0) {
-            throw new BusinessException(OrderErrorCode.ORDER_AMOUNT_EXCEEDED);
         }
 
         return new PreparedOrderItem(
                 product,
                 form.getQuantity(),
                 selectedOptions,
-                optionAmount,
-                totalAmount
+                amounts.unitOptionAmount(),
+                amounts.totalAmount()
         );
     }
 

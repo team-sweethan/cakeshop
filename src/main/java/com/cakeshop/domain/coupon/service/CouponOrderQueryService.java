@@ -2,11 +2,9 @@ package com.cakeshop.domain.coupon.service;
 
 import com.cakeshop.domain.coupon.dto.view.CouponOrderAvailableView;
 import com.cakeshop.domain.coupon.dto.view.CouponOrderDiscount;
-import com.cakeshop.domain.coupon.entity.DiscountType;
 import com.cakeshop.domain.coupon.error.CouponErrorCode;
 import com.cakeshop.global.error.BusinessException;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import com.cakeshop.domain.coupon.mapper.CouponOrderMapper;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -35,14 +33,7 @@ public class CouponOrderQueryService {
     public CouponPricePreview previewDiscount(long memberId, long memberCouponId, BigDecimal originalAmount) {
         CouponOrderDiscount coupon = couponOrderMapper.findAvailableCouponForOrder(memberCouponId, memberId)
                 .orElseThrow(() -> new BusinessException(CouponErrorCode.ORDER_COUPON_UNAVAILABLE));
-        if (originalAmount.compareTo(coupon.minimumOrderAmount()) < 0) {
-            throw new BusinessException(CouponErrorCode.MINIMUM_ORDER_AMOUNT_NOT_MET);
-        }
-        BigDecimal discount = coupon.discountType() == DiscountType.PERCENTAGE
-                ? originalAmount.multiply(coupon.discountValue()).divide(BigDecimal.valueOf(100), 0, RoundingMode.DOWN)
-                : coupon.discountValue().setScale(0, RoundingMode.DOWN);
-        if (coupon.maximumDiscountAmount() != null) discount = discount.min(coupon.maximumDiscountAmount());
-        discount = discount.min(originalAmount);
+        BigDecimal discount = CouponDiscountCalculator.calculate(coupon, originalAmount);
         return new CouponPricePreview(discount, originalAmount.subtract(discount));
     }
 
