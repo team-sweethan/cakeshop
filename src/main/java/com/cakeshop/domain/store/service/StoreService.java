@@ -22,6 +22,8 @@ import java.util.Map;
 import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
@@ -117,7 +119,7 @@ public class StoreService {
 
         // DB 저장이 확정된 뒤에만 이전 파일을 지워, 실패 시 원본이 사라지는 것을 막는다.
         if (imageReplaced && previousImageUrl != null) {
-            fileStorageClient.delete(previousImageUrl);
+            registerCommitFileDeletion(previousImageUrl);
         }
 
         for (DayOfWeek day : DayOfWeek.values()) {
@@ -207,6 +209,20 @@ public class StoreService {
         if (contentType == null || !contentType.startsWith("image/")) {
             throw new BusinessException(StoreErrorCode.INVALID_IMAGE);
         }
+    }
+
+    private void registerCommitFileDeletion(String imageUrl) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        fileStorageClient.delete(imageUrl);
+                    }
+                });
     }
 
     private String trimToNull(String value) {
