@@ -42,6 +42,10 @@ public class StatisticsAdminController {
             return "admin/statistics";
         }
 
+        model.addAttribute(
+                "latestSelectableDate",
+                periodStatisticsReadModelQueryService.getLatestSelectableDate()
+        );
         try {
             PeriodStatisticsView statistics = periodStatisticsReadModelQueryService.getStatistics(
                     searchForm.getStartDate(),
@@ -51,7 +55,8 @@ public class StatisticsAdminController {
             searchForm.setEndDate(statistics.endDate());
             model.addAttribute("statistics", statistics);
         } catch (BusinessException e) {
-            if (e.getErrorCode() != StatisticsErrorCode.INVALID_DATE_RANGE) {
+            if (e.getErrorCode() != StatisticsErrorCode.INVALID_DATE_RANGE
+                    && e.getErrorCode() != StatisticsErrorCode.STATISTICS_NOT_READY) {
                 throw e;
             }
             bindingResult.reject(e.getErrorCode().code(), e.getMessage());

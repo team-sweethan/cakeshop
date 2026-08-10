@@ -143,6 +143,24 @@ class StatisticsAdminControllerTests {
         verify(periodStatisticsReadModelQueryService).getStatistics(startDate, endDate);
     }
 
+    @Test
+    void statistics_unaggregatedPeriod_addsNotReadyError() throws Exception {
+        LocalDate startDate = LocalDate.of(2026, 8, 1);
+        LocalDate endDate = LocalDate.of(2026, 8, 9);
+        when(periodStatisticsReadModelQueryService.getLatestSelectableDate())
+                .thenReturn(endDate);
+        when(periodStatisticsReadModelQueryService.getStatistics(startDate, endDate))
+                .thenThrow(new BusinessException(StatisticsErrorCode.STATISTICS_NOT_READY));
+
+        mockMvc.perform(get("/admin/statistics")
+                        .param("startDate", startDate.toString())
+                        .param("endDate", endDate.toString()))
+                .andExpect(status().isOk())
+                .andExpect(view().name("admin/statistics"))
+                .andExpect(model().attributeHasErrors("searchForm"))
+                .andExpect(model().attributeDoesNotExist("statistics"));
+    }
+
     private PeriodStatisticsView statistics(LocalDate startDate, LocalDate endDate) {
         return new PeriodStatisticsView(
                 startDate,
