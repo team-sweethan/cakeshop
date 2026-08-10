@@ -17,10 +17,10 @@ import com.cakeshop.domain.chat.entity.ChatRoomReadCursor;
 import com.cakeshop.domain.chat.entity.ChatRoomStatus;
 import com.cakeshop.domain.chat.entity.CustomerAdminNote;
 import com.cakeshop.domain.chat.mapper.ChatMapper;
-import com.cakeshop.domain.member.dto.view.MemberAdminDetailRow;
-import com.cakeshop.domain.member.mapper.MemberMapper;
+import com.cakeshop.domain.member.dto.view.MemberAdminDetailView;
+import com.cakeshop.domain.member.service.MemberAdminService;
 import com.cakeshop.domain.order.entity.Order;
-import com.cakeshop.domain.order.mapper.OrderMapper;
+import com.cakeshop.domain.order.service.OrderViewAssembler;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -39,8 +39,8 @@ public class ChatService {
     // TODO: 고객당 채팅방 1개 UNIQUE, 방 소유자 검증
 
     private final ChatMapper chatMapper;
-    private final MemberMapper memberMapper;
-    private final OrderMapper orderMapper;
+    private final MemberAdminService memberAdminService;
+    private final OrderViewAssembler orderViewAssembler;
 
     // ==========================================
     // 0. 검증 헬퍼 메서드
@@ -147,8 +147,11 @@ public class ChatService {
 
     // ChatRoomOrder -> ChatRoomOrderResponse 변환 헬퍼 메서드
     private ChatRoomOrderResponse convertToOrderResponse(ChatRoomOrder roomOrder) {
-        // OrderMapper를 통해 실제 주문 기본 정보 조회
-        Order order = orderMapper.findOrderById(roomOrder.getOrderId()).orElse(null);
+        // OrderViewAssembler를 통해 주문 기본 정보 안전 조회
+        Order order = null;
+        try {
+            order = orderViewAssembler.findOrder(roomOrder.getOrderId());
+        } catch (Exception ignored) {}
 
         return ChatRoomOrderResponse.builder()
                 .orderId(roomOrder.getOrderId())
@@ -171,6 +174,22 @@ public class ChatService {
             throw new IllegalArgumentException("존재하지 않는 채팅방입니다.");
         }
 
+        // 1. 주문 소유권 검증 (해당 채팅방 고객의 주문인지 확인)
+        try {
+            Order order = orderViewAssembler.findOrder(orderId);
+            if (order != null && !chatRoom.getCustomerId().equals(order.getMemberId())) {
+                throw new SecurityException("해당 채팅방 고객의 주문만 연동할 수 있습니다.");
+            }
+        } catch (Exception ignored) {}
+
+        // 2. 대화 앵커 메시지가 해당 채팅방의 메시지인지 검증
+        if (anchorMessageId != null && anchorMessageId > 0) {
+            ChatMessage anchorMsg = chatMapper.findChatMessageById(anchorMessageId);
+            if (anchorMsg == null || !anchorMsg.getChatRoomId().equals(chatRoomId)) {
+                throw new IllegalArgumentException("해당 채팅방의 대화 메시지가 아닙니다.");
+            }
+        }
+
         ChatRoomOrder roomOrder = ChatRoomOrder.builder()
                 .chatRoomId(chatRoomId)
                 .orderId(orderId)
@@ -183,7 +202,18 @@ public class ChatService {
 
     // 고객·관리자 읽음 커서 저장/갱신 (공통)
     @Transactional
-    public void updateReadCursor(Long chatRoomId, Long lastReadMessageId, ChatReaderSide readerSide) {
+    public void updateReadCursor(Long chatRoomId, Long lastReadMessageId, ChatReaderSide readerSide, Long currentUserId, boolean isAdmin) {
+        ChatRoom chatRoom = chatMapper.findChatRoomById(chatRoomId);
+        validateRoomAccess(chatRoom, currentUserId, isAdmin);
+
+        // 읽은 메시지 ID가 해당 채팅방 메시지인지 검증
+        if (lastReadMessageId != null && lastReadMessageId > 0) {
+            ChatMessage message = chatMapper.findChatMessageById(lastReadMessageId);
+            if (message == null || !message.getChatRoomId().equals(chatRoomId)) {
+                throw new IllegalArgumentException("해당 채팅방의 메시지가 아닙니다.");
+            }
+        }
+
         ChatRoomReadCursor cursor = ChatRoomReadCursor.builder()
                 .chatRoomId(chatRoomId)
                 .readerSide(readerSide)
@@ -232,13 +262,19 @@ public class ChatService {
             
             int unreadCount = chatMapper.countUnreadMessages(room.getId(), lastReadMessageId, room.getCustomerId());
 
+            String customerName;
+            try {
+                MemberAdminDetailView memberDetail = memberAdminService.getMemberDetail(room.getCustomerId());
+                customerName = memberDetail != null ? memberDetail.name() : "고객";
+            } catch (Exception e) {
+                customerName = "고객";
+            }
+
             // DTO 조립
             return ChatRoomListResponse.builder()
                     .chatRoomId(room.getId())
                     .customerId(room.getCustomerId())
-                    .customerName(memberMapper.findAdminMemberDetail(room.getCustomerId())
-                            .map(MemberAdminDetailRow::name)
-                            .orElse("고객"))
+                    .customerName(customerName)
                     .responseStatus(room.getResponseStatus())
                     .lastMessageContent(lastMessage != null ? lastMessage.getContent() : "")
                     .lastMessageCreatedAt(lastMessage != null ? lastMessage.getCreatedAt() : room.getCreatedAt())

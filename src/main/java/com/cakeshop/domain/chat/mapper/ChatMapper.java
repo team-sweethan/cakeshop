@@ -65,7 +65,7 @@ public interface ChatMapper {
     int countUnreadMessages(
         @Param("chatRoomId") Long chatRoomId,
         @Param("lastReadMessageId") Long lastReadMessageId,
-        @Param("readerUserId") Long readerUserId
+        @Param("customerId") Long customerId
     );
 
 

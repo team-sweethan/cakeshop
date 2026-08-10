@@ -107,13 +107,13 @@
         WHERE id = #{id}
     </select>
 
-    <!-- 안 읽은 메시지 수 계산 -->
+    <!-- 안 읽은 메시지 수 계산 (고객이 보낸 메시지 중 관리자가 안 읽은 수) -->
     <select id="countUnreadMessages" resultType="int">
         SELECT COUNT(*)
         FROM chat_messages
         WHERE chat_room_id = #{chatRoomId}
           AND id &gt; #{lastReadMessageId}
-          AND sender_id != #{readerUserId}
+          AND sender_id = #{customerId}
     </select>
 
     <!-- 채팅방 대화 목록 조회 -->
