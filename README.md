@@ -275,13 +275,6 @@ IAM Role 같은 AWS SDK 기본 자격 증명 체인을 사용합니다. 다음 �
 .\gradlew.bat bootRun --args="--spring.profiles.active=local,s3"
 ```
 
-단순 연결 확인용 API는 `local,s3` 프로필에서만 생성되고 현재 PC의 loopback 요청만 허용됩니다.
-
-```powershell
-curl.exe -X POST -F "file=@C:\temp\cake.jpg" `
-  http://localhost:8080/api/local/s3-test/upload
-```
-
 ### RDS와 S3 함께 사용
 
 애플리케이션 코드를 바꾸지 않고 기존 `RDS_*` 설정과 S3 설정을 준비한 뒤 프로필만 조합합니다.

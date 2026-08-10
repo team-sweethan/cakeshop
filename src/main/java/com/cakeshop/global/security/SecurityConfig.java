@@ -38,10 +38,6 @@ public class SecurityConfig {
         RequestMatcher localPasswordRecoveryRequest = new AndRequestMatcher(
                 passwordRecoveryRequest,
                 SecurityConfig::isLoopbackRequest);
-        RequestMatcher s3TestRequest = SecurityConfig::isS3TestRequest;
-        RequestMatcher localS3TestRequest = new AndRequestMatcher(
-                s3TestRequest,
-                SecurityConfig::isLoopbackRequest);
         HttpSessionRequestCache requestCache = new HttpSessionRequestCache();
         requestCache.setRequestMatcher(request ->
                 !"/cart/count".equals(request.getRequestURI()
@@ -49,9 +45,7 @@ public class SecurityConfig {
 
         http
             // 웹훅 경로만 CSRF 제외 — 전체 비활성화 금지
-                .csrf(csrf -> csrf
-                        .ignoringRequestMatchers("/webhooks/toss")
-                        .ignoringRequestMatchers(localS3TestRequest))
+                .csrf(csrf -> csrf.ignoringRequestMatchers("/webhooks/toss"))
             .requestCache(cache -> cache.requestCache(requestCache))
             .authorizeHttpRequests(auth -> {
                 // ① 공개 GET을 먼저 선언 (matcher 순서 = 우선순위)
@@ -64,9 +58,6 @@ public class SecurityConfig {
                         "/products/**", "/screens", "/favicon.ico",
                         "/css/**", "/js/**", "/images/**", "/uploads/**", "/error")
                         .permitAll();
-                // local+s3 프로필의 연결 확인 API는 현재 PC의 요청만 허용한다.
-                auth.requestMatchers(localS3TestRequest).permitAll();
-                auth.requestMatchers(s3TestRequest).denyAll();
                 // 로드밸런서/헬스체크가 인증 없이 호출할 수 있도록 허용 (그 외 actuator 엔드포인트는 미노출)
                 auth.requestMatchers("/actuator/health", "/actuator/health/**").permitAll();
                 auth.requestMatchers(HttpMethod.GET, "/community", "/community/{id:\\d+}").permitAll();
@@ -135,12 +126,6 @@ public class SecurityConfig {
         return "/find-password".equals(path)
                 || "/find-password/verify".equals(path)
                 || "/reset-password".equals(path);
-    }
-
-    // 로컬 S3 연결 확인 API 경로인지 검사
-    private static boolean isS3TestRequest(HttpServletRequest request) {
-        String path = request.getRequestURI().substring(request.getContextPath().length());
-        return path.startsWith("/api/local/s3-test/");
     }
 
     private static boolean isLoopbackRequest(HttpServletRequest request) {
