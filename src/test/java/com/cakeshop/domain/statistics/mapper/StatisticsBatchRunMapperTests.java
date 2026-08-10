@@ -132,6 +132,24 @@ class StatisticsBatchRunMapperTests {
     }
 
     @Test
+    void findEarliestBackfillStartedAt_resumedRunSucceeded_returnsFirstAttemptStart() {
+        StatisticsBatchRun failedRun = newBackfillRun();
+        mapper.insertRunningBatch(failedRun);
+        assertThat(mapper.completeFailed(failedRun.getId())).isOne();
+        LocalDateTime firstAttemptStartedAt = jdbcTemplate.queryForObject(
+                "SELECT started_at FROM statistics_batch_runs WHERE id = ?",
+                LocalDateTime.class,
+                failedRun.getId()
+        );
+
+        StatisticsBatchRun resumedRun = newBackfillRun();
+        mapper.insertRunningBatch(resumedRun);
+        assertThat(mapper.completeSucceeded(resumedRun.getId())).isOne();
+
+        assertThat(mapper.findEarliestBackfillStartedAt()).isEqualTo(firstAttemptStartedAt);
+    }
+
+    @Test
     void findLatestSuccessfulDailyWindowEnd_failedNewerRun_returnsLatestSuccessWindowEnd() {
         StatisticsBatchRun successfulRun = newDailyRun(WINDOW_START, WINDOW_END);
         mapper.insertRunningBatch(successfulRun);

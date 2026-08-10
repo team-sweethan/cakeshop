@@ -89,7 +89,10 @@ public class DailyStatisticsAggregationService {
         if (latestDailyWindowEnd != null) {
             return latestDailyWindowEnd;
         }
-        return batchRunMapper.findLatestSuccessfulBackfillStartedAt();
+        if (batchRunMapper.findLatestSuccessfulBackfillStartedAt() == null) {
+            return null;
+        }
+        return batchRunMapper.findEarliestBackfillStartedAt();
     }
 
     private List<LocalDate> findTargetDates(

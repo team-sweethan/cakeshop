@@ -42,6 +42,9 @@ public interface StatisticsBatchRunMapper {
     /** 첫 일별 집계의 변경 탐색 기준이 되는 마지막 성공 백필 시작 시각을 조회한다. */
     LocalDateTime findLatestSuccessfulBackfillStartedAt();
 
+    /** 재개 실행을 포함한 최초 백필 시작 시각을 조회한다. */
+    LocalDateTime findEarliestBackfillStartedAt();
+
     /** 가장 최근에 저장된 백필 완료 날짜를 조회한다. */
     LocalDate findLatestBackfillCompletedDate();
 }

@@ -3,11 +3,13 @@ package com.cakeshop.domain.statistics.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 
 import com.cakeshop.domain.statistics.entity.StatisticsBatchRun;
 import com.cakeshop.domain.statistics.mapper.DailyStatisticsAggregationMapper;
+import com.cakeshop.domain.statistics.mapper.DailyStatisticsSourceReadModelMapper;
 import com.cakeshop.domain.statistics.mapper.StatisticsBatchRunMapper;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 import java.math.BigDecimal;
@@ -41,6 +43,9 @@ class DailyStatisticsAggregationServiceTests {
 
     @MockitoSpyBean
     private DailyStatisticsAggregationMapper aggregationMapper;
+
+    @MockitoSpyBean
+    private DailyStatisticsSourceReadModelMapper sourceReadModelMapper;
 
     @Autowired
     DailyStatisticsAggregationServiceTests(
@@ -104,6 +109,33 @@ class DailyStatisticsAggregationServiceTests {
                     new DailyStatisticsRow(0, 0, 0, BigDecimal.ZERO)
             );
         }
+    }
+
+    @Test
+    void aggregateDailyStatistics_resumedBackfill_usesFirstAttemptAsChangeWindowStart() {
+        LocalDate yesterday = findYesterday();
+        StatisticsBatchRun failedRun = StatisticsBatchRun.backfill(
+                yesterday.minusDays(6),
+                yesterday
+        );
+        batchRunMapper.insertRunningBatch(failedRun);
+        batchRunMapper.updateBackfillProgress(failedRun.getId(), yesterday.minusDays(3));
+        batchRunMapper.completeFailed(failedRun.getId());
+        LocalDateTime firstAttemptStartedAt = jdbcTemplate.queryForObject(
+                "SELECT started_at FROM statistics_batch_runs WHERE id = ?",
+                LocalDateTime.class,
+                failedRun.getId()
+        );
+        insertSuccessfulBackfill(yesterday);
+
+        boolean executed = service.aggregateDailyStatistics();
+
+        assertThat(executed).isTrue();
+        verify(sourceReadModelMapper).findChangedStatisticsDates(
+                eq(firstAttemptStartedAt),
+                any(LocalDateTime.class),
+                eq(yesterday)
+        );
     }
 
     @Test
