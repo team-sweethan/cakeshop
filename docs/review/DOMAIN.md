@@ -112,6 +112,8 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 
 **`reviews.status`가 노출 여부의 유일한 기준이다.** 조건이 두 개면 새 쿼리를 추가할 때 하나를 빠뜨린다.
 
+**선행 관문은 이 원칙과 다르다.** B1은 후기를 읽기 전에 상품이 공개되는지 먼저 본다(`specs/review-read.md` B1). 그것은 후기의 노출 조건이 아니라 **그 목록에 들어올 수 있는지**를 가르는 문이라 위 원칙을 깨지 않는다. 후기 SQL의 `WHERE`에 조건을 하나 더 얹는 것과는 다른 자리다.
+
 | 전이 | 허용 | 주체 |
 |---|---|---|
 | `PUBLISHED → DELETED` | 허용 | 작성자 (A5) |
@@ -246,7 +248,7 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 
 **연동 계약의 이름과 위치는 `docs/conventions.md` 12절을 따른다** — 데이터를 소유한 도메인이 이름 앞에 온다.
 
-**목록 화면은 건별 조회가 아니라 ID 묶음 조회다.** 후기 20건에 회원 조회를 20번 하면 N+1이다. 계약은 `List<Long>`을 받아 DTO 목록을 돌려주는 모양이어야 한다. **이것도 계약 설계에 포함한다.**
+**목록 화면은 건별 조회가 아니라 ID 묶음 조회다.** 후기 20건에 회원 조회를 20번 하면 N+1이다. 계약은 `Collection<Long>`을 받아 DTO 목록을 돌려주는 모양이어야 한다. **이것도 계약 설계에 포함한다.**
 
 **리뷰에는 예외가 하나도 없다** (2026-08-06 개정)
 
@@ -282,7 +284,9 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 | 관리자 목록 (C1·C2) | `admin/review/list.html` | 목업 → 전환 (조각 5. `삭제` 제거, 상태 필터 추가) |
 | 관리자 상세 (C3·C5·C6) | `admin/review/detail.html` | **신규** (조각 5) |
 
-진입점 수정: `customer/member/mypage.html`(A1·B3 링크 2개 — 완료), `customer/product/detail.html`(작성 버튼 → A1, `전체 리뷰 확인` → B1 — 완료), `customer/order/detail.html`(`orderItemId` 전달 — **아직 안 함**. 지금 작성 진입은 A1 목록 하나뿐이다)
+진입점 수정: `customer/member/mypage.html`(A1·B3 링크 2개 — 완료), `customer/product/detail.html`(작성 버튼 → A1, `전체 리뷰 확인` → B1 — 완료), `home/screens.html`(화면 카탈로그 C16·C22·C23 — 완료), `customer/order/detail.html`(`orderItemId` 전달 — **아직 안 함**. 지금 작성 진입은 A1 목록 하나뿐이다)
+
+**화면 카탈로그(`home/screens.html`)도 진입점이다.** 새 화면을 내고 여기를 빠뜨리면 팀이 그 화면의 존재를 모른다. `specs/review-write.md`가 조각 1에서 같은 자리를 한 번 놓쳤다.
 
 상품 후기 한 건의 표시는 미리보기와 전체 목록이 `fragments/customer/product-review.html`을 함께 쓴다.
 두 자리의 모양이 갈리면 상세에서 본 후기가 전체 목록에서 달라 보인다.

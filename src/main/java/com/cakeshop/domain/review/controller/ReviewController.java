@@ -122,6 +122,6 @@ public class ReviewController {
 
         reviewService.write(reviewWriteForm, memberId);
 
-        return "redirect:/mypage/reviews/writable";
+        return "redirect:/mypage/reviews";
     }
 }

@@ -134,7 +134,7 @@ class ReviewControllerTests {
     }
 
     @Test
-    void write_validForm_redirectsToWritableList() throws Exception {
+    void write_validForm_redirectsToMyReviewsSoTheAuthorSeesWhatWasSaved() throws Exception {
         mockMvc.perform(post("/reviews")
                         .param("orderItemId", String.valueOf(ORDER_ITEM_ID))
                         .param("overallRating", "5")
@@ -143,7 +143,7 @@ class ReviewControllerTests {
                         .param("serviceRating", "4")
                         .param("content", "맛있게 잘 먹었습니다. 다음에도 주문할게요."))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/mypage/reviews/writable"));
+                .andExpect(redirectedUrl("/mypage/reviews"));
 
         verify(reviewService).write(any(ReviewWriteForm.class), eq(MEMBER_ID));
     }

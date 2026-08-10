@@ -82,7 +82,8 @@ public class OrderReviewQueryService {
      * <p>이미 쓴 후기가 가리키는 주문 상품의 상품명·주문번호를 묶음으로 돌려준다.</p>
      *
      * <p>{@link #findWritableOrderItems} 로는 대신할 수 없다 — 그쪽은 <b>미작성</b> 항목만
-     * 돌려주므로 이미 쓴 후기의 상품명을 받을 자리가 없다({@code docs/review/DOMAIN.md} 4).</p>
+     * 돌려주므로 이미 쓴 후기의 상품명을 받을 자리가 없다
+     * ({@code docs/review/specs/review-read.md} B3).</p>
      *
      * <p><b>회원으로 좁히지 않는다.</b> 관리자 후기 목록도 같은 조회를 쓰는데 그쪽은 남의 후기를
      * 보는 것이 정상이라, 소유권 판정은 후기를 고르는 자리에 둔다. 호출하는 쪽은 <b>이미 권한을

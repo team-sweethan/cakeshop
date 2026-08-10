@@ -159,7 +159,7 @@ class ReviewScreenRenderingTests {
                         .param("serviceRating", "4")
                         .param("content", "맛있게 잘 먹었습니다. 다음에도 주문할게요."))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/mypage/reviews/writable"));
+                .andExpect(redirectedUrl("/mypage/reviews"));
 
         assertThat(
                         jdbcTemplate.queryForObject(
