@@ -5,7 +5,7 @@
     if (typeof Chart === "undefined") return;
 
     const rows = Array.from(document.querySelectorAll("[data-statistics-point]"));
-    const labels = rows.map(function (row) { return row.dataset.dateLabel; });
+    const labels = rows.map(function (row) { return row.dataset.axisLabel; });
 
     function formatValue(value, unit) {
       return Number(value).toLocaleString("ko-KR") + unit;

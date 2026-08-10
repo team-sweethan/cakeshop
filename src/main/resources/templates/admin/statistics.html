@@ -56,7 +56,7 @@
           <div id="statistics-chart-data" hidden>
             <span th:each="daily : ${statistics.dailyStatistics}"
                   data-statistics-point
-                  th:attr="data-date-label=${#temporals.format(daily.date, 'MM.dd')},
+                  th:attr="data-axis-label=${#temporals.format(daily.date, 'MM.dd')},
                            data-order-count=${daily.orderCount},
                            data-sales-amount=${daily.salesAmount}"></span>
           </div>
