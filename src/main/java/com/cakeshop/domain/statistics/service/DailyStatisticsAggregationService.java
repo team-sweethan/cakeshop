@@ -55,7 +55,7 @@ public class DailyStatisticsAggregationService {
 
         long batchRunId;
         try {
-            batchRunId = transactionService.startDailyRun(batchRun);
+            batchRunId = transactionService.startRun(batchRun);
         } catch (DuplicateKeyException exception) {
             log.info("일별 통계 집계를 건너뜁니다. 다른 집계가 실행 중입니다.");
             return false;
