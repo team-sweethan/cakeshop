@@ -34,6 +34,8 @@ public class NotificationResponse {
 
     public String getTargetUrl() {
         if (targetUrl != null) return targetUrl;
+        // 주문 거절 알림인 경우, orderId 유무와 상관없이 사유 확인을 위해 1:1 채팅 화면(/chat)으로 안내!
+        if (type == NotificationType.CUSTOM_ORDER_REJECTED) return "/chat";
         if (orderId != null) return "/orders/" + orderId;
         if (chatRoomId != null) return "/chat";
         if (postId != null && commentId != null) return "/community/" + postId + "#comment-" + commentId;

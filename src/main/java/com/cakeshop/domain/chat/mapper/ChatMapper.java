@@ -61,6 +61,13 @@ public interface ChatMapper {
         @Param("size") int size
     );
 
+    // 안 읽은 메시지 수 계산
+    int countUnreadMessages(
+        @Param("chatRoomId") Long chatRoomId,
+        @Param("lastReadMessageId") Long lastReadMessageId,
+        @Param("readerUserId") Long readerUserId
+    );
+
 
     // ==========================================
     // 3. xmr

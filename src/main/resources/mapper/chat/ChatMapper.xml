@@ -41,10 +41,11 @@
         WHERE customer_id = #{customerId}
     </select>
     
-    <!-- 메시지 발송 시 최신 메시지 ID, 시각, 답변 상태 (response_status) 갱신 -->
+    <!-- 메시지 발송 시 최신 메시지 ID, 시각, 답변 상태 (response_status) 갱신 (CLOSED 방 시 자동 OPEN 재오픈) -->
     <update id="updateChatRoomLastMessage">
         UPDATE chat_rooms
         SET
+            status = 'OPEN',
             last_message_id = #{lastMessageId},
             last_message_at = #{lastMessageAt},
             response_status = #{responseStatus},
@@ -95,7 +96,7 @@
             #{senderId},
             #{productId},
             #{content},
-            CURRENT_TIMESTAMP(6)
+            #{createdAt}
         )
     </insert>
 
@@ -104,6 +105,15 @@
         SELECT *
         FROM chat_messages
         WHERE id = #{id}
+    </select>
+
+    <!-- 안 읽은 메시지 수 계산 -->
+    <select id="countUnreadMessages" resultType="int">
+        SELECT COUNT(*)
+        FROM chat_messages
+        WHERE chat_room_id = #{chatRoomId}
+          AND id &gt; #{lastReadMessageId}
+          AND sender_id != #{readerUserId}
     </select>
 
     <!-- 채팅방 대화 목록 조회 -->

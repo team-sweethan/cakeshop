@@ -43,6 +43,18 @@ public class ChatService {
     private final OrderMapper orderMapper;
 
     // ==========================================
+    // 0. 검증 헬퍼 메서드
+    // ==========================================
+    private void validateRoomAccess(ChatRoom room, Long currentUserId, boolean isAdmin) {
+        if (room == null) {
+            throw new IllegalArgumentException("존재하지 않는 채팅방입니다.");
+        }
+        if (!isAdmin && currentUserId != null && !currentUserId.equals(room.getCustomerId())) {
+            throw new SecurityException("해당 채팅방에 대한 접근 권한이 없습니다.");
+        }
+    }
+
+    // ==========================================
     // 1. 공통 & 고객용 기능 (Customer)
     // ==========================================
     
@@ -53,9 +65,7 @@ public class ChatService {
 
         if (chatRoom != null) {
             return chatRoom;
-        }
-
-        else {
+        } else {
             chatRoom = ChatRoom.builder()
                 .customerId(customerId)
                 .status(ChatRoomStatus.OPEN)
@@ -73,12 +83,10 @@ public class ChatService {
     public ChatMessage createMessage(Long roomId, Long senderId, Long productId, 
         String content, List<ChatMessageAttachmentRequest> attachments) {
 
-            // 채팅방 존재 여부 조회 (발신자가 고객인지 확인하기 위함)
+            // 채팅방 존재 여부 및 권한 검증
             ChatRoom chatRoom = chatMapper.findChatRoomById(roomId);
-            
-            if (chatRoom == null) {
-                throw new IllegalArgumentException("존재하지 않는 채팅방입니다.");
-            }
+            boolean isAdminSender = (senderId != null && chatRoom != null && !senderId.equals(chatRoom.getCustomerId()));
+            validateRoomAccess(chatRoom, senderId, isAdminSender);
 
             ChatMessage message = ChatMessage.builder()
                 .chatRoomId(roomId)
@@ -111,7 +119,7 @@ public class ChatService {
                 roomId,
                 message.getId(),
                 message.getCreatedAt(),
-                senderId == null || chatRoom.getCustomerId().equals(senderId)
+                (senderId != null && senderId.equals(chatRoom.getCustomerId()))
                     ? ChatResponseStatus.WAITING_ADMIN
                     : ChatResponseStatus.WAITING_CUSTOMER
             );
@@ -145,8 +153,8 @@ public class ChatService {
         return ChatRoomOrderResponse.builder()
                 .orderId(roomOrder.getOrderId())
                 .orderNumber(order != null ? order.getOrderNumber() : "")
-                .productName(order != null ? "연동 주문 상품" : "")
-                .productType(order != null ? "GENERAL" : "CUSTOM")
+                .productName(order != null ? order.getOrdererName() + "님의 주문" : "연동 주문 상품")
+                .productType(order != null && order.getOrderType() != null ? order.getOrderType().name() : "GENERAL")
                 .totalAmount(order != null ? order.getFinalAmount() : BigDecimal.ZERO)
                 .orderStatus(order != null && order.getStatus() != null ? order.getStatus().name() : "")
                 .pickupDateTime(order != null ? order.getPickupAt() : null)
@@ -158,6 +166,11 @@ public class ChatService {
     // 채팅방에 주문 연동 저장 (신규 주문 연결)
     @Transactional
     public void linkOrderToChatRoom(Long chatRoomId, Long orderId, Long anchorMessageId) {
+        ChatRoom chatRoom = chatMapper.findChatRoomById(chatRoomId);
+        if (chatRoom == null) {
+            throw new IllegalArgumentException("존재하지 않는 채팅방입니다.");
+        }
+
         ChatRoomOrder roomOrder = ChatRoomOrder.builder()
                 .chatRoomId(chatRoomId)
                 .orderId(orderId)
@@ -211,9 +224,13 @@ public class ChatService {
                     ? chatMapper.findChatMessageById(room.getLastMessageId()) 
                     : null;
 
-            // 관리자의 읽음 커서 위치 조회
+            // 관리자의 읽음 커서 위치 조회 및 안 읽은 메시지 개수 계산
             ChatRoomReadCursor adminCursor = chatMapper.findReadCursor(room.getId(), ChatReaderSide.ADMIN);
-            Long lastReadMessageId = (adminCursor != null) ? adminCursor.getLastReadMessageId() : 0L;
+            Long lastReadMessageId = (adminCursor != null && adminCursor.getLastReadMessageId() != null) 
+                    ? adminCursor.getLastReadMessageId() 
+                    : 0L;
+            
+            int unreadCount = chatMapper.countUnreadMessages(room.getId(), lastReadMessageId, room.getCustomerId());
 
             // DTO 조립
             return ChatRoomListResponse.builder()
@@ -225,7 +242,7 @@ public class ChatService {
                     .responseStatus(room.getResponseStatus())
                     .lastMessageContent(lastMessage != null ? lastMessage.getContent() : "")
                     .lastMessageCreatedAt(lastMessage != null ? lastMessage.getCreatedAt() : room.getCreatedAt())
-                    .unreadCount(0) // 💡 안 읽은 메시지 수 매핑
+                    .unreadCount(unreadCount)
                     .build();
         }).collect(Collectors.toList());
     }
@@ -271,8 +288,18 @@ public class ChatService {
 
     // 대화 내역 조회
     @Transactional(readOnly = true)
-    public List<ChatMessageResponse> getChatMessages(Long chatRoomId, Long currentUserId, int page, int size) {
+    public List<ChatMessageResponse> getChatMessages(Long chatRoomId, Long currentUserId, boolean isAdmin, int page, int size) {
+        ChatRoom chatRoom = chatMapper.findChatRoomById(chatRoomId);
+        validateRoomAccess(chatRoom, currentUserId, isAdmin);
+
         int offset = Math.max(0, (page - 1) * size);
+
+        // 상대방의 읽음 커서 조회
+        ChatReaderSide opponentSide = isAdmin ? ChatReaderSide.CUSTOMER : ChatReaderSide.ADMIN;
+        ChatRoomReadCursor opponentCursor = chatMapper.findReadCursor(chatRoomId, opponentSide);
+        Long opponentLastReadId = (opponentCursor != null && opponentCursor.getLastReadMessageId() != null)
+                ? opponentCursor.getLastReadMessageId()
+                : 0L;
         
         // 메시지 목록 조회
         List<ChatMessage> messages = chatMapper.findMessageByChatRoomId(chatRoomId, offset, size);
@@ -287,6 +314,8 @@ public class ChatService {
                     ? attachments.stream().map(ChatMessageAttachment::getObjectKey).collect(Collectors.toList())
                     : Collections.emptyList();
 
+            boolean isRead = (msg.getId() <= opponentLastReadId);
+
             return ChatMessageResponse.builder()
                     .id(msg.getId())
                     .chatRoomId(msg.getChatRoomId())
@@ -294,7 +323,7 @@ public class ChatService {
                     .productId(msg.getProductId())
                     .content(msg.getContent())
                     .imageUrls(imageUrls)
-                    .isRead(true)
+                    .isRead(isRead)
                     .createdAt(msg.getCreatedAt())
                     .build();
         }).collect(Collectors.toList());
