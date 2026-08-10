@@ -16,42 +16,17 @@ import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
 
-/**
- * 커뮤니티가 회원 도메인을 넘어다보지 않는지 고정한다(조각 10d).
- *
- * <p>조각 10에서 `members` 직접 JOIN 8곳을 걷어내고 {@code MemberCommunityQueryService}
- * 경유로 바꿨다(conventions.md 15.1). <b>여기서 막으려는 것은 되돌아오는 것이다</b> — JOIN
- * 하나를 다시 넣으면 화면 결과가 똑같고 테스트도 전부 통과한다. 빠르고 편하기까지 해서
- * 되돌아올 이유는 늘 있다.
- *
- * <p>형태 검사인 것은 다른 방법이 없기 때문이다. 조각 7a의 H28, 조각 1의 H1a와 같은 종류로,
- * <b>동작으로는 드러나지 않는 규칙</b>은 형태를 직접 적어 두는 것 말고 잡을 방법이 없다.
- *
- * <p><b>여기서 다루지 않는 것</b>: "회원 행이 없는 게시글이 목록에서 빠지지 않는지"는 실제 DB로
- * 재현할 수 없다. {@code posts.member_id}가 members를 참조하는 NOT NULL FK라 그런 행을 만들
- * 수가 없다(DOMAIN.md 8). 탈퇴는 행을 지우는 것이 아니라 {@code WITHDRAWN} 상태로 두는 것이고,
- * 그쪽은 {@code CommunityMemberContractTests}가 실제 DB로 확인한다. FK가 없는 상황을 가정한
- * 조립 규칙은 {@code CommunityServiceTests}·{@code CommunityAdminServiceTests}가 맡는다.
- */
+/** 커뮤니티가 회원 도메인의 공개 계약만 사용하도록 고정한다. */
 class CommunityDomainBoundaryTests {
 
     private static final Path JAVA_ROOT =
             Path.of("src", "main", "java", "com", "cakeshop", "domain", "community");
 
-    /**
-     * 파일 하나가 아니라 디렉터리다. 매퍼가 고객·관리자로 갈렸고 앞으로 더 갈릴 수 있는데,
-     * 파일 이름을 박아 두면 <b>새 파일만 검사에서 빠진다</b> — 빠진 자리는 초록불로 보인다.
-     */
+    /** 새 매퍼도 검사하도록 디렉터리 전체를 읽는다. */
     private static final Path MAPPER_DIRECTORY =
             Path.of("src", "main", "resources", "mapper", "community");
 
-    /**
-     * 커뮤니티가 회원 도메인에서 쓸 수 있는 것 전부.
-     *
-     * <p>계약 하나와 그 반환 타입뿐이다. 여기에 무언가를 더하는 변경은 <b>새 연동 계약을
-     * 만드는 일</b>이므로, 목록을 늘리기 전에 conventions.md 15.2·15.8과 회원 담당자 확인을
-     * 거친다. 목록을 늘리는 것 자체가 그 신호가 되라고 화이트리스트로 뒀다.</p>
-     */
+    /** 합의된 회원 조회 계약과 반환 타입만 허용한다. */
     private static final Set<String> ALLOWED_MEMBER_TYPES = Set.of(
             "com.cakeshop.domain.member.service.MemberCommunityQueryService",
             "com.cakeshop.domain.member.dto.view.MemberCommunityView");
@@ -59,30 +34,15 @@ class CommunityDomainBoundaryTests {
     private static final Pattern MEMBER_PACKAGE_REFERENCE =
             Pattern.compile("com\\.cakeshop\\.domain\\.member\\.[A-Za-z0-9_.]+");
 
-    /**
-     * 회원 도메인이 소유한 테이블 전부.
-     *
-     * <p>{@code members} 하나만 보면 부족하다. 회원 상태 이력을 관리자 조회에 직접 붙이는
-     * 변경은 JOIN 대상만 다를 뿐 소유권을 넘는 것은 똑같은데, 테이블 이름 하나만 보는 검사는
-     * 그대로 통과한다 (PR #144 Codex 리뷰).
-     *
-     * <p>{@code member_coupons}는 이름과 달리 <b>쿠폰 도메인 소유</b>라 여기에 넣지 않는다.
-     * 이 검사가 보는 것은 회원 도메인 경계 하나다. 다른 도메인 경계는 그 도메인 담당자와
-     * 합의해 따로 세운다(AGENTS.md 도메인 담당 표).
-     */
+    /** 회원 도메인이 소유한 테이블 목록이다. */
     private static final List<String> MEMBER_OWNED_TABLES =
             List.of("MEMBERS", "SOCIAL_ACCOUNTS", "MEMBER_STATUS_HISTORIES");
 
-    /** 낱말 단위로 본다. {@code p.member_id}는 members 참조가 아니다. */
+    /** 테이블 이름을 낱말 단위로 찾는다. */
     private static final Pattern MEMBER_OWNED_TABLE_REFERENCE = Pattern.compile(
             "\\b(" + String.join("|", MEMBER_OWNED_TABLES) + ")\\b");
 
-    /**
-     * 커뮤니티 SQL이 회원 도메인 소유 테이블을 건드리지 않는지 확인한다.
-     *
-     * <p>JOIN만이 아니라 어떤 형태의 참조도 잡는다. 서브쿼리나 {@code EXISTS}로 우회하면
-     * JOIN이라는 낱말은 없지만 소유권을 넘는 것은 똑같다.
-     */
+    /** 커뮤니티 SQL의 모든 회원 소유 테이블 참조를 금지한다. */
     @Test
     void communityMapperXml_doesNotTouchMemberOwnedTables() throws IOException {
         List<String> violations = new ArrayList<>();
@@ -101,16 +61,9 @@ class CommunityDomainBoundaryTests {
                 .isEmpty();
     }
 
-    /**
-     * 커뮤니티 코드가 회원 도메인에서 허용된 계약만 쓰는지 확인한다.
-     *
-     * <p>Entity와 Mapper를 콕 집어 막지 않고 <b>허용 목록으로 뒤집었다.</b> 금지 목록은 새로
-     * 생기는 것을 못 잡는다 — 회원 쪽에 Service가 하나 더 생기면 그것을 직접 가져다 쓰는
-     * 변경이 조용히 통과한다. 15.4는 "Mapper는 데이터 소유 도메인 내부 Service에서만"이고,
-     * 커뮤니티가 볼 수 있는 것은 합의된 공개 계약 하나뿐이다.
-     */
+    /** 커뮤니티 코드가 합의된 회원 계약만 정확히 사용하는지 확인한다. */
     @Test
-    void communitySources_useOnlyAgreedMemberContract() throws IOException {
+    void communitySources_useExactlyAgreedMemberContract() throws IOException {
         Set<String> referenced = new LinkedHashSet<>();
 
         for (Path source : javaSources()) {
@@ -122,35 +75,11 @@ class CommunityDomainBoundaryTests {
         }
 
         assertThat(referenced)
-                .as("커뮤니티는 회원 도메인의 공개 계약만 쓴다. 다른 Entity·Mapper·Service 를"
-                        + " 직접 참조하지 않는다 (conventions.md 15.1·15.4, 조각 10)")
-                .isSubsetOf(ALLOWED_MEMBER_TYPES);
-    }
-
-    /**
-     * 허용 목록이 살아 있는지 확인한다.
-     *
-     * <p>위 검사는 참조가 <b>하나도 없어도</b> 통과한다. 계약 이름이 바뀌었는데 아무도 목록을
-     * 고치지 않으면, 실제로는 새 이름을 쓰면서 검사는 초록불인 상태가 된다.
-     */
-    @Test
-    void allowedMemberContract_isActuallyUsed() throws IOException {
-        Set<String> referenced = new LinkedHashSet<>();
-
-        for (Path source : javaSources()) {
-            Matcher matcher = MEMBER_PACKAGE_REFERENCE.matcher(strippedOf(source, false));
-
-            while (matcher.find()) {
-                referenced.add(matcher.group());
-            }
-        }
-
-        assertThat(referenced)
-                .as("허용 목록이 실제로 쓰이는 이름인지 확인한다. 이름이 바뀌면 목록도 고친다")
+                .as("커뮤니티는 합의된 회원 계약만 사용해야 한다")
                 .containsExactlyInAnyOrderElementsOf(ALLOWED_MEMBER_TYPES);
     }
 
-    /** 커뮤니티 매퍼 XML 전부. 하나도 못 읽었다면 경로가 바뀐 것이다. */
+    /** 커뮤니티 매퍼 XML 전체를 읽는다. */
     private List<Path> mapperXmlFiles() throws IOException {
         List<Path> mappers;
 
@@ -179,18 +108,7 @@ class CommunityDomainBoundaryTests {
         return strippedOf(source, true);
     }
 
-    /**
-     * 파일에서 주석을 걷어낸다. 확장자에 따라 주석 문법이 다르다.
-     *
-     * <p>주석을 걷어내는 이유는 {@code CommunityCommentScopeTests}와 같다 — 규칙을 설명하는
-     * 주석이 그 자체로 위반이 되면, 다음 사람은 설명을 지워서 초록불을 만든다.
-     *
-     * <p>XML은 XML 주석만이 아니라 <b>SQL 주석</b>({@literal --} 줄 주석과 블록 주석)도
-     * 걷어낸다. "여기서는 members 를 JOIN 하지 않고 회원 계약을 쓴다"고 SQL 옆에 적어 두는
-     * 것은 아주 자연스러운 일인데, 그것만으로 CI가 빨간불이 되면 다음 사람이 지우는 것은
-     * JOIN이 아니라 설명이다 (PR #144 Codex 리뷰). XML 주석을 먼저 걷어내야 한다 —
-     * {@code <!--} 안에 {@code --}가 들어 있어서 순서를 바꾸면 서로 잡아먹는다.</p>
-     */
+    /** 소스 종류에 맞게 주석을 제거한다. */
     private String strippedOf(Path source, boolean upperCase) throws IOException {
         String text = Files.readString(source, StandardCharsets.UTF_8);
 
@@ -201,20 +119,14 @@ class CommunityDomainBoundaryTests {
         return upperCase ? withoutComments.toUpperCase() : withoutComments;
     }
 
-    /** SQL 주석을 걷어낸다. 줄 주석({@literal --} 부터 줄 끝까지)과 블록 주석 둘 다. */
+    /** SQL 줄 주석과 블록 주석을 제거한다. */
     private String withoutSqlComments(String sql) {
         return sql
                 .replaceAll("(?s)/\\*.*?\\*/", " ")
                 .replaceAll("--[^\\n]*", " ");
     }
 
-    /**
-     * 자바 주석만 걷어낸다. 문자열·문자 리터럴 안은 건드리지 않는다.
-     *
-     * <p>정규식으로 {@code //}부터 줄 끝까지를 지우면 {@code "https://..."} 같은 리터럴이
-     * 줄 나머지를 통째로 먹는다. 그렇게 비는 자리는 <b>실패가 아니라 통과의 모습</b>으로
-     * 나타나서 눈에 띄지 않는다.
-     */
+    /** 문자열과 문자 리터럴을 보존하며 자바 주석만 제거한다. */
     private String withoutJavaComments(String source) {
         StringBuilder code = new StringBuilder();
         int i = 0;
@@ -246,7 +158,7 @@ class CommunityDomainBoundaryTests {
         return code.toString();
     }
 
-    /** 여는 따옴표에서 닫는 따옴표 다음까지. 역슬래시 이스케이프를 건너뛴다. */
+    /** 이스케이프를 건너뛰며 리터럴 끝을 찾는다. */
     private int endOfLiteral(String source, int open) {
         char quote = source.charAt(open);
 

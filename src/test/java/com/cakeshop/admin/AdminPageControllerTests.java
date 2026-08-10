@@ -8,11 +8,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.time.LocalDate;
 
 import com.cakeshop.domain.coupon.dto.form.CouponSearchCondition;
 import com.cakeshop.domain.coupon.dto.view.CouponView;
@@ -52,6 +53,8 @@ import com.cakeshop.domain.payment.service.RefundFacade;
 import com.cakeshop.domain.product.controller.ProductAdminController;
 import com.cakeshop.domain.review.controller.ReviewAdminController;
 import com.cakeshop.domain.statistics.controller.StatisticsAdminController;
+import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
+import com.cakeshop.domain.statistics.service.DashboardReadModelQueryService;
 
 class AdminPageControllerTests {
 
@@ -98,6 +101,8 @@ class AdminPageControllerTests {
         CommunityAdminService communityAdminService =
                 Mockito.mock(CommunityAdminService.class);
         CommunityService communityService = Mockito.mock(CommunityService.class);
+        DashboardReadModelQueryService dashboardReadModelQueryService =
+                Mockito.mock(DashboardReadModelQueryService.class);
 
         when(communityAdminService.getPosts(any(), any(), any(PageRequest.class)))
                 .thenReturn(new PageResult<AdminPostListView>(
@@ -110,9 +115,20 @@ class AdminPageControllerTests {
         when(communityAdminService.getReports(anyLong())).thenReturn(List.of());
         when(communityService.getComments(anyLong(), any()))
                 .thenReturn(new CommentSectionView(List.of(), 0, 0, 20));
+        when(dashboardReadModelQueryService.getDashboard())
+                .thenReturn(new StatisticsDashboardView(
+                        0L,
+                        BigDecimal.ZERO,
+                        0L,
+                        0L,
+                        0L,
+                        List.of(),
+                        List.of(),
+                        List.of()
+                ));
 
         mockMvc = MockMvcBuilders.standaloneSetup(
-                new StatisticsAdminController(),
+                new StatisticsAdminController(dashboardReadModelQueryService),
                 new ProductAdminController(
                         Mockito.mock(ProductAdminService.class)),
                 new OrderAdminController(

@@ -156,6 +156,33 @@ class ProductAdminControllerTests {
     }
 
     @Test
+    void changeStatus_dashboardRequest_redirectsToDashboard()
+            throws Exception {
+        ProductAdminService productAdminService =
+                mock(ProductAdminService.class);
+        MockMvc mockMvc = MockMvcBuilders
+                .standaloneSetup(new ProductAdminController(productAdminService))
+                .build();
+
+        mockMvc.perform(
+                        post("/admin/products/{productId}/status", 1L)
+                                .param("status", "INACTIVE")
+                                .param("returnTo", "dashboard")
+                )
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/admin"))
+                .andExpect(flash().attribute(
+                        "successMessage",
+                        "상품 판매를 중지했습니다."
+                ));
+
+        verify(productAdminService).changeProductStatus(
+                1L,
+                ProductStatus.INACTIVE
+        );
+    }
+
+    @Test
     void startSaleUsesActiveStatus()
             throws Exception {
         ProductAdminService productAdminService =

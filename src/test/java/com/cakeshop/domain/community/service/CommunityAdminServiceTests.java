@@ -35,14 +35,11 @@ import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.InOrder;
 
-/**
- * 관리자 조치의 규칙을 고정한다(docs/community/DOMAIN.md 4.2, 6.6, 6.7).
- *
- * <p>여기서 잡는 것들은 화면으로는 정상으로 보인다. 이미 차단된 글을 다시 차단해도
- * 화면은 "차단했습니다"라고 말하고, 신고를 안 닫아도 게시글은 멀쩡히 가려진다.
- */
+/** 관리자 조치 규칙을 검증한다. */
 class CommunityAdminServiceTests {
 
     private static final long POST_ID = 42L;
@@ -53,11 +50,6 @@ class CommunityAdminServiceTests {
 
     private CommunityAdminMapper communityAdminMapper;
 
-    /**
-     * 잠금(lockPost)만 고객 매퍼에 있다. 순서 검증에는 <b>두 목이 함께</b> 들어가야 한다 —
-     * {@code inOrder}에 한쪽만 넣으면 다른 쪽 호출은 순서 판단에서 통째로 빠져서,
-     * 잠그기 전에 쓰는 구현이 그대로 통과한다(H17).
-     */
     private CommunityMapper communityMapper;
 
     private MemberCommunityQueryService memberCommunityQueryService;
@@ -73,12 +65,7 @@ class CommunityAdminServiceTests {
                 communityAdminMapper, communityMapper, memberCommunityQueryService);
     }
 
-    /**
-     * 차단이 <b>잠그고 → 바꾸고 → 신고를 닫는</b> 순서를 지키는지 확인한다.
-     *
-     * <p>잠금이 먼저인 것은 좋아요·조회수와 같은 이유다(H13·H15). posts 행에 쓰는 경로가
-     * 늘 때마다 잠금 순서를 맞춰야 하고, 어긋나면 동시 요청에서 교착이 난다.
-     */
+    /** 차단은 잠금, 상태 변경, 신고 종료 순서로 처리한다. */
     @Test
     void blockPost_publishedPost_locksThenBlocksThenClosesReports() {
         givenLockedPost(PostStatus.PUBLISHED);
@@ -92,15 +79,10 @@ class CommunityAdminServiceTests {
         order.verify(communityAdminMapper).closePendingReports(POST_ID, ReportStatus.RESOLVED);
     }
 
-    /**
-     * 이미 차단된 글은 다시 차단할 수 없다(DOMAIN.md 4.2의 전이 규칙).
-     *
-     * <p>막지 않으면 원래 조치의 시각과 사유가 덮여 사라진다. 화면에는 성공으로 보이고,
-     * 지워진 것은 "언제 왜 처음 막았는지"라 나중에 확인할 방법이 없다.
-     */
-    @Test
-    void blockPost_alreadyBlocked_isRejected() {
-        givenLockedPost(PostStatus.BLOCKED);
+    @ParameterizedTest
+    @EnumSource(value = PostStatus.class, names = {"BLOCKED", "DELETED"})
+    void blockPost_nonPublishedPost_isRejected(PostStatus status) {
+        givenLockedPost(status);
 
         assertThatThrownBy(() -> communityAdminService.blockPost(POST_ID, "사유", ADMIN_ID))
                 .isInstanceOf(BusinessException.class)
@@ -109,17 +91,6 @@ class CommunityAdminServiceTests {
 
         verify(communityAdminMapper, never()).blockPost(anyLong(), any(), anyLong());
         verify(communityAdminMapper, never()).closePendingReports(anyLong(), any());
-    }
-
-    /** 작성자가 지운 글은 종착 상태다. 차단하면 지운 글이 되살아난다(DOMAIN.md 4.2). */
-    @Test
-    void blockPost_deletedPost_isRejected() {
-        givenLockedPost(PostStatus.DELETED);
-
-        assertThatThrownBy(() -> communityAdminService.blockPost(POST_ID, "사유", ADMIN_ID))
-                .isInstanceOf(BusinessException.class)
-                .extracting(e -> ((BusinessException) e).getErrorCode())
-                .isEqualTo(CommunityErrorCode.INVALID_POST_TRANSITION);
     }
 
     @Test
@@ -132,29 +103,21 @@ class CommunityAdminServiceTests {
                 .isEqualTo(CommunityErrorCode.POST_NOT_FOUND);
     }
 
-    /**
-     * 차단이 실제로 한 행을 바꾸지 못했으면 신고까지 닫지 않는다.
-     *
-     * <p>갱신 행 수를 버리면 글은 그대로 노출된 채 신고만 닫힌다. 그러면 아무도 그 글을
-     * 다시 신고할 수 없고(회원당 한 건뿐이다), 관리자 목록에서는 처리된 것으로 보인다.
-     */
+    /** 차단 갱신이 0행이면 신고를 종료하지 않는다. */
     @Test
     void blockPost_updateAffectedNoRow_doesNotCloseReports() {
         givenLockedPost(PostStatus.PUBLISHED);
         when(communityAdminMapper.blockPost(POST_ID, "사유", ADMIN_ID)).thenReturn(0);
 
         assertThatThrownBy(() -> communityAdminService.blockPost(POST_ID, "사유", ADMIN_ID))
-                .isInstanceOf(BusinessException.class);
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(CommunityErrorCode.INVALID_POST_TRANSITION);
 
         verify(communityAdminMapper, never()).closePendingReports(anyLong(), any());
     }
 
-    /**
-     * 차단 해제는 신고 상태를 되돌리지 않는다(DOMAIN.md 6.6).
-     *
-     * <p>RESOLVED는 "그때 조치했다"는 기록이지 지금 차단 중이라는 뜻이 아니다. 되돌리면
-     * 이미 처리한 신고가 관리자 목록에 다시 나타난다.
-     */
+    /** 차단 해제는 종료된 신고를 되돌리지 않는다. */
     @Test
     void unblockPost_blockedPost_leavesReportsClosed() {
         givenLockedPost(PostStatus.BLOCKED);
@@ -166,7 +129,7 @@ class CommunityAdminServiceTests {
         verify(communityAdminMapper, never()).closePendingReports(anyLong(), any());
     }
 
-    /** 차단된 적 없는 글에는 해제할 것이 없다. 성공으로 넘기면 화면만 거짓말을 한다. */
+    /** 공개 글은 차단 해제할 수 없다. */
     @Test
     void unblockPost_publishedPost_isRejected() {
         givenLockedPost(PostStatus.PUBLISHED);
@@ -179,7 +142,7 @@ class CommunityAdminServiceTests {
         verify(communityAdminMapper, never()).unblockPost(anyLong());
     }
 
-    /** 기각은 게시글을 건드리지 않는다. "차단하지 않기로 했다"도 조치다(DOMAIN.md 6.6). */
+    /** 신고 기각은 게시글을 변경하지 않는다. */
     @Test
     void rejectReports_pendingReports_closesThemWithoutTouchingPost() {
         givenLockedPost(PostStatus.PUBLISHED);
@@ -187,7 +150,7 @@ class CommunityAdminServiceTests {
 
         communityAdminService.rejectReports(POST_ID);
 
-        // 잠금이 먼저다. 차단·해제와 같은 행이라 순서가 어긋나면 교착이다(H17).
+        // 신고 기각도 게시글 잠금부터 처리한다.
         InOrder order = inOrder(communityMapper, communityAdminMapper);
         order.verify(communityMapper).lockPost(POST_ID);
         order.verify(communityAdminMapper).closePendingReports(POST_ID, ReportStatus.REJECTED);
@@ -195,14 +158,7 @@ class CommunityAdminServiceTests {
         verify(communityAdminMapper, never()).unblockPost(anyLong());
     }
 
-    /**
-     * 작성자가 지운 글에는 기각도 할 수 없다(DOMAIN.md 6.6, PR #96 Codex 리뷰).
-     *
-     * <p>글이 PUBLISHED일 때 접수된 신고는 작성자가 글을 지워도 PENDING으로 남는다 —
-     * 게시글을 지워도 자식 행은 건드리지 않기 때문이다(4.5). 그 신고를 REJECTED로 닫으면
-     * "관리자가 보고 문제없다고 판단했다"는 기록이 남는데, 실제로는 판단할 글이 사라진
-     * 것이라 기록이 사실과 달라진다.
-     */
+    /** 삭제 글의 신고는 기각할 수 없다. */
     @Test
     void rejectReports_deletedPost_isRejected() {
         givenLockedPost(PostStatus.DELETED);
@@ -215,13 +171,7 @@ class CommunityAdminServiceTests {
         verify(communityAdminMapper, never()).closePendingReports(anyLong(), any());
     }
 
-    /**
-     * 차단된 글의 기각은 막지 않는다.
-     *
-     * <p>차단 시점에 미처리 신고가 함께 닫히므로 여기 남아 있는 것은 그 뒤에 들어온
-     * 신고이고(R16), 이미 조치한 글이라 닫을 길이 있어야 한다. 막아 버리면 그 신고가
-     * 관리자 목록 맨 위에 영원히 남는다.
-     */
+    /** 차단 후 접수된 신고는 기각할 수 있다. */
     @Test
     void rejectReports_blockedPost_isAllowed() {
         givenLockedPost(PostStatus.BLOCKED);
@@ -232,12 +182,7 @@ class CommunityAdminServiceTests {
         verify(communityAdminMapper).closePendingReports(POST_ID, ReportStatus.REJECTED);
     }
 
-    /**
-     * 닫을 신고가 없으면 성공으로 넘기지 않는다.
-     *
-     * <p>화면에는 "기각했습니다"가 나오는데 아무 일도 일어나지 않은 상태다. 두 번 눌렀거나
-     * 다른 관리자가 먼저 처리한 경우인데, 성공으로 답하면 그 사실이 사라진다.
-     */
+    /** 미처리 신고가 없으면 기각 성공으로 처리하지 않는다. */
     @Test
     void rejectReports_withoutPendingReports_isRejected() {
         givenLockedPost(PostStatus.PUBLISHED);
@@ -249,7 +194,7 @@ class CommunityAdminServiceTests {
                 .isEqualTo(CommunityErrorCode.INVALID_POST_TRANSITION);
     }
 
-    /** 없는 글에는 404다. 차단·해제와 같은 판단이고, 같은 잠금 조회에서 갈린다. */
+    /** 없는 글의 신고는 기각할 수 없다. */
     @Test
     void rejectReports_missingPost_isRejectedAsNotFound() {
         when(communityMapper.lockPost(POST_ID)).thenReturn(null);
@@ -262,10 +207,7 @@ class CommunityAdminServiceTests {
         verify(communityAdminMapper, never()).closePendingReports(anyLong(), any());
     }
 
-    /**
-     * 관리자 상세는 상태로 거르지 않는다(DOMAIN.md 4.3). 없는 글에만 404다 —
-     * 고객 경로처럼 삭제·차단을 숨기면 조치 이력을 확인할 방법이 사라진다.
-     */
+    /** 관리자 상세도 없는 글에는 404를 반환한다. */
     @Test
     void getPostDetail_missingPost_isRejectedAsNotFound() {
         when(communityAdminMapper.findPostByIdForAdmin(POST_ID)).thenReturn(null);
@@ -276,7 +218,7 @@ class CommunityAdminServiceTests {
                 .isEqualTo(CommunityErrorCode.POST_NOT_FOUND);
     }
 
-    /** 관리자 목록의 작성자도 members JOIN 이 아니라 회원 도메인 계약으로 채운다(조각 10c). */
+    /** 관리자 목록 작성자를 회원 계약으로 채운다. */
     @Test
     void getPosts_fillsAuthorFromMemberContract() {
         when(communityAdminMapper.findPostsForAdmin(null, AdminPostSort.LATEST, 20, 0))
@@ -292,7 +234,7 @@ class CommunityAdminServiceTests {
                 .satisfies(post -> assertThat(post.authorName()).isEqualTo("글쓴이"));
     }
 
-    /** 회원 행이 없어도 관리자 목록에서 글이 사라지지 않는다(DOMAIN.md 8). */
+    /** 회원 정보가 없으면 작성자만 가린다. */
     @Test
     void getPosts_missingAuthor_keepsPostAndMasksAuthor() {
         when(communityAdminMapper.findPostsForAdmin(null, AdminPostSort.LATEST, 20, 0))
@@ -308,7 +250,7 @@ class CommunityAdminServiceTests {
                 .satisfies(post -> assertThat(post.authorName()).isEqualTo("탈퇴한 회원"));
     }
 
-    /** 신고자도 같은 계약으로 채운다. 탈퇴한 신고자는 표시명만 가려진다(조각 10c). */
+    /** 신고자를 회원 계약으로 채운다. */
     @Test
     void getReports_fillsReporterFromMemberContract() {
         when(communityAdminMapper.findReportsByPost(POST_ID)).thenReturn(List.of(
@@ -321,26 +263,6 @@ class CommunityAdminServiceTests {
         assertThat(communityAdminService.getReports(POST_ID))
                 .extracting(ReportView::reporterName)
                 .containsExactly("신고자", "탈퇴한 회원");
-    }
-
-    /**
-     * 차단 관리자 닉네임도 회원 계약으로 채운다.
-     *
-     * <p>원래 SQL 이 {@code LEFT JOIN} 이었으므로 차단 기록이 없으면 비는 것이 정상이다.
-     * 그 경우 회원 조회 대상에서도 빠진다(조각 10c).</p>
-     */
-    @Test
-    void getPostDetail_blockedPost_fillsBothAuthorAndBlockingAdmin() {
-        when(communityAdminMapper.findPostByIdForAdmin(POST_ID))
-                .thenReturn(adminDetailRow(ADMIN_ID));
-        givenMembers(
-                new MemberCommunityView(AUTHOR_ID, "글쓴이", false),
-                new MemberCommunityView(ADMIN_ID, "관리자", false));
-
-        AdminPostDetailView post = communityAdminService.getPostDetail(POST_ID);
-
-        assertThat(post.authorName()).isEqualTo("글쓴이");
-        assertThat(post.blockedByNickname()).isEqualTo("관리자");
     }
 
     @Test

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+******************************
+작성자 : HyunGyu-Cho
+담당자 : 시은
+작성일 : 2026-08-10
+기능 : 후기 집계를 products 에 반영하는 SQL
+설명 : UPDATE products 한 문장만 둔다. reviews 를 읽지 않는다 - 집계는 리뷰가 계산해 넘긴다.
+******************************
+-->
+<mapper namespace="com.cakeshop.domain.product.mapper.ProductReviewMapper">
+
+    <!-- updated_at = updated_at 을 빼면 집계가 바뀔 때마다 상품에 수정 흔적이 남는다.
+         커뮤니티에서 같은 자리를 두 번 빠뜨려 화면에 (수정됨) 이 붙는 버그가 났다. -->
+    <update id="applyReviewAggregate">
+        UPDATE products
+           SET average_rating = #{averageRating},
+               review_count   = #{reviewCount},
+               updated_at     = updated_at
+         WHERE id = #{productId}
+    </update>
+</mapper>

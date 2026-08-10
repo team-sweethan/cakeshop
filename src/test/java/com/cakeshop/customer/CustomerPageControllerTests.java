@@ -31,7 +31,6 @@ import com.cakeshop.domain.payment.service.PaymentQueryService;
 import com.cakeshop.domain.payment.service.RefundFacade;
 import com.cakeshop.domain.product.controller.ProductController;
 import com.cakeshop.domain.product.service.ProductService;
-import com.cakeshop.domain.review.controller.ReviewController;
 import com.cakeshop.global.security.MemberDetails;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -105,8 +104,7 @@ class CustomerPageControllerTests {
                                 memberService,
                                 mock(SessionRegistry.class)),
                         new NotificationUserController(),
-                        new CouponController(),
-                        new ReviewController())
+                        new CouponController())
                 .setCustomArgumentResolvers(
                         new AuthenticationPrincipalArgumentResolver())
                 .build();
@@ -127,7 +125,6 @@ class CustomerPageControllerTests {
         pages.put("/mypage", "customer/member/mypage");
         pages.put("/orders/1", "customer/order/detail");
         pages.put("/notifications", "customer/notification/list");
-        pages.put("/reviews/new", "customer/review/form");
         pages.put("/mypage/coupons", "customer/coupon/list");
         pages.put("/mypage/profile", "customer/member/profile-edit");
     }

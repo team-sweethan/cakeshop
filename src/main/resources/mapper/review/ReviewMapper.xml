@@ -2,4 +2,44 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.cakeshop.domain.review.mapper.ReviewMapper">
     <!-- 사용자 입력은 #{} 만 사용 (${} 금지) -->
+    <!-- reviews 외의 테이블을 JOIN 하지 않는다 (DOMAIN.md 2.7) -->
+
+    <select id="findReviewedOrderItemIds" resultType="long">
+        SELECT order_item_id
+          FROM reviews
+         WHERE member_id = #{memberId}
+    </select>
+
+    <select id="existsByOrderItemId" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+              FROM reviews
+             WHERE order_item_id = #{orderItemId}
+        )
+    </select>
+
+    <!-- status 를 컬럼 기본값에 맡기지 않는다. rds 는 flyway.enabled=false 라 조각 0 의 기본값
+         변경(VISIBLE -> PUBLISHED)이 반영된다는 보장이 없고, 반영 전이면 어휘가 다른 행이
+         조용히 쌓인다 (R11). -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO reviews (order_item_id, product_id, member_id,
+                             overall_rating, taste_rating, design_rating, service_rating,
+                             content, status)
+        VALUES (#{orderItemId}, #{productId}, #{memberId},
+                #{overallRating}, #{tasteRating}, #{designRating}, #{serviceRating},
+                #{content}, 'PUBLISHED')
+    </insert>
+
+    <!-- COALESCE 가 없으면 마지막 공개 후기를 지웠을 때 AVG 가 NULL 을 돌려주는데
+         products.average_rating 은 NOT NULL 이다. 후기가 쌓이는 동안에는 드러나지 않는다. -->
+    <select id="aggregateForUpdate"
+            resultType="com.cakeshop.domain.review.dto.view.ProductRatingAggregate">
+
+        SELECT COALESCE(AVG(overall_rating), 0) AS averageRating,
+               COUNT(*)                         AS reviewCount
+          FROM reviews
+         WHERE product_id = #{productId}
+           AND status = 'PUBLISHED'
+           FOR UPDATE
+    </select>
 </mapper>
