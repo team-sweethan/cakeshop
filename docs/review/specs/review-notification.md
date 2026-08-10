@@ -29,4 +29,6 @@
   - 반대로 커밋 전에 `REQUIRES_NEW`로 먼저 보내는 안은 택하지 않았다. 후기가 커밋에 실패하면 **없는 후기의 알림**이 남는데, 그게 위에서 더 나쁘다고 한 쪽이다.
 - A4·A5(`review-edit-delete.md`)·C4(`review-admin.md`)에는 알림을 보내지 않는다. C6(`review-reply.md`)도 보내지 않는다.
 
-**남은 것 — 알림에서 후기로 가는 링크.** `notifications.target_url`은 알림 migration이 걷어내고 타입별 ID로 옮겼고, 남아 있는 `NotificationRequest.targetUrl`은 저장되지 않는다. 링크는 `NotificationResponse.getTargetUrl()`이 ID로 되돌려 주는데 후기는 `reviewId != null → "/mypage"` 하나뿐이라, **관리자가 `NEW_REVIEW`에서 그 후기의 관리자 상세(C3)로 갈 수 없다.** 고치려면 그 fallback이 갈라져야 하는데 알림 도메인 파일이라 민정님과 합의가 필요하다. 알림 자체는 정상 저장·표시되므로 조각 7을 막지는 않는다.
+**남은 것 — 알림에서 후기로 가는 링크.** `notifications.target_url`은 알림 migration이 걷어내고 타입별 ID로 옮겼고, 남아 있는 `NotificationRequest.targetUrl`은 저장되지 않는다. 링크는 `NotificationResponse.getTargetUrl()`이 ID로 되돌려 주는데 후기는 `reviewId != null → "/mypage"` 하나뿐이라, **관리자가 `NEW_REVIEW`에서 그 후기의 관리자 상세(C3)로 갈 수 없다.** 고치려면 그 fallback이 갈라져야 하는데 알림 도메인 파일이라 민정님과 합의가 필요하다.
+
+**링크보다 앞선 것 — 알림 목록 화면 자체가 아직 없다.** `admin/notification/list.html`과 `customer/notification/list.html`은 둘 다 고정 목업이라 `/api/notifications`를 부르지 않는다. 목록·읽음 API는 이미 있고, 지금 살아 있는 표시는 공통 헤더의 미읽음 배지(`app.js`) 하나뿐이다. 관리자든 고객이든 사정이 같으므로 리뷰 알림만의 문제가 아니라 알림 도메인의 남은 화면 작업이다. 알림은 정상 저장되고 배지에 반영되므로 조각 7을 막지는 않는다.
