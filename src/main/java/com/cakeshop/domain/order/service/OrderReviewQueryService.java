@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.cakeshop.domain.order.dto.view.OrderReviewItemView;
+import com.cakeshop.domain.order.dto.view.OrderReviewSnapshotView;
 import com.cakeshop.domain.order.dto.view.OrderReviewTargetView;
 import com.cakeshop.domain.order.mapper.OrderReviewMapper;
 import com.cakeshop.global.common.paging.PageRequest;
@@ -66,5 +67,50 @@ public class OrderReviewQueryService {
     @Transactional(readOnly = true)
     public Optional<OrderReviewTargetView> findReviewTarget(long orderItemId, long memberId) {
         return Optional.ofNullable(orderReviewMapper.findReviewTarget(orderItemId, memberId));
+    }
+
+    /**
+     * ******************************
+     * 작성자 : HyunGyu-Cho
+     * 담당자 : 주환
+     * 작성일 : 2026-08-10
+     * 기능 : 이미 쓴 후기의 주문 상품 스냅샷 묶음 조회
+     * 설명 : 후기 목록(B3·C1·C3)이 order_items·orders 를 직접 JOIN 하지 않도록 추가한다.
+     *        계약의 근거는 docs/review/DOMAIN.md 2.7.
+     * ******************************
+     */
+    @Transactional(readOnly = true)
+    public List<OrderReviewSnapshotView> findOrderItemSnapshots(Collection<Long> orderItemIds) {
+        if (orderItemIds == null || orderItemIds.isEmpty()) {
+            return List.of();
+        }
+        return orderReviewMapper.findSnapshotsByOrderItemIds(orderItemIds);
+    }
+
+    /**
+     * ******************************
+     * 작성자 : HyunGyu-Cho
+     * 담당자 : 주환
+     * 작성일 : 2026-08-10
+     * 기능 : 관리자 후기 검색의 상품명 조건
+     * 설명 : 상품명이 부분 일치하는 주문 상품 ID 를 돌려준다. 빈 목록은 "조건에 맞는 주문 상품이
+     *        없다"는 뜻이므로, 조건을 걸지 않는 경우는 호출한 쪽이 이 메서드를 부르지 않는 것으로
+     *        가른다. 계약의 근거는 docs/review/specs/review-admin.md C2.
+     * ******************************
+     */
+    @Transactional(readOnly = true)
+    public List<Long> findOrderItemIdsByProductName(String keyword) {
+        String normalized = keyword == null ? "" : keyword.trim();
+
+        if (normalized.isEmpty()) {
+            return List.of();
+        }
+
+        return orderReviewMapper.findOrderItemIdsByProductName(escapeLikeKeyword(normalized));
+    }
+
+    // '!' 를 먼저 바꾸지 않으면 뒤에서 만들어 낸 '!%' 를 다시 이스케이프해 패턴이 어긋난다.
+    private static String escapeLikeKeyword(String keyword) {
+        return keyword.replace("!", "!!").replace("%", "!%").replace("_", "!_");
     }
 }

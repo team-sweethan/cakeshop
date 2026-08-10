@@ -5,34 +5,54 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.cakeshop.domain.order.mapper.OrderCouponQueryMapper;
+import com.cakeshop.domain.order.mapper.OrderCouponMapper;
 
 /**
- * 첫 주문 쿠폰 선별에 필요한 주문 이력을 제공하는 읽기 전용 Service다.
- *
- * <p>작성자: 이정후, 주문 담당자 협의 - 쿠폰 도메인의 미주문 회원 선별에 사용한다.</p>
+ * ******************************
+ * 작성자 : 이정후
+ * 담당자 : 주환
+ * 작성일 : 2026-08-07
+ * 기능 : 쿠폰 연동용 주문 이력 조회 계약
+ * 설명 : 쿠폰 도메인이 orders 테이블을 직접 조회하지 않고 첫 주문 쿠폰 대상 여부를 판단하도록 제공한다.
+ * ******************************
  */
 @Service
 public class OrderCouponQueryService {
 
-    private final OrderCouponQueryMapper orderCouponQueryMapper;
+    private final OrderCouponMapper orderCouponMapper;
 
-    public OrderCouponQueryService(OrderCouponQueryMapper orderCouponQueryMapper) {
-        this.orderCouponQueryMapper = orderCouponQueryMapper;
+    public OrderCouponQueryService(OrderCouponMapper orderCouponMapper) {
+        this.orderCouponMapper = orderCouponMapper;
     }
 
-    /** 전달받은 회원 중 주문 이력이 하나라도 있는 회원 식별자만 반환한다. */
+    /**
+     * ******************************
+     * 작성자 : 이정후
+     * 담당자 : 주환
+     * 작성일 : 2026-08-07
+     * 기능 : 주문 이력 보유 회원 조회
+     * 설명 : 첫 주문 쿠폰 등록 시 후보 중 주문 이력이 있는 회원 ID를 제외하도록 제공한다.
+     * ******************************
+     */
     @Transactional(readOnly = true)
     public List<Long> getMemberIdsWithOrderHistory(List<Long> memberIds) {
         if (memberIds.isEmpty()) {
             return List.of();
         }
-        return orderCouponQueryMapper.findMemberIdsWithOrderHistory(memberIds);
+        return orderCouponMapper.findMemberIdsWithOrderHistory(memberIds);
     }
 
-    /** 첫 주문 쿠폰을 실제 발급하기 직전 회원의 주문 이력을 다시 확인한다. */
+    /**
+     * ******************************
+     * 작성자 : 이정후
+     * 담당자 : 주환
+     * 작성일 : 2026-08-07
+     * 기능 : 회원 주문 이력 재확인
+     * 설명 : 첫 주문 쿠폰 INSERT 직전에 최신 주문 이력을 확인해 대상 조건을 재검증한다.
+     * ******************************
+     */
     @Transactional(readOnly = true)
     public boolean hasOrderHistory(Long memberId) {
-        return orderCouponQueryMapper.existsOrderHistory(memberId);
+        return orderCouponMapper.existsOrderHistory(memberId);
     }
 }

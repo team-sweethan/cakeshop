@@ -24,6 +24,9 @@ public class RefundFacade {
     private final TossPaymentClient tossPaymentClient;
 
     public void cancelCustomerOrder(long memberId, long orderId, String reason) {
+        if (refundService.cancelCustomerZeroAmountOrder(memberId, orderId, reason)) {
+            return;
+        }
         RefundRequest request = refundService.prepareCustomerCancellation(
                 memberId,
                 orderId,
@@ -33,6 +36,9 @@ public class RefundFacade {
     }
 
     public void cancelAdminOrder(long adminMemberId, long orderId, String reason) {
+        if (refundService.cancelAdminZeroAmountOrder(adminMemberId, orderId, reason)) {
+            return;
+        }
         RefundRequest request = refundService.prepareAdminCancellation(
                 adminMemberId,
                 orderId,

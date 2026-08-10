@@ -1,8 +1,132 @@
-<!doctype html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>후기 관리 | 관리자</title><link rel="stylesheet" th:href="@{/css/app.css}"></head><body>
-<div class="admin-layout"><aside th:replace="~{fragments/admin/sidebar :: sidebar('reviews')}"></aside><div class="admin-main"><header th:replace="~{fragments/admin/header :: header('후기 관리')}"></header><main class="admin-content">
-<div th:replace="~{fragments/admin/mock-notice :: notice}"></div><h1 class="admin-page-title">후기 관리</h1><form class="admin-toolbar" method="get" th:action="@{/admin/reviews}"><input class="form-control" name="writer" aria-label="작성자 검색" placeholder="작성자 검색"><input class="form-control" name="product" aria-label="상품명 검색" placeholder="상품명 검색"><select class="form-control" name="rating" aria-label="평점"><option>평점 전체</option><option>5점</option><option>4점</option><option>3점 이하</option></select><button class="btn" type="submit">검색</button></form>
-<div class="table-wrap"><table class="data-table"><thead><tr><th>작성자</th><th>상품명</th><th>평점</th><th>내용 미리보기</th><th>작성일</th><th>관리</th></tr></thead><tbody>
-<tr><td>홍길동</td><td>딸기 생크림 케이크</td><td>★★★★★ 5.0</td><td>맛있고 예뻐요. 다음에도 주문할게요.</td><td>2025.01.15</td><td><div class="cluster"><button class="btn" type="button">상세보기</button><button class="btn btn--danger" type="button">숨김</button><button class="btn btn--danger" type="button" data-confirm="후기를 삭제하시겠습니까?">삭제</button></div></td></tr>
-<tr><td>이영희</td><td>레터링 케이크</td><td>★★★★☆ 4.0</td><td>레터링이 예쁘게 나왔어요. 조금...</td><td>2025.01.10</td><td><div class="cluster"><button class="btn" type="button">상세보기</button><button class="btn btn--danger" type="button">숨김</button><button class="btn btn--danger" type="button">삭제</button></div></td></tr>
-<tr><td>박민수</td><td>초코 케이크</td><td>★★★☆☆ 3.0</td><td>맛은 괜찮은데 배달이 늦었어요.</td><td>2025.01.05</td><td><div class="cluster"><button class="btn" type="button">상세보기</button><button class="btn btn--danger" type="button">숨김</button><button class="btn btn--danger" type="button">삭제</button></div></td></tr>
-</tbody></table></div></main></div></div></body></html>
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>후기 관리 | 관리자</title>
+  <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<div class="admin-layout">
+  <aside th:replace="~{fragments/admin/sidebar :: sidebar('reviews')}"></aside>
+  <div class="admin-main">
+    <header th:replace="~{fragments/admin/header :: header('후기 관리')}"></header>
+    <main class="admin-content">
+
+      <div th:replace="~{fragments/common/alert :: alert}"></div>
+
+      <h1 class="admin-page-title">후기 관리</h1>
+
+      <form class="admin-toolbar" method="get" th:action="@{/admin/reviews}">
+        <input class="form-control" name="writer" aria-label="작성자 검색"
+               placeholder="작성자 검색" th:value="${writer}">
+
+        <input class="form-control" name="product" aria-label="상품명 검색"
+               placeholder="상품명 검색" th:value="${product}">
+
+        <select class="form-control" name="rating" aria-label="평점">
+          <option value="" th:selected="${selectedRating.name() == 'ALL'}">평점 전체</option>
+          <option value="5" th:selected="${selectedRating.name() == 'FIVE'}">5점</option>
+          <option value="4" th:selected="${selectedRating.name() == 'FOUR'}">4점</option>
+          <option value="3" th:selected="${selectedRating.name() == 'THREE_OR_LESS'}">3점 이하</option>
+        </select>
+
+        <select class="form-control" name="status" aria-label="상태">
+          <option value="" th:selected="${selectedStatus == null}">상태 전체</option>
+          <option value="PUBLISHED" th:selected="${selectedStatus?.name() == 'PUBLISHED'}">노출 중</option>
+          <option value="BLOCKED" th:selected="${selectedStatus?.name() == 'BLOCKED'}">숨김</option>
+          <option value="DELETED" th:selected="${selectedStatus?.name() == 'DELETED'}">삭제됨</option>
+        </select>
+
+        <button class="btn" type="submit">검색</button>
+      </form>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th>작성자</th><th>상품명</th><th>평점</th><th>내용 미리보기</th><th>작성일</th><th>상태</th><th>관리</th></tr>
+          </thead>
+          <tbody>
+            <tr th:each="review : ${reviews.content}">
+              <td th:text="${review.authorName}">작성자</td>
+              <td th:text="${review.productName}">상품명</td>
+              <td th:text="${review.overallRating} + '점'">5점</td>
+              <td th:text="${#strings.abbreviate(review.content, 30)}">내용 미리보기</td>
+              <td th:text="${#temporals.format(review.createdAt, 'yyyy.MM.dd')}">2026.01.01</td>
+              <td>
+                <span th:if="${review.status.name() == 'PUBLISHED'}"
+                      class="badge badge--success">노출 중</span>
+                <span th:if="${review.status.name() == 'BLOCKED'}"
+                      class="badge badge--danger">숨김</span>
+                <span th:if="${review.status.name() == 'DELETED'}"
+                      class="badge">삭제됨</span>
+              </td>
+              <td>
+                <a class="btn" th:href="@{/admin/reviews/{reviewId}(reviewId=${review.id})}">상세보기</a>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="panel panel--dashed text-muted"
+           th:if="${reviews.content.isEmpty()}"
+           style="text-align:center">
+        조건에 맞는 후기가 없습니다.
+      </div>
+
+      <nav th:if="${reviews.totalPages > 1}"
+           class="cluster section"
+           aria-label="페이지 이동"
+           style="justify-content:center">
+
+        <a class="btn"
+           th:if="${pageNavigation.hasPreviousBlock}"
+           th:href="@{/admin/reviews(
+               writer=${writer},
+               product=${product},
+               rating=${selectedRating.parameter},
+               status=${selectedStatus},
+               page=${pageNavigation.previousPage}
+           )}">
+          이전
+        </a>
+
+        <span class="btn btn--disabled" th:unless="${pageNavigation.hasPreviousBlock}">이전</span>
+
+        <a class="btn"
+           th:each="pageNumber :
+               ${#numbers.sequence(pageNavigation.startPage, pageNavigation.endPage)}"
+           th:text="${pageNumber}"
+           th:classappend="${pageNumber == reviews.page} ? ' is-active'"
+           th:href="@{/admin/reviews(
+               writer=${writer},
+               product=${product},
+               rating=${selectedRating.parameter},
+               status=${selectedStatus},
+               page=${pageNumber}
+           )}">
+          1
+        </a>
+
+        <a class="btn"
+           th:if="${pageNavigation.hasNextBlock}"
+           th:href="@{/admin/reviews(
+               writer=${writer},
+               product=${product},
+               rating=${selectedRating.parameter},
+               status=${selectedStatus},
+               page=${pageNavigation.nextPage}
+           )}">
+          다음
+        </a>
+
+        <span class="btn btn--disabled" th:unless="${pageNavigation.hasNextBlock}">다음</span>
+      </nav>
+
+      <p class="note">숨긴 후기는 상품 화면과 평점 집계에서 빠집니다. 관리자 조치는 숨김과 해제뿐입니다.</p>
+    </main>
+  </div>
+</div>
+</body>
+</html>

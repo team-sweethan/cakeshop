@@ -106,6 +106,15 @@ class PaymentControllerTests {
     }
 
     @Test
+    void completeZeroAmountPayment_usesAuthenticatedMemberAndRedirects() throws Exception {
+        mockMvc.perform(post("/orders/1/payment/zero"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/orders/complete?orderId=1"));
+
+        verify(paymentFacade).completeZeroAmountGeneralPayment(10L, 1L);
+    }
+
+    @Test
     void payment_ownedOrder_addsActualCheckoutModel() throws Exception {
         PaymentCheckoutView checkout = mock(PaymentCheckoutView.class);
         when(paymentQueryService.getCheckout(

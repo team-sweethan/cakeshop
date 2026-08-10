@@ -10,6 +10,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
 import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.order.entity.OrderItem;
 import com.cakeshop.domain.order.entity.OrderStatus;
@@ -62,6 +63,9 @@ class RefundServiceTests {
     @Mock
     private MemberService memberService;
 
+    @Mock
+    private CouponOrderCommandService couponOrderCommandService;
+
     private RefundService refundService;
 
     @BeforeEach
@@ -71,6 +75,7 @@ class RefundServiceTests {
                 paymentMapper,
                 productStockService,
                 memberService,
+                couponOrderCommandService,
                 CLOCK
         );
         lenient().when(memberService.isActiveMember(anyLong())).thenReturn(true);
@@ -126,6 +131,25 @@ class RefundServiceTests {
         assertThat(result.reason()).isEqualTo("단순 변심");
         assertThat(result.canceledBy()).isEqualTo("CUSTOMER");
         assertThat(result.requestedAt()).isEqualTo(NOW);
+    }
+
+    @Test
+    void cancelCustomerZeroAmountOrder_zeroAmount_cancelsWithoutPaymentCancellation() {
+        Order order = order(3L);
+        Payment payment = payment();
+        payment.setAmount(BigDecimal.ZERO);
+        when(orderMapper.findOrderByIdForUpdate(10L)).thenReturn(Optional.of(order));
+        when(paymentMapper.findDonePaymentByOrderId(10L)).thenReturn(Optional.of(payment));
+        when(paymentMapper.cancelIfDone(20L, "ZERO_AMOUNT_CANCELED", NOW)).thenReturn(1);
+        when(orderMapper.cancelIfCurrent(
+                10L, OrderStatus.READY_FOR_PICKUP, "CUSTOMER", "cancel", NOW
+        )).thenReturn(1);
+        when(orderMapper.findStockDeductedItemsForRestore(10L)).thenReturn(List.of());
+
+        assertThat(refundService.cancelCustomerZeroAmountOrder(3L, 10L, "cancel")).isTrue();
+
+        verify(paymentMapper, never()).insertPaymentCancellation(any(PaymentCancellation.class));
+        verify(couponOrderCommandService).restoreCouponForCanceledOrder(10L);
     }
 
     @Test
@@ -305,6 +329,7 @@ class RefundServiceTests {
 
         verify(productStockService).restoreStock(1L, 2);
         verify(orderMapper).markStockRestoredIfDeducted(100L, NOW.plusSeconds(2));
+        verify(couponOrderCommandService).restoreCouponForCanceledOrder(10L);
     }
 
     @Test
@@ -344,6 +369,7 @@ class RefundServiceTests {
         verify(productStockService, never()).restoreStock(1L, 2);
         verify(orderMapper, never()).findStockDeductedItemsForRestore(10L);
         verify(paymentMapper, never()).completeCancellationIfRequested(anyLong(), any(), any());
+        verify(couponOrderCommandService).restoreCouponForCanceledOrder(10L);
     }
 
     @Test

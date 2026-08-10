@@ -3,6 +3,7 @@ package com.cakeshop.domain.order.mapper;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.cakeshop.domain.order.dto.view.OrderReviewItemView;
+import com.cakeshop.domain.order.dto.view.OrderReviewSnapshotView;
 import com.cakeshop.domain.order.dto.view.OrderReviewTargetView;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 import java.time.LocalDateTime;
@@ -154,6 +155,68 @@ class OrderReviewMapperTests {
                 insertOrderItem(insertOrder(otherMemberId, "PICKED_UP", PICKED_UP_AT), "남의 케이크");
 
         assertThat(orderReviewMapper.findReviewTarget(orderItemId, memberId)).isNull();
+    }
+
+    @Test
+    void findSnapshotsByOrderItemIds_carriesProductNameSnapshotAndOrderNumber() {
+        long orderId = insertOrder(memberId, "PICKED_UP", PICKED_UP_AT);
+        long orderItemId = insertOrderItem(orderId, "주문 시점 케이크");
+        jdbcTemplate.update("UPDATE products SET name = ? WHERE id = ?", "이름 바뀐 케이크", productId);
+        String orderNumber = jdbcTemplate.queryForObject(
+                "SELECT order_number FROM orders WHERE id = ?", String.class, orderId);
+
+        List<OrderReviewSnapshotView> snapshots =
+                orderReviewMapper.findSnapshotsByOrderItemIds(List.of(orderItemId, Long.MAX_VALUE));
+
+        assertThat(snapshots).singleElement().satisfies(snapshot -> {
+            assertThat(snapshot.orderItemId()).isEqualTo(orderItemId);
+            assertThat(snapshot.productName()).isEqualTo("주문 시점 케이크");
+            assertThat(snapshot.orderNumber()).isEqualTo(orderNumber);
+        });
+    }
+
+    @Test
+    void findSnapshotsByOrderItemIds_otherMembersItem_isStillReturnedForAdminUse() {
+        long otherMemberId = insertMember();
+        long orderItemId =
+                insertOrderItem(insertOrder(otherMemberId, "PICKED_UP", PICKED_UP_AT), "남의 케이크");
+
+        assertThat(orderReviewMapper.findSnapshotsByOrderItemIds(List.of(orderItemId)))
+                .as("소유권 판정은 후기를 고르는 자리에 있고 이 조회는 관리자 목록도 쓴다")
+                .extracting(OrderReviewSnapshotView::productName)
+                .containsExactly("남의 케이크");
+    }
+
+    @Test
+    void findOrderItemIdsByProductName_matchesPartOfTheSnapshotName() {
+        long strawberry = insertPickedUpOrderItem("딸기 생크림 케이크", PICKED_UP_AT);
+        long chocolate = insertPickedUpOrderItem("초코 케이크", PICKED_UP_AT);
+
+        List<Long> ids = orderReviewMapper.findOrderItemIdsByProductName("딸기");
+
+        assertThat(ids).contains(strawberry).doesNotContain(chocolate);
+    }
+
+    @Test
+    void findOrderItemIdsByProductName_escapedWildcard_matchesTheLiteralCharacter() {
+        long literal = insertPickedUpOrderItem("50% 할인 케이크", PICKED_UP_AT);
+        long other = insertPickedUpOrderItem("정가 케이크", PICKED_UP_AT);
+
+        List<Long> ids = orderReviewMapper.findOrderItemIdsByProductName("!% 할인");
+
+        assertThat(ids).contains(literal).doesNotContain(other);
+    }
+
+    @Test
+    void findOrderItemIdsByProductName_looksAtTheSnapshotNotTheProductTable() {
+        long orderItemId = insertPickedUpOrderItem("주문 당시 이름", PICKED_UP_AT);
+        jdbcTemplate.update("UPDATE products SET name = ? WHERE id = ?", "바뀐 이름", productId);
+
+        assertThat(orderReviewMapper.findOrderItemIdsByProductName("주문 당시"))
+                .as("관리자는 화면에 보이는 스냅샷 이름 그대로 검색할 수 있어야 한다")
+                .contains(orderItemId);
+        assertThat(orderReviewMapper.findOrderItemIdsByProductName("바뀐 이름"))
+                .doesNotContain(orderItemId);
     }
 
     private List<Long> idsOf(List<OrderReviewItemView> items) {

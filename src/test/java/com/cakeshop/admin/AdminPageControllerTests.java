@@ -52,6 +52,10 @@ import com.cakeshop.domain.payment.service.PaymentAdminQueryService;
 import com.cakeshop.domain.payment.service.RefundFacade;
 import com.cakeshop.domain.product.controller.ProductAdminController;
 import com.cakeshop.domain.review.controller.ReviewAdminController;
+import com.cakeshop.domain.review.dto.view.AdminReviewDetailView;
+import com.cakeshop.domain.review.dto.view.AdminReviewListView;
+import com.cakeshop.domain.review.entity.ReviewStatus;
+import com.cakeshop.domain.review.service.ReviewAdminService;
 import com.cakeshop.domain.statistics.controller.StatisticsAdminController;
 import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
 import com.cakeshop.domain.statistics.service.DashboardReadModelQueryService;
@@ -104,6 +108,15 @@ class AdminPageControllerTests {
         DashboardReadModelQueryService dashboardReadModelQueryService =
                 Mockito.mock(DashboardReadModelQueryService.class);
 
+        ReviewAdminService reviewAdminService = Mockito.mock(ReviewAdminService.class);
+        when(reviewAdminService.getReviews(any(), any(), any(), any(), any(PageRequest.class)))
+                .thenReturn(new PageResult<AdminReviewListView>(
+                        List.of(), new PageRequest(null, null), 0));
+        when(reviewAdminService.getReviewDetail(anyLong()))
+                .thenReturn(new AdminReviewDetailView(
+                        1L, 9L, "작성자", "상품명", "20260101-0001", 5, 5, 4, 4, "본문",
+                        LocalDateTime.now(), LocalDateTime.now(), ReviewStatus.PUBLISHED, null));
+
         when(communityAdminService.getPosts(any(), any(), any(PageRequest.class)))
                 .thenReturn(new PageResult<AdminPostListView>(
                         List.of(), new PageRequest(null, null), 0));
@@ -140,7 +153,7 @@ class AdminPageControllerTests {
                 new MemberAdminController(
                         Mockito.mock(MemberAdminService.class),
                         Mockito.mock(MemberSessionService.class)),
-                new ReviewAdminController(),
+                new ReviewAdminController(reviewAdminService),
                 new NotificationAdminController(),
                 new CommunityAdminController(communityAdminService, communityService),
                 new CouponAdminController(couponAdminService)
@@ -157,6 +170,7 @@ class AdminPageControllerTests {
         pages.put("/admin/payments", "admin/payment/list");
         pages.put("/admin/members", "admin/member/list");
         pages.put("/admin/reviews", "admin/review/list");
+        pages.put("/admin/reviews/1", "admin/review/detail");
         pages.put("/admin/notifications", "admin/notification/list");
         pages.put("/admin/community", "admin/community/list");
         pages.put("/admin/community/15", "admin/community/detail");

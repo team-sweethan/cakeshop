@@ -96,6 +96,16 @@ public class PaymentController {
         return "redirect:/orders/complete?orderId=" + orderId;
     }
 
+    /** 전액 쿠폰 등으로 최종 금액이 0원인 주문을 PG 없이 완료한다. */
+    @PostMapping("/orders/{orderId:\\d+}/payment/zero")
+    public String completeZeroAmountPayment(
+            @PathVariable("orderId") long orderId,
+            @AuthenticationPrincipal MemberDetails memberDetails
+    ) {
+        paymentFacade.completeZeroAmountGeneralPayment(requireMemberId(memberDetails), orderId);
+        return "redirect:/orders/complete?orderId=" + orderId;
+    }
+
     @GetMapping("/orders/complete")
     public String complete(
             @RequestParam("orderId") long orderId,

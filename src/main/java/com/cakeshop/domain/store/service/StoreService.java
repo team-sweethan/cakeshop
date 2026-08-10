@@ -11,6 +11,7 @@ import com.cakeshop.domain.store.entity.StoreBusinessHour;
 import com.cakeshop.domain.store.entity.StoreHoliday;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.infra.FileStorageClient;
+import com.cakeshop.global.infra.FileStorageDirectory;
 import java.time.DayOfWeek;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
@@ -19,8 +20,12 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
@@ -29,9 +34,11 @@ public class StoreService {
     // 현재 서비스는 단일 매장을 운영하므로 초기 SQL에서 보장한 대표 행을 사용한다.
     public static final long DEFAULT_STORE_ID = 1L;
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
+    private static final Logger log = LoggerFactory.getLogger(StoreService.class);
 
-    // 매장 도메인이 저장하는 이미지의 저장 하위 디렉토리 (/{directory}/{yyyyMM}/{uuid}.{ext})
-    private static final String IMAGE_DIRECTORY = "store";
+    // 매장 이미지가 환경별 prefix 아래에서 사용하는 도메인 하위 디렉터리
+    private static final String IMAGE_DIRECTORY =
+            FileStorageDirectory.STORE.getPath();
 
     private final StoreMapper storeMapper;
     private final FileStorageClient fileStorageClient;
@@ -106,7 +113,9 @@ public class StoreService {
         boolean imageReplaced = image != null && !image.isEmpty();
         if (imageReplaced) {
             validateImage(image);
-            store.setImageUrl(fileStorageClient.store(image, IMAGE_DIRECTORY));
+            String newImageUrl = fileStorageClient.store(image, IMAGE_DIRECTORY);
+            store.setImageUrl(newImageUrl);
+            registerRollbackCleanup(newImageUrl);
         }
 
         if (storeMapper.updateStore(store) != 1) {
@@ -115,7 +124,7 @@ public class StoreService {
 
         // DB 저장이 확정된 뒤에만 이전 파일을 지워, 실패 시 원본이 사라지는 것을 막는다.
         if (imageReplaced && previousImageUrl != null) {
-            fileStorageClient.delete(previousImageUrl);
+            registerCommitFileDeletion(previousImageUrl);
         }
 
         for (DayOfWeek day : DayOfWeek.values()) {
@@ -204,6 +213,44 @@ public class StoreService {
         String contentType = image.getContentType();
         if (contentType == null || !contentType.startsWith("image/")) {
             throw new BusinessException(StoreErrorCode.INVALID_IMAGE);
+        }
+    }
+
+    private void registerCommitFileDeletion(String imageUrl) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        deleteStoredFileQuietly(imageUrl);
+                    }
+                });
+    }
+
+    private void registerRollbackCleanup(String imageUrl) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCompletion(int status) {
+                        if (status != STATUS_COMMITTED) {
+                            deleteStoredFileQuietly(imageUrl);
+                        }
+                    }
+                });
+    }
+
+    private void deleteStoredFileQuietly(String imageUrl) {
+        try {
+            fileStorageClient.delete(imageUrl);
+        } catch (RuntimeException exception) {
+            log.warn("매장 이미지 저장 파일을 정리하지 못했습니다.");
         }
     }
 

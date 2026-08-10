@@ -1,5 +1,6 @@
 package com.cakeshop.domain.order.service;
 
+import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
 import com.cakeshop.domain.order.mapper.OrderMapper;
 import java.time.Clock;
 import java.time.Instant;
@@ -30,11 +31,14 @@ class OrderExpirationServiceTests {
     @Mock
     private OrderMapper orderMapper;
 
+    @Mock
+    private CouponOrderCommandService couponOrderCommandService;
+
     private OrderExpirationService service;
 
     @BeforeEach
     void setUp() {
-        service = new OrderExpirationService(orderMapper, CLOCK);
+        service = new OrderExpirationService(orderMapper, CLOCK, couponOrderCommandService);
         ReflectionTestUtils.setField(service, "batchSize", 100);
     }
 

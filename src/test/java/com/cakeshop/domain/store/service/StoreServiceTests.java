@@ -1,8 +1,11 @@
 package com.cakeshop.domain.store.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -19,6 +22,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.EnumSet;
 import java.util.Optional;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,6 +30,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 @ExtendWith(MockitoExtension.class)
@@ -42,6 +48,13 @@ class StoreServiceTests {
     @BeforeEach
     void setUp() {
         storeService = new StoreService(storeMapper, fileStorageClient);
+    }
+
+    @AfterEach
+    void clearTransactionSynchronization() {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
     }
 
     @Test
@@ -88,12 +101,62 @@ class StoreServiceTests {
         MultipartFile image = new MockMultipartFile(
             "image", "cake.jpg", "image/jpeg", new byte[] {1, 2, 3});
 
+        TransactionSynchronizationManager.initSynchronization();
+
         storeService.updateStore(validForm(), image);
 
         ArgumentCaptor<Store> captor = ArgumentCaptor.forClass(Store.class);
         verify(storeMapper).updateStore(captor.capture());
         assertThat(captor.getValue().getImageUrl()).isEqualTo("/uploads/store/202607/new.jpg");
+        verify(fileStorageClient, never()).delete("/uploads/store/202601/old.jpg");
+
+        TransactionSynchronizationManager.getSynchronizations().forEach(
+                TransactionSynchronization::afterCommit);
+
         verify(fileStorageClient).delete("/uploads/store/202601/old.jpg");
+    }
+
+    @Test
+    void updateStore_transactionRollsBack_keepsPreviousImage() {
+        Store existing = store();
+        existing.setImageUrl("/uploads/store/202601/old.jpg");
+        when(storeMapper.findStoreById(StoreService.DEFAULT_STORE_ID)).thenReturn(Optional.of(existing));
+        when(storeMapper.updateStore(any(Store.class))).thenReturn(1);
+        when(fileStorageClient.store(any(), org.mockito.ArgumentMatchers.eq("store")))
+            .thenReturn("/uploads/store/202607/new.jpg");
+        MultipartFile image = new MockMultipartFile(
+            "image", "cake.jpg", "image/jpeg", new byte[] {1, 2, 3});
+        TransactionSynchronizationManager.initSynchronization();
+
+        storeService.updateStore(validForm(), image);
+
+        TransactionSynchronizationManager.getSynchronizations().forEach(
+                synchronization -> synchronization.afterCompletion(
+                        TransactionSynchronization.STATUS_ROLLED_BACK));
+
+        verify(fileStorageClient, never()).delete("/uploads/store/202601/old.jpg");
+        verify(fileStorageClient).delete("/uploads/store/202607/new.jpg");
+    }
+
+    @Test
+    void updateStore_previousImageCleanupFails_keepsSuccessfulResult() {
+        Store existing = store();
+        existing.setImageUrl("/uploads/store/202601/old.jpg");
+        when(storeMapper.findStoreById(StoreService.DEFAULT_STORE_ID)).thenReturn(Optional.of(existing));
+        when(storeMapper.updateStore(any(Store.class))).thenReturn(1);
+        when(fileStorageClient.store(any(), org.mockito.ArgumentMatchers.eq("store")))
+            .thenReturn("/uploads/store/202607/new.jpg");
+        doThrow(new IllegalStateException("S3 delete failed"))
+            .when(fileStorageClient).delete("/uploads/store/202601/old.jpg");
+        MultipartFile image = new MockMultipartFile(
+            "image", "cake.jpg", "image/jpeg", new byte[] {1, 2, 3});
+        TransactionSynchronizationManager.initSynchronization();
+
+        storeService.updateStore(validForm(), image);
+
+        assertThatCode(() -> TransactionSynchronizationManager.getSynchronizations().forEach(
+                TransactionSynchronization::afterCommit))
+            .doesNotThrowAnyException();
     }
 
     @Test

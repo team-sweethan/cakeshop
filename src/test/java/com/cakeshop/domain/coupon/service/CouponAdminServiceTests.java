@@ -13,6 +13,8 @@ import com.cakeshop.domain.coupon.dto.form.CouponSearchCondition;
 import com.cakeshop.domain.coupon.dto.form.CouponUpdateForm;
 import com.cakeshop.domain.coupon.dto.view.CouponView;
 import com.cakeshop.domain.coupon.dto.view.CouponIssueCandidateView;
+import com.cakeshop.domain.coupon.dto.view.CouponIssuedMemberView;
+import com.cakeshop.domain.coupon.entity.CustomerCouponStatus;
 import com.cakeshop.domain.coupon.entity.Coupon;
 import com.cakeshop.domain.coupon.entity.CouponDisplayStatus;
 import com.cakeshop.domain.coupon.entity.CouponStatus;
@@ -22,6 +24,7 @@ import com.cakeshop.domain.coupon.error.CouponErrorCode;
 import com.cakeshop.domain.coupon.mapper.CouponMapper;
 import com.cakeshop.domain.member.service.MemberCouponQueryService;
 import com.cakeshop.domain.member.dto.view.MemberCouponView;
+import com.cakeshop.domain.coupon.dto.view.CouponIssuedMemberHistoryView;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
@@ -130,12 +133,12 @@ class CouponAdminServiceTests {
                 1L, "홍길동", "member@example.com", "010-1234-5678", LocalDate.of(2000, 1, 15)
         );
         PageRequest request = new PageRequest(1, 5);
-        when(memberCouponQueryService.searchActiveMembers(any(), any())).thenReturn(
+        when(memberCouponQueryService.searchActiveMembers(any(), any(), any())).thenReturn(
                 new PageResult<>(List.of(member), request, 1)
         );
         when(couponMapper.findIssuedMemberIds(3L, List.of(1L))).thenReturn(List.of());
 
-        PageResult<CouponIssueCandidateView> result = couponAdminService.searchTargetMembers(3L, "홍", 1);
+        PageResult<CouponIssueCandidateView> result = couponAdminService.searchTargetMembers(3L, "NAME", "홍길", 1);
 
         CouponIssueCandidateView candidate = result.getContent().getFirst();
         assertThat(candidate.email()).isEqualTo("me***@example.com");
@@ -144,9 +147,30 @@ class CouponAdminServiceTests {
     }
 
     @Test
+    void getIssuedMembers_combinesCouponHistoryWithMemberProfile() {
+        CouponIssuedMemberHistoryView history = new CouponIssuedMemberHistoryView(
+                1L, CustomerCouponStatus.AVAILABLE, LocalDateTime.of(2026, 8, 7, 10, 0), null
+        );
+        MemberCouponView member = new MemberCouponView(
+                1L, "회원", "member@example.com", "010-1234-5678", LocalDate.of(2000, 1, 15)
+        );
+        when(couponMapper.countIssuedMemberHistories(3L, null)).thenReturn(1L);
+        when(couponMapper.findIssuedMemberHistories(3L, null, 5, 0)).thenReturn(List.of(history));
+        when(memberCouponQueryService.getMembersByIds(List.of(1L))).thenReturn(List.of(member));
+
+        PageResult<CouponIssuedMemberView> result = couponAdminService.getIssuedMembers(3L, null, 1);
+
+        assertThat(result.getTotalElements()).isEqualTo(1);
+        assertThat(result.getContent()).containsExactly(new CouponIssuedMemberView(
+                1L, "회원", "member@example.com", "010-1234-5678", "01-15", CustomerCouponStatus.AVAILABLE, null
+        ));
+    }
+
+    @Test
     void issueSpecificMemberRejectsCouponBeforeStart() {
         Coupon coupon = coupon(CouponStatus.ACTIVE, 10, 0, LocalDateTime.now().plusDays(1));
         coupon.setStartsAt(LocalDateTime.now().plusHours(1));
+        when(memberCouponQueryService.lockActiveCouponIssuableMember(2L)).thenReturn(true);
         when(couponMapper.findCouponByIdForUpdate(1L)).thenReturn(Optional.of(coupon));
 
         assertThatThrownBy(() -> couponAdminService.issueSpecificMember(1L, 2L))
@@ -154,14 +178,15 @@ class CouponAdminServiceTests {
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(CouponErrorCode.UPDATE_FAILED);
 
-        verify(couponMapper, never()).insertMemberCouponIfAbsent(1L, 2L, false, false);
+        verify(couponMapper, never()).insertMemberCouponIfAbsent(1L, 2L, false);
     }
 
     @Test
     void issueSpecificMemberThrowsWhenTargetIsNoLongerIssuable() {
         Coupon coupon = coupon(CouponStatus.ACTIVE, 10, 0, LocalDateTime.now().plusDays(1));
         when(couponMapper.findCouponByIdForUpdate(1L)).thenReturn(Optional.of(coupon));
-        when(couponMapper.insertMemberCouponIfAbsent(1L, 2L, false, false)).thenReturn(0);
+        when(memberCouponQueryService.lockActiveCouponIssuableMember(2L)).thenReturn(true);
+        when(couponMapper.insertMemberCouponIfAbsent(1L, 2L, false)).thenReturn(0);
 
         assertThatThrownBy(() -> couponAdminService.issueSpecificMember(1L, 2L))
                 .isInstanceOf(BusinessException.class)

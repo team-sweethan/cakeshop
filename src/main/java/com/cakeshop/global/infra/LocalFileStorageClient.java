@@ -11,14 +11,16 @@ import java.util.Locale;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
-// MVP 구현 — 로컬 디스크 저장 (추후 S3 구현체로 교체 가능)
+// s3 프로필을 사용하지 않을 때 선택되는 로컬 디스크 저장 구현체
 // 실제 파일은 app.file.upload-dir 아래에 저장하고,
 // 반환/DB 저장 값은 웹 접근 경로(app.file.url-prefix 접두)를 사용한다.
 @Component
+@Profile("!s3")
 public class LocalFileStorageClient implements FileStorageClient {
 
     private static final DateTimeFormatter MONTH = DateTimeFormatter.ofPattern("yyyyMM");

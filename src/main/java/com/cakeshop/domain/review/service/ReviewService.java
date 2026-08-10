@@ -1,20 +1,36 @@
 package com.cakeshop.domain.review.service;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.cakeshop.domain.member.dto.view.MemberReviewView;
+import com.cakeshop.domain.member.service.MemberReviewQueryService;
 import com.cakeshop.domain.order.dto.view.OrderReviewItemView;
+import com.cakeshop.domain.order.dto.view.OrderReviewSnapshotView;
 import com.cakeshop.domain.order.dto.view.OrderReviewTargetView;
 import com.cakeshop.domain.order.service.OrderReviewQueryService;
+import com.cakeshop.domain.product.service.ProductQueryService;
 import com.cakeshop.domain.product.service.ProductReviewCommandService;
+import com.cakeshop.domain.review.dto.form.ReviewEditForm;
 import com.cakeshop.domain.review.dto.form.ReviewWriteForm;
+import com.cakeshop.domain.review.dto.view.MyReviewView;
 import com.cakeshop.domain.review.dto.view.ProductRatingAggregate;
+import com.cakeshop.domain.review.dto.view.ProductReviewView;
+import com.cakeshop.domain.review.dto.view.ReviewReplyView;
+import com.cakeshop.domain.review.dto.view.ReviewRow;
 import com.cakeshop.domain.review.entity.Review;
+import com.cakeshop.domain.review.entity.ReviewStatus;
 import com.cakeshop.domain.review.error.ReviewErrorCode;
 import com.cakeshop.domain.review.mapper.ReviewMapper;
+import com.cakeshop.domain.review.mapper.ReviewReplyMapper;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
@@ -22,17 +38,28 @@ import com.cakeshop.global.error.BusinessException;
 @Service
 public class ReviewService {
 
+    public static final int PRODUCT_PREVIEW_SIZE = 3;
+
     private final ReviewMapper reviewMapper;
+    private final ReviewReplyMapper reviewReplyMapper;
     private final OrderReviewQueryService orderReviewQueryService;
     private final ProductReviewCommandService productReviewCommandService;
+    private final ProductQueryService productQueryService;
+    private final MemberReviewQueryService memberReviewQueryService;
 
     public ReviewService(
             ReviewMapper reviewMapper,
+            ReviewReplyMapper reviewReplyMapper,
             OrderReviewQueryService orderReviewQueryService,
-            ProductReviewCommandService productReviewCommandService) {
+            ProductReviewCommandService productReviewCommandService,
+            ProductQueryService productQueryService,
+            MemberReviewQueryService memberReviewQueryService) {
         this.reviewMapper = reviewMapper;
+        this.reviewReplyMapper = reviewReplyMapper;
         this.orderReviewQueryService = orderReviewQueryService;
         this.productReviewCommandService = productReviewCommandService;
+        this.productQueryService = productQueryService;
+        this.memberReviewQueryService = memberReviewQueryService;
     }
 
     @Transactional(readOnly = true)
@@ -50,6 +77,61 @@ public class ReviewService {
     @Transactional(readOnly = true)
     public OrderReviewTargetView getWriteTarget(long orderItemId, long memberId) {
         return requireWritableTarget(orderItemId, memberId);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResult<ProductReviewView> getProductReviews(
+            long productId, PageRequest pageRequest) {
+
+        requireVisibleProduct(productId);
+
+        long total = reviewMapper.countPublishedByProductId(productId);
+        if (total <= pageRequest.getOffset()) {
+            return new PageResult<>(List.of(), pageRequest, total);
+        }
+
+        List<ProductReviewView> content = toProductReviewViews(
+                reviewMapper.findPublishedByProductId(
+                        productId, pageRequest.getOffset(), pageRequest.getSize()));
+
+        return new PageResult<>(content, pageRequest, total);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProductReviewView> getProductReviewPreview(long productId) {
+        return toProductReviewViews(
+                reviewMapper.findPublishedByProductId(productId, 0, PRODUCT_PREVIEW_SIZE));
+    }
+
+    @Transactional(readOnly = true)
+    public PageResult<MyReviewView> getMyReviews(long memberId, PageRequest pageRequest) {
+        long total = reviewMapper.countByMemberId(memberId);
+        if (total <= pageRequest.getOffset()) {
+            return new PageResult<>(List.of(), pageRequest, total);
+        }
+
+        List<ReviewRow> rows = reviewMapper.findByMemberId(
+                memberId, pageRequest.getOffset(), pageRequest.getSize());
+
+        Map<Long, OrderReviewSnapshotView> snapshots = findOrderSnapshots(rows);
+        Map<Long, ReviewReplyView> replies = findReplies(rows);
+
+        List<MyReviewView> content = rows.stream()
+                .map(row -> MyReviewView.of(
+                        row, snapshots.get(row.orderItemId()), replies.get(row.id())))
+                .toList();
+
+        return new PageResult<>(content, pageRequest, total);
+    }
+
+    @Transactional(readOnly = true)
+    public MyReviewView getEditableReview(long reviewId, long memberId) {
+        ReviewRow review = requireEditableReview(reviewId, memberId);
+
+        return MyReviewView.of(
+                review,
+                findOrderSnapshots(List.of(review)).get(review.orderItemId()),
+                null);
     }
 
     @Transactional
@@ -82,13 +164,131 @@ public class ReviewService {
         recalculateRating(target.productId());
     }
 
-    // 후기 쓰기와 같은 트랜잭션이어야 한다. 후기만 커밋되고 집계가 실패하면 그 상품에 다음 쓰기가
-    // 올 때까지 아무도 모르는 채 틀린 평점과 정렬이 나간다 (D1).
-    private void recalculateRating(long productId) {
+    @Transactional
+    public void edit(long reviewId, ReviewEditForm form, long memberId) {
+        ReviewRow review = requireEditableReview(reviewId, memberId);
+
+        productReviewCommandService.lockForRating(review.productId());
+
+        requireApplied(
+                reviewMapper.update(Review.edit(
+                        reviewId,
+                        memberId,
+                        form.getOverallRating(),
+                        form.getTasteRating(),
+                        form.getDesignRating(),
+                        form.getServiceRating(),
+                        form.getContent())),
+                reviewId,
+                memberId);
+
+        recalculateRating(review.productId());
+    }
+
+    @Transactional
+    public void delete(long reviewId, long memberId) {
+        ReviewRow review = requireEditableReview(reviewId, memberId);
+
+        productReviewCommandService.lockForRating(review.productId());
+
+        requireApplied(reviewMapper.deleteByAuthor(reviewId, memberId), reviewId, memberId);
+
+        recalculateRating(review.productId());
+    }
+
+    private ReviewRow requireEditableReview(long reviewId, long memberId) {
+        return requireEditable(reviewMapper.findById(reviewId), memberId);
+    }
+
+    private ReviewRow requireEditable(ReviewRow review, long memberId) {
+        if (review == null
+                || !Objects.equals(review.memberId(), memberId)
+                || review.status() == ReviewStatus.DELETED) {
+            throw new BusinessException(ReviewErrorCode.REVIEW_NOT_FOUND);
+        }
+
+        if (review.status() == ReviewStatus.BLOCKED) {
+            throw new BusinessException(ReviewErrorCode.BLOCKED_REVIEW);
+        }
+
+        return review;
+    }
+
+    private void requireApplied(int affectedRows, long reviewId, long memberId) {
+        if (affectedRows > 0) {
+            return;
+        }
+
+        requireEditable(reviewMapper.findByIdForUpdate(reviewId), memberId);
+
+        throw new BusinessException(ReviewErrorCode.INVALID_REVIEW_TRANSITION);
+    }
+
+    // 후기를 바꾼 쓰기와 같은 트랜잭션이어야 한다. 후기만 커밋되고 집계가 실패하면 그 상품에
+    // 다음 쓰기가 올 때까지 아무도 모르는 채 틀린 평점과 정렬이 나간다 (D1). MANDATORY 가
+    // 그 요구를 관리자 숨김(C4)처럼 바깥에서 부르는 자리에서도 강제한다.
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void recalculateRating(long productId) {
         ProductRatingAggregate aggregate = reviewMapper.aggregateForUpdate(productId);
 
         productReviewCommandService.applyReviewAggregate(
                 productId, aggregate.averageRating(), aggregate.reviewCount());
+    }
+
+    private void requireVisibleProduct(long productId) {
+        try {
+            productQueryService.getSalesInfo(productId);
+        } catch (BusinessException e) {
+            throw new BusinessException(ReviewErrorCode.REVIEW_NOT_FOUND);
+        }
+    }
+
+    private List<ProductReviewView> toProductReviewViews(List<ReviewRow> rows) {
+        Map<Long, MemberReviewView> authors = findAuthors(rows);
+        Map<Long, ReviewReplyView> replies = findReplies(rows);
+
+        return rows.stream()
+                .map(row -> ProductReviewView.of(
+                        row, authors.get(row.memberId()), replies.get(row.id())))
+                .toList();
+    }
+
+    private Map<Long, ReviewReplyView> findReplies(List<ReviewRow> rows) {
+        List<Long> reviewIds = rows.stream()
+                .map(ReviewRow::id)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        if (reviewIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return reviewReplyMapper.findByReviewIds(reviewIds).stream()
+                .collect(Collectors.toMap(ReviewReplyView::reviewId, Function.identity()));
+    }
+
+    private Map<Long, MemberReviewView> findAuthors(List<ReviewRow> rows) {
+        List<Long> memberIds = rows.stream()
+                .map(ReviewRow::memberId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        return memberReviewQueryService.getMembersByIds(memberIds).stream()
+                .collect(Collectors.toMap(MemberReviewView::id, Function.identity()));
+    }
+
+    private Map<Long, OrderReviewSnapshotView> findOrderSnapshots(List<ReviewRow> rows) {
+        List<Long> orderItemIds = rows.stream()
+                .map(ReviewRow::orderItemId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        return orderReviewQueryService.findOrderItemSnapshots(orderItemIds).stream()
+                .collect(Collectors.toMap(
+                        OrderReviewSnapshotView::orderItemId, Function.identity()));
     }
 
     private OrderReviewTargetView requireWritableTarget(Long orderItemId, long memberId) {

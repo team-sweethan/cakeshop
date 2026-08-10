@@ -92,9 +92,10 @@ public class CouponAdminController {
     @GetMapping("{couponId}/target-members")
     @ResponseBody
     public PageResult<CouponIssueCandidateView> targetMembers(@PathVariable Long couponId,
+                                                              @RequestParam(required = false) String searchType,
                                                               @RequestParam(required = false) String keyword,
                                                               @RequestParam(required = false) Integer page) {
-        return couponAdminService.searchTargetMembers(couponId, keyword, page);
+        return couponAdminService.searchTargetMembers(couponId, searchType, keyword, page);
     }
 
     /**
@@ -301,9 +302,9 @@ public class CouponAdminController {
     @ResponseBody
     public PageResult<com.cakeshop.domain.coupon.dto.view.CouponIssuedMemberView> issuedMembers(
             @PathVariable Long couponId,
-            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long memberId,
             @RequestParam(required = false) Integer page) {
-        return couponAdminService.getIssuedMembers(couponId, keyword, page);
+        return couponAdminService.getIssuedMembers(couponId, memberId, page);
     }
 
     @PostMapping("{couponId}/members/{memberId}/issue")

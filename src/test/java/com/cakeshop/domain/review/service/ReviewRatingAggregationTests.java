@@ -4,16 +4,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,8 +28,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import com.cakeshop.domain.product.service.ProductReviewCommandService;
+import com.cakeshop.domain.review.dto.form.ReviewEditForm;
 import com.cakeshop.domain.review.dto.form.ReviewWriteForm;
+import com.cakeshop.domain.review.error.ReviewErrorCode;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
+import com.cakeshop.global.error.BusinessException;
 
 @SpringBootTest
 @MariaDbIntegrationTest
@@ -35,6 +42,9 @@ class ReviewRatingAggregationTests {
 
     @Autowired
     private ReviewService reviewService;
+
+    @Autowired
+    private ReviewAdminService reviewAdminService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -104,6 +114,249 @@ class ReviewRatingAggregationTests {
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM reviews WHERE order_item_id = ?", Long.class, orderItemId))
                 .isZero();
+    }
+
+    @Test
+    void edit_changedOverallRating_movesTheStoredAverage() {
+        long orderItemId = insertPickedUpOrderItem();
+        reviewService.write(form(orderItemId, 5), memberId);
+
+        reviewService.edit(reviewIdOf(orderItemId), editForm(1), memberId);
+
+        assertThat(averageRating()).isEqualByComparingTo("1.00");
+        assertThat(reviewCount()).isEqualTo(1);
+    }
+
+    @Test
+    void edit_unchangedOverallRating_stillRewritesTheAggregate() {
+        long orderItemId = insertPickedUpOrderItem();
+        reviewService.write(form(orderItemId, 4), memberId);
+        jdbcTemplate.update("UPDATE products SET average_rating = 0, review_count = 0 WHERE id = ?",
+                productId);
+
+        reviewService.edit(reviewIdOf(orderItemId), editForm(4), memberId);
+
+        assertThat(averageRating())
+                .as("평점이 그대로여도 재집계가 도는지 — 조건부 호출이면 0 이 남는다")
+                .isEqualByComparingTo("4.00");
+        assertThat(reviewCount()).isEqualTo(1);
+    }
+
+    @Test
+    void delete_lastPublishedReview_dropsTheAverageToZero() {
+        long orderItemId = insertPickedUpOrderItem();
+        reviewService.write(form(orderItemId, 5), memberId);
+
+        reviewService.delete(reviewIdOf(orderItemId), memberId);
+
+        assertThat(averageRating()).isEqualByComparingTo("0.00");
+        assertThat(reviewCount()).isZero();
+    }
+
+    @Test
+    void delete_oneOfTwoReviews_leavesTheOtherInTheAverage() {
+        long firstOrderItemId = insertPickedUpOrderItem();
+        long secondOrderItemId = insertPickedUpOrderItem();
+        reviewService.write(form(firstOrderItemId, 5), memberId);
+        reviewService.write(form(secondOrderItemId, 3), memberId);
+
+        reviewService.delete(reviewIdOf(firstOrderItemId), memberId);
+
+        assertThat(averageRating()).isEqualByComparingTo("3.00");
+        assertThat(reviewCount()).isEqualTo(1);
+    }
+
+    @Test
+    void delete_aggregateFails_rollsBackTheDeletionToo() {
+        long orderItemId = insertPickedUpOrderItem();
+        reviewService.write(form(orderItemId, 5), memberId);
+        long reviewId = reviewIdOf(orderItemId);
+        doThrow(new IllegalStateException("집계 실패"))
+                .when(productReviewCommandService)
+                .applyReviewAggregate(anyLong(), any(), anyLong());
+
+        assertThatThrownBy(() -> reviewService.delete(reviewId, memberId))
+                .isInstanceOf(IllegalStateException.class);
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM reviews WHERE id = ?", String.class, reviewId))
+                .isEqualTo("PUBLISHED");
+    }
+
+    @Test
+    void editAndDeleteAtTheSameTime_leaveTheAggregateMatchingTheStoredRows() throws Exception {
+        long orderItemId = insertPickedUpOrderItem();
+        reviewService.write(form(orderItemId, 5), memberId);
+        long reviewId = reviewIdOf(orderItemId);
+
+        List<Future<Void>> results = executor.invokeAll(List.of(
+                rejectableTask(() -> reviewService.edit(reviewId, editForm(1), memberId)),
+                rejectableTask(() -> reviewService.delete(reviewId, memberId))));
+
+        for (Future<Void> result : results) {
+            result.get(30, TimeUnit.SECONDS);
+        }
+
+        long storedRows = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM reviews WHERE product_id = ? AND status = 'PUBLISHED'",
+                Long.class,
+                productId);
+
+        assertThat(reviewCount()).isEqualTo(storedRows);
+    }
+
+    @Test
+    void block_publishedReview_dropsItFromTheAggregate() {
+        long firstOrderItemId = insertPickedUpOrderItem();
+        long secondOrderItemId = insertPickedUpOrderItem();
+        reviewService.write(form(firstOrderItemId, 5), memberId);
+        reviewService.write(form(secondOrderItemId, 3), memberId);
+
+        reviewAdminService.block(reviewIdOf(firstOrderItemId));
+
+        assertThat(averageRating()).isEqualByComparingTo("3.00");
+        assertThat(reviewCount()).isEqualTo(1);
+    }
+
+    @Test
+    void unblock_blockedReview_bringsItBackIntoTheAggregate() {
+        long orderItemId = insertPickedUpOrderItem();
+        reviewService.write(form(orderItemId, 5), memberId);
+        long reviewId = reviewIdOf(orderItemId);
+        reviewAdminService.block(reviewId);
+
+        reviewAdminService.unblock(reviewId);
+
+        assertThat(averageRating()).isEqualByComparingTo("5.00");
+        assertThat(reviewCount()).isEqualTo(1);
+    }
+
+    @Test
+    void deleteAndBlockAtTheSameTime_applyOnlyOneAndLeaveTheAggregateMatching() throws Exception {
+        long orderItemId = insertPickedUpOrderItem();
+        reviewService.write(form(orderItemId, 5), memberId);
+        long reviewId = reviewIdOf(orderItemId);
+
+        List<Future<Void>> results = executor.invokeAll(List.of(
+                rejectableTask(() -> reviewService.delete(reviewId, memberId)),
+                rejectableTask(() -> reviewAdminService.block(reviewId))));
+
+        for (Future<Void> result : results) {
+            result.get(30, TimeUnit.SECONDS);
+        }
+
+        String finalStatus = jdbcTemplate.queryForObject(
+                "SELECT status FROM reviews WHERE id = ?", String.class, reviewId);
+
+        assertThat(finalStatus)
+                .as("나중 쓰기가 앞의 조치를 덮으면 안 된다 (DOMAIN.md 2.1)")
+                .isIn("DELETED", "BLOCKED");
+        assertThat(reviewCount()).isEqualTo(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM reviews WHERE product_id = ? AND status = 'PUBLISHED'",
+                Long.class,
+                productId));
+    }
+
+    @Test
+    void block_waitingBehindDelete_reportsTheLatestDeletedState() throws Exception {
+        long orderItemId = insertPickedUpOrderItem();
+        reviewService.write(form(orderItemId, 5), memberId);
+        long reviewId = reviewIdOf(orderItemId);
+        CountDownLatch blockReachedProductLock = new CountDownLatch(1);
+        CountDownLatch deletionCommitted = new CountDownLatch(1);
+        AtomicBoolean pauseFirstLock = new AtomicBoolean(true);
+        doAnswer(invocation -> {
+            if (pauseFirstLock.compareAndSet(true, false)) {
+                blockReachedProductLock.countDown();
+                if (!deletionCommitted.await(30, TimeUnit.SECONDS)) {
+                    throw new AssertionError("삭제 커밋을 기다리는 동안 시간 초과");
+                }
+            }
+            return invocation.callRealMethod();
+        }).when(productReviewCommandService).lockForRating(productId);
+
+        Future<Void> blockResult = executor.submit(() -> {
+            reviewAdminService.block(reviewId);
+            return null;
+        });
+        assertThat(blockReachedProductLock.await(30, TimeUnit.SECONDS)).isTrue();
+
+        try {
+            reviewService.delete(reviewId, memberId);
+        } finally {
+            deletionCommitted.countDown();
+        }
+
+        assertThatThrownBy(() -> blockResult.get(30, TimeUnit.SECONDS))
+                .isInstanceOfSatisfying(ExecutionException.class, exception ->
+                        assertThat(exception.getCause())
+                                .isInstanceOfSatisfying(BusinessException.class, businessException ->
+                                        assertThat(businessException.getErrorCode())
+                                                .isEqualTo(
+                                                        ReviewErrorCode.INVALID_REVIEW_TRANSITION)));
+    }
+
+    @Test
+    void edit_waitingBehindDelete_reportsTheLatestDeletedState() throws Exception {
+        long orderItemId = insertPickedUpOrderItem();
+        reviewService.write(form(orderItemId, 5), memberId);
+        long reviewId = reviewIdOf(orderItemId);
+        CountDownLatch editReachedProductLock = new CountDownLatch(1);
+        CountDownLatch deletionCommitted = new CountDownLatch(1);
+        AtomicBoolean pauseFirstLock = new AtomicBoolean(true);
+        doAnswer(invocation -> {
+            if (pauseFirstLock.compareAndSet(true, false)) {
+                editReachedProductLock.countDown();
+                if (!deletionCommitted.await(30, TimeUnit.SECONDS)) {
+                    throw new AssertionError("삭제 커밋을 기다리는 동안 시간 초과");
+                }
+            }
+            return invocation.callRealMethod();
+        }).when(productReviewCommandService).lockForRating(productId);
+
+        Future<Void> editResult = executor.submit(() -> {
+            reviewService.edit(reviewId, editForm(1), memberId);
+            return null;
+        });
+        assertThat(editReachedProductLock.await(30, TimeUnit.SECONDS)).isTrue();
+
+        try {
+            reviewService.delete(reviewId, memberId);
+        } finally {
+            deletionCommitted.countDown();
+        }
+
+        assertThatThrownBy(() -> editResult.get(30, TimeUnit.SECONDS))
+                .isInstanceOfSatisfying(ExecutionException.class, exception ->
+                        assertThat(exception.getCause())
+                                .isInstanceOfSatisfying(BusinessException.class, businessException ->
+                                        assertThat(businessException.getErrorCode())
+                                                .isEqualTo(ReviewErrorCode.REVIEW_NOT_FOUND)));
+    }
+
+    private Callable<Void> rejectableTask(Runnable action) {
+        return () -> {
+            try {
+                action.run();
+            } catch (BusinessException ignored) {
+            }
+            return null;
+        };
+    }
+
+    private long reviewIdOf(long orderItemId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM reviews WHERE order_item_id = ?", Long.class, orderItemId);
+    }
+
+    private ReviewEditForm editForm(int rating) {
+        ReviewEditForm form = new ReviewEditForm();
+        form.setOverallRating(rating);
+        form.setTasteRating(5);
+        form.setDesignRating(4);
+        form.setServiceRating(4);
+        form.setContent("다시 먹어 보고 평점을 고쳤습니다.");
+        return form;
     }
 
     private Callable<Void> writeTask(long orderItemId, int rating) {

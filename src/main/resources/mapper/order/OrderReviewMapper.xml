@@ -61,4 +61,27 @@
          WHERE oi.id = #{orderItemId}
            AND o.member_id = #{memberId}
     </select>
+
+    <select id="findSnapshotsByOrderItemIds"
+            resultType="com.cakeshop.domain.order.dto.view.OrderReviewSnapshotView">
+
+        SELECT oi.id           AS orderItemId,
+               oi.product_name AS productName,
+               o.order_number  AS orderNumber
+          FROM order_items oi
+          JOIN orders o ON o.id = oi.order_id
+         WHERE oi.id IN
+        <foreach collection="orderItemIds" item="orderItemId"
+                 open="(" separator="," close=")">
+            #{orderItemId}
+        </foreach>
+    </select>
+
+    <!-- 상품명은 주문 시점 스냅샷이라 products 를 보지 않는다. 이름이 바뀐 뒤에도 관리자가
+         화면에 보이는 이름 그대로 검색할 수 있어야 한다 (DOMAIN.md 2.6). -->
+    <select id="findOrderItemIdsByProductName" resultType="long">
+        SELECT id
+          FROM order_items
+         WHERE product_name LIKE CONCAT('%', #{keyword}, '%') ESCAPE '!'
+    </select>
 </mapper>
