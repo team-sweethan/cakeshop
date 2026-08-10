@@ -25,12 +25,25 @@ Controller -> Service -> Mapper -> DB
 
 데이터와 업무 규칙은 해당 도메인이 소유한다. 다른 도메인은 그 도메인의 Entity, Mapper와 테이블을 직접
 사용하지 않고, 소유 도메인이 제공하는 공개 `QueryService`·`CommandService`와 필요한 최소 DTO를 통해
-연동한다.
+연동하는 것을 프로젝트의 원칙으로 삼는다.
 
 이 구조는 DDD(Domain-Driven Design)의 **도메인 경계, 업무 언어, 명시적인 연동 계약**에서 영향을 받았다.
 하지만 전술적 DDD 전체를 적용했다고 표현하지 않는다. 현재 Entity는 MyBatis가 DB 한 행을 매핑하는
 객체이고, 모든 기능을 Aggregate·Value Object·Repository로 모델링하지 않는다. 따라서 cakeshop의 현재
 구조를 가장 정확하게 설명하는 이름은 **DDD에서 영향을 받은 도메인 중심 수직 슬라이스**다.
+
+### 현재 남아 있는 경계 예외
+
+이 결정은 도메인 경계 정리가 모든 기존 코드에서 완료됐다는 뜻이 아니다. 현재 코드에는 원칙을 도입하기
+전에 만들어졌거나 아직 계약으로 분리되지 않은 예외가 남아 있다. 대표적으로
+[`RefundService`](../../src/main/java/com/cakeshop/domain/payment/service/RefundService.java)는 주문 Entity와
+`OrderMapper`를 직접 사용하고,
+[`PaymentMapper.xml`](../../src/main/resources/mapper/payment/PaymentMapper.xml)은 `orders` 테이블을 직접
+조회·JOIN한다.
+
+이 문서는 해당 예외를 허용 규칙으로 확정하지 않는다. payment·order 담당자가 공개 Service와 최소 DTO
+계약으로 정리해야 할 기존 기술 부채로 기록하며, 정리되기 전까지는 현재 구조 설명과 목표 규칙을 구분해
+읽는다.
 
 ## 선택 이유
 
