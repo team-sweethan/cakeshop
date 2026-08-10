@@ -80,7 +80,7 @@ public class OrderController {
     ) {
         prefillMemberContact(form, member);
         form.setRequestKey(UUID.randomUUID().toString());
-        return renderCheckout(form, model, requireMemberId(member));
+        return renderGeneralOrderForm(form, model, requireMemberId(member));
     }
 
     // 일반 상품 주문 생성
@@ -95,7 +95,7 @@ public class OrderController {
             if (hasInvalidOrderItem(bindingResult)) {
                 throw new BusinessException(CommonErrorCode.INVALID_INPUT);
             }
-            return renderCheckout(form, model, requireMemberId(member));
+            return renderGeneralOrderForm(form, model, requireMemberId(member));
         }
         long memberId = requireMemberId(member);
 
@@ -143,7 +143,7 @@ public class OrderController {
 
 
     /** 클라이언트 값을 통해 DB정보를 활용해 주문서 화면용 데이터 구성.**/
-    private String renderCheckout(GeneralOrderForm form, Model model, long memberId) {
+    private String renderGeneralOrderForm(GeneralOrderForm form, Model model, long memberId) {
         var checkout = orderCheckoutService.getGeneralCheckout(
                 form.getProductId(), form.getQuantity(), form.getOptionIds()
         );
