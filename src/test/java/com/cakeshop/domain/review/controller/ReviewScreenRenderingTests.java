@@ -293,6 +293,140 @@ class ReviewScreenRenderingTests {
                 .andExpect(content().string(not(containsString("남의 후기입니다."))));
     }
 
+    @Test
+    void myReviews_publishedReview_rendersEditAndDeleteWithTheRewriteWarning() throws Exception {
+        insertReviewWithContent("공개된 내 후기입니다.", "PUBLISHED", WRITTEN_AT);
+        long reviewId = jdbcTemplate.queryForObject(
+                "SELECT id FROM reviews WHERE member_id = ?", Long.class, memberId);
+
+        mockMvc.perform(get("/mypage/reviews").with(authentication(login())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("/reviews/" + reviewId + "/edit")))
+                .andExpect(content().string(containsString("/reviews/" + reviewId + "/delete")))
+                .andExpect(content().string(containsString(
+                        "삭제하면 이 주문 상품에는 다시 후기를 작성할 수 없습니다.")));
+    }
+
+    @Test
+    void myReviews_blockedReview_hidesEditAndDeleteBecauseNothingCanBeDoneToIt()
+            throws Exception {
+
+        insertReviewWithContent("숨겨진 내 후기입니다.", "BLOCKED", WRITTEN_AT);
+        long reviewId = jdbcTemplate.queryForObject(
+                "SELECT id FROM reviews WHERE member_id = ?", Long.class, memberId);
+
+        mockMvc.perform(get("/mypage/reviews").with(authentication(login())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("숨겨진 내 후기입니다.")))
+                .andExpect(content().string(not(containsString("/reviews/" + reviewId + "/edit"))))
+                .andExpect(content().string(
+                        not(containsString("/reviews/" + reviewId + "/delete"))));
+    }
+
+    @Test
+    void editForm_ownPublishedReview_rendersSavedValuesWithoutOrderItemSelection()
+            throws Exception {
+
+        insertReviewWithContent("고치기 전 후기입니다.", "PUBLISHED", WRITTEN_AT);
+        long reviewId = jdbcTemplate.queryForObject(
+                "SELECT id FROM reviews WHERE member_id = ?", Long.class, memberId);
+
+        mockMvc.perform(get("/reviews/{id}/edit", reviewId).with(authentication(login())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("고치기 전 후기입니다.")))
+                .andExpect(content().string(containsString("딸기 생크림 케이크")))
+                .andExpect(content().string(containsString("id=\"overall-rating\"")))
+                .andExpect(content().string(not(containsString("name=\"orderItemId\""))));
+    }
+
+    @Test
+    void editForm_othersReview_is404LikeAMissingOne() throws Exception {
+        insertReviewWithContent("남의 후기입니다.", "PUBLISHED", WRITTEN_AT);
+        long reviewId = jdbcTemplate.queryForObject(
+                "SELECT id FROM reviews WHERE member_id = ?", Long.class, memberId);
+        memberId = insertOtherMember();
+
+        mockMvc.perform(get("/reviews/{id}/edit", reviewId).with(authentication(login())))
+                .andExpect(status().isNotFound())
+                .andExpect(content().string(not(containsString("남의 후기입니다."))));
+    }
+
+    @Test
+    void editForm_blockedReview_is403SoTheAuthorLearnsItWasHidden() throws Exception {
+        insertReviewWithContent("숨겨진 후기입니다.", "BLOCKED", WRITTEN_AT);
+        long reviewId = jdbcTemplate.queryForObject(
+                "SELECT id FROM reviews WHERE member_id = ?", Long.class, memberId);
+
+        mockMvc.perform(get("/reviews/{id}/edit", reviewId).with(authentication(login())))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void edit_validForm_savesNewValuesAndKeepsTheOrderItem() throws Exception {
+        insertReviewWithContent("고치기 전 후기입니다.", "PUBLISHED", WRITTEN_AT);
+        long reviewId = jdbcTemplate.queryForObject(
+                "SELECT id FROM reviews WHERE member_id = ?", Long.class, memberId);
+        long orderItemId = jdbcTemplate.queryForObject(
+                "SELECT order_item_id FROM reviews WHERE id = ?", Long.class, reviewId);
+
+        mockMvc.perform(post("/reviews/{id}/edit", reviewId)
+                        .with(authentication(login()))
+                        .with(csrf())
+                        .param("overallRating", "3")
+                        .param("tasteRating", "3")
+                        .param("designRating", "4")
+                        .param("serviceRating", "4")
+                        .param("content", "다시 먹어 보고 평점을 고쳤습니다."))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/mypage/reviews"));
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT content FROM reviews WHERE id = ?", String.class, reviewId))
+                .isEqualTo("다시 먹어 보고 평점을 고쳤습니다.");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT order_item_id FROM reviews WHERE id = ?", Long.class, reviewId))
+                .isEqualTo(orderItemId);
+    }
+
+    @Test
+    void delete_ownReview_hidesItFromEveryListButKeepsTheRow() throws Exception {
+        insertReviewWithContent("지울 후기입니다.", "PUBLISHED", WRITTEN_AT);
+        long reviewId = jdbcTemplate.queryForObject(
+                "SELECT id FROM reviews WHERE member_id = ?", Long.class, memberId);
+
+        mockMvc.perform(post("/reviews/{id}/delete", reviewId)
+                        .with(authentication(login()))
+                        .with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/mypage/reviews"));
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM reviews WHERE id = ?", String.class, reviewId))
+                .isEqualTo("DELETED");
+
+        mockMvc.perform(get("/mypage/reviews").with(authentication(login())))
+                .andExpect(content().string(not(containsString("지울 후기입니다."))));
+        mockMvc.perform(get("/products/{id}/reviews", productId))
+                .andExpect(content().string(not(containsString("지울 후기입니다."))));
+    }
+
+    @Test
+    void delete_othersReview_is404AndLeavesTheReviewAlone() throws Exception {
+        insertReviewWithContent("남의 후기입니다.", "PUBLISHED", WRITTEN_AT);
+        long reviewId = jdbcTemplate.queryForObject(
+                "SELECT id FROM reviews WHERE member_id = ?", Long.class, memberId);
+        memberId = insertOtherMember();
+
+        mockMvc.perform(post("/reviews/{id}/delete", reviewId)
+                        .with(authentication(login()))
+                        .with(csrf()))
+                .andExpect(status().isNotFound());
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM reviews WHERE id = ?", String.class, reviewId))
+                .isEqualTo("PUBLISHED");
+    }
+
     private void insertReviewWithContent(
             String content, String status, LocalDateTime createdAt) {
 

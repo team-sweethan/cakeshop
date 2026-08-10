@@ -83,8 +83,8 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 | **A1** | 작성할 후기 목록 | 고객 | `GET /mypage/reviews/writable` | **완료** | 1 | `review-write.md` |
 | **A2** | 후기 작성 폼 | 고객 | `GET /reviews/new?orderItemId={N}` | **완료** | 1 | `review-write.md` |
 | **A3** | 후기 등록 | 고객 | `POST /reviews` | **완료** | 1 | `review-write.md` |
-| **A4** | 후기 수정 | 고객 | `GET·POST /reviews/{id}/edit` | 목업 버튼만 | 4 | `review-edit-delete.md` |
-| **A5** | 후기 삭제 | 고객 | `POST /reviews/{id}/delete` | 목업 버튼만 | 4 | `review-edit-delete.md` |
+| **A4** | 후기 수정 | 고객 | `GET·POST /reviews/{id}/edit` | **완료** | 4 | `review-edit-delete.md` |
+| **A5** | 후기 삭제 | 고객 | `POST /reviews/{id}/delete` | **완료** | 4 | `review-edit-delete.md` |
 | **A6** | 이미지 첨부 | 고객 | (A2·A3에 포함) | 목업 입력만 | 8 (2차) | `review-write.md` |
 | **B1** | 상품 후기 목록 | 누구나 | 미리보기 3개(상품 상세 안) · 전체 `GET /products/{id}/reviews` | **완료** | 3 | `review-read.md` |
 | **B2** | 상품 평균 평점·후기 수 | 누구나 | (상품 상세에 포함) | **완료** | 2 | `review-read.md` |
@@ -102,7 +102,7 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 | **E2** | 평점 범위 `CHECK` | — | — | **완료** (#125) | 0 | `history/2026-08-slice-0-schema.md` |
 | **E3** | `Review`·`ReviewReply` 엔티티 | — | — | **완료** (#125) | 0 | `history/2026-08-slice-0-schema.md` |
 
-**신규 화면 5개 중 3개가 났다** — A1(`customer/review/writable.html`, 조각 1), **B1 전체 목록**(`customer/review/product.html`, 조각 3), B3(`customer/review/my.html`, 조각 3). 남은 둘은 A4(`customer/review/edit.html`, 조각 4)와 C3(`admin/review/detail.html`, 조각 5)다. C5·C6의 답글 영역은 C3 화면 안에 들어간다. 화면 인벤토리의 정본은 3절이다.
+**신규 화면 5개 중 4개가 났다** — A1(`customer/review/writable.html`, 조각 1), **B1 전체 목록**(`customer/review/product.html`, 조각 3), B3(`customer/review/my.html`, 조각 3), A4(`customer/review/edit.html`, 조각 4). 남은 하나는 C3(`admin/review/detail.html`, 조각 5)다. C5·C6의 답글 영역은 C3 화면 안에 들어간다. 화면 인벤토리의 정본은 3절이다.
 
 ## 2. 공통 규칙
 
@@ -195,7 +195,7 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 
 ### 2.5 오류 코드
 
-`REVIEW_001`~`REVIEW_004`가 코드에 있다(`ReviewErrorCode`). 나머지는 조각 진행에 맞춰 추가한다. 번호는 `<도메인>_NNN` 팀 규약을 따르며, **`조각` 열이 그 코드가 들어온(또는 들어올) 조각이다.**
+`REVIEW_001`~`REVIEW_006`이 코드에 있다(`ReviewErrorCode`). 나머지는 조각 진행에 맞춰 추가한다. 번호는 `<도메인>_NNN` 팀 규약을 따르며, **`조각` 열이 그 코드가 들어온(또는 들어올) 조각이다.**
 
 | 코드 | 이름 | 메시지 | HTTP | 조각 |
 |---|---|---|---|---|
@@ -277,14 +277,14 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 |---|---|---|
 | 작성할 후기 목록 (A1) | `customer/review/writable.html` | 완료 (조각 1) |
 | 후기 작성 폼 (A2) | `customer/review/form.html` | 완료 (조각 1) |
-| 후기 수정 폼 (A4) | `customer/review/edit.html` | **신규** (조각 4) |
-| 내 후기 목록 (B3) | `customer/review/my.html` | 완료 (조각 3) |
+| 후기 수정 폼 (A4) | `customer/review/edit.html` | 완료 (조각 4) |
+| 내 후기 목록 (B3) | `customer/review/my.html` | 완료 (조각 3. 조각 4에서 수정·삭제 버튼) |
 | 상품 후기 미리보기 3개 (B1·B2·B4) | `customer/product/detail.html` | 후기 영역 교체 + `전체 리뷰 확인` 버튼 완료 (조각 3) |
 | 상품 후기 전체 목록 (B1·B4) | `customer/review/product.html` | 완료 (조각 3) |
 | 관리자 목록 (C1·C2) | `admin/review/list.html` | 목업 → 전환 (조각 5. `삭제` 제거, 상태 필터 추가) |
 | 관리자 상세 (C3·C5·C6) | `admin/review/detail.html` | **신규** (조각 5) |
 
-진입점 수정: `customer/member/mypage.html`(A1·B3 링크 2개 — 완료), `customer/product/detail.html`(작성 버튼 → A1, `전체 리뷰 확인` → B1 — 완료), `home/screens.html`(화면 카탈로그 C16·C22·C23 — 완료), `customer/order/detail.html`(`orderItemId` 전달 — **아직 안 함**. 지금 작성 진입은 A1 목록 하나뿐이다)
+진입점 수정: `customer/member/mypage.html`(A1·B3 링크 2개 — 완료), `customer/product/detail.html`(작성 버튼 → A1, `전체 리뷰 확인` → B1 — 완료), `home/screens.html`(화면 카탈로그 C16·C22·C23·C24 — 완료), `customer/order/detail.html`(`orderItemId` 전달 — **아직 안 함**. 지금 작성 진입은 A1 목록 하나뿐이다)
 
 **화면 카탈로그(`home/screens.html`)도 진입점이다.** 새 화면을 내고 여기를 빠뜨리면 팀이 그 화면의 존재를 모른다. `specs/review-write.md`가 조각 1에서 같은 자리를 한 번 놓쳤다.
 
@@ -298,7 +298,6 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 | 항목 | 결정 시점 |
 |---|---|
 | **관리자 검색 계약**(`writer`·`product`) | 조각 5 착수 시 설계 확정, **PR에서 수민·주환님 확인** (C2·2.7) |
-| **A4 수정 시 재집계 조건** — `overall_rating`이 바뀔 때만 부르면, 두 요청이 같은 값을 읽고 하나가 먼저 바꾼 뒤 다른 하나가 옛 값으로 되돌릴 때 집계가 누락된다. 잠금 아래에서 최신 값과 비교하거나 조건 없이 항상 재집계하는 쪽 | 조각 4 착수 전 (A4·D1) |
 | D2 `event_key` 규격 | 조각 7 |
 | D2 `NEW_REVIEW` 수신 관리자 | 조각 7, 민정님과 합의 |
 | 관리자 숨김 사유·조치 이력 기록 여부 | 필요해지면 새 migration (C1) |

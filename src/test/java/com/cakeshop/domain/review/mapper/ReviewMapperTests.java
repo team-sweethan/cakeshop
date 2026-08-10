@@ -226,6 +226,118 @@ class ReviewMapperTests {
         assertThat(firstPage).doesNotContainAnyElementsOf(secondPage);
     }
 
+    @Test
+    void findById_deletedReview_isStillReturnedSoTheCauseCanBeTold() {
+        long orderItemId = insertPickedUpOrderItem();
+        Review review = Review.create(
+                orderItemId, productId, memberId, 5, 5, 4, 4, "지워질 후기입니다.");
+        reviewMapper.insert(review);
+        jdbcTemplate.update("UPDATE reviews SET status = 'DELETED' WHERE id = ?", review.getId());
+
+        assertThat(reviewMapper.findById(review.getId()))
+                .extracting(ReviewRow::status)
+                .isEqualTo(ReviewStatus.DELETED);
+    }
+
+    @Test
+    void findById_missingReview_isNull() {
+        assertThat(reviewMapper.findById(Long.MAX_VALUE)).isNull();
+    }
+
+    @Test
+    void update_publishedReview_changesRatingsAndContentOnly() {
+        long orderItemId = insertPickedUpOrderItem();
+        Review review = Review.create(
+                orderItemId, productId, memberId, 5, 5, 4, 4, "고치기 전 후기입니다.");
+        reviewMapper.insert(review);
+
+        int affectedRows = reviewMapper.update(Review.edit(
+                review.getId(), memberId, 3, 2, 1, 4, "고친 뒤 후기입니다."));
+
+        assertThat(affectedRows).isEqualTo(1);
+
+        ReviewRow updated = reviewMapper.findById(review.getId());
+        assertThat(updated.overallRating()).isEqualTo(3);
+        assertThat(updated.tasteRating()).isEqualTo(2);
+        assertThat(updated.designRating()).isEqualTo(1);
+        assertThat(updated.serviceRating()).isEqualTo(4);
+        assertThat(updated.content()).isEqualTo("고친 뒤 후기입니다.");
+        assertThat(updated.orderItemId()).isEqualTo(orderItemId);
+        assertThat(updated.productId()).isEqualTo(productId);
+        assertThat(updated.memberId()).isEqualTo(memberId);
+        assertThat(updated.status()).isEqualTo(ReviewStatus.PUBLISHED);
+    }
+
+    @Test
+    void update_blockedReview_affectsNoRowSoTheAuthorCannotOverwriteIt() {
+        long reviewId = insertReviewWithStatus(5, "BLOCKED");
+
+        assertThat(reviewMapper.update(Review.edit(
+                reviewId, memberId, 1, 1, 1, 1, "숨겨진 뒤 덮어쓴 후기입니다.")))
+                .isZero();
+
+        assertThat(reviewMapper.findById(reviewId).content()).isEqualTo("후기 본문입니다.");
+    }
+
+    @Test
+    void update_otherMembersReview_affectsNoRow() {
+        long reviewId = insertReviewWithStatus(5, "PUBLISHED");
+        long otherMemberId = insertMember();
+
+        assertThat(reviewMapper.update(Review.edit(
+                reviewId, otherMemberId, 1, 1, 1, 1, "남이 고쳐 쓴 후기입니다.")))
+                .isZero();
+    }
+
+    @Test
+    void update_ratingOutOfRange_isRejectedByCheckConstraint() {
+        long reviewId = insertReviewWithStatus(5, "PUBLISHED");
+
+        assertThatThrownBy(() -> reviewMapper.update(Review.edit(
+                reviewId, memberId, 6, 5, 4, 4, "범위 밖으로 고친 후기입니다.")))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void deleteByAuthor_publishedReview_keepsTheRowSoRewritingStaysBlocked() {
+        long orderItemId = insertPickedUpOrderItem();
+        Review review = Review.create(
+                orderItemId, productId, memberId, 5, 5, 4, 4, "지울 후기입니다.");
+        reviewMapper.insert(review);
+
+        assertThat(reviewMapper.deleteByAuthor(review.getId(), memberId)).isEqualTo(1);
+
+        assertThat(reviewMapper.findById(review.getId()).status())
+                .isEqualTo(ReviewStatus.DELETED);
+        assertThatThrownBy(() -> reviewMapper.insert(Review.create(
+                orderItemId, productId, memberId, 4, 4, 4, 4, "다시 쓴 후기입니다.")))
+                .isInstanceOf(DuplicateKeyException.class);
+    }
+
+    @Test
+    void deleteByAuthor_blockedReview_affectsNoRow() {
+        long reviewId = insertReviewWithStatus(5, "BLOCKED");
+
+        assertThat(reviewMapper.deleteByAuthor(reviewId, memberId)).isZero();
+        assertThat(reviewMapper.findById(reviewId).status()).isEqualTo(ReviewStatus.BLOCKED);
+    }
+
+    @Test
+    void deleteByAuthor_alreadyDeletedReview_affectsNoRow() {
+        long reviewId = insertReviewWithStatus(5, "DELETED");
+
+        assertThat(reviewMapper.deleteByAuthor(reviewId, memberId)).isZero();
+    }
+
+    @Test
+    void deleteByAuthor_otherMembersReview_affectsNoRow() {
+        long reviewId = insertReviewWithStatus(5, "PUBLISHED");
+        long otherMemberId = insertMember();
+
+        assertThat(reviewMapper.deleteByAuthor(reviewId, otherMemberId)).isZero();
+        assertThat(reviewMapper.findById(reviewId).status()).isEqualTo(ReviewStatus.PUBLISHED);
+    }
+
     private List<Long> idsOf(List<ReviewRow> rows) {
         return rows.stream().map(ReviewRow::id).toList();
     }
@@ -246,12 +358,14 @@ class ReviewMapperTests {
         return ids;
     }
 
-    private void insertReviewWithStatus(int overallRating, String status) {
+    private long insertReviewWithStatus(int overallRating, String status) {
         long orderItemId = insertPickedUpOrderItem();
-        reviewMapper.insert(Review.create(
-                orderItemId, productId, memberId, overallRating, 5, 4, 4, "후기 본문입니다."));
+        Review review = Review.create(
+                orderItemId, productId, memberId, overallRating, 5, 4, 4, "후기 본문입니다.");
+        reviewMapper.insert(review);
         jdbcTemplate.update(
                 "UPDATE reviews SET status = ? WHERE order_item_id = ?", status, orderItemId);
+        return review.getId();
     }
 
     private long insertMember() {

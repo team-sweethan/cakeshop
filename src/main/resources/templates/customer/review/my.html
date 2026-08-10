@@ -23,13 +23,11 @@
       </p>
 
       <div class="stack" th:unless="${reviews.content.isEmpty()}">
-        <a class="panel stack"
-           th:each="review : ${reviews.content}"
-           th:href="@{/products/{id}/reviews(id=${review.productId})}"
-           style="display:block">
+        <div class="panel stack" th:each="review : ${reviews.content}">
           <div class="cluster" style="justify-content:space-between">
             <div>
-              <strong th:text="${review.productName}">상품명</strong>
+              <a th:href="@{/products/{id}/reviews(id=${review.productId})}"
+                 th:text="${review.productName}">상품명</a>
               <p class="text-muted" th:text="${review.orderNumber}">주문번호</p>
             </div>
             <div class="cluster">
@@ -47,7 +45,17 @@
           </p>
 
           <p style="white-space:pre-wrap" th:text="${review.content}">후기 본문</p>
-        </a>
+
+          <div class="cluster" th:unless="${review.blocked}">
+            <a class="btn" th:href="@{/reviews/{id}/edit(id=${review.id})}">수정</a>
+
+            <form method="post"
+                  th:action="@{/reviews/{id}/delete(id=${review.id})}"
+                  onsubmit="return confirm('삭제하면 이 주문 상품에는 다시 후기를 작성할 수 없습니다. 삭제하시겠습니까?');">
+              <button class="btn btn--danger" type="submit">삭제</button>
+            </form>
+          </div>
+        </div>
       </div>
     </section>
 
