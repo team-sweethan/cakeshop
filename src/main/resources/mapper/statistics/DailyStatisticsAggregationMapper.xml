@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cakeshop.domain.statistics.mapper.DailyStatisticsAggregationMapper">
+    <!-- 사용자 입력은 #{}만 사용하고 ${}는 사용하지 않는다. -->
+
+    <insert id="replaceDailyStatistics">
+        INSERT INTO daily_statistics (
+            statistics_date,
+            total_order_count,
+            completed_order_count,
+            canceled_order_count,
+            total_sales_amount,
+            aggregated_at
+        )
+        SELECT
+            #{statisticsDate},
+            COUNT(statistics_order.id),
+            COALESCE(SUM(
+                CASE
+                    WHEN statistics_order.status = 'PICKED_UP' THEN 1
+                    ELSE 0
+                END
+            ), 0),
+            COALESCE(SUM(
+                CASE
+                    WHEN statistics_order.status IN ('CANCELED', 'REJECTED') THEN 1
+                    ELSE 0
+                END
+            ), 0),
+            (
+                SELECT COALESCE(SUM(statistics_payment.amount), 0)
+                FROM payments AS statistics_payment
+                WHERE statistics_payment.status = 'DONE'
+                  AND statistics_payment.approved_at &gt;= #{start}
+                  AND statistics_payment.approved_at &lt; #{end}
+            ),
+            CURRENT_TIMESTAMP(6)
+        FROM orders AS statistics_order
+        WHERE statistics_order.created_at &gt;= #{start}
+          AND statistics_order.created_at &lt; #{end}
+        ON DUPLICATE KEY UPDATE
+            total_order_count = VALUES(total_order_count),
+            completed_order_count = VALUES(completed_order_count),
+            canceled_order_count = VALUES(canceled_order_count),
+            total_sales_amount = VALUES(total_sales_amount),
+            aggregated_at = VALUES(aggregated_at)
+    </insert>
+
+    <select id="findChangedStatisticsDates" resultType="java.time.LocalDate">
+        SELECT changed_statistics.statistics_date
+        FROM (
+            SELECT DATE(statistics_order.created_at) AS statistics_date
+            FROM orders AS statistics_order
+            WHERE statistics_order.updated_at &gt; #{sourceWindowStartedAt}
+              AND statistics_order.updated_at &lt;= #{sourceWindowEndedAt}
+
+            UNION
+
+            SELECT DATE(statistics_payment.approved_at) AS statistics_date
+            FROM payments AS statistics_payment
+            WHERE statistics_payment.approved_at IS NOT NULL
+              AND statistics_payment.updated_at &gt; #{sourceWindowStartedAt}
+              AND statistics_payment.updated_at &lt;= #{sourceWindowEndedAt}
+        ) AS changed_statistics
+        WHERE changed_statistics.statistics_date &lt;= #{latestStatisticsDate}
+        ORDER BY changed_statistics.statistics_date
+    </select>
+
+    <select id="findEarliestOrderDate" resultType="java.time.LocalDate">
+        SELECT DATE(MIN(statistics_order.created_at))
+        FROM orders AS statistics_order
+    </select>
+
+    <select id="findEarliestApprovedPaymentDate" resultType="java.time.LocalDate">
+        SELECT DATE(MIN(statistics_payment.approved_at))
+        FROM payments AS statistics_payment
+        WHERE statistics_payment.approved_at IS NOT NULL
+    </select>
+</mapper>
