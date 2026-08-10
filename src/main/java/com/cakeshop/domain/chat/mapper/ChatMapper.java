@@ -51,6 +51,9 @@ public interface ChatMapper {
     // ==========================================
     void insertChatMessage(ChatMessage chatMessage); // 메시지 저장
 
+    // 메시지 단건 조회
+    ChatMessage findChatMessageById(Long id);
+
     // 채팅방 대화 목록 조회
     List<ChatMessage> findMessageByChatRoomId(
         @Param("chatRoomId") Long chatRoomId,
