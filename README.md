@@ -263,13 +263,15 @@ RDS는 데이터베이스이고 S3는 파일 저장소이므로 서로 독립적
 AWS_REGION=ap-northeast-2
 AWS_ACCESS_KEY_ID=your-local-access-key
 AWS_SECRET_ACCESS_KEY=your-local-secret-key
+AWS_SESSION_TOKEN=
 AWS_S3_BUCKET=sweethan-cakeshop-images
 AWS_S3_BASE_URL=https://sweethan-cakeshop-images.s3.ap-northeast-2.amazonaws.com
 ```
 
-로컬 키 두 값은 반드시 함께 설정합니다. 둘 다 비어 있으면 `aws configure`, 현재 프로세스의 AWS 환경 변수,
-IAM Role 같은 AWS SDK 기본 자격 증명 체인을 사용합니다. 다음 프로필 조합으로 실행한 뒤 관리자 상품·매장
-이미지 업로드로 확인합니다.
+로컬 Access Key와 Secret Key는 반드시 함께 설정합니다. STS나 IAM Identity Center의 임시 자격 증명을
+사용하면 `AWS_SESSION_TOKEN`도 함께 설정합니다. Access Key와 Secret Key가 모두 비어 있으면
+`aws configure`, 현재 프로세스의 AWS 환경 변수, IAM Role 같은 AWS SDK 기본 자격 증명 체인을 사용합니다.
+다음 프로필 조합으로 실행한 뒤 관리자 상품·매장 이미지 업로드로 확인합니다.
 
 ```powershell
 .\gradlew.bat bootRun --args="--spring.profiles.active=local,s3"
