@@ -1,6 +1,7 @@
 package com.cakeshop.domain.member.mapper;
 
 import com.cakeshop.domain.member.dto.view.MemberAdminDetailRow;
+import com.cakeshop.domain.member.dto.view.MemberSummaryView;
 import com.cakeshop.domain.member.entity.Member;
 import com.cakeshop.domain.member.entity.MemberStatus;
 import com.cakeshop.domain.member.dto.form.MemberAdminSearchCondition;
@@ -33,6 +34,14 @@ public interface MemberMapper {
             @Param("memberId") Long memberId);
 
     Optional<Member> findByEmail(@Param("email") String email);
+
+    Optional<MemberSummaryView> findSummaryByMemberId(@Param("memberId") Long memberId);
+
+    List<MemberSummaryView> findAllSummaries(
+            @Param("size") int size,
+            @Param("offset") int offset);
+
+    long countAllMembers();
 
     /** 주문 등 회원 전용 기능 실행 시 현재 ACTIVE 상태인지 DB 기준으로 확인한다. */
     boolean existsActiveMember(@Param("memberId") long memberId);

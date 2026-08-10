@@ -3,6 +3,7 @@ package com.cakeshop.domain.member.mapper;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.cakeshop.domain.member.dto.view.MemberSummaryView;
 import com.cakeshop.domain.member.entity.Member;
 import com.cakeshop.domain.member.entity.MemberStatus;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
@@ -60,6 +61,36 @@ class MemberMapperTests {
         assertThat(memberMapper.existsActiveMember(activeId)).isTrue();
         assertThat(memberMapper.existsActiveMember(withdrawnId)).isFalse();
         assertThat(memberMapper.existsActiveMember(Long.MAX_VALUE)).isFalse();
+    }
+
+    @Test
+    void findSummaryByMemberId_existingMember_returnsPublicFields() {
+        Long memberId = insertMember(uniqueEmail("summary"), MemberStatus.SUSPENDED);
+
+        assertThat(memberMapper.findSummaryByMemberId(memberId))
+                .hasValueSatisfying(summary -> {
+                    assertThat(summary.id()).isEqualTo(memberId);
+                    assertThat(summary.name()).isEqualTo("매퍼 테스트");
+                    assertThat(summary.role()).isEqualTo("USER");
+                    assertThat(summary.status()).isEqualTo(MemberStatus.SUSPENDED);
+                });
+    }
+
+    @Test
+    void findSummaryByMemberId_missingMember_returnsEmpty() {
+        assertThat(memberMapper.findSummaryByMemberId(Long.MAX_VALUE)).isEmpty();
+    }
+
+    @Test
+    void findAllSummaries_existingMembers_returnsPublicFieldsInIdOrder() {
+        Long firstId = insertMember(uniqueEmail("summary-all-first"), MemberStatus.ACTIVE);
+        Long secondId = insertMember(uniqueEmail("summary-all-second"), MemberStatus.SUSPENDED);
+
+        assertThat(memberMapper.findAllSummaries(1000, 0))
+                .filteredOn(summary -> summary.id().equals(firstId) || summary.id().equals(secondId))
+                .extracting(MemberSummaryView::id)
+                .containsExactly(firstId, secondId);
+        assertThat(memberMapper.countAllMembers()).isGreaterThanOrEqualTo(2);
     }
 
     @Test
