@@ -30,6 +30,7 @@ import com.cakeshop.domain.order.service.OrderReviewQueryService;
 import com.cakeshop.domain.product.error.ProductErrorCode;
 import com.cakeshop.domain.product.service.ProductQueryService;
 import com.cakeshop.domain.product.service.ProductReviewCommandService;
+import com.cakeshop.domain.review.dto.form.ReviewEditForm;
 import com.cakeshop.domain.review.dto.form.ReviewWriteForm;
 import com.cakeshop.domain.review.dto.view.MyReviewView;
 import com.cakeshop.domain.review.dto.view.ProductRatingAggregate;
@@ -204,9 +205,7 @@ class ReviewServiceTests {
     }
 
     private ReviewRow row(ReviewStatus status) {
-        return new ReviewRow(
-                REVIEW_ID, ORDER_ITEM_ID, PRODUCT_ID, MEMBER_ID,
-                5, 5, 4, 4, "맛있게 잘 먹었습니다.", status, WRITTEN_AT);
+        return rowOf(MEMBER_ID, status);
     }
 
     @Test
@@ -319,6 +318,191 @@ class ReviewServiceTests {
 
         verify(productReviewCommandService, never())
                 .applyReviewAggregate(anyLong(), any(), anyLong());
+    }
+
+    @Test
+    void getEditableReview_otherMembersReview_throwsReviewNotFoundNotForbidden() {
+        when(reviewMapper.findById(REVIEW_ID)).thenReturn(rowOf(999L, ReviewStatus.PUBLISHED));
+
+        assertThatThrownBy(() -> reviewService.getEditableReview(REVIEW_ID, MEMBER_ID))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ReviewErrorCode.REVIEW_NOT_FOUND));
+    }
+
+    @Test
+    void getEditableReview_deletedReview_throwsTheSameReviewNotFound() {
+        when(reviewMapper.findById(REVIEW_ID)).thenReturn(row(ReviewStatus.DELETED));
+
+        assertThatThrownBy(() -> reviewService.getEditableReview(REVIEW_ID, MEMBER_ID))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ReviewErrorCode.REVIEW_NOT_FOUND));
+    }
+
+    @Test
+    void getEditableReview_blockedReview_throwsBlockedReviewSoTheAuthorLearnsWhy() {
+        when(reviewMapper.findById(REVIEW_ID)).thenReturn(row(ReviewStatus.BLOCKED));
+
+        assertThatThrownBy(() -> reviewService.getEditableReview(REVIEW_ID, MEMBER_ID))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ReviewErrorCode.BLOCKED_REVIEW));
+    }
+
+    @Test
+    void edit_savedReview_keepsOrderItemAndProductOutOfTheUpdate() {
+        givenEditableReview();
+
+        reviewService.edit(REVIEW_ID, editForm(3), MEMBER_ID);
+
+        ArgumentCaptor<Review> updated = ArgumentCaptor.forClass(Review.class);
+        verify(reviewMapper).update(updated.capture());
+        assertThat(updated.getValue().getId()).isEqualTo(REVIEW_ID);
+        assertThat(updated.getValue().getMemberId()).isEqualTo(MEMBER_ID);
+        assertThat(updated.getValue().getOverallRating()).isEqualTo(3);
+        assertThat(updated.getValue().getOrderItemId()).isNull();
+        assertThat(updated.getValue().getProductId()).isNull();
+    }
+
+    @Test
+    void edit_overallRatingUnchanged_stillRecalculatesTheAggregate() {
+        givenEditableReview();
+
+        reviewService.edit(REVIEW_ID, editForm(5), MEMBER_ID);
+
+        verify(reviewMapper).aggregateForUpdate(PRODUCT_ID);
+        verify(productReviewCommandService)
+                .applyReviewAggregate(PRODUCT_ID, new BigDecimal("4.50"), 2L);
+    }
+
+    @Test
+    void edit_ratingAggregate_isAppliedAfterLockAndUpdateInThatOrder() {
+        givenEditableReview();
+
+        reviewService.edit(REVIEW_ID, editForm(3), MEMBER_ID);
+
+        InOrder order = inOrder(productReviewCommandService, reviewMapper);
+        order.verify(productReviewCommandService).lockForRating(PRODUCT_ID);
+        order.verify(reviewMapper).update(any());
+        order.verify(reviewMapper).aggregateForUpdate(PRODUCT_ID);
+        order.verify(productReviewCommandService)
+                .applyReviewAggregate(PRODUCT_ID, new BigDecimal("4.50"), 2L);
+    }
+
+    @Test
+    void edit_blockedBetweenCheckAndUpdate_throwsBlockedReviewAndSkipsAggregate() {
+        when(reviewMapper.findById(REVIEW_ID))
+                .thenReturn(row(ReviewStatus.PUBLISHED), row(ReviewStatus.BLOCKED));
+        when(reviewMapper.update(any())).thenReturn(0);
+
+        assertThatThrownBy(() -> reviewService.edit(REVIEW_ID, editForm(3), MEMBER_ID))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ReviewErrorCode.BLOCKED_REVIEW));
+
+        verify(productReviewCommandService, never())
+                .applyReviewAggregate(anyLong(), any(), anyLong());
+    }
+
+    @Test
+    void edit_updateAppliedToNoRowWithNoVisibleCause_throwsInvalidTransition() {
+        when(reviewMapper.findById(REVIEW_ID)).thenReturn(row(ReviewStatus.PUBLISHED));
+        when(reviewMapper.update(any())).thenReturn(0);
+
+        assertThatThrownBy(() -> reviewService.edit(REVIEW_ID, editForm(3), MEMBER_ID))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ReviewErrorCode.INVALID_REVIEW_TRANSITION));
+    }
+
+    @Test
+    void edit_blockedReview_isRejectedBeforeTheProductIsLocked() {
+        when(reviewMapper.findById(REVIEW_ID)).thenReturn(row(ReviewStatus.BLOCKED));
+
+        assertThatThrownBy(() -> reviewService.edit(REVIEW_ID, editForm(3), MEMBER_ID))
+                .isInstanceOf(BusinessException.class);
+
+        verify(productReviewCommandService, never()).lockForRating(anyLong());
+        verify(reviewMapper, never()).update(any());
+    }
+
+    @Test
+    void delete_publishedReview_softDeletesAndRecalculatesInThatOrder() {
+        givenEditableReview();
+        when(reviewMapper.deleteByAuthor(REVIEW_ID, MEMBER_ID)).thenReturn(1);
+
+        reviewService.delete(REVIEW_ID, MEMBER_ID);
+
+        InOrder order = inOrder(productReviewCommandService, reviewMapper);
+        order.verify(productReviewCommandService).lockForRating(PRODUCT_ID);
+        order.verify(reviewMapper).deleteByAuthor(REVIEW_ID, MEMBER_ID);
+        order.verify(productReviewCommandService)
+                .applyReviewAggregate(PRODUCT_ID, new BigDecimal("4.50"), 2L);
+    }
+
+    @Test
+    void delete_blockedReview_throwsBlockedReviewAndTouchesNothing() {
+        when(reviewMapper.findById(REVIEW_ID)).thenReturn(row(ReviewStatus.BLOCKED));
+
+        assertThatThrownBy(() -> reviewService.delete(REVIEW_ID, MEMBER_ID))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ReviewErrorCode.BLOCKED_REVIEW));
+
+        verify(reviewMapper, never()).deleteByAuthor(anyLong(), anyLong());
+        verify(productReviewCommandService, never())
+                .applyReviewAggregate(anyLong(), any(), anyLong());
+    }
+
+    @Test
+    void delete_otherMembersReview_throwsReviewNotFoundAndTouchesNothing() {
+        when(reviewMapper.findById(REVIEW_ID)).thenReturn(rowOf(999L, ReviewStatus.PUBLISHED));
+
+        assertThatThrownBy(() -> reviewService.delete(REVIEW_ID, MEMBER_ID))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ReviewErrorCode.REVIEW_NOT_FOUND));
+
+        verify(reviewMapper, never()).deleteByAuthor(anyLong(), anyLong());
+    }
+
+    @Test
+    void delete_deletedBetweenCheckAndUpdate_throwsReviewNotFoundAndSkipsAggregate() {
+        when(reviewMapper.findById(REVIEW_ID))
+                .thenReturn(row(ReviewStatus.PUBLISHED), row(ReviewStatus.DELETED));
+        when(reviewMapper.deleteByAuthor(REVIEW_ID, MEMBER_ID)).thenReturn(0);
+
+        assertThatThrownBy(() -> reviewService.delete(REVIEW_ID, MEMBER_ID))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ReviewErrorCode.REVIEW_NOT_FOUND));
+
+        verify(productReviewCommandService, never())
+                .applyReviewAggregate(anyLong(), any(), anyLong());
+    }
+
+    private void givenEditableReview() {
+        when(reviewMapper.findById(REVIEW_ID)).thenReturn(row(ReviewStatus.PUBLISHED));
+        when(reviewMapper.update(any())).thenReturn(1);
+        when(reviewMapper.aggregateForUpdate(PRODUCT_ID))
+                .thenReturn(new ProductRatingAggregate(new BigDecimal("4.50"), 2L));
+    }
+
+    private ReviewEditForm editForm(int overallRating) {
+        ReviewEditForm form = new ReviewEditForm();
+        form.setOverallRating(overallRating);
+        form.setTasteRating(5);
+        form.setDesignRating(4);
+        form.setServiceRating(4);
+        form.setContent("다시 먹어 보고 평점을 고쳤습니다.");
+        return form;
+    }
+
+    private ReviewRow rowOf(long memberId, ReviewStatus status) {
+        return new ReviewRow(
+                REVIEW_ID, ORDER_ITEM_ID, PRODUCT_ID, memberId,
+                5, 5, 4, 4, "맛있게 잘 먹었습니다.", status, WRITTEN_AT);
     }
 
     private void givenWritableTarget() {

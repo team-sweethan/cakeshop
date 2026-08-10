@@ -20,6 +20,12 @@ public interface ReviewMapper {
 
     int insert(Review review);
 
+    ReviewRow findById(@Param("id") long id);
+
+    int update(Review review);
+
+    int deleteByAuthor(@Param("reviewId") long reviewId, @Param("memberId") long memberId);
+
     // FOR UPDATE 를 빼면 REPEATABLE READ 스냅샷이 자격 검증 시점에 굳어 먼저 커밋된 후기를
     // 못 본다 (D1).
     ProductRatingAggregate aggregateForUpdate(@Param("productId") long productId);

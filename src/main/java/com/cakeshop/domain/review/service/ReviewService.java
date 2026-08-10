@@ -18,12 +18,14 @@ import com.cakeshop.domain.order.dto.view.OrderReviewTargetView;
 import com.cakeshop.domain.order.service.OrderReviewQueryService;
 import com.cakeshop.domain.product.service.ProductQueryService;
 import com.cakeshop.domain.product.service.ProductReviewCommandService;
+import com.cakeshop.domain.review.dto.form.ReviewEditForm;
 import com.cakeshop.domain.review.dto.form.ReviewWriteForm;
 import com.cakeshop.domain.review.dto.view.MyReviewView;
 import com.cakeshop.domain.review.dto.view.ProductRatingAggregate;
 import com.cakeshop.domain.review.dto.view.ProductReviewView;
 import com.cakeshop.domain.review.dto.view.ReviewRow;
 import com.cakeshop.domain.review.entity.Review;
+import com.cakeshop.domain.review.entity.ReviewStatus;
 import com.cakeshop.domain.review.error.ReviewErrorCode;
 import com.cakeshop.domain.review.mapper.ReviewMapper;
 import com.cakeshop.global.common.paging.PageRequest;
@@ -114,6 +116,13 @@ public class ReviewService {
         return new PageResult<>(content, pageRequest, total);
     }
 
+    @Transactional(readOnly = true)
+    public MyReviewView getEditableReview(long reviewId, long memberId) {
+        ReviewRow review = requireEditableReview(reviewId, memberId);
+
+        return MyReviewView.of(review, findOrderSnapshots(List.of(review)).get(review.orderItemId()));
+    }
+
     @Transactional
     public void write(ReviewWriteForm form, long memberId) {
         // 폼을 연 뒤 제출까지 시간이 벌어질 수 있고, 폼을 거치지 않은 직접 호출도 막아야 한다.
@@ -144,8 +153,66 @@ public class ReviewService {
         recalculateRating(target.productId());
     }
 
-    // 후기 쓰기와 같은 트랜잭션이어야 한다. 후기만 커밋되고 집계가 실패하면 그 상품에 다음 쓰기가
-    // 올 때까지 아무도 모르는 채 틀린 평점과 정렬이 나간다 (D1).
+    @Transactional
+    public void edit(long reviewId, ReviewEditForm form, long memberId) {
+        ReviewRow review = requireEditableReview(reviewId, memberId);
+
+        productReviewCommandService.lockForRating(review.productId());
+
+        requireApplied(
+                reviewMapper.update(Review.edit(
+                        reviewId,
+                        memberId,
+                        form.getOverallRating(),
+                        form.getTasteRating(),
+                        form.getDesignRating(),
+                        form.getServiceRating(),
+                        form.getContent())),
+                reviewId,
+                memberId);
+
+        recalculateRating(review.productId());
+    }
+
+    @Transactional
+    public void delete(long reviewId, long memberId) {
+        ReviewRow review = requireEditableReview(reviewId, memberId);
+
+        productReviewCommandService.lockForRating(review.productId());
+
+        requireApplied(reviewMapper.deleteByAuthor(reviewId, memberId), reviewId, memberId);
+
+        recalculateRating(review.productId());
+    }
+
+    private ReviewRow requireEditableReview(long reviewId, long memberId) {
+        ReviewRow review = reviewMapper.findById(reviewId);
+
+        if (review == null
+                || !Objects.equals(review.memberId(), memberId)
+                || review.status() == ReviewStatus.DELETED) {
+            throw new BusinessException(ReviewErrorCode.REVIEW_NOT_FOUND);
+        }
+
+        if (review.status() == ReviewStatus.BLOCKED) {
+            throw new BusinessException(ReviewErrorCode.BLOCKED_REVIEW);
+        }
+
+        return review;
+    }
+
+    private void requireApplied(int affectedRows, long reviewId, long memberId) {
+        if (affectedRows > 0) {
+            return;
+        }
+
+        requireEditableReview(reviewId, memberId);
+
+        throw new BusinessException(ReviewErrorCode.INVALID_REVIEW_TRANSITION);
+    }
+
+    // 후기를 바꾼 쓰기와 같은 트랜잭션이어야 한다. 후기만 커밋되고 집계가 실패하면 그 상품에
+    // 다음 쓰기가 올 때까지 아무도 모르는 채 틀린 평점과 정렬이 나간다 (D1).
     private void recalculateRating(long productId) {
         ProductRatingAggregate aggregate = reviewMapper.aggregateForUpdate(productId);
 

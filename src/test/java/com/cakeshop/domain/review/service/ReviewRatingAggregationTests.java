@@ -24,8 +24,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import com.cakeshop.domain.product.service.ProductReviewCommandService;
+import com.cakeshop.domain.review.dto.form.ReviewEditForm;
 import com.cakeshop.domain.review.dto.form.ReviewWriteForm;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
+import com.cakeshop.global.error.BusinessException;
 
 @SpringBootTest
 @MariaDbIntegrationTest
@@ -104,6 +106,120 @@ class ReviewRatingAggregationTests {
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM reviews WHERE order_item_id = ?", Long.class, orderItemId))
                 .isZero();
+    }
+
+    @Test
+    void edit_changedOverallRating_movesTheStoredAverage() {
+        long orderItemId = insertPickedUpOrderItem();
+        reviewService.write(form(orderItemId, 5), memberId);
+
+        reviewService.edit(reviewIdOf(orderItemId), editForm(1), memberId);
+
+        assertThat(averageRating()).isEqualByComparingTo("1.00");
+        assertThat(reviewCount()).isEqualTo(1);
+    }
+
+    @Test
+    void edit_unchangedOverallRating_stillRewritesTheAggregate() {
+        long orderItemId = insertPickedUpOrderItem();
+        reviewService.write(form(orderItemId, 4), memberId);
+        jdbcTemplate.update("UPDATE products SET average_rating = 0, review_count = 0 WHERE id = ?",
+                productId);
+
+        reviewService.edit(reviewIdOf(orderItemId), editForm(4), memberId);
+
+        assertThat(averageRating())
+                .as("평점이 그대로여도 재집계가 도는지 — 조건부 호출이면 0 이 남는다")
+                .isEqualByComparingTo("4.00");
+        assertThat(reviewCount()).isEqualTo(1);
+    }
+
+    @Test
+    void delete_lastPublishedReview_dropsTheAverageToZero() {
+        long orderItemId = insertPickedUpOrderItem();
+        reviewService.write(form(orderItemId, 5), memberId);
+
+        reviewService.delete(reviewIdOf(orderItemId), memberId);
+
+        assertThat(averageRating()).isEqualByComparingTo("0.00");
+        assertThat(reviewCount()).isZero();
+    }
+
+    @Test
+    void delete_oneOfTwoReviews_leavesTheOtherInTheAverage() {
+        long firstOrderItemId = insertPickedUpOrderItem();
+        long secondOrderItemId = insertPickedUpOrderItem();
+        reviewService.write(form(firstOrderItemId, 5), memberId);
+        reviewService.write(form(secondOrderItemId, 3), memberId);
+
+        reviewService.delete(reviewIdOf(firstOrderItemId), memberId);
+
+        assertThat(averageRating()).isEqualByComparingTo("3.00");
+        assertThat(reviewCount()).isEqualTo(1);
+    }
+
+    @Test
+    void delete_aggregateFails_rollsBackTheDeletionToo() {
+        long orderItemId = insertPickedUpOrderItem();
+        reviewService.write(form(orderItemId, 5), memberId);
+        long reviewId = reviewIdOf(orderItemId);
+        doThrow(new IllegalStateException("집계 실패"))
+                .when(productReviewCommandService)
+                .applyReviewAggregate(anyLong(), any(), anyLong());
+
+        assertThatThrownBy(() -> reviewService.delete(reviewId, memberId))
+                .isInstanceOf(IllegalStateException.class);
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM reviews WHERE id = ?", String.class, reviewId))
+                .isEqualTo("PUBLISHED");
+    }
+
+    @Test
+    void editAndDeleteAtTheSameTime_leaveTheAggregateMatchingTheStoredRows() throws Exception {
+        long orderItemId = insertPickedUpOrderItem();
+        reviewService.write(form(orderItemId, 5), memberId);
+        long reviewId = reviewIdOf(orderItemId);
+
+        List<Future<Void>> results = executor.invokeAll(List.of(
+                rejectableTask(() -> reviewService.edit(reviewId, editForm(1), memberId)),
+                rejectableTask(() -> reviewService.delete(reviewId, memberId))));
+
+        for (Future<Void> result : results) {
+            result.get(30, TimeUnit.SECONDS);
+        }
+
+        long storedRows = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM reviews WHERE product_id = ? AND status = 'PUBLISHED'",
+                Long.class,
+                productId);
+
+        assertThat(reviewCount()).isEqualTo(storedRows);
+    }
+
+    private Callable<Void> rejectableTask(Runnable action) {
+        return () -> {
+            try {
+                action.run();
+            } catch (BusinessException ignored) {
+            }
+            return null;
+        };
+    }
+
+    private long reviewIdOf(long orderItemId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM reviews WHERE order_item_id = ?", Long.class, orderItemId);
+    }
+
+    private ReviewEditForm editForm(int rating) {
+        ReviewEditForm form = new ReviewEditForm();
+        form.setOverallRating(rating);
+        form.setTasteRating(5);
+        form.setDesignRating(4);
+        form.setServiceRating(4);
+        form.setContent("다시 먹어 보고 평점을 고쳤습니다.");
+        return form;
     }
 
     private Callable<Void> writeTask(long orderItemId, int rating) {

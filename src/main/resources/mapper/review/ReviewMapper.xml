@@ -30,6 +30,32 @@
                 #{content}, 'PUBLISHED')
     </insert>
 
+    <select id="findById" resultType="com.cakeshop.domain.review.dto.view.ReviewRow">
+        SELECT <include refid="reviewRowColumns"/>
+          FROM reviews
+         WHERE id = #{id}
+    </select>
+
+    <update id="update">
+        UPDATE reviews
+           SET overall_rating = #{overallRating},
+               taste_rating   = #{tasteRating},
+               design_rating  = #{designRating},
+               service_rating = #{serviceRating},
+               content        = #{content}
+         WHERE id = #{id}
+           AND member_id = #{memberId}
+           AND status = 'PUBLISHED'
+    </update>
+
+    <update id="deleteByAuthor">
+        UPDATE reviews
+           SET status = 'DELETED'
+         WHERE id = #{reviewId}
+           AND member_id = #{memberId}
+           AND status = 'PUBLISHED'
+    </update>
+
     <!-- COALESCE 가 없으면 마지막 공개 후기를 지웠을 때 AVG 가 NULL 을 돌려주는데
          products.average_rating 은 NOT NULL 이다. 후기가 쌓이는 동안에는 드러나지 않는다. -->
     <select id="aggregateForUpdate"

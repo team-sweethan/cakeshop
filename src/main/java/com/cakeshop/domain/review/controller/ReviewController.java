@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import com.cakeshop.domain.order.dto.view.OrderReviewItemView;
 import com.cakeshop.domain.order.dto.view.OrderReviewTargetView;
+import com.cakeshop.domain.review.dto.form.ReviewEditForm;
 import com.cakeshop.domain.review.dto.form.ReviewWriteForm;
 import com.cakeshop.domain.review.dto.view.MyReviewView;
 import com.cakeshop.domain.review.dto.view.ProductReviewView;
@@ -119,6 +120,57 @@ public class ReviewController {
         }
 
         reviewService.write(reviewWriteForm, memberId);
+
+        return "redirect:/mypage/reviews";
+    }
+
+    @GetMapping("/reviews/{reviewId:\\d+}/edit")
+    public String editForm(
+            @PathVariable("reviewId") long reviewId,
+            @AuthenticationPrincipal MemberDetails memberDetails,
+            @ModelAttribute("reviewEditForm") ReviewEditForm reviewEditForm,
+            Model model
+    ) {
+        MyReviewView review =
+                reviewService.getEditableReview(reviewId, memberDetails.getMemberId());
+
+        reviewEditForm.setOverallRating(review.overallRating());
+        reviewEditForm.setTasteRating(review.tasteRating());
+        reviewEditForm.setDesignRating(review.designRating());
+        reviewEditForm.setServiceRating(review.serviceRating());
+        reviewEditForm.setContent(review.content());
+        model.addAttribute("review", review);
+
+        return "customer/review/edit";
+    }
+
+    @PostMapping("/reviews/{reviewId:\\d+}/edit")
+    public String edit(
+            @PathVariable("reviewId") long reviewId,
+            @Valid @ModelAttribute("reviewEditForm") ReviewEditForm reviewEditForm,
+            BindingResult bindingResult,
+            @AuthenticationPrincipal MemberDetails memberDetails,
+            Model model
+    ) {
+        long memberId = memberDetails.getMemberId();
+
+        if (bindingResult.hasErrors()) {
+            model.addAttribute("review", reviewService.getEditableReview(reviewId, memberId));
+
+            return "customer/review/edit";
+        }
+
+        reviewService.edit(reviewId, reviewEditForm, memberId);
+
+        return "redirect:/mypage/reviews";
+    }
+
+    @PostMapping("/reviews/{reviewId:\\d+}/delete")
+    public String delete(
+            @PathVariable("reviewId") long reviewId,
+            @AuthenticationPrincipal MemberDetails memberDetails
+    ) {
+        reviewService.delete(reviewId, memberDetails.getMemberId());
 
         return "redirect:/mypage/reviews";
     }

@@ -54,4 +54,17 @@ public class Review {
                 null, orderItemId, productId, memberId,
                 overallRating, tasteRating, designRating, serviceRating, content);
     }
+
+    public static Review edit(
+            Long id,
+            Long memberId,
+            Integer overallRating,
+            Integer tasteRating,
+            Integer designRating,
+            Integer serviceRating,
+            String content) {
+        return new Review(
+                id, null, null, memberId,
+                overallRating, tasteRating, designRating, serviceRating, content);
+    }
 }
