@@ -85,7 +85,7 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 | **A3** | 후기 등록 | 고객 | `POST /reviews` | **완료** | 1 | `review-write.md` |
 | **A4** | 후기 수정 | 고객 | `GET·POST /reviews/{id}/edit` | **완료** | 4 | `review-edit-delete.md` |
 | **A5** | 후기 삭제 | 고객 | `POST /reviews/{id}/delete` | **완료** | 4 | `review-edit-delete.md` |
-| **A6** | 이미지 첨부 | 고객 | (A2·A3에 포함) | 목업 입력만 | 8 (2차) | `review-write.md` |
+| **A6** | 이미지 첨부 | 고객 | (A2·A3에 포함) | **없음** — 목업 입력은 조각 1에서 걷어냈다 | 8 (2차) | `review-write.md` |
 | **B1** | 상품 후기 목록 | 누구나 | 미리보기 3개(상품 상세 안) · 전체 `GET /products/{id}/reviews` | **완료** | 3 | `review-read.md` |
 | **B2** | 상품 평균 평점·후기 수 | 누구나 | (상품 상세에 포함) | **완료** | 2 | `review-read.md` |
 | **B3** | 내가 쓴 후기 목록 | 고객 | `GET /mypage/reviews` | **완료** | 3 | `review-read.md` |
