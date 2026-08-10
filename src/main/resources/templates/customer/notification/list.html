@@ -72,9 +72,9 @@
               const displayDate = item.lastEventAt || item.createdAt;
               const formattedDate = displayDate ? displayDate.replace("T", " ").substring(0, 16) : "";
 
-              // 상세 링크 버튼 생성 (targetUrl이 있는 경우)
+              // 상세 링크 버튼 생성 (targetUrl이 있는 경우, data-noti-id 추가로 읽음 처리 연동)
               const detailBtn = item.targetUrl 
-                ? `<a class="btn" href="${escapeHtml(item.targetUrl)}">상세</a>` 
+                ? `<a class="btn" data-noti-id="${item.id}" href="${escapeHtml(item.targetUrl)}">상세</a>` 
                 : "";
 
               // 개별 알림 HTML 조립 (XSS 방지 이스케이프 적용)
@@ -133,9 +133,32 @@
 
       // 4. 개별 알림 클릭 시 읽음 처리 이벤트
       function attachItemClickEvents() {
+        // [상세] 버튼 클릭 시 읽음 처리 API 호출 후 페이지 이동
+        document.querySelectorAll("a[data-noti-id]").forEach(link => {
+          link.addEventListener("click", function (e) {
+            e.preventDefault();
+            const targetHref = this.href;
+            const notiId = this.getAttribute("data-noti-id");
+
+            const csrfToken = document.querySelector('meta[name="_csrf"]')?.getAttribute('content');
+            const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.getAttribute('content');
+            const headers = {};
+            if (csrfToken && csrfHeader) headers[csrfHeader] = csrfToken;
+
+            fetch(`/api/notifications/${notiId}/read`, {
+              method: "PATCH",
+              headers: headers,
+              keepalive: true
+            }).finally(() => {
+              location.href = targetHref;
+            });
+          });
+        });
+
         const items = document.querySelectorAll(".notification-item.is-unread");
         items.forEach(item => {
-          item.addEventListener("click", function () {
+          item.addEventListener("click", function (e) {
+            if (e.target.closest("a, button")) return;
             const notiId = this.getAttribute("data-id");
             if (!notiId) return;
 
