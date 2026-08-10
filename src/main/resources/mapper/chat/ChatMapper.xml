@@ -46,7 +46,7 @@
         UPDATE chat_rooms
         SET
             last_message_id = #{lastMessageId},
-            last_message_at = CURRENT_TIMESTAMP(6),
+            last_message_at = #{lastMessageAt},
             response_status = #{responseStatus},
             updated_at = CURRENT_TIMESTAMP(6)
         WHERE id = #{chatRoomId}
@@ -104,7 +104,7 @@
         SELECT *
         FROM chat_messages
         WHERE chat_room_id = #{chatRoomId}
-        ORDER BY created_at ASC
+        ORDER BY created_at ASC, id ASC
         LIMIT #{size} OFFSET #{offset}
     </select>
 
@@ -152,6 +152,7 @@
             chat_room_id,
             reader_side,
             last_read_message_id,
+            last_read_at,
             created_at,
             updated_at
         )
@@ -160,10 +161,12 @@
             #{readerSide},
             #{lastReadMessageId},
             CURRENT_TIMESTAMP(6),
+            CURRENT_TIMESTAMP(6),
             CURRENT_TIMESTAMP(6)
         )
         ON DUPLICATE KEY UPDATE
             last_read_message_id = VALUES(last_read_message_id),
+            last_read_at = CURRENT_TIMESTAMP(6),
             updated_at = CURRENT_TIMESTAMP(6)
     </insert>
 
@@ -197,6 +200,7 @@
         )
         ON DUPLICATE KEY UPDATE
             content = VALUES(content),
+            updated_by = VALUES(updated_by),
             updated_at = CURRENT_TIMESTAMP(6)
     </insert>
 
@@ -225,6 +229,7 @@
             CURRENT_TIMESTAMP(6)
         )
         ON DUPLICATE KEY UPDATE
+            chat_room_id = VALUES(chat_room_id),
             order_id = VALUES(order_id),
             conversation_anchor_message_id = VALUES(conversation_anchor_message_id)
     </insert>  
