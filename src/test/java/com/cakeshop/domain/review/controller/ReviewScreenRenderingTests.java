@@ -223,6 +223,33 @@ class ReviewScreenRenderingTests {
     }
 
     @Test
+    void productReviews_repliedReview_showsTheOwnerReplyOnlyUnderThatReview() throws Exception {
+        insertReviewWithContent("답글이 달릴 후기입니다.", "PUBLISHED", WRITTEN_AT);
+        insertReviewWithContent("답글이 없는 후기입니다.", "PUBLISHED", WRITTEN_AT.plusDays(1));
+        insertReplyOn("답글이 달릴 후기입니다.", "찾아 주셔서 감사합니다.");
+
+        String body = mockMvc.perform(get("/products/{id}/reviews", productId))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(body).contains("찾아 주셔서 감사합니다.");
+        assertThat(body.split("사장님 답글", -1)).hasSize(2);
+    }
+
+    @Test
+    void productDetail_repliedReview_showsTheOwnerReplyInThePreview() throws Exception {
+        insertReviewWithContent("미리보기에 뜰 후기입니다.", "PUBLISHED", WRITTEN_AT);
+        insertReplyOn("미리보기에 뜰 후기입니다.", "미리보기에도 보여야 합니다.");
+
+        mockMvc.perform(get("/products/{id}", productId))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("사장님 답글")))
+                .andExpect(content().string(containsString("미리보기에도 보여야 합니다.")));
+    }
+
+    @Test
     void productReviews_noPublishedReview_rendersEmptyNotice() throws Exception {
         mockMvc.perform(get("/products/{id}/reviews", productId))
                 .andExpect(status().isOk())
@@ -280,6 +307,29 @@ class ReviewScreenRenderingTests {
                 .andExpect(content().string(
                         containsString("/products/" + productId + "/reviews")))
                 .andExpect(content().string(not(containsString("지워진 내 후기입니다."))));
+    }
+
+    @Test
+    void myReviews_repliedReview_showsTheOwnerReply() throws Exception {
+        insertReviewWithContent("답글 받은 내 후기입니다.", "PUBLISHED", WRITTEN_AT);
+        insertReplyOn("답글 받은 내 후기입니다.", "다음에도 찾아 주세요.");
+
+        mockMvc.perform(get("/mypage/reviews").with(authentication(login())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("사장님 답글")))
+                .andExpect(content().string(containsString("다음에도 찾아 주세요.")));
+    }
+
+    @Test
+    void myReviews_blockedReview_hidesTheOwnerReplyWithIt() throws Exception {
+        insertReviewWithContent("숨겨진 내 후기입니다.", "BLOCKED", WRITTEN_AT);
+        insertReplyOn("숨겨진 내 후기입니다.", "숨긴 뒤에는 보이면 안 됩니다.");
+
+        mockMvc.perform(get("/mypage/reviews").with(authentication(login())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("숨겨진 내 후기입니다.")))
+                .andExpect(content().string(not(containsString("사장님 답글"))))
+                .andExpect(content().string(not(containsString("숨긴 뒤에는 보이면 안 됩니다."))));
     }
 
     @Test
@@ -445,6 +495,30 @@ class ReviewScreenRenderingTests {
                 content,
                 status,
                 createdAt);
+    }
+
+    private void insertReplyOn(String reviewContent, String replyContent) {
+        long reviewId = jdbcTemplate.queryForObject(
+                "SELECT id FROM reviews WHERE content = ?", Long.class, reviewContent);
+
+        jdbcTemplate.update(
+                "INSERT INTO review_replies (review_id, admin_id, content) VALUES (?, ?, ?)",
+                reviewId,
+                insertAdmin(),
+                replyContent);
+    }
+
+    private long insertAdmin() {
+        String email = "review-screen-admin-" + System.nanoTime() + "@example.com";
+        jdbcTemplate.update(
+                """
+                INSERT INTO members (email, password, name, nickname, phone, role, status)
+                VALUES (?, 'encoded-password', '관리자', ?, '010-0000-0000', 'ADMIN', 'ACTIVE')
+                """,
+                email,
+                "관리닉" + System.nanoTime());
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM members WHERE email = ?", Long.class, email);
     }
 
     private Authentication login() {

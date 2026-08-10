@@ -291,7 +291,8 @@ class ReviewControllerTests {
                 5, 5, 4, 4,
                 "맛있게 잘 먹었습니다.",
                 LocalDateTime.of(2026, 8, 9, 12, 0),
-                ReviewStatus.PUBLISHED);
+                ReviewStatus.PUBLISHED,
+                null);
     }
 
     private OrderReviewTargetView target() {

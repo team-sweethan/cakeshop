@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>후기 상세 | 관리자</title>
+  <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<div class="admin-layout">
+  <aside th:replace="~{fragments/admin/sidebar :: sidebar('reviews')}"></aside>
+  <div class="admin-main">
+    <header th:replace="~{fragments/admin/header :: header('후기 상세')}"></header>
+    <main class="admin-content">
+
+      <div th:replace="~{fragments/common/alert :: alert}"></div>
+
+      <div class="cluster cluster--between section">
+        <h1 class="admin-page-title" th:text="'후기 상세 - No.' + ${review.id}">후기 상세</h1>
+        <a class="btn" th:href="@{/admin/reviews}">목록으로</a>
+      </div>
+
+      <div class="grid grid--2">
+        <div class="stack">
+          <section class="section">
+            <h2 class="section-title">후기 정보</h2>
+            <div class="panel">
+              <div class="data-row"><span class="data-row__label">번호</span><span th:text="${review.id}">0</span></div>
+              <div class="data-row"><span class="data-row__label">작성자</span><span th:text="${review.authorName}">작성자</span></div>
+              <div class="data-row"><span class="data-row__label">상품명</span><span th:text="${review.productName}">상품명</span></div>
+              <div class="data-row"><span class="data-row__label">주문번호</span><span th:text="${review.orderNumber}">주문번호</span></div>
+              <div class="data-row"><span class="data-row__label">작성일</span><span th:text="${#temporals.format(review.createdAt, 'yyyy.MM.dd HH:mm')}">2026.01.01 00:00</span></div>
+              <div class="data-row"><span class="data-row__label">최종 변경일</span><span th:text="${#temporals.format(review.updatedAt, 'yyyy.MM.dd HH:mm')}">2026.01.01 00:00</span></div>
+              <div class="data-row">
+                <span class="data-row__label">상태</span>
+                <span>
+                  <span th:if="${review.published}" class="badge badge--success">노출 중</span>
+                  <span th:if="${review.blocked}" class="badge badge--danger">숨김</span>
+                  <span th:if="${review.deleted}" class="badge">삭제됨</span>
+                </span>
+              </div>
+            </div>
+          </section>
+
+          <section class="section">
+            <h2 class="section-title">평점</h2>
+            <div class="panel">
+              <div class="data-row"><span class="data-row__label">전체</span><span th:text="${review.overallRating} + '점'">5점</span></div>
+              <div class="data-row"><span class="data-row__label">맛</span><span th:text="${review.tasteRating} + '점'">5점</span></div>
+              <div class="data-row"><span class="data-row__label">디자인</span><span th:text="${review.designRating} + '점'">5점</span></div>
+              <div class="data-row"><span class="data-row__label">응대</span><span th:text="${review.serviceRating} + '점'">5점</span></div>
+            </div>
+          </section>
+
+          <section class="section">
+            <h2 class="section-title">본문</h2>
+            <div class="panel stack">
+              <p th:text="${review.content}" style="white-space:pre-wrap">후기 본문</p>
+            </div>
+          </section>
+        </div>
+
+        <div class="stack">
+          <section class="section">
+            <h2 class="section-title">모더레이션</h2>
+
+            <div class="panel form-stack">
+              <form method="post" th:if="${review.published}"
+                    th:action="@{/admin/reviews/{reviewId}/block(reviewId=${review.id})}"
+                    onsubmit="return confirm('이 후기를 숨길까요? 상품 평점 집계에서도 빠집니다.');">
+                <button class="btn btn--danger" type="submit">숨기기</button>
+              </form>
+
+              <form method="post" th:if="${review.blocked}"
+                    th:action="@{/admin/reviews/{reviewId}/unblock(reviewId=${review.id})}">
+                <button class="btn" type="submit">숨김 해제</button>
+              </form>
+
+              <p class="note" th:if="${review.deleted}">
+                작성자가 삭제한 후기라 조치할 수 없습니다.
+              </p>
+
+              <p class="note">
+                이 화면은 조치 이력이 아니라 현재 상태를 보여 줍니다. 숨김을 해제하면 과거에
+                숨겨졌다는 기록은 남지 않습니다.
+              </p>
+            </div>
+          </section>
+
+          <section class="section">
+            <h2 class="section-title">사장님 답글</h2>
+
+            <div class="panel stack">
+              <div th:if="${review.reply != null}" class="stack">
+                <p style="white-space:pre-wrap" th:text="${review.reply.content}">답글 본문</p>
+                <p class="text-muted"
+                   th:text="'등록일 ' + ${#temporals.format(review.reply.createdAt, 'yyyy.MM.dd HH:mm')}">
+                  등록일 2026.01.01 00:00
+                </p>
+              </div>
+
+              <p class="text-muted" th:if="${review.reply == null}">
+                아직 답글이 없습니다. 후기당 답글은 한 개입니다.
+              </p>
+
+              <form method="post"
+                    th:if="${review.published}"
+                    th:object="${reviewReplyForm}"
+                    th:action="${review.reply == null}
+                               ? @{/admin/reviews/{reviewId}/replies(reviewId=${review.id})}
+                               : @{/admin/reviews/{reviewId}/replies/edit(reviewId=${review.id})}">
+
+                <div class="form-group">
+                  <label class="form-label" for="reply-content">
+                    답글 내용 <span class="required">*</span>
+                  </label>
+                  <textarea class="form-control form-control--textarea"
+                            id="reply-content"
+                            th:field="*{content}"
+                            maxlength="1000"
+                            placeholder="고객에게 보일 답글을 작성해 주세요 (1000자 이하)"
+                            required></textarea>
+                  <p class="form-error" th:if="${#fields.hasErrors('content')}"
+                     th:errors="*{content}">내용 오류</p>
+                </div>
+
+                <button class="btn btn--primary" type="submit"
+                        th:text="${review.reply == null} ? '답글 등록' : '답글 수정'">답글 등록</button>
+              </form>
+
+              <p class="note" th:unless="${review.published}">
+                노출 중인 후기에만 답글을 달거나 고칠 수 있습니다. 숨긴 후기의 답글은 고객 화면에서도
+                함께 가려집니다.
+              </p>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+</body>
+</html>

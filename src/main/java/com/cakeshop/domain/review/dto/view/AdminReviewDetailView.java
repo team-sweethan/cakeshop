@@ -2,12 +2,14 @@ package com.cakeshop.domain.review.dto.view;
 
 import java.time.LocalDateTime;
 
+import com.cakeshop.domain.member.dto.view.MemberReviewView;
 import com.cakeshop.domain.order.dto.view.OrderReviewSnapshotView;
 import com.cakeshop.domain.review.entity.ReviewStatus;
 
-public record MyReviewView(
+public record AdminReviewDetailView(
         Long id,
         Long productId,
+        String authorName,
         String productName,
         String orderNumber,
         Integer overallRating,
@@ -16,18 +18,23 @@ public record MyReviewView(
         Integer serviceRating,
         String content,
         LocalDateTime createdAt,
+        LocalDateTime updatedAt,
         ReviewStatus status,
         ReviewReplyView reply
 ) {
 
-    // 숨겨진 후기의 답글은 여기서 떨어뜨린다. 화면마다 조건을 적으면 한 곳을 빠뜨렸을 때
-    // 가려진 후기에 사장님 답글만 남는다 (specs/review-reply.md B4).
-    public static MyReviewView of(
-            ReviewRow row, OrderReviewSnapshotView snapshot, ReviewReplyView reply) {
+    public static AdminReviewDetailView of(
+            ReviewRow row,
+            MemberReviewView author,
+            OrderReviewSnapshotView snapshot,
+            ReviewReplyView reply) {
 
-        return new MyReviewView(
+        return new AdminReviewDetailView(
                 row.id(),
                 row.productId(),
+                author == null || author.withdrawn()
+                        ? ProductReviewView.WITHDRAWN_AUTHOR_NAME
+                        : author.nickname(),
                 snapshot == null ? null : snapshot.productName(),
                 snapshot == null ? null : snapshot.orderNumber(),
                 row.overallRating(),
@@ -36,11 +43,20 @@ public record MyReviewView(
                 row.serviceRating(),
                 row.content(),
                 row.createdAt(),
+                row.updatedAt(),
                 row.status(),
-                row.status() == ReviewStatus.BLOCKED ? null : reply);
+                reply);
+    }
+
+    public boolean isPublished() {
+        return status == ReviewStatus.PUBLISHED;
     }
 
     public boolean isBlocked() {
         return status == ReviewStatus.BLOCKED;
+    }
+
+    public boolean isDeleted() {
+        return status == ReviewStatus.DELETED;
     }
 }

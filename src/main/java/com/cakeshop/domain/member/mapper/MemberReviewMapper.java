@@ -22,4 +22,16 @@ import com.cakeshop.domain.member.dto.view.MemberReviewView;
 public interface MemberReviewMapper {
 
     List<MemberReviewView> findMembersByIds(@Param("memberIds") Collection<Long> memberIds);
+
+    /**
+     * ******************************
+     * 작성자 : HyunGyu-Cho
+     * 담당자 : 수민
+     * 작성일 : 2026-08-10
+     * 기능 : 관리자 후기 검색의 작성자명 조건
+     * 설명 : 닉네임 부분 일치 회원 ID 를 돌려준다. keyword 는 호출한 쪽이 LIKE 이스케이프를
+     *        끝낸 값이어야 하고, SQL 은 ESCAPE '!' 로 받는다.
+     * ******************************
+     */
+    List<Long> findMemberIdsByNickname(@Param("keyword") String keyword);
 }

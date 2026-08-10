@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cakeshop.domain.coupon.mapper.CouponMemberMapper">
+
+        <!-- 고객 쿠폰함은 현재 주문에 사용할 수 있는 AVAILABLE 쿠폰만 조회한다. -->
+    <select id="findMemberCoupons"
+            resultType="com.cakeshop.domain.coupon.dto.view.CustomerCouponQueryView">
+        SELECT mc.id AS memberCouponId,
+               c.name,
+               c.discount_type AS discountType,
+               c.discount_value AS discountValue,
+               c.minimum_order_amount AS minimumOrderAmount,
+               c.maximum_discount_amount AS maximumDiscountAmount,
+               mc.status,
+               mc.issued_at AS issuedAt,
+               c.expires_at AS expiresAt
+        FROM member_coupons mc
+        INNER JOIN coupons c ON c.id = mc.coupon_id
+        WHERE mc.member_id = #{memberId}
+          AND mc.status = 'AVAILABLE'
+          AND c.status = 'ACTIVE'
+          AND c.starts_at &lt;= NOW(6)
+          AND c.expires_at &gt; NOW(6)
+        ORDER BY mc.issued_at DESC,
+            mc.id DESC
+        LIMIT #{size}
+        OFFSET #{offset}
+    </select>
+
+    <select id="countMemberCoupons" resultType="long">
+        SELECT COUNT(*)
+        FROM member_coupons mc
+        INNER JOIN coupons c ON c.id = mc.coupon_id
+        WHERE mc.member_id = #{memberId}
+          AND mc.status = 'AVAILABLE'
+          AND c.status = 'ACTIVE'
+          AND c.starts_at &lt;= NOW(6)
+          AND c.expires_at &gt; NOW(6)
+    </select>
+</mapper>

@@ -187,6 +187,38 @@ class OrderReviewMapperTests {
                 .containsExactly("남의 케이크");
     }
 
+    @Test
+    void findOrderItemIdsByProductName_matchesPartOfTheSnapshotName() {
+        long strawberry = insertPickedUpOrderItem("딸기 생크림 케이크", PICKED_UP_AT);
+        long chocolate = insertPickedUpOrderItem("초코 케이크", PICKED_UP_AT);
+
+        List<Long> ids = orderReviewMapper.findOrderItemIdsByProductName("딸기");
+
+        assertThat(ids).contains(strawberry).doesNotContain(chocolate);
+    }
+
+    @Test
+    void findOrderItemIdsByProductName_escapedWildcard_matchesTheLiteralCharacter() {
+        long literal = insertPickedUpOrderItem("50% 할인 케이크", PICKED_UP_AT);
+        long other = insertPickedUpOrderItem("정가 케이크", PICKED_UP_AT);
+
+        List<Long> ids = orderReviewMapper.findOrderItemIdsByProductName("!% 할인");
+
+        assertThat(ids).contains(literal).doesNotContain(other);
+    }
+
+    @Test
+    void findOrderItemIdsByProductName_looksAtTheSnapshotNotTheProductTable() {
+        long orderItemId = insertPickedUpOrderItem("주문 당시 이름", PICKED_UP_AT);
+        jdbcTemplate.update("UPDATE products SET name = ? WHERE id = ?", "바뀐 이름", productId);
+
+        assertThat(orderReviewMapper.findOrderItemIdsByProductName("주문 당시"))
+                .as("관리자는 화면에 보이는 스냅샷 이름 그대로 검색할 수 있어야 한다")
+                .contains(orderItemId);
+        assertThat(orderReviewMapper.findOrderItemIdsByProductName("바뀐 이름"))
+                .doesNotContain(orderItemId);
+    }
+
     private List<Long> idsOf(List<OrderReviewItemView> items) {
         return items.stream().map(OrderReviewItemView::orderItemId).toList();
     }

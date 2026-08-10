@@ -23,4 +23,12 @@
             #{memberId}
         </foreach>
     </select>
+
+    <!-- 이스케이프 문자를 '!' 로 둔다. 기본값인 역슬래시는 문자열 리터럴 단계에서도 특수 문자라
+         이스케이프가 두 겹이 되고, 어느 겹이 빠졌는지 SQL 만 보고는 드러나지 않는다. -->
+    <select id="findMemberIdsByNickname" resultType="long">
+        SELECT id
+          FROM members
+         WHERE nickname LIKE CONCAT('%', #{keyword}, '%') ESCAPE '!'
+    </select>
 </mapper>

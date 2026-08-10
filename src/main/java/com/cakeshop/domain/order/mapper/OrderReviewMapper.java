@@ -39,4 +39,16 @@ public interface OrderReviewMapper {
 
     List<OrderReviewSnapshotView> findSnapshotsByOrderItemIds(
             @Param("orderItemIds") Collection<Long> orderItemIds);
+
+    /**
+     * ******************************
+     * 작성자 : HyunGyu-Cho
+     * 담당자 : 주환
+     * 작성일 : 2026-08-10
+     * 기능 : 관리자 후기 검색의 상품명 조건
+     * 설명 : 주문 상품명이 부분 일치하는 order_items.id 를 돌려준다. keyword 는 호출한 쪽이
+     *        LIKE 이스케이프를 끝낸 값이어야 하고, SQL 은 ESCAPE '!' 로 받는다.
+     * ******************************
+     */
+    List<Long> findOrderItemIdsByProductName(@Param("keyword") String keyword);
 }
