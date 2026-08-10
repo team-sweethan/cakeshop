@@ -2,6 +2,7 @@ package com.cakeshop.global.storage;
 
 import com.cakeshop.global.infra.FileStorageClient;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.time.Clock;
 import java.time.LocalDate;
@@ -71,10 +72,10 @@ public class S3StorageService implements FileStorageClient {
                 .contentLength(file.getSize())
                 .build();
 
-        try {
+        try (InputStream inputStream = file.getInputStream()) {
             s3Client.putObject(
                     request,
-                    RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
+                    RequestBody.fromInputStream(inputStream, file.getSize()));
         } catch (IOException exception) {
             throw new UncheckedIOException("업로드할 파일을 읽지 못했습니다.", exception);
         } catch (SdkException exception) {

@@ -3,11 +3,14 @@ package com.cakeshop.global.storage;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.cakeshop.global.infra.FileStorageDirectory;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
@@ -19,6 +22,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
@@ -85,6 +89,23 @@ class S3StorageServiceTests {
         verify(s3Client, never()).putObject(
                 any(PutObjectRequest.class),
                 any(RequestBody.class));
+    }
+
+    @Test
+    void store_validFile_closesInputStream() throws IOException {
+        MultipartFile file = mock(MultipartFile.class);
+        InputStream inputStream = mock(InputStream.class);
+        when(file.isEmpty()).thenReturn(false);
+        when(file.getOriginalFilename()).thenReturn("cake.jpg");
+        when(file.getContentType()).thenReturn("image/jpeg");
+        when(file.getSize()).thenReturn(5L);
+        when(file.getInputStream()).thenReturn(inputStream);
+        when(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
+                .thenReturn(PutObjectResponse.builder().build());
+
+        storageService.store(file, FileStorageDirectory.PRODUCT.getPath());
+
+        verify(inputStream).close();
     }
 
     @Test
