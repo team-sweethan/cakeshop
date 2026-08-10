@@ -32,20 +32,20 @@ class MemberQueryServiceTests {
 
     @ParameterizedTest
     @EnumSource(MemberStatus.class)
-    void findByMemberId_existingMember_returnsSummaryRegardlessOfStatus(MemberStatus status) {
+    void getByMemberId_existingMember_returnsSummaryRegardlessOfStatus(MemberStatus status) {
         MemberSummaryView summary = new MemberSummaryView(1L, "회원", "USER", status);
         when(memberMapper.findSummaryByMemberId(1L)).thenReturn(Optional.of(summary));
 
-        MemberSummaryView result = memberQueryService.findByMemberId(1L);
+        MemberSummaryView result = memberQueryService.getByMemberId(1L);
 
         assertThat(result).isEqualTo(summary);
     }
 
     @Test
-    void findByMemberId_missingMember_throwsMemberNotFound() {
+    void getByMemberId_missingMember_throwsMemberNotFound() {
         when(memberMapper.findSummaryByMemberId(999L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> memberQueryService.findByMemberId(999L))
+        assertThatThrownBy(() -> memberQueryService.getByMemberId(999L))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(MemberErrorCode.NOT_FOUND);

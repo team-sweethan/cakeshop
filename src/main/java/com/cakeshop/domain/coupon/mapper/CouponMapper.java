@@ -8,8 +8,10 @@ import org.apache.ibatis.annotations.Param;
 
 import com.cakeshop.domain.coupon.dto.form.CouponSearchCondition;
 import com.cakeshop.domain.coupon.dto.view.CouponView;
+import com.cakeshop.domain.coupon.dto.view.CouponIssuedMemberHistoryView;
 import com.cakeshop.domain.coupon.entity.Coupon;
 import com.cakeshop.domain.coupon.entity.CouponStatus;
+import com.cakeshop.domain.coupon.entity.CouponTargetType;
 
 /**
  * 쿠폰 도메인의 SQL 경계다.
@@ -23,6 +25,7 @@ public interface CouponMapper {
 
     /** 수정·상태 전이 전에 현재 DB 상태를 확인한다. */
     Optional<Coupon> findCouponById( @Param("couponId") Long couponId );
+    Optional<Coupon> findCouponByIdForUpdate(@Param("couponId") Long couponId);
 
     /** 검색 조건과 LIMIT/OFFSET에 해당하는 목록 화면용 행을 조회한다. */
     List<CouponView> findCoupons( @Param("condition") CouponSearchCondition condition,
@@ -40,6 +43,24 @@ public interface CouponMapper {
     int updateCouponAfterStart(Coupon coupon);
 
     /** 관리자 명령에 따라 ACTIVE와 INACTIVE 상태를 전환한다. */
-    int updateStatus( @Param("couponId") Long couponId, @Param("status") CouponStatus status );
+    int updateStatus(@Param("couponId") Long couponId,
+                     @Param("expectedStatus") CouponStatus expectedStatus,
+                     @Param("nextStatus") CouponStatus nextStatus);
+
+    /** 쿠폰 상태·수량과 중복 발급 이력을 확인한 뒤 발급 이력을 생성한다. */
+    int insertMemberCouponIfAbsent(@Param("couponId") Long couponId,
+                                   @Param("memberId") Long memberId,
+                                   @Param("allowBeforeStart") boolean allowBeforeStart);
+    int increaseIssuedQuantityIfAvailable(@Param("couponId") Long couponId);
+    int deleteAvailableMemberCoupon(@Param("couponId") Long couponId, @Param("memberId") Long memberId);
+    int decreaseIssuedQuantity(@Param("couponId") Long couponId);
+    /** 회원 조회 결과 중 이미 발급된 회원을 표시하기 위한 식별자 목록이다. */
+    List<Long> findIssuedMemberIds(@Param("couponId") Long couponId, @Param("memberIds") List<Long> memberIds);
+    List<CouponIssuedMemberHistoryView> findIssuedMemberHistories(
+            @Param("couponId") Long couponId, @Param("memberId") Long memberId,
+            @Param("size") int size, @Param("offset") int offset);
+    long countIssuedMemberHistories(@Param("couponId") Long couponId, @Param("memberId") Long memberId);
+    /** 대상 정책별로 발급 후보 쿠폰을 조회한다. */
+    List<Coupon> findCouponsByTargetType(@Param("targetType") CouponTargetType targetType);
 
 }

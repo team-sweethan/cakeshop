@@ -1,46 +1,118 @@
 # cakeshop
 
-Spring Boot 4.0.2 · Java 21 · Gradle · Thymeleaf · MyBatis · MariaDB
+오프라인 케이크 매장의 상품 탐색부터 주문·결제·회원·커뮤니티·후기·관리자 운영까지 하나의 흐름으로 구현하는 Spring Boot 기반 웹 애플리케이션입니다.
 
-각 개발자가 PC에 MariaDB를 직접 설치하고 Spring Boot를 실행한다. 기본적으로 각자의 로컬 MariaDB를 사용하고, 필요할 때만 `rds` 프로필로 공용 AWS RDS에 접속한다. 애플리케이션의 로컬 실행에는 Docker가 필요하지 않지만, MariaDB Testcontainers 기반 DB 통합 테스트에는 Docker가 필요하다.
+> Java 21 · Spring Boot 4.0.2 · Spring MVC · Thymeleaf · Spring Security · MyBatis · Flyway · MariaDB
 
----
+## Table of Contents
 
-## 목차
+- [Overview](#overview)
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Getting Started](#getting-started)
+- [Quick Start](#quick-start)
+- [Project Structure](#project-structure)
+- [Contributing](#contributing)
+- [Architecture & Developer Playbook](#architecture--developer-playbook)
+- [File Upload Storage](#file-upload-storage)
 
-- [처음 설치하기](#처음-설치하기) — 빈 DB에서 화면이 뜨기까지
-- [실행 프로필](#실행-프로필) — `local` / `rds` 선택과 전환
-- [DB 스키마 관리](#db-스키마-관리) — Flyway migration, 샘플 데이터
-- [로컬 DB 초기화](#로컬-db-초기화) — 기동 실패 시 재생성 절차, 오류 대응표
-- [프로젝트 구조](#프로젝트-구조)
-- [Store 수직 슬라이스 구현 예시](#store-수직-슬라이스-구현-예시)
+## Overview
 
----
+cakeshop은 매장에 방문하기 전에 상품과 옵션을 살펴보고 주문할 수 있는 고객 경험과, 상품·주문·결제·쿠폰·회원·콘텐츠를 관리하는 운영 경험을 함께 다루는 팀 프로젝트입니다.
 
-## 처음 설치하기
+이 프로젝트는 다음 목표를 중심으로 개발합니다.
 
-빈 DB에서 화면이 뜨기까지의 전체 절차다. 이미 로컬 DB가 있고 기동이 실패한다면 [로컬 DB 초기화](#로컬-db-초기화)로 간다.
+- 고객과 관리자의 실제 사용 흐름을 서버 렌더링 웹 애플리케이션으로 완성합니다.
+- 기능별 수직 슬라이스와 명시적인 도메인 경계로 여러 사람이 안전하게 협업합니다.
+- Flyway migration과 MariaDB 기반 통합 테스트로 개발 환경과 운영 스키마의 차이를 줄입니다.
+- 인증·인가, 트랜잭션, 상태 전이, 결제 복구처럼 서비스 운영에 필요한 무결성을 코드와 테스트로 보장합니다.
 
-### 0. 필요한 것
+## Features
 
-| | 비고 |
+- 상품·옵션 조회와 장바구니
+- 주문·결제와 결제 복구
+- 쿠폰 발급·사용
+- 회원 가입·로그인·회원 관리
+- 커뮤니티 게시글·댓글·좋아요·신고
+- 상품 후기·평점·관리자 답글
+- 알림·채팅
+- 매장 정보와 관리자 통계·대시보드
+
+## Tech Stack
+
+| 구분 | 기술 및 버전 |
 |---|---|
-| **JDK 21** | Gradle toolchain이 자동으로 받아오지만, 미리 설치돼 있으면 첫 빌드가 빠르다 |
-| **MariaDB 11.4** | 각 PC에 직접 설치한다 |
-| **Docker** | 애플리케이션 실행에는 필요 없다. `gradlew test`의 Testcontainers 통합 테스트에만 필요하다 |
+| Language | Java 21 |
+| Framework | Spring Boot 4.0.2, Spring MVC |
+| View | Thymeleaf, Thymeleaf Spring Security Extras |
+| Security | Spring Security |
+| Data | MyBatis 4.0.1, MariaDB Connector/J |
+| Database Migration | Flyway |
+| Build | Gradle Wrapper |
+| Validation | Jakarta Validation |
+| Test | JUnit Platform, AssertJ, Mockito, MockMvc, Spring Security Test, Testcontainers for MariaDB |
+| Development | Spring Boot DevTools, Lombok, Spring Boot Actuator |
 
-```powershell
+정확한 의존성 버전과 구성은 [`build.gradle`](build.gradle)을 기준으로 합니다.
+
+## Getting Started
+
+### 사전 준비
+
+| 도구 | 용도 |
+|---|---|
+| Git | 저장소 내려받기 |
+| JDK 21 | 애플리케이션 빌드와 실행 |
+| MariaDB 11.4 | 로컬 개발 데이터베이스 |
+| Docker | MariaDB Testcontainers 통합 테스트 실행 시에만 필요 |
+
+Gradle은 저장소의 Wrapper를 사용하므로 별도로 설치할 필요가 없습니다. 애플리케이션만 실행할 때는 Docker가 필요하지 않습니다.
+
+### 1. 저장소 내려받기
+
+```bash
 git clone https://github.com/team-sweethan/cakeshop.git
 cd cakeshop
 ```
 
-### 1. `.env` 만들기
+### 2. 환경 변수 설정
 
-`.env_sample`을 `.env`로 복사하고 `LOCAL_DB_HOST`, `LOCAL_DB_PORT`, `LOCAL_DB_DATABASE`, `LOCAL_DB_USERNAME`, `LOCAL_DB_PASSWORD`를 자신의 환경에 맞게 고친다. `.env_sample`의 값은 예시이며 **포트가 `3307`로 되어 있으니** MariaDB 기본 포트(`3306`)를 쓴다면 반드시 바꾼다. `.env`는 커밋하지 않는다.
+프로젝트 루트의 `.env_sample`을 `.env`로 복사한 뒤 로컬 MariaDB 접속 정보를 입력합니다.
 
-### 2. 빈 데이터베이스 만들기
+```powershell
+# Windows PowerShell
+Copy-Item .env_sample .env
+```
 
-`root` 또는 데이터베이스 생성 권한이 있는 계정으로 실행한다.
+```bash
+# macOS / Linux
+cp .env_sample .env
+```
+
+기본 개발 환경은 로컬 MariaDB와 공용 S3를 함께 사용합니다. 최소한 다음 값을 확인해야 합니다.
+
+```dotenv
+LOCAL_DB_HOST=localhost
+LOCAL_DB_PORT=3306
+LOCAL_DB_DATABASE=cakeshop
+LOCAL_DB_USERNAME=your-username
+LOCAL_DB_PASSWORD=your-password
+AWS_REGION=ap-northeast-2
+AWS_ACCESS_KEY_ID=your-access-key
+AWS_SECRET_ACCESS_KEY=your-secret-key
+AWS_S3_BUCKET=sweethan-cakeshop-images
+AWS_S3_BASE_URL=https://sweethan-cakeshop-images.s3.ap-northeast-2.amazonaws.com
+AWS_S3_KEY_PREFIX=local-your-name
+```
+
+`.env_sample`의 기본 포트는 `3307`입니다. 로컬 MariaDB가 기본 포트 `3306`을 사용한다면 반드시 수정합니다.
+Access Key와 Secret Key는 팀 공용 S3 전용 IAM 자격 증명을 별도로 전달받아 입력하며, 실제 비밀 값이 들어간
+`.env`는 커밋하지 않습니다. 일반 IAM Access Key는 `AWS_SESSION_TOKEN`이 필요하지 않고, STS 임시 자격 증명을
+사용할 때만 세션 토큰을 함께 입력합니다.
+
+### 3. 로컬 데이터베이스 생성
+
+MariaDB에서 다음 SQL을 한 번 실행합니다. 이후 테이블과 제약조건은 애플리케이션 시작 시 Flyway가 생성합니다.
 
 ```sql
 CREATE DATABASE `cakeshop`
@@ -48,336 +120,198 @@ CREATE DATABASE `cakeshop`
     COLLATE utf8mb4_unicode_ci;
 ```
 
-애플리케이션이 사용하는 계정에는 최소한 `cakeshop` 데이터베이스에서 테이블 생성·변경과 데이터 읽기·쓰기 권한이 있어야 한다.
+애플리케이션용 계정에는 `cakeshop` 데이터베이스의 테이블 생성·변경과 데이터 읽기·쓰기 권한이 필요합니다.
 
-### 3. 애플리케이션 실행 — Flyway가 스키마를 만든다
-
-별도의 수동 DDL을 실행하지 않는다. 스키마는 Flyway가 적용한다.
+### 4. 애플리케이션 실행
 
 ```powershell
-.\gradlew.bat bootRun --args="--spring.profiles.active=local"
+# Windows
+.\gradlew.bat bootRun
 ```
 
-macOS·Linux에서는 `./gradlew bootRun --args="--spring.profiles.active=local"`을 사용한다.
-
-### 4. 샘플 데이터 넣기
-
-시드는 Flyway 관리 대상이 아니라서 **애플리케이션 실행만으로는 들어가지 않는다.** 스키마가 올라온 뒤 MariaDB 클라이언트로 직접 실행한다. 호스트·포트·사용자는 자신의 `.env`에 맞게 바꾼다.
-
-```powershell
-mariadb --host=localhost --port=3307 --user=root --password cakeshop `
-  < src\main\resources\db\seed\seed-local.sql
-mariadb --host=localhost --port=3307 --user=root --password cakeshop `
-  < src\main\resources\db\seed\seed-community.sql
+```bash
+# macOS / Linux
+./gradlew bootRun
 ```
 
-**순서를 바꾸지 않는다.** `seed-local.sql`이 `members`와 `post_categories`를 지우고 다시 넣으므로, 먼저 실행하지 않으면 커뮤니티 시드의 글이 전부 사라진다.
+`http://localhost:8080`에 접속해 화면이 열리는지 확인합니다.
 
-### 5. 확인
+### 5. 샘플 데이터 입력(선택)
+
+샘플 데이터는 Flyway 관리 대상이 아니므로 애플리케이션 실행 후 별도로 입력합니다. MariaDB 클라이언트에서 다음 순서로 실행합니다.
 
 ```sql
-USE `cakeshop`;
-
-SELECT `installed_rank`, `version`, `description`, `success`
-FROM `flyway_schema_history`
-ORDER BY `installed_rank`;
+SOURCE src/main/resources/db/seed/seed-local.sql;
+SOURCE src/main/resources/db/seed/seed-community.sql;
 ```
 
-[현재 migration](#현재-migration) 13개가 모두 `success = 1`이어야 한다. 버전은 `0`, `1`, `3`으로 시작해 `20260802.113229`로 끝난다. 시드는 Flyway 관리 대상이 아니므로 이 목록에 나타나지 않는다.
+`seed-local.sql`이 회원과 게시글 카테고리를 먼저 준비하므로 실행 순서를 바꾸지 않습니다. 경로는 MariaDB 클라이언트를 시작한 위치에 맞게 절대 경로로 바꿔도 됩니다.
 
-`http://localhost:8080/`에서 고객 화면이 뜨고, `admin@cakeshop.local / Admin1234!`로 관리자 로그인이 되면 완료다.
-
----
-
-## 실행 프로필
-
-| 프로필 | 사용하는 `.env` 값 | Flyway | 용도 |
-|---|---|---|---|
-| `local` (기본) | `LOCAL_DB_HOST`, `LOCAL_DB_PORT`, `LOCAL_DB_DATABASE`, `LOCAL_DB_USERNAME`, `LOCAL_DB_PASSWORD` | 적용 | 개인 개발·화면 확인. 샘플 데이터는 `db/seed/seed-local.sql`을 직접 실행 |
-| `rds` | `RDS_ENDPOINT`, `RDS_PORT`, `RDS_DATABASE`, `RDS_USERNAME`, `RDS_PASSWORD` | 비활성화 | 공용 AWS RDS 접속. 스키마는 별도 승인 절차로 반영 |
-
-애플리케이션을 시작할 때 둘 중 하나를 선택한다. 기본 프로필은 `local`이지만, 오접속을 막고 실행 의도를 분명히 하기 위해 항상 프로필을 명시하는 것을 권장한다. 실행 중에는 프로필을 바꿀 수 없으므로 전환하기 전에 실행 중인 서버를 `Ctrl+C`로 종료해야 한다. 종료하지 않고 다시 실행하면 `Port 8080 was already in use` 오류가 발생한다.
-
-### 로컬 DB로 실행
+### 6. 빌드와 테스트
 
 ```powershell
-.\gradlew.bat bootRun --args="--spring.profiles.active=local"
-```
-
-정상 실행 로그에는 `The following 1 profile is active: "local"`과 `Tomcat started on port 8080`이 표시된다. 실행 후 `http://localhost:8080/`에서 고객 화면을 확인한다.
-
-### 공용 RDS로 실행
-
-`rds` 프로필에서는 Flyway를 비활성화한다. 애플리케이션 기동은 RDS 스키마를 생성하거나 변경하지 않으므로, 필요한 스키마가 별도 검토·승인 절차로 먼저 반영됐는지 확인한다. 로컬 DB 초기화 절차의 `DROP DATABASE`를 RDS에 실행해서는 안 된다.
-
-1. `.env_sample`을 `.env`로 복사한다.
-2. `.env`의 `RDS_ENDPOINT`, `RDS_PORT`, `RDS_DATABASE`, `RDS_USERNAME`, `RDS_PASSWORD`를 실제 접속 정보로 변경한다.
-3. 다음 명령을 실행한다.
-
-```powershell
-.\gradlew.bat bootRun --args="--spring.profiles.active=rds"
-```
-
-정상 실행 로그에는 `The following 1 profile is active: "rds"`가 표시되고 Flyway migration은 실행되지 않는다. `.env`는 Git에 커밋하지 않으며 저장소에는 실제 값이 없는 `.env_sample`만 유지한다.
-
-RDS 프로필은 `require_secure_transport=ON` 환경에 맞춰 MariaDB Connector/J의 `sslMode=trust`로 TLS 연결을 사용한다. 이 설정은 통신을 암호화하지만 서버 인증서와 호스트명은 검증하지 않으므로 팀 공용 개발 RDS 용도에만 사용한다. 운영 환경에서는 AWS RDS CA 인증서를 등록하고 `sslMode=verify-full`을 사용해야 한다.
-
-TLS 설정이 빠진 JDBC URL을 사용하면 다음 오류가 발생한다.
-
-```text
-Connections using insecure transport are prohibited while --require_secure_transport=ON
-```
-
-### PowerShell 환경변수로 전환한 경우
-
-다음처럼 환경변수를 사용하면 해당 PowerShell 창에서 이후 실행에도 같은 프로필이 유지된다.
-
-```powershell
-$env:SPRING_PROFILES_ACTIVE="rds"
-```
-
-다시 `local` 프로필로 돌아가려면 실행 중인 서버를 종료한 후 환경변수를 제거하고 프로필을 명시해 실행한다.
-
-```powershell
-Remove-Item Env:SPRING_PROFILES_ACTIVE -ErrorAction SilentlyContinue
-.\gradlew.bat bootRun --args="--spring.profiles.active=local"
-```
-
-이미 실행된 Java 프로세스의 프로필은 환경변수를 제거해도 바뀌지 않는다. 반드시 기존 서버를 먼저 종료하고 다시 실행한다.
-
----
-
-## DB 스키마 관리
-
-로컬과 테스트 DB 스키마는 Flyway가 관리한다. `rds` 프로필의 Flyway는 비활성화하며 애플리케이션 기동으로 공용 DB를 변경하지 않는다. 이미 공유된 versioned migration은 수정하지 않고 새로운 버전 파일을 추가한다.
-
-| 위치 | 성격 |
-|---|---|
-| `src/main/resources/db/migration` | `local`, `test`에서 자동 적용. RDS에는 별도 검토·승인 절차로 반영하는 스키마 변경 |
-| `src/main/resources/db/seed` | 로컬 개발용 샘플 데이터. **Flyway 관리 대상이 아니다.** 필요할 때 직접 실행한다 |
-
-### 현재 migration
-
-`local` 프로필에서 다음 순서로 적용된다.
-
-| # | 파일 | 내용 |
-|---|---|---|
-| 1 | `V0__initial_schema.sql` | 전체 공통 스키마 생성 |
-| 2 | `V1__add_product_stock.sql` | 상품 재고 컬럼 추가 |
-| 3 | `V3__add_member_name.sql` | 회원 이름 컬럼 추가 및 기존 로컬 계정 값 보정 |
-| 4 | `V20260729_003452__provision_default_store.sql` | 모든 환경에 필요한 대표 매장과 7개 요일 영업시간 보장 |
-| 5 | `V20260729_123306__add_member_status_constraint.sql` | `members.status` 기본값과 `CHECK` 제약 |
-| 6 | `V20260729_152154__add_product_option_group_status.sql` | 상품 옵션 그룹·옵션의 `status` 컬럼과 `CHECK` 제약 |
-| 7 | `V20260729_181617__add_member_birth_date.sql` | 회원 생년월일 컬럼 추가 |
-| 8 | `V20260729_184356__align_order_payment_schema.sql` | 주문·결제 스키마를 7개 상태 모델에 맞춰 정렬 |
-| 9 | `V20260730_123931__apply_product_preparation_policy.sql` | 상품 유형별 준비 기간 정책 적용 |
-| 10 | `V20260730_170822__add_payment_request_guards.sql` | 결제 요청 재시도 시 주문당 `READY` 결제 1건 보장 |
-| 11 | `V20260731_091629__unify_active_payment_guard.sql` | `READY`·`DONE`을 합친 활성 결제를 주문당 1건으로 통합 |
-| 12 | `V20260802_113219__add_post_status_constraint.sql` | `posts`·`comments`의 `status` `CHECK` 제약 |
-| 13 | `V20260802_113229__provision_post_categories.sql` | 모든 환경에 필요한 게시글 카테고리 3종 보장 |
-
-버전 번호가 `0`, `1`, `3`에서 타임스탬프로 바뀌는 것은 Flyway 도입 전후의 차이다(아래 [주의할 함정](#주의할-함정) 참고). 새 파일은 생성 명령이 이름을 짓는다.
-
-### 새 migration 만들기
-
-#### 1. 파일 생성
-
-파일명은 직접 짓지 않는다. 여러 사람이 동시에 브랜치를 나눠 작업하면 같은 버전 번호가 나오고, Git은 파일명이 다르면 조용히 둘 다 머지하기 때문이다. 충돌은 머지 뒤 앱을 띄울 때야 드러난다. 아래 명령으로 만든다.
-
-```powershell
-.\gradlew.bat newMigration -Pdesc=add_coupon_table
-```
-```
-created: src/main/resources/db/migration/V20260729_101542__add_coupon_table.sql
-```
-
-직접 정하는 것은 `-Pdesc` 하나뿐이다. 버전은 생성 시각(`yyyyMMdd_HHmmss`)으로 자동으로 찍히고, 같은 초의 버전이 이미 있으면 1초 밀어서 생성한다. 파일은 규칙 주석이 들어간 템플릿으로 만들어진다.
-
-`-Pdesc`는 필수이며 **소문자 snake_case**(`[a-z0-9]+(_[a-z0-9]+)*`)만 받는다. 대문자·하이픈·한글은 태스크가 거부한다. 예: `add_coupon_table`, `drop_legacy_index`.
-
-작성 예시와 포맷은 [`docs/flyway_make_sample.md`](docs/flyway_make_sample.md)를 참고한다.
-
-#### 2. DDL 작성
-
-생성된 파일에 SQL을 채운다.
-
-| 규칙 | 이유 |
-|---|---|
-| 서로 의존하는 DDL은 **한 파일·한 PR**에 담는다 | 테이블 생성 → 그 테이블에 컬럼 추가를 나누면, `out-of-order: true`라 머신마다 적용 순서가 달라질 수 있다 |
-| 로컬 샘플 데이터는 넣지 않는다 **[금지]** | `db/seed/seed-local.sql`에 둔다. 시드는 Flyway가 스캔하지 않아 고쳐도 DB 재생성이 필요 없다 |
-| 모든 환경에 필요한 기준 데이터는 여기 넣는다 | 애플리케이션이 특정 PK나 행의 존재를 전제한다면 seed에만 두면 안 된다 (예: `V20260729_003452__provision_default_store.sql`) |
-
-#### 3. 로컬 적용 확인
-
-```powershell
-.\gradlew.bat bootRun --args="--spring.profiles.active=local"
-```
-
-Flyway가 새 버전만 이어서 적용한다. DB를 다시 만들 필요는 없다. 적용 결과를 확인한다.
-
-```sql
-USE `cakeshop`;
-
-SELECT `installed_rank`, `version`, `description`, `success`
-FROM `flyway_schema_history`
-ORDER BY `installed_rank`;
-```
-
-기존 `0`, `1`, `3`, `20260729.003452` 뒤에 새 타임스탬프 버전이 `success = 1`로 붙어야 한다.
-
-#### 4. 테스트
-
-```powershell
+# Windows
+.\gradlew.bat build
 .\gradlew.bat test
 ```
 
-`MigrationNamingTests`가 명명 규약을 검사하고, `test` 프로필의 Testcontainers 통합 테스트가 빈 DB에 전체 migration을 처음부터 적용해 본다. **Docker가 실행 중이어야 한다.**
+```bash
+# macOS / Linux
+./gradlew build
+./gradlew test
+```
 
-#### 5. PR
+전체 테스트에는 MariaDB Testcontainers 테스트가 포함되므로 Docker가 실행 중이어야 합니다.
 
-`docs/pull-request.md` 절차를 따른다. 스키마 변경은 리뷰 대상이며, `rds` 반영은 별도 검토·승인 절차다. 애플리케이션 기동은 RDS 스키마를 바꾸지 않는다.
+### 실행 프로필
 
-#### 머지된 뒤에는 손대지 않는다
+| 프로필 | 용도 | Flyway |
+|---|---|---|
+| `local,s3` | 개인 PC의 MariaDB와 공용 S3를 사용하는 기본 개발 환경 | 활성화 |
+| `local` | 개인 PC의 MariaDB와 로컬 디스크를 사용하는 대체 개발 환경 | 활성화 |
+| `rds` | 팀 공용 AWS RDS 연결 | 비활성화 |
+| `rds,s3` | 팀 공용 AWS RDS와 공용 S3 연결 | 비활성화 |
 
-머지된 migration을 고치면 checksum이 바뀌어 **팀원 전원이 로컬 DB를 다시 만들어야 한다.** 머지 전 자기 브랜치에서는 자유롭게 고쳐도 된다.
+공용 RDS 스키마는 애플리케이션 시작으로 변경하지 않습니다. `rds` 프로필은 접속 정보와 별도의 스키마 반영 절차가 준비된 경우에만 사용합니다.
 
-- **내용 수정 [금지]** — checksum 불일치. 변경이 필요하면 새 migration을 만든다.
-- **파일명 변경 [금지]** — checksum은 파일 *내용*으로 계산하므로 이름만 바꿔서는 checksum이 변하지 않는다. 대신 이력에 기록된 버전·설명과 어긋나 실패한다. 설명만 바꾸면 `DESCRIPTION_MISMATCH`, 버전까지 바꾸면 이력의 기존 버전이 미해결이 되고 새 버전은 미적용으로 잡힌다.
+### 자주 발생하는 문제
 
-#### 주의할 함정
+- `Access denied`: `.env`의 계정·비밀번호와 MariaDB 권한을 확인합니다.
+- `Unknown database 'cakeshop'`: 위의 데이터베이스 생성 SQL을 먼저 실행합니다.
+- `Port 8080 was already in use`: 기존 애플리케이션 프로세스를 종료한 뒤 다시 실행합니다.
+- `Found non-empty schema ... but no schema history table`: 개인 로컬 DB를 백업한 뒤 빈 `cakeshop` 데이터베이스로 다시 시작합니다. 공용 RDS를 초기화해서는 안 됩니다.
+- Testcontainers 연결 실패: Docker Desktop 또는 Docker Engine이 실행 중인지 확인합니다.
 
-- **분 단위 버전(`V20260729_1015__x.sql`)은 [금지].** Flyway는 버전 조각을 숫자로 비교하므로 초 단위와 섞이면 `1015 < 101542`가 되어 나중에 만든 파일이 먼저 실행된다. 생성 명령을 쓰면 이 문제가 없고, 위반은 `MigrationNamingTests`가 CI에서 잡는다.
-- **레거시 `V0`, `V1`, `V3`을 따라하지 않는다.** Flyway 도입 이전에 손으로 지은 이름이라 생성기 형식과 다르다. 타임스탬프 버전이 항상 더 크므로(`3 < 20260729.003452`) 순서에 문제가 없어 그대로 두며, `MigrationNamingTests`가 이 셋만 예외로 허용한다.
+## Quick Start
 
-기동이 실패하면 `global/config/FlywayConfig.java`가 이력 테이블 부재·checksum 불일치·버전 중복을 한국어 조치 안내와 함께 출력한다.
+설치와 샘플 데이터 입력을 마쳤다면 다음 흐름으로 주요 화면을 확인할 수 있습니다.
 
-### 샘플 데이터
+1. `http://localhost:8080`에서 고객 홈과 상품 목록을 확인합니다.
+2. `user@cakeshop.local` / `Admin1234!`로 로그인해 장바구니·주문·커뮤니티·후기 기능을 확인합니다.
+3. `admin@cakeshop.local` / `Admin1234!`로 로그인해 관리자 기능을 확인합니다.
+4. 코드를 수정한 뒤 테스트를 실행해 변경이 기존 동작을 깨뜨리지 않는지 확인합니다.
 
-시드는 `db/seed/seed-local.sql`과 `db/seed/seed-community.sql` 두 개이며 **이 순서로** 실행한다. 커뮤니티 시드는 `seed-local.sql`이 지운 `post_categories`를 다시 채운 뒤 게시글·댓글·좋아요·신고 샘플을 넣는다. 두 파일 모두 Flyway가 스캔하지 않는다. 그래서 checksum 검증에 걸리지 않고, 내용을 고쳐도 팀원들이 DB를 다시 만들 필요가 없다. 스크립트 맨 앞에서 로컬 샘플 데이터를 지운 뒤 다시 넣으므로 몇 번을 실행해도 결과가 같다. 로컬에서 만든 주문·리뷰·게시글도 함께 사라지므로 로컬 DB에서만 실행한다. 모든 환경에 필요한 대표 매장과 영업시간은 versioned migration으로 관리하며 로컬 seed가 삭제하거나 덮어쓰지 않는다. 같은 migration이 넣는 `post_categories`는 예외로 `seed-local.sql`이 지우므로, 반드시 `seed-community.sql`까지 실행해 다시 채운다.
+샘플 계정은 로컬 확인 전용입니다. 공용 또는 운영 환경에서 사용하지 않습니다.
 
-### 주의 사항
-
-- 빈 로컬 DB에서는 Flyway가 자동으로 전체 이력을 적용한다. 기존 수동 DB는 스키마 상태가 사람마다 다를 수 있으므로 `baseline-on-migrate`를 임의로 활성화하지 않는다.
-- Flyway의 `clean`은 `clean-disabled: true`로 차단되어 있다. 초기화 목적으로 이 보호 설정을 해제하지 않는다.
-- `rds` 프로필은 Flyway를 실행하지 않으며, 백업과 스키마 비교를 거친 팀 승인 절차 없이 RDS를 초기화하거나 migration을 반영하지 않는다.
-- 상태값(`status`) 컬럼은 도메인마다 흩어지지 않도록 `docs/status-design.md`의 상태값 공통 규칙(영문 enum 이름 저장·한글 라벨 미저장·전이는 service)을 따른다.
-
----
-
-## 로컬 DB 초기화
-
-이 절차는 Flyway 도입 전에 DDL을 수동 적용했거나 Flyway 이력이 꼬인 **개인 로컬 DB만** 대상으로 한다. 데이터베이스 전체와 그 안의 모든 테이블, 데이터, `flyway_schema_history`가 삭제된다. 공용 RDS나 보존해야 할 데이터베이스에는 절대 실행하지 않는다.
-
-### 언제 필요한가
-
-**Flyway 도입 브랜치가 `dev`에 머지된 뒤 최초 실행**에서 애플리케이션이 다음 오류로 기동하지 못하면 이 절차가 필요한 경우다.
+## Project Structure
 
 ```text
-Found non-empty schema(s) `cakeshop` but no schema history table.
+src/
+├── main/
+│   ├── java/com/cakeshop/
+│   │   ├── domain/<domain>/
+│   │   │   ├── controller/
+│   │   │   ├── service/
+│   │   │   ├── mapper/
+│   │   │   ├── entity/
+│   │   │   ├── dto/{form,view}/
+│   │   │   └── error/
+│   │   └── global/
+│   └── resources/
+│       ├── db/{migration,seed}/
+│       ├── mapper/<domain>/
+│       └── templates/{admin,customer,auth,home,error,fragments}/
+└── test/
+    ├── java/
+    └── resources/
 ```
 
-Flyway 도입 이전에 만든 로컬 DB에는 `flyway_schema_history`가 없어서 발생하며 정상이다. 각자 로컬 DB를 **1회 재생성**하면 되고, 이번 한 번으로 끝난다. 이후 샘플 데이터가 바뀌어도 `db/seed/seed-local.sql`만 다시 실행하면 되며 DB를 다시 만들 필요가 없다.
+요청은 기본적으로 `Controller → Service → Mapper → DB` 방향으로 흐릅니다. 도메인 간에는 상대 도메인의 테이블·Mapper·Entity를 직접 참조하지 않고 공개 Service 계약을 사용합니다.
 
-### 절차
+## Contributing
 
-전체 흐름은 다음과 같다.
+1. 하나의 브랜치와 PR에는 하나의 목적만 담습니다.
+2. 구현 전에 [`docs/conventions.md`](docs/conventions.md)의 계층·명명·도메인 경계 규칙을 확인합니다.
+3. 테스트는 [`docs/testing.md`](docs/testing.md)의 이름과 범위 규칙을 따릅니다.
+4. 새 Flyway migration은 파일명을 직접 만들지 않고
+   [Flyway migration 작성 가이드의 파일 생성](docs/flyway_make_sample.md#2-파일-생성)을 따릅니다.
 
-1. 실행 중인 애플리케이션을 `Ctrl+C`로 종료한다.
-2. 보존할 데이터가 있으면 먼저 백업한다.
-3. 접속하려는 호스트·포트·데이터베이스 이름이 `.env`의 `LOCAL_DB_*` 값과 일치하는지 다시 확인한다.
-4. `cakeshop` 데이터베이스 전체를 삭제하고 같은 이름으로 다시 생성한다.
-5. 애플리케이션을 `local` 프로필로 실행해 Flyway가 빈 DB를 처음부터 구성하도록 한다.
-6. `db/seed/seed-local.sql`, `db/seed/seed-community.sql`을 순서대로 실행해 샘플 데이터를 넣는다.
-7. `flyway_schema_history`와 샘플 계정을 확인한다.
+5. 이미 공유된 versioned migration은 수정하지 않습니다. 변경이 필요하면 새 migration을 추가합니다.
+6. 커밋 제목은 `<type>: 한글 요약` 형식을 사용합니다. 예: `feat: 후기 작성 기능 추가`.
+7. PR에는 변경 목적, 주요 변경, 테스트 결과, DB 영향, 집중 리뷰 사항, 관련 이슈를 적습니다.
 
-**2단계 — 백업.** Windows에서 MariaDB CLI로 백업하는 예시는 다음과 같다. 호스트, 포트, 사용자, 백업 경로는 자신의 `.env`에 맞게 바꾼다. `--password`는 명령행에 비밀번호를 노출하지 않고 입력 프롬프트를 표시한다.
+세부 브랜치·리뷰·병합 규칙은 [`docs/pull-request.md`](docs/pull-request.md)를 따릅니다.
 
-```powershell
-mariadb-dump `
-  --host=localhost `
-  --port=3307 `
-  --user=root `
-  --password `
-  --result-file="C:\backup\cakeshop-before-reset.sql" `
-  cakeshop
-```
+## 🏛️ Architecture & Developer Playbook
 
-**4단계 — 재생성.** 백업이 필요 없거나 백업이 완료되면 MariaDB에 접속한다.
+- 🧭 **[코드 컨벤션과 아키텍처](docs/conventions.md)**: 기술 기준, 수직 슬라이스, 네이밍, DB·MyBatis·트랜잭션·인증 규칙과 도메인 연동 경계
+- 🧪 **[테스트 작성 가이드](docs/testing.md)**: 계층별 테스트 전략, MariaDB Testcontainers, 테스트 대역, 명명과 검증 기준
+- 🗃️ **[Flyway migration 작성 가이드](docs/flyway_make_sample.md)**: 변경 단위, 기존 데이터 영향, MariaDB DDL 실패·복구와 검증 기준
+- 🧱 **[데이터베이스 스키마 명세](docs/database-schema.md)**: 현재 Flyway 적용 결과를 담당자·도메인·테이블별로 정리한 최종 스키마
+- 🔄 **[상태값 규칙](docs/conventions.md#11-상태값)**: Enum 저장값, DB 제약, Service 전이와 동시성 검증의 공통 기준
+- 🤝 **[팀 미결정 항목](docs/team-plan.md)**: 여러 담당자가 함께 결정해야 하는 도메인 연동과 운영 환경 질문
+- 🔀 **[Pull Request 가이드](docs/pull-request.md)**: PR 크기·제목·본문, 리뷰 요청과 브랜치별 병합 기준
+- 🎨 **[Thymeleaf 화면 작성 규칙](docs/frontend-template-format.md)**: 고객·관리자 화면 구조, 프래그먼트 계약, 정적 자원과 렌더링 검증 기준
 
-```powershell
-mariadb --host=localhost --port=3307 --user=root --password
-```
+## File Upload Storage
 
-접속 후 다음 SQL을 실행한다. 이 명령은 복구할 수 없는 삭제 작업이므로 현재 접속 대상이 로컬 MariaDB인지 반드시 확인한다.
+업로드 호출부는 공통 `FileStorageClient`만 사용하며 활성 프로필에 따라 저장소 구현체가 선택됩니다.
 
-```sql
-SELECT
-    @@hostname AS `server_host`,
-    @@port AS `server_port`;
-
-DROP DATABASE IF EXISTS `cakeshop`;
-
-CREATE DATABASE `cakeshop`
-    CHARACTER SET utf8mb4
-    COLLATE utf8mb4_unicode_ci;
-```
-
-일부 테이블만 골라 삭제하면 안 된다. 그 방법은 `flyway_schema_history` 또는 이후 추가된 테이블을 남길 수 있고, Flyway가 이미 적용된 마이그레이션이라고 오판하게 만든다. `flyway_schema_history`만 따로 삭제하거나 임의로 수정하는 것도 금지한다.
-
-**5~7단계.** 이후는 [처음 설치하기](#처음-설치하기)의 3~5단계와 동일하다. 프로젝트 루트에서 애플리케이션을 실행해 Flyway가 [현재 migration](#현재-migration)을 적용하게 하고, `db/seed/seed-local.sql`과 `db/seed/seed-community.sql`을 순서대로 실행한 뒤 `flyway_schema_history`를 확인한다. 초기화가 완료되면 `admin@cakeshop.local / Admin1234!` 계정으로 관리자 화면 로그인을 확인한다.
-
-### 자주 발생하는 오류
-
-| 증상 | 원인 | 조치 |
+| 활성 프로필 | 저장소 | 용도 |
 |---|---|---|
-| `NON_EMPTY_SCHEMA_WITHOUT_SCHEMA_HISTORY_TABLE` | 기존 수동 스키마가 남아 있음 | 로컬 DB가 맞는지 확인한 뒤 데이터베이스 전체를 다시 생성한다. 임의로 baseline을 켜지 않는다. |
-| `Table ... already exists` | 테이블만 일부 삭제했거나 다른 DB에 접속함 | `.env` 접속 정보를 확인하고 데이터베이스 전체를 다시 생성한다. |
-| 샘플 이메일·매장 PK 중복 | 기존 샘플 데이터가 남아 있음 | 테이블 단위 삭제 대신 로컬 데이터베이스 전체를 초기화한다. |
-| `chk_order_payment_migration_guard` 실패 | 이전 11개 주문 상태 또는 자동 변환할 수 없는 주문·결제 데이터가 남아 있음 | 개인 로컬 DB는 백업 후 전체 초기화한다. 공용 RDS나 보존 대상 DB에서는 적용을 중단하고 주문·결제 담당자와 데이터를 검토한다. |
-| `Access denied` | 애플리케이션 계정의 권한 또는 비밀번호가 잘못됨 | `.env` 값과 MariaDB 계정 권한을 확인한다. |
-| `Unknown database 'cakeshop'` | 삭제 후 데이터베이스를 다시 만들지 않음 | `CREATE DATABASE`를 실행하고 다시 시작한다. |
+| `local,s3` | `S3StorageService` | 기본 개발 환경: 로컬 DB와 공용 S3 사용 |
+| `local` | `LocalFileStorageClient` | 필요할 때 로컬 DB와 PC 외부 디렉터리 사용 |
+| `rds` | `LocalFileStorageClient` | RDS와 실행 PC의 로컬 저장소 사용 |
+| `rds,s3` | `S3StorageService` | RDS와 S3를 함께 사용하는 배포 환경 |
 
-위 오류 중 조치 방법이 정해진 것은 애플리케이션이 기동에 실패할 때 한국어 안내와 함께 로그에 출력한다(`global/config/FlywayConfig.java`). 원인을 특정할 수 없는 오류는 Flyway의 원본 메시지를 그대로 남긴다.
+RDS는 데이터베이스이고 S3는 파일 저장소이므로 서로 독립적으로 선택합니다.
 
-기존 데이터 보존이 필요하면 전체 삭제를 진행하지 말고 팀과 별도의 전환 마이그레이션 및 baseline 절차를 먼저 합의한다.
+### 로컬 디스크 사용
 
-로컬 DB 전환과 함께 테스트 실행 조건도 바뀐다. `.\gradlew.bat test`는 MariaDB Testcontainers 기반 DB 통합 테스트를 포함하므로 **실행 중인 Docker가 필요**하다. Docker 없이 실행하면 해당 테스트만 실패한다.
+공용 S3를 사용하지 않는 예외적인 경우에만 `.env`의 `FILE_UPLOAD_DIR`에 프로젝트 밖의 저장 경로를 지정하고
+`local` 프로필을 명시해 실행합니다.
+값을 생략하면 `<user home>/cakeshop-uploads`가 사용됩니다.
 
----
+```powershell
+.\gradlew.bat bootRun --args="--spring.profiles.active=local"
+```
 
-## 프로젝트 구조
+### 기본 개발 환경: 로컬 DB와 S3
 
-- `global`: 공통 기반(config·security·error·web·paging·infra)
-- `domain/{13개}`: controller·service·mapper·dto(form/view)·entity·error
+`.env_sample`을 복사한 로컬 `.env`에서 다음 설정을 확인합니다. 공용 버킷명과 URL은 비밀 값이 아니지만,
+실제 Access Key와 Secret Key는 Git에 추적되지 않는 로컬 `.env`에만 입력합니다.
 
----
+```dotenv
+AWS_REGION=ap-northeast-2
+AWS_ACCESS_KEY_ID=your-local-access-key
+AWS_SECRET_ACCESS_KEY=your-local-secret-key
+AWS_SESSION_TOKEN=
+AWS_S3_BUCKET=sweethan-cakeshop-images
+AWS_S3_BASE_URL=https://sweethan-cakeshop-images.s3.ap-northeast-2.amazonaws.com
+AWS_S3_KEY_PREFIX=local-your-name
+```
 
-## Store 수직 슬라이스 구현 예시
+로컬 Access Key와 Secret Key는 반드시 함께 설정합니다. STS나 IAM Identity Center의 임시 자격 증명을
+사용하면 `AWS_SESSION_TOKEN`도 함께 설정합니다. Access Key와 Secret Key가 모두 비어 있으면
+`aws configure`, 현재 프로세스의 AWS 환경 변수, IAM Role 같은 AWS SDK 기본 자격 증명 체인을 사용합니다.
+`AWS_S3_KEY_PREFIX`는 `local-본인GitHub아이디`처럼 영문·숫자·점·밑줄·하이픈만 사용해 개발자마다
+고유하게 설정하고, RDS 환경은 `rds-dev`처럼 별도 값을
+사용합니다. 저장소는 현재 prefix로 만든 객체만 삭제하므로 로컬 DB가 다른 환경의 URL을 갖고 있어도 해당
+S3 객체를 삭제하지 않습니다. prefix 도입 전에 생성한 S3 객체는 새 환경에서 자동 삭제하지 않으므로 필요하면
+참조 여부를 확인한 뒤 버킷에서 별도로 정리합니다.
+기본 프로필이 `local,s3`이므로 별도 실행 인수 없이 관리자 상품·매장 이미지 업로드로 확인합니다.
 
-새 설정형 도메인은 `domain/store`의 흐름을 기준으로 구현한다. 단, store는 단일 매장 설정이므로 목록·페이징을 포함한 전체 CRUD 예시는 product 도메인에서 별도로 제공한다.
+```powershell
+.\gradlew.bat bootRun
+```
 
-### 적용 순서
+### RDS와 S3 함께 사용
 
-1. 빈 로컬 DB를 생성하고 애플리케이션을 `local` 프로필로 실행해 Flyway가 테이블과 필수 대표
-   매장·7개 요일 영업시간을 만들게 한 뒤, `db/seed/seed-local.sql`을 실행해 공통 샘플 계정
-   `admin@cakeshop.local`·`user@cakeshop.local` 등 로컬 샘플 데이터를 넣는다.
-2. `admin@cakeshop.local / Admin1234!`로 로그인한다.
-3. `GET /admin/store`에서 매장 정보를 조회한다.
-4. 폼 저장은 `StoreUpdateForm` 검증 → `StoreService` 트랜잭션 → `StoreMapper.xml`의 `#{}` 바인딩 순서로 처리된다.
-5. 검증 실패는 같은 화면을 재렌더하고, 성공은 `/admin/store`로 redirect한 뒤 공통 FlashMessage를 표시한다.
-6. 저장 결과는 `HomeService`가 `StorePublicView`로 받아 고객 메인과 공통 Footer에 전달한다.
+애플리케이션 코드를 바꾸지 않고 기존 `RDS_*` 설정과 S3 설정을 준비한 뒤 프로필만 조합합니다.
 
-`db/seed/seed-local.sql`의 샘플 계정은 화면 확인용이며 `rds` 프로필에는 적용되지 않는다. Spring Security는 이메일로 회원을 조회하고 DB의 `ADMIN` 역할(권한 문자열 `ROLE_ADMIN`)을 확인한 뒤, 로그인 전에 요청했던 `/admin/store`로 돌려보낸다.
+```powershell
+.\gradlew.bat bootRun --args="--spring.profiles.active=rds,s3"
+```
 
-### 역할 분리 기준
+배포 환경은 장기 액세스 키 대신 EC2 Instance Profile 또는 ECS Task Role 같은 IAM Role을 사용합니다.
+업로드 대상 prefix에 필요한 `s3:PutObject`, `s3:DeleteObject` 등 최소 권한만 부여하고, 운영 환경에서는
+CloudFront와 비공개 S3 조합을 우선 검토합니다.
 
-| 계층 | 책임 |
-|---|---|
-| `entity` | DB 조회 결과와 영속 상태 (MyBatis POJO — JPA `@Entity`가 아니며 더티체킹·지연로딩 없음, 저장은 mapper 호출로만) |
-| `dto/form` | 관리자 입력 및 Jakarta Validation 규칙 |
-| `dto/view` | 관리자·고객 화면에 필요한 읽기 데이터 |
-| `service` | 여러 테이블 변경의 트랜잭션과 `BusinessException + StoreErrorCode` |
-| `mapper/XML` | SQL과 `#{}` 바인딩, camelCase 매핑 |
-| `controller` | Model+View, BindingResult 재렌더, RedirectAttributes FlashMessage |
+현재 이미지 URL 컬럼은 `VARCHAR(500)`이므로 S3 URL 저장만을 위한 migration은 필요하지 않습니다.
+기존 `/uploads/...` 파일은 자동 이전되지 않으므로 S3 복사와 DB URL 변경을 별도 이관 작업으로 진행해야
+하며, 공유 RDS 데이터 변경은 백업과 팀 승인 후 수행합니다.
 
-구현 과정과 선택 이유는 각 계층의 핵심 지점에 주석으로 남겨 두었다. 새 도메인은 자명한 문법 주석까지 복사하지 말고, 트랜잭션 경계·검증 실패 처리·도메인 조합처럼 구조상 중요한 주석만 유지한다.
+프로필 변경은 로컬 DB와 RDS의 데이터를 자동으로 동기화하지 않습니다. 같은 S3 버킷을 사용하더라도 각 DB에
+상품·매장 정보와 `image_url`이 존재해야 화면에서 조회할 수 있습니다. RDS에 S3 URL을 저장하기 시작한 뒤에는
+로컬 경로와 S3 URL이 섞이지 않도록 `rds,s3` 조합을 사용합니다. 버킷이나 CloudFront 기본 URL을 변경하면 기존
+전체 URL 데이터는 자동으로 바뀌지 않으므로 별도 이관 계획이 필요합니다.

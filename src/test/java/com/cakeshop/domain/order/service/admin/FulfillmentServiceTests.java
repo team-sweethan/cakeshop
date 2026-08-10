@@ -1,0 +1,185 @@
+package com.cakeshop.domain.order.service.admin;
+
+import com.cakeshop.domain.order.service.admin.FulfillmentService;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.cakeshop.domain.order.dto.form.admin.FulfillmentSearchCondition;
+import com.cakeshop.domain.order.dto.view.admin.FulfillmentListView;
+import com.cakeshop.domain.order.entity.Order;
+import com.cakeshop.domain.order.entity.OrderItem;
+import com.cakeshop.domain.order.entity.OrderItemOption;
+import com.cakeshop.domain.order.entity.OrderStatus;
+import com.cakeshop.domain.order.entity.OrderType;
+import com.cakeshop.domain.order.error.OrderErrorCode;
+import com.cakeshop.domain.order.mapper.OrderMapper;
+import com.cakeshop.domain.product.entity.ProductType;
+import com.cakeshop.global.error.BusinessException;
+import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+@ExtendWith(MockitoExtension.class)
+class FulfillmentServiceTests {
+
+    private static final LocalDateTime NOW = LocalDateTime.of(2026, 8, 2, 15, 0);
+    private static final Clock CLOCK = Clock.fixed(
+            NOW.atZone(ZoneId.of("Asia/Seoul")).toInstant(),
+            ZoneId.of("Asia/Seoul")
+    );
+
+    @Mock
+    private OrderMapper orderMapper;
+
+    private FulfillmentService fulfillmentService;
+
+    @BeforeEach
+    void setUp() {
+        fulfillmentService = new FulfillmentService(orderMapper, CLOCK);
+    }
+
+    @Test
+    void markPickedUp_readyOrder_recordsAdminAndTime() {
+        when(orderMapper.markPickedUpIfReady(10L, 7L, NOW)).thenReturn(1);
+
+        fulfillmentService.markPickedUp(10L, 7L);
+
+        verify(orderMapper).markPickedUpIfReady(10L, 7L, NOW);
+    }
+
+    @Test
+    void markPickedUp_nonReadyOrder_rejectsStateTransition() {
+        when(orderMapper.markPickedUpIfReady(10L, 7L, NOW)).thenReturn(0);
+
+        assertThatThrownBy(() -> fulfillmentService.markPickedUp(10L, 7L))
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        error -> assertThat(error.getErrorCode())
+                                .isEqualTo(OrderErrorCode.INVALID_STATUS_TRANSITION)
+                );
+    }
+
+    @Test
+    void getFulfillments_missingCondition_usesTodayAndMapsOrderSnapshots() {
+        Order order = order(OrderStatus.READY_FOR_PICKUP);
+        OrderItem item = item();
+        OrderItemOption option = option();
+        when(orderMapper.findFulfillmentOrders(
+                LocalDate.of(2026, 8, 2).atStartOfDay(),
+                LocalDate.of(2026, 8, 3).atStartOfDay(),
+                null
+        )).thenReturn(List.of(order));
+        when(orderMapper.findOrderItemsByOrderId(10L)).thenReturn(List.of(item));
+        when(orderMapper.findOrderItemOptionsByOrderId(10L)).thenReturn(List.of(option));
+
+        FulfillmentListView result = fulfillmentService.getFulfillments(null);
+
+        assertThat(result.pickupDate()).isEqualTo(LocalDate.of(2026, 8, 2));
+        assertThat(result.selectedStatus()).isNull();
+        assertThat(result.orders()).singleElement().satisfies(view -> {
+            assertThat(view.orderNumber()).isEqualTo("ORD-10");
+            assertThat(view.statusLabel()).isEqualTo("픽업 준비");
+            assertThat(view.pickupCompletable()).isTrue();
+            assertThat(view.items()).singleElement().satisfies(itemView -> {
+                assertThat(itemView.productName()).isEqualTo("딸기 케이크");
+                assertThat(itemView.optionSummary()).isEqualTo("크기: 2호");
+            });
+        });
+    }
+
+    @Test
+    void getFulfillments_unsupportedStatus_ignoresStatusFilter() {
+        FulfillmentSearchCondition condition = new FulfillmentSearchCondition();
+        condition.setPickupDate(LocalDate.of(2026, 8, 10));
+        condition.setStatus(OrderStatus.CANCELED);
+        when(orderMapper.findFulfillmentOrders(
+                LocalDate.of(2026, 8, 10).atStartOfDay(),
+                LocalDate.of(2026, 8, 11).atStartOfDay(),
+                null
+        )).thenReturn(List.of());
+
+        FulfillmentListView result = fulfillmentService.getFulfillments(condition);
+
+        assertThat(result.selectedStatus()).isNull();
+    }
+
+    @Test
+    void getFulfillments_futurePickupOrder_exposesCompletionAction() {
+        Order order = order(OrderStatus.READY_FOR_PICKUP);
+        order.setPickupAt(NOW.plusHours(1));
+        when(orderMapper.findFulfillmentOrders(
+                LocalDate.of(2026, 8, 2).atStartOfDay(),
+                LocalDate.of(2026, 8, 3).atStartOfDay(),
+                null
+        )).thenReturn(List.of(order));
+        when(orderMapper.findOrderItemsByOrderId(10L)).thenReturn(List.of());
+        when(orderMapper.findOrderItemOptionsByOrderId(10L)).thenReturn(List.of());
+
+        FulfillmentListView result = fulfillmentService.getFulfillments(null);
+
+        assertThat(result.orders()).singleElement()
+                .satisfies(view -> assertThat(view.pickupCompletable()).isTrue());
+    }
+
+    @Test
+    void getFulfillments_requestedCancellation_doesNotExposeCompletionAction() {
+        Order order = order(OrderStatus.READY_FOR_PICKUP);
+        when(orderMapper.findFulfillmentOrders(
+                LocalDate.of(2026, 8, 2).atStartOfDay(),
+                LocalDate.of(2026, 8, 3).atStartOfDay(),
+                null
+        )).thenReturn(List.of(order));
+        when(orderMapper.findOrderItemsByOrderId(10L)).thenReturn(List.of());
+        when(orderMapper.findOrderItemOptionsByOrderId(10L)).thenReturn(List.of());
+        when(orderMapper.hasRequestedRefundCancellation(10L)).thenReturn(true);
+
+        FulfillmentListView result = fulfillmentService.getFulfillments(null);
+
+        assertThat(result.orders()).singleElement()
+                .satisfies(view -> assertThat(view.pickupCompletable()).isFalse());
+    }
+
+    private Order order(OrderStatus status) {
+        Order order = new Order();
+        order.setId(10L);
+        order.setOrderNumber("ORD-10");
+        order.setOrderType(OrderType.GENERAL);
+        order.setStatus(status);
+        order.setPickupName("수령자");
+        order.setPickupPhone("010-1111-2222");
+        order.setPickupAt(LocalDateTime.of(2026, 8, 2, 14, 0));
+        return order;
+    }
+
+    private OrderItem item() {
+        OrderItem item = new OrderItem();
+        item.setId(100L);
+        item.setOrderId(10L);
+        item.setProductName("딸기 케이크");
+        item.setProductType(ProductType.GENERAL);
+        item.setQuantity(1);
+        item.setBasePrice(BigDecimal.valueOf(30_000));
+        item.setOptionAmount(BigDecimal.valueOf(5_000));
+        item.setTotalAmount(BigDecimal.valueOf(35_000));
+        return item;
+    }
+
+    private OrderItemOption option() {
+        OrderItemOption option = new OrderItemOption();
+        option.setOrderItemId(100L);
+        option.setOptionGroupName("크기");
+        option.setOptionName("2호");
+        return option;
+    }
+}

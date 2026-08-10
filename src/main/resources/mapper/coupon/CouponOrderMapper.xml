@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cakeshop.domain.coupon.mapper.CouponOrderMapper">
+
+    <select id="findAvailableCouponsForMember"
+            resultType="com.cakeshop.domain.coupon.dto.view.CouponOrderAvailableView">
+        SELECT mc.id AS memberCouponId, c.name
+        FROM member_coupons mc INNER JOIN coupons c ON c.id = mc.coupon_id
+        WHERE mc.member_id = #{memberId} AND mc.status = 'AVAILABLE'
+          AND c.status = 'ACTIVE' AND c.starts_at &lt;= NOW(6) AND c.expires_at &gt; NOW(6)
+          AND c.minimum_order_amount &lt;= #{orderAmount}
+        ORDER BY c.expires_at, mc.id
+    </select>
+
+    <select id="findAvailableCouponForOrderForUpdate"
+            resultType="com.cakeshop.domain.coupon.dto.view.CouponOrderDiscount">
+        SELECT mc.id AS memberCouponId, c.discount_type AS discountType, c.discount_value AS discountValue,
+               c.minimum_order_amount AS minimumOrderAmount, c.maximum_discount_amount AS maximumDiscountAmount
+        FROM member_coupons mc INNER JOIN coupons c ON c.id = mc.coupon_id
+        WHERE mc.id = #{memberCouponId} AND mc.member_id = #{memberId} AND mc.status = 'AVAILABLE'
+          AND c.status = 'ACTIVE' AND c.starts_at &lt;= NOW(6) AND c.expires_at &gt; NOW(6)
+        FOR UPDATE
+    </select>
+
+    <select id="findAvailableCouponForOrder"
+            resultType="com.cakeshop.domain.coupon.dto.view.CouponOrderDiscount">
+        SELECT mc.id AS memberCouponId, c.discount_type AS discountType, c.discount_value AS discountValue,
+               c.minimum_order_amount AS minimumOrderAmount, c.maximum_discount_amount AS maximumDiscountAmount
+        FROM member_coupons mc INNER JOIN coupons c ON c.id = mc.coupon_id
+        WHERE mc.id = #{memberCouponId} AND mc.member_id = #{memberId} AND mc.status = 'AVAILABLE'
+          AND c.status = 'ACTIVE' AND c.starts_at &lt;= NOW(6) AND c.expires_at &gt; NOW(6)
+    </select>
+
+    <update id="reserveCouponForOrder">
+        UPDATE member_coupons SET status = 'RESERVED', applied_order_id = #{orderId}
+        WHERE id = #{memberCouponId} AND status = 'AVAILABLE' AND applied_order_id IS NULL
+    </update>
+
+    <update id="useReservedCouponForOrder">
+        UPDATE member_coupons SET status = 'USED', used_at = NOW(6)
+        WHERE applied_order_id = #{orderId} AND status = 'RESERVED'
+    </update>
+
+    <update id="releaseReservedCouponForExpiredOrder">
+        UPDATE member_coupons mc INNER JOIN coupons c ON c.id = mc.coupon_id
+        SET mc.status = CASE WHEN c.expires_at &gt; NOW(6) THEN 'AVAILABLE' ELSE 'ENDED' END,
+            mc.applied_order_id = NULL
+        WHERE mc.applied_order_id = #{orderId} AND mc.status = 'RESERVED'
+    </update>
+
+    <!--
+        쿠폰 사용 이력은 applied_order_id로 주문에 연결된다.
+        취소 완료 후에도 사용 기간이 남은 쿠폰만 AVAILABLE로 복구하고,
+        이미 만료된 쿠폰은 ENDED로 유지해 만료 쿠폰을 다시 사용하지 못하게 한다.
+    -->
+    <update id="restoreCouponForCanceledOrder">
+        UPDATE member_coupons mc
+        INNER JOIN coupons c ON c.id = mc.coupon_id
+        SET mc.status = CASE
+                            WHEN c.expires_at &gt; NOW(6) THEN 'AVAILABLE'
+                            ELSE 'ENDED'
+                        END,
+            mc.applied_order_id = NULL,
+            mc.used_at = NULL
+        WHERE mc.applied_order_id = #{orderId}
+          AND mc.status IN ('RESERVED', 'USED')
+    </update>
+</mapper>

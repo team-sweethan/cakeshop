@@ -12,17 +12,28 @@ import com.cakeshop.domain.coupon.dto.form.CouponCreateForm;
 import com.cakeshop.domain.coupon.dto.form.CouponSearchCondition;
 import com.cakeshop.domain.coupon.dto.form.CouponUpdateForm;
 import com.cakeshop.domain.coupon.dto.view.CouponView;
+import com.cakeshop.domain.coupon.dto.view.CouponIssueCandidateView;
+import com.cakeshop.domain.coupon.dto.view.CouponIssuedMemberView;
+import com.cakeshop.domain.coupon.entity.CustomerCouponStatus;
 import com.cakeshop.domain.coupon.entity.Coupon;
 import com.cakeshop.domain.coupon.entity.CouponDisplayStatus;
 import com.cakeshop.domain.coupon.entity.CouponStatus;
+import com.cakeshop.domain.coupon.entity.CouponTargetType;
 import com.cakeshop.domain.coupon.entity.DiscountType;
 import com.cakeshop.domain.coupon.error.CouponErrorCode;
 import com.cakeshop.domain.coupon.mapper.CouponMapper;
+import com.cakeshop.domain.member.service.MemberCouponQueryService;
+import com.cakeshop.domain.member.dto.view.MemberCouponView;
+import com.cakeshop.domain.coupon.dto.view.CouponIssuedMemberHistoryView;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -30,6 +41,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,6 +49,15 @@ class CouponAdminServiceTests {
 
     @Mock
     private CouponMapper couponMapper;
+
+    @Mock
+    private CouponIssueService couponIssueService;
+
+    @Mock
+    private MemberCouponQueryService memberCouponQueryService;
+
+    @Spy
+    private Clock clock = Clock.systemDefaultZone();
 
     @InjectMocks
     private CouponAdminService couponAdminService;
@@ -59,6 +80,20 @@ class CouponAdminServiceTests {
         assertThat(saved.getMinimumOrderAmount()).isEqualByComparingTo("10000");
         assertThat(saved.getTotalQuantity()).isEqualTo(100);
         assertThat(saved.getCreatedBy()).isEqualTo(7L);
+    }
+
+    @Test
+    void insertAutomaticTargetStoresNullTotalQuantity() {
+        CouponCreateForm form = createForm();
+        form.setTargetType(CouponTargetType.ALL_MEMBERS);
+        form.setTotalQuantity(null);
+        when(couponMapper.insertCoupon(any())).thenReturn(1);
+
+        couponAdminService.insertCoupon(form, 7L);
+
+        ArgumentCaptor<Coupon> couponCaptor = ArgumentCaptor.forClass(Coupon.class);
+        verify(couponMapper).insertCoupon(couponCaptor.capture());
+        assertThat(couponCaptor.getValue().getTotalQuantity()).isNull();
     }
 
     @Test
@@ -90,6 +125,102 @@ class CouponAdminServiceTests {
         verify(couponMapper, never()).findCoupons(any(), anyInt(), anyInt());
         assertThat(result.getContent()).isEmpty();
         assertThat(result.getTotalElements()).isZero();
+    }
+
+    @Test
+    void searchTargetMembers_masksPhoneAndReturnsOnlyMonthAndDay() {
+        MemberCouponView member = new MemberCouponView(
+                1L, "홍길동", "member@example.com", "010-1234-5678", LocalDate.of(2000, 1, 15)
+        );
+        PageRequest request = new PageRequest(1, 5);
+        when(memberCouponQueryService.searchActiveMembers(any(), any(), any())).thenReturn(
+                new PageResult<>(List.of(member), request, 1)
+        );
+        when(couponMapper.findIssuedMemberIds(3L, List.of(1L))).thenReturn(List.of());
+
+        PageResult<CouponIssueCandidateView> result = couponAdminService.searchTargetMembers(3L, "NAME", "홍길", 1);
+
+        CouponIssueCandidateView candidate = result.getContent().getFirst();
+        assertThat(candidate.email()).isEqualTo("me***@example.com");
+        assertThat(candidate.phone()).isEqualTo("010-****-5678");
+        assertThat(candidate.birthday()).isEqualTo("01-15");
+    }
+
+    @Test
+    void getIssuedMembers_combinesCouponHistoryWithMemberProfile() {
+        CouponIssuedMemberHistoryView history = new CouponIssuedMemberHistoryView(
+                1L, CustomerCouponStatus.AVAILABLE, LocalDateTime.of(2026, 8, 7, 10, 0), null
+        );
+        MemberCouponView member = new MemberCouponView(
+                1L, "회원", "member@example.com", "010-1234-5678", LocalDate.of(2000, 1, 15)
+        );
+        when(couponMapper.countIssuedMemberHistories(3L, null)).thenReturn(1L);
+        when(couponMapper.findIssuedMemberHistories(3L, null, 5, 0)).thenReturn(List.of(history));
+        when(memberCouponQueryService.getMembersByIds(List.of(1L))).thenReturn(List.of(member));
+
+        PageResult<CouponIssuedMemberView> result = couponAdminService.getIssuedMembers(3L, null, 1);
+
+        assertThat(result.getTotalElements()).isEqualTo(1);
+        assertThat(result.getContent()).containsExactly(new CouponIssuedMemberView(
+                1L, "회원", "member@example.com", "010-1234-5678", "01-15", CustomerCouponStatus.AVAILABLE, null
+        ));
+    }
+
+    @Test
+    void issueSpecificMemberRejectsCouponBeforeStart() {
+        Coupon coupon = coupon(CouponStatus.ACTIVE, 10, 0, LocalDateTime.now().plusDays(1));
+        coupon.setStartsAt(LocalDateTime.now().plusHours(1));
+        when(memberCouponQueryService.lockActiveCouponIssuableMember(2L)).thenReturn(true);
+        when(couponMapper.findCouponByIdForUpdate(1L)).thenReturn(Optional.of(coupon));
+
+        assertThatThrownBy(() -> couponAdminService.issueSpecificMember(1L, 2L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(CouponErrorCode.UPDATE_FAILED);
+
+        verify(couponMapper, never()).insertMemberCouponIfAbsent(1L, 2L, false);
+    }
+
+    @Test
+    void issueSpecificMemberThrowsWhenTargetIsNoLongerIssuable() {
+        Coupon coupon = coupon(CouponStatus.ACTIVE, 10, 0, LocalDateTime.now().plusDays(1));
+        when(couponMapper.findCouponByIdForUpdate(1L)).thenReturn(Optional.of(coupon));
+        when(memberCouponQueryService.lockActiveCouponIssuableMember(2L)).thenReturn(true);
+        when(couponMapper.insertMemberCouponIfAbsent(1L, 2L, false)).thenReturn(0);
+
+        assertThatThrownBy(() -> couponAdminService.issueSpecificMember(1L, 2L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(CouponErrorCode.ISSUE_TARGET_UNAVAILABLE);
+
+        verify(couponMapper, never()).increaseIssuedQuantityIfAvailable(1L);
+    }
+
+    @Test
+    void cancelSpecificMemberCouponRejectsExpiredCoupon() {
+        Coupon coupon = coupon(CouponStatus.ACTIVE, 10, 1, LocalDateTime.now().minusSeconds(1));
+        when(couponMapper.findCouponByIdForUpdate(1L)).thenReturn(Optional.of(coupon));
+
+        assertThatThrownBy(() -> couponAdminService.cancelSpecificMemberCoupon(1L, 2L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(CouponErrorCode.EXPIRED_COUPON);
+
+        verify(couponMapper, never()).deleteAvailableMemberCoupon(1L, 2L);
+    }
+
+    @Test
+    void cancelSpecificMemberCouponThrowsWhenIssuanceIsNoLongerAvailable() {
+        Coupon coupon = coupon(CouponStatus.ACTIVE, 10, 1, LocalDateTime.now().plusDays(1));
+        when(couponMapper.findCouponByIdForUpdate(1L)).thenReturn(Optional.of(coupon));
+        when(couponMapper.deleteAvailableMemberCoupon(1L, 2L)).thenReturn(0);
+
+        assertThatThrownBy(() -> couponAdminService.cancelSpecificMemberCoupon(1L, 2L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(CouponErrorCode.ISSUE_CANCELLATION_UNAVAILABLE);
+
+        verify(couponMapper, never()).decreaseIssuedQuantity(1L);
     }
 
     @Test
@@ -142,6 +273,24 @@ class CouponAdminServiceTests {
             .isInstanceOf(BusinessException.class)
             .extracting(exception -> ((BusinessException) exception).getErrorCode())
             .isEqualTo(CouponErrorCode.CANNOT_EDIT_ENDED_COUPON);
+    }
+
+    @Test
+    void getUpdateForm_seoulClockBeforeStartsAt_marksFullEdit() {
+        Clock seoulClock = Clock.fixed(Instant.parse("2026-08-06T15:30:00Z"), ZoneId.of("Asia/Seoul"));
+        CouponAdminService service = new CouponAdminService(
+                couponMapper, couponIssueService, memberCouponQueryService, seoulClock
+        );
+        Coupon coupon = coupon(
+                CouponStatus.ACTIVE, 10, 0, LocalDateTime.of(2026, 8, 8, 0, 0)
+        );
+        coupon.setStartsAt(LocalDateTime.of(2026, 8, 7, 1, 0));
+        when(couponMapper.findCouponById(1L)).thenReturn(Optional.of(coupon));
+
+        CouponUpdateForm form = service.getUpdateForm(1L);
+
+        assertThat(form.isFullEdit()).isTrue();
+        assertThat(form.getDisplayStatus()).isEqualTo(CouponDisplayStatus.SCHEDULED);
     }
 
     @Test
@@ -325,11 +474,11 @@ class CouponAdminServiceTests {
         when(couponMapper.findCouponById(1L)).thenReturn(Optional.of(
             coupon(CouponStatus.ACTIVE, 10, 0, LocalDateTime.now().plusDays(1))
         ));
-        when(couponMapper.updateStatus(1L, CouponStatus.INACTIVE)).thenReturn(1);
+        when(couponMapper.updateStatus(1L, CouponStatus.ACTIVE, CouponStatus.INACTIVE)).thenReturn(1);
 
         couponAdminService.deactivateCoupon(1L);
 
-        verify(couponMapper).updateStatus(1L, CouponStatus.INACTIVE);
+        verify(couponMapper).updateStatus(1L, CouponStatus.ACTIVE, CouponStatus.INACTIVE);
     }
 
     @Test
@@ -343,7 +492,7 @@ class CouponAdminServiceTests {
             .extracting(exception -> ((BusinessException) exception).getErrorCode())
             .isEqualTo(CouponErrorCode.NOT_ACTIVE);
 
-        verify(couponMapper, never()).updateStatus(any(), any());
+        verify(couponMapper, never()).updateStatus(any(), any(), any());
     }
 
     @Test
@@ -351,11 +500,11 @@ class CouponAdminServiceTests {
         Coupon coupon = coupon(CouponStatus.ACTIVE, 10, 0, LocalDateTime.now().plusDays(1));
         coupon.setStartsAt(LocalDateTime.now().plusHours(1));
         when(couponMapper.findCouponById(1L)).thenReturn(Optional.of(coupon));
-        when(couponMapper.updateStatus(1L, CouponStatus.INACTIVE)).thenReturn(1);
+        when(couponMapper.updateStatus(1L, CouponStatus.ACTIVE, CouponStatus.INACTIVE)).thenReturn(1);
 
         couponAdminService.deactivateCoupon(1L);
 
-        verify(couponMapper).updateStatus(1L, CouponStatus.INACTIVE);
+        verify(couponMapper).updateStatus(1L, CouponStatus.ACTIVE, CouponStatus.INACTIVE);
     }
 
     @Test
@@ -369,7 +518,7 @@ class CouponAdminServiceTests {
             .extracting(exception -> ((BusinessException) exception).getErrorCode())
             .isEqualTo(CouponErrorCode.EXPIRED_COUPON);
 
-        verify(couponMapper, never()).updateStatus(any(), any());
+        verify(couponMapper, never()).updateStatus(any(), any(), any());
     }
 
     @Test
@@ -377,11 +526,11 @@ class CouponAdminServiceTests {
         when(couponMapper.findCouponById(1L)).thenReturn(Optional.of(
             coupon(CouponStatus.INACTIVE, 10, 0, LocalDateTime.now().plusDays(1))
         ));
-        when(couponMapper.updateStatus(1L, CouponStatus.ACTIVE)).thenReturn(1);
+        when(couponMapper.updateStatus(1L, CouponStatus.INACTIVE, CouponStatus.ACTIVE)).thenReturn(1);
 
         couponAdminService.activateCoupon(1L);
 
-        verify(couponMapper).updateStatus(1L, CouponStatus.ACTIVE);
+        verify(couponMapper).updateStatus(1L, CouponStatus.INACTIVE, CouponStatus.ACTIVE);
     }
 
     private CouponCreateForm createForm() {
@@ -391,6 +540,7 @@ class CouponAdminServiceTests {
         form.setDiscountValue(BigDecimal.valueOf(3000));
         form.setMinimumOrderAmount(BigDecimal.valueOf(10000));
         form.setTotalQuantity(100L);
+        form.setTargetType(CouponTargetType.SPECIFIC_MEMBERS);
         form.setStartsAt(LocalDateTime.of(2026, 8, 1, 9, 0));
         form.setExpiresAt(LocalDateTime.of(2026, 8, 31, 23, 59));
         return form;
@@ -417,6 +567,7 @@ class CouponAdminServiceTests {
         coupon.setId(1L);
         coupon.setName("여름 할인");
         coupon.setStatus(status);
+        coupon.setTargetType(CouponTargetType.SPECIFIC_MEMBERS);
         coupon.setTotalQuantity(totalQuantity);
         coupon.setIssuedQuantity(issuedQuantity);
         coupon.setStartsAt(LocalDateTime.now().minusDays(1));

@@ -6,6 +6,7 @@
         INSERT INTO orders (
             order_number,
             member_id,
+            request_key,
             order_type,
             orderer_name,
             orderer_phone,
@@ -23,6 +24,7 @@
         VALUES (
                    #{orderNumber},
                    #{memberId},
+                   #{requestKey},
                    #{orderType},
                    #{ordererName},
 
@@ -38,7 +40,13 @@
                    #{paymentExpiresAt},
                    #{requestMessage}
                )
+        ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)
     </insert>
+
+    <update id="updateAmountsIfPendingPayment">
+        UPDATE orders SET discount_amount = #{discountAmount}, final_amount = #{finalAmount}
+        WHERE id = #{orderId} AND status = 'PENDING_PAYMENT'
+    </update>
     <insert id="insertOrderItem" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO order_items (
             order_id,
@@ -51,7 +59,9 @@
             total_amount,
             requirements,
             preparation_days,
-            cancellation_limit_days
+            cancellation_limit_days,
+            stock_deducted_at,
+            stock_restored_at
         )
         VALUES (
                    #{orderId},
@@ -64,9 +74,31 @@
                    #{totalAmount},
                    #{requirements},
                    #{preparationDays},
-                   #{cancellationLimitDays}
+                   #{cancellationLimitDays},
+                   #{stockDeductedAt},
+                   #{stockRestoredAt}
                )
     </insert>
+
+    <select id="existsOrderItemByOrderId" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+              FROM order_items
+             WHERE order_id = #{orderId}
+        )
+    </select>
+
+    <select id="hasRequestedRefundCancellation" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM payments payment
+            INNER JOIN payment_cancellations cancellation
+                ON cancellation.payment_id = payment.id
+            WHERE payment.order_id = #{orderId}
+              AND cancellation.status = 'REQUESTED'
+              AND cancellation.request_type IN ('CUSTOMER', 'ADMIN')
+        )
+    </select>
 
     <insert id="insertOrderItemOption"
             parameterType="com.cakeshop.domain.order.entity.OrderItemOption"
@@ -108,6 +140,7 @@
             id,
             order_number,
             member_id,
+            request_key,
             order_type,
             orderer_name,
             orderer_phone,
@@ -140,6 +173,202 @@
         WHERE id = #{orderId}
     </select>
 
+    <select id="findOrderByMemberIdAndRequestKey"
+            resultType="com.cakeshop.domain.order.entity.Order">
+        SELECT id,
+               order_number,
+               member_id,
+               request_key,
+               order_type,
+               status,
+               final_amount,
+               pickup_at,
+               payment_expires_at,
+               created_at,
+               updated_at
+          FROM orders
+         WHERE member_id = #{memberId}
+           AND request_key = #{requestKey}
+    </select>
+
+    <select id="findOrdersByMemberId" resultType="com.cakeshop.domain.order.entity.Order">
+        SELECT
+            id,
+            order_number,
+            member_id,
+            request_key,
+            order_type,
+            orderer_name,
+            orderer_phone,
+            pickup_name,
+            pickup_phone,
+            original_amount,
+            discount_amount,
+            final_amount,
+            status,
+            pickup_at,
+            cancellation_blocked_at,
+            payment_expires_at,
+            request_message,
+            reject_reason,
+            under_review_at,
+            rejected_at,
+            rejected_by,
+            ready_at,
+            approved_by,
+            picked_up_at,
+            picked_up_by,
+            expired_at,
+            canceled_at,
+            cancel_reason,
+            canceled_by,
+            pickup_reminder_sent_at,
+            created_at,
+            updated_at
+        FROM orders
+        WHERE member_id = #{memberId}
+        ORDER BY created_at DESC, id DESC
+    </select>
+
+    <select id="findOrderByIdForUpdate" resultType="com.cakeshop.domain.order.entity.Order">
+        SELECT
+            id,
+            order_number,
+            member_id,
+            request_key,
+            order_type,
+            orderer_name,
+            orderer_phone,
+            pickup_name,
+            pickup_phone,
+            original_amount,
+            discount_amount,
+            final_amount,
+            status,
+            pickup_at,
+            cancellation_blocked_at,
+            payment_expires_at,
+            request_message,
+            reject_reason,
+            under_review_at,
+            rejected_at,
+            rejected_by,
+            ready_at,
+            approved_by,
+            picked_up_at,
+            picked_up_by,
+            expired_at,
+            canceled_at,
+            cancel_reason,
+            canceled_by,
+            pickup_reminder_sent_at,
+            created_at,
+            updated_at
+        FROM orders
+        WHERE id = #{orderId}
+        FOR UPDATE
+    </select>
+
+    <select id="findAllOrders" resultType="com.cakeshop.domain.order.entity.Order">
+        SELECT
+            id,
+            order_number,
+            member_id,
+            request_key,
+            order_type,
+            orderer_name,
+            orderer_phone,
+            pickup_name,
+            pickup_phone,
+            original_amount,
+            discount_amount,
+            final_amount,
+            status,
+            pickup_at,
+            cancellation_blocked_at,
+            payment_expires_at,
+            request_message,
+            reject_reason,
+            under_review_at,
+            rejected_at,
+            rejected_by,
+            ready_at,
+            approved_by,
+            picked_up_at,
+            picked_up_by,
+            expired_at,
+            canceled_at,
+            cancel_reason,
+            canceled_by,
+            pickup_reminder_sent_at,
+            created_at,
+            updated_at
+        FROM orders
+        ORDER BY created_at DESC, id DESC
+    </select>
+
+    <select id="findFulfillmentOrders" resultType="com.cakeshop.domain.order.entity.Order">
+        SELECT
+            id,
+            order_number,
+            member_id,
+            request_key,
+            order_type,
+            orderer_name,
+            orderer_phone,
+            pickup_name,
+            pickup_phone,
+            original_amount,
+            discount_amount,
+            final_amount,
+            status,
+            pickup_at,
+            cancellation_blocked_at,
+            payment_expires_at,
+            request_message,
+            reject_reason,
+            under_review_at,
+            rejected_at,
+            rejected_by,
+            ready_at,
+            approved_by,
+            picked_up_at,
+            picked_up_by,
+            expired_at,
+            canceled_at,
+            cancel_reason,
+            canceled_by,
+            pickup_reminder_sent_at,
+            created_at,
+            updated_at
+        FROM orders
+        WHERE pickup_at &gt;= #{pickupStart}
+          AND pickup_at &lt; #{pickupEnd}
+          AND status IN ('UNDER_REVIEW', 'READY_FOR_PICKUP', 'PICKED_UP')
+        <if test="status != null">
+          AND status = #{status}
+        </if>
+        ORDER BY pickup_at, created_at, id
+    </select>
+
+    <select id="findOverduePendingOrderIds" resultType="long">
+        SELECT id
+          FROM orders
+         WHERE status = 'PENDING_PAYMENT'
+           AND payment_expires_at IS NOT NULL
+           AND payment_expires_at &lt;= #{now}
+           AND NOT EXISTS (
+               SELECT 1
+                 FROM payments AS candidate_payment
+                 INNER JOIN payment_cancellations AS compensation
+                    ON compensation.active_requested_payment_id = candidate_payment.id
+                   AND compensation.request_type = 'SYSTEM_COMPENSATION'
+                WHERE candidate_payment.order_id = orders.id
+           )
+         ORDER BY payment_expires_at, id
+         LIMIT #{limit}
+    </select>
+
     <select id="existsByIdAndMemberId" resultType="boolean">
         SELECT EXISTS (
             SELECT 1
@@ -162,11 +391,54 @@
             total_amount,
             requirements,
             preparation_days,
-            cancellation_limit_days
+            cancellation_limit_days,
+            stock_deducted_at,
+            stock_restored_at
         FROM order_items
         WHERE order_id = #{orderId}
         ORDER BY id
     </select>
+
+    <update id="markStockDeductedIfUnset">
+        UPDATE order_items
+        SET stock_deducted_at = #{deductedAt}
+        WHERE id = #{orderItemId}
+          AND stock_deducted_at IS NULL
+          AND stock_restored_at IS NULL
+    </update>
+
+    <select id="findStockDeductedItemsForRestore"
+            resultType="com.cakeshop.domain.order.entity.OrderItem">
+        SELECT
+            id,
+            order_id,
+            product_id,
+            product_name,
+            product_type,
+            quantity,
+            base_price,
+            option_amount,
+            total_amount,
+            requirements,
+            preparation_days,
+            cancellation_limit_days,
+            stock_deducted_at,
+            stock_restored_at
+        FROM order_items
+        WHERE order_id = #{orderId}
+          AND stock_deducted_at IS NOT NULL
+          AND stock_restored_at IS NULL
+        ORDER BY id
+        FOR UPDATE
+    </select>
+
+    <update id="markStockRestoredIfDeducted">
+        UPDATE order_items
+        SET stock_restored_at = #{restoredAt}
+        WHERE id = #{orderItemId}
+          AND stock_deducted_at IS NOT NULL
+          AND stock_restored_at IS NULL
+    </update>
 
     <select id="findOrderItemOptionsByOrderId"
             resultType="com.cakeshop.domain.order.entity.OrderItemOption">
@@ -242,6 +514,14 @@
               WHERE payment.order_id = orders.id
                 AND payment.status = 'DONE'
           )
+          AND NOT EXISTS (
+              SELECT 1
+              FROM payments AS cancel_payment
+              INNER JOIN payment_cancellations AS cancellation
+                  ON cancellation.payment_id = cancel_payment.id
+              WHERE cancel_payment.order_id = orders.id
+                AND cancellation.status = 'REQUESTED'
+          )
     </update>
 
     <update id="rejectIfUnderReview">
@@ -274,6 +554,31 @@
               WHERE payment.order_id = orders.id
                 AND payment.status = 'DONE'
           )
+          AND NOT EXISTS (
+              SELECT 1
+              FROM payments AS cancel_payment
+              INNER JOIN payment_cancellations AS cancellation
+                  ON cancellation.payment_id = cancel_payment.id
+              WHERE cancel_payment.order_id = orders.id
+                AND cancellation.status = 'REQUESTED'
+          )
+    </update>
+
+    <update id="cancelAfterPaymentCompensation">
+        UPDATE orders
+        SET status = 'CANCELED',
+            canceled_by = 'SYSTEM',
+            canceled_at = #{canceledAt},
+            cancel_reason = #{cancelReason}
+        WHERE id = #{orderId}
+          AND status IN ('PENDING_PAYMENT', 'READY_FOR_PICKUP', 'EXPIRED')
+          AND EXISTS (
+              SELECT 1
+              FROM payments AS payment
+              WHERE payment.order_id = orders.id
+                AND payment.status = 'CANCELED'
+                AND payment.failure_code = 'INTERNAL_COMPLETION_FAILED'
+          )
     </update>
 
     <update id="expireIfPendingPayment">
@@ -290,6 +595,12 @@
         WHERE current_order.id = #{orderId}
           AND current_order.status = 'PENDING_PAYMENT'
           AND (payment.id IS NULL OR payment.status = 'READY')
+          AND NOT EXISTS (
+              SELECT 1
+                FROM payment_cancellations AS compensation
+               WHERE compensation.active_requested_payment_id = payment.id
+                 AND compensation.request_type = 'SYSTEM_COMPENSATION'
+          )
     </update>
 
     <update id="cancelIfCurrent">
@@ -306,14 +617,9 @@
               WHERE payment.order_id = orders.id
                 AND payment.status = 'CANCELED'
           )
-          AND (
-              (order_type = 'CUSTOM' AND status = 'UNDER_REVIEW')
-              OR (
-                  order_type = 'GENERAL'
-                  AND status = 'READY_FOR_PICKUP'
-                  AND #{canceledAt} &lt; pickup_at
-              )
-          )
+          AND order_type = 'GENERAL'
+          AND status = 'READY_FOR_PICKUP'
+          AND #{canceledAt} &lt; pickup_at
     </update>
 
 </mapper>

@@ -11,7 +11,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.cakeshop.domain.cart.controller.CartController;
 import com.cakeshop.domain.cart.dto.view.CartView;
 import com.cakeshop.domain.cart.service.CartService;
-import com.cakeshop.domain.coupon.controller.CouponController;
+import com.cakeshop.domain.coupon.service.CouponMemberQueryService;
+import com.cakeshop.domain.coupon.dto.view.CustomerCouponView;
+import com.cakeshop.global.common.paging.PageRequest;
+import com.cakeshop.global.common.paging.PageResult;
+import com.cakeshop.domain.coupon.service.CouponOrderQueryService;
 import com.cakeshop.domain.home.controller.HomeController;
 import com.cakeshop.domain.home.service.HomeService;
 import com.cakeshop.domain.member.controller.AuthController;
@@ -19,12 +23,20 @@ import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
 import com.cakeshop.domain.member.dto.view.MemberProfileView;
 import com.cakeshop.domain.member.controller.MyPageController;
 import com.cakeshop.domain.member.service.MemberService;
-import com.cakeshop.domain.notification.controller.NotificationController;
-import com.cakeshop.domain.order.controller.OrderController;
+import com.cakeshop.domain.notification.controller.NotificationUserController;
+import com.cakeshop.domain.order.controller.customer.OrderController;
+import com.cakeshop.domain.order.dto.view.OrderDetailView;
+import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView;
+import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
+import com.cakeshop.domain.order.service.customer.CustomerOrderQueryService;
+import com.cakeshop.domain.order.service.OrderService;
 import com.cakeshop.domain.payment.controller.PaymentController;
+import com.cakeshop.domain.payment.service.PaymentFacade;
+import com.cakeshop.domain.payment.service.PaymentQueryService;
+import com.cakeshop.domain.payment.service.RefundFacade;
 import com.cakeshop.domain.product.controller.ProductController;
 import com.cakeshop.domain.product.service.ProductService;
-import com.cakeshop.domain.review.controller.ReviewController;
+import com.cakeshop.domain.review.service.ReviewProductQueryService;
 import com.cakeshop.global.security.MemberDetails;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -70,23 +82,57 @@ class CustomerPageControllerTests {
                         "010-1234-5678",
                         LocalDate.of(2000, 1, 15)));
 
+        CustomerOrderQueryService orderQueryService = mock(CustomerOrderQueryService.class);
+        when(orderQueryService.getMemberOrders(1L)).thenReturn(List.of());
+        when(orderQueryService.getMemberOrder(1L, 1L))
+                .thenReturn(mock(OrderDetailView.class));
         CartService cartService = mock(CartService.class);
         when(cartService.getCart(1L)).thenReturn(new CartView(
                 List.of(), 0, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO));
+        CouponOrderQueryService couponOrderQueryService = mock(CouponOrderQueryService.class);
+        when(couponOrderQueryService.getAvailableCouponsForMember(
+                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any()
+        )).thenReturn(List.of());
+        CouponMemberQueryService couponMemberQueryService = mock(CouponMemberQueryService.class);
+        when(couponMemberQueryService.getMemberCoupons(
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.any(PageRequest.class)
+        )).thenReturn(new PageResult<>(List.<CustomerCouponView>of(), new PageRequest(1, 10), 0));
+        OrderCheckoutService orderCheckoutService = mock(OrderCheckoutService.class);
+        when(orderCheckoutService.getGeneralCheckout(
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyList()
+        )).thenReturn(new GeneralOrderCheckoutView(
+                1L, "테스트 케이크", "일반 케이크", 1,
+                List.of(), BigDecimal.valueOf(30_000), BigDecimal.ZERO,
+                BigDecimal.valueOf(30_000), List.of()
+        ));
 
         mockMvc = MockMvcBuilders.standaloneSetup(
                         new HomeController(mock(HomeService.class)),
                         new AuthController(memberService),
-                        new ProductController(mock(ProductService.class)),
+                        new ProductController(
+                                mock(ProductService.class),
+                                mock(ReviewProductQueryService.class)),
                         new CartController(cartService),
-                        new OrderController(),
-                        new PaymentController(),
+                        new OrderController(
+                                orderCheckoutService,
+                                mock(OrderService.class),
+                                orderQueryService,
+                                memberService,
+                                mock(RefundFacade.class),
+                                couponOrderQueryService
+                        ),
+                        new PaymentController(
+                                mock(PaymentFacade.class),
+                                mock(PaymentQueryService.class)
+                        ),
                         new MyPageController(
                                 memberService,
+                                couponMemberQueryService,
                                 mock(SessionRegistry.class)),
-                        new NotificationController(),
-                        new CouponController(),
-                        new ReviewController())
+                        new NotificationUserController())
                 .setCustomArgumentResolvers(
                         new AuthenticationPrincipalArgumentResolver())
                 .build();
@@ -98,16 +144,15 @@ class CustomerPageControllerTests {
         pages.put("/products", "customer/product/list");
         pages.put("/products/1", "customer/product/detail");
         pages.put("/cart", "customer/cart/list");
-        pages.put("/orders/pickup", "customer/order/pickup-setting");
-        pages.put("/orders/custom/options", "customer/order/custom-option");
-        pages.put("/orders/custom/request", "customer/order/custom-request");
-        pages.put("/orders/checkout", "customer/order/form");
+        pages.put(
+                "/orders/checkout?productId=1&quantity=1&optionIds=1",
+                "customer/order/form"
+        );
         pages.put("/orders/1/payment", "customer/payment/form");
-        pages.put("/orders/complete", "customer/order/complete");
+        pages.put("/orders/complete?orderId=1", "customer/order/complete");
         pages.put("/mypage", "customer/member/mypage");
         pages.put("/orders/1", "customer/order/detail");
         pages.put("/notifications", "customer/notification/list");
-        pages.put("/reviews/new", "customer/review/form");
         pages.put("/mypage/coupons", "customer/coupon/list");
         pages.put("/mypage/profile", "customer/member/profile-edit");
     }
@@ -208,5 +253,24 @@ class CustomerPageControllerTests {
                 .contains("state.available");
         assertThat(cartTemplate)
                 .contains("item.stockQuantity != null ? item.stockQuantity : 10");
+    }
+
+    @Test
+    void productDetail_generalOrder_usesIntegratedCheckout() throws IOException {
+        String productDetail = new ClassPathResource(
+                "templates/customer/product/detail.html"
+        ).getContentAsString(StandardCharsets.UTF_8);
+        String customerScript = new ClassPathResource(
+                "static/js/customer-mockup.js"
+        ).getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(productDetail)
+                .contains("th:href=\"@{/orders/checkout}\"")
+                .contains("data-order-checkout")
+                .doesNotContain("@{/orders/pickup(intent='order')}");
+        assertThat(customerScript)
+                .contains("new URL(\"/orders/checkout\", location.origin)")
+                .contains("url.searchParams.set(\"productId\"")
+                .contains("url.searchParams.append(\"optionIds\"");
     }
 }

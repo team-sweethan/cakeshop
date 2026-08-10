@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+******************************
+작성자 : HyunGyu-Cho
+담당자 : 주환
+작성일 : 2026-08-08
+기능 : 후기 작성이 쓰는 주문 상품 조회 SQL
+설명 : OrderReviewQueryService 가 쓰는 읽기 전용 조회만 둔다. reviews 는 참조하지 않는다.
+******************************
+-->
+<mapper namespace="com.cakeshop.domain.order.mapper.OrderReviewMapper">
+
+    <!-- 목록이 비면 NOT IN () 이 문법 오류라 조건 자체를 넣지 않는다. 후기를 한 건도 쓰지 않은
+         회원이 그 경우다. -->
+    <sql id="writableCondition">
+        FROM order_items oi
+        JOIN orders o ON o.id = oi.order_id
+        WHERE o.member_id = #{memberId}
+          AND o.status = 'PICKED_UP'
+        <if test="excludedOrderItemIds != null and !excludedOrderItemIds.isEmpty()">
+            AND oi.id NOT IN
+            <foreach collection="excludedOrderItemIds" item="excludedId"
+                     open="(" separator="," close=")">
+                #{excludedId}
+            </foreach>
+        </if>
+    </sql>
+
+    <!-- 한 주문의 상품들은 picked_up_at 이 전부 같다. oi.id 를 함께 두지 않으면 오프셋 페이징에서
+         순서가 흔들려 같은 항목이 두 페이지에 나오거나 어느 페이지에도 안 나온다. -->
+    <select id="findWritableOrderItems"
+            resultType="com.cakeshop.domain.order.dto.view.OrderReviewItemView">
+
+        SELECT oi.id           AS orderItemId,
+               oi.product_name AS productName,
+               o.order_number  AS orderNumber,
+               o.picked_up_at  AS pickedUpAt
+        <include refid="writableCondition"/>
+        ORDER BY o.picked_up_at DESC, oi.id DESC
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="countWritableOrderItems" resultType="long">
+
+        SELECT COUNT(*)
+        <include refid="writableCondition"/>
+    </select>
+
+    <select id="findReviewTarget"
+            resultType="com.cakeshop.domain.order.dto.view.OrderReviewTargetView">
+
+        SELECT oi.id                    AS orderItemId,
+               oi.product_id            AS productId,
+               oi.product_name          AS productName,
+               o.order_number           AS orderNumber,
+               (o.status = 'PICKED_UP') AS pickedUp,
+               o.picked_up_at           AS pickedUpAt
+          FROM order_items oi
+          JOIN orders o ON o.id = oi.order_id
+         WHERE oi.id = #{orderItemId}
+           AND o.member_id = #{memberId}
+    </select>
+
+    <select id="findSnapshotsByOrderItemIds"
+            resultType="com.cakeshop.domain.order.dto.view.OrderReviewSnapshotView">
+
+        SELECT oi.id           AS orderItemId,
+               oi.product_name AS productName,
+               o.order_number  AS orderNumber
+          FROM order_items oi
+          JOIN orders o ON o.id = oi.order_id
+         WHERE oi.id IN
+        <foreach collection="orderItemIds" item="orderItemId"
+                 open="(" separator="," close=")">
+            #{orderItemId}
+        </foreach>
+    </select>
+
+    <!-- 상품명은 주문 시점 스냅샷이라 products 를 보지 않는다. 이름이 바뀐 뒤에도 관리자가
+         화면에 보이는 이름 그대로 검색할 수 있어야 한다 (DOMAIN.md 2.6). -->
+    <select id="findOrderItemIdsByProductName" resultType="long">
+        SELECT id
+          FROM order_items
+         WHERE product_name LIKE CONCAT('%', #{keyword}, '%') ESCAPE '!'
+    </select>
+</mapper>

@@ -118,7 +118,7 @@
                             </span>
                         </td>
 
-                        <td th:text="|${coupon.issuedQuantity} / ${coupon.totalQuantity}|">0 / 100</td>
+                        <td th:text="|${coupon.issuedQuantity} / ${coupon.totalQuantity == null ? '제한 없음' : coupon.totalQuantity}|">0 / 100</td>
 
                         <td>
                             <span th:text="${#temporals.format(coupon.startsAt,'yyyy-MM-dd HH:mm')}">2026-07-01 00:00</span>
@@ -127,11 +127,11 @@
                         </td>
 
                         <td th:switch="${#strings.toString(coupon.displayStatus)}">
-                            <span th:case="'SCHEDULED'" class="badge badge--info">발급 예정</span>
-                            <span th:case="'ACTIVE'" class="badge badge--success">발급 중</span>
-                            <span th:case="'INACTIVE'" class="badge badge--warning">발급 중지</span>
-                            <span th:case="'EXHAUSTED'" class="badge badge--warning">수량 소진</span>
-                            <span th:case="'ENDED'" class="badge badge--danger">종료</span>
+                            <span th:case="'SCHEDULED'" class="badge badge--info" th:text="${coupon.displayStatus.description}">발급 예정</span>
+                            <span th:case="'ACTIVE'" class="badge badge--success" th:text="${coupon.displayStatus.description}">발급 중</span>
+                            <span th:case="'INACTIVE'" class="badge badge--warning" th:text="${coupon.displayStatus.description}">발급 중지</span>
+                            <span th:case="'EXHAUSTED'" class="badge badge--warning" th:text="${coupon.displayStatus.description}">수량 소진</span>
+                            <span th:case="'ENDED'" class="badge badge--danger" th:text="${coupon.displayStatus.description}">종료</span>
                         </td>
 
                         <td>
@@ -167,7 +167,7 @@
                 </table>
             </div>
 
-            <nav th:if="${pageResult.totalPages > 1}"
+            <nav
                  class="cluster"
                  aria-label="페이지 이동"
                  style="justify-content: center; margin-top: 16px">
@@ -182,11 +182,6 @@
                )}">
                     이전
                 </a>
-
-                <span class="btn btn--disabled"
-                      th:unless="${pageNavigation.hasPreviousBlock}">
-                    이전
-                </span>
 
                 <!-- startPage부터 endPage까지만 렌더링해 전체 페이지 번호 노출을 막는다. -->
                 <a class="btn"
@@ -216,10 +211,6 @@
                     다음
                 </a>
 
-                <span class="btn btn--disabled"
-                      th:unless="${pageNavigation.hasNextBlock}">
-                    다음
-                </span>
             </nav>
         </main>
     </div>

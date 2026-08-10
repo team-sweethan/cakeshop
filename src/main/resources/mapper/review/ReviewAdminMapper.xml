@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cakeshop.domain.review.mapper.ReviewAdminMapper">
+    <!-- 사용자 입력은 #{} 만 사용 (${} 금지) -->
+    <!-- reviews 외의 테이블을 JOIN 하지 않는다. 작성자명·상품명 조건은 각 도메인 계약이
+         돌려준 ID 목록으로 받는다 (DOMAIN.md 2.7, specs/review-admin.md C2) -->
+
+    <!-- null 과 빈 목록의 뜻이 다르다. null 은 조건 없음이고, 빈 목록은 계약이 "일치하는 것이
+         없다"고 답한 것이라 0건으로 떨어져야 한다. IN () 은 문법 오류라 1 = 0 으로 받는다. -->
+    <sql id="adminConditions">
+        <where>
+            <if test="filter.memberIds != null">
+                <choose>
+                    <when test="!filter.memberIds.isEmpty()">
+                        AND member_id IN
+                        <foreach collection="filter.memberIds" item="memberId"
+                                 open="(" separator="," close=")">
+                            #{memberId}
+                        </foreach>
+                    </when>
+                    <otherwise>AND 1 = 0</otherwise>
+                </choose>
+            </if>
+
+            <if test="filter.orderItemIds != null">
+                <choose>
+                    <when test="!filter.orderItemIds.isEmpty()">
+                        AND order_item_id IN
+                        <foreach collection="filter.orderItemIds" item="orderItemId"
+                                 open="(" separator="," close=")">
+                            #{orderItemId}
+                        </foreach>
+                    </when>
+                    <otherwise>AND 1 = 0</otherwise>
+                </choose>
+            </if>
+
+            <if test="filter.status != null">
+                AND status = #{filter.status}
+            </if>
+
+            <if test="filter.rating.min != null">
+                AND overall_rating &gt;= #{filter.rating.min}
+            </if>
+
+            <if test="filter.rating.max != null">
+                AND overall_rating &lt;= #{filter.rating.max}
+            </if>
+        </where>
+    </sql>
+
+    <!-- 상태를 가리지 않는다. 숨긴 후기가 목록에 없으면 해제할 방법이 없다 (C1). -->
+    <select id="findForAdmin" resultType="com.cakeshop.domain.review.dto.view.ReviewRow">
+        SELECT <include refid="com.cakeshop.domain.review.mapper.ReviewMapper.reviewRowColumns"/>
+          FROM reviews
+        <include refid="adminConditions"/>
+         ORDER BY created_at DESC, id DESC
+         LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="countForAdmin" resultType="long">
+        SELECT COUNT(*)
+          FROM reviews
+        <include refid="adminConditions"/>
+    </select>
+
+    <update id="updateStatus">
+        UPDATE reviews
+           SET status = #{next}
+         WHERE id = #{reviewId}
+           AND status = #{expected}
+    </update>
+</mapper>

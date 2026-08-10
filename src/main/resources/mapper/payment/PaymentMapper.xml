@@ -3,6 +3,66 @@
 <mapper namespace="com.cakeshop.domain.payment.mapper.PaymentMapper">
     <!-- 사용자 입력은 #{} 만 사용 (${} 금지) -->
 
+    <select id="findPaymentsForAdmin"
+            resultType="com.cakeshop.domain.payment.dto.view.PaymentAdminListRow">
+        SELECT
+            payment.id AS payment_id,
+            payment.order_id,
+            current_order.order_number,
+            payment.toss_order_id,
+            current_order.orderer_name,
+            current_order.order_type,
+            payment.amount,
+            payment.method,
+            payment.status,
+            cancellation.status AS cancellation_status,
+            cancellation.request_type AS cancellation_request_type,
+            payment.requested_at,
+            payment.approved_at,
+            payment.canceled_at
+        FROM payments AS payment
+        INNER JOIN orders AS current_order
+            ON current_order.id = payment.order_id
+        LEFT JOIN payment_cancellations AS cancellation
+            ON cancellation.id = (
+                SELECT MAX(recent_cancellation.id)
+                FROM payment_cancellations AS recent_cancellation
+                WHERE recent_cancellation.payment_id = payment.id
+                  AND NOT (
+                      recent_cancellation.request_type = 'SYSTEM_COMPENSATION'
+                      AND recent_cancellation.status = 'FAILED'
+                      AND recent_cancellation.failure_code = 'PAYMENT_COMPLETED'
+                  )
+            )
+        <if test="status != null">
+            WHERE payment.status = #{status}
+        </if>
+        ORDER BY payment.created_at DESC, payment.id DESC
+    </select>
+
+    <select id="summarizePaymentsForAdmin"
+            resultType="com.cakeshop.domain.payment.dto.view.PaymentAdminSummaryView">
+        SELECT
+            COUNT(*) AS total_count,
+            COALESCE(SUM(status = 'DONE'), 0) AS done_count,
+            COALESCE(SUM(status IN ('CANCELED', 'PARTIAL_CANCELED')), 0) AS canceled_count,
+            COALESCE(SUM(
+                payment.status IN ('ABORTED', 'EXPIRED')
+                OR EXISTS (
+                    SELECT 1
+                    FROM payment_cancellations AS cancellation
+                    WHERE cancellation.payment_id = payment.id
+                      AND cancellation.status IN ('REQUESTED', 'FAILED')
+                      AND NOT (
+                          cancellation.request_type = 'SYSTEM_COMPENSATION'
+                          AND cancellation.status = 'FAILED'
+                          AND cancellation.failure_code = 'PAYMENT_COMPLETED'
+                      )
+                )
+            ), 0) AS attention_count
+        FROM payments AS payment
+    </select>
+
     <insert id="insertReadyPayment"
             parameterType="com.cakeshop.domain.payment.entity.Payment"
             useGeneratedKeys="true"
@@ -61,6 +121,82 @@
         ORDER BY id
     </select>
 
+    <select id="findReadyPaymentByOrderId"
+            resultType="com.cakeshop.domain.payment.entity.Payment">
+        SELECT
+            id,
+            order_id,
+            toss_order_id,
+            payment_key,
+            idempotency_key,
+            method,
+            amount,
+            status,
+            provider_status,
+            active_payment_order_id,
+            failure_code,
+            failure_message,
+            requested_at,
+            approved_at,
+            canceled_at,
+            created_at,
+            updated_at
+        FROM payments
+        WHERE order_id = #{orderId}
+          AND status = 'READY'
+        LIMIT 1
+    </select>
+
+    <select id="findPaymentById"
+            resultType="com.cakeshop.domain.payment.entity.Payment">
+        SELECT
+            id,
+            order_id,
+            toss_order_id,
+            payment_key,
+            idempotency_key,
+            method,
+            amount,
+            status,
+            provider_status,
+            active_payment_order_id,
+            failure_code,
+            failure_message,
+            requested_at,
+            approved_at,
+            canceled_at,
+            created_at,
+            updated_at
+        FROM payments
+        WHERE id = #{paymentId}
+    </select>
+
+    <select id="findDonePaymentByOrderId"
+            resultType="com.cakeshop.domain.payment.entity.Payment">
+        SELECT
+            id,
+            order_id,
+            toss_order_id,
+            payment_key,
+            idempotency_key,
+            method,
+            amount,
+            status,
+            provider_status,
+            active_payment_order_id,
+            failure_code,
+            failure_message,
+            requested_at,
+            approved_at,
+            canceled_at,
+            created_at,
+            updated_at
+        FROM payments
+        WHERE order_id = #{orderId}
+          AND status = 'DONE'
+        LIMIT 1
+    </select>
+
     <update id="completeIfReady">
         UPDATE payments AS payment
         INNER JOIN orders AS current_order
@@ -75,6 +211,24 @@
         WHERE payment.id = #{paymentId}
           AND payment.status = 'READY'
           AND current_order.status = 'PENDING_PAYMENT'
+    </update>
+
+    <update id="completeZeroAmountIfReady">
+        UPDATE payments AS payment
+        INNER JOIN orders AS current_order
+            ON current_order.id = payment.order_id
+        SET payment.status = 'DONE',
+            payment.payment_key = CONCAT('ZERO-', payment.id),
+            payment.method = 'ZERO_AMOUNT',
+            payment.provider_status = 'ZERO_AMOUNT',
+            payment.approved_at = #{approvedAt},
+            payment.failure_code = NULL,
+            payment.failure_message = NULL
+        WHERE payment.id = #{paymentId}
+          AND payment.status = 'READY'
+          AND payment.amount = 0
+          AND current_order.status = 'PENDING_PAYMENT'
+          AND current_order.final_amount = 0
     </update>
 
     <update id="abortIfReady">
@@ -156,6 +310,186 @@
         WHERE id = #{cancellationId}
     </select>
 
+    <select id="findPaymentCancellationByIdForUpdate"
+            resultType="com.cakeshop.domain.payment.entity.PaymentCancellation">
+        SELECT
+            id,
+            payment_id,
+            idempotency_key,
+            cancel_amount,
+            cancel_reason,
+            request_type,
+            requested_by,
+            status,
+            active_requested_payment_id,
+            transaction_key,
+            failure_code,
+            failure_message,
+            requested_at,
+            canceled_at,
+            created_at,
+            updated_at
+        FROM payment_cancellations
+        WHERE id = #{cancellationId}
+        FOR UPDATE
+    </select>
+
+    <select id="findPaymentCancellationByIdempotencyKey"
+            resultType="com.cakeshop.domain.payment.entity.PaymentCancellation">
+        SELECT
+            id,
+            payment_id,
+            idempotency_key,
+            cancel_amount,
+            cancel_reason,
+            request_type,
+            requested_by,
+            status,
+            active_requested_payment_id,
+            transaction_key,
+            failure_code,
+            failure_message,
+            requested_at,
+            canceled_at,
+            created_at,
+            updated_at
+        FROM payment_cancellations
+        WHERE idempotency_key = #{idempotencyKey}
+    </select>
+
+    <select id="findRequestedCancellationByPaymentId"
+            resultType="com.cakeshop.domain.payment.entity.PaymentCancellation">
+        SELECT
+            id,
+            payment_id,
+            idempotency_key,
+            cancel_amount,
+            cancel_reason,
+            request_type,
+            requested_by,
+            status,
+            active_requested_payment_id,
+            transaction_key,
+            failure_code,
+            failure_message,
+            requested_at,
+            canceled_at,
+            created_at,
+            updated_at
+        FROM payment_cancellations
+        WHERE active_requested_payment_id = #{paymentId}
+    </select>
+
+    <select id="findRequestedRefundCancellations"
+            resultType="com.cakeshop.domain.payment.entity.PaymentCancellation">
+        SELECT
+            id, payment_id, idempotency_key, cancel_amount, cancel_reason,
+            request_type, requested_by, status, active_requested_payment_id,
+            transaction_key, failure_code, failure_message, requested_at,
+            canceled_at, created_at, updated_at
+        FROM payment_cancellations
+        WHERE status = 'REQUESTED'
+          AND request_type IN ('CUSTOMER', 'ADMIN')
+          AND requested_at &lt;= DATE_SUB(CURRENT_TIMESTAMP(6), INTERVAL 1 MINUTE)
+        ORDER BY requested_at, id
+        LIMIT #{limit}
+    </select>
+
+    <insert id="insertCompensationCancellation"
+            parameterType="com.cakeshop.domain.payment.entity.PaymentCancellation"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO payment_cancellations (
+            payment_id,
+            idempotency_key,
+            cancel_amount,
+            cancel_reason,
+            request_type,
+            requested_by,
+            status
+        )
+        SELECT
+            payment.id,
+            #{idempotencyKey},
+            payment.amount,
+            #{cancelReason},
+            'SYSTEM_COMPENSATION',
+            NULL,
+            'REQUESTED'
+        FROM payments AS payment
+        WHERE payment.id = #{paymentId}
+          AND payment.status IN ('READY', 'DONE', 'EXPIRED')
+          AND payment.amount = #{cancelAmount}
+        ON DUPLICATE KEY UPDATE
+            payment_cancellations.id = LAST_INSERT_ID(payment_cancellations.id)
+    </insert>
+
+    <update id="attachRecoveryPaymentKey">
+        UPDATE payments
+        SET payment_key = #{paymentKey}
+        WHERE id = #{paymentId}
+          AND status IN ('READY', 'DONE', 'EXPIRED')
+          AND (payment_key IS NULL OR payment_key = #{paymentKey})
+    </update>
+
+    <update id="clearRecoveryPaymentKey">
+        UPDATE payments
+        SET payment_key = NULL
+        WHERE id = #{paymentId}
+          AND status = 'READY'
+          AND payment_key = #{paymentKey}
+    </update>
+
+    <update id="rotateReadyPaymentIdempotencyKey">
+        UPDATE payments
+        SET idempotency_key = #{idempotencyKey}
+        WHERE id = #{paymentId}
+          AND status = 'READY'
+          AND payment_key = #{paymentKey}
+    </update>
+
+    <update id="reopenReleasedCompensation">
+        UPDATE payment_cancellations
+        SET status = 'REQUESTED',
+            failure_code = NULL,
+            failure_message = NULL,
+            transaction_key = NULL,
+            canceled_at = NULL,
+            requested_at = CURRENT_TIMESTAMP(6)
+        WHERE payment_id = #{paymentId}
+          AND idempotency_key = #{idempotencyKey}
+          AND request_type = 'SYSTEM_COMPENSATION'
+          AND status = 'FAILED'
+          AND failure_code IN ('PAYMENT_NOT_APPROVED', 'PAYMENT_COMPLETED')
+    </update>
+
+    <select id="findRequestedCompensations"
+            resultType="com.cakeshop.domain.payment.entity.PaymentCancellation">
+        SELECT
+            id,
+            payment_id,
+            idempotency_key,
+            cancel_amount,
+            cancel_reason,
+            request_type,
+            requested_by,
+            status,
+            active_requested_payment_id,
+            transaction_key,
+            failure_code,
+            failure_message,
+            requested_at,
+            canceled_at,
+            created_at,
+            updated_at
+        FROM payment_cancellations
+        WHERE status = 'REQUESTED'
+          AND request_type = 'SYSTEM_COMPENSATION'
+          AND requested_at &lt;= DATE_SUB(CURRENT_TIMESTAMP(6), INTERVAL 1 MINUTE)
+        ORDER BY requested_at, id
+        LIMIT #{limit}
+    </select>
+
     <update id="completeCancellationIfRequested">
         UPDATE payment_cancellations AS cancellation
         INNER JOIN payments AS payment
@@ -182,5 +516,38 @@
             failure_message = #{failureMessage}
         WHERE id = #{cancellationId}
           AND status = 'REQUESTED'
+    </update>
+
+    <update id="failUnapprovedCompensationIfRequested">
+        UPDATE payment_cancellations
+        SET status = 'FAILED',
+            failure_code = 'PAYMENT_NOT_APPROVED',
+            failure_message = 'PG 승인 전 결제 요청이 종료되었습니다.'
+        WHERE id = #{cancellationId}
+          AND request_type = 'SYSTEM_COMPENSATION'
+          AND status = 'REQUESTED'
+          AND requested_at &lt;= DATE_SUB(CURRENT_TIMESTAMP(6), INTERVAL 1 MINUTE)
+    </update>
+
+    <update id="completeCompensationIfRequested">
+        UPDATE payment_cancellations AS cancellation
+        INNER JOIN payments AS payment
+            ON payment.id = cancellation.payment_id
+        SET cancellation.status = 'DONE',
+            cancellation.transaction_key = #{transactionKey},
+            cancellation.canceled_at = #{canceledAt},
+            cancellation.failure_code = NULL,
+            cancellation.failure_message = NULL,
+            payment.status = 'CANCELED',
+            payment.payment_key = COALESCE(payment.payment_key, #{paymentKey}),
+            payment.provider_status = 'CANCELED',
+            payment.canceled_at = #{canceledAt},
+            payment.failure_code = 'INTERNAL_COMPLETION_FAILED',
+            payment.failure_message = '내부 주문 처리 실패로 승인 결제를 자동 취소했습니다.'
+        WHERE cancellation.id = #{cancellationId}
+          AND cancellation.status = 'REQUESTED'
+          AND cancellation.request_type = 'SYSTEM_COMPENSATION'
+          AND payment.status IN ('READY', 'DONE', 'EXPIRED')
+          AND (payment.payment_key IS NULL OR payment.payment_key = #{paymentKey})
     </update>
 </mapper>

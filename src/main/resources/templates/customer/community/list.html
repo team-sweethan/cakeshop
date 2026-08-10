@@ -1,3 +1,12 @@
+<!--/*
+******************************
+작성자 : HyunGyu-Cho
+담당자 : 현규
+작성일 : 2026-08-05
+기능 : 고객 커뮤니티 화면
+설명 : list 커뮤니티 화면을 구성한다.
+******************************
+*/-->
 <!doctype html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
@@ -13,7 +22,6 @@
   <header th:replace="~{fragments/common/header :: header}"></header>
   <main class="page-container">
 
-    <!-- 삭제처럼 결과가 이 화면에 남지 않는 동작의 성공 메시지를 받는다(conventions.md 9). -->
     <div th:replace="~{fragments/common/alert :: alert}"></div>
 
     <div class="cluster cluster--between">
@@ -21,21 +29,6 @@
       <a class="btn btn--primary" th:href="@{/community/new}">글쓰기</a>
     </div>
 
-    <!--
-      인기글 영역 (DOMAIN.md 6.9). 1쪽이고 카테고리 필터가 없을 때만 실린다 —
-      그 판단은 Service가 하고 여기서는 비었는지만 본다.
-
-      비었으면 영역이 통째로 사라진다. 제목만 남기고 안을 비우지 않는다: 첫 배포
-      직후처럼 아직 확정된 순위가 없는 상태는 고장이 아니다.
-
-      날짜를 함께 적는 것이 규칙이다. 인기글은 실시간이 아니라 확정된 스냅샷이고,
-      배치를 한 번 거르면 어제 것으로 폴백한다. 언제 것인지 없으면 낡은 순위를
-      오늘 것으로 읽게 되는데, 그 화면은 정상일 때와 똑같이 생겼다.
-
-      숫자(조회수·좋아요·댓글)를 싣지 않는 것도 규칙이다. 같은 글이 아래 목록에도
-      나오고 그쪽은 현재 수치를 보여 준다 — 한 화면에 같은 글의 숫자가 둘이면
-      사용자에게는 어느 쪽도 못 믿을 값이 된다.
-    -->
     <section class="section" th:if="${!popularSection.isEmpty()}">
       <div class="cluster">
         <h2>인기글</h2>
@@ -55,10 +48,6 @@
       </div>
     </section>
 
-    <!--
-      카테고리 필터. 선택지는 활성 카테고리만 노출한다(DOMAIN.md 6.8).
-      필터는 주소로 표현해 새로고침·뒤로가기에서도 유지된다.
-    -->
     <div class="cluster section">
       <a class="btn"
          th:classappend="${selectedCategoryId == null} ? ' is-active'"
@@ -72,11 +61,6 @@
          th:href="@{/community(categoryId=${category.id}, sort=${selectedSort})}">카테고리</a>
     </div>
 
-    <!--
-      정렬. 카테고리 필터와 서로를 지워버리지 않도록 각 링크가 상대의 현재 값을 함께
-      싣는다 — 분류를 고른 뒤 조회수순을 누르면 분류가 풀리는 것이 그 실수다.
-      모르는 값이 들어와도 오류가 아니라 최신순으로 떨어진다(PostSort).
-    -->
     <div class="cluster section">
       <a class="btn"
          th:classappend="${selectedSort.name() == 'LATEST'} ? ' is-active'"
@@ -118,7 +102,6 @@
          aria-label="페이지 이동"
          style="justify-content:center">
 
-      <!-- 이전/다음은 한 페이지씩이 아니라 현재 번호 블록 단위로 이동한다. -->
       <a class="btn"
          th:if="${pageNavigation.hasPreviousBlock}"
          th:href="@{/community(
@@ -134,7 +117,6 @@
         이전
       </span>
 
-      <!-- startPage부터 endPage까지만 렌더링해 전체 페이지 번호 노출을 막는다. -->
       <a class="btn"
          th:each="pageNumber :
              ${#numbers.sequence(

@@ -2,4 +2,185 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.cakeshop.domain.notification.mapper.NotificationMapper">
     <!-- 사용자 입력은 #{} 만 사용 (${} 금지) -->
+    
+    <!--알림 DB에 저장-->
+    <insert id="save" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO notifications (
+            receiver_id, 
+            actor_id, 
+            order_id, 
+            chat_room_id, 
+            chat_message_id,
+            post_id, 
+            comment_id, 
+            review_id, 
+            review_reply_id, 
+            user_coupon_id, 
+            notification_type,
+            title, 
+            content, 
+            delivery_scope, 
+            is_read, 
+            read_at, 
+            event_key, 
+            created_at,
+            last_event_at
+        )
+        VALUES (
+            #{receiverId}, 
+            #{actorId}, 
+            #{orderId}, 
+            #{chatRoomId}, 
+            #{chatMessageId},
+            #{postId}, 
+            #{commentId}, 
+            #{reviewId}, 
+            #{reviewReplyId}, 
+            #{userCouponId}, 
+            #{notificationType},
+            #{title}, 
+            #{content}, 
+            #{deliveryScope}, 
+            #{isRead}, 
+            #{readAt}, 
+            #{eventKey}, 
+            #{createdAt},
+            #{lastEventAt}
+        )
+    </insert>
+
+    <!-- 특정 회원 알림 목록 조회-->
+    <select id="findUserNotificationList" resultType="NotificationResponse">
+        SELECT 
+            n.id,
+            n.notification_type AS type,
+            n.title,
+            n.content,
+            n.is_read AS isRead,
+            n.created_at AS createdAt,
+            n.last_event_at AS lastEventAt,
+            n.order_id AS orderId,
+            COALESCE(n.chat_room_id, cm.chat_room_id) AS chatRoomId,
+            COALESCE(n.post_id, c.post_id) AS postId,
+            n.comment_id AS commentId,
+            COALESCE(n.review_id, rr.review_id) AS reviewId,
+            n.user_coupon_id AS userCouponId
+        FROM notifications n
+        LEFT JOIN comments c ON c.id = n.comment_id
+        LEFT JOIN chat_messages cm ON cm.id = n.chat_message_id
+        LEFT JOIN review_replies rr ON rr.id = n.review_reply_id
+        WHERE n.receiver_id = #{receiverId}
+        ORDER BY n.last_event_at DESC, n.id DESC
+        LIMIT #{size}
+        OFFSET #{offset}
+    </select>
+    
+    <!--특정 회원 알림 1건 읽음 처리-->
+    <update id="markAsRead">
+        UPDATE notifications
+        SET is_read = true, read_at = NOW()
+        WHERE id=#{id} AND receiver_id=#{receiverId}
+    </update>
+
+    <!--특정 회원 알림 전체 읽음 처리-->
+    <update id="markAllAsRead">
+        UPDATE notifications
+        SET is_read = true, read_at = NOW()
+        WHERE receiver_id = #{receiverId} AND is_read = false
+    </update>
+    
+    <!--특정 회원의 안 읽은 알림 개수 조회-->
+    <select id="countUnreadNotifications" resultType="int">
+        SELECT count(*) 
+        FROM notifications 
+        WHERE receiver_id = #{receiverId} AND is_read = false
+    </select>
+    
+    <!--중복 event_key 존재 여부-->
+    <select id="existsByReceiverIdAndEventKey" resultType="boolean">
+        SELECT EXISTS (
+            SELECT true 
+            FROM notifications
+            WHERE receiver_id = #{receiverId} AND event_key = #{eventKey} LIMIT 1
+        )
+    </select>
+
+    <!-- 동일 eventKey 알림 재발생 시 최근 시각 갱신 및 unread 처리 (GREATEST 단조 증가 보장) -->
+    <update id="updateLastEventAtAndUnread">
+        UPDATE notifications
+        SET last_event_at = GREATEST(last_event_at, #{lastEventAt}),
+            is_read = false,
+            read_at = NULL,
+            title = COALESCE(#{title}, title),
+            content = COALESCE(#{content}, content)
+        WHERE receiver_id = #{receiverId} AND event_key = #{eventKey}
+    </update>
+
+    <!-- 중복 eventKey 기반 기존 알림 객체 조회 -->
+    <select id="findNotificationByReceiverAndEventKey" resultType="Notification">
+        SELECT * FROM notifications
+        WHERE receiver_id = #{receiverId} AND event_key = #{eventKey}
+        LIMIT 1
+    </select>
+
+    <!-- 중복 eventKey 기반 기존 알림 비관적 잠금 조회 (FOR UPDATE) -->
+    <select id="findNotificationByReceiverAndEventKeyForUpdate" resultType="Notification">
+        SELECT * FROM notifications
+        WHERE receiver_id = #{receiverId} AND event_key = #{eventKey}
+        LIMIT 1
+        FOR UPDATE
+    </select>
+
+    <!--중복 event_key 기반 기존 알림 ID 조회-->
+    <select id="findIdByReceiverIdAndEventKey" resultType="long">
+        SELECT id FROM notifications
+        WHERE receiver_id = #{receiverId} AND event_key = #{eventKey}
+        LIMIT 1
+    </select>
+
+    <!--이미 SENT 성공 발송 이력이 있는지 확인-->
+    <select id="hasSentDelivery" resultType="boolean">
+        SELECT EXISTS (
+            SELECT true FROM notification_deliveries
+            WHERE notification_id = #{notificationId} AND status = 'SENT'
+            LIMIT 1
+        )
+    </select>
+
+    <!-- 수신 전화번호 조회 (주문이 있으면 orderer_phone 우선, 없으면 members.phone) -->
+    <select id="findReceiverPhone" resultType="string">
+        SELECT COALESCE(o.orderer_phone, m.phone)
+        FROM members m
+        LEFT JOIN orders o ON o.id = #{orderId} AND o.member_id = m.id
+        WHERE m.id = #{receiverId}
+        LIMIT 1
+    </select>
+
+    <!--알림 문자 DB에 저장하기-->
+    <!-- insert 끝나고 만들어진 pk 자바로 되돌림, pk를 id 변수에 채워 넣기 -->
+    <insert id="saveDelivery" parameterType="NotificationDelivery" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO notification_deliveries (
+            notification_id,
+            recipient,
+            template_code,
+            provider_message_id,
+            status,
+            failure_reason,
+            sent_at,
+            delivered_at,
+            created_at,
+            updated_at
+        )
+        VALUES (
+            #{notificationId},
+            #{recipient},
+            #{templateCode},
+            #{providerMessageId},
+            #{status},
+            #{failureReason},
+            #{sentAt},
+            #{deliveredAt},
+            #{createdAt},
+            #{updatedAt})
+    </insert>
 </mapper>

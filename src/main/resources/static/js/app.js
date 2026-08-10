@@ -30,3 +30,22 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 document.addEventListener("cart:updated", (event) => updateCartCount(event.detail));
+
+// 안 읽은 알림 개수 DB API 호출 및 뱃지 업데이트
+async function updateNotificationUnreadCount() {
+  try {
+    const response = await fetch('/api/notifications/unread-count');
+    if (!response.ok) return;
+    const count = await response.json();
+    document.querySelectorAll('[data-unread-count]').forEach((element) => {
+      element.textContent = count;
+      element.style.display = count > 0 ? 'inline-block' : 'none';
+    });
+  } catch (e) {
+    // 비로그인 시 예외 무시
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  updateNotificationUnreadCount();
+});

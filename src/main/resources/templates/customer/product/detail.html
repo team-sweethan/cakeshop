@@ -425,13 +425,14 @@
                 th:if="${product.available
                         and product.productType.name() == 'GENERAL'}"
         >
-          <!-- 픽업 일시 선택 화면 -->
+          <!-- 일반 상품은 픽업 선택을 포함한 통합 주문서로 바로 이동한다. -->
           <a
                   class="btn btn--primary"
-                  th:href="@{/orders/pickup(intent='order')}"
-                  data-prepare-product
+                  th:if="${product.productType.name() == 'GENERAL'}"
+                  th:href="@{/orders/checkout}"
+                  data-order-checkout
           >
-            픽업 일시 선택
+            주문서 작성하기
           </a>
 
           <form sec:authorize="isAuthenticated()"
@@ -512,9 +513,15 @@
   </span>
     </div>
 
-    <!-- 후기 목록 도메인이 연결되기 전까지 허위 샘플은 표시하지 않는다. -->
-    <div class="panel panel--dashed text-muted">
-      후기 목록은 준비 중입니다.
+    <div class="panel panel--dashed text-muted"
+         th:if="${reviewPreviews.isEmpty()}"
+    >
+      아직 등록된 후기가 없습니다.
+    </div>
+
+    <div th:unless="${reviewPreviews.isEmpty()}"
+         th:replace="~{fragments/customer/product-review :: reviewList(${reviewPreviews})}"
+    >
     </div>
 
     <!-- 실제 후기 작성 화면 이동 -->
@@ -524,7 +531,15 @@
     >
       <a
               class="btn"
-              th:href="@{/reviews/new}"
+              th:unless="${reviewPreviews.isEmpty()}"
+              th:href="@{/products/{id}/reviews(id=${product.id})}"
+      >
+        전체 리뷰 확인
+      </a>
+
+      <a
+              class="btn"
+              th:href="@{/mypage/reviews/writable}"
       >
         후기 작성
       </a>

@@ -1,0 +1,27 @@
+package com.cakeshop.domain.coupon.service;
+
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
+/**
+ * 생일 쿠폰 발급 작업을 주기적으로 실행한다.
+ *
+ * <p>작성자: 이정후 - CouponIssueService의 생일 대상 발급을 예약 실행한다.</p>
+ */
+@Component
+public class CouponIssueScheduler {
+
+    private final CouponIssueService couponIssueService;
+
+    public CouponIssueScheduler(CouponIssueService couponIssueService) {
+        this.couponIssueService = couponIssueService;
+    }
+
+    /** 생일 쿠폰 발급을 매시 정각에 실행한다. */
+//    @Scheduled(cron = "0 0 * * * *", zone = "Asia/Seoul")
+    // 5분마다 테스트하기 위함.
+    @Scheduled(cron = "0 0 * * * *", zone = "Asia/Seoul")
+    public void issueCoupons() {
+        couponIssueService.issueBirthdayCoupons();
+    }
+}

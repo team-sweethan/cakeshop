@@ -19,14 +19,14 @@ public class MemberQueryService {
         this.memberMapper = memberMapper;
     }
 
-    // 회원 PK로 회원 요약 정보 조회
+    // 다른 도메인에 회원 Entity 대신 필요한 최소 공개 정보만 제공
     @Transactional(readOnly = true)
-    public MemberSummaryView findByMemberId(Long memberId) {
+    public MemberSummaryView getByMemberId(Long memberId) {
         return memberMapper.findSummaryByMemberId(memberId)
                 .orElseThrow(() -> new BusinessException(MemberErrorCode.NOT_FOUND));
     }
 
-    // 전체 회원 요약 정보 조회
+    // 전체 회원을 한 번에 적재하지 않도록 공개 목록 조회에 페이징 적용
     @Transactional(readOnly = true)
     public PageResult<MemberSummaryView> findAll(PageRequest pageRequest) {
         PageRequest normalizedPageRequest =

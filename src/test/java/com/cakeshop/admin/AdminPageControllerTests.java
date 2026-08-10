@@ -8,6 +8,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -38,12 +40,25 @@ import com.cakeshop.domain.member.controller.MemberAdminController;
 import com.cakeshop.domain.member.service.MemberAdminService;
 import com.cakeshop.domain.member.service.MemberSessionService;
 import com.cakeshop.domain.notification.controller.NotificationAdminController;
-import com.cakeshop.domain.order.controller.FulfillmentAdminController;
-import com.cakeshop.domain.order.controller.OrderAdminController;
+import com.cakeshop.domain.order.controller.admin.FulfillmentAdminController;
+import com.cakeshop.domain.order.controller.admin.OrderAdminController;
+import com.cakeshop.domain.order.dto.view.admin.FulfillmentListView;
+import com.cakeshop.domain.order.service.admin.AdminOrderService;
+import com.cakeshop.domain.order.service.admin.FulfillmentService;
 import com.cakeshop.domain.payment.controller.PaymentAdminController;
+import com.cakeshop.domain.payment.dto.view.PaymentAdminListView;
+import com.cakeshop.domain.payment.dto.view.PaymentAdminSummaryView;
+import com.cakeshop.domain.payment.service.PaymentAdminQueryService;
+import com.cakeshop.domain.payment.service.RefundFacade;
 import com.cakeshop.domain.product.controller.ProductAdminController;
 import com.cakeshop.domain.review.controller.ReviewAdminController;
+import com.cakeshop.domain.review.dto.view.AdminReviewDetailView;
+import com.cakeshop.domain.review.dto.view.AdminReviewListView;
+import com.cakeshop.domain.review.entity.ReviewStatus;
+import com.cakeshop.domain.review.service.ReviewAdminService;
 import com.cakeshop.domain.statistics.controller.StatisticsAdminController;
+import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
+import com.cakeshop.domain.statistics.service.DashboardReadModelQueryService;
 
 class AdminPageControllerTests {
 
@@ -67,11 +82,40 @@ class AdminPageControllerTests {
                 0
         ));
 
+        FulfillmentService fulfillmentService =
+                Mockito.mock(FulfillmentService.class);
+        when(fulfillmentService.getFulfillments(any()))
+                .thenReturn(new FulfillmentListView(
+                        LocalDate.of(2026, 8, 3),
+                        null,
+                        List.of()
+                ));
+
+        PaymentAdminQueryService paymentAdminQueryService =
+                Mockito.mock(PaymentAdminQueryService.class);
+        when(paymentAdminQueryService.getPayments(any()))
+                .thenReturn(new PaymentAdminListView(
+                        null,
+                        new PaymentAdminSummaryView(0, 0, 0, 0),
+                        List.of()
+                ));
+
         // 커뮤니티 관리 화면은 조각 5에서 목업을 걷어내고 실제 데이터를 그린다.
         // 이 테스트는 "주소가 그 템플릿을 가리키는가"만 보므로 빈 결과로 충분하다.
         CommunityAdminService communityAdminService =
                 Mockito.mock(CommunityAdminService.class);
         CommunityService communityService = Mockito.mock(CommunityService.class);
+        DashboardReadModelQueryService dashboardReadModelQueryService =
+                Mockito.mock(DashboardReadModelQueryService.class);
+
+        ReviewAdminService reviewAdminService = Mockito.mock(ReviewAdminService.class);
+        when(reviewAdminService.getReviews(any(), any(), any(), any(), any(PageRequest.class)))
+                .thenReturn(new PageResult<AdminReviewListView>(
+                        List.of(), new PageRequest(null, null), 0));
+        when(reviewAdminService.getReviewDetail(anyLong()))
+                .thenReturn(new AdminReviewDetailView(
+                        1L, 9L, "작성자", "상품명", "20260101-0001", 5, 5, 4, 4, "본문",
+                        LocalDateTime.now(), LocalDateTime.now(), ReviewStatus.PUBLISHED, null));
 
         when(communityAdminService.getPosts(any(), any(), any(PageRequest.class)))
                 .thenReturn(new PageResult<AdminPostListView>(
@@ -84,18 +128,32 @@ class AdminPageControllerTests {
         when(communityAdminService.getReports(anyLong())).thenReturn(List.of());
         when(communityService.getComments(anyLong(), any()))
                 .thenReturn(new CommentSectionView(List.of(), 0, 0, 20));
+        when(dashboardReadModelQueryService.getDashboard())
+                .thenReturn(new StatisticsDashboardView(
+                        0L,
+                        BigDecimal.ZERO,
+                        0L,
+                        0L,
+                        0L,
+                        List.of(),
+                        List.of(),
+                        List.of()
+                ));
 
         mockMvc = MockMvcBuilders.standaloneSetup(
-                new StatisticsAdminController(),
+                new StatisticsAdminController(dashboardReadModelQueryService),
                 new ProductAdminController(
                         Mockito.mock(ProductAdminService.class)),
-                new OrderAdminController(),
-                new FulfillmentAdminController(),
-                new PaymentAdminController(),
+                new OrderAdminController(
+                        Mockito.mock(AdminOrderService.class),
+                        Mockito.mock(RefundFacade.class)),
+                new FulfillmentAdminController(
+                        fulfillmentService),
+                new PaymentAdminController(paymentAdminQueryService),
                 new MemberAdminController(
                         Mockito.mock(MemberAdminService.class),
                         Mockito.mock(MemberSessionService.class)),
-                new ReviewAdminController(),
+                new ReviewAdminController(reviewAdminService),
                 new NotificationAdminController(),
                 new CommunityAdminController(communityAdminService, communityService),
                 new CouponAdminController(couponAdminService)
@@ -112,6 +170,7 @@ class AdminPageControllerTests {
         pages.put("/admin/payments", "admin/payment/list");
         pages.put("/admin/members", "admin/member/list");
         pages.put("/admin/reviews", "admin/review/list");
+        pages.put("/admin/reviews/1", "admin/review/detail");
         pages.put("/admin/notifications", "admin/notification/list");
         pages.put("/admin/community", "admin/community/list");
         pages.put("/admin/community/15", "admin/community/detail");

@@ -40,7 +40,7 @@ public record PageNavigation(
 
         if (totalPages < 1) {
             return new PageNavigation(
-                    0, 0, 1, 1, false, false
+                    1, 1, 1, 1, false, false
             );
         }
 

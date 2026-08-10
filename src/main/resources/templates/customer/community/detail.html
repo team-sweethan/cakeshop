@@ -1,3 +1,12 @@
+<!--/*
+******************************
+작성자 : HyunGyu-Cho
+담당자 : 현규
+작성일 : 2026-08-05
+기능 : 고객 커뮤니티 화면
+설명 : detail 커뮤니티 화면을 구성한다.
+******************************
+*/-->
 <!doctype html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
@@ -16,11 +25,6 @@
     <div class="cluster cluster--between">
       <a class="btn" th:href="@{/community}">← 목록</a>
 
-      <!--
-        작성자 본인에게만, 그리고 차단되지 않은 글에만 보인다(DOMAIN.md 4.2).
-        버튼을 숨기는 것만으로는 막은 것이 아니라서 Service가 다시 검증한다.
-        삭제가 링크가 아니라 폼인 것은 GET으로 글이 지워지면 안 되기 때문이다.
-      -->
       <div class="cluster" th:if="${canEdit}">
         <a class="btn" th:href="@{/community/{postId}/edit(postId=${post.id})}">수정</a>
         <form method="post" th:action="@{/community/{postId}/delete(postId=${post.id})}"
@@ -30,16 +34,8 @@
       </div>
     </div>
 
-    <!--
-      신고 접수처럼 화면에 흔적이 남지 않는 조치의 결과를 알린다. 신고 내역은 관리자만
-      보므로(DOMAIN.md 6.6), 알리지 않으면 접수됐는지 알 방법이 없다.
-    -->
     <div th:replace="~{fragments/common/alert :: alert}"></div>
 
-    <!--
-      차단된 글은 작성자 본인만 여기까지 도달한다(DOMAIN.md 4.3).
-      작성자는 차단된 글에 아무 조치도 할 수 없으므로 사유만 전달한다.
-    -->
     <div class="panel" th:if="${post.blocked}">
       <strong>관리자가 차단한 게시글입니다.</strong>
       <p class="text-muted" th:text="${post.blockedReason}">차단 사유</p>
@@ -57,34 +53,15 @@
       </p>
       <hr class="divider">
 
-      <!--
-        본문은 순수 텍스트다. th:utext를 쓰지 않는다(DOMAIN.md 7).
-        줄바꿈은 CSS로 살린다.
-      -->
       <div class="stack">
         <p th:text="${post.content}" style="white-space:pre-wrap">본문</p>
       </div>
 
-      <!--
-        좋아요. 숫자는 누구에게나 보이고 버튼은 로그인 회원에게, 노출 중인 글에만 열린다
-        (DOMAIN.md 4.5). 댓글 폼과 같은 조건이다.
-
-        토글 버튼 하나가 아니라 추가와 취소가 서로 다른 주소로 간다(6.5). 하나의 주소를
-        번갈아 누르게 만들면 재전송·더블클릭이 두 번 실행되어 원래 상태로 돌아가는데,
-        사용자에게는 눌렀는데 안 눌린 것으로 보인다.
-
-        링크가 아니라 폼인 것은 글을 지우는 자리와 같은 이유다. GET으로 상태가 바뀌면
-        링크 미리보기나 크롤러가 좋아요를 누른다.
-
-        주석 문구에 화면 문자열을 그대로 쓰지 않는다. Thymeleaf는 HTML 주석을 응답에
-        그대로 내보내므로, "그 문구가 화면에 없다"를 단언하는 테스트가 주석 때문에 깨진다.
-      -->
       <div class="cluster section">
         <span class="text-muted" th:text="'좋아요 ' + ${post.likeCount}">좋아요 0</span>
 
         <form method="post" th:if="${canLike and likedByViewer}"
               th:action="@{/community/{postId}/likes/delete(postId=${post.id})}">
-          <!-- 좋아요는 댓글 구역 위에 있다. 펼쳐 둔 상태로 눌렀다가 접혀 돌아오면 읽던 자리를 잃는다. -->
           <input type="hidden" name="comments" th:value="${commentSection.limit}">
           <button class="btn" type="submit">좋아요 취소</button>
         </form>
@@ -96,16 +73,6 @@
         </form>
       </div>
 
-      <!--
-        신고. 남의 글에만, 로그인 회원에게만 열린다(DOMAIN.md 6.6). 자기 글이 문제라면
-        지우면 되므로 작성자에게는 이 자리가 아예 없다.
-
-        좋아요와 정반대로 <b>취소가 없다.</b> 한 번 접수되면 되돌릴 수 없으므로 폼을 펼쳐야
-        보이게 두고, 사유를 필수로 받는다. 관리자가 읽고 판단할 근거가 그 문장뿐이다.
-
-        검증에 실패해 화면이 다시 그려지면 스스로 펼친다. 접힌 채로 돌아오면 사용자에게는
-        아무 일도 일어나지 않은 것처럼 보이고, 오류 문구가 화면 밖에 남는다.
-      -->
       <details class="section" th:if="${canReport and !alreadyReported}"
                th:object="${reportForm}"
                th:attr="open=${#fields.hasErrors('reason')} ? 'open' : null">
@@ -113,11 +80,9 @@
 
         <form method="post"
               th:action="@{/community/{postId}/reports(postId=${post.id})}">
-          <!-- 신고 폼도 댓글 구역 위에 있다. 좋아요와 같은 이유로 펼친 상태를 실어 보낸다. -->
           <input type="hidden" name="comments" th:value="${commentSection.limit}">
           <div class="form-group">
             <label class="form-label" for="reportReason">신고 사유</label>
-            <!-- maxlength는 서버 검증(DOMAIN.md 7)과 같은 500자다. -->
             <textarea class="form-control form-control--textarea" id="reportReason"
                       th:field="*{reason}" style="min-height:96px"
                       placeholder="신고 사유를 입력하세요" maxlength="500" required></textarea>
@@ -130,10 +95,6 @@
         </form>
       </details>
 
-      <!--
-        이미 신고한 사람에게는 폼 대신 이 안내가 보인다. 폼을 그대로 두면 다시 눌렀을 때
-        오류 화면으로 튀는데, 그건 사용자가 잘못한 것이 아니라 이미 접수된 것이다.
-      -->
       <p class="note" th:if="${alreadyReported}">
         이미 신고한 게시글입니다.
       </p>
@@ -141,23 +102,10 @@
 
     <hr class="divider">
 
-    <!--
-      댓글. 최신 20건을 오래된 순으로 보여주고, 더 있으면 "더 보기"로 과거를 펼친다.
-
-      구역 제목의 개수는 노출 중인 댓글만 센다. 삭제된 댓글은 자리 표시로 남지만
-      개수에는 들어가지 않는다(DOMAIN.md 4.4).
-    -->
     <section class="section">
       <h2 class="section-title"
           th:text="'댓글 ' + ${commentSection.publishedCount}">댓글 0</h2>
 
-      <!--
-        더 보기는 과거로 거슬러 올라간다. 링크라서 JS 없이 동작하고, 펼친 상태가 주소에
-        남아 새로고침·뒤로가기에서도 유지된다.
-
-        이 블록은 댓글이 한 번에 보여주는 수를 넘어야만 나타난다. 개발 중에는 댓글이 몇 건
-        뿐이라 화면에 아예 없고, 표현식이 깨져도 눈에 띄지 않는다.
-      -->
       <div class="cluster" th:if="${commentSection.canLoadMore()}">
         <a class="btn"
            th:href="@{/community/{postId}(
@@ -170,10 +118,6 @@
               th:text="'남은 댓글 ' + ${commentSection.hiddenCount()}">남은 댓글 0</span>
       </div>
 
-      <!--
-        상한에 막혀 더 못 보여주는 상태. 링크를 조용히 감추지 않고 사실을 적는다 —
-        감추면 "댓글이 여기까지"로 보이는데 그것은 거짓이다(CommentSectionView 참고).
-      -->
       <p class="note" th:if="${commentSection.cappedByLimit()}">
         오래된 댓글 일부는 표시하지 않습니다.
       </p>
@@ -181,10 +125,6 @@
       <div class="stack">
         <article class="panel" th:each="comment : ${commentSection.comments}">
 
-          <!--
-            삭제된 댓글은 자리만 남긴다. 작성자도 본문도 내보내지 않는다 —
-            본문은 SQL이 이미 NULL로 지웠다(DOMAIN.md 4.4).
-          -->
           <p class="text-muted" th:if="${comment.deleted}">삭제된 댓글입니다.</p>
 
           <div th:unless="${comment.deleted}">
@@ -194,15 +134,6 @@
                 <span th:text="${#temporals.format(comment.createdAt, 'yyyy.MM.dd')}">2026.01.01</span>
               </span>
 
-              <!--
-                자기 댓글에만 보인다. 게시글 작성자에게도 관리자에게도 남의 댓글을 지울
-                권한은 없다(DOMAIN.md 6.7). 버튼을 숨기는 것은 안내일 뿐이고 막는 것은
-                Service다. 삭제가 링크가 아니라 폼인 것은 게시글과 같은 이유다.
-
-                조건에 canComment가 함께 붙는다. 삭제도 게시글이 PUBLISHED여야 하므로
-                (DOMAIN.md 6.4) 차단된 글을 보는 작성자에게 이 버튼을 남기면 눌러도
-                403만 나오는 죽은 버튼이 된다. 댓글 폼과 같은 조건으로 묶어 둔다.
-              -->
               <form method="post"
                     th:if="${canComment and viewerId == comment.memberId}"
                     th:action="@{/community/{postId}/comments/{commentId}/delete(
@@ -210,20 +141,11 @@
                         commentId=${comment.id}
                     )}"
                     onsubmit="return confirm('댓글을 삭제할까요? 되돌릴 수 없습니다.');">
-                <!--
-                  펼친 상태를 삭제 요청에 실어 보낸다. 지운 자리에 남는 "삭제된 댓글입니다"가
-                  결과를 보여 주는 유일한 신호인데(성공 메시지가 없다), 20건으로 접혀
-                  돌아오면 최신 20건 밖의 댓글은 그 자리가 화면 밖으로 나가 버린다.
-                -->
                 <input type="hidden" name="comments" th:value="${commentSection.limit}">
                 <button class="btn btn--danger" type="submit">댓글 삭제</button>
               </form>
             </div>
 
-            <!--
-              본문은 순수 텍스트다. th:utext를 쓰지 않는다(DOMAIN.md 7).
-              줄바꿈은 게시글 본문과 같이 CSS로 살린다.
-            -->
             <p th:text="${comment.content}" style="white-space:pre-wrap">댓글 본문</p>
           </div>
         </article>
@@ -235,23 +157,13 @@
         </div>
       </div>
 
-      <!--
-        댓글 작성. 로그인 회원에게, 노출 중인 글에만 연다(DOMAIN.md 4.5, 5).
-        차단된 글을 보고 있는 작성자에게도 이 폼은 없다.
-      -->
       <form class="section" method="post"
             th:if="${canComment}"
             th:object="${commentForm}"
             th:action="@{/community/{postId}/comments(postId=${post.id})}">
-        <!--
-          검증에 실패해 이 화면이 다시 그려질 때 펼친 상태를 잃지 않게 한다. 등록에
-          성공하면 이 값은 쓰지 않는다 — 새 댓글은 언제나 최신 20건 안에 있어서 접어도
-          보이기 때문이다(screens/detail.md).
-        -->
         <input type="hidden" name="comments" th:value="${commentSection.limit}">
         <div class="form-group">
           <label class="form-label" for="commentContent">댓글 작성</label>
-          <!-- maxlength는 서버 검증(DOMAIN.md 7)과 같은 500자다. -->
           <textarea class="form-control form-control--textarea" id="commentContent"
                     th:field="*{content}" style="min-height:96px"
                     placeholder="댓글을 입력하세요" maxlength="500" required></textarea>
@@ -263,10 +175,6 @@
         </div>
       </form>
 
-      <!--
-        비로그인에게 보이는 안내. 차단된 글에는 띄우지 않는다 — 그 화면의 상대는 작성자
-        본인이고, 로그인해도 댓글을 달 수 없어서 안내가 거짓이 된다.
-      -->
       <p class="note" th:if="${!canComment and !post.blocked}">
         <a th:href="@{/login}">로그인하면 댓글을 쓸 수 있습니다.</a>
       </p>

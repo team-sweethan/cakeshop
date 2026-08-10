@@ -18,7 +18,9 @@ import com.cakeshop.domain.coupon.dto.form.CouponCreateForm;
 import com.cakeshop.domain.coupon.dto.form.CouponSearchCondition;
 import com.cakeshop.domain.coupon.dto.form.CouponUpdateForm;
 import com.cakeshop.domain.coupon.dto.view.CouponView;
+import com.cakeshop.domain.coupon.dto.view.CouponDetailView;
 import com.cakeshop.domain.coupon.entity.CouponDisplayStatus;
+import com.cakeshop.domain.coupon.entity.CouponTargetType;
 import com.cakeshop.domain.coupon.entity.DiscountType;
 import com.cakeshop.domain.coupon.error.CouponErrorCode;
 import com.cakeshop.domain.coupon.service.CouponAdminService;
@@ -168,6 +170,20 @@ class CouponAdminControllerTests {
     }
 
     @Test
+    void invalidUpdateRedirectsWhenCouponExpiresBeforeFormRerender() throws Exception {
+        doThrow(new BusinessException(CouponErrorCode.CANNOT_EDIT_ENDED_COUPON))
+                .when(couponAdminService).getUpdateForm(3L);
+
+        mockMvc.perform(post("/admin/coupons/3/edit")
+                        .param("name", ""))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/admin/coupons"))
+                .andExpect(flash().attribute(
+                        "errorMessage", CouponErrorCode.CANNOT_EDIT_ENDED_COUPON.message()
+                ));
+    }
+
+    @Test
     void validCreateUsesLoggedInAdminAndRedirects() throws Exception {
         authenticateAdmin(7L);
 
@@ -178,7 +194,8 @@ class CouponAdminControllerTests {
                 .param("minimumOrderAmount", "10000")
                 .param("totalQuantity", "100")
                 .param("startsAt", "2026-08-01T09:00")
-                .param("expiresAt", "2026-08-31T23:59"))
+                .param("expiresAt", "2026-08-31T23:59")
+                .param("targetType", "SPECIFIC_MEMBERS"))
             .andExpect(status().is3xxRedirection())
             .andExpect(redirectedUrl("/admin/coupons"))
             .andExpect(flash().attribute("successMessage", "쿠폰을 등록했습니다."));
@@ -204,7 +221,8 @@ class CouponAdminControllerTests {
                 .param("minimumOrderAmount", "10000")
                 .param("totalQuantity", "100")
                 .param("startsAt", "2026-08-01T09:00")
-                .param("expiresAt", "2026-08-31T23:59"))
+                .param("expiresAt", "2026-08-31T23:59")
+                .param("targetType", "SPECIFIC_MEMBERS"))
             .andExpect(status().is3xxRedirection())
             .andExpect(redirectedUrl("/admin/coupons"))
             .andExpect(flash().attribute(
@@ -237,7 +255,8 @@ class CouponAdminControllerTests {
                 .param("maximumDiscountAmount", "5000")
                 .param("totalQuantity", "100")
                 .param("startsAt", "2026-08-01T09:00")
-                .param("expiresAt", "2026-08-31T23:59"))
+                .param("expiresAt", "2026-08-31T23:59")
+                .param("targetType", "SPECIFIC_MEMBERS"))
             .andExpect(status().is3xxRedirection())
             .andExpect(redirectedUrl("/admin/coupons"))
             .andExpect(flash().attribute("successMessage", "쿠폰을 수정했습니다."));
@@ -256,6 +275,7 @@ class CouponAdminControllerTests {
                 .param("totalQuantity", "100")
                 .param("startsAt", "2026-08-01T09:00")
                 .param("expiresAt", "2026-08-31T23:59")
+                .param("targetType", "SPECIFIC_MEMBERS")
                 .param("keyword", "summer")
                 .param("status", "ACTIVE")
                 .param("page", "3")
@@ -275,6 +295,7 @@ class CouponAdminControllerTests {
                 .param("totalQuantity", "100")
                 .param("startsAt", "2026-08-01T09:00")
                 .param("expiresAt", "2026-08-31T23:59")
+                .param("targetType", "SPECIFIC_MEMBERS")
                 .param("keyword", "summer")
                 .param("status", "ACTIVE")
                 .param("page", "3")
@@ -298,6 +319,7 @@ class CouponAdminControllerTests {
                 .param("totalQuantity", "100")
                 .param("startsAt", "2026-08-01T09:00")
                 .param("expiresAt", "2026-08-31T23:59")
+                .param("targetType", "SPECIFIC_MEMBERS")
                 .param("origin", "DETAIL"))
             .andExpect(status().is3xxRedirection())
             .andExpect(redirectedUrl("/admin/coupons/3/detail"))
@@ -330,7 +352,8 @@ class CouponAdminControllerTests {
                 .param("maximumDiscountAmount", "5000")
                 .param("totalQuantity", "100")
                 .param("startsAt", "2026-08-01T09:00")
-                .param("expiresAt", "2026-08-31T23:59"))
+                .param("expiresAt", "2026-08-31T23:59")
+                .param("targetType", "SPECIFIC_MEMBERS"))
             .andExpect(status().is3xxRedirection())
             .andExpect(redirectedUrl("/admin/coupons"))
             .andExpect(flash().attribute("errorMessage", CouponErrorCode.CANNOT_EDIT_ENDED_COUPON.message()));
@@ -338,8 +361,12 @@ class CouponAdminControllerTests {
 
     @Test
     void detailKeepsSearchConditionAndPageForListNavigation() throws Exception {
-        CouponUpdateForm form = validUpdateForm();
-        when(couponAdminService.getDetailCoupon(3L)).thenReturn(form);
+        CouponDetailView detail = new CouponDetailView(
+                3L, "쿠폰", DiscountType.FIXED_AMOUNT, BigDecimal.valueOf(1000),
+                BigDecimal.ZERO, null, 100, 0, LocalDateTime.now(), LocalDateTime.now().plusDays(1),
+                CouponTargetType.SPECIFIC_MEMBERS, CouponDisplayStatus.ACTIVE
+        );
+        when(couponAdminService.getCouponDetail(3L)).thenReturn(detail);
 
         mockMvc.perform(get("/admin/coupons/3/detail")
                 .param("keyword", "여름")
@@ -347,11 +374,11 @@ class CouponAdminControllerTests {
                 .param("page", "6"))
             .andExpect(status().isOk())
             .andExpect(view().name("admin/coupon/detail"))
-            .andExpect(model().attribute("couponForm", form))
+            .andExpect(model().attribute("couponDetail", detail))
             .andExpect(model().attribute("page", 6))
             .andExpect(model().attributeExists("condition"));
 
-        verify(couponAdminService).getDetailCoupon(3L);
+        verify(couponAdminService).getCouponDetail(3L);
     }
 
     @Test

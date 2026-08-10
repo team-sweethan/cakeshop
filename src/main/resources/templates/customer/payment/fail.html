@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>결제 실패 | 케이크 쇼핑몰</title>
+  <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body data-page-title="결제 실패">
+  <header th:replace="~{fragments/common/header :: header}"></header>
+  <main class="page-container page-container--narrow">
+    <section class="panel" style="padding:32px;text-align:center">
+      <h1>결제가 완료되지 않았습니다.</h1>
+      <p class="text-muted" th:text="${failure.message}">결제를 다시 확인해 주세요.</p>
+      <div class="cluster" style="justify-content:center;margin-top:16px">
+        <a class="btn btn--primary"
+           th:if="${failure.retryAvailable}"
+           th:href="@{/orders/{id}/payment(id=${failure.orderId})}">
+          다시 결제하기
+        </a>
+        <a class="btn" th:href="@{/orders/{id}(id=${failure.orderId})}">주문 상세 보기</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
