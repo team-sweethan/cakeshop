@@ -86,9 +86,48 @@
     });
   }
 
+  function initializeCouponAmountDisplay() {
+    const select = document.getElementById("memberCouponId");
+    const total = document.querySelector("[data-order-total]");
+    const discount = document.querySelector("[data-coupon-discount]");
+    const finalAmount = document.querySelector("[data-final-amount]");
+    if (!select || !total || !discount || !finalAmount) return;
+
+    const originalAmount = Number(total.dataset.originalAmount);
+    const format = value => Number(value).toLocaleString("ko-KR") + "원";
+
+    function updateAmountDisplay() {
+      const selectedCoupon = select.selectedOptions[0];
+      if (!selectedCoupon || !selectedCoupon.dataset.discountType) {
+        discount.textContent = "0원";
+        finalAmount.textContent = format(originalAmount);
+        return;
+      }
+
+      const discountValue = Number(selectedCoupon.dataset.discountValue);
+      const maximumDiscountAmount = selectedCoupon.dataset.maximumDiscountAmount
+        ? Number(selectedCoupon.dataset.maximumDiscountAmount)
+        : null;
+      let discountAmount = selectedCoupon.dataset.discountType === "PERCENTAGE"
+        ? Math.floor(originalAmount * discountValue / 100)
+        : Math.floor(discountValue);
+      if (maximumDiscountAmount !== null) {
+        discountAmount = Math.min(discountAmount, maximumDiscountAmount);
+      }
+      discountAmount = Math.min(discountAmount, originalAmount);
+
+      discount.textContent = "-" + format(discountAmount);
+      finalAmount.textContent = format(originalAmount - discountAmount);
+    }
+
+    select.addEventListener("change", updateAmountDisplay);
+    updateAmountDisplay();
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     initializePickupScheduler();
     initializeOrdererContact();
     initializeSingleSubmit();
+    initializeCouponAmountDisplay();
   });
 })();

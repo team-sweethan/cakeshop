@@ -116,6 +116,9 @@
               <option value="">쿠폰을 선택하지 않음</option>
               <option th:each="coupon : ${availableCoupons}"
                       th:value="${coupon.memberCouponId}"
+                      th:attr="data-discount-type=${coupon.discountType},
+                               data-discount-value=${coupon.discountValue},
+                               data-maximum-discount-amount=${coupon.maximumDiscountAmount}"
                       th:text="${coupon.name}">쿠폰명</option>
             </select>
           </div>
@@ -215,9 +218,9 @@
 
       <aside class="order-summary">
         <h2 class="section-title">결제 금액</h2>
-        <div class="data-row">
+        <div class="data-row" data-order-total th:attr="data-original-amount=${checkout.totalAmount}">
           <span class="data-row__label">쿠폰 할인</span>
-          <span>주문 생성 시 확정</span>
+          <span data-coupon-discount>0원</span>
         </div>
         <div class="data-row">
           <span class="data-row__label">상품 금액</span>
@@ -232,8 +235,8 @@
           </span>
         </div>
         <div class="data-row">
-          <span class="data-row__label">상품·옵션 합계</span>
-          <strong th:text="|${#numbers.formatInteger(checkout.totalAmount, 1, 'COMMA')}원|">
+          <span class="data-row__label">예상 최종 결제 금액</span>
+          <strong data-final-amount th:text="|${#numbers.formatInteger(checkout.totalAmount, 1, 'COMMA')}원|">
             0원
           </strong>
         </div>
