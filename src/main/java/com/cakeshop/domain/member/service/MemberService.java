@@ -1,5 +1,6 @@
 package com.cakeshop.domain.member.service;
 
+import com.cakeshop.domain.coupon.service.CouponMemberCommandService;
 import com.cakeshop.domain.member.dto.form.ProfileUpdateForm;
 import com.cakeshop.domain.member.dto.form.SignupForm;
 import com.cakeshop.domain.member.dto.view.EmailRecoveryResult;
@@ -27,6 +28,7 @@ public class MemberService {
 
     private final MemberMapper memberMapper;
     private final PasswordEncoder passwordEncoder;
+    private final CouponMemberCommandService couponMemberCommandService;
 
     /**
      * 회원가입 로직
@@ -49,6 +51,11 @@ public class MemberService {
                 .role("USER")
                 .build();
         memberMapper.join(member);
+        if (member.getId() == null) {
+            throw new BusinessException(MemberErrorCode.UPDATE_FAILED);
+        }
+        // 회원 INSERT와 신규 회원 대상 쿠폰 발급은 같은 트랜잭션에서 함께 확정한다.
+        couponMemberCommandService.issueNewMemberCoupons(member.getId());
     }
 
     /**
