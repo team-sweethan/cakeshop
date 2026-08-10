@@ -148,7 +148,7 @@ public class RefundService {
         OrderStatus expectedStatus = requireGeneralCancelableStatus(order, canceledAt);
         requireOneRow(paymentMapper.cancelIfDone(payment.getId(), "ZERO_AMOUNT_CANCELED", canceledAt));
         requireOneRow(orderMapper.cancelIfCurrent(
-                order.getId(), expectedStatus, canceledBy, reason.trim(), canceledAt
+                order.getId(), expectedStatus, canceledBy, reason.trim(), canceledAt, canceledAt
         ));
         couponOrderCommandService.restoreCouponForCanceledOrder(order.getId());
         restoreDeductedStock(order, canceledAt);

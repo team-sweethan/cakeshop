@@ -142,7 +142,7 @@ class RefundServiceTests {
         when(paymentMapper.findDonePaymentByOrderId(10L)).thenReturn(Optional.of(payment));
         when(paymentMapper.cancelIfDone(20L, "ZERO_AMOUNT_CANCELED", NOW)).thenReturn(1);
         when(orderMapper.cancelIfCurrent(
-                10L, OrderStatus.READY_FOR_PICKUP, "CUSTOMER", "cancel", NOW
+                10L, OrderStatus.READY_FOR_PICKUP, "CUSTOMER", "cancel", NOW, NOW
         )).thenReturn(1);
         when(orderMapper.findStockDeductedItemsForRestore(10L)).thenReturn(List.of());
 
