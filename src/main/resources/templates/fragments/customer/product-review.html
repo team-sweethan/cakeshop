@@ -1,10 +1,6 @@
 <!doctype html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <body>
-<!--/*
-  상품 후기 한 건의 표시. 상품 상세의 미리보기 3개와 전체 목록 화면이 같은 조각을 쓴다.
-  두 자리의 모양이 갈리면 상세에서 본 후기가 전체 목록에서 달라 보인다.
-*/-->
 <div th:fragment="reviewList(reviews)" class="stack">
   <article class="panel stack" th:each="review : ${reviews}">
     <div class="cluster" style="justify-content:space-between">
@@ -20,7 +16,6 @@
       응대 <span th:text="${review.serviceRating}">5</span>점
     </p>
 
-    <!--/* 본문은 순수 텍스트다. th:utext 를 쓰지 않고 줄바꿈만 CSS 로 살린다 (DOMAIN 2.4). */-->
     <p style="white-space:pre-wrap" th:text="${review.content}">후기 본문</p>
   </article>
 </div>

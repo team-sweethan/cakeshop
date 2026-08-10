@@ -23,14 +23,6 @@
       </p>
 
       <div class="stack" th:unless="${reviews.content.isEmpty()}">
-        <!--/*
-          카드 전체가 그 상품의 후기 목록으로 가는 링크다. 커뮤니티 인기글이 같은 모양이다.
-          상품이 내려간 뒤에는 그 목록이 404 라, 내 후기에서 눌러도 404 를 만난다 (spec B3).
-        */-->
-        <!--/*
-          display:block 이 없으면 앵커가 인라인으로 남아 .panel 의 테두리가 조각난다.
-          커뮤니티 인기글은 .cluster 의 display:flex 가 그 자리를 대신하고 있다.
-        */-->
         <a class="panel stack"
            th:each="review : ${reviews.content}"
            th:href="@{/products/{id}/reviews(id=${review.productId})}"
@@ -41,9 +33,6 @@
               <p class="text-muted" th:text="${review.orderNumber}">주문번호</p>
             </div>
             <div class="cluster">
-              <!--/*
-                숨겨진 사실은 본인에게 알린다. 수정·삭제가 닫히는 이유이기도 하다 (DOMAIN 2.1).
-              */-->
               <span class="badge badge--warning" th:if="${review.blocked}">숨김</span>
               <span class="text-muted"
                     th:text="${#temporals.format(review.createdAt, 'yyyy-MM-dd')}">2026-08-10</span>

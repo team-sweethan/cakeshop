@@ -11,11 +11,6 @@
 -->
 <mapper namespace="com.cakeshop.domain.member.mapper.MemberReviewMapper">
 
-    <!--
-      탈퇴 여부를 리뷰가 아니라 여기서 계산한다. 리뷰가 members.status 를 읽어 판단하지 않게
-      하려는 것이다(docs/review/DOMAIN.md 2.6). 탈퇴 회원도 닉네임을 그대로 반환하고,
-      표기 마스킹은 리뷰 View 가 맡는다.
-    -->
     <select id="findMembersByIds"
             resultType="com.cakeshop.domain.member.dto.view.MemberReviewView">
 

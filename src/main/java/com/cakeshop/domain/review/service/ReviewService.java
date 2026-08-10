@@ -33,8 +33,6 @@ import com.cakeshop.global.error.BusinessException;
 @Service
 public class ReviewService {
 
-    // 상품 상세에 붙는 미리보기 개수. 고정이라 상세에 모델로 주입할 수 있고, 페이징이 전체 목록
-    // 화면 한 곳에만 남는다 (B1).
     public static final int PRODUCT_PREVIEW_SIZE = 3;
 
     private final ReviewMapper reviewMapper;
@@ -91,12 +89,6 @@ public class ReviewService {
         return new PageResult<>(content, pageRequest, total);
     }
 
-    /**
-     * 상품 상세에 붙일 최신 후기 {@value #PRODUCT_PREVIEW_SIZE} 건.
-     *
-     * <p>여기서는 상품 공개 여부를 다시 보지 않는다. 상품 상세가 이미 판매 중이 아닌 상품을
-     * 404 로 끝내고, 이 조회는 그 뒤에만 불린다.</p>
-     */
     @Transactional(readOnly = true)
     public List<ProductReviewView> getProductReviewPreview(long productId) {
         return toProductReviewViews(
@@ -110,7 +102,6 @@ public class ReviewService {
             return new PageResult<>(List.of(), pageRequest, total);
         }
 
-        // 인증 회원으로 좁혀 읽은 행이라 주문 스냅샷을 받을 자격은 여기서 이미 판정됐다.
         List<ReviewRow> rows = reviewMapper.findByMemberId(
                 memberId, pageRequest.getOffset(), pageRequest.getSize());
 
@@ -162,14 +153,6 @@ public class ReviewService {
                 productId, aggregate.averageRating(), aggregate.reviewCount());
     }
 
-    /**
-     * 고객에게 공개되는 상품인지 먼저 확인한다.
-     *
-     * <p>없는 상품과 판매 중지 상품을 <b>같은 404 로 합친다.</b> 계약이 던지는 대로 흘리면
-     * 없는 상품은 404, 판매 중지 상품은 400 이라 주소를 훑어 "있지만 내린 상품"을 골라낼 수
-     * 있다. 화면 안에서는 상세가 먼저 404 라 드러나지 않고 주소를 직접 넣는 경로에서만
-     * 보인다(B1).</p>
-     */
     private void requireVisibleProduct(long productId) {
         try {
             productQueryService.getSalesInfo(productId);
@@ -186,8 +169,6 @@ public class ReviewService {
                 .toList();
     }
 
-    // 후기마다 회원을 따로 조회하면 N+1 이다 (DOMAIN 2.7). 없는 회원은 Map 에서 빠지고 그 자리는
-    // View 가 탈퇴로 처리한다.
     private Map<Long, MemberReviewView> findAuthors(List<ReviewRow> rows) {
         List<Long> memberIds = rows.stream()
                 .map(ReviewRow::memberId)

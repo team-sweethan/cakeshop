@@ -78,19 +78,6 @@ public class OrderReviewQueryService {
      * 설명 : 후기 목록(B3·C1·C3)이 order_items·orders 를 직접 JOIN 하지 않도록 추가한다.
      *        계약의 근거는 docs/review/DOMAIN.md 2.7.
      * ******************************
-     *
-     * <p>이미 쓴 후기가 가리키는 주문 상품의 상품명·주문번호를 묶음으로 돌려준다.</p>
-     *
-     * <p>{@link #findWritableOrderItems} 로는 대신할 수 없다 — 그쪽은 <b>미작성</b> 항목만
-     * 돌려주므로 이미 쓴 후기의 상품명을 받을 자리가 없다
-     * ({@code docs/review/specs/review-read.md} B3).</p>
-     *
-     * <p><b>회원으로 좁히지 않는다.</b> 관리자 후기 목록도 같은 조회를 쓰는데 그쪽은 남의 후기를
-     * 보는 것이 정상이라, 소유권 판정은 후기를 고르는 자리에 둔다. 호출하는 쪽은 <b>이미 권한을
-     * 확인한 식별자만</b> 넘겨야 한다.</p>
-     *
-     * <p>없는 식별자는 결과에서 빠질 뿐 예외로 다루지 않는다. 후기 한 건 때문에 목록 전체가
-     * 보이지 않게 되면 안 되기 때문이다.</p>
      */
     @Transactional(readOnly = true)
     public List<OrderReviewSnapshotView> findOrderItemSnapshots(Collection<Long> orderItemIds) {

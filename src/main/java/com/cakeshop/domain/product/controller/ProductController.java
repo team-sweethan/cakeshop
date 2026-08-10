@@ -202,7 +202,6 @@ public class ProductController {
         );
 
         // ProductController 수정: HyunGyu-Cho
-        // 판매 중이 아닌 상품은 위 조회가 이미 끝내므로 후기가 함께 가려진다.
         model.addAttribute(
                 "reviewPreviews",
                 reviewProductQueryService.getPreview(productId)

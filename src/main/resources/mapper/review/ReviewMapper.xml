@@ -50,8 +50,6 @@
         content, status, created_at AS createdAt
     </sql>
 
-    <!-- id tiebreaker 를 반드시 붙인다. 같은 초에 들어온 후기가 두 페이지에 겹쳐 나오거나
-         어느 페이지에도 안 나온다 (B1). -->
     <select id="findPublishedByProductId"
             resultType="com.cakeshop.domain.review.dto.view.ReviewRow">
 
@@ -70,8 +68,6 @@
            AND status = 'PUBLISHED'
     </select>
 
-    <!-- 상태를 status = 'PUBLISHED' 로 좁히지 않는다. 숨겨진 후기는 본인에게만 보이고, 지워진
-         것만 감춘다 (B3). -->
     <select id="findByMemberId"
             resultType="com.cakeshop.domain.review.dto.view.ReviewRow">
 

@@ -49,8 +49,6 @@ public class ReviewController {
         return "customer/review/writable";
     }
 
-    // 비로그인도 볼 수 있다. 상품 상세의 평균 평점은 이미 공개인데 근거가 되는 후기만 가리면
-    // 숫자만 있고 이유는 없는 화면이 된다 (DOMAIN 2.3).
     @GetMapping("/products/{productId:\\d+}/reviews")
     public String productReviews(
             @PathVariable("productId") long productId,
