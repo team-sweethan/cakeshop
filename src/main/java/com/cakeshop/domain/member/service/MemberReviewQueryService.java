@@ -58,6 +58,22 @@ public class MemberReviewQueryService {
         return memberReviewMapper.findMemberIdsByNickname(escapeLikeKeyword(normalized));
     }
 
+    /**
+     * ******************************
+     * 작성자 : HyunGyu-Cho
+     * 담당자 : 수민
+     * 작성일 : 2026-08-10
+     * 기능 : 신규 후기 알림을 받을 관리자 조회
+     * 설명 : 활성 관리자 전원의 회원 ID 를 돌려준다. 알림은 receiverId 가 필수라 받는 사람을
+     *        정해야 보낼 수 있고, members 에 대표 관리자를 가리키는 컬럼이 없다.
+     *        계약의 근거는 docs/review/specs/review-notification.md D2.
+     * ******************************
+     */
+    @Transactional(readOnly = true)
+    public List<Long> findActiveAdminIds() {
+        return memberReviewMapper.findActiveAdminIds();
+    }
+
     // '!' 를 먼저 바꾸지 않으면 뒤에서 만들어 낸 '!%' 를 다시 이스케이프해 패턴이 어긋난다.
     private static String escapeLikeKeyword(String keyword) {
         return keyword.replace("!", "!!").replace("%", "!%").replace("_", "!_");

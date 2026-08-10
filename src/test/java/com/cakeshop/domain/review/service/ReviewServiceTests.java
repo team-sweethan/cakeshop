@@ -55,6 +55,7 @@ class ReviewServiceTests {
 
     private ReviewMapper reviewMapper;
     private ReviewReplyMapper reviewReplyMapper;
+    private ReviewNotificationService reviewNotificationService;
     private OrderReviewQueryService orderReviewQueryService;
     private ProductReviewCommandService productReviewCommandService;
     private ProductQueryService productQueryService;
@@ -65,6 +66,7 @@ class ReviewServiceTests {
     void setUp() {
         reviewMapper = mock(ReviewMapper.class);
         reviewReplyMapper = mock(ReviewReplyMapper.class);
+        reviewNotificationService = mock(ReviewNotificationService.class);
         orderReviewQueryService = mock(OrderReviewQueryService.class);
         productReviewCommandService = mock(ProductReviewCommandService.class);
         productQueryService = mock(ProductQueryService.class);
@@ -75,7 +77,8 @@ class ReviewServiceTests {
                 orderReviewQueryService,
                 productReviewCommandService,
                 productQueryService,
-                memberReviewQueryService);
+                memberReviewQueryService,
+                reviewNotificationService);
     }
 
     @Test
@@ -514,6 +517,10 @@ class ReviewServiceTests {
         when(orderReviewQueryService.findReviewTarget(ORDER_ITEM_ID, MEMBER_ID))
                 .thenReturn(Optional.of(target(true)));
         when(reviewMapper.existsByOrderItemId(ORDER_ITEM_ID)).thenReturn(false);
+        when(reviewMapper.insert(any(Review.class))).thenAnswer(invocation -> {
+            invocation.getArgument(0, Review.class).setId(REVIEW_ID);
+            return 1;
+        });
         when(reviewMapper.aggregateForUpdate(PRODUCT_ID))
                 .thenReturn(new ProductRatingAggregate(new BigDecimal("4.50"), 2L));
     }

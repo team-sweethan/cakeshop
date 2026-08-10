@@ -46,6 +46,7 @@ public class ReviewService {
     private final ProductReviewCommandService productReviewCommandService;
     private final ProductQueryService productQueryService;
     private final MemberReviewQueryService memberReviewQueryService;
+    private final ReviewNotificationService reviewNotificationService;
 
     public ReviewService(
             ReviewMapper reviewMapper,
@@ -53,13 +54,15 @@ public class ReviewService {
             OrderReviewQueryService orderReviewQueryService,
             ProductReviewCommandService productReviewCommandService,
             ProductQueryService productQueryService,
-            MemberReviewQueryService memberReviewQueryService) {
+            MemberReviewQueryService memberReviewQueryService,
+            ReviewNotificationService reviewNotificationService) {
         this.reviewMapper = reviewMapper;
         this.reviewReplyMapper = reviewReplyMapper;
         this.orderReviewQueryService = orderReviewQueryService;
         this.productReviewCommandService = productReviewCommandService;
         this.productQueryService = productQueryService;
         this.memberReviewQueryService = memberReviewQueryService;
+        this.reviewNotificationService = reviewNotificationService;
     }
 
     @Transactional(readOnly = true)
@@ -162,6 +165,8 @@ public class ReviewService {
         }
 
         recalculateRating(target.productId());
+
+        reviewNotificationService.notifyNewReview(review.getId(), memberId);
     }
 
     @Transactional

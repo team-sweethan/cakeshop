@@ -50,6 +50,7 @@ class ReviewAdminServiceTests {
     private ReviewMapper reviewMapper;
     private ReviewReplyMapper reviewReplyMapper;
     private ReviewService reviewService;
+    private ReviewNotificationService reviewNotificationService;
     private ProductReviewCommandService productReviewCommandService;
     private MemberReviewQueryService memberReviewQueryService;
     private OrderReviewQueryService orderReviewQueryService;
@@ -61,6 +62,7 @@ class ReviewAdminServiceTests {
         reviewMapper = mock(ReviewMapper.class);
         reviewReplyMapper = mock(ReviewReplyMapper.class);
         reviewService = mock(ReviewService.class);
+        reviewNotificationService = mock(ReviewNotificationService.class);
         productReviewCommandService = mock(ProductReviewCommandService.class);
         memberReviewQueryService = mock(MemberReviewQueryService.class);
         orderReviewQueryService = mock(OrderReviewQueryService.class);
@@ -70,6 +72,7 @@ class ReviewAdminServiceTests {
                 reviewMapper,
                 reviewReplyMapper,
                 reviewService,
+                reviewNotificationService,
                 productReviewCommandService,
                 memberReviewQueryService,
                 orderReviewQueryService);

@@ -39,6 +39,7 @@ public class ReviewAdminService {
     private final ReviewMapper reviewMapper;
     private final ReviewReplyMapper reviewReplyMapper;
     private final ReviewService reviewService;
+    private final ReviewNotificationService reviewNotificationService;
     private final ProductReviewCommandService productReviewCommandService;
     private final MemberReviewQueryService memberReviewQueryService;
     private final OrderReviewQueryService orderReviewQueryService;
@@ -48,6 +49,7 @@ public class ReviewAdminService {
             ReviewMapper reviewMapper,
             ReviewReplyMapper reviewReplyMapper,
             ReviewService reviewService,
+            ReviewNotificationService reviewNotificationService,
             ProductReviewCommandService productReviewCommandService,
             MemberReviewQueryService memberReviewQueryService,
             OrderReviewQueryService orderReviewQueryService) {
@@ -55,6 +57,7 @@ public class ReviewAdminService {
         this.reviewMapper = reviewMapper;
         this.reviewReplyMapper = reviewReplyMapper;
         this.reviewService = reviewService;
+        this.reviewNotificationService = reviewNotificationService;
         this.productReviewCommandService = productReviewCommandService;
         this.memberReviewQueryService = memberReviewQueryService;
         this.orderReviewQueryService = orderReviewQueryService;
@@ -102,11 +105,12 @@ public class ReviewAdminService {
 
     @Transactional
     public void reply(long reviewId, ReviewReplyForm form, long adminId) {
+        ReviewReply reply = ReviewReply.create(reviewId, adminId, form.getContent());
+
         int inserted;
 
         try {
-            inserted = reviewReplyMapper.insertForPublishedReview(
-                    ReviewReply.create(reviewId, adminId, form.getContent()));
+            inserted = reviewReplyMapper.insertForPublishedReview(reply);
         } catch (DuplicateKeyException e) {
             throw new BusinessException(ReviewErrorCode.ALREADY_REPLIED);
         }
@@ -116,6 +120,11 @@ public class ReviewAdminService {
 
             throw new BusinessException(ReviewErrorCode.INVALID_REVIEW_TRANSITION);
         }
+
+        // 저장이 성공했으니 후기는 존재하고 PUBLISHED 다. 작성자만 다시 읽어 받는 사람을 정한다.
+        reviewNotificationService.notifyReviewReply(
+                reviewId, reply.getId(), requireFound(reviewMapper.findById(reviewId)).memberId(),
+                adminId);
     }
 
     @Transactional

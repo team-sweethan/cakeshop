@@ -34,4 +34,17 @@ public interface MemberReviewMapper {
      * ******************************
      */
     List<Long> findMemberIdsByNickname(@Param("keyword") String keyword);
+
+    /**
+     * ******************************
+     * 작성자 : HyunGyu-Cho
+     * 담당자 : 수민
+     * 작성일 : 2026-08-10
+     * 기능 : 신규 후기 알림을 받을 관리자 조회
+     * 설명 : role 이 ADMIN 이고 status 가 ACTIVE 인 회원 ID 를 돌려준다. 관리자 판별은 회원
+     *        도메인의 사실이므로 리뷰가 members 를 직접 읽지 않는다.
+     *        계약의 근거는 docs/review/specs/review-notification.md D2.
+     * ******************************
+     */
+    List<Long> findActiveAdminIds();
 }

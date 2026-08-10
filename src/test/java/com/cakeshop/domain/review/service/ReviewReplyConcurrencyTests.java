@@ -59,8 +59,13 @@ class ReviewReplyConcurrencyTests {
     @AfterEach
     void tearDown() {
         executor.shutdownNow();
+        jdbcTemplate.update("DELETE FROM notifications WHERE review_id = ?", reviewId);
         jdbcTemplate.update("DELETE FROM review_replies WHERE review_id = ?", reviewId);
         jdbcTemplate.update("DELETE FROM reviews WHERE id = ?", reviewId);
+
+        // 이 관리자를 남기면 다른 테스트의 findActiveAdminIds 에 섞여 신규 후기 알림이 딸려
+        // 생기고, 그쪽 정리가 알림 FK 에 걸린다.
+        jdbcTemplate.update("DELETE FROM members WHERE id = ?", adminId);
     }
 
     @Test

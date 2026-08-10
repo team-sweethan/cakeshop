@@ -27,7 +27,7 @@
   - **0행일 때 원인은 최신 행을 다시 읽어 가린다**(`findByIdForUpdate`). 조각 4·5가 같은 자리를 같은 방법으로 처리한다.
 - `review_replies`에 INSERT. `admin_id`는 **인증 관리자**에서 가져온다. `members(id)` FK이므로 사람이 다는 것을 전제한다.
 - `uk_review_replies_review`가 후기당 1건을 강제한다. `DuplicateKeyException`을 잡아 `ALREADY_REPLIED` 409로 바꾼다.
-- 저장 후 **D2(알림)를 호출** — `CUSTOMER_REVIEW`가 후기 작성자에게 간다. 조각 7에서 붙인다.
+- 저장 후 **D2(알림)를 호출** — `CUSTOMER_REVIEW`가 후기 작성자에게 간다. 조각 7에서 붙었고, 후기 트랜잭션이 커밋된 뒤에 나간다(`review-notification.md` D2).
 
 ### C6. 답글 수정
 
