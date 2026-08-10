@@ -47,6 +47,7 @@ import static org.mockito.Mockito.when;
         PaymentService.class,
         ProductStockService.class,
         OrderServiceImpl.class,
+        PickupAvailabilityPolicy.class,
         OrderExpirationService.class
 })
 @MariaDbIntegrationTest

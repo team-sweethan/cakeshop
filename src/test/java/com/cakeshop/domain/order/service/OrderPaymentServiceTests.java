@@ -70,7 +70,7 @@ class OrderPaymentServiceTests {
         lenient().when(memberService.isActiveMember(10L)).thenReturn(true);
         lenient().when(memberCouponQueryService.lockActiveCouponIssuableMember(10L)).thenReturn(true);
         orderService = new OrderServiceImpl(
-                storeService,
+                new PickupAvailabilityPolicy(storeService),
                 productQueryService,
                 orderOptionValidator,
                 orderMapper,

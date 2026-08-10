@@ -10,6 +10,7 @@ import com.cakeshop.domain.order.service.OrderOptionValidator;
 import com.cakeshop.domain.order.service.OrderPaymentRecoveryService;
 import com.cakeshop.domain.order.service.OrderService;
 import com.cakeshop.domain.order.service.OrderServiceImpl;
+import com.cakeshop.domain.order.service.PickupAvailabilityPolicy;
 import com.cakeshop.domain.order.service.OrderService.GeneralPaymentOrder;
 import com.cakeshop.domain.order.service.OrderService.PaymentProduct;
 import com.cakeshop.domain.payment.entity.Payment;
@@ -51,6 +52,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         PaymentRecoveryService.class,
         OrderPaymentRecoveryService.class,
         OrderServiceImpl.class,
+        PickupAvailabilityPolicy.class,
         PaymentPreparationServiceImpl.class,
         ProductStockService.class
 })

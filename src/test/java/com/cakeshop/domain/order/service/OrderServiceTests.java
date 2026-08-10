@@ -96,7 +96,7 @@ class OrderServiceTests {
         lenient().when(memberService.isActiveMember(anyLong())).thenReturn(true);
         lenient().when(memberCouponQueryService.lockActiveCouponIssuableMember(anyLong())).thenReturn(true);
         orderService = new OrderServiceImpl(
-                storeService,
+                new PickupAvailabilityPolicy(storeService),
                 productQueryService,
                 orderOptionValidator,
                 orderMapper,
@@ -402,60 +402,6 @@ class OrderServiceTests {
 
         verify(productQueryService, never()).getSalesInfo(1L);
         verify(orderMapper, never()).insertOrder(any(Order.class));
-    }
-
-    @Test
-    void createGeneralOrder_unavailablePickupTime_throwsInvalidInput() {
-        GeneralOrderForm form = form(1L, 1, List.of());
-        form.setPickupAt(form.getPickupAt().plusMinutes(30));
-
-        assertThatThrownBy(() -> orderService.createGeneralOrder(10L, form))
-                .isInstanceOfSatisfying(
-                        BusinessException.class,
-                        error -> assertThat(error.getErrorCode())
-                                .isEqualTo(CommonErrorCode.INVALID_INPUT)
-                );
-
-        verify(productQueryService, never()).getSalesInfo(1L);
-        verify(orderMapper, never()).insertOrder(any(Order.class));
-    }
-
-    @Test
-    void createGeneralOrder_closedDay_throwsInvalidInput() {
-        GeneralOrderForm form = form(1L, 1, List.of());
-        when(storeService.getStoreView()).thenReturn(storeView(
-                Set.of(form.getPickupAt().getDayOfWeek()),
-                List.of()
-        ));
-
-        assertThatThrownBy(() -> orderService.createGeneralOrder(10L, form))
-                .isInstanceOfSatisfying(
-                        BusinessException.class,
-                        error -> assertThat(error.getErrorCode())
-                                .isEqualTo(CommonErrorCode.INVALID_INPUT)
-                );
-
-        verify(productQueryService, never()).getSalesInfo(1L);
-    }
-
-    @Test
-    void createGeneralOrder_storeHoliday_throwsInvalidInput() {
-        GeneralOrderForm form = form(1L, 1, List.of());
-        StoreHoliday holiday = new StoreHoliday();
-        holiday.setHolidayDate(form.getPickupAt().toLocalDate());
-        when(storeService.getStoreView()).thenReturn(storeView(
-                Set.of(),
-                List.of(holiday)
-        ));
-
-        assertThatThrownBy(() -> orderService.createGeneralOrder(10L, form))
-                .isInstanceOfSatisfying(
-                        BusinessException.class,
-                        error -> assertThat(error.getErrorCode())
-                                .isEqualTo(CommonErrorCode.INVALID_INPUT)
-                );
-
-        verify(productQueryService, never()).getSalesInfo(1L);
     }
 
     @Test

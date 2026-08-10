@@ -17,8 +17,6 @@ import com.cakeshop.domain.product.dto.view.ProductSalesInfo;
 import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.error.ProductErrorCode;
 import com.cakeshop.domain.product.service.ProductQueryService;
-import com.cakeshop.domain.store.dto.view.StoreView;
-import com.cakeshop.domain.store.service.StoreService;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.error.CommonErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -27,10 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Clock;
-import java.time.DayOfWeek;
-import java.time.Duration;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -44,7 +39,7 @@ public class OrderServiceImpl implements OrderService {
     private static final int MAX_UNLIMITED_STOCK_QUANTITY = 10;
     private static final long PAYMENT_EXPIRATION_MINUTES = 10L;
 
-    private final StoreService storeService;
+    private final PickupAvailabilityPolicy pickupAvailabilityPolicy;
     private final ProductQueryService productQueryService;
     private final OrderOptionValidator orderOptionValidator;
     private final OrderMapper orderMapper;
@@ -217,43 +212,9 @@ public class OrderServiceImpl implements OrderService {
         if (pickupAt == null
                 || !pickupAt.isAfter(now)
                 || !pickupAt.isAfter(now.plusMinutes(PAYMENT_EXPIRATION_MINUTES))
-                || !isPickupAvailable(pickupAt, storeService.getStoreView())) {
+                || !pickupAvailabilityPolicy.isAvailable(pickupAt)) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
-    }
-
-    private boolean isPickupAvailable(LocalDateTime pickupAt, StoreView store) {
-        DayOfWeek dayOfWeek = pickupAt.getDayOfWeek();
-        if (store.closedDays().contains(dayOfWeek)
-                || store.holidays().stream()
-                        .anyMatch(holiday -> holiday.getHolidayDate().equals(pickupAt.toLocalDate()))) {
-            return false;
-        }
-
-        boolean weekend = dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY;
-        LocalTime businessStart = weekend ? store.weekendOpenTime() : store.weekdayOpenTime();
-        LocalTime businessEnd = weekend ? store.weekendCloseTime() : store.weekdayCloseTime();
-        LocalTime pickupTime = pickupAt.toLocalTime();
-
-        if (!isWithin(pickupTime, businessStart, businessEnd)
-                || !isWithin(pickupTime, store.pickupStartTime(), store.pickupEndTime())
-                || store.pickupIntervalMinutes() == null
-                || store.pickupIntervalMinutes() <= 0
-                || pickupTime.getSecond() != 0
-                || pickupTime.getNano() != 0) {
-            return false;
-        }
-
-        long minutesFromStart = Duration.between(store.pickupStartTime(), pickupTime).toMinutes();
-        return minutesFromStart % store.pickupIntervalMinutes() == 0;
-    }
-
-    private boolean isWithin(LocalTime value, LocalTime start, LocalTime end) {
-        return value != null
-                && start != null
-                && end != null
-                && !value.isBefore(start)
-                && !value.isAfter(end);
     }
 
     private void validateForm(GeneralOrderForm form) {

@@ -48,6 +48,7 @@ import static org.mockito.Mockito.when;
 @MybatisTest
 @Import({
         OrderServiceImpl.class,
+        PickupAvailabilityPolicy.class,
         OrderOptionValidator.class
 })
 @MariaDbIntegrationTest
