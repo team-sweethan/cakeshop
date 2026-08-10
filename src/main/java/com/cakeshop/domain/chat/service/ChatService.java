@@ -53,8 +53,10 @@ public class ChatService {
         if (room == null) {
             throw new IllegalArgumentException("존재하지 않는 채팅방입니다.");
         }
-        if (!isAdmin && currentUserId != null && !currentUserId.equals(room.getCustomerId())) {
-            throw new AccessDeniedException("해당 채팅방에 대한 접근 권한이 없습니다.");
+        if (!isAdmin) {
+            if (currentUserId == null || !currentUserId.equals(room.getCustomerId())) {
+                throw new AccessDeniedException("해당 채팅방에 대한 접근 권한이 없습니다.");
+            }
         }
     }
 
@@ -84,13 +86,19 @@ public class ChatService {
 
     // 메시지 만들고 저장, 방 상태 갱신
     @Transactional
-    public ChatMessage createMessage(Long roomId, Long senderId, Long productId, 
+    public ChatMessage createMessage(Long roomId, Long senderId, boolean isAdmin, Long productId, 
         String content, List<ChatMessageAttachmentRequest> attachments) {
 
-            // 채팅방 존재 여부 및 권한 검증
+            // 1. 텅 빈 메시지 저장 차단 (본문 및 첨부파일 둘 다 비어있으면 예외 처리)
+            boolean hasContent = content != null && !content.trim().isEmpty();
+            boolean hasAttachments = attachments != null && !attachments.isEmpty();
+            if (!hasContent && !hasAttachments) {
+                throw new IllegalArgumentException("메시지 내용이나 첨부파일 중 하나는 필수입니다.");
+            }
+
+            // 2. 채팅방 존재 여부 및 실제 인증 권한(isAdmin) 검증
             ChatRoom chatRoom = chatMapper.findChatRoomById(roomId);
-            boolean isAdminSender = (senderId != null && chatRoom != null && !senderId.equals(chatRoom.getCustomerId()));
-            validateRoomAccess(chatRoom, senderId, isAdminSender);
+            validateRoomAccess(chatRoom, senderId, isAdmin);
 
             ChatMessage message = ChatMessage.builder()
                 .chatRoomId(roomId)
@@ -102,7 +110,7 @@ public class ChatService {
             chatMapper.insertChatMessage(message);
 
             // 첨부파일 저장
-            if (attachments != null && !attachments.isEmpty()) {
+            if (hasAttachments) {
                 int displayOrder = 0;
                 for (ChatMessageAttachmentRequest att : attachments) {
                     ChatMessageAttachment attachment = ChatMessageAttachment.builder()
@@ -123,9 +131,7 @@ public class ChatService {
                 roomId,
                 message.getId(),
                 message.getCreatedAt(),
-                (senderId != null && senderId.equals(chatRoom.getCustomerId()))
-                    ? ChatResponseStatus.WAITING_ADMIN
-                    : ChatResponseStatus.WAITING_CUSTOMER
+                isAdmin ? ChatResponseStatus.WAITING_CUSTOMER : ChatResponseStatus.WAITING_ADMIN
             );
 
             return message;
