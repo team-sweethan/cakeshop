@@ -149,7 +149,10 @@
            AND password IS NOT NULL
     </select>
 
-    <insert id="join" parameterType="com.cakeshop.domain.member.entity.Member">
+    <insert id="join"
+            parameterType="com.cakeshop.domain.member.entity.Member"
+            useGeneratedKeys="true"
+            keyProperty="id">
         INSERT INTO members (email, password, nickname, role, name, created_at, phone, birth_date)
         VALUES (#{email}, #{password}, #{nickname}, #{role}, #{name}, NOW(), #{phone}, #{birthDate})
     </insert>
