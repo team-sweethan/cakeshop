@@ -81,6 +81,15 @@
         LIMIT 1
     </select>
 
+    <select id="findLatestSuccessfulBackfillStartedAt" resultType="java.time.LocalDateTime">
+        SELECT started_at
+        FROM statistics_batch_runs
+        WHERE batch_type = 'BACKFILL'
+          AND status = 'SUCCEEDED'
+        ORDER BY id DESC
+        LIMIT 1
+    </select>
+
     <select id="findLatestBackfillCompletedDate" resultType="java.time.LocalDate">
         SELECT last_completed_date
         FROM statistics_batch_runs
