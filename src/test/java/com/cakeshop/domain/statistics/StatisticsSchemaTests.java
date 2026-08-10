@@ -127,6 +127,51 @@ class StatisticsSchemaTests {
         )).isInstanceOf(DataIntegrityViolationException.class);
     }
 
+    @Test
+    void statisticsSourceIndexes_haveExpectedColumnsInOrder() {
+        assertIndexColumns(
+                "orders",
+                "idx_orders_created_at_status",
+                "created_at,status"
+        );
+        assertIndexColumns(
+                "orders",
+                "idx_orders_updated_at_created_at",
+                "updated_at,created_at"
+        );
+        assertIndexColumns(
+                "payments",
+                "idx_payments_status_approved_at",
+                "status,approved_at"
+        );
+        assertIndexColumns(
+                "payments",
+                "idx_payments_updated_at_approved_at",
+                "updated_at,approved_at"
+        );
+    }
+
+    private void assertIndexColumns(
+            String tableName,
+            String indexName,
+            String expectedColumns
+    ) {
+        String columns = jdbcTemplate.queryForObject(
+                """
+                SELECT GROUP_CONCAT(column_name ORDER BY seq_in_index)
+                FROM information_schema.statistics
+                WHERE table_schema = DATABASE()
+                  AND table_name = ?
+                  AND index_name = ?
+                """,
+                String.class,
+                tableName,
+                indexName
+        );
+
+        assertThat(columns).isEqualTo(expectedColumns);
+    }
+
     private void insertDailyStatistics(long totalOrderCount, BigDecimal totalSalesAmount) {
         jdbcTemplate.update(
                 """
