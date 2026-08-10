@@ -66,6 +66,10 @@ class ReviewRatingAggregationTests {
     @AfterEach
     void tearDown() {
         executor.shutdownNow();
+        jdbcTemplate.update(
+                "DELETE FROM notifications WHERE review_id IN"
+                        + " (SELECT id FROM reviews WHERE member_id = ?)",
+                memberId);
         jdbcTemplate.update("DELETE FROM reviews WHERE member_id = ?", memberId);
     }
 

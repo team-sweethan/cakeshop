@@ -14,9 +14,19 @@
 | C5(`review-reply.md`) 답글 작성 | `NotificationType.CUSTOMER_REVIEW` | 후기 작성자 |
 
 - `NotificationRequest`의 `reviewId`·`reviewReplyId`를 채운다.
-- **`NEW_REVIEW`를 받을 관리자가 누구인지 아직 정해지지 않았다.** `NotificationRequest`는 `receiverId`를 필수로 받는데, 관리자 계정이 둘 이상이면 누구의 ID를 넣을지 정해야 구현할 수 있다. 활성 관리자 전원에게 각각인지 대표 계정 하나인지, 그 조회를 review·member·notification 중 어디가 맡는지가 함께 걸린다. 조각 7에서 민정님과 합의한다(`DOMAIN 4`).
+- **`NEW_REVIEW`는 활성 관리자 전원에게 각각 보낸다**(2026-08-10 결정).
+  - **팀 전제가 이미 "관리자 계정은 하나"다.** 채팅 스키마(PR #149, 아직 `dev` 미머지)가 `chat_rooms.admin_id`를 걷어내면서 `관리자 계정 하나가 전체 채팅방을 관리하므로`라고 적었고, `seed-local.sql`의 관리자 계정도 하나다. 채팅과 알림은 같은 담당이다.
+  - 그 전제 아래서는 "전원"이 곧 그 하나라 결과가 같고, **관리자가 둘이 되어도 깨지지 않는다.** 전제를 코드에 박지 않는 쪽을 골랐다.
+  - 대표 계정 하나를 고르는 안은 `members`에 그것을 가리키는 컬럼이 없어 스키마를 바꿔야 한다. 담당자가 `admin_id`를 오히려 걷어낸 방향과도 어긋난다.
+  - **관리자 조회는 member 도메인이 맡는다** — 관리자 판별은 `role`·`status`라는 회원 도메인의 사실이다. 계약은 `MemberReviewQueryService.findActiveAdminIds()` → `List<Long>`이고 `role = 'ADMIN' AND status = 'ACTIVE'`로 거른다. 탈퇴·정지된 관리자를 넣으면 받을 사람이 없는 알림이 쌓이고, 계정을 되살리면 그동안의 알림이 한꺼번에 보인다.
   - `CUSTOMER_REVIEW`는 이 문제가 없다. 받는 사람이 후기 작성자 하나로 정해져 있다.
-- `event_key`를 정한다. `uk_notifications_receiver_event` UNIQUE가 중복 알림을 막는다.
+- **`event_key`는 명시한다.** `NEW_REVIEW:{adminId}:{reviewId}`, `CUSTOMER_REVIEW:{authorId}:{reviewReplyId}`. `uk_notifications_receiver_event` UNIQUE가 중복 알림을 막는다.
+  - 서버가 채워 주는 기본 키와 값은 같지만 맡기지 않는다. 기본값은 "가장 세밀한 연관 ID"를 고르는 우선순위 사슬에서 나오므로, 그 사슬이 바뀌면 같은 사건의 키가 조용히 달라져 UNIQUE가 막던 중복이 되살아난다.
 - `DeliveryScope`는 명시하지 않으면 서버가 `WEB_ONLY`로 채운다.
 - **알림 실패가 후기 저장을 되돌리면 안 된다.** 후기는 저장됐는데 알림만 못 간 상태가 그 반대보다 낫다.
+  - **그래서 커밋 이후에 보낸다.** 후기 트랜잭션 안에서 부르면 알림 쪽 예외가 그 트랜잭션을 rollback-only로 만들어, 잡아도 후기가 함께 사라진다. `TransactionSynchronization.afterCommit`으로 미루고 실패는 로그만 남긴다(`ReviewNotificationService`).
+  - **발송은 `REQUIRES_NEW`여야 한다.** `afterCommit` 시점에는 완료 중인 트랜잭션이 아직 살아 있어, 기본 전파로 부르면 그 트랜잭션에 얹혀 아무도 커밋하지 않고 사라진다(`ReviewNotificationSender`). 알림 도메인의 `NotificationDeliveryService`가 같은 이유로 같은 모양이다.
+  - 반대로 커밋 전에 `REQUIRES_NEW`로 먼저 보내는 안은 택하지 않았다. 후기가 커밋에 실패하면 **없는 후기의 알림**이 남는데, 그게 위에서 더 나쁘다고 한 쪽이다.
 - A4·A5(`review-edit-delete.md`)·C4(`review-admin.md`)에는 알림을 보내지 않는다. C6(`review-reply.md`)도 보내지 않는다.
+
+**남은 것 — 알림에서 후기로 가는 링크.** `notifications.target_url`은 알림 migration이 걷어내고 타입별 ID로 옮겼고, 남아 있는 `NotificationRequest.targetUrl`은 저장되지 않는다. 링크는 `NotificationResponse.getTargetUrl()`이 ID로 되돌려 주는데 후기는 `reviewId != null → "/mypage"` 하나뿐이라, **관리자가 `NEW_REVIEW`에서 그 후기의 관리자 상세(C3)로 갈 수 없다.** 고치려면 그 fallback이 갈라져야 하는데 알림 도메인 파일이라 민정님과 합의가 필요하다. 알림 자체는 정상 저장·표시되므로 조각 7을 막지는 않는다.
