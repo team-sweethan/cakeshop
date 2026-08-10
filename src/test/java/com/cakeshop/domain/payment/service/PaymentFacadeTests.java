@@ -72,8 +72,8 @@ class PaymentFacadeTests {
                 orderService,
                 orderQueryService,
                 paymentService,
-                paymentRecoveryService,
-                tossPaymentClient,
+                new PaymentCompensationProcessor(paymentRecoveryService, tossPaymentClient),
+                new TossPaymentApprovalResolver(tossPaymentClient),
                 CLOCK
         );
         lenient().when(orderQueryService.getMemberOrder(10L, 1L))
