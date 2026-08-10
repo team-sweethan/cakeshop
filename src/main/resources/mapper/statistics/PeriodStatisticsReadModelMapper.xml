@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cakeshop.domain.statistics.mapper.PeriodStatisticsReadModelMapper">
+    <!-- 사용자 입력은 #{}만 사용하고 ${}는 사용하지 않는다. -->
+
+    <select id="findDailyOrderStatistics"
+            resultType="com.cakeshop.domain.statistics.dto.view.DailyOrderStatisticsView">
+        SELECT
+            DATE(statistics_order.created_at) AS date,
+            COUNT(*) AS total_order_count,
+            SUM(
+                CASE
+                    WHEN statistics_order.status = 'PICKED_UP' THEN 1
+                    ELSE 0
+                END
+            ) AS completed_order_count,
+            SUM(
+                CASE
+                    WHEN statistics_order.status IN ('CANCELED', 'REJECTED') THEN 1
+                    ELSE 0
+                END
+            ) AS canceled_order_count
+        FROM orders AS statistics_order
+        WHERE statistics_order.created_at &gt;= #{start}
+          AND statistics_order.created_at &lt; #{end}
+        GROUP BY DATE(statistics_order.created_at)
+        ORDER BY DATE(statistics_order.created_at)
+    </select>
+
+    <select id="findDailySalesStatistics"
+            resultType="com.cakeshop.domain.statistics.dto.view.DailySalesStatisticsView">
+        SELECT
+            DATE(statistics_payment.approved_at) AS date,
+            SUM(statistics_payment.amount) AS sales_amount
+        FROM payments AS statistics_payment
+        WHERE statistics_payment.status = 'DONE'
+          AND statistics_payment.approved_at &gt;= #{start}
+          AND statistics_payment.approved_at &lt; #{end}
+        GROUP BY DATE(statistics_payment.approved_at)
+        ORDER BY DATE(statistics_payment.approved_at)
+    </select>
+</mapper>

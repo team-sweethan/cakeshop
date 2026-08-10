@@ -57,8 +57,10 @@ import com.cakeshop.domain.review.dto.view.AdminReviewListView;
 import com.cakeshop.domain.review.entity.ReviewStatus;
 import com.cakeshop.domain.review.service.ReviewAdminService;
 import com.cakeshop.domain.statistics.controller.StatisticsAdminController;
+import com.cakeshop.domain.statistics.dto.view.PeriodStatisticsView;
 import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
 import com.cakeshop.domain.statistics.service.DashboardReadModelQueryService;
+import com.cakeshop.domain.statistics.service.PeriodStatisticsReadModelQueryService;
 
 class AdminPageControllerTests {
 
@@ -107,6 +109,8 @@ class AdminPageControllerTests {
         CommunityService communityService = Mockito.mock(CommunityService.class);
         DashboardReadModelQueryService dashboardReadModelQueryService =
                 Mockito.mock(DashboardReadModelQueryService.class);
+        PeriodStatisticsReadModelQueryService periodStatisticsReadModelQueryService =
+                Mockito.mock(PeriodStatisticsReadModelQueryService.class);
 
         ReviewAdminService reviewAdminService = Mockito.mock(ReviewAdminService.class);
         when(reviewAdminService.getReviews(any(), any(), any(), any(), any(PageRequest.class)))
@@ -139,9 +143,22 @@ class AdminPageControllerTests {
                         List.of(),
                         List.of()
                 ));
+        when(periodStatisticsReadModelQueryService.getStatistics(null, null))
+                .thenReturn(new PeriodStatisticsView(
+                        LocalDate.of(2026, 7, 28),
+                        LocalDate.of(2026, 8, 3),
+                        0L,
+                        0L,
+                        0L,
+                        BigDecimal.ZERO,
+                        List.of()
+                ));
 
         mockMvc = MockMvcBuilders.standaloneSetup(
-                new StatisticsAdminController(dashboardReadModelQueryService),
+                new StatisticsAdminController(
+                        dashboardReadModelQueryService,
+                        periodStatisticsReadModelQueryService
+                ),
                 new ProductAdminController(
                         Mockito.mock(ProductAdminService.class)),
                 new OrderAdminController(
