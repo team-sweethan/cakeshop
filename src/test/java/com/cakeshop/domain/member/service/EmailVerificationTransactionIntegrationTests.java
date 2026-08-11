@@ -1,9 +1,12 @@
 package com.cakeshop.domain.member.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
 import com.cakeshop.domain.member.entity.EmailVerificationPurpose;
+import com.cakeshop.domain.member.error.EmailVerificationSendException;
 import com.cakeshop.domain.member.mapper.EmailVerificationMapper;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 import java.time.Clock;
@@ -28,7 +31,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class EmailVerificationTransactionIntegrationTests {
 
-    private static final String EMAIL = "transaction-lock@example.com";
+    private static final String SUCCESS_EMAIL = "transaction-lock-success@example.com";
+    private static final String FAILURE_EMAIL = "transaction-lock-failure@example.com";
 
     @Autowired
     private EmailVerificationService emailVerificationService;
@@ -41,16 +45,36 @@ class EmailVerificationTransactionIntegrationTests {
 
     @Test
     void sendSignupCode_transactionCompletion_releasesRequestLock() {
-        emailVerificationService.sendSignupCode(EMAIL);
+        emailVerificationService.sendSignupCode(SUCCESS_EMAIL);
 
         assertThat(emailVerificationMapper.acquireRequestLock(
-                EMAIL, EmailVerificationPurpose.SIGNUP, 0)).isOne();
+                SUCCESS_EMAIL, EmailVerificationPurpose.SIGNUP, 0)).isOne();
         assertThat(emailVerificationMapper.releaseRequestLock(
-                EMAIL, EmailVerificationPurpose.SIGNUP)).isOne();
+                SUCCESS_EMAIL, EmailVerificationPurpose.SIGNUP)).isOne();
         verify(emailSender).sendVerificationCode(
-                org.mockito.ArgumentMatchers.eq(EMAIL),
+                org.mockito.ArgumentMatchers.eq(SUCCESS_EMAIL),
                 org.mockito.ArgumentMatchers.matches("\\d{6}"),
                 org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void sendSignupCode_smtpFailure_commitsAttemptAndReleasesRequestLock() {
+        doThrow(new EmailVerificationSendException())
+                .when(emailSender)
+                .sendVerificationCode(
+                        org.mockito.ArgumentMatchers.eq(FAILURE_EMAIL),
+                        org.mockito.ArgumentMatchers.anyString(),
+                        org.mockito.ArgumentMatchers.any());
+
+        assertThatThrownBy(() -> emailVerificationService.sendSignupCode(FAILURE_EMAIL))
+                .isInstanceOf(EmailVerificationSendException.class);
+
+        assertThat(emailVerificationMapper.findLatest(
+                FAILURE_EMAIL, EmailVerificationPurpose.SIGNUP)).isPresent();
+        assertThat(emailVerificationMapper.acquireRequestLock(
+                FAILURE_EMAIL, EmailVerificationPurpose.SIGNUP, 0)).isOne();
+        assertThat(emailVerificationMapper.releaseRequestLock(
+                FAILURE_EMAIL, EmailVerificationPurpose.SIGNUP)).isOne();
     }
 
     @TestConfiguration

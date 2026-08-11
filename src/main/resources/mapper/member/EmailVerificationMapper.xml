@@ -80,9 +80,8 @@
         UPDATE email_verifications
            SET attempt_count = attempt_count + 1
          WHERE id = #{id}
-           AND verified_at IS NULL
            AND consumed_at IS NULL
-           AND expires_at &gt; #{now}
+           AND (verified_at IS NOT NULL OR expires_at &gt; #{now})
            AND attempt_count &lt; 5
     </update>
 

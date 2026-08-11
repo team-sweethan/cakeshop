@@ -1,7 +1,6 @@
 package com.cakeshop.domain.member.service;
 
-import com.cakeshop.domain.member.error.MemberErrorCode;
-import com.cakeshop.global.error.BusinessException;
+import com.cakeshop.domain.member.error.EmailVerificationSendException;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
@@ -55,7 +54,7 @@ public class SmtpEmailSender implements EmailSender {
                     """.formatted(code, validFor.toMinutes()));
             mailSender.send(message);
         } catch (MessagingException | UnsupportedEncodingException | MailException exception) {
-            throw new BusinessException(MemberErrorCode.EMAIL_VERIFICATION_SEND_FAILED);
+            throw new EmailVerificationSendException();
         }
     }
 }

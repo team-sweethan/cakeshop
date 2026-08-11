@@ -18,7 +18,8 @@
   <h1>회원가입</h1>
 
   <!-- 1. th:object와 th:action을 사용하여 폼과 DTO 연결 -->
-  <form class="panel" th:action="@{/join}" th:object="${signupForm}" method="post">
+  <form class="panel" th:action="@{/join}" th:object="${signupForm}" method="post"
+        th:attr="data-email-verified=${signupEmailVerified ?: false}">
 
     <section class="section">
       <h2 class="section-title">약관 동의</h2>
@@ -137,6 +138,7 @@
   let emailFormatTouched = false;
   let availableEmail = '';
   let verifiedEmail = '';
+  const signupEmailVerified = signupForm.dataset.emailVerified === 'true';
 
   function resetEmailVerification() {
     availableEmail = '';
@@ -279,6 +281,19 @@
       emailVerificationMessage.className = 'form-error';
     }
   });
+
+  if (signupEmailVerified) {
+    availableEmail = emailInput.value.trim();
+    verifiedEmail = availableEmail;
+    emailInput.readOnly = true;
+    emailCodeSendButton.disabled = true;
+    emailVerificationGroup.hidden = false;
+    emailCodeInput.readOnly = true;
+    emailCodeVerifyButton.disabled = true;
+    emailVerificationMessage.innerText = '이메일 인증이 완료되었습니다.';
+    emailVerificationMessage.className = 'form-success';
+    signupSubmitButton.disabled = false;
+  }
 </script>
 <script>
   const passwordInput = document.getElementById('signup-password');

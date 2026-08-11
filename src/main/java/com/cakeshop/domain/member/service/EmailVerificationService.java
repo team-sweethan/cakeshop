@@ -4,6 +4,7 @@ import com.cakeshop.domain.member.dto.form.SignupForm;
 import com.cakeshop.domain.member.entity.EmailVerification;
 import com.cakeshop.domain.member.entity.EmailVerificationPurpose;
 import com.cakeshop.domain.member.error.MemberErrorCode;
+import com.cakeshop.domain.member.error.EmailVerificationSendException;
 import com.cakeshop.domain.member.mapper.EmailVerificationMapper;
 import com.cakeshop.domain.member.mapper.MemberMapper;
 import com.cakeshop.global.error.BusinessException;
@@ -39,14 +40,10 @@ public class EmailVerificationService {
     private final Clock clock;
 
     /** 회원가입 이메일로 새 인증번호를 발송한다. */
-    @Transactional
+    @Transactional(noRollbackFor = EmailVerificationSendException.class)
     public void sendSignupCode(String rawEmail) {
         String email = normalizeAndValidateEmail(rawEmail);
         EmailVerificationPurpose purpose = EmailVerificationPurpose.SIGNUP;
-        if (memberMapper.findByEmail(email).isPresent()) {
-            throw new BusinessException(MemberErrorCode.DUPLICATE_EMAIL);
-        }
-
         if (emailVerificationMapper.acquireRequestLock(
                 email, purpose, REQUEST_LOCK_TIMEOUT_SECONDS) != 1) {
             throw new BusinessException(MemberErrorCode.EMAIL_VERIFICATION_RATE_LIMITED);
@@ -65,6 +62,10 @@ public class EmailVerificationService {
     }
 
     private void sendCodeWithinLock(String email, EmailVerificationPurpose purpose) {
+        if (memberMapper.findByEmail(email).isPresent()) {
+            throw new BusinessException(MemberErrorCode.DUPLICATE_EMAIL);
+        }
+
         LocalDateTime now = LocalDateTime.now(clock);
         emailVerificationMapper.findLatest(email, purpose)
                 .filter(latest -> latest.getCreatedAt()
@@ -106,12 +107,20 @@ public class EmailVerificationService {
                         MemberErrorCode.EMAIL_VERIFICATION_INVALID));
 
         if (verification.getVerifiedAt() != null) {
-            if (verification.getConsumedAt() == null
+            if (verification.getAttemptCount() < 5
+                    && verification.getConsumedAt() == null
                     && verification.getVerifiedAt().plus(VERIFIED_TTL).isAfter(now)
                     && code != null
                     && code.matches("\\d{6}")
                     && passwordEncoder.matches(code, verification.getCodeHash())) {
                 return email;
+            }
+            if (verification.getAttemptCount() < 5
+                    && verification.getConsumedAt() == null
+                    && verification.getVerifiedAt().plus(VERIFIED_TTL).isAfter(now)
+                    && code != null
+                    && code.matches("\\d{6}")) {
+                emailVerificationMapper.incrementAttemptCount(verification.getId(), now);
             }
             throw new BusinessException(MemberErrorCode.EMAIL_VERIFICATION_INVALID);
         }

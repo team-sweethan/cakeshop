@@ -66,6 +66,30 @@ class AuthControllerTests {
     }
 
     @Test
+    void join_otherValidationError_restoresVerifiedEmailState() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute(
+                EmailVerificationController.SIGNUP_VERIFIED_EMAIL_SESSION_KEY,
+                "member@example.com");
+
+        mockMvc.perform(post("/join")
+                        .session(session)
+                        .param("email", "member@example.com")
+                        .param("password", "weak")
+                        .param("passwordConfirm", "weak")
+                        .param("name", "홍길동")
+                        .param("nickname", "길동이")
+                        .param("phone", "010-1234-5678")
+                        .param("birthDate", "2000-01-15"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("customer/member/signup"))
+                .andExpect(model().attribute("signupEmailVerified", true))
+                .andExpect(model().attributeHasFieldErrors("signupForm", "password"));
+
+        verify(memberService, never()).join(any(SignupForm.class), any());
+    }
+
+    @Test
     void join_validSignupInput_redirectsWithCommonSuccessMessage() throws Exception {
         MockHttpSession session = new MockHttpSession();
         session.setAttribute(

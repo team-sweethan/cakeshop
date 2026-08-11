@@ -8,6 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.inOrder;
 
 import com.cakeshop.domain.member.entity.EmailVerification;
 import com.cakeshop.domain.member.entity.EmailVerificationPurpose;
@@ -26,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.InOrder;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -74,6 +76,11 @@ class EmailVerificationServiceTests {
         when(emailVerificationMapper.insert(any())).thenReturn(1);
 
         emailVerificationService.sendSignupCode(" User@Example.com ");
+
+        InOrder requestOrder = inOrder(emailVerificationMapper, memberMapper);
+        requestOrder.verify(emailVerificationMapper).acquireRequestLock(
+                "user@example.com", EmailVerificationPurpose.SIGNUP, 3);
+        requestOrder.verify(memberMapper).findByEmail("user@example.com");
 
         ArgumentCaptor<EmailVerification> verificationCaptor =
                 ArgumentCaptor.forClass(EmailVerification.class);
@@ -173,6 +180,7 @@ class EmailVerificationServiceTests {
                 () -> emailVerificationService.verifySignupCode(
                         "user@example.com", "654321"),
                 MemberErrorCode.EMAIL_VERIFICATION_INVALID);
+        verify(emailVerificationMapper).incrementAttemptCount(latest.getId(), NOW);
     }
 
     @Test

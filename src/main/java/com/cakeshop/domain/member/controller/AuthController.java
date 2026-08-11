@@ -123,8 +123,10 @@ public class AuthController {
     public String join(@Valid @ModelAttribute("signupForm") SignupForm form,
                        BindingResult bindingResult,
                        HttpSession session,
+                       Model model,
                        RedirectAttributes redirectAttributes) {
         if (bindingResult.hasErrors()) {
+            restoreSignupEmailVerification(form, session, model);
             return "customer/member/signup";
         }
 
@@ -170,5 +172,17 @@ public class AuthController {
                 available
                         ? "사용 가능한 이메일입니다."
                         : "이미 사용 중인 이메일입니다.");
+    }
+
+    private void restoreSignupEmailVerification(
+            SignupForm form,
+            HttpSession session,
+            Model model) {
+        String verifiedEmail = (String) session.getAttribute(
+                EmailVerificationController.SIGNUP_VERIFIED_EMAIL_SESSION_KEY);
+        if (form.getEmail() != null
+                && form.getEmail().trim().equalsIgnoreCase(verifiedEmail)) {
+            model.addAttribute("signupEmailVerified", true);
+        }
     }
 }
