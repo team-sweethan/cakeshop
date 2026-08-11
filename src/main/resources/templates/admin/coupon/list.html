@@ -48,6 +48,35 @@
                             <option value="ENDED">종료</option>
                         </select>
                     </div>
+
+                    <div class="form-group">
+                        <label for="discountTypeFilter">할인 유형</label>
+
+                        <select id="discountTypeFilter"
+                                class="form-control"
+                                th:field="*{discountTypeFilter}">
+                            <option value="">전체 할인 유형</option>
+                            <option value="FIXED_AMOUNT">금액 할인</option>
+                            <option value="PERCENTAGE">비율 할인</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>사용 기간</label>
+
+                        <div class="cluster">
+                            <input id="periodStart"
+                                   class="form-control"
+                                   type="datetime-local"
+                                   th:field="*{periodStart}">
+                            <span aria-hidden="true">~</span>
+                            <input id="periodEnd"
+                                   class="form-control"
+                                   type="datetime-local"
+                                   th:field="*{periodEnd}">
+                        </div>
+                        <p class="form-help">선택한 기간과 사용 기간이 겹치는 쿠폰을 조회합니다.</p>
+                    </div>
                 </div>
 
                 <div class="cluster">
@@ -91,11 +120,14 @@
 
                         <td>
                             <a th:href="@{/admin/coupons/{couponId}/detail(
-                                   couponId=${coupon.id},
-                                   keyword=${condition.keyword},
-                                   status=${condition.status},
-                                   page=${pageResult.page}
-                               )}"
+                                    couponId=${coupon.id},
+                                    keyword=${condition.keyword},
+                                    status=${condition.status},
+                                    discountTypeFilter=${condition.discountTypeFilter},
+                                    periodStart=${condition.periodStart},
+                                    periodEnd=${condition.periodEnd},
+                                    page=${pageResult.page}
+                                )}"
                                th:text="${coupon.name}">
                                 첫 주문 할인 쿠폰
                             </a>
@@ -136,16 +168,19 @@
 
                         <td>
                             <div class="cluster">
-                                <a class="btn" th:if="${#strings.toString(coupon.displayStatus) != 'ENDED'}"
-                                   th:href="@{/admin/coupons/{couponId}/edit(couponId=${coupon.id}, keyword=${condition.keyword}, status=${condition.status}, page=${pageResult.page}, origin='LIST')}">수정</a>
+                                 <a class="btn" th:if="${#strings.toString(coupon.displayStatus) != 'ENDED'}"
+                                    th:href="@{/admin/coupons/{couponId}/edit(couponId=${coupon.id}, keyword=${condition.keyword}, status=${condition.status}, discountTypeFilter=${condition.discountTypeFilter}, periodStart=${condition.periodStart}, periodEnd=${condition.periodEnd}, page=${pageResult.page}, origin='LIST')}">수정</a>
 
                                 <form th:if="${#strings.toString(coupon.adminStatus) == 'ACTIVE'
                                         && #strings.toString(coupon.displayStatus) != 'ENDED'}"
                                       th:action="@{/admin/coupons/{couponId}/deactivate(couponId=${coupon.id})}"
                                       method="post">
-                                    <input type="hidden" name="keyword" th:value="${condition.keyword}">
-                                    <input type="hidden" name="status" th:value="${condition.status}">
-                                    <input type="hidden" name="page" th:value="${pageResult.page}">
+                                     <input type="hidden" name="keyword" th:value="${condition.keyword}">
+                                     <input type="hidden" name="status" th:value="${condition.status}">
+                                     <input type="hidden" name="discountTypeFilter" th:value="${condition.discountTypeFilter}">
+                                     <input type="hidden" name="periodStart" th:value="${condition.periodStart}">
+                                     <input type="hidden" name="periodEnd" th:value="${condition.periodEnd}">
+                                     <input type="hidden" name="page" th:value="${pageResult.page}">
 
                                     <button class="btn btn--danger" type="submit">발급 중지</button>
                                 </form>
@@ -154,9 +189,12 @@
                                         && #strings.toString(coupon.displayStatus) != 'ENDED'}"
                                       th:action="@{/admin/coupons/{couponId}/activate(couponId=${coupon.id})}"
                                       method="post">
-                                    <input type="hidden" name="keyword" th:value="${condition.keyword}">
-                                    <input type="hidden" name="status" th:value="${condition.status}">
-                                    <input type="hidden" name="page" th:value="${pageResult.page}">
+                                     <input type="hidden" name="keyword" th:value="${condition.keyword}">
+                                     <input type="hidden" name="status" th:value="${condition.status}">
+                                     <input type="hidden" name="discountTypeFilter" th:value="${condition.discountTypeFilter}">
+                                     <input type="hidden" name="periodStart" th:value="${condition.periodStart}">
+                                     <input type="hidden" name="periodEnd" th:value="${condition.periodEnd}">
+                                     <input type="hidden" name="page" th:value="${pageResult.page}">
 
                                     <button class="btn btn--success" type="submit">발급 재개</button>
                                 </form>
@@ -176,9 +214,12 @@
                 <a class="btn"
                    th:if="${pageNavigation.hasPreviousBlock}"
                    th:href="@{/admin/coupons(
-                   keyword=${condition.keyword},
-                   status=${condition.status},
-                   page=${pageNavigation.previousPage}
+                    keyword=${condition.keyword},
+                    status=${condition.status},
+                    discountTypeFilter=${condition.discountTypeFilter},
+                    periodStart=${condition.periodStart},
+                    periodEnd=${condition.periodEnd},
+                    page=${pageNavigation.previousPage}
                )}">
                     이전
                 </a>
@@ -194,9 +235,12 @@
                    th:classappend="${pageNumber == pageResult.page}
                    ? ' is-active'"
                    th:href="@{/admin/coupons(
-                   keyword=${condition.keyword},
-                   status=${condition.status},
-                   page=${pageNumber}
+                    keyword=${condition.keyword},
+                    status=${condition.status},
+                    discountTypeFilter=${condition.discountTypeFilter},
+                    periodStart=${condition.periodStart},
+                    periodEnd=${condition.periodEnd},
+                    page=${pageNumber}
                )}">
                     1
                 </a>
@@ -204,9 +248,12 @@
                 <a class="btn"
                    th:if="${pageNavigation.hasNextBlock}"
                    th:href="@{/admin/coupons(
-                   keyword=${condition.keyword},
-                   status=${condition.status},
-                   page=${pageNavigation.nextPage}
+                    keyword=${condition.keyword},
+                    status=${condition.status},
+                    discountTypeFilter=${condition.discountTypeFilter},
+                    periodStart=${condition.periodStart},
+                    periodEnd=${condition.periodEnd},
+                    page=${pageNavigation.nextPage}
                )}">
                     다음
                 </a>

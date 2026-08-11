@@ -72,6 +72,18 @@
                     </when>
                 </choose>
             </if>
+
+            <if test="condition.discountTypeFilter != null">
+                AND discount_type = #{condition.discountTypeFilter}
+            </if>
+
+            <!-- 선택 기간과 쿠폰 사용 기간이 겹치는 항목을 조회한다. -->
+            <if test="condition.periodStart != null">
+                AND expires_at &gt;= #{condition.periodStart}
+            </if>
+            <if test="condition.periodEnd != null">
+                AND starts_at &lt;= #{condition.periodEnd}
+            </if>
         </where>
     </sql>
 
@@ -164,6 +176,12 @@
             AND (total_quantity IS NULL OR issued_quantity &lt; total_quantity)
             THEN starts_at
             END ASC,
+
+            <!-- 특정 회원 쿠폰의 수량 소진은 마지막 발급으로 변경된 시각이 최근인 항목부터 확인한다. -->
+            CASE
+            WHEN total_quantity IS NOT NULL AND issued_quantity &gt;= total_quantity
+            THEN updated_at
+            END DESC,
 
             <!-- 종료 쿠폰은 가장 최근에 종료된 항목부터 확인한다. -->
             CASE

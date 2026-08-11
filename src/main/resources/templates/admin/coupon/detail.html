@@ -7,7 +7,7 @@
     <div class="admin-main">
         <header th:replace="~{fragments/admin/header :: header('쿠폰 관리')}"></header>
         <main class="admin-content" data-coupon-detail
-              th:attr="data-coupon-id=${couponId},data-keyword=${condition.keyword},data-status=${condition.status},data-page=${page},data-csrf-name=${_csrf.parameterName},data-csrf-token=${_csrf.token},data-specific-members=${couponDetail.targetType.name() == 'SPECIFIC_MEMBERS'}">
+              th:attr="data-coupon-id=${couponId},data-keyword=${condition.keyword},data-status=${condition.status},data-discount-type-filter=${condition.discountTypeFilter},data-period-start=${condition.periodStart},data-period-end=${condition.periodEnd},data-page=${page},data-csrf-name=${_csrf.parameterName},data-csrf-token=${_csrf.token},data-specific-members=${couponDetail.targetType.name() == 'SPECIFIC_MEMBERS'}">
             <div th:replace="~{fragments/common/alert :: alert}"></div>
             <h1 class="admin-page-title">쿠폰 상세 정보</h1>
 
@@ -66,9 +66,9 @@
                 </div>
                 <div class="cluster">
                     <a class="btn btn--primary" th:if="${couponDetail.displayStatus.name() != 'ENDED'}"
-                       th:href="@{/admin/coupons/{couponId}/edit(couponId=${couponId}, keyword=${condition.keyword}, status=${condition.status}, page=${page}, origin='DETAIL')}">수정</a>
+                       th:href="@{/admin/coupons/{couponId}/edit(couponId=${couponId}, keyword=${condition.keyword}, status=${condition.status}, discountTypeFilter=${condition.discountTypeFilter}, periodStart=${condition.periodStart}, periodEnd=${condition.periodEnd}, page=${page}, origin='DETAIL')}">수정</a>
                     <a class="btn"
-                       th:href="@{/admin/coupons(keyword=${condition.keyword}, status=${condition.status}, page=${page})}">목록</a>
+                       th:href="@{/admin/coupons(keyword=${condition.keyword}, status=${condition.status}, discountTypeFilter=${condition.discountTypeFilter}, periodStart=${condition.periodStart}, periodEnd=${condition.periodEnd}, page=${page})}">목록</a>
                 </div>
             </div>
 
