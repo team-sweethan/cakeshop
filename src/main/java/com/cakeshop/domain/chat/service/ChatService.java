@@ -16,11 +16,15 @@ import com.cakeshop.domain.chat.entity.ChatRoomOrder;
 import com.cakeshop.domain.chat.entity.ChatRoomReadCursor;
 import com.cakeshop.domain.chat.entity.ChatRoomStatus;
 import com.cakeshop.domain.chat.entity.CustomerAdminNote;
+import com.cakeshop.domain.chat.error.ChatErrorCode;
 import com.cakeshop.domain.chat.mapper.ChatMapper;
 import com.cakeshop.domain.member.dto.view.MemberAdminDetailView;
 import com.cakeshop.domain.member.service.MemberAdminService;
 import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.order.service.OrderViewAssembler;
+import com.cakeshop.domain.product.service.ProductImageValidator;
+import com.cakeshop.global.error.BusinessException;
+import com.cakeshop.global.error.CommonErrorCode;
 import com.cakeshop.global.infra.FileStorageClient;
 
 import lombok.RequiredArgsConstructor;
@@ -34,8 +38,8 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Collectors;
 import java.util.stream.Collectors;
 
 
@@ -48,13 +52,14 @@ public class ChatService {
     private final MemberAdminService memberAdminService;
     private final OrderViewAssembler orderViewAssembler;
     private final FileStorageClient fileStorageClient;
+    private final ProductImageValidator productImageValidator;
 
     // ==========================================
     // 0. 검증 헬퍼 메서드
     // ==========================================
     private void validateRoomAccess(ChatRoom room, Long currentUserId, boolean isAdmin) {
         if (room == null) {
-            throw new IllegalArgumentException("존재하지 않는 채팅방입니다.");
+            throw new BusinessException(ChatErrorCode.ROOM_NOT_FOUND);
         }
         if (!isAdmin) {
             if (currentUserId == null || !currentUserId.equals(room.getCustomerId())) {
@@ -92,11 +97,11 @@ public class ChatService {
     public ChatMessage createMessage(Long roomId, Long senderId, boolean isAdmin, Long productId, 
         String content, List<ChatMessageAttachmentRequest> attachments) {
 
-            // 1. 텅 빈 메시지 저장 차단 (본문 및 첨부파일 둘 다 비어있으면 예외 처리)
+            // 1. 텅 빈 메시지 저장 차단 (본문 및 첨부파일 둘 다 비어있으면 400 BusinessException 예외 처리)
             boolean hasContent = content != null && !content.trim().isEmpty();
             boolean hasAttachments = attachments != null && !attachments.isEmpty();
             if (!hasContent && !hasAttachments) {
-                throw new IllegalArgumentException("메시지 내용이나 첨부파일 중 하나는 필수입니다.");
+                throw new BusinessException(CommonErrorCode.INVALID_INPUT);
             }
 
             // 2. 채팅방 존재 여부 및 실제 인증 권한(isAdmin) 검증
@@ -142,104 +147,88 @@ public class ChatService {
 
     // S3 저장소에 이미지 파일 직접 업로드 (프론트가 파일 객체 직접 보낼 때)
     public String uploadChatImageToS3(MultipartFile file) {
-        if (file == null || file.isEmpty()) {
-            throw new IllegalArgumentException("업로드할 파일이 존재하지 않습니다.");
-        }
+        // 이미지 파일 확장자, MIME 타입, 파일 시그니처, 5MB 크기 검증
+        productImageValidator.validate(file);
         return fileStorageClient.store(file, "chat");
     }
 
-    // 해당 고객 주문 내역 조회
-    // 채팅방 우측 패널 연동 주문 목록 조회 (공통)
-    @Transactional(readOnly = true) // 주문 매퍼 사용함
+    // 채팅방 연동 주문 목록 조회
+    @Transactional(readOnly = true)
     public List<ChatRoomOrderResponse> getChatRoomOrders(Long chatRoomId) {
-        // 1. DB에서 채팅방에 연동된 주문 연결 행 목록 조회
         List<ChatRoomOrder> roomOrders = chatMapper.findChatRoomOrderByChatRoomId(chatRoomId);
-
-        // 2. 연동된 주문이 없으면 빈 목록 반환
         if (roomOrders == null || roomOrders.isEmpty()) {
             return Collections.emptyList();
         }
 
-        // 3. 연동된 주문이 있으면 Order 정보와 조합하여 ChatRoomOrderResponse DTO로 변환하여 반환
-        return roomOrders.stream()
-                .map(this::convertToOrderResponse)
-                .collect(Collectors.toList());
+        return roomOrders.stream().map(ro -> {
+            Order order;
+            try {
+                order = orderViewAssembler.findOrder(ro.getOrderId());
+            } catch (Exception e) {
+                order = null;
+            }
+
+            return ChatRoomOrderResponse.builder()
+                    .orderId(ro.getOrderId())
+                    .orderNumber(order != null ? order.getOrderNumber() : "ORD-UNKNOWN")
+                    .productName(order != null ? order.getOrdererName() + "님의 주문" : "연동 주문 상품")
+                    .productType(order != null && order.getOrderType() != null ? order.getOrderType().name() : "GENERAL")
+                    .totalAmount(order != null ? order.getFinalAmount() : BigDecimal.ZERO)
+                    .orderStatus(order != null && order.getStatus() != null ? order.getStatus().name() : "UNKNOWN")
+                    .pickupDateTime(order != null ? order.getPickupAt() : null)
+                    .conversationAnchorMessageId(ro.getConversationAnchorMessageId())
+                    .createdAt(ro.getCreatedAt())
+                    .build();
+        }).collect(Collectors.toList());
     }
 
-    // ChatRoomOrder -> ChatRoomOrderResponse 변환 헬퍼 메서드
-    private ChatRoomOrderResponse convertToOrderResponse(ChatRoomOrder roomOrder) {
-        // OrderViewAssembler를 통해 주문 기본 정보 안전 조회
-        Order order = null;
-        try {
-            order = orderViewAssembler.findOrder(roomOrder.getOrderId());
-        } catch (Exception ignored) {}
-
-        return ChatRoomOrderResponse.builder()
-                .orderId(roomOrder.getOrderId())
-                .orderNumber(order != null ? order.getOrderNumber() : "")
-                .productName(order != null ? order.getOrdererName() + "님의 주문" : "연동 주문 상품")
-                .productType(order != null && order.getOrderType() != null ? order.getOrderType().name() : "GENERAL")
-                .totalAmount(order != null ? order.getFinalAmount() : BigDecimal.ZERO)
-                .orderStatus(order != null && order.getStatus() != null ? order.getStatus().name() : "")
-                .pickupDateTime(order != null ? order.getPickupAt() : null)
-                .conversationAnchorMessageId(roomOrder.getConversationAnchorMessageId())
-                .createdAt(roomOrder.getCreatedAt())
-                .build();
-    }
-
-    // 채팅방에 주문 연동 저장 (신규 주문 연결)
+    // 채팅방에 주문 연동 (검증 포함)
     @Transactional
-    public void linkOrderToChatRoom(Long chatRoomId, Long orderId, Long anchorMessageId) {
+    public void linkOrderToChatRoom(Long chatRoomId, Long orderId, Long anchorMessageId, Long currentUserId, boolean isAdmin) {
         ChatRoom chatRoom = chatMapper.findChatRoomById(chatRoomId);
-        if (chatRoom == null) {
-            throw new IllegalArgumentException("존재하지 않는 채팅방입니다.");
-        }
+        validateRoomAccess(chatRoom, currentUserId, isAdmin);
 
-        // 1. 주문 소유권 검증 (해당 채팅방 고객의 주문인지 확인)
-        Order order = null;
-        try {
-            order = orderViewAssembler.findOrder(orderId);
-        } catch (Exception ignored) {}
-
-        if (order != null && !chatRoom.getCustomerId().equals(order.getMemberId())) {
-            throw new AccessDeniedException("해당 채팅방 고객의 주문만 연동할 수 있습니다.");
-        }
-
-        // 2. 대화 앵커 메시지가 해당 채팅방의 메시지인지 검증
+        // anchorMessageId가 전달된 경우, 해당 메시지가 이 채팅방의 메시지인지 검증!
         if (anchorMessageId != null && anchorMessageId > 0) {
             ChatMessage anchorMsg = chatMapper.findChatMessageById(anchorMessageId);
-            if (anchorMsg == null || !anchorMsg.getChatRoomId().equals(chatRoomId)) {
-                throw new IllegalArgumentException("해당 채팅방의 대화 메시지가 아닙니다.");
+            if (anchorMsg == null || !chatRoomId.equals(anchorMsg.getChatRoomId())) {
+                throw new BusinessException(CommonErrorCode.INVALID_INPUT);
             }
+        }
+
+        // OrderViewAssembler를 통한 소유권 검증 (try-catch로 예외가 삼켜지지 않도록 수정!)
+        Order order = orderViewAssembler.findOrder(orderId);
+        if (order != null && !chatRoom.getCustomerId().equals(order.getMemberId())) {
+            throw new AccessDeniedException("해당 채팅방 고객의 주문만 연동할 수 있습니다.");
         }
 
         ChatRoomOrder roomOrder = ChatRoomOrder.builder()
                 .chatRoomId(chatRoomId)
                 .orderId(orderId)
-                .conversationAnchorMessageId(anchorMessageId) // 대화 앵커 메시지 ID (선택)
+                .conversationAnchorMessageId(anchorMessageId)
                 .createdAt(LocalDateTime.now())
                 .build();
 
-        chatMapper.upsertChatRoomOrder(roomOrder); // 👈 매퍼 호출해서 DB에 연동 저장!
+        chatMapper.upsertChatRoomOrder(roomOrder);
     }
 
-    // 고객·관리자 읽음 커서 저장/갱신 (공통)
+    // 고객·관리자 읽음 커서 갱신 (Derived Side 기반 해킹 차단)
     @Transactional
-    public void updateReadCursor(Long chatRoomId, Long lastReadMessageId, ChatReaderSide readerSide, Long currentUserId, boolean isAdmin) {
-        ChatRoom chatRoom = chatMapper.findChatRoomById(chatRoomId);
-        validateRoomAccess(chatRoom, currentUserId, isAdmin);
-
+    public void updateReadCursor(Long chatRoomId, Long currentUserId, boolean isAdmin, Long lastReadMessageId) {
         if (lastReadMessageId == null || lastReadMessageId <= 0) {
-            throw new IllegalArgumentException("읽은 메시지 ID는 양수여야 합니다.");
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
 
-        // 읽은 메시지 ID가 해당 채팅방 메시지인지 검증
-        ChatMessage message = chatMapper.findChatMessageById(lastReadMessageId);
-        if (message == null || !message.getChatRoomId().equals(chatRoomId)) {
-            throw new IllegalArgumentException("해당 채팅방의 메시지가 아닙니다.");
+        ChatRoom room = chatMapper.findChatRoomById(chatRoomId);
+        validateRoomAccess(room, currentUserId, isAdmin);
+
+        // 검증: lastReadMessageId가 진짜 해당 채팅방의 메시지인지 확인!
+        ChatMessage lastMessage = chatMapper.findChatMessageById(lastReadMessageId);
+        if (lastMessage == null || !chatRoomId.equals(lastMessage.getChatRoomId())) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
 
-        // readerSide는 클라이언트 파라미터를 신뢰하지 않고 인증 권한(isAdmin)에서 강제로 확정
+        // derivedSide: 파라미터 readerSide 대신 실제 로그인 사용자의 권한(isAdmin)으로 결정!
         ChatReaderSide derivedSide = isAdmin ? ChatReaderSide.ADMIN : ChatReaderSide.CUSTOMER;
 
         ChatRoomReadCursor cursor = ChatRoomReadCursor.builder()
@@ -290,11 +279,24 @@ public class ChatService {
             (a, b) -> a
         ));
 
-        // 3. 각 채팅방을 ChatRoomListResponse DTO로 변환
+        // 3. 마지막 메시지 일괄 배치 조회 (방 20개당 20번 단건 쿼리 나가던 N+1 문제 완전 해소!)
+        List<Long> lastMessageIds = rooms.stream()
+                .map(ChatRoom::getLastMessageId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+
+        List<ChatMessage> lastMessages = !lastMessageIds.isEmpty()
+                ? chatMapper.findMessagesByIds(lastMessageIds)
+                : Collections.emptyList();
+
+        Map<Long, ChatMessage> lastMessageMap = lastMessages.stream()
+                .collect(Collectors.toMap(ChatMessage::getId, m -> m, (a, b) -> a));
+
+        // 4. 각 채팅방을 ChatRoomListResponse DTO로 변환
         return rooms.stream().map(room -> {
-            // 마지막 메시지 정보 조회
+            // 마지막 메시지 정보 Map에서 꺼내기
             ChatMessage lastMessage = room.getLastMessageId() != null 
-                    ? chatMapper.findChatMessageById(room.getLastMessageId()) 
+                    ? lastMessageMap.get(room.getLastMessageId()) 
                     : null;
 
             // 이미지만 올린 메시지의 경우 미리보기 대체 문구("(사진)") 적용
@@ -348,7 +350,7 @@ public class ChatService {
     public ChatRoomSidePanelResponse getAdminSidePanel(Long chatRoomId) {
         ChatRoom room = chatMapper.findChatRoomById(chatRoomId);
         if (room == null) {
-            throw new IllegalArgumentException("존재하지 않는 채팅방입니다.");
+            throw new BusinessException(ChatErrorCode.ROOM_NOT_FOUND);
         }
 
         // 1. 고객 메모 조회
@@ -399,15 +401,20 @@ public class ChatService {
         return messages.stream().map(msg -> {
             List<ChatMessageAttachment> attachments = attachmentMap.getOrDefault(msg.getId(), Collections.emptyList());
             
-            // 메시지 첨부 이미지 S3 URL 목록 변환
+            // 메시지 첨부 이미지 S3 / 로컬 안전 URL 변환 (외부 해커 트래킹 URL 거부)
             List<String> imageUrls = !attachments.isEmpty()
                     ? attachments.stream()
                             .map(att -> {
                                 String key = att.getObjectKey();
                                 if (key == null || key.isBlank()) return "";
-                                return key.startsWith("http")
-                                        ? key
-                                        : "https://sweethan-cakeshop-images.s3.ap-northeast-2.amazonaws.com/" + key;
+                                // 1. 로컬 저장소 경로 (/uploads/...)
+                                if (key.startsWith("/uploads/")) return key;
+                                // 2. S3 공개 저장소 버킷 주소
+                                if (key.startsWith("https://sweethan-cakeshop-images.s3.ap-northeast-2.amazonaws.com/")) return key;
+                                // 3. 외부 도메인(http:// 또는 https://)으로 시작하는 해커 트래킹 URL은 무조건 거부!
+                                if (key.startsWith("http://") || key.startsWith("https://")) return "";
+                                // 4. 상대 경로 key인 경우 S3 버킷 주소 결합
+                                return "https://sweethan-cakeshop-images.s3.ap-northeast-2.amazonaws.com/" + key;
                             })
                             .filter(url -> !url.isBlank())
                             .collect(Collectors.toList())

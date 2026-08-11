@@ -54,6 +54,9 @@ public interface ChatMapper {
     // 메시지 단건 조회
     ChatMessage findChatMessageById(Long id);
 
+    // 메시지 ID 목록 일괄 조회 (N+1 방지)
+    List<ChatMessage> findMessagesByIds(@Param("messageIds") List<Long> messageIds);
+
     // 채팅방 대화 목록 조회
     List<ChatMessage> findMessageByChatRoomId(
         @Param("chatRoomId") Long chatRoomId,

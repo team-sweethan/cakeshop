@@ -107,6 +107,16 @@
         WHERE id = #{id}
     </select>
 
+    <!-- 메시지 ID 목록 일괄 조회 (N+1 방지) -->
+    <select id="findMessagesByIds" resultType="ChatMessage">
+        SELECT *
+        FROM chat_messages
+        WHERE id IN
+        <foreach item="msgId" collection="messageIds" open="(" separator="," close=")">
+            #{msgId}
+        </foreach>
+    </select>
+
     <!-- 안 읽은 메시지 수 계산 (고객이 보낸 메시지 중 관리자가 안 읽은 수) -->
     <select id="countUnreadMessages" resultType="int">
         SELECT COUNT(*)
