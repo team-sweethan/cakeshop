@@ -148,6 +148,33 @@ class StatisticsAdminControllerTests {
     }
 
     @Test
+    void statistics_weeklyRequestWithBlankWeek_appliesResolvedDefaultWeek() throws Exception {
+        PeriodStatisticsView statistics = statistics(
+                LocalDate.of(2026, 8, 3),
+                LocalDate.of(2026, 8, 9)
+        );
+        when(periodStatisticsReadModelQueryService.getStatistics(any())).thenReturn(statistics);
+
+        mockMvc.perform(get("/admin/statistics")
+                        .param("periodType", "WEEKLY")
+                        .param("week", ""))
+                .andExpect(status().isOk())
+                .andExpect(model().attributeHasNoErrors("searchForm"))
+                .andExpect(model().attribute("searchForm", org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.hasProperty(
+                                "periodType",
+                                org.hamcrest.Matchers.is(StatisticsPeriodType.WEEKLY)
+                        ),
+                        org.hamcrest.Matchers.hasProperty(
+                                "week",
+                                org.hamcrest.Matchers.is("2026-W32")
+                        )
+                )));
+
+        verify(periodStatisticsReadModelQueryService).getStatistics(any());
+    }
+
+    @Test
     void statistics_monthlyRequest_bindsYearMonth() throws Exception {
         YearMonth yearMonth = YearMonth.of(2026, 7);
         PeriodStatisticsView statistics = statistics(

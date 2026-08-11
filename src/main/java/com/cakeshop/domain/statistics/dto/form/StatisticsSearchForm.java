@@ -34,6 +34,11 @@ public class StatisticsSearchForm {
     )
     private String week;
 
+    /** 빈 주 선택값은 기본 주간 조회로 처리한다. */
+    public void setWeek(String week) {
+        this.week = week == null || week.isBlank() ? null : week;
+    }
+
     /** 선택한 연·월의 1일부터 말일까지를 월간 조회한다. */
     @DateTimeFormat(pattern = "yyyy-MM")
     private YearMonth yearMonth;

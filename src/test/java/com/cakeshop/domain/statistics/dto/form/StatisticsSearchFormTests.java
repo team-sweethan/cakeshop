@@ -74,6 +74,16 @@ class StatisticsSearchFormTests {
     }
 
     @Test
+    void validate_weeklySearchWithBlankWeek_acceptsDefaultSearch() {
+        StatisticsSearchForm form = new StatisticsSearchForm();
+        form.setPeriodType(StatisticsPeriodType.WEEKLY);
+        form.setWeek("");
+
+        assertThat(form.getWeek()).isNull();
+        assertThat(validator.validate(form)).isEmpty();
+    }
+
+    @Test
     void validate_weeklySearchWithInvalidFormat_rejectsWeek() {
         StatisticsSearchForm form = new StatisticsSearchForm();
         form.setPeriodType(StatisticsPeriodType.WEEKLY);
