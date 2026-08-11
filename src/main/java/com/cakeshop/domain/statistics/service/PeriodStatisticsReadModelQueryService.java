@@ -1,14 +1,17 @@
 package com.cakeshop.domain.statistics.service;
 
+import com.cakeshop.domain.statistics.dto.form.StatisticsPeriodType;
+import com.cakeshop.domain.statistics.dto.form.StatisticsSearchForm;
 import com.cakeshop.domain.statistics.dto.view.DailyStatisticsRow;
-import com.cakeshop.domain.statistics.dto.view.DailyStatisticsView;
 import com.cakeshop.domain.statistics.dto.view.PeriodStatisticsView;
+import com.cakeshop.domain.statistics.dto.view.StatisticsTrendView;
 import com.cakeshop.domain.statistics.error.StatisticsErrorCode;
 import com.cakeshop.domain.statistics.mapper.PeriodStatisticsReadModelMapper;
 import com.cakeshop.global.error.BusinessException;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -19,20 +22,19 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class PeriodStatisticsReadModelQueryService {
 
-    private static final long DEFAULT_RANGE_DAYS = 7;
-    private static final long MAX_RANGE_DAYS = 366;
-
     private final PeriodStatisticsReadModelMapper mapper;
     private final Clock clock;
+    private final StatisticsPeriodResolver periodResolver;
+    private final MonthlyStatisticsTrendAggregator monthlyTrendAggregator;
 
-    /** 조회 기간의 확정 주문·매출 요약과 일별 추이를 조회한다. */
+    /** 조회 유형에 맞는 확정 주문·매출 요약과 기간별 추이를 조회한다. */
     @Transactional(readOnly = true)
-    public PeriodStatisticsView getStatistics(LocalDate startDate, LocalDate endDate) {
+    public PeriodStatisticsView getStatistics(StatisticsSearchForm form) {
         LocalDate latestSelectableDate = getLatestSelectableDate();
-        boolean defaultSearch = startDate == null && endDate == null;
-        if (!defaultSearch) {
-            validateRequestedRange(startDate, endDate, latestSelectableDate);
-        }
+        boolean defaultRangeSearch = isDefaultRangeSearch(form);
+        StatisticsDateRange range = defaultRangeSearch
+                ? null
+                : periodResolver.resolve(form, latestSelectableDate);
 
         LocalDate latestContinuousDate =
                 mapper.findLatestContinuousStatisticsDate(latestSelectableDate);
@@ -40,21 +42,22 @@ public class PeriodStatisticsReadModelQueryService {
             throw new BusinessException(StatisticsErrorCode.STATISTICS_NOT_READY);
         }
 
-        DateRange range = defaultSearch
-                ? resolveDefaultRange(latestContinuousDate)
-                : new DateRange(startDate, endDate);
+        if (defaultRangeSearch) {
+            range = periodResolver.resolve(form, latestContinuousDate);
+        }
         List<DailyStatisticsRow> rows = mapper.findDailyStatistics(
                 range.startDate(),
                 range.endDate()
         );
-        if (defaultSearch && !rows.isEmpty()) {
-            range = new DateRange(rows.getFirst().date(), range.endDate());
+        if (defaultRangeSearch && !rows.isEmpty()) {
+            range = new StatisticsDateRange(rows.getFirst().date(), range.endDate());
         }
         validateCompletedRange(rows, range);
 
         return createView(
                 range,
                 rows,
+                form.getPeriodType(),
                 latestContinuousDate.isBefore(latestSelectableDate)
         );
     }
@@ -64,30 +67,16 @@ public class PeriodStatisticsReadModelQueryService {
         return LocalDate.now(clock).minusDays(1);
     }
 
-    private DateRange resolveDefaultRange(LocalDate latestContinuousDate) {
-        return new DateRange(
-                latestContinuousDate.minusDays(DEFAULT_RANGE_DAYS - 1),
-                latestContinuousDate
-        );
-    }
-
-    private void validateRequestedRange(
-            LocalDate startDate,
-            LocalDate endDate,
-            LocalDate latestSelectableDate
-    ) {
-        if (startDate == null
-                || endDate == null
-                || startDate.isAfter(endDate)
-                || endDate.isAfter(latestSelectableDate)
-                || ChronoUnit.DAYS.between(startDate, endDate) >= MAX_RANGE_DAYS) {
-            throw new BusinessException(StatisticsErrorCode.INVALID_DATE_RANGE);
-        }
+    private boolean isDefaultRangeSearch(StatisticsSearchForm form) {
+        return form != null
+                && form.getPeriodType() == StatisticsPeriodType.RANGE
+                && form.getStartDate() == null
+                && form.getEndDate() == null;
     }
 
     private void validateCompletedRange(
             List<DailyStatisticsRow> rows,
-            DateRange range
+            StatisticsDateRange range
     ) {
         long expectedDays = ChronoUnit.DAYS.between(range.startDate(), range.endDate()) + 1;
         if (rows.size() != expectedDays) {
@@ -102,8 +91,9 @@ public class PeriodStatisticsReadModelQueryService {
     }
 
     private PeriodStatisticsView createView(
-            DateRange range,
+            StatisticsDateRange range,
             List<DailyStatisticsRow> rows,
+            StatisticsPeriodType periodType,
             boolean aggregationDelayed
     ) {
         long totalOrderCount = rows.stream()
@@ -118,13 +108,15 @@ public class PeriodStatisticsReadModelQueryService {
         BigDecimal totalSalesAmount = rows.stream()
                 .map(DailyStatisticsRow::totalSalesAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        List<DailyStatisticsView> dailyStatistics = rows.stream()
-                .map(row -> new DailyStatisticsView(
-                        row.date(),
-                        row.totalOrderCount(),
-                        row.totalSalesAmount()
-                ))
-                .toList();
+        List<StatisticsTrendView> trends = periodType == StatisticsPeriodType.MONTHLY
+                ? monthlyTrendAggregator.aggregate(rows, YearMonth.from(range.startDate()))
+                : rows.stream()
+                        .map(row -> StatisticsTrendView.daily(
+                                row.date(),
+                                row.totalOrderCount(),
+                                row.totalSalesAmount()
+                        ))
+                        .toList();
 
         return new PeriodStatisticsView(
                 range.startDate(),
@@ -133,11 +125,8 @@ public class PeriodStatisticsReadModelQueryService {
                 completedOrderCount,
                 canceledOrderCount,
                 totalSalesAmount,
-                dailyStatistics,
+                trends,
                 aggregationDelayed
         );
-    }
-
-    private record DateRange(LocalDate startDate, LocalDate endDate) {
     }
 }

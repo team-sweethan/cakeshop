@@ -5,9 +5,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.cakeshop.domain.statistics.dto.form.StatisticsPeriodType;
+import com.cakeshop.domain.statistics.dto.form.StatisticsSearchForm;
 import com.cakeshop.domain.statistics.dto.view.DailyStatisticsRow;
-import com.cakeshop.domain.statistics.dto.view.DailyStatisticsView;
 import com.cakeshop.domain.statistics.dto.view.PeriodStatisticsView;
+import com.cakeshop.domain.statistics.dto.view.StatisticsTrendView;
 import com.cakeshop.domain.statistics.error.StatisticsErrorCode;
 import com.cakeshop.domain.statistics.mapper.PeriodStatisticsReadModelMapper;
 import com.cakeshop.global.error.BusinessException;
@@ -15,6 +17,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -42,11 +45,11 @@ class PeriodStatisticsReadModelQueryServiceTests {
         when(mapper.findLatestContinuousStatisticsDate(YESTERDAY)).thenReturn(YESTERDAY);
         when(mapper.findDailyStatistics(startDate, YESTERDAY)).thenReturn(rows);
 
-        PeriodStatisticsView statistics = service().getStatistics(null, null);
+        PeriodStatisticsView statistics = service().getStatistics(form(null, null));
 
         assertThat(statistics.startDate()).isEqualTo(startDate);
         assertThat(statistics.endDate()).isEqualTo(YESTERDAY);
-        assertThat(statistics.dailyStatistics()).hasSize(7);
+        assertThat(statistics.trends()).hasSize(7);
         assertThat(statistics.aggregationDelayed()).isFalse();
     }
 
@@ -61,11 +64,11 @@ class PeriodStatisticsReadModelQueryServiceTests {
         when(mapper.findDailyStatistics(requestedStartDate, latestCompletedDate))
                 .thenReturn(rows);
 
-        PeriodStatisticsView statistics = service().getStatistics(null, null);
+        PeriodStatisticsView statistics = service().getStatistics(form(null, null));
 
         assertThat(statistics.startDate()).isEqualTo(completedStartDate);
         assertThat(statistics.endDate()).isEqualTo(latestCompletedDate);
-        assertThat(statistics.dailyStatistics()).hasSize(3);
+        assertThat(statistics.trends()).hasSize(3);
         assertThat(statistics.aggregationDelayed()).isTrue();
     }
 
@@ -79,16 +82,69 @@ class PeriodStatisticsReadModelQueryServiceTests {
         when(mapper.findLatestContinuousStatisticsDate(YESTERDAY)).thenReturn(YESTERDAY);
         when(mapper.findDailyStatistics(startDate, YESTERDAY)).thenReturn(rows);
 
-        PeriodStatisticsView statistics = service().getStatistics(startDate, YESTERDAY);
+        PeriodStatisticsView statistics = service().getStatistics(form(startDate, YESTERDAY));
 
         assertThat(statistics.totalOrderCount()).isEqualTo(5);
         assertThat(statistics.completedOrderCount()).isEqualTo(3);
         assertThat(statistics.canceledOrderCount()).isOne();
         assertThat(statistics.totalSalesAmount()).isEqualByComparingTo("70000");
-        assertThat(statistics.dailyStatistics()).containsExactly(
-                new DailyStatisticsView(startDate, 3, new BigDecimal("50000")),
-                new DailyStatisticsView(YESTERDAY, 2, new BigDecimal("20000"))
+        assertThat(statistics.trends()).containsExactly(
+                StatisticsTrendView.daily(startDate, 3, new BigDecimal("50000")),
+                StatisticsTrendView.daily(YESTERDAY, 2, new BigDecimal("20000"))
         );
+    }
+
+    @Test
+    void getStatistics_weeklyAcrossMonthBoundary_returnsSevenDailyTrends() {
+        LocalDate startDate = LocalDate.of(2026, 7, 27);
+        LocalDate endDate = LocalDate.of(2026, 8, 2);
+        StatisticsSearchForm form = new StatisticsSearchForm();
+        form.setPeriodType(StatisticsPeriodType.WEEKLY);
+        form.setWeek("2026-W31");
+        when(mapper.findLatestContinuousStatisticsDate(YESTERDAY)).thenReturn(YESTERDAY);
+        when(mapper.findDailyStatistics(startDate, endDate)).thenReturn(rows(startDate, endDate));
+
+        PeriodStatisticsView statistics = service().getStatistics(form);
+
+        assertThat(statistics.startDate()).isEqualTo(startDate);
+        assertThat(statistics.endDate()).isEqualTo(endDate);
+        assertThat(statistics.trends())
+                .extracting(StatisticsTrendView::axisLabel)
+                .containsExactly(
+                        "2026.07.27",
+                        "2026.07.28",
+                        "2026.07.29",
+                        "2026.07.30",
+                        "2026.07.31",
+                        "2026.08.01",
+                        "2026.08.02"
+                );
+    }
+
+    @Test
+    void getStatistics_monthly_returnsWeeklyTrends() {
+        YearMonth yearMonth = YearMonth.of(2026, 7);
+        LocalDate startDate = yearMonth.atDay(1);
+        LocalDate endDate = yearMonth.atEndOfMonth();
+        StatisticsSearchForm form = new StatisticsSearchForm();
+        form.setPeriodType(StatisticsPeriodType.MONTHLY);
+        form.setYearMonth(yearMonth);
+        when(mapper.findLatestContinuousStatisticsDate(YESTERDAY)).thenReturn(YESTERDAY);
+        when(mapper.findDailyStatistics(startDate, endDate)).thenReturn(rows(startDate, endDate));
+
+        PeriodStatisticsView statistics = service().getStatistics(form);
+
+        assertThat(statistics.startDate()).isEqualTo(startDate);
+        assertThat(statistics.endDate()).isEqualTo(endDate);
+        assertThat(statistics.trends())
+                .extracting(StatisticsTrendView::axisLabel)
+                .containsExactly(
+                        "1주차 (07.01~07.05)",
+                        "2주차 (07.06~07.12)",
+                        "3주차 (07.13~07.19)",
+                        "4주차 (07.20~07.26)",
+                        "5주차 (07.27~07.31)"
+                );
     }
 
     @Test
@@ -100,7 +156,7 @@ class PeriodStatisticsReadModelQueryServiceTests {
                 row(YESTERDAY)
         ));
 
-        assertThatThrownBy(() -> service().getStatistics(startDate, YESTERDAY))
+        assertThatThrownBy(() -> service().getStatistics(form(startDate, YESTERDAY)))
                 .isInstanceOfSatisfying(
                         BusinessException.class,
                         exception -> assertThat(exception.getErrorCode())
@@ -112,7 +168,7 @@ class PeriodStatisticsReadModelQueryServiceTests {
     void getStatistics_noCompletedStatistics_rejectsNotReady() {
         when(mapper.findLatestContinuousStatisticsDate(YESTERDAY)).thenReturn(null);
 
-        assertThatThrownBy(() -> service().getStatistics(null, null))
+        assertThatThrownBy(() -> service().getStatistics(form(null, null)))
                 .isInstanceOfSatisfying(
                         BusinessException.class,
                         exception -> assertThat(exception.getErrorCode())
@@ -124,7 +180,7 @@ class PeriodStatisticsReadModelQueryServiceTests {
     void getStatistics_endDateIsToday_rejectsRangeBeforeQuery() {
         LocalDate today = YESTERDAY.plusDays(1);
 
-        assertThatThrownBy(() -> service().getStatistics(YESTERDAY, today))
+        assertThatThrownBy(() -> service().getStatistics(form(YESTERDAY, today)))
                 .isInstanceOfSatisfying(
                         BusinessException.class,
                         exception -> assertThat(exception.getErrorCode())
@@ -140,7 +196,19 @@ class PeriodStatisticsReadModelQueryServiceTests {
     }
 
     private PeriodStatisticsReadModelQueryService service() {
-        return new PeriodStatisticsReadModelQueryService(mapper, CLOCK);
+        return new PeriodStatisticsReadModelQueryService(
+                mapper,
+                CLOCK,
+                new StatisticsPeriodResolver(),
+                new MonthlyStatisticsTrendAggregator()
+        );
+    }
+
+    private StatisticsSearchForm form(LocalDate startDate, LocalDate endDate) {
+        StatisticsSearchForm form = new StatisticsSearchForm();
+        form.setStartDate(startDate);
+        form.setEndDate(endDate);
+        return form;
     }
 
     private List<DailyStatisticsRow> rows(LocalDate startDate, LocalDate endDate) {

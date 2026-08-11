@@ -255,12 +255,42 @@ Flyway migration, 실제 전이는 Service와 테스트를 함께 바꿔 일치�
 - 다른 도메인의 Entity와 Mapper를 직접 참조하지 않는다.
 - 다른 도메인의 테이블을 직접 조회·변경하거나 JOIN하지 않는다.
 - 도메인 간 호출은 소유 도메인이 제공하는 공개 Service와 필요한 최소 DTO를 사용한다.
-- 연동 Service, Mapper, XML은 데이터를 소유한 도메인에 둔다.
+- 연동 Service, DTO, Mapper와 XML은 데이터를 소유한 도메인에 둔다.
 - 공개 메서드는 SQL 동작이 아니라 조회나 상태 변경 같은 업무 행위를 표현한다.
 - 조회 계약은 `QueryService`로 분리하고 `@Transactional(readOnly = true)`를 사용한다.
 - 다른 도메인의 데이터를 변경하는 계약은 `CommandService`로 의도를 드러낸다.
 - Entity, 비밀번호, 인증 정보와 불필요한 개인정보를 계약 DTO에 담지 않는다.
 - 필요한 계약만 만든다. 관리자·고객, Query·Command 조합을 예상만으로 미리 생성하지 않는다.
+
+### 연동 계약 작성 책임
+
+연동 계약은 해당 데이터를 필요로 하는 사용 도메인 담당자가 작성한다.
+
+- 사용 도메인 담당자는 실제 연동에 필요한 Service, 최소 DTO와 전용 Mapper·XML을 데이터 소유 도메인
+  아래에 새 파일로 추가한다.
+- 데이터 소유 담당자가 작성한 기존 Service·Mapper·Entity는 임의로 수정하지 않는다.
+- 기존 파일이나 공개 계약을 변경해야 하면 데이터 소유 담당자와 먼저 협의한다.
+- 작성한 연동 계약은 데이터 소유 담당자를 리뷰어로 지정해 데이터 접근 범위와 업무 규칙을 확인받는다.
+- 예상되는 연동을 미리 만들지 않고 현재 필요한 계약만 작성한다.
+
+연동 계약 이름은 `<데이터 소유 도메인><사용 도메인><역할>` 형식을 사용한다.
+
+- 데이터를 조회만 하는 계약은 `QueryService`로 작성하고 `@Transactional(readOnly = true)`를 사용한다.
+- 데이터를 등록·수정·삭제하거나 상태를 변경하는 계약은 `CommandService`로 작성한다.
+- Query와 Command가 모두 필요하면 각각 분리한다.
+- 전용 Mapper와 XML은 `<데이터 소유 도메인><사용 도메인>Mapper`로 이름을 맞춘다.
+
+예를 들어 Order가 Cart 데이터를 필요로 하면 주문 담당자가 `domain/cart` 아래에
+`CartOrderQueryService`, `CartOrderCommandService`와 필요한 전용 DTO·Mapper를 작성한다.
+
+- 계약 작성자: 주문 담당자
+- 데이터 소유 담당자 및 리뷰어: 장바구니 담당자
+
+Member가 Order 데이터를 필요로 하면 회원 담당자가 `domain/order` 아래에
+`OrderMemberQueryService`와 필요한 전용 DTO·Mapper를 작성한다.
+
+- 계약 작성자: 회원 담당자
+- 데이터 소유 담당자 및 리뷰어: 주문 담당자
 
 ### 연동 계약의 협업 기준
 
@@ -276,23 +306,22 @@ Flyway migration, 실제 전이는 Service와 테스트를 함께 바꿔 일치�
 - 여러 도메인을 JOIN하는 ReadModel은 최초 작성과 주요 변경 때 읽는 테이블 담당자의 확인을 받는다.
 - PR에서의 합의 기록과 리뷰어 지정 절차는 [pull-request.md](pull-request.md) 1절을 따른다.
 
-연동 전용 이름은 `<소유 도메인><사용 목적><역할>` 형식을 사용한다. 예를 들어 리뷰가 주문 정보를
-조회하는 주문 소유 계약은 `OrderReviewQueryService`, 그 Mapper는 `OrderReviewMapper`다.
-
 ### 집계 ReadModel 예외
 
-통계·대시보드처럼 여러 도메인의 데이터를 집계·요약하는 읽기 전용 기능은 ReadModel로 구현할 수
-있다. 관리자 화면이라는 이유만으로 이 예외를 적용하지 않는다.
+ReadModel은 관리자 대시보드(`/admin`), 관리자 통계(`/admin/statistics`)와 관리자 통계 데이터를 만드는
+집계 배치에서만 예외적으로 사용한다. 그 밖의 관리자 목록·검색, 고객 화면과 홈 화면에는 적용하지 않고
+일반 도메인 연동 계약을 사용한다.
 
 - 여러 도메인 테이블의 조회와 JOIN만 허용하며 쓰기 SQL을 두지 않는다.
 - 결과는 해당 조회 전용 DTO로 반환한다.
 - 권한, 상태 전이, 변경 가능 여부와 업무 규칙을 판단하지 않는다.
 - 결과를 원본 도메인의 데이터 변경 근거로 사용하지 않는다.
-- 단, 원본으로부터 재생성 가능한 통계 도메인의 파생 집계 데이터를 생성·교체하는 데에는 사용할 수 있다.
+- 원본으로부터 재생성 가능한 통계 도메인의 파생 집계 데이터를 생성·교체하는 조회 근거로 사용할 수 있다.
 - 파생 집계 데이터 쓰기는 별도의 통계 도메인 Mapper에서 수행하며, ReadModel Mapper에는 쓰기 SQL을
   두지 않는다.
-- 조회 기능을 소유한 도메인에 두고 `<Purpose>ReadModelQueryService`,
+- `statistics` 도메인에 두고 `<Purpose>ReadModelQueryService`,
   `<Purpose>ReadModelMapper`로 이름을 짓는다.
+- 최초 작성과 주요 변경 때 JOIN 대상 데이터의 소유 담당자를 리뷰어로 지정한다.
 - 조회 대상 테이블의 구조와 제외 조건을 실제 MariaDB 통합 테스트로 검증한다.
 
 ## 13. global과 화면 코드
