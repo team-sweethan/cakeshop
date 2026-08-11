@@ -5,6 +5,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
 public class HomeController {
@@ -18,15 +19,19 @@ public class HomeController {
     @GetMapping("/")
     public String home(
             @RequestParam(name = "logout", required = false) String logout,
-            Model model) {
+            Model model,
+            RedirectAttributes redirectAttributes) {
+        // 로그아웃 결과는 URL에 남기지 않고, 다음 홈 요청에서 한 번만 소비되는 Flash로 전달한다.
+        if (logout != null) {
+            redirectAttributes.addFlashAttribute("successMessage", "로그아웃되었습니다.");
+            return "redirect:/";
+        }
+
         model.addAttribute("store", homeService.getStore());
         model.addAttribute(
                 "recommendedProducts",
                 homeService.getRecommendedProducts()
         );
-        if (logout != null) {
-            model.addAttribute("successMessage", "로그아웃되었습니다.");
-        }
         return "home/main";
     }
 
