@@ -4,7 +4,9 @@ import com.cakeshop.global.error.ErrorCode;
 
 public enum ChatErrorCode implements ErrorCode {
 
-    ROOM_NOT_FOUND("CHAT_001", "채팅방을 찾을 수 없습니다.", 404);
+    ROOM_NOT_FOUND("CHAT_001", "채팅방을 찾을 수 없습니다.", 404),
+    INVALID_IMAGE_FILE("CHAT_002", "유효하지 않거나 지원하지 않는 이미지 파일 형식입니다.", 400),
+    IMAGE_TOO_LARGE("CHAT_003", "채팅 이미지 파일 크기는 5MB 이하이어야 합니다.", 400);
 
     private final String code;
     private final String message;

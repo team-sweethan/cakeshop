@@ -22,7 +22,8 @@ import com.cakeshop.domain.member.dto.view.MemberAdminDetailView;
 import com.cakeshop.domain.member.service.MemberAdminService;
 import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.order.service.OrderViewAssembler;
-import com.cakeshop.domain.product.service.ProductImageValidator;
+import com.cakeshop.domain.product.service.ProductQueryService;
+import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.error.CommonErrorCode;
 import com.cakeshop.global.infra.FileStorageClient;
@@ -52,7 +53,8 @@ public class ChatService {
     private final MemberAdminService memberAdminService;
     private final OrderViewAssembler orderViewAssembler;
     private final FileStorageClient fileStorageClient;
-    private final ProductImageValidator productImageValidator;
+    private final ChatImageValidator chatImageValidator;
+    private final ProductQueryService productQueryService;
 
     // ==========================================
     // 0. 검증 헬퍼 메서드
@@ -97,14 +99,22 @@ public class ChatService {
     public ChatMessage createMessage(Long roomId, Long senderId, boolean isAdmin, Long productId, 
         String content, List<ChatMessageAttachmentRequest> attachments) {
 
-            // 1. 텅 빈 메시지 저장 차단 (본문 및 첨부파일 둘 다 비어있으면 400 BusinessException 예외 처리)
+            // 1. 텅 빈 메시지 저장 차단 및 null 첨부 항목 거절
             boolean hasContent = content != null && !content.trim().isEmpty();
             boolean hasAttachments = attachments != null && !attachments.isEmpty();
             if (!hasContent && !hasAttachments) {
                 throw new BusinessException(CommonErrorCode.INVALID_INPUT);
             }
+            if (hasAttachments && attachments.stream().anyMatch(Objects::isNull)) {
+                throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+            }
 
-            // 2. 채팅방 존재 여부 및 실제 인증 권한(isAdmin) 검증
+            // 2. 문의 상품(productId) 존재 및 공개 상태 검증
+            if (productId != null && productId > 0) {
+                productQueryService.getSalesInfo(productId);
+            }
+
+            // 3. 채팅방 존재 여부 및 실제 인증 권한(isAdmin) 검증
             ChatRoom chatRoom = chatMapper.findChatRoomById(roomId);
             validateRoomAccess(chatRoom, senderId, isAdmin);
 
@@ -147,8 +157,8 @@ public class ChatService {
 
     // S3 저장소에 이미지 파일 직접 업로드 (프론트가 파일 객체 직접 보낼 때)
     public String uploadChatImageToS3(MultipartFile file) {
-        // 이미지 파일 확장자, MIME 타입, 파일 시그니처, 5MB 크기 검증
-        productImageValidator.validate(file);
+        // 채팅 전용 이미지 파일 검증기 사용 (확장자, MIME 타입, 파일 시그니처, 5MB 크기 검증)
+        chatImageValidator.validate(file);
         return fileStorageClient.store(file, "chat");
     }
 
@@ -253,13 +263,15 @@ public class ChatService {
     // ==========================================
     
     // 채팅 목록 조회
-    // 관리자 좌측 배너 채팅방 목록 조회 (탭 필터링 + 페이징)
+    // 관리자 좌측 배너 채팅방 목록 조회 (탭 필터링 + PageRequest 정규화 페이징)
     @Transactional(readOnly = true)
     public List<ChatRoomListResponse> getAdminChatRooms(ChatResponseStatus responseStatus, int page, int size) {
-        int offset = Math.max(0, (page - 1) * size);
+        PageRequest pageRequest = new PageRequest(page, size);
+        int offset = pageRequest.getOffset();
+        int safeSize = pageRequest.getSize();
         
         // 1. DB에서 채팅방 목록 가져오기
-        List<ChatRoom> rooms = chatMapper.adminChatRoomList(responseStatus, offset, size);
+        List<ChatRoom> rooms = chatMapper.adminChatRoomList(responseStatus, offset, safeSize);
         if (rooms == null || rooms.isEmpty()) {
             return Collections.emptyList();
         }
@@ -370,13 +382,15 @@ public class ChatService {
                 .build();
     }
 
-    // 대화 내역 조회
+    // 대화 내역 조회 (PageRequest 정규화 페이징 적용)
     @Transactional(readOnly = true)
     public List<ChatMessageResponse> getChatMessages(Long chatRoomId, Long currentUserId, boolean isAdmin, int page, int size) {
         ChatRoom chatRoom = chatMapper.findChatRoomById(chatRoomId);
         validateRoomAccess(chatRoom, currentUserId, isAdmin);
 
-        int offset = Math.max(0, (page - 1) * size);
+        PageRequest pageRequest = new PageRequest(page, size);
+        int offset = pageRequest.getOffset();
+        int safeSize = pageRequest.getSize();
 
         // 상대방의 읽음 커서 조회
         ChatReaderSide opponentSide = isAdmin ? ChatReaderSide.CUSTOMER : ChatReaderSide.ADMIN;
@@ -386,7 +400,7 @@ public class ChatService {
                 : 0L;
         
         // 메시지 목록 조회
-        List<ChatMessage> messages = chatMapper.findMessageByChatRoomId(chatRoomId, offset, size);
+        List<ChatMessage> messages = chatMapper.findMessageByChatRoomId(chatRoomId, offset, safeSize);
         if (messages == null || messages.isEmpty()) {
             return Collections.emptyList();
         }

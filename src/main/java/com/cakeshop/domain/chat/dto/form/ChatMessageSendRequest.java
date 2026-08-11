@@ -21,6 +21,6 @@ public class ChatMessageSendRequest {
     private String content; // 보내는 메시지 내용
     private Long productId; // 문의 대상 상품 id (선택)
 
-    @Valid // 👈 첨부파일 목록 내부 객체들에 검증 규칙을 전달하기 위해 추가!
-    private List<ChatMessageAttachmentRequest> attachments; // 첨부 정보 목록 (선택)
+    @Valid
+    private List<@NotNull @Valid ChatMessageAttachmentRequest> attachments; // 첨부 정보 목록 (선택)
 }
