@@ -112,10 +112,13 @@ public class ChatService {
     public ChatMessage createMessage(Long roomId, Long senderId, boolean isAdmin, Long productId, 
         String content, List<ChatMessageAttachmentRequest> attachments) {
 
-            // 1. 텅 빈 메시지 저장 차단 및 첨부파일 최대 5개 상한선 제한
+            // 1. 텅 빈 메시지 저장 차단, 2,000자 상한선 및 첨부파일 최대 5개 상한선 제한
             boolean hasContent = content != null && !content.trim().isEmpty();
             boolean hasAttachments = attachments != null && !attachments.isEmpty();
             if (!hasContent && !hasAttachments) {
+                throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+            }
+            if (hasContent && content.length() > 2000) {
                 throw new BusinessException(CommonErrorCode.INVALID_INPUT);
             }
             if (hasAttachments) {
@@ -123,6 +126,14 @@ public class ChatService {
                     throw new BusinessException(CommonErrorCode.INVALID_INPUT);
                 }
                 if (attachments.stream().anyMatch(Objects::isNull)) {
+                    throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+                }
+                // 중복 S3 객체 키(objectKey) 거절
+                Set<String> uniqueKeys = attachments.stream()
+                        .map(ChatMessageAttachmentRequest::getObjectKey)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toSet());
+                if (uniqueKeys.size() != attachments.size()) {
                     throw new BusinessException(CommonErrorCode.INVALID_INPUT);
                 }
             }
@@ -162,7 +173,11 @@ public class ChatService {
                         .createdAt(LocalDateTime.now())
                         .build();
                         
-                    chatMapper.insertChatMessageAttachment(attachment); // 첨부파일 매퍼 호출!
+                    try {
+                        chatMapper.insertChatMessageAttachment(attachment); // 첨부파일 매퍼 호출!
+                    } catch (org.springframework.dao.DataIntegrityViolationException e) {
+                        throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+                    }
                 }
             }
 
@@ -373,6 +388,10 @@ public class ChatService {
     // 관리자 특이사항 메모 저장/수정
     @Transactional
     public void saveCustomerAdminNote(Long customerId, CustomerAdminNoteRequest request, Long adminId) {
+        if (customerId == null || customerId <= 0 || !memberChatQueryService.existsCustomer(customerId)) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+
         CustomerAdminNote note = CustomerAdminNote.builder()
                 .customerId(customerId)
                 .content(request.getContent())

@@ -19,6 +19,7 @@ public class ChatMessageSendRequest {
     @NotNull(message = "채팅방 ID는 필수입니다.")
     private Long chatRoomId; // 채팅방 id
 
+    @Size(max = 2000, message = "메시지 내용은 2,000자 이하여야 합니다.")
     private String content; // 보내는 메시지 내용
     private Long productId; // 문의 대상 상품 id (선택)
 
