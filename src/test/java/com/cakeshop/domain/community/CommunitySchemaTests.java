@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.cakeshop.domain.community.entity.CommentStatus;
+import com.cakeshop.domain.community.entity.NoticeStatus;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.entity.ReportStatus;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
@@ -116,6 +117,54 @@ class CommunitySchemaTests {
     }
 
     @Test
+    void communityNotices_undefinedStatus_isRejectedByCheckConstraint() {
+        Long memberId = insertMember("notice-status@cakeshop.local");
+
+        assertThatThrownBy(() -> insertNotice(memberId, "BLOCKED", null, null))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void communityNotices_definedStatuses_areAccepted() {
+        Long memberId = insertMember("notice-allowed@cakeshop.local");
+
+        for (NoticeStatus status : NoticeStatus.values()) {
+            insertNotice(memberId, status.name(), null, null);
+        }
+
+        Integer inserted = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM community_notices WHERE created_by = ?",
+                Integer.class, memberId);
+        assertThat(inserted).isEqualTo(NoticeStatus.values().length);
+    }
+
+    @Test
+    void communityNotices_invertedPeriod_isRejectedByCheckConstraint() {
+        Long memberId = insertMember("notice-period@cakeshop.local");
+
+        assertThatThrownBy(() -> insertNotice(
+                memberId, NoticeStatus.PUBLISHED.name(), CREATED_AT.plusDays(1), CREATED_AT))
+                .isInstanceOf(DataIntegrityViolationException.class);
+
+        assertThatThrownBy(() -> insertNotice(
+                memberId, NoticeStatus.PUBLISHED.name(), CREATED_AT, CREATED_AT))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void communityNotices_openPeriod_isAccepted() {
+        Long memberId = insertMember("notice-open-period@cakeshop.local");
+
+        insertNotice(memberId, NoticeStatus.PUBLISHED.name(), CREATED_AT, null);
+        insertNotice(memberId, NoticeStatus.PUBLISHED.name(), null, CREATED_AT);
+
+        Integer inserted = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM community_notices WHERE created_by = ?",
+                Integer.class, memberId);
+        assertThat(inserted).isEqualTo(2);
+    }
+
+    @Test
     void communityIndexes_haveRequiredColumnPrefixes() {
         assertIndexPrefix("posts", null, "status,view_count,id");
         assertIndexPrefix("comments", null, "created_at,post_id");
@@ -195,6 +244,21 @@ class CommunitySchemaTests {
                 VALUES (?, ?, ?, ?)
                 """,
                 postId, reporterId, "신고 사유", status);
+
+        return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+    }
+
+    private Long insertNotice(
+            Long memberId, String status, LocalDateTime startsAt, LocalDateTime endsAt) {
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO community_notices (
+                    title, content, status, starts_at, ends_at, created_by
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                "공지 제목", "공지 본문", status, startsAt, endsAt, memberId);
 
         return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
     }

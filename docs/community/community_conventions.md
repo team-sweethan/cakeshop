@@ -49,10 +49,14 @@ Validation에 사용하지 않으며 불변 `record`를 기본으로 한다. Ent
 
 | 역할 | 타입 |
 |---|---|
-| Form | `BlockForm`, `CommentForm`, `PostForm`, `ReportForm` |
-| Command | `PostUpdateCommand` |
-| Query | `PostListRow`, `PostDetailRow`, `CommentRow`, `CommentCountRow`, `PostLockRow`, 관리자 `*Row` |
-| View | `PostListView`, `PostDetailView`, `CommentView`, `CommentSectionView`, 관리자 `*View`, 인기글 View |
+| Form | `BlockForm`, `CommentForm`, `PostForm`, `ReportForm`, `NoticeForm` |
+| Command | `PostUpdateCommand`, `NoticeUpdateCommand` |
+| Query | `PostListRow`, `PostDetailRow`, `CommentRow`, `CommentCountRow`, `PostLockRow`, `NoticeLockRow`, 관리자 `*Row`(공지 포함) |
+| View | `PostListView`, `PostDetailView`, `CommentView`, `CommentSectionView`, 관리자 `*View`(공지 포함), 인기글 View |
+
+`NoticeDisplayStatus`는 저장된 값이 아니라 **저장 상태와 노출 기간에서 파생된 판정**이라 `entity`가
+아니라 `dto/view`에 둔다. 판정 규칙은 enum이 갖고 Service가 `Clock`으로 만든 시각을 넘겨 부른다 —
+화면이 계산하면 같은 규칙이 템플릿마다 한 벌씩 생긴다.
 
 `PostSort`와 `AdminPostSort`는 요청 허용값이면서 화면 선택 목록이고 SQL 분기값이기도 하다. 사용자 입력을
 그대로 SQL에 연결하지 않는 제한된 enum이라는 성격을 유지하며 `dto/view`에서 라벨과 파라미터를 제공한다.

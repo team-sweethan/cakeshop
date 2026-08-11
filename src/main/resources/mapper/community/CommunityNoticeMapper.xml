@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+******************************
+작성자 : HyunGyu-Cho
+담당자 : 현규
+작성일 : 2026-08-12
+기능 : 커뮤니티 데이터 접근
+설명 : CommunityNoticeMapper 기능에 필요한 조회와 변경을 수행한다.
+******************************
+
+관리자 조회는 노출 조건을 걸지 않는다 — 모든 상태, 모든 기간이 나온다. 조각 14b 가 더할 고객
+조회와 한 파일에 두기로 했고, 그때 노출 조각을 <sql> 하나로 공유하기 위해서다
+(specs/community-notice.md E4). 그래서 이름을 selectAdmin* 으로 미리 떼어 둔다.
+-->
+<mapper namespace="com.cakeshop.domain.community.mapper.CommunityNoticeMapper">
+
+    <select id="selectAdminNotices"
+            resultType="com.cakeshop.domain.community.dto.query.AdminNoticeListRow">
+
+        SELECT
+        n.id,
+        n.title,
+        n.status,
+        n.starts_at,
+        n.ends_at,
+        n.created_at
+
+        FROM community_notices n
+
+        ORDER BY n.created_at DESC, n.id DESC
+
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="countAdminNotices" resultType="long">
+
+        SELECT COUNT(*)
+        FROM community_notices n
+    </select>
+
+    <select id="selectAdminNoticeById"
+            resultType="com.cakeshop.domain.community.dto.query.AdminNoticeDetailRow">
+
+        SELECT
+        n.id,
+        n.title,
+        n.content,
+        n.status,
+        n.starts_at,
+        n.ends_at,
+        n.created_at,
+        n.updated_at
+
+        FROM community_notices n
+
+        WHERE n.id = #{noticeId}
+    </select>
+
+    <select id="lockNotice"
+            resultType="com.cakeshop.domain.community.dto.query.NoticeLockRow">
+
+        SELECT
+        n.id,
+        n.status
+
+        FROM community_notices n
+
+        WHERE n.id = #{noticeId}
+
+        FOR UPDATE
+    </select>
+
+    <insert id="insertNotice" useGeneratedKeys="true" keyProperty="id">
+
+        INSERT INTO community_notices (
+        title,
+        content,
+        status,
+        starts_at,
+        ends_at,
+        created_by
+        ) VALUES (
+        #{title},
+        #{content},
+        'PUBLISHED',
+        #{startsAt},
+        #{endsAt},
+        #{createdBy}
+        )
+    </insert>
+
+    <update id="updateNotice">
+
+        UPDATE community_notices n
+        SET n.title = #{title},
+        n.content = #{content},
+        n.starts_at = #{startsAt},
+        n.ends_at = #{endsAt}
+        WHERE n.id = #{noticeId}
+        AND n.status = 'PUBLISHED'
+    </update>
+
+    <update id="deleteNotice">
+
+        UPDATE community_notices n
+        SET n.status = 'DELETED'
+        WHERE n.id = #{noticeId}
+        AND n.status = 'PUBLISHED'
+    </update>
+</mapper>

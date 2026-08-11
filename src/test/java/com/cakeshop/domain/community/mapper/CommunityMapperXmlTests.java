@@ -27,7 +27,9 @@ class CommunityMapperXmlTests {
 
     private static final Map<String, Class<?>> MAPPERS = Map.of(
             "mapper/community/CommunityMapper.xml", CommunityMapper.class,
-            "mapper/community/CommunityAdminMapper.xml", CommunityAdminMapper.class);
+            "mapper/community/CommunityAdminMapper.xml", CommunityAdminMapper.class,
+            "mapper/community/CommunityNoticeMapper.xml", CommunityNoticeMapper.class);
+
 
     private Configuration configuration;
 
@@ -147,6 +149,28 @@ class CommunityMapperXmlTests {
                 .contains("ORDER BY POPULARITY_SCORE DESC, E.POST_ID DESC LIMIT ?");
     }
 
+    @Test
+    void adminNoticeQueries_showEveryStatusAndPeriod() {
+        for (String statement
+                : new String[]{"selectAdminNotices", "countAdminNotices", "selectAdminNoticeById"}) {
+            assertThat(normalizedSql(statement))
+                    .as(statement)
+                    .doesNotContain("N.STARTS_AT IS NULL", "N.STATUS = 'PUBLISHED'");
+        }
+    }
+
+    @Test
+    void adminNotices_orderByRegisteredAtWithIdTiebreaker() {
+        assertThat(normalizedSql("selectAdminNotices"))
+                .contains("ORDER BY N.CREATED_AT DESC, N.ID DESC");
+    }
+
+    @Test
+    void noticeWrites_conditionOnCurrentStatus() {
+        assertThat(normalizedSql("updateNotice")).contains("N.STATUS = 'PUBLISHED'");
+        assertThat(normalizedSql("deleteNotice")).contains("N.STATUS = 'PUBLISHED'");
+    }
+
     private int countOccurrences(String text, String target) {
         return (text.length() - text.replace(target, "").length()) / target.length();
     }
@@ -172,6 +196,12 @@ class CommunityMapperXmlTests {
         parameters.put("sort", null);
         parameters.put("rankingDate", LocalDate.of(2026, 8, 4));
         parameters.put("postCount", 20);
+        parameters.put("noticeId", 1L);
+        parameters.put("title", "제목");
+        parameters.put("content", "본문");
+        parameters.put("startsAt", null);
+        parameters.put("endsAt", null);
+        parameters.put("createdBy", 1L);
         parameters.putAll(overrides);
 
         return statementOf(statementId).getBoundSql(parameters).getSql()
