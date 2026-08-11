@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import com.cakeshop.domain.statistics.dto.form.StatisticsPeriodType;
 import com.cakeshop.domain.statistics.dto.form.StatisticsSearchForm;
 import com.cakeshop.domain.statistics.dto.view.DailyStatisticsView;
 import com.cakeshop.domain.statistics.dto.view.PeriodStatisticsView;
@@ -19,6 +20,7 @@ import com.cakeshop.domain.statistics.service.PeriodStatisticsReadModelQueryServ
 import com.cakeshop.global.error.BusinessException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -111,6 +113,68 @@ class StatisticsAdminControllerTests {
                 )));
 
         verify(periodStatisticsReadModelQueryService).getStatistics(null, null);
+    }
+
+    @Test
+    void statistics_weeklyRequest_bindsReferenceDate() throws Exception {
+        LocalDate weekReferenceDate = LocalDate.of(2026, 7, 30);
+        PeriodStatisticsView statistics = statistics(
+                LocalDate.of(2026, 7, 27),
+                LocalDate.of(2026, 8, 2)
+        );
+        when(periodStatisticsReadModelQueryService.getStatistics(null, null)).thenReturn(statistics);
+
+        mockMvc.perform(get("/admin/statistics")
+                        .param("periodType", "WEEKLY")
+                        .param("weekReferenceDate", weekReferenceDate.toString()))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("searchForm", org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.hasProperty(
+                                "periodType",
+                                org.hamcrest.Matchers.is(StatisticsPeriodType.WEEKLY)
+                        ),
+                        org.hamcrest.Matchers.hasProperty(
+                                "weekReferenceDate",
+                                org.hamcrest.Matchers.is(weekReferenceDate)
+                        )
+                )));
+    }
+
+    @Test
+    void statistics_monthlyRequest_bindsYearMonth() throws Exception {
+        YearMonth yearMonth = YearMonth.of(2026, 7);
+        PeriodStatisticsView statistics = statistics(
+                yearMonth.atDay(1),
+                yearMonth.atEndOfMonth()
+        );
+        when(periodStatisticsReadModelQueryService.getStatistics(null, null)).thenReturn(statistics);
+
+        mockMvc.perform(get("/admin/statistics")
+                        .param("periodType", "MONTHLY")
+                        .param("yearMonth", yearMonth.toString()))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("searchForm", org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.hasProperty(
+                                "periodType",
+                                org.hamcrest.Matchers.is(StatisticsPeriodType.MONTHLY)
+                        ),
+                        org.hamcrest.Matchers.hasProperty(
+                                "yearMonth",
+                                org.hamcrest.Matchers.is(yearMonth)
+                        )
+                )));
+    }
+
+    @Test
+    void statistics_unknownPeriodType_doesNotQueryStatistics() throws Exception {
+        mockMvc.perform(get("/admin/statistics")
+                        .param("periodType", "UNKNOWN"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("admin/statistics"))
+                .andExpect(model().attributeHasFieldErrors("searchForm", "periodType"))
+                .andExpect(model().attributeDoesNotExist("statistics"));
+
+        verifyNoInteractions(periodStatisticsReadModelQueryService);
     }
 
     @Test
