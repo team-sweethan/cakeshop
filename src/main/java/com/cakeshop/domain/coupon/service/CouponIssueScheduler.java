@@ -18,8 +18,6 @@ public class CouponIssueScheduler {
     }
 
     /** 생일 쿠폰 발급을 매시 정각에 실행한다. */
-//    @Scheduled(cron = "0 0 * * * *", zone = "Asia/Seoul")
-    // 5분마다 테스트하기 위함.
     @Scheduled(cron = "0 0 * * * *", zone = "Asia/Seoul")
     public void issueCoupons() {
         couponIssueService.issueBirthdayCoupons();

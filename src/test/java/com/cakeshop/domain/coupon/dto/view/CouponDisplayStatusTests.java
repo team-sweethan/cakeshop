@@ -12,21 +12,43 @@ import com.cakeshop.domain.coupon.entity.CouponStatus;
 class CouponDisplayStatusTests {
 
     @Test
-    void fromExpiredCouponReturnsEndedBeforeAdministrativeStatus() {
-        Coupon coupon = coupon(CouponStatus.INACTIVE, 10, 0,
-                LocalDateTime.now().minusSeconds(1), LocalDateTime.now().minusDays(1));
+    void fromExpiredCompletedCoupon_returnsEnded() {
+        LocalDateTime now = LocalDateTime.now();
+        Coupon coupon = coupon(CouponStatus.ACTIVE, 10, 10,
+                now.minusSeconds(1), now.minusDays(1));
 
-        assertThat(CouponDisplayStatus.from(coupon, LocalDateTime.now()))
+        assertThat(CouponDisplayStatus.from(coupon, now))
                 .isEqualTo(CouponDisplayStatus.ENDED);
     }
 
     @Test
-    void fromExhaustedCouponReturnsExhaustedBeforeAdministrativeStatus() {
-        Coupon coupon = coupon(CouponStatus.INACTIVE, 10, 10,
-                LocalDateTime.now().plusDays(1), LocalDateTime.now().minusDays(1));
+    void fromScheduledCompletedCoupon_returnsScheduled() {
+        LocalDateTime now = LocalDateTime.now();
+        Coupon coupon = coupon(CouponStatus.ACTIVE, 10, 10,
+                now.plusDays(1), now.plusHours(1));
 
-        assertThat(CouponDisplayStatus.from(coupon, LocalDateTime.now()))
+        assertThat(CouponDisplayStatus.from(coupon, now))
+                .isEqualTo(CouponDisplayStatus.SCHEDULED);
+    }
+
+    @Test
+    void fromActiveCompletedCoupon_returnsExhausted() {
+        LocalDateTime now = LocalDateTime.now();
+        Coupon coupon = coupon(CouponStatus.ACTIVE, 10, 10,
+                now.plusDays(1), now.minusDays(1));
+
+        assertThat(CouponDisplayStatus.from(coupon, now))
                 .isEqualTo(CouponDisplayStatus.EXHAUSTED);
+    }
+
+    @Test
+    void fromInactiveCompletedCoupon_returnsInactive() {
+        LocalDateTime now = LocalDateTime.now();
+        Coupon coupon = coupon(CouponStatus.INACTIVE, 10, 10,
+                now.plusDays(1), now.minusDays(1));
+
+        assertThat(CouponDisplayStatus.from(coupon, now))
+                .isEqualTo(CouponDisplayStatus.INACTIVE);
     }
 
     @Test

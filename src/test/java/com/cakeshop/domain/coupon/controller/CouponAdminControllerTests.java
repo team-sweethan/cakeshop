@@ -85,6 +85,10 @@ class CouponAdminControllerTests {
         mockMvc.perform(get("/admin/coupons")
                         .param("keyword", " 여름 ")
                         .param("status", "ACTIVE")
+                        .param("discountTypeFilter", "PERCENTAGE")
+                        .param("targetTypeFilter", "SPECIFIC_MEMBERS")
+                        .param("periodStart", "2026-08-01T00:00")
+                        .param("periodEnd", "2026-08-31T23:59")
                         .param("page", "2"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("admin/coupon/list"))
@@ -110,6 +114,10 @@ class CouponAdminControllerTests {
 
         assertThat(capturedCondition.getKeyword()).isEqualTo(" 여름 ");
         assertThat(capturedCondition.getStatus()).isEqualTo(CouponDisplayStatus.ACTIVE);
+        assertThat(capturedCondition.getDiscountTypeFilter()).isEqualTo(DiscountType.PERCENTAGE);
+        assertThat(capturedCondition.getTargetTypeFilter()).isEqualTo(CouponTargetType.SPECIFIC_MEMBERS);
+        assertThat(capturedCondition.getPeriodStart()).isEqualTo(LocalDateTime.of(2026, 8, 1, 0, 0));
+        assertThat(capturedCondition.getPeriodEnd()).isEqualTo(LocalDateTime.of(2026, 8, 31, 23, 59));
         assertThat(capturedPageRequest.getPage()).isEqualTo(2);
         assertThat(capturedPageRequest.getSize()).isEqualTo(PageRequest.DEFAULT_SIZE);
         assertThat(capturedPageRequest.getOffset()).isEqualTo((2 - 1) * PageRequest.DEFAULT_SIZE);
