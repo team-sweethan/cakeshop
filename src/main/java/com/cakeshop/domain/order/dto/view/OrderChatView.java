@@ -20,6 +20,7 @@ public record OrderChatView(
         String status,
         BigDecimal finalAmount,
         LocalDateTime pickupAt,
+        LocalDateTime orderCreatedAt,
         String representativeProductName
 ) {
 }

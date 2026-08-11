@@ -221,7 +221,7 @@ public class ChatService {
                     .orderStatus(order != null && order.status() != null ? order.status() : "UNKNOWN")
                     .pickupDateTime(order != null ? order.pickupAt() : null)
                     .conversationAnchorMessageId(ro.getConversationAnchorMessageId())
-                    .createdAt(ro.getCreatedAt())
+                    .createdAt(order != null && order.orderCreatedAt() != null ? order.orderCreatedAt() : ro.getCreatedAt())
                     .build();
         }).collect(Collectors.toList());
     }
