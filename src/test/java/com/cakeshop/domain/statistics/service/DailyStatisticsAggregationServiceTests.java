@@ -4,9 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
+import com.cakeshop.domain.statistics.dto.view.DailyProductStatisticsSourceView;
 import com.cakeshop.domain.statistics.entity.StatisticsBatchRun;
 import com.cakeshop.domain.statistics.mapper.DailyStatisticsAggregationMapper;
 import com.cakeshop.domain.statistics.mapper.DailyStatisticsSourceReadModelMapper;
@@ -15,6 +17,7 @@ import com.cakeshop.global.config.MariaDbIntegrationTest;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 @MybatisTest
 @Import({
         DailyStatisticsAggregationService.class,
+        DailyProductStatisticsSourceReadModelQueryService.class,
         StatisticsAggregationTransactionService.class
 })
 @MariaDbIntegrationTest
@@ -46,6 +50,9 @@ class DailyStatisticsAggregationServiceTests {
 
     @MockitoSpyBean
     private DailyStatisticsSourceReadModelMapper sourceReadModelMapper;
+
+    @MockitoSpyBean
+    private DailyProductStatisticsSourceReadModelQueryService productSourceQueryService;
 
     @Autowired
     DailyStatisticsAggregationServiceTests(
@@ -87,6 +94,7 @@ class DailyStatisticsAggregationServiceTests {
         assertThat(findDailyStatistics(yesterday)).isEqualTo(
                 new DailyStatisticsRow(0, 0, 0, BigDecimal.ZERO)
         );
+        assertThat(findProductAggregatedAt(yesterday)).isNotNull();
         BatchRunRow dailyRun = findLatestDailyRun();
         assertThat(dailyRun.status()).isEqualTo("SUCCEEDED");
         assertThat(dailyRun.sourceWindowStartedAt()).isEqualTo(backfillStartedAt);
@@ -222,6 +230,43 @@ class DailyStatisticsAggregationServiceTests {
         assertThat(countBatchRunsByStatus("RUNNING")).isZero();
     }
 
+    @Test
+    void aggregateDailyStatistics_productInsertFails_preservesBothExistingResults() {
+        LocalDate yesterday = findYesterday();
+        insertSuccessfulBackfill(yesterday);
+        insertDailyStatistics(yesterday);
+        LocalDateTime previousProductAggregatedAt = LocalDateTime.of(2026, 8, 1, 0, 10);
+        jdbcTemplate.update(
+                "UPDATE daily_statistics SET product_aggregated_at = ? WHERE statistics_date = ?",
+                previousProductAggregatedAt,
+                yesterday
+        );
+        insertDailyProductStatistics(yesterday, 1L, "기존 상품", 99L);
+        doReturn(List.of(new DailyProductStatisticsSourceView(
+                2L,
+                "새 상품",
+                1,
+                1,
+                new BigDecimal("10000")
+        ))).when(productSourceQueryService).getDailyProductStatistics(any(), any());
+        doThrow(new IllegalStateException("상품 집계 실패 테스트"))
+                .when(aggregationMapper)
+                .insertDailyProductStatistics(any(), any());
+
+        assertThatThrownBy(service::aggregateDailyStatistics)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("상품 집계 실패 테스트");
+
+        assertThat(findDailyStatistics(yesterday)).isEqualTo(
+                new DailyStatisticsRow(99, 88, 7, new BigDecimal("123456"))
+        );
+        assertThat(findProductStatistics(yesterday)).containsExactly(
+                new ProductStatisticsRow(1L, "기존 상품", 99L)
+        );
+        assertThat(findProductAggregatedAt(yesterday)).isEqualTo(previousProductAggregatedAt);
+        assertThat(findLatestDailyRun().status()).isEqualTo("FAILED");
+    }
+
     private LocalDate findYesterday() {
         return batchRunMapper.findCurrentDateTime().toLocalDate().minusDays(1);
     }
@@ -276,6 +321,56 @@ class DailyStatisticsAggregationServiceTests {
         );
     }
 
+    private void insertDailyProductStatistics(
+            LocalDate statisticsDate,
+            long productId,
+            String productName,
+            long orderCount
+    ) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO daily_product_statistics (
+                    statistics_date,
+                    product_id,
+                    product_name,
+                    order_count,
+                    sales_quantity,
+                    sales_amount
+                )
+                VALUES (?, ?, ?, ?, 0, 0)
+                """,
+                statisticsDate,
+                productId,
+                productName,
+                orderCount
+        );
+    }
+
+    private List<ProductStatisticsRow> findProductStatistics(LocalDate statisticsDate) {
+        return jdbcTemplate.query(
+                """
+                SELECT product_id, product_name, order_count
+                FROM daily_product_statistics
+                WHERE statistics_date = ?
+                ORDER BY product_id
+                """,
+                (resultSet, rowNum) -> new ProductStatisticsRow(
+                        resultSet.getLong("product_id"),
+                        resultSet.getString("product_name"),
+                        resultSet.getLong("order_count")
+                ),
+                statisticsDate
+        );
+    }
+
+    private LocalDateTime findProductAggregatedAt(LocalDate statisticsDate) {
+        return jdbcTemplate.queryForObject(
+                "SELECT product_aggregated_at FROM daily_statistics WHERE statistics_date = ?",
+                LocalDateTime.class,
+                statisticsDate
+        );
+    }
+
     private BatchRunRow findLatestDailyRun() {
         return jdbcTemplate.queryForObject(
                 """
@@ -317,6 +412,7 @@ class DailyStatisticsAggregationServiceTests {
     }
 
     private void deleteAggregationData() {
+        jdbcTemplate.update("DELETE FROM daily_product_statistics");
         jdbcTemplate.update("DELETE FROM daily_statistics");
         jdbcTemplate.update("DELETE FROM statistics_batch_runs");
     }
@@ -327,6 +423,9 @@ class DailyStatisticsAggregationServiceTests {
             long canceledOrderCount,
             BigDecimal totalSalesAmount
     ) {
+    }
+
+    private record ProductStatisticsRow(long productId, String productName, long orderCount) {
     }
 
     private record BatchRunRow(
