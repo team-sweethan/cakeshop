@@ -111,7 +111,7 @@ public class SecurityConfig {
                 }
 
                 // ② 관리자. 모든 관리자 화면은 관리자 로그인을 요구한다.
-                auth.requestMatchers("/admin/**").hasRole("ADMIN");
+                auth.requestMatchers("/admin", "/admin/**").hasRole("ADMIN");
                 // ③ 나머지 회원 전용 기능은 일반 회원만 사용한다.
                 auth.anyRequest().hasRole("USER");
             })
