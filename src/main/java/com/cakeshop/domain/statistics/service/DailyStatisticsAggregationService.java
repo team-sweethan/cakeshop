@@ -33,6 +33,15 @@ public class DailyStatisticsAggregationService {
 
     /** 전날과 원본 변경이 발견된 과거 날짜의 확정 통계를 집계한다. */
     public boolean aggregateDailyStatistics() {
+        return aggregateDailyStatistics(false);
+    }
+
+    /** 시작 시 실행 잠금 획득 후에도 누락 날짜가 있을 때만 확정 통계를 집계한다. */
+    public boolean catchUpMissingDailyStatistics() {
+        return aggregateDailyStatistics(true);
+    }
+
+    private boolean aggregateDailyStatistics(boolean catchupOnly) {
         LocalDateTime sourceWindowEndedAt = batchRunMapper.findCurrentDateTime();
         LocalDate latestStatisticsDate = sourceWindowEndedAt.toLocalDate().minusDays(1);
         LocalDateTime sourceWindowStartedAt = findSourceWindowStartedAt();
@@ -58,11 +67,22 @@ public class DailyStatisticsAggregationService {
                 targetDates.getLast()
         );
 
-        long batchRunId;
+        Long batchRunId;
         try {
-            batchRunId = transactionService.startRun(batchRun);
+            if (catchupOnly) {
+                batchRunId = transactionService.startDailyCatchupRun(
+                        batchRun,
+                        latestStatisticsDate
+                );
+            } else {
+                batchRunId = transactionService.startRun(batchRun);
+            }
         } catch (DuplicateKeyException exception) {
             log.info("일별 통계 집계를 건너뜁니다. 다른 집계가 실행 중입니다.");
+            return false;
+        }
+        if (batchRunId == null) {
+            log.info("시작 시 일별 통계 집계를 건너뜁니다. 어제까지 집계가 완료되어 있습니다.");
             return false;
         }
 

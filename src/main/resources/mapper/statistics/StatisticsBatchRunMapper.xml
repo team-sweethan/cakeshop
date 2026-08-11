@@ -29,6 +29,13 @@
         )
     </insert>
 
+    <delete id="deleteRunningDailyBatch">
+        DELETE FROM statistics_batch_runs
+        WHERE id = #{batchRunId}
+          AND batch_type = 'DAILY'
+          AND status = 'RUNNING'
+    </delete>
+
     <update id="failExpiredRunningBatch">
         UPDATE statistics_batch_runs
         SET status = 'FAILED',

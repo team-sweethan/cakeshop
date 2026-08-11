@@ -48,6 +48,21 @@ class StatisticsBatchRunMapperTests {
     }
 
     @Test
+    void deleteRunningDailyBatch_dailyRunningRun_deletesRun() {
+        StatisticsBatchRun dailyRun = newDailyRun(WINDOW_START, WINDOW_END);
+        mapper.insertRunningBatch(dailyRun);
+
+        int deleted = mapper.deleteRunningDailyBatch(dailyRun.getId());
+
+        assertThat(deleted).isOne();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM statistics_batch_runs WHERE id = ?",
+                Integer.class,
+                dailyRun.getId()
+        )).isZero();
+    }
+
+    @Test
     void failExpiredRunningBatch_heartbeatOlderThanOneHour_marksRunFailed() {
         StatisticsBatchRun run = newDailyRun(WINDOW_START, WINDOW_END);
         mapper.insertRunningBatch(run);

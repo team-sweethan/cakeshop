@@ -15,6 +15,9 @@ public interface StatisticsBatchRunMapper {
     /** RUNNING 실행을 등록하고 생성된 식별자를 전달받는다. */
     int insertRunningBatch(StatisticsBatchRun batchRun);
 
+    /** 아직 시작하지 않은 일별 RUNNING 실행을 제거한다. */
+    int deleteRunningDailyBatch(@Param("batchRunId") long batchRunId);
+
     /** heartbeat가 1시간 이상 지난 RUNNING 실행을 실패 처리한다. */
     int failExpiredRunningBatch();
 
