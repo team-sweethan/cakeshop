@@ -7,7 +7,7 @@ import com.cakeshop.domain.order.dto.form.CancelForm;
 import com.cakeshop.domain.order.dto.form.customer.GeneralOrderForm;
 import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
-import com.cakeshop.domain.order.service.customer.CustomerOrderQueryService;
+import com.cakeshop.domain.order.service.customer.OrderCustomerService;
 import com.cakeshop.domain.order.service.OrderService;
 import com.cakeshop.domain.payment.service.RefundFacade;
 import com.cakeshop.global.error.BusinessException;
@@ -34,7 +34,7 @@ public class OrderController {
 
     private final OrderCheckoutService orderCheckoutService;
     private final OrderService orderService;
-    private final CustomerOrderQueryService orderQueryService;
+    private final OrderCustomerService orderCustomerService;
     private final MemberService memberService;
     private final RefundFacade refundFacade;
     private final CouponOrderQueryService couponOrderQueryService;
@@ -64,6 +64,7 @@ public class OrderController {
     ) {
         prefillMemberContact(form, member);
         form.setRequestKey(UUID.randomUUID().toString());
+
         return renderGeneralOrderForm(form, model, requireMemberId(member));
     }
 
@@ -98,10 +99,14 @@ public class OrderController {
     // 로그인 회원의 주문 취소
     @PostMapping("/{orderId}/cancel")
     public String cancel(
-            @PathVariable long orderId,
+            @PathVariable("orderId") long orderId,
             @AuthenticationPrincipal MemberDetails member,
-            @Valid @ModelAttribute CancelForm form
+            @Valid @ModelAttribute CancelForm form,
+            BindingResult bindingResult
     ) {
+        if (bindingResult.hasErrors()) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
         refundFacade.cancelCustomerOrder(requireMemberId(member), orderId, form.getReason());
         return "redirect:/orders/" + orderId;
     }
@@ -115,7 +120,7 @@ public class OrderController {
         long memberId = requireMemberId(member);
         model.addAttribute(
                 "orders",
-                orderQueryService.getMemberOrders(memberId)
+                orderCustomerService.getMemberOrders(memberId)
         );
         return "customer/order/detail";
     }
@@ -128,8 +133,8 @@ public class OrderController {
             Model model
     ) {
         long memberId = requireMemberId(member);
-        model.addAttribute("orders", orderQueryService.getMemberOrders(memberId));
-        model.addAttribute("order", orderQueryService.getMemberOrder(memberId, orderId));
+        model.addAttribute("orders", orderCustomerService.getMemberOrders(memberId));
+        model.addAttribute("order", orderCustomerService.getMemberOrder(memberId, orderId));
         return "customer/order/detail";
     }
 
@@ -139,7 +144,9 @@ public class OrderController {
         var checkout = orderCheckoutService.getGeneralCheckout(
                 form.getProductId(), form.getQuantity(), form.getOptionIds()
         );
+
         form.setDisplayedOriginalAmount(checkout.totalAmount());
+
         model.addAttribute("checkout", checkout);
         model.addAttribute(
                 "availableCoupons",

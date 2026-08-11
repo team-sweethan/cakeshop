@@ -1,0 +1,169 @@
+package com.cakeshop.domain.order.service;
+
+import com.cakeshop.domain.order.dto.view.OrderDetailView;
+import com.cakeshop.domain.order.entity.Order;
+import com.cakeshop.domain.order.entity.OrderItem;
+import com.cakeshop.domain.order.entity.OrderStatus;
+import com.cakeshop.domain.order.entity.OrderType;
+import com.cakeshop.domain.order.mapper.OrderMapper;
+import com.cakeshop.domain.order.service.customer.OrderCustomerService;
+import com.cakeshop.domain.member.service.MemberService;
+import com.cakeshop.domain.order.error.OrderErrorCode;
+import com.cakeshop.domain.product.entity.ProductType;
+import com.cakeshop.global.error.BusinessException;
+import com.cakeshop.global.error.CommonErrorCode;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * ******************************
+ * 작성자 : 주환
+ * 담당자 : 주환
+ * 작성일 : 2026-08-11
+ * 기능 : 결제 연동용 고객 주문 조회 계약
+ * 설명 : 결제 도메인이 orders 테이블을 직접 조회하지 않고 고객 소유 일반 주문의 최소 정보를 조회하도록 제공한다.
+ * ******************************
+ */
+@Service
+@RequiredArgsConstructor
+public class OrderPaymentQueryService {
+
+    private final OrderCustomerService orderCustomerService;
+    private final MemberService memberService;
+    private final OrderMapper orderMapper;
+
+    /**
+     * ******************************
+     * 작성자 : 주환
+     * 담당자 : 주환
+     * 작성일 : 2026-08-11
+     * 기능 : 고객 소유 결제 대상 주문 조회
+     * 설명 : 결제 준비·승인·완료 화면에서 필요한 일반 주문 정보만 제공하고, 주문 Entity를 외부에 노출하지 않는다.
+     * ******************************
+     */
+    @Transactional(readOnly = true)
+    public PaymentOrder getMemberPaymentOrder(long memberId, long orderId) {
+        OrderDetailView order = orderCustomerService.getMemberOrder(memberId, orderId);
+        return new PaymentOrder(
+                order.orderId(),
+                order.orderNumber(),
+                order.orderType() == OrderType.GENERAL,
+                order.status() == OrderStatus.PENDING_PAYMENT,
+                order.originalAmount(),
+                order.discountAmount(),
+                order.finalAmount(),
+                order.pickupAt(),
+                order.paymentExpiresAt(),
+                order.ordererName(),
+                order.ordererPhone(),
+                order.items().stream()
+                        .map(item -> new PaymentOrderItem(
+                                item.productName(),
+                                item.quantity(),
+                                item.totalAmount(),
+                                item.options().stream()
+                                        .map(option -> new PaymentOrderOption(
+                                                option.groupName(),
+                                                option.optionName()
+                                        ))
+                                        .toList()
+                        ))
+                        .toList()
+        );
+    }
+
+    /**
+     * ******************************
+     * 작성자 : 주환
+     * 담당자 : 주환
+     * 작성일 : 2026-08-11
+     * 기능 : 고객 소유 결제 실행용 일반 주문 조회
+     * 설명 : 결제 승인과 0원 결제 완료에 필요한 주문 금액·만료 시각·재고 차감 대상만 제공한다.
+     * ******************************
+     */
+    @Transactional(readOnly = true)
+    public PaymentExecutionOrder getMemberGeneralPaymentOrder(long memberId, long orderId) {
+        if (!memberService.isActiveMember(memberId)) {
+            throw new BusinessException(OrderErrorCode.MEMBER_NOT_AVAILABLE);
+        }
+        Order order = orderMapper.findOrderById(orderId)
+                .orElseThrow(() -> new BusinessException(CommonErrorCode.NOT_FOUND));
+        if (!Long.valueOf(memberId).equals(order.getMemberId())) {
+            throw new BusinessException(CommonErrorCode.NOT_FOUND);
+        }
+        if (order.getOrderType() != OrderType.GENERAL
+                || order.getStatus() != OrderStatus.PENDING_PAYMENT) {
+            throw new BusinessException(OrderErrorCode.INVALID_STATUS_TRANSITION);
+        }
+        List<PaymentProduct> products = orderMapper.findOrderItemsByOrderId(orderId).stream()
+                .map(this::toPaymentProduct)
+                .toList();
+        if (products.isEmpty()) {
+            throw new BusinessException(OrderErrorCode.EMPTY_ORDER_ITEMS);
+        }
+        return new PaymentExecutionOrder(
+                order.getId(),
+                order.getFinalAmount(),
+                order.getPaymentExpiresAt(),
+                products
+        );
+    }
+
+    private PaymentProduct toPaymentProduct(OrderItem orderItem) {
+        if (orderItem.getProductType() != ProductType.GENERAL
+                || orderItem.getProductId() == null
+                || orderItem.getQuantity() == null
+                || orderItem.getQuantity() <= 0) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_ERROR);
+        }
+        return new PaymentProduct(
+                orderItem.getId(),
+                orderItem.getProductId(),
+                orderItem.getQuantity()
+        );
+    }
+
+    public record PaymentOrder(
+            long orderId,
+            String orderNumber,
+            boolean generalOrder,
+            boolean pendingPayment,
+            BigDecimal originalAmount,
+            BigDecimal discountAmount,
+            BigDecimal finalAmount,
+            LocalDateTime pickupAt,
+            LocalDateTime paymentExpiresAt,
+            String ordererName,
+            String ordererPhone,
+            List<PaymentOrderItem> items
+    ) {
+    }
+
+    public record PaymentOrderItem(
+            String productName,
+            int quantity,
+            BigDecimal totalAmount,
+            List<PaymentOrderOption> options
+    ) {
+    }
+
+    public record PaymentOrderOption(String groupName, String optionName) {
+    }
+
+    /** 결제 승인과 완료 처리에서만 사용하는 최소 주문 스냅샷이다. */
+    public record PaymentExecutionOrder(
+            long orderId,
+            BigDecimal amount,
+            LocalDateTime paymentExpiresAt,
+            List<PaymentProduct> products
+    ) {
+    }
+
+    /** 결제 완료 시 재고를 차감할 주문 상품이다. */
+    public record PaymentProduct(long orderItemId, long productId, int quantity) {
+    }
+}

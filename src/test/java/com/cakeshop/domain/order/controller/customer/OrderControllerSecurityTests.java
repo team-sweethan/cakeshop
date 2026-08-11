@@ -12,7 +12,7 @@ import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
 import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.coupon.service.CouponOrderQueryService;
 import com.cakeshop.domain.order.service.OrderService;
-import com.cakeshop.domain.order.service.customer.CustomerOrderQueryService;
+import com.cakeshop.domain.order.service.customer.OrderCustomerService;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
 import com.cakeshop.domain.payment.service.RefundFacade;
 import com.cakeshop.global.security.MemberDetails;
@@ -42,7 +42,7 @@ class OrderControllerSecurityTests {
     private OrderService orderService;
 
     @MockitoBean
-    private CustomerOrderQueryService orderQueryService;
+    private OrderCustomerService orderQueryService;
 
     @MockitoBean
     private MemberService memberService;

@@ -1,9 +1,8 @@
 package com.cakeshop.domain.payment.service;
 
-import com.cakeshop.domain.order.dto.view.OrderDetailView;
-import com.cakeshop.domain.order.service.OrderService;
-import com.cakeshop.domain.order.service.OrderService.GeneralPaymentOrder;
-import com.cakeshop.domain.order.service.customer.CustomerOrderQueryService;
+import com.cakeshop.domain.order.service.OrderPaymentQueryService;
+import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentOrder;
+import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentExecutionOrder;
 import com.cakeshop.domain.payment.dto.form.PaymentConfirmForm;
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.error.PaymentErrorCode;
@@ -28,8 +27,7 @@ public class PaymentFacade {
 
     private static final Logger log = LoggerFactory.getLogger(PaymentFacade.class);
 
-    private final OrderService orderService;
-    private final CustomerOrderQueryService orderQueryService;
+    private final OrderPaymentQueryService orderPaymentQueryService;
     private final PaymentService paymentService;
     private final PaymentCompensationProcessor compensationProcessor;
     private final TossPaymentApprovalResolver approvalResolver;
@@ -37,7 +35,7 @@ public class PaymentFacade {
 
     /** 일반 주문의 Toss 결제를 승인하고 내부 상태를 완료한다. */
     public void confirmGeneralPayment(long memberId, long orderId, PaymentConfirmForm form) {
-        OrderDetailView ownedOrder = orderQueryService.getMemberOrder(memberId, orderId);
+        PaymentOrder ownedOrder = orderPaymentQueryService.getMemberPaymentOrder(memberId, orderId);
         Payment completedPayment = paymentService.findDonePayment(orderId).orElse(null);
         if (completedPayment != null) {
             validateCompletedRequest(ownedOrder, completedPayment, form);
@@ -45,7 +43,7 @@ public class PaymentFacade {
             return;
         }
 
-        GeneralPaymentOrder order = orderService.getGeneralPaymentOrder(memberId, orderId);
+        PaymentExecutionOrder order = orderPaymentQueryService.getMemberGeneralPaymentOrder(memberId, orderId);
         validatePaymentExpiration(order.paymentExpiresAt());
 
         Payment payment = paymentService.getReadyPayment(orderId);
@@ -66,7 +64,7 @@ public class PaymentFacade {
     /** 0원 주문은 Toss 승인 요청 없이 서버가 READY 결제를 완료한다. */
     public void completeZeroAmountGeneralPayment(long memberId, long orderId) {
         // 브라우저 재전송은 이미 완료된 0원 결제를 성공으로 간주하되, 회원 소유권은 먼저 확인한다.
-        orderQueryService.getMemberOrder(memberId, orderId);
+        orderPaymentQueryService.getMemberPaymentOrder(memberId, orderId);
         Payment completedPayment = paymentService.findDonePayment(orderId).orElse(null);
         if (completedPayment != null) {
             if (completedPayment.getAmount() == null || completedPayment.getAmount().signum() != 0) {
@@ -74,7 +72,7 @@ public class PaymentFacade {
             }
             return;
         }
-        GeneralPaymentOrder order = orderService.getGeneralPaymentOrder(memberId, orderId);
+        PaymentExecutionOrder order = orderPaymentQueryService.getMemberGeneralPaymentOrder(memberId, orderId);
         if (order.amount().signum() != 0) {
             throw new BusinessException(PaymentErrorCode.AMOUNT_MISMATCH);
         }
@@ -163,7 +161,7 @@ public class PaymentFacade {
         }
     }
 
-    private void validateCompletedRequest(OrderDetailView order, Payment payment, PaymentConfirmForm form) {
+    private void validateCompletedRequest(PaymentOrder order, Payment payment, PaymentConfirmForm form) {
         if (form == null
                 || payment.getPaymentKey() == null
                 || !payment.getPaymentKey().equals(form.getPaymentKey())) {
@@ -193,7 +191,7 @@ public class PaymentFacade {
         }
     }
 
-    private void validateRequest(GeneralPaymentOrder order, Payment payment, PaymentConfirmForm form) {
+    private void validateRequest(PaymentExecutionOrder order, Payment payment, PaymentConfirmForm form) {
         if (form == null || form.getPaymentKey() == null || form.getPaymentKey().isBlank()) {
             throw new BusinessException(PaymentErrorCode.TOSS_APPROVAL_FAILED);
         }

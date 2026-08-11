@@ -1,9 +1,9 @@
 package com.cakeshop.domain.payment.service;
 
-import com.cakeshop.domain.order.service.OrderService;
+import com.cakeshop.domain.order.service.OrderPaymentCommandService;
 import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
-import com.cakeshop.domain.order.service.OrderService.GeneralPaymentOrder;
-import com.cakeshop.domain.order.service.OrderService.PaymentProduct;
+import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentExecutionOrder;
+import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentProduct;
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.error.PaymentErrorCode;
 import com.cakeshop.domain.payment.infra.TossPaymentClient.ApprovalResult;
@@ -25,7 +25,7 @@ public class PaymentService {
 
     private final PaymentMapper paymentMapper;
     private final ProductStockService productStockService;
-    private final OrderService orderService;
+    private final OrderPaymentCommandService orderPaymentCommandService;
     private final PaymentRecoveryService paymentRecoveryService;
     // 쿠폰 담당자의 공개 계약으로 결제 성공 시 RESERVED 쿠폰을 USED로 확정한다.
     private final CouponOrderCommandService couponOrderCommandService;
@@ -55,12 +55,12 @@ public class PaymentService {
     /** 재고 차감, 결제 완료, 주문 상태 변경을 하나의 트랜잭션으로 확정한다. */
     @Transactional
     public void completeGeneralPayment(
-            GeneralPaymentOrder order,
+            PaymentExecutionOrder order,
             Payment payment,
             ApprovalResult approval
     ) {
         // 주문 행을 먼저 잠가 스케줄러의 EXPIRED 전이와 동일한 잠금 순서를 사용한다.
-        orderService.lockGeneralOrderForPayment(order.orderId());
+        orderPaymentCommandService.lockGeneralOrderForPayment(order.orderId());
 
         // products는 주문 생성 시점에 GENERAL로 저장된 주문 항목 스냅샷이다.
         for (PaymentProduct product : order.products()) {
@@ -69,7 +69,7 @@ public class PaymentService {
                     product.quantity()
             );
             if (stockDeducted) {
-                orderService.recordGeneralStockDeduction(
+                orderPaymentCommandService.recordGeneralStockDeduction(
                         product.orderItemId(),
                         approval.approvedAt()
                 );
@@ -85,7 +85,7 @@ public class PaymentService {
         ));
 
         // 주문 상태 변경 쿼리는 같은 트랜잭션에서 DONE 결제를 확인한다.
-        orderService.completeGeneralOrderAfterPayment(
+        orderPaymentCommandService.completeGeneralOrderAfterPayment(
                 order.orderId(),
                 approval.approvedAt()
         );
@@ -97,7 +97,7 @@ public class PaymentService {
     /** PG 호출 없이 0원 주문의 재고·결제·주문·쿠폰 상태를 같은 트랜잭션에서 완료한다. */
     @Transactional
     public void completeZeroAmountGeneralPayment(
-            GeneralPaymentOrder order,
+            PaymentExecutionOrder order,
             Payment payment,
             LocalDateTime completedAt
     ) {
@@ -107,14 +107,14 @@ public class PaymentService {
             throw new BusinessException(PaymentErrorCode.AMOUNT_MISMATCH);
         }
 
-        orderService.lockGeneralOrderForPayment(order.orderId());
+        orderPaymentCommandService.lockGeneralOrderForPayment(order.orderId());
         for (PaymentProduct product : order.products()) {
             if (productStockService.decreaseStock(product.productId(), product.quantity())) {
-                orderService.recordGeneralStockDeduction(product.orderItemId(), completedAt);
+                orderPaymentCommandService.recordGeneralStockDeduction(product.orderItemId(), completedAt);
             }
         }
         requireOneRow(paymentMapper.completeZeroAmountIfReady(payment.getId(), completedAt));
-        orderService.completeGeneralOrderAfterPayment(order.orderId(), completedAt);
+        orderPaymentCommandService.completeGeneralOrderAfterPayment(order.orderId(), completedAt);
         couponOrderCommandService.useReservedCouponForOrder(order.orderId());
     }
 

@@ -7,7 +7,7 @@ import com.cakeshop.domain.coupon.service.CouponOrderQueryService;
 import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
 import com.cakeshop.domain.order.controller.customer.OrderController;
-import com.cakeshop.domain.order.service.customer.CustomerOrderQueryService;
+import com.cakeshop.domain.order.service.customer.OrderCustomerService;
 import com.cakeshop.domain.order.service.OrderService;
 import com.cakeshop.domain.payment.service.RefundFacade;
 import com.cakeshop.global.security.MemberDetails;
@@ -54,7 +54,7 @@ class OrderControllerTests {
     private OrderService orderService;
 
     @Mock
-    private CustomerOrderQueryService orderQueryService;
+    private OrderCustomerService orderQueryService;
 
     @Mock
     private MemberService memberService;

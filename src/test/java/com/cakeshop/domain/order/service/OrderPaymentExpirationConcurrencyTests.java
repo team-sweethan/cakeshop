@@ -5,13 +5,13 @@ import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.member.service.MemberCouponQueryService;
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.mapper.OrderMapper;
-import com.cakeshop.domain.order.service.OrderService.GeneralPaymentOrder;
-import com.cakeshop.domain.order.service.OrderService.PaymentProduct;
+import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentExecutionOrder;
+import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentProduct;
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.entity.PaymentStatus;
 import com.cakeshop.domain.payment.infra.TossPaymentClient.ApprovalResult;
 import com.cakeshop.domain.payment.mapper.PaymentMapper;
-import com.cakeshop.domain.payment.service.PaymentPreparationService;
+import com.cakeshop.domain.payment.service.PaymentOrderPreparationCommandService;
 import com.cakeshop.domain.payment.service.PaymentRecoveryService;
 import com.cakeshop.domain.payment.service.PaymentService;
 import com.cakeshop.domain.product.service.ProductQueryService;
@@ -46,6 +46,7 @@ import static org.mockito.Mockito.when;
 @Import({
         PaymentService.class,
         ProductStockService.class,
+        OrderPaymentCommandService.class,
         OrderServiceImpl.class,
         PickupAvailabilityPolicy.class,
         OrderExpirationService.class
@@ -78,7 +79,7 @@ class OrderPaymentExpirationConcurrencyTests {
     private StoreService storeService;
 
     @MockitoBean
-    private PaymentPreparationService paymentPreparationService;
+    private PaymentOrderPreparationCommandService paymentPreparationService;
 
     @MockitoBean
     private PaymentRecoveryService paymentRecoveryService;
@@ -138,7 +139,7 @@ class OrderPaymentExpirationConcurrencyTests {
             await(start);
             try {
                 paymentService.completeGeneralPayment(
-                        new GeneralPaymentOrder(
+                        new PaymentExecutionOrder(
                                 orderId,
                                 BigDecimal.valueOf(40_000),
                                 NOW,

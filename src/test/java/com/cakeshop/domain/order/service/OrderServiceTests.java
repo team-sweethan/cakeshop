@@ -12,7 +12,7 @@ import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.order.mapper.OrderMapper;
 import com.cakeshop.domain.order.service.OrderOptionValidator.ValidatedOption;
-import com.cakeshop.domain.payment.service.PaymentPreparationService;
+import com.cakeshop.domain.payment.service.PaymentOrderPreparationCommandService;
 import com.cakeshop.domain.product.dto.view.ProductSalesInfo;
 import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.error.ProductErrorCode;
@@ -77,7 +77,7 @@ class OrderServiceTests {
     private OrderMapper orderMapper;
 
     @Mock
-    private PaymentPreparationService paymentPreparationService;
+    private PaymentOrderPreparationCommandService paymentPreparationService;
 
     @Mock
     private MemberService memberService;

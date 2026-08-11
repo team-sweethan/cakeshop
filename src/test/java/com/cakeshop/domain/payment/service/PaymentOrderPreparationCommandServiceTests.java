@@ -21,13 +21,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class PaymentPreparationServiceTests {
+class PaymentOrderPreparationCommandServiceTests {
 
     @Mock
     private PaymentMapper paymentMapper;
 
     @InjectMocks
-    private PaymentPreparationServiceImpl paymentPreparationService;
+    private PaymentOrderPreparationCommandServiceImpl paymentPreparationService;
 
     @Test
     void prepareReadyPayment_validOrder_savesReadyPayment() {

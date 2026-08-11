@@ -12,7 +12,7 @@ import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.order.mapper.OrderMapper;
 import com.cakeshop.domain.order.service.OrderOptionValidator.ValidatedOption;
-import com.cakeshop.domain.payment.service.PaymentPreparationService;
+import com.cakeshop.domain.payment.service.PaymentOrderPreparationCommandService;
 import com.cakeshop.domain.product.dto.view.ProductSalesInfo;
 import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.error.ProductErrorCode;
@@ -42,7 +42,7 @@ public class OrderServiceImpl implements OrderService {
     private final ProductQueryService productQueryService;
     private final OrderOptionValidator orderOptionValidator;
     private final OrderMapper orderMapper;
-    private final PaymentPreparationService paymentPreparationService;
+    private final PaymentOrderPreparationCommandService paymentOrderPreparationCommandService;
     private final MemberService memberService;
     private final MemberCouponQueryService memberCouponQueryService;
     // 쿠폰 담당자가 제공하는 공개 명령 계약이다. 주문 도메인은 쿠폰 Mapper를 직접 사용하지 않는다.
@@ -111,91 +111,13 @@ public class OrderServiceImpl implements OrderService {
 
         saveOrderItem(order.getId(), preparedItem);
 
-        paymentPreparationService.prepareReadyPayment(
+        paymentOrderPreparationCommandService.prepareReadyPayment(
                 order.getId(),
                 order.getOrderNumber(),
                 order.getFinalAmount()
         );
 
         return order.getId();
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public GeneralPaymentOrder getGeneralPaymentOrder(
-            long memberId,
-            long orderId
-    ) {
-        validateActiveMember(memberId);
-
-        Order order = orderMapper.findOrderById(orderId)
-                .orElseThrow(() ->
-                        new BusinessException(CommonErrorCode.NOT_FOUND));
-
-        if (!Long.valueOf(memberId).equals(order.getMemberId())) {
-            // 주문 존재 여부를 다른 회원에게 노출하지 않는다.
-            throw new BusinessException(CommonErrorCode.NOT_FOUND);
-        }
-        if (order.getOrderType() != OrderType.GENERAL
-                || order.getStatus() != OrderStatus.PENDING_PAYMENT) {
-            throw new BusinessException(
-                    OrderErrorCode.INVALID_STATUS_TRANSITION
-            );
-        }
-
-        List<PaymentProduct> products = orderMapper
-                .findOrderItemsByOrderId(orderId)
-                .stream()
-                .map(this::toPaymentProduct)
-                .toList();
-        if (products.isEmpty()) {
-            throw new BusinessException(OrderErrorCode.EMPTY_ORDER_ITEMS);
-        }
-
-        return new GeneralPaymentOrder(
-                order.getId(),
-                order.getFinalAmount(),
-                order.getPaymentExpiresAt(),
-                products
-        );
-    }
-
-    @Override
-    @Transactional
-    public void completeGeneralOrderAfterPayment(
-            long orderId,
-            LocalDateTime readyAt
-    ) {
-        requireOneRow(
-                orderMapper.markReadyForPickupAfterPaymentIfPending(
-                        orderId,
-                        readyAt
-                ),
-                OrderErrorCode.INVALID_STATUS_TRANSITION
-        );
-    }
-
-    @Override
-    @Transactional
-    public void lockGeneralOrderForPayment(long orderId) {
-        Order order = orderMapper.findOrderByIdForUpdate(orderId)
-                .orElseThrow(() -> new BusinessException(CommonErrorCode.NOT_FOUND));
-        if (order.getOrderType() != OrderType.GENERAL
-                || order.getStatus() != OrderStatus.PENDING_PAYMENT) {
-            throw new BusinessException(OrderErrorCode.INVALID_STATUS_TRANSITION);
-        }
-    }
-
-    @Override
-    @Transactional
-    public void recordGeneralStockDeduction(long orderItemId, LocalDateTime deductedAt) {
-        if (orderItemId <= 0 || deductedAt == null) {
-            throw new BusinessException(CommonErrorCode.INTERNAL_ERROR);
-        }
-        requireOneRow(
-                orderMapper.markStockDeductedIfUnset(orderItemId, deductedAt),
-                OrderErrorCode.INVALID_STATUS_TRANSITION
-        );
     }
 
     /** 세션 값만 신뢰하지 않고 현재 ACTIVE 회원인지 DB 기준으로 검증한다. */
@@ -297,21 +219,6 @@ public class OrderServiceImpl implements OrderService {
                 || stockQuantity != null && stockQuantity < quantity) {
             throw new BusinessException(ProductErrorCode.INSUFFICIENT_STOCK);
         }
-    }
-
-    private PaymentProduct toPaymentProduct(OrderItem orderItem) {
-        if (orderItem.getProductType() != ProductType.GENERAL
-                || orderItem.getProductId() == null
-                || orderItem.getQuantity() == null
-                || orderItem.getQuantity() <= 0) {
-            throw new BusinessException(CommonErrorCode.INTERNAL_ERROR);
-        }
-
-        return new PaymentProduct(
-                orderItem.getId(),
-                orderItem.getProductId(),
-                orderItem.getQuantity()
-        );
     }
 
     /** 결제 대기 상태와 결제 만료 시각이 설정된 일반 주문을 구성한다. */

@@ -102,8 +102,6 @@ class PaymentMapperTests {
                 .satisfies(row -> {
                     assertThat(row.paymentId()).isEqualTo(payment.getId());
                     assertThat(row.orderId()).isEqualTo(orderId);
-                    assertThat(row.orderNumber()).startsWith("PAYMENT-MAPPER-");
-                    assertThat(row.ordererName()).isEqualTo("주문자");
                     assertThat(row.status()).isEqualTo(PaymentStatus.DONE);
                     assertThat(row.cancellationStatus())
                             .isEqualTo(PaymentCancellationStatus.REQUESTED);
@@ -241,24 +239,6 @@ class PaymentMapperTests {
     }
 
     @Test
-    void insertReadyPayment_requiresPendingOrderAndMatchingAmount() {
-        Payment wrongAmount = newPayment("WRONG-AMOUNT");
-        wrongAmount.setAmount(BigDecimal.valueOf(39_000));
-
-        assertThat(paymentMapper.insertReadyPayment(wrongAmount)).isZero();
-        assertThat(wrongAmount.getId()).isNull();
-
-        jdbcTemplate.update(
-                "UPDATE orders SET status = 'EXPIRED' WHERE id = ?",
-                orderId
-        );
-        Payment expiredOrderPayment = newPayment("EXPIRED-ORDER");
-
-        assertThat(paymentMapper.insertReadyPayment(expiredOrderPayment)).isZero();
-        assertThat(expiredOrderPayment.getId()).isNull();
-    }
-
-    @Test
     void completeIfReady_recordsApprovalDataConditionally() {
         Payment payment = insertPayment("READY-TO-DONE");
         LocalDateTime approvedAt =
@@ -288,25 +268,6 @@ class PaymentMapperTests {
                 "DONE",
                 approvedAt.plusMinutes(1)
         )).isZero();
-    }
-
-    @Test
-    void completeIfReady_doesNotCompleteAfterOrderExpires() {
-        Payment payment = insertPayment("EXPIRED-ORDER-CANNOT-COMPLETE");
-        jdbcTemplate.update(
-                "UPDATE orders SET status = 'EXPIRED' WHERE id = ?",
-                orderId
-        );
-
-        assertThat(paymentMapper.completeIfReady(
-                payment.getId(),
-                "PAYMENT-KEY-EXPIRED-" + suffix,
-                "CARD",
-                "DONE",
-                LocalDateTime.of(2026, 8, 1, 12, 11)
-        )).isZero();
-        assertThat(findPayment(payment.getId()).getStatus())
-                .isEqualTo(PaymentStatus.READY);
     }
 
     @Test

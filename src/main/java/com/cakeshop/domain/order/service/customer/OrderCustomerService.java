@@ -5,7 +5,6 @@ import com.cakeshop.domain.order.dto.view.OrderListView;
 import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.order.service.OrderViewAssembler;
 import com.cakeshop.domain.order.error.OrderErrorCode;
-import com.cakeshop.domain.order.mapper.OrderMapper;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.error.CommonErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +16,7 @@ import java.util.List;
 /** 고객 소유권을 적용한 주문 목록·상세 조회를 담당한다. */
 @Service
 @RequiredArgsConstructor
-public class CustomerOrderQueryService {
+public class OrderCustomerService {
 
     private final OrderViewAssembler orderViewAssembler;
 

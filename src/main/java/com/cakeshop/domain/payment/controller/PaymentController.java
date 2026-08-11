@@ -3,7 +3,7 @@ package com.cakeshop.domain.payment.controller;
 import com.cakeshop.domain.payment.dto.form.PaymentConfirmForm;
 import com.cakeshop.domain.payment.dto.form.TossPaymentSuccessForm;
 import com.cakeshop.domain.payment.service.PaymentFacade;
-import com.cakeshop.domain.payment.service.PaymentQueryService;
+import com.cakeshop.domain.payment.service.PaymentCheckoutService;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.error.CommonErrorCode;
 import com.cakeshop.global.security.MemberDetails;
@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 public class PaymentController {
 
     private final PaymentFacade paymentFacade;
-    private final PaymentQueryService paymentQueryService;
+    private final PaymentCheckoutService paymentCheckoutService;
 
     /** 회원 소유의 [결제 대기] 주문을 검증하고 Toss 결제 화면에 필요한 정보를 모델에 담음.**/
     @GetMapping("/orders/{orderId:\\d+}/payment")
@@ -35,7 +35,7 @@ public class PaymentController {
     ) {
         model.addAttribute(
                 "payment",
-                paymentQueryService.getCheckout(requireMemberId(member), member.getUsername(), orderId
+                paymentCheckoutService.getCheckout(requireMemberId(member), member.getUsername(), orderId
                 )
         );
         return "customer/payment/form";
@@ -54,7 +54,7 @@ public class PaymentController {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
 
-        paymentQueryService.validateSuccessCallback(requireMemberId(member), orderId, form);
+        paymentCheckoutService.validateSuccessCallback(requireMemberId(member), orderId, form);
 
         model.addAttribute("orderId", orderId);
         model.addAttribute("paymentForm", form.toConfirmForm());
@@ -71,7 +71,7 @@ public class PaymentController {
     ) {
         model.addAttribute(
                 "failure",
-                paymentQueryService.getFailure(
+                paymentCheckoutService.getFailure(
                         requireMemberId(member),
                         orderId,
                         failureCode
@@ -85,8 +85,12 @@ public class PaymentController {
     public String confirm(
             @PathVariable("orderId") long orderId,
             @Valid @ModelAttribute PaymentConfirmForm form,
+            BindingResult bindingResult,
             @AuthenticationPrincipal MemberDetails memberDetails
     ) {
+        if (bindingResult.hasErrors()) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
         paymentFacade.confirmGeneralPayment(
                 requireMemberId(memberDetails),
                 orderId,
@@ -114,7 +118,7 @@ public class PaymentController {
     ) {
         model.addAttribute(
                 "completion",
-                paymentQueryService.getCompletion(
+                paymentCheckoutService.getCompletion(
                         requireMemberId(member),
                         orderId
                 )

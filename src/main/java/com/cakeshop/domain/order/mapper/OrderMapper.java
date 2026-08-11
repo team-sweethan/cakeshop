@@ -5,6 +5,7 @@ import com.cakeshop.domain.order.entity.OrderItem;
 import com.cakeshop.domain.order.entity.OrderItemImage;
 import com.cakeshop.domain.order.entity.OrderItemOption;
 import com.cakeshop.domain.order.entity.OrderStatus;
+import com.cakeshop.domain.order.dto.view.OrderPaymentAdminView;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -69,6 +70,11 @@ public interface OrderMapper {
 
     /** 관리자 화면에 표시할 전체 주문을 최근 생성 순서로 조회한다. */
     List<Order> findAllOrders();
+
+    /** 결제 관리자 화면에 필요한 주문 기본 정보를 일괄 조회한다. */
+    List<OrderPaymentAdminView> findPaymentAdminOrders(
+            @Param("orderIds") java.util.Collection<Long> orderIds
+    );
 
     /** 지정한 픽업일의 제작·픽업 대상 주문을 픽업 시각 순서로 조회한다. */
     List<Order> findFulfillmentOrders(

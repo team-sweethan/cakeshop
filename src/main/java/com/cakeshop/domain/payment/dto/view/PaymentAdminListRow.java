@@ -1,6 +1,5 @@
 package com.cakeshop.domain.payment.dto.view;
 
-import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.payment.entity.PaymentCancellationStatus;
 import com.cakeshop.domain.payment.entity.PaymentStatus;
 
@@ -14,7 +13,7 @@ public record PaymentAdminListRow(
         String orderNumber,
         String tossOrderId,
         String ordererName,
-        OrderType orderType,
+        String orderType,
         BigDecimal amount,
         String method,
         PaymentStatus status,
@@ -30,7 +29,7 @@ public record PaymentAdminListRow(
     }
 
     public String orderTypeLabel() {
-        return orderType == OrderType.CUSTOM ? "주문 제작" : "일반 상품";
+        return "CUSTOM".equals(orderType) ? "주문 제작" : "일반 상품";
     }
 
     public String methodLabel() {

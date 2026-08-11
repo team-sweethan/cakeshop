@@ -3,7 +3,7 @@ package com.cakeshop.domain.payment.mapper;
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.entity.PaymentCancellation;
 import com.cakeshop.domain.payment.entity.PaymentStatus;
-import com.cakeshop.domain.payment.dto.view.PaymentAdminListRow;
+import com.cakeshop.domain.payment.dto.view.PaymentAdminPaymentRow;
 import com.cakeshop.domain.payment.dto.view.PaymentAdminSummaryView;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -15,12 +15,8 @@ import java.util.Optional;
 @Mapper
 public interface PaymentMapper {
 
-    // 관리자 화면에서 결제 상태별 실제 결제 시도와 최근 취소 요청 결과를 조회한다.
-    List<PaymentAdminListRow> findPaymentsForAdmin(
-            @Param("status") PaymentStatus status
-    );
+    List<PaymentAdminPaymentRow> findPaymentsForAdmin(@Param("status") PaymentStatus status);
 
-    // 관리자 결제 화면의 전체 상태별 건수를 집계한다.
     PaymentAdminSummaryView summarizePaymentsForAdmin();
 
     // 결제 대기 주문에 금액이 일치하는 결제 시도를 생성하고 상태를 READY로 고정한다.

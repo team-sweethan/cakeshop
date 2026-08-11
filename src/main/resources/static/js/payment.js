@@ -64,6 +64,7 @@
         const customerMobilePhone = optionalCustomerMobilePhone(root.dataset.customerPhone);
         if (customerEmail) request.customerEmail = customerEmail;
         if (customerMobilePhone) request.customerMobilePhone = customerMobilePhone;
+        // 토스 호출.
         await payment.requestPayment(request);
       } catch (error) {
         button.disabled = false;

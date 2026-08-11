@@ -7,12 +7,12 @@ import com.cakeshop.domain.member.service.MemberCouponQueryService;
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.mapper.OrderMapper;
 import com.cakeshop.domain.order.service.OrderOptionValidator;
+import com.cakeshop.domain.order.service.OrderPaymentCommandService;
 import com.cakeshop.domain.order.service.OrderPaymentRecoveryService;
-import com.cakeshop.domain.order.service.OrderService;
 import com.cakeshop.domain.order.service.OrderServiceImpl;
 import com.cakeshop.domain.order.service.PickupAvailabilityPolicy;
-import com.cakeshop.domain.order.service.OrderService.GeneralPaymentOrder;
-import com.cakeshop.domain.order.service.OrderService.PaymentProduct;
+import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentExecutionOrder;
+import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentProduct;
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.entity.PaymentCancellation;
 import com.cakeshop.domain.payment.entity.PaymentCancellationStatus;
@@ -51,9 +51,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         PaymentService.class,
         PaymentRecoveryService.class,
         OrderPaymentRecoveryService.class,
+        OrderPaymentCommandService.class,
         OrderServiceImpl.class,
         PickupAvailabilityPolicy.class,
-        PaymentPreparationServiceImpl.class,
+        PaymentOrderPreparationCommandServiceImpl.class,
         ProductStockService.class
 })
 @MariaDbIntegrationTest
@@ -126,7 +127,7 @@ class PaymentCompletionIntegrationTests {
     void completeGeneralPayment_readyPayment_updatesStockPaymentAndOrder() {
         assertThat(AopUtils.isAopProxy(paymentService)).isTrue();
         Payment readyPayment = paymentService.getReadyPayment(orderId);
-        GeneralPaymentOrder order = new GeneralPaymentOrder(
+        PaymentExecutionOrder order = new PaymentExecutionOrder(
                 orderId,
                 BigDecimal.valueOf(40_000),
                 APPROVED_AT.plusMinutes(10),
@@ -175,7 +176,7 @@ class PaymentCompletionIntegrationTests {
     @Test
     void completeCompensation_donePayment_cancelsOrderAndRestoresStockIdempotently() {
         Payment readyPayment = paymentService.getReadyPayment(orderId);
-        GeneralPaymentOrder order = new GeneralPaymentOrder(
+        PaymentExecutionOrder order = new PaymentExecutionOrder(
                 orderId,
                 BigDecimal.valueOf(40_000),
                 APPROVED_AT.plusMinutes(10),
