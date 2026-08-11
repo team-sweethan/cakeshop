@@ -52,10 +52,10 @@ class MemberAdminControllerSecurityTests {
 
     @Test
     @WithAnonymousUser
-    void members_anonymousUser_redirectsToLogin() throws Exception {
+    void members_anonymousUser_redirectsToAdminLogin() throws Exception {
         mockMvc.perform(get("/admin/members"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/login"));
+                .andExpect(redirectedUrl("/admin/login"));
     }
 
     @Test

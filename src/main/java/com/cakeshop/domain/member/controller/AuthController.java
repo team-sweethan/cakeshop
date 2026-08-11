@@ -39,6 +39,12 @@ public class AuthController {
         return "auth/login";
     }
 
+    // 관리자 로그인 화면
+    @GetMapping("/admin/login")
+    public String adminLogin() {
+        return "auth/admin-login";
+    }
+
     // 회원가입 화면
     @GetMapping("/signup")
     public String signup(Model model) {

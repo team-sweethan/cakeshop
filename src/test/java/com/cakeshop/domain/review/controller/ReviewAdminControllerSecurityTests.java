@@ -44,7 +44,7 @@ class ReviewAdminControllerSecurityTests {
     void adminReviews_redirectsToLogin_whenNotAuthenticated() throws Exception {
         mockMvc.perform(get("/admin/reviews"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/login"));
+                .andExpect(redirectedUrl("/admin/login"));
     }
 
     @Test

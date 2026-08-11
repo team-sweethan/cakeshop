@@ -40,7 +40,7 @@ class StatisticsAdminControllerSecurityTests {
     void statistics_notAuthenticated_redirectsToLogin() throws Exception {
         mockMvc.perform(get("/admin/statistics"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/login"));
+                .andExpect(redirectedUrl("/admin/login"));
     }
 
     @Test

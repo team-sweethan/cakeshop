@@ -9,15 +9,21 @@ import org.springframework.security.core.userdetails.User;
 public class MemberDetails extends User {
 
     private final Long memberId;
+    private final String displayName;
 
     public MemberDetails(MemberAuthenticationView member) {
         super(member.email(), member.password(),
                 List.of(new SimpleGrantedAuthority("ROLE_" + member.role())));
 
         this.memberId = member.id();
+        this.displayName = member.displayName();
     }
 
     public Long getMemberId() {
         return memberId;
+    }
+
+    public String getDisplayName() {
+        return displayName;
     }
 }

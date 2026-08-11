@@ -170,6 +170,19 @@ class CommunityScreenRenderingTests {
                 .andExpect(content().string(containsString("첫 줄")));
     }
 
+    @Test
+    void communityDetail_adminAccount_rendersWithoutCustomerActions() throws Exception {
+        long postId = insertPost(memberId, "관리자 조회용 글", "본문", PostStatus.PUBLISHED);
+
+        mockMvc.perform(get("/community/" + postId).with(authentication(admin())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("관리자 조회용 글")))
+                .andExpect(content().string(not(containsString("/likes"))))
+                .andExpect(content().string(not(containsString("/reports"))))
+                .andExpect(content().string(not(containsString("/comments"))))
+                .andExpect(content().string(not(containsString("로그인하면 댓글을 쓸 수 있습니다."))));
+    }
+
     /** 게시글 HTML을 이스케이프한다. */
     @Test
     void communityDetail_htmlInContent_isEscaped() throws Exception {
