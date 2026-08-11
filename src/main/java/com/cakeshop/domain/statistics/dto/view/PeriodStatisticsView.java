@@ -12,6 +12,28 @@ public record PeriodStatisticsView(
         long completedOrderCount,
         long canceledOrderCount,
         BigDecimal totalSalesAmount,
-        List<DailyStatisticsView> dailyStatistics
+        List<DailyStatisticsView> dailyStatistics,
+        boolean aggregationDelayed
 ) {
+
+    public PeriodStatisticsView(
+            LocalDate startDate,
+            LocalDate endDate,
+            long totalOrderCount,
+            long completedOrderCount,
+            long canceledOrderCount,
+            BigDecimal totalSalesAmount,
+            List<DailyStatisticsView> dailyStatistics
+    ) {
+        this(
+                startDate,
+                endDate,
+                totalOrderCount,
+                completedOrderCount,
+                canceledOrderCount,
+                totalSalesAmount,
+                dailyStatistics,
+                false
+        );
+    }
 }

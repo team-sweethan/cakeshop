@@ -7,17 +7,14 @@ import java.util.Set;
 
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 import com.cakeshop.domain.coupon.entity.Coupon;
 import com.cakeshop.domain.coupon.entity.CouponTargetType;
-import com.cakeshop.domain.coupon.error.CouponErrorCode;
 import com.cakeshop.domain.coupon.mapper.CouponMapper;
 import com.cakeshop.domain.member.service.MemberCouponQueryService;
 import com.cakeshop.domain.order.service.OrderCouponQueryService;
-import com.cakeshop.global.error.BusinessException;
 
 /**
  * 발급 정책에 따라 자동 발급 대상을 찾고, 대상별 발급 작업을 분배한다.
@@ -72,14 +69,6 @@ public class CouponIssueService {
         }
     }
 
-    /** 회원가입 완료 트랜잭션에서 신규 회원 한 명에게 적용할 쿠폰을 발급한다. */
-    @Transactional
-    public void issueNewMemberCoupons(Long memberId) {
-        for (Coupon coupon : couponMapper.findCouponsByTargetType(CouponTargetType.NEW_MEMBERS)) {
-            issueCurrentTransactionMember(coupon.getId(), memberId, false);
-        }
-    }
-
     /** 매시 정각에 해당 월 생일 회원을 찾고, 회원별 독립 트랜잭션으로 발급한다. */
     public void issueBirthdayCoupons() {
         int month = LocalDateTime.now(clock).getMonthValue();
@@ -96,14 +85,6 @@ public class CouponIssueService {
                               boolean firstOrderOnly) {
         for (Long memberId : memberIds) {
             couponMemberIssueService.issueAutomatically(couponId, memberId, allowBeforeStart, firstOrderOnly);
-        }
-    }
-
-    /** 신규 회원 발급은 회원가입 트랜잭션에서 한 명만 처리하므로 별도 행 잠금을 누적하지 않는다. */
-    private void issueCurrentTransactionMember(Long couponId, Long memberId, boolean allowBeforeStart) {
-        if (couponMapper.insertMemberCouponIfAbsent(couponId, memberId, allowBeforeStart) == 1
-                && couponMapper.increaseIssuedQuantityIfAvailable(couponId) != 1) {
-            throw new BusinessException(CouponErrorCode.UPDATE_FAILED);
         }
     }
 }

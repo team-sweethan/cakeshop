@@ -1,8 +1,7 @@
 package com.cakeshop.domain.statistics.mapper;
 
-import com.cakeshop.domain.statistics.dto.view.DailyOrderStatisticsView;
-import com.cakeshop.domain.statistics.dto.view.DailySalesStatisticsView;
-import java.time.LocalDateTime;
+import com.cakeshop.domain.statistics.dto.view.DailyStatisticsRow;
+import java.time.LocalDate;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -10,15 +9,14 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 public interface PeriodStatisticsReadModelMapper {
 
-    /** 주문 생성일별 총 주문, 완료 주문과 취소 주문 건수를 조회한다. */
-    List<DailyOrderStatisticsView> findDailyOrderStatistics(
-            @Param("start") LocalDateTime start,
-            @Param("end") LocalDateTime end
+    /** 조회 기간에 집계가 완료된 날짜별 주문·매출 통계를 조회한다. */
+    List<DailyStatisticsRow> findDailyStatistics(
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
     );
 
-    /** 결제 승인일별 현재 유효한 매출 합계를 조회한다. */
-    List<DailySalesStatisticsView> findDailySalesStatistics(
-            @Param("start") LocalDateTime start,
-            @Param("end") LocalDateTime end
+    /** 백필 시작일부터 끊기지 않고 집계된 마지막 날짜를 조회한다. */
+    LocalDate findLatestContinuousStatisticsDate(
+            @Param("latestStatisticsDate") LocalDate latestStatisticsDate
     );
 }

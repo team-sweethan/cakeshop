@@ -129,7 +129,7 @@ ALL_MEMBERS / FIRST_ORDER
   -> 회원별 CouponMemberIssueService 독립 트랜잭션 -> member_coupons
 
 NEW_MEMBERS
-회원가입 완료 -> member 도메인 -> CouponIssueService.issueNewMemberCoupons(memberId)
+회원가입 완료 -> member 도메인 -> CouponMemberCommandService.issueNewMemberCoupons(memberId)
 
 BIRTHDAY
 매시 정각 -> CouponIssueScheduler -> CouponIssueService.issueBirthdayCoupons()
@@ -146,7 +146,9 @@ SPECIFIC_MEMBERS
 | member | `MemberCouponQueryService` | 활성 회원 검색, 전체 회원·생일 회원 조회 |
 | order | `OrderCouponQueryService` | 주문 이력이 있는 회원 식별 |
 
-신규 회원 발급은 member 도메인이 회원가입 완료 트랜잭션의 적절한 시점에 `CouponIssueService.issueNewMemberCoupons(memberId)`를 호출해 연결한다.
+신규 회원 발급은 member 도메인이 회원가입 트랜잭션에서 `Member` INSERT로 생성된 ID를
+`CouponMemberCommandService.issueNewMemberCoupons(memberId)`에 전달해 연결한다. 쿠폰 발급에 실패하면
+회원가입도 함께 롤백한다.
 
 첫 주문 대상은 회원 행 잠금 뒤 `OrderCouponQueryService`로 주문 이력을 다시 확인한다.
 일반 주문 생성도 동일한 회원 행 잠금을 먼저 획득하므로, 쿠폰 발급 후보 조회와 주문 생성이 경합해도
@@ -272,5 +274,4 @@ FIRST_ORDER 후보 회원 조회
 
 - 주문제작 주문의 쿠폰 선택, 할인 금액 계산, 사용 확정·실패 복구
 - 첫 주문 이벤트 시점 발급으로 정책을 전환할지 여부 협의
-- 신규 회원 가입 Service와 `issueNewMemberCoupons` 실제 연결
 - MariaDB Testcontainers로 대상별 수량 제약·중복 발급·동시 발급 통합 테스트 추가

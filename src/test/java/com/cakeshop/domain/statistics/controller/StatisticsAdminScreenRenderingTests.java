@@ -54,8 +54,10 @@ class StatisticsAdminScreenRenderingTests {
     @Test
     @WithMockUser(roles = "ADMIN")
     void statistics_statisticsReturned_rendersSummaryAndDailyTrend() throws Exception {
-        LocalDate startDate = LocalDate.of(2026, 8, 9);
-        LocalDate endDate = LocalDate.of(2026, 8, 10);
+        LocalDate startDate = LocalDate.of(2026, 8, 8);
+        LocalDate endDate = LocalDate.of(2026, 8, 9);
+        when(periodStatisticsReadModelQueryService.getLatestSelectableDate())
+                .thenReturn(endDate);
         when(periodStatisticsReadModelQueryService.getStatistics(startDate, endDate))
                 .thenReturn(new PeriodStatisticsView(
                         startDate,
@@ -82,14 +84,18 @@ class StatisticsAdminScreenRenderingTests {
                         .param("startDate", startDate.toString())
                         .param("endDate", endDate.toString()))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("value=\"2026-08-09\"")))
+                .andExpect(content().string(containsString("value=\"2026-08-08\"")))
+                .andExpect(content().string(containsString("max=\"2026-08-09\"")))
+                .andExpect(content().string(containsString(
+                        "통계는 집계가 완료된 어제까지 제공됩니다."
+                )))
                 .andExpect(content().string(containsString("12건")))
                 .andExpect(content().string(containsString("123,456원")))
                 .andExpect(content().string(containsString("일별 주문 추이")))
                 .andExpect(content().string(containsString("일별 매출 추이")))
                 .andExpect(content().string(containsString("id=\"daily-order-chart\"")))
                 .andExpect(content().string(containsString("id=\"daily-sales-chart\"")))
-                .andExpect(content().string(containsString("data-axis-label=\"2026.08.09\"")))
+                .andExpect(content().string(containsString("data-axis-label=\"2026.08.08\"")))
                 .andExpect(content().string(containsString("data-order-count=\"5\"")))
                 .andExpect(content().string(containsString("data-sales-amount=\"45678\"")))
                 .andExpect(content().string(containsString("/webjars/chart.js/4.5.1/dist/chart.umd.js")))
@@ -100,6 +106,31 @@ class StatisticsAdminScreenRenderingTests {
                 .andExpect(content().string(not(containsString("<table"))))
                 .andExpect(content().string(not(containsString("딸기 생크림 케이크"))))
                 .andExpect(content().string(not(containsString("주별"))));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void statistics_aggregationDelayed_rendersLatestCompletedDateNotice() throws Exception {
+        LocalDate startDate = LocalDate.of(2026, 8, 2);
+        LocalDate endDate = LocalDate.of(2026, 8, 8);
+        when(periodStatisticsReadModelQueryService.getLatestSelectableDate())
+                .thenReturn(LocalDate.of(2026, 8, 9));
+        when(periodStatisticsReadModelQueryService.getStatistics(null, null))
+                .thenReturn(new PeriodStatisticsView(
+                        startDate,
+                        endDate,
+                        0,
+                        0,
+                        0,
+                        BigDecimal.ZERO,
+                        List.of(),
+                        true
+                ));
+
+        mockMvc.perform(get("/admin/statistics"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("전날 집계가 아직 완료되지 않아")))
+                .andExpect(content().string(containsString("2026.08.08")));
     }
 
     @Test

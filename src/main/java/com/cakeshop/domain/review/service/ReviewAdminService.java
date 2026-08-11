@@ -6,6 +6,8 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,32 +35,17 @@ import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
 
 @Service
+@RequiredArgsConstructor
 public class ReviewAdminService {
 
     private final ReviewAdminMapper reviewAdminMapper;
     private final ReviewMapper reviewMapper;
     private final ReviewReplyMapper reviewReplyMapper;
     private final ReviewService reviewService;
+    private final ReviewNotificationService reviewNotificationService;
     private final ProductReviewCommandService productReviewCommandService;
     private final MemberReviewQueryService memberReviewQueryService;
     private final OrderReviewQueryService orderReviewQueryService;
-
-    public ReviewAdminService(
-            ReviewAdminMapper reviewAdminMapper,
-            ReviewMapper reviewMapper,
-            ReviewReplyMapper reviewReplyMapper,
-            ReviewService reviewService,
-            ProductReviewCommandService productReviewCommandService,
-            MemberReviewQueryService memberReviewQueryService,
-            OrderReviewQueryService orderReviewQueryService) {
-        this.reviewAdminMapper = reviewAdminMapper;
-        this.reviewMapper = reviewMapper;
-        this.reviewReplyMapper = reviewReplyMapper;
-        this.reviewService = reviewService;
-        this.productReviewCommandService = productReviewCommandService;
-        this.memberReviewQueryService = memberReviewQueryService;
-        this.orderReviewQueryService = orderReviewQueryService;
-    }
 
     @Transactional(readOnly = true)
     public PageResult<AdminReviewListView> getReviews(
@@ -80,8 +67,8 @@ public class ReviewAdminService {
         Map<Long, OrderReviewSnapshotView> snapshots = findOrderSnapshots(rows);
 
         List<AdminReviewListView> content = rows.stream()
-                .map(row -> AdminReviewListView.of(
-                        row, authors.get(row.memberId()), snapshots.get(row.orderItemId())))
+                .map(row -> AdminReviewListView.from(
+                        row, authors.get(row.getMemberId()), snapshots.get(row.getOrderItemId())))
                 .toList();
 
         return new PageResult<>(content, pageRequest, total);
@@ -93,20 +80,21 @@ public class ReviewAdminService {
 
         List<ReviewRow> rows = List.of(review);
 
-        return AdminReviewDetailView.of(
+        return AdminReviewDetailView.from(
                 review,
-                findAuthors(rows).get(review.memberId()),
-                findOrderSnapshots(rows).get(review.orderItemId()),
+                findAuthors(rows).get(review.getMemberId()),
+                findOrderSnapshots(rows).get(review.getOrderItemId()),
                 reviewReplyMapper.findByReviewId(reviewId));
     }
 
     @Transactional
     public void reply(long reviewId, ReviewReplyForm form, long adminId) {
+        ReviewReply reply = ReviewReply.create(reviewId, adminId, form.getContent());
+
         int inserted;
 
         try {
-            inserted = reviewReplyMapper.insertForPublishedReview(
-                    ReviewReply.create(reviewId, adminId, form.getContent()));
+            inserted = reviewReplyMapper.insertForPublishedReview(reply);
         } catch (DuplicateKeyException e) {
             throw new BusinessException(ReviewErrorCode.ALREADY_REPLIED);
         }
@@ -116,6 +104,11 @@ public class ReviewAdminService {
 
             throw new BusinessException(ReviewErrorCode.INVALID_REVIEW_TRANSITION);
         }
+
+        // 저장이 성공했으니 후기는 존재하고 PUBLISHED 다. 작성자만 다시 읽어 받는 사람을 정한다.
+        reviewNotificationService.notifyReviewReply(
+                reviewId, reply.getId(), requireFound(reviewMapper.findById(reviewId)).getMemberId(),
+                adminId);
     }
 
     @Transactional
@@ -134,11 +127,11 @@ public class ReviewAdminService {
     private void requirePublished(long reviewId) {
         ReviewRow review = reviewMapper.findByIdForUpdate(reviewId);
 
-        if (review == null || review.status() == ReviewStatus.DELETED) {
+        if (review == null || review.getStatus() == ReviewStatus.DELETED) {
             throw new BusinessException(ReviewErrorCode.REVIEW_NOT_FOUND);
         }
 
-        if (review.status() == ReviewStatus.BLOCKED) {
+        if (review.getStatus() == ReviewStatus.BLOCKED) {
             throw new BusinessException(ReviewErrorCode.BLOCKED_REVIEW);
         }
     }
@@ -158,11 +151,11 @@ public class ReviewAdminService {
     private void changeStatus(long reviewId, ReviewStatus expected, ReviewStatus next) {
         ReviewRow review = requireFound(reviewMapper.findById(reviewId));
 
-        if (!review.status().canTransitionTo(next)) {
+        if (!review.getStatus().canTransitionTo(next)) {
             throw new BusinessException(ReviewErrorCode.INVALID_REVIEW_TRANSITION);
         }
 
-        productReviewCommandService.lockForRating(review.productId());
+        productReviewCommandService.lockForRating(review.getProductId());
 
         if (reviewAdminMapper.updateStatus(reviewId, expected, next) == 0) {
             // 잠금을 기다리는 동안 커밋된 조치는 검증 시점의 스냅샷에 없다. 최신 행을 다시 읽어야
@@ -172,7 +165,7 @@ public class ReviewAdminService {
             throw new BusinessException(ReviewErrorCode.INVALID_REVIEW_TRANSITION);
         }
 
-        reviewService.recalculateRating(review.productId());
+        reviewService.recalculateRating(review.getProductId());
     }
 
     private ReviewRow requireFound(ReviewRow review) {
@@ -207,7 +200,7 @@ public class ReviewAdminService {
 
     private Map<Long, MemberReviewView> findAuthors(List<ReviewRow> rows) {
         List<Long> memberIds = rows.stream()
-                .map(ReviewRow::memberId)
+                .map(ReviewRow::getMemberId)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
@@ -218,7 +211,7 @@ public class ReviewAdminService {
 
     private Map<Long, OrderReviewSnapshotView> findOrderSnapshots(List<ReviewRow> rows) {
         List<Long> orderItemIds = rows.stream()
-                .map(ReviewRow::orderItemId)
+                .map(ReviewRow::getOrderItemId)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();

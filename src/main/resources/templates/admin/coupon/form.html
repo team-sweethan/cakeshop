@@ -13,7 +13,7 @@
 
             <form class="panel"
                   id="couponForm"
-                  th:attr="data-form-mode=${formMode},data-target-type=${formMode == 'update' ? couponForm.displayTargetType : ''}"
+                  th:attr="data-form-mode=${formMode},data-target-type=${formMode == 'update' ? couponUpdateView.targetType : ''}"
                   th:action="${formMode == 'create' ? '/admin/coupons/create' : '/admin/coupons/' + couponId + '/edit'}"
                   th:object="${couponForm}"
                   method="post">
@@ -54,15 +54,15 @@
 
                         <div class="choice-list">
                             <label class="choice">
-                                <input type="radio" th:field="*{discountType}" value="FIXED_AMOUNT" th:disabled="${formMode == 'update' && !couponForm.fullEdit}"> 금액 할인
+                                <input type="radio" th:field="*{discountType}" value="FIXED_AMOUNT" th:disabled="${formMode == 'update' && !couponUpdateView.fullEdit}"> 금액 할인
                             </label>
 
                             <label class="choice">
-                                <input type="radio" th:field="*{discountType}" value="PERCENTAGE" th:disabled="${formMode == 'update' && !couponForm.fullEdit}"> 비율 할인
+                                <input type="radio" th:field="*{discountType}" value="PERCENTAGE" th:disabled="${formMode == 'update' && !couponUpdateView.fullEdit}"> 비율 할인
                             </label>
                         </div>
                         <!-- disabled 입력값은 전송되지 않으므로 기존 값은 hidden으로 함께 전송한다. -->
-                        <input type="hidden" name="discountType" th:value="*{discountType}" th:if="${formMode == 'update' && !couponForm.fullEdit}">
+                        <input type="hidden" name="discountType" th:value="*{discountType}" th:if="${formMode == 'update' && !couponUpdateView.fullEdit}">
 
                         <p class="field-error" th:errors="*{discountType}"></p>
                     </fieldset>
@@ -77,8 +77,8 @@
                                step="0.01"
                                th:field="*{discountValue}"
                                placeholder="예: 5000 또는 10"
-                               th:disabled="${formMode == 'update' && !couponForm.fullEdit}">
-                        <input type="hidden" name="discountValue" th:value="*{discountValue}" th:if="${formMode == 'update' && !couponForm.fullEdit}">
+                               th:disabled="${formMode == 'update' && !couponUpdateView.fullEdit}">
+                        <input type="hidden" name="discountValue" th:value="*{discountValue}" th:if="${formMode == 'update' && !couponUpdateView.fullEdit}">
 
                         <p class="field-error" th:errors="*{discountValue}"></p>
                     </div>
@@ -95,8 +95,8 @@
                                step="1"
                                th:field="*{minimumOrderAmount}"
                                placeholder="미입력 시 0원"
-                               th:disabled="${formMode == 'update' && !couponForm.fullEdit}">
-                        <input type="hidden" name="minimumOrderAmount" th:value="*{minimumOrderAmount}" th:if="${formMode == 'update' && !couponForm.fullEdit}">
+                               th:disabled="${formMode == 'update' && !couponUpdateView.fullEdit}">
+                        <input type="hidden" name="minimumOrderAmount" th:value="*{minimumOrderAmount}" th:if="${formMode == 'update' && !couponUpdateView.fullEdit}">
 
                         <p class="field-error" th:errors="*{minimumOrderAmount}"></p>
                     </div>
@@ -113,8 +113,8 @@
                                step="1"
                                th:field="*{maximumDiscountAmount}"
                                placeholder="비율 할인에만 사용"
-                               th:disabled="${formMode == 'update' && !couponForm.fullEdit}">
-                        <input type="hidden" name="maximumDiscountAmount" th:value="*{maximumDiscountAmount}" th:if="${formMode == 'update' && !couponForm.fullEdit}">
+                               th:disabled="${formMode == 'update' && !couponUpdateView.fullEdit}">
+                        <input type="hidden" name="maximumDiscountAmount" th:value="*{maximumDiscountAmount}" th:if="${formMode == 'update' && !couponUpdateView.fullEdit}">
 
                         <p class="field-error" th:errors="*{maximumDiscountAmount}"></p>
                     </div>
@@ -128,10 +128,10 @@
                                class="form-control"
                                type="datetime-local"
                                th:field="*{startsAt}"
-                               th:disabled="${formMode == 'update' && !couponForm.fullEdit}">
+                               th:disabled="${formMode == 'update' && !couponUpdateView.fullEdit}">
                         <input type="hidden" name="startsAt"
                                th:value="${#temporals.format(couponForm.startsAt, 'yyyy-MM-dd''T''HH:mm')}"
-                               th:if="${formMode == 'update' && !couponForm.fullEdit}">
+                               th:if="${formMode == 'update' && !couponUpdateView.fullEdit}">
 
                         <p class="field-error" th:errors="*{startsAt}"></p>
                     </div>
@@ -158,7 +158,7 @@
                         <label class="choice"><input type="radio" th:field="*{targetType}" value="BIRTHDAY" th:disabled="${formMode == 'update'}">생일 회원</label>
                         <label class="choice"><input type="radio" th:field="*{targetType}" value="SPECIFIC_MEMBERS" th:disabled="${formMode == 'update'}">특정 회원</label>
                     </div>
-                    <p class="form-help" th:if="${formMode == 'update'}" th:text="${couponForm.displayTargetType.description}">발급 대상</p>
+                    <p class="form-help" th:if="${formMode == 'update'}" th:text="${couponUpdateView.targetType.description}">발급 대상</p>
                     <p id="targetTypeGuide" class="form-help" th:if="${formMode == 'create'}"></p>
                 </fieldset>
 

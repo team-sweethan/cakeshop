@@ -9,6 +9,7 @@ import static org.mockito.ArgumentMatchers.any;
 
 import com.cakeshop.domain.member.dto.form.ProfileUpdateForm;
 import com.cakeshop.domain.member.dto.form.SignupForm;
+import com.cakeshop.domain.coupon.service.CouponMemberCommandService;
 import com.cakeshop.domain.member.dto.view.EmailRecoveryResult;
 import com.cakeshop.domain.member.dto.view.MemberProfileView;
 import com.cakeshop.domain.member.dto.view.PasswordRecoveryTarget;
@@ -38,6 +39,9 @@ class MemberServiceTests {
 
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private CouponMemberCommandService couponMemberCommandService;
 
     @InjectMocks
     private MemberService memberService;
@@ -79,12 +83,17 @@ class MemberServiceTests {
         form.setBirthDate(LocalDate.of(2000, 1, 15));
         when(memberMapper.findByEmail(form.getEmail())).thenReturn(Optional.empty());
         when(passwordEncoder.encode(form.getPassword())).thenReturn("encoded-password");
+        org.mockito.Mockito.doAnswer(invocation -> {
+            invocation.getArgument(0, Member.class).setId(1L);
+            return 1;
+        }).when(memberMapper).join(any(Member.class));
 
         memberService.join(form);
 
         ArgumentCaptor<Member> captor = ArgumentCaptor.forClass(Member.class);
         verify(memberMapper).join(captor.capture());
         assertThat(captor.getValue().getBirthDate()).isEqualTo(form.getBirthDate());
+        verify(couponMemberCommandService).issueNewMemberCoupons(1L);
     }
 
     @Test
