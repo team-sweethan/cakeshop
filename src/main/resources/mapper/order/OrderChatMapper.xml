@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cakeshop.domain.order.mapper.OrderChatMapper">
+
+    <!-- 채팅방 연동용 주문 상세 정보 조회 -->
+    <select id="findOrderById" resultType="Order">
+        SELECT *
+        FROM orders
+        WHERE id = #{orderId}
+    </select>
+
+    <!-- 채팅방 연동용 주문 대표 상품명 및 수량 조립 조회 -->
+    <select id="findRepresentativeProductName" resultType="string">
+        SELECT 
+            CASE 
+                WHEN (SELECT COUNT(*) FROM order_items WHERE order_id = #{orderId}) = 0 THEN '연동 주문 상품'
+                WHEN (SELECT COUNT(*) FROM order_items WHERE order_id = #{orderId}) = 1 THEN (SELECT product_name FROM order_items WHERE order_id = #{orderId} ORDER BY id ASC LIMIT 1)
+                ELSE CONCAT((SELECT product_name FROM order_items WHERE order_id = #{orderId} ORDER BY id ASC LIMIT 1), ' 외 ', (SELECT COUNT(*) FROM order_items WHERE order_id = #{orderId}) - 1, '건')
+            END
+    </select>
+
+</mapper>

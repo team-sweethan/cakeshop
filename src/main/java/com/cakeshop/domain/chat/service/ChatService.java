@@ -19,11 +19,10 @@ import com.cakeshop.domain.chat.entity.ChatRoomStatus;
 import com.cakeshop.domain.chat.entity.CustomerAdminNote;
 import com.cakeshop.domain.chat.error.ChatErrorCode;
 import com.cakeshop.domain.chat.mapper.ChatMapper;
-import com.cakeshop.domain.member.dto.view.MemberAdminDetailView;
-import com.cakeshop.domain.member.service.MemberAdminService;
+import com.cakeshop.domain.member.service.MemberChatQueryService;
 import com.cakeshop.domain.order.entity.Order;
-import com.cakeshop.domain.order.service.OrderViewAssembler;
-import com.cakeshop.domain.product.service.ProductQueryService;
+import com.cakeshop.domain.order.service.OrderChatQueryService;
+import com.cakeshop.domain.product.service.ProductChatQueryService;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.error.CommonErrorCode;
@@ -51,11 +50,11 @@ public class ChatService {
     // TODO: 고객당 채팅방 1개 UNIQUE, 방 소유자 검증
 
     private final ChatMapper chatMapper;
-    private final MemberAdminService memberAdminService;
-    private final OrderViewAssembler orderViewAssembler;
+    private final MemberChatQueryService memberChatQueryService;
+    private final OrderChatQueryService orderChatQueryService;
     private final FileStorageClient fileStorageClient;
     private final ChatImageValidator chatImageValidator;
-    private final ProductQueryService productQueryService;
+    private final ProductChatQueryService productChatQueryService;
 
     // ==========================================
     // 0. 검증 헬퍼 메서드
@@ -79,6 +78,9 @@ public class ChatService {
     @Transactional
     public ChatRoom getOrMakeChatRoom(Long customerId) {
         if (customerId == null || customerId <= 0) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+        if (!memberChatQueryService.existsCustomer(customerId)) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
         ChatRoom chatRoom = chatMapper.findChatRoomByCustomerId(customerId);
@@ -130,7 +132,7 @@ public class ChatService {
                 if (productId <= 0) {
                     throw new BusinessException(CommonErrorCode.INVALID_INPUT);
                 }
-                productQueryService.getSalesInfo(productId);
+                productChatQueryService.validateProductForChat(productId);
             }
 
             // 3. 채팅방 존재 여부 및 실제 인증 권한(isAdmin) 검증
@@ -195,15 +197,17 @@ public class ChatService {
         return roomOrders.stream().map(ro -> {
             Order order;
             try {
-                order = orderViewAssembler.findOrder(ro.getOrderId());
+                order = orderChatQueryService.findOrder(ro.getOrderId());
             } catch (Exception e) {
                 order = null;
             }
 
+            String representativeName = orderChatQueryService.getRepresentativeProductName(ro.getOrderId());
+
             return ChatRoomOrderResponse.builder()
                     .orderId(ro.getOrderId())
                     .orderNumber(order != null ? order.getOrderNumber() : "ORD-UNKNOWN")
-                    .productName(order != null ? order.getOrdererName() + "님의 주문" : "연동 주문 상품")
+                    .productName(representativeName)
                     .productType(order != null && order.getOrderType() != null ? order.getOrderType().name() : "GENERAL")
                     .totalAmount(order != null ? order.getFinalAmount() : BigDecimal.ZERO)
                     .orderStatus(order != null && order.getStatus() != null ? order.getStatus().name() : "UNKNOWN")
@@ -228,8 +232,8 @@ public class ChatService {
             }
         }
 
-        // OrderViewAssembler를 통한 소유권 검증 (try-catch로 예외가 삼켜지지 않도록 수정!)
-        Order order = orderViewAssembler.findOrder(orderId);
+        // OrderChatQueryService를 통한 소유권 검증
+        Order order = orderChatQueryService.findOrder(orderId);
         if (order != null && !chatRoom.getCustomerId().equals(order.getMemberId())) {
             throw new AccessDeniedException("해당 채팅방 고객의 주문만 연동할 수 있습니다.");
         }
@@ -302,14 +306,7 @@ public class ChatService {
         Set<Long> uniqueCustomerIds = rooms.stream().map(ChatRoom::getCustomerId).collect(Collectors.toSet());
         Map<Long, String> customerNameMap = uniqueCustomerIds.stream().collect(Collectors.toMap(
             id -> id,
-            id -> {
-                try {
-                    MemberAdminDetailView memberDetail = memberAdminService.getMemberDetail(id);
-                    return (memberDetail != null && memberDetail.name() != null) ? memberDetail.name() : "고객";
-                } catch (Exception e) {
-                    return "고객";
-                }
-            },
+            id -> memberChatQueryService.getCustomerName(id),
             (a, b) -> a
         ));
 

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cakeshop.domain.member.mapper.MemberChatMapper">
+
+    <!-- 채팅방 관리자 화면 표기용 고객 이름 조회 -->
+    <select id="findCustomerNameById" resultType="string">
+        SELECT name
+        FROM members
+        WHERE id = #{customerId}
+    </select>
+
+</mapper>
