@@ -1,9 +1,11 @@
 package com.cakeshop.domain.order.service.admin;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.cakeshop.domain.member.service.MemberOrderQueryService;
 import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.entity.OrderType;
@@ -31,11 +33,15 @@ class AdminCustomOrderServiceTests {
     @Mock
     private OrderMapper orderMapper;
 
+    @Mock
+    private MemberOrderQueryService memberOrderQueryService;
+
     private AdminCustomOrderService service;
 
     @BeforeEach
     void setUp() {
-        service = new AdminCustomOrderService(orderMapper, CLOCK);
+        service = new AdminCustomOrderService(orderMapper, memberOrderQueryService, CLOCK);
+        when(memberOrderQueryService.isActiveAdmin(7L)).thenReturn(true);
     }
 
     @Test
@@ -54,6 +60,16 @@ class AdminCustomOrderServiceTests {
 
         assertThatThrownBy(() -> service.completeProduction(10L, 7L))
                 .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void startProduction_suspendedOrDemotedAdmin_rejectsBeforeLockingOrder() {
+        when(memberOrderQueryService.isActiveAdmin(7L)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.startProduction(10L, 7L))
+                .isInstanceOf(BusinessException.class);
+
+        verify(orderMapper, never()).findOrderByIdForUpdate(10L);
     }
 
     private Order custom(OrderStatus status) {

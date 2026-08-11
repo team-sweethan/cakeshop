@@ -1,6 +1,7 @@
 package com.cakeshop.domain.payment.service;
 
 import com.cakeshop.domain.member.service.MemberService;
+import com.cakeshop.domain.member.service.MemberOrderQueryService;
 import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.order.service.OrderPaymentCancellationCommandService;
 import com.cakeshop.domain.payment.entity.Payment;
@@ -29,6 +30,7 @@ public class RefundService {
     private final PaymentMapper paymentMapper;
     private final OrderPaymentCancellationCommandService orderPaymentCancellationCommandService;
     private final MemberService memberService;
+    private final MemberOrderQueryService memberOrderQueryService;
     private final Clock clock;
 
     /** 고객 요청은 일반 주문 또는 승인 전 수제 주문만 취소할 수 있다. */
@@ -49,6 +51,7 @@ public class RefundService {
     @Transactional
     public RefundRequest prepareAdminCancellation(long adminMemberId, long orderId, String reason) {
         validateCancellationInput(adminMemberId, reason);
+        requireActiveAdmin(adminMemberId);
         orderPaymentCancellationCommandService.lockOrderForPaymentCancellation(orderId);
         return prepareCancellation(
                 adminMemberId,
@@ -62,6 +65,7 @@ public class RefundService {
     @Transactional
     public RefundRequest prepareAdminRejection(long adminMemberId, long orderId, String reason) {
         validateCancellationInput(adminMemberId, reason);
+        requireActiveAdmin(adminMemberId);
         orderPaymentCancellationCommandService.lockOrderForPaymentCancellation(orderId);
         return prepareCancellation(
                 adminMemberId,
@@ -89,6 +93,7 @@ public class RefundService {
     @Transactional
     public boolean cancelAdminZeroAmountOrder(long adminMemberId, long orderId, String reason) {
         validateCancellationInput(adminMemberId, reason);
+        requireActiveAdmin(adminMemberId);
         orderPaymentCancellationCommandService.lockOrderForPaymentCancellation(orderId);
         return cancelZeroAmountOrder(
                 adminMemberId,
@@ -102,6 +107,7 @@ public class RefundService {
     @Transactional
     public boolean rejectCustomZeroAmountOrder(long adminMemberId, long orderId, String reason) {
         validateCancellationInput(adminMemberId, reason);
+        requireActiveAdmin(adminMemberId);
         orderPaymentCancellationCommandService.lockOrderForPaymentCancellation(orderId);
         return cancelZeroAmountOrder(
                 adminMemberId,
@@ -305,6 +311,12 @@ public class RefundService {
     private void validateActiveMember(long memberId) {
         if (!memberService.isActiveMember(memberId)) {
             throw new BusinessException(OrderErrorCode.MEMBER_NOT_AVAILABLE);
+        }
+    }
+
+    private void requireActiveAdmin(long memberId) {
+        if (!memberOrderQueryService.isActiveAdmin(memberId)) {
+            throw new BusinessException(CommonErrorCode.FORBIDDEN);
         }
     }
 

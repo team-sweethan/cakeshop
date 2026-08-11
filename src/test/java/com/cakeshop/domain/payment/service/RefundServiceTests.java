@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.cakeshop.domain.member.service.MemberService;
+import com.cakeshop.domain.member.service.MemberOrderQueryService;
 import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.order.service.OrderPaymentCancellationCommandService;
 import com.cakeshop.domain.payment.entity.Payment;
@@ -21,6 +22,7 @@ import com.cakeshop.domain.payment.infra.TossPaymentClient.CancellationResult;
 import com.cakeshop.domain.payment.mapper.PaymentMapper;
 import com.cakeshop.domain.payment.service.RefundService.RefundRequest;
 import com.cakeshop.global.error.BusinessException;
+import com.cakeshop.global.error.CommonErrorCode;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -51,6 +53,9 @@ class RefundServiceTests {
     @Mock
     private MemberService memberService;
 
+    @Mock
+    private MemberOrderQueryService memberOrderQueryService;
+
     private RefundService refundService;
 
     @BeforeEach
@@ -59,9 +64,11 @@ class RefundServiceTests {
                 paymentMapper,
                 orderPaymentCancellationCommandService,
                 memberService,
+                memberOrderQueryService,
                 CLOCK
         );
         lenient().when(memberService.isActiveMember(anyLong())).thenReturn(true);
+        lenient().when(memberOrderQueryService.isActiveAdmin(anyLong())).thenReturn(true);
     }
 
     @Test
@@ -135,6 +142,20 @@ class RefundServiceTests {
 
         assertThat(result.canceledBy()).isEqualTo("ADMIN_REJECTION");
         verify(orderPaymentCancellationCommandService).lockOrderForPaymentCancellation(10L);
+    }
+
+    @Test
+    void prepareAdminRejection_suspendedOrDemotedAdmin_rejectsBeforeOrderLock() {
+        when(memberOrderQueryService.isActiveAdmin(7L)).thenReturn(false);
+
+        assertThatThrownBy(() -> refundService.prepareAdminRejection(7L, 10L, "제작 일정이 부족합니다."))
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(CommonErrorCode.FORBIDDEN)
+                );
+
+        verify(orderPaymentCancellationCommandService, never()).lockOrderForPaymentCancellation(10L);
+        verify(paymentMapper, never()).findDonePaymentByOrderId(anyLong());
     }
 
     @Test
