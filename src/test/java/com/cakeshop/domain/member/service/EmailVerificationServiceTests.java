@@ -3,7 +3,9 @@ package com.cakeshop.domain.member.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -51,6 +53,8 @@ class EmailVerificationServiceTests {
 
     @BeforeEach
     void setUp() {
+        lenient().when(emailVerificationMapper.acquireRequestLock(
+                any(), any(), anyInt())).thenReturn(1);
         emailVerificationService = new EmailVerificationService(
                 emailVerificationMapper,
                 memberMapper,

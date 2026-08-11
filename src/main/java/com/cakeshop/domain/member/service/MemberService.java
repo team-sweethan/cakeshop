@@ -35,10 +35,13 @@ public class MemberService {
      * 회원가입 로직
      */
     @Transactional
-    public void join(SignupForm form) {
+    public void join(SignupForm form, String verifiedEmail) {
         String email = form.getEmail().trim().toLowerCase(java.util.Locale.ROOT);
         if (memberMapper.findByEmail(email).isPresent()) {
             throw new BusinessException(MemberErrorCode.DUPLICATE_EMAIL);
+        }
+        if (!email.equals(verifiedEmail)) {
+            throw new BusinessException(MemberErrorCode.EMAIL_VERIFICATION_REQUIRED);
         }
         emailVerificationService.consumeSignupVerification(email);
 

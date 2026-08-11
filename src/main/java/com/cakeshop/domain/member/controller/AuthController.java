@@ -122,6 +122,7 @@ public class AuthController {
     @PostMapping("/join")
     public String join(@Valid @ModelAttribute("signupForm") SignupForm form,
                        BindingResult bindingResult,
+                       HttpSession session,
                        RedirectAttributes redirectAttributes) {
         if (bindingResult.hasErrors()) {
             return "customer/member/signup";
@@ -135,7 +136,10 @@ public class AuthController {
             return "customer/member/signup";
         }
 
-        memberService.join(form);
+        String verifiedEmail = (String) session.getAttribute(
+                EmailVerificationController.SIGNUP_VERIFIED_EMAIL_SESSION_KEY);
+        memberService.join(form, verifiedEmail);
+        session.removeAttribute(EmailVerificationController.SIGNUP_VERIFIED_EMAIL_SESSION_KEY);
         redirectAttributes.addFlashAttribute("successMessage", "회원가입이 완료되었습니다!");
         return "redirect:/login";
     }

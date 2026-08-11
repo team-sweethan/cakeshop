@@ -10,6 +10,17 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 public interface EmailVerificationMapper {
 
+    /** 이메일과 인증 목적 단위의 DB 잠금을 획득한다. */
+    int acquireRequestLock(
+            @Param("email") String email,
+            @Param("purpose") EmailVerificationPurpose purpose,
+            @Param("timeoutSeconds") int timeoutSeconds);
+
+    /** 이메일과 인증 목적 단위의 DB 잠금을 해제한다. */
+    int releaseRequestLock(
+            @Param("email") String email,
+            @Param("purpose") EmailVerificationPurpose purpose);
+
     /** 새 인증 요청을 저장한다. */
     int insert(EmailVerification verification);
 

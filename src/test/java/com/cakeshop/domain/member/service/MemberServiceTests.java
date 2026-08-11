@@ -67,12 +67,28 @@ class MemberServiceTests {
         when(memberMapper.findByEmail(form.getEmail()))
                 .thenReturn(Optional.of(Member.builder().id(1L).build()));
 
-        assertThatThrownBy(() -> memberService.join(form))
+        assertThatThrownBy(() -> memberService.join(form, form.getEmail()))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(MemberErrorCode.DUPLICATE_EMAIL);
 
         verify(memberMapper, never()).join(org.mockito.ArgumentMatchers.any(Member.class));
+    }
+
+    @Test
+    void join_verifiedInDifferentSession_rejectsSignup() {
+        SignupForm form = new SignupForm();
+        form.setEmail("member@cakeshop.local");
+        when(memberMapper.findByEmail(form.getEmail())).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> memberService.join(form, null))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(MemberErrorCode.EMAIL_VERIFICATION_REQUIRED);
+
+        verify(emailVerificationService, never())
+                .consumeSignupVerification(form.getEmail());
+        verify(memberMapper, never()).join(any(Member.class));
     }
 
     @Test
@@ -91,7 +107,7 @@ class MemberServiceTests {
             return 1;
         }).when(memberMapper).join(any(Member.class));
 
-        memberService.join(form);
+        memberService.join(form, form.getEmail());
 
         ArgumentCaptor<Member> captor = ArgumentCaptor.forClass(Member.class);
         verify(memberMapper).join(captor.capture());

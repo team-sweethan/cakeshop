@@ -1,7 +1,9 @@
 package com.cakeshop.domain.member.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -15,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.mock.web.MockHttpSession;
 
 class EmailVerificationControllerTests {
 
@@ -49,6 +52,24 @@ class EmailVerificationControllerTests {
                         .content("{\"email\":\"member@example.com\",\"code\":\"123\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void verifySignupCode_validCode_bindsVerifiedEmailToSession() throws Exception {
+        when(emailVerificationService.verifySignupCode("member@example.com", "123456"))
+                .thenReturn("member@example.com");
+        MockHttpSession session = new MockHttpSession();
+
+        mockMvc.perform(post("/email-verifications/signup/verify")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"member@example.com\",\"code\":\"123456\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        assertThat(session.getAttribute(
+                EmailVerificationController.SIGNUP_VERIFIED_EMAIL_SESSION_KEY))
+                .isEqualTo("member@example.com");
     }
 
     @Test

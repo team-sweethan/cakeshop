@@ -27,6 +27,7 @@ public class EmailVerificationService {
     private static final Duration REQUEST_WINDOW = Duration.ofHours(1);
     private static final Duration RETENTION = Duration.ofDays(7);
     private static final int MAX_REQUESTS_PER_WINDOW = 5;
+    private static final int REQUEST_LOCK_TIMEOUT_SECONDS = 3;
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final EmailVerificationMapper emailVerificationMapper;
@@ -39,12 +40,25 @@ public class EmailVerificationService {
     @Transactional
     public void sendSignupCode(String rawEmail) {
         String email = normalizeAndValidateEmail(rawEmail);
+        EmailVerificationPurpose purpose = EmailVerificationPurpose.SIGNUP;
         if (memberMapper.findByEmail(email).isPresent()) {
             throw new BusinessException(MemberErrorCode.DUPLICATE_EMAIL);
         }
 
+        if (emailVerificationMapper.acquireRequestLock(
+                email, purpose, REQUEST_LOCK_TIMEOUT_SECONDS) != 1) {
+            throw new BusinessException(MemberErrorCode.EMAIL_VERIFICATION_RATE_LIMITED);
+        }
+        try {
+            sendCodeWithinLock(email, purpose);
+        } finally {
+            emailVerificationMapper.releaseRequestLock(email, purpose);
+        }
+    }
+
+    private void sendCodeWithinLock(String email, EmailVerificationPurpose purpose) {
         LocalDateTime now = LocalDateTime.now(clock);
-        emailVerificationMapper.findLatest(email, EmailVerificationPurpose.SIGNUP)
+        emailVerificationMapper.findLatest(email, purpose)
                 .filter(latest -> latest.getCreatedAt()
                         .plus(RESEND_INTERVAL)
                         .isAfter(now))
@@ -54,7 +68,7 @@ public class EmailVerificationService {
                 });
         if (emailVerificationMapper.countRequestsSince(
                 email,
-                EmailVerificationPurpose.SIGNUP,
+                purpose,
                 now.minus(REQUEST_WINDOW)) >= MAX_REQUESTS_PER_WINDOW) {
             throw new BusinessException(MemberErrorCode.EMAIL_VERIFICATION_RATE_LIMITED);
         }
@@ -62,7 +76,7 @@ public class EmailVerificationService {
         String code = "%06d".formatted(SECURE_RANDOM.nextInt(1_000_000));
         EmailVerification verification = new EmailVerification();
         verification.setEmail(email);
-        verification.setPurpose(EmailVerificationPurpose.SIGNUP);
+        verification.setPurpose(purpose);
         verification.setCodeHash(passwordEncoder.encode(code));
         verification.setExpiresAt(now.plus(CODE_TTL));
         if (emailVerificationMapper.insert(verification) != 1) {
@@ -74,7 +88,7 @@ public class EmailVerificationService {
 
     /** 가장 최근 회원가입 인증번호를 확인한다. */
     @Transactional
-    public void verifySignupCode(String rawEmail, String code) {
+    public String verifySignupCode(String rawEmail, String code) {
         String email = normalizeAndValidateEmail(rawEmail);
         LocalDateTime now = LocalDateTime.now(clock);
         EmailVerification verification = emailVerificationMapper.findLatest(
@@ -84,7 +98,7 @@ public class EmailVerificationService {
                         MemberErrorCode.EMAIL_VERIFICATION_INVALID));
 
         if (verification.getVerifiedAt() != null) {
-            return;
+            return email;
         }
         if (verification.getConsumedAt() != null
                 || !verification.getExpiresAt().isAfter(now)
@@ -104,6 +118,7 @@ public class EmailVerificationService {
                 now) != 1) {
             throw new BusinessException(MemberErrorCode.EMAIL_VERIFICATION_INVALID);
         }
+        return email;
     }
 
     /** 인증된 이메일을 회원가입에서 한 번만 사용 처리한다. */

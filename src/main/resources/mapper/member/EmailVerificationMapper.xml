@@ -29,6 +29,19 @@
         updated_at
     </sql>
 
+    <select id="acquireRequestLock" resultType="int">
+        SELECT GET_LOCK(
+            SHA2(CONCAT('email-verification:', #{email}, ':', #{purpose}), 256),
+            #{timeoutSeconds}
+        )
+    </select>
+
+    <select id="releaseRequestLock" resultType="int">
+        SELECT RELEASE_LOCK(
+            SHA2(CONCAT('email-verification:', #{email}, ':', #{purpose}), 256)
+        )
+    </select>
+
     <insert id="insert"
             parameterType="com.cakeshop.domain.member.entity.EmailVerification"
             useGeneratedKeys="true"

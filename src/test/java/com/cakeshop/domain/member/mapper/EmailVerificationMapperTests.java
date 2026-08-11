@@ -26,6 +26,14 @@ class EmailVerificationMapperTests {
     private JdbcTemplate jdbcTemplate;
 
     @Test
+    void requestLock_sameEmailAndPurpose_canAcquireAndRelease() {
+        assertThat(emailVerificationMapper.acquireRequestLock(
+                "lock@example.com", EmailVerificationPurpose.SIGNUP, 1)).isOne();
+        assertThat(emailVerificationMapper.releaseRequestLock(
+                "lock@example.com", EmailVerificationPurpose.SIGNUP)).isOne();
+    }
+
+    @Test
     void findLatest_multipleRequests_returnsNewestRequest() {
         EmailVerification first = insert("latest@example.com", NOW.plusMinutes(5));
         EmailVerification second = insert("latest@example.com", NOW.plusMinutes(6));
