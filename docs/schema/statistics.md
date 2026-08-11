@@ -1,21 +1,76 @@
 # 통계 스키마
 
 - 담당: 시은
-- 물리 테이블: 없음
-- 성격: 여러 소유 도메인의 테이블을 읽어 집계하는 ReadModel
+- 물리 테이블: 2개
+- 성격: 여러 소유 도메인의 원본을 읽어 재생성 가능한 파생 집계 데이터를 관리한다.
 
-## 현재 상태
+## `daily_statistics`
 
-현재 Flyway migration에는 `statistics`가 소유하는 물리 테이블이 없다. 따라서 이 문서에는 임의의 통계 테이블이나
-컬럼을 정의하지 않는다. 통계 화면의 조회 SQL이 다른 도메인의 테이블을 읽더라도 그 테이블 소유권은 원래 도메인에
-남는다.
+날짜별 주문·매출 집계 결과를 저장한다. `statistics_date`당 한 행이며 원본 데이터가 없는 집계 완료
+날짜도 지표가 `0`인 행을 저장한다.
+
+| 컬럼 | 타입 | Null | 기본값 | 키·속성 |
+|---|---|---|---|---|
+| `statistics_date` | `DATE` | X | 없음 | PK |
+| `total_order_count` | `BIGINT` | X | `0` | CHECK |
+| `completed_order_count` | `BIGINT` | X | `0` | CHECK |
+| `canceled_order_count` | `BIGINT` | X | `0` | CHECK |
+| `total_sales_amount` | `DECIMAL(18, 0)` | X | `0` | CHECK |
+| `aggregated_at` | `DATETIME(6)` | X | 없음 |  |
+
+### 제약조건
+
+- `chk_daily_statistics_counts`: 주문 건수 지표는 모두 `0` 이상이다.
+- `chk_daily_statistics_sales_amount`: 총매출은 `0` 이상이다.
+
+## `statistics_batch_runs`
+
+정규 일별 집계, 초기 백필과 운영자 수동 재집계의 실행 상태·범위·진행 상황을 기록한다.
+
+| 컬럼 | 타입 | Null | 기본값 | 키·속성 |
+|---|---|---|---|---|
+| `id` | `BIGINT` | X | 자동 증가 | PK |
+| `batch_type` | `VARCHAR(20)` | X | 없음 | CHECK |
+| `status` | `VARCHAR(20)` | X | 없음 | CHECK |
+| `source_window_started_at` | `DATETIME(6)` | O | `NULL` | CHECK |
+| `source_window_ended_at` | `DATETIME(6)` | O | `NULL` | CHECK |
+| `target_start_date` | `DATE` | X | 없음 | CHECK |
+| `target_end_date` | `DATE` | X | 없음 | CHECK |
+| `last_completed_date` | `DATE` | O | `NULL` | CHECK |
+| `started_at` | `DATETIME(6)` | X | `CURRENT_TIMESTAMP(6)` |  |
+| `heartbeat_at` | `DATETIME(6)` | X | `CURRENT_TIMESTAMP(6)` |  |
+| `completed_at` | `DATETIME(6)` | O | `NULL` | CHECK |
+| `running_lock` | `TINYINT` | O | 생성값 | GEN, UK |
+
+### 제약조건
+
+- `uk_statistics_batch_runs_running`: `RUNNING` 실행을 하나만 허용한다.
+- `chk_statistics_batch_runs_type`: `DAILY`, `BACKFILL`, `REBUILD`만 허용한다.
+- `chk_statistics_batch_runs_status`: `RUNNING`, `SUCCEEDED`, `FAILED`만 허용한다.
+- `chk_statistics_batch_runs_target_range`: 대상 시작일은 종료일보다 늦을 수 없다.
+- `chk_statistics_batch_runs_source_window`: 원본 변경 탐색 시각은 둘 다 없거나 유효한 범위여야 한다.
+- `chk_statistics_batch_runs_type_fields`: `DAILY`는 진행일을 사용하지 않고 `BACKFILL`, `REBUILD`는
+  원본 변경 탐색 시각을 사용하지 않는다.
+- `chk_statistics_batch_runs_progress`: 진행일은 대상 기간 안에 있어야 한다.
+- `chk_statistics_batch_runs_completion`: 실행 상태와 완료 시각의 존재 여부가 일치해야 한다.
+
+### 인덱스
+
+- `idx_statistics_batch_runs_daily_watermark`
+  (`batch_type`, `status`, `source_window_ended_at`)
+- `idx_statistics_batch_runs_backfill_history` (`batch_type`, `id`)
 
 ## 변경 원칙
 
-- 통계 전용 물리 테이블이 새 migration으로 추가될 때만 이 문서에 테이블 명세를 추가한다.
-- ReadModel이 읽는 테이블이나 집계 기준을 주요하게 변경할 때는 해당 테이블 담당자의 확인을 받는다.
+- 집계 결과는 원본 도메인의 데이터를 변경하는 근거로 사용하지 않는다.
+- ReadModel 원본 조회와 통계 집계 테이블 쓰기는 별도 Mapper로 분리한다.
+- ReadModel이 읽는 테이블이나 집계 기준을 주요하게 변경할 때 해당 테이블 담당자의 확인을 받는다.
 - 원본 테이블의 컬럼·제약조건은 이 문서에 복제하지 않고 각 도메인 문서를 참조한다.
-- 통계 조회를 위해 원본 도메인의 기존 migration을 수정하지 않는다.
+
+## 관련 migration
+
+- `V20260810_163646__create_statistics_aggregation_tables.sql`
+- `V20260811_101818__add_statistics_rebuild_batch_type.sql`
 
 ## 관련 문서
 
