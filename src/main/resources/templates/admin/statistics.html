@@ -67,11 +67,11 @@
 
         <section class="section">
           <div id="statistics-chart-data" hidden>
-            <span th:each="daily : ${statistics.dailyStatistics}"
+            <span th:each="trend : ${statistics.trends}"
                   data-statistics-point
-                  th:attr="data-axis-label=${#temporals.format(daily.date, 'yyyy.MM.dd')},
-                           data-order-count=${daily.orderCount},
-                           data-sales-amount=${daily.salesAmount}"></span>
+                  th:attr="data-axis-label=${trend.axisLabel},
+                           data-order-count=${trend.orderCount},
+                           data-sales-amount=${trend.salesAmount}"></span>
           </div>
           <div class="grid grid--2 statistics-chart-grid">
             <section>

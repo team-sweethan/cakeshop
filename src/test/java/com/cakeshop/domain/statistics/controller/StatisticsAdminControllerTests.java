@@ -11,8 +11,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.cakeshop.domain.statistics.dto.form.StatisticsPeriodType;
 import com.cakeshop.domain.statistics.dto.form.StatisticsSearchForm;
-import com.cakeshop.domain.statistics.dto.view.DailyStatisticsView;
 import com.cakeshop.domain.statistics.dto.view.PeriodStatisticsView;
+import com.cakeshop.domain.statistics.dto.view.StatisticsTrendView;
 import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
 import com.cakeshop.domain.statistics.error.StatisticsErrorCode;
 import com.cakeshop.domain.statistics.service.DashboardReadModelQueryService;
@@ -233,7 +233,7 @@ class StatisticsAdminControllerTests {
                 0,
                 0,
                 BigDecimal.ZERO,
-                List.<DailyStatisticsView>of()
+                List.<StatisticsTrendView>of()
         );
     }
 }

@@ -8,8 +8,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.cakeshop.domain.statistics.dto.view.DailyStatisticsView;
 import com.cakeshop.domain.statistics.dto.view.PeriodStatisticsView;
+import com.cakeshop.domain.statistics.dto.view.StatisticsTrendView;
 import com.cakeshop.domain.statistics.service.DashboardReadModelQueryService;
 import com.cakeshop.domain.statistics.service.PeriodStatisticsReadModelQueryService;
 import com.cakeshop.global.security.SecurityConfig;
@@ -67,12 +67,12 @@ class StatisticsAdminScreenRenderingTests {
                         2L,
                         new BigDecimal("123456"),
                         List.of(
-                                new DailyStatisticsView(
+                                StatisticsTrendView.daily(
                                         startDate,
                                         5L,
                                         new BigDecimal("45678")
                                 ),
-                                new DailyStatisticsView(
+                                StatisticsTrendView.daily(
                                         endDate,
                                         7L,
                                         new BigDecimal("77778")

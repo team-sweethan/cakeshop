@@ -6,8 +6,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.cakeshop.domain.statistics.dto.view.DailyStatisticsRow;
-import com.cakeshop.domain.statistics.dto.view.DailyStatisticsView;
 import com.cakeshop.domain.statistics.dto.view.PeriodStatisticsView;
+import com.cakeshop.domain.statistics.dto.view.StatisticsTrendView;
 import com.cakeshop.domain.statistics.error.StatisticsErrorCode;
 import com.cakeshop.domain.statistics.mapper.PeriodStatisticsReadModelMapper;
 import com.cakeshop.global.error.BusinessException;
@@ -46,7 +46,7 @@ class PeriodStatisticsReadModelQueryServiceTests {
 
         assertThat(statistics.startDate()).isEqualTo(startDate);
         assertThat(statistics.endDate()).isEqualTo(YESTERDAY);
-        assertThat(statistics.dailyStatistics()).hasSize(7);
+        assertThat(statistics.trends()).hasSize(7);
         assertThat(statistics.aggregationDelayed()).isFalse();
     }
 
@@ -65,7 +65,7 @@ class PeriodStatisticsReadModelQueryServiceTests {
 
         assertThat(statistics.startDate()).isEqualTo(completedStartDate);
         assertThat(statistics.endDate()).isEqualTo(latestCompletedDate);
-        assertThat(statistics.dailyStatistics()).hasSize(3);
+        assertThat(statistics.trends()).hasSize(3);
         assertThat(statistics.aggregationDelayed()).isTrue();
     }
 
@@ -85,9 +85,9 @@ class PeriodStatisticsReadModelQueryServiceTests {
         assertThat(statistics.completedOrderCount()).isEqualTo(3);
         assertThat(statistics.canceledOrderCount()).isOne();
         assertThat(statistics.totalSalesAmount()).isEqualByComparingTo("70000");
-        assertThat(statistics.dailyStatistics()).containsExactly(
-                new DailyStatisticsView(startDate, 3, new BigDecimal("50000")),
-                new DailyStatisticsView(YESTERDAY, 2, new BigDecimal("20000"))
+        assertThat(statistics.trends()).containsExactly(
+                StatisticsTrendView.daily(startDate, 3, new BigDecimal("50000")),
+                StatisticsTrendView.daily(YESTERDAY, 2, new BigDecimal("20000"))
         );
     }
 

@@ -1,8 +1,8 @@
 package com.cakeshop.domain.statistics.service;
 
 import com.cakeshop.domain.statistics.dto.view.DailyStatisticsRow;
-import com.cakeshop.domain.statistics.dto.view.DailyStatisticsView;
 import com.cakeshop.domain.statistics.dto.view.PeriodStatisticsView;
+import com.cakeshop.domain.statistics.dto.view.StatisticsTrendView;
 import com.cakeshop.domain.statistics.error.StatisticsErrorCode;
 import com.cakeshop.domain.statistics.mapper.PeriodStatisticsReadModelMapper;
 import com.cakeshop.global.error.BusinessException;
@@ -118,8 +118,8 @@ public class PeriodStatisticsReadModelQueryService {
         BigDecimal totalSalesAmount = rows.stream()
                 .map(DailyStatisticsRow::totalSalesAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        List<DailyStatisticsView> dailyStatistics = rows.stream()
-                .map(row -> new DailyStatisticsView(
+        List<StatisticsTrendView> trends = rows.stream()
+                .map(row -> StatisticsTrendView.daily(
                         row.date(),
                         row.totalOrderCount(),
                         row.totalSalesAmount()
@@ -133,7 +133,7 @@ public class PeriodStatisticsReadModelQueryService {
                 completedOrderCount,
                 canceledOrderCount,
                 totalSalesAmount,
-                dailyStatistics,
+                trends,
                 aggregationDelayed
         );
     }
