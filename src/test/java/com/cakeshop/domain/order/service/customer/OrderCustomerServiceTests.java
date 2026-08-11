@@ -113,7 +113,7 @@ class OrderCustomerServiceTests {
     }
 
     @Test
-    void getMemberOrder_customOrder_doesNotExposeGeneralCancellation() {
+    void getMemberOrder_customOrderUnderReview_exposesCustomerCancellationOnly() {
         Order order = order(10L, 3L);
         order.setOrderType(OrderType.CUSTOM);
         order.setStatus(OrderStatus.UNDER_REVIEW);
@@ -124,7 +124,7 @@ class OrderCustomerServiceTests {
 
         OrderDetailView result = orderQueryService.getMemberOrder(3L, 10L);
 
-        assertThat(result.cancelRequestAvailable()).isFalse();
+        assertThat(result.cancelRequestAvailable()).isTrue();
         assertThat(result.adminCancellationAvailable()).isFalse();
     }
 

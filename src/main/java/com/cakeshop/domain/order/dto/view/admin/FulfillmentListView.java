@@ -22,6 +22,9 @@ public record FulfillmentListView(
             String pickupName,
             String pickupPhone,
             LocalDateTime pickupAt,
+            boolean productionStartable,
+            boolean productionCompletable,
+            boolean rejectionAvailable,
             boolean pickupCompletable,
             List<Item> items
     ) {
@@ -33,6 +36,7 @@ public record FulfillmentListView(
         public String statusLabel() {
             return switch (status) {
                 case UNDER_REVIEW -> "승인 대기";
+                case IN_PRODUCTION -> "제작 중";
                 case READY_FOR_PICKUP -> "픽업 준비";
                 case PICKED_UP -> "픽업 완료";
                 default -> status.name();
@@ -42,6 +46,7 @@ public record FulfillmentListView(
         public String statusClass() {
             return switch (status) {
                 case UNDER_REVIEW -> "badge--warning";
+                case IN_PRODUCTION -> "badge--info";
                 case READY_FOR_PICKUP -> "badge--success";
                 case PICKED_UP -> "badge--info";
                 default -> "";

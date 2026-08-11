@@ -50,7 +50,7 @@
 - UK: `uk_orders_member_request_key` (`member_id`, `request_key`)
 - FK: `member_id`, `approved_by`, `rejected_by`, `picked_up_by` → 각각 `members.id`
 - CHECK: `order_type IN ('GENERAL', 'CUSTOM')`
-- CHECK: `status IN ('PENDING_PAYMENT', 'UNDER_REVIEW', 'READY_FOR_PICKUP', 'PICKED_UP', 'CANCELED', 'REJECTED', 'EXPIRED')`
+- CHECK: `status IN ('PENDING_PAYMENT', 'UNDER_REVIEW', 'IN_PRODUCTION', 'READY_FOR_PICKUP', 'PICKED_UP', 'CANCELED', 'REJECTED', 'EXPIRED')`
 - CHECK: 세 금액은 0 이상이고 `REJECTED` 상태에는 `reject_reason`이 필요하다.
 - INDEX: `idx_orders_status` (`status`)
 - INDEX: `idx_orders_pickup_at` (`pickup_at`)

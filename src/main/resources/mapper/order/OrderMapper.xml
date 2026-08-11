@@ -96,7 +96,7 @@
                 ON cancellation.payment_id = payment.id
             WHERE payment.order_id = #{orderId}
               AND cancellation.status = 'REQUESTED'
-              AND cancellation.request_type IN ('CUSTOMER', 'ADMIN')
+              AND cancellation.request_type IN ('CUSTOMER', 'ADMIN', 'ADMIN_REJECTION')
         )
     </select>
 
@@ -156,6 +156,7 @@
             request_message,
             reject_reason,
             under_review_at,
+            approved_at,
             rejected_at,
             rejected_by,
             ready_at,
@@ -212,6 +213,7 @@
             request_message,
             reject_reason,
             under_review_at,
+            approved_at,
             rejected_at,
             rejected_by,
             ready_at,
@@ -251,6 +253,7 @@
             request_message,
             reject_reason,
             under_review_at,
+            approved_at,
             rejected_at,
             rejected_by,
             ready_at,
@@ -290,6 +293,7 @@
             request_message,
             reject_reason,
             under_review_at,
+            approved_at,
             rejected_at,
             rejected_by,
             ready_at,
@@ -342,6 +346,7 @@
             request_message,
             reject_reason,
             under_review_at,
+            approved_at,
             rejected_at,
             rejected_by,
             ready_at,
@@ -358,7 +363,7 @@
         FROM orders
         WHERE pickup_at &gt;= #{pickupStart}
           AND pickup_at &lt; #{pickupEnd}
-          AND status IN ('UNDER_REVIEW', 'READY_FOR_PICKUP', 'PICKED_UP')
+          AND status IN ('UNDER_REVIEW', 'IN_PRODUCTION', 'READY_FOR_PICKUP', 'PICKED_UP')
         <if test="status != null">
           AND status = #{status}
         </if>
@@ -514,14 +519,37 @@
           )
     </update>
 
-    <update id="approveIfUnderReview">
+    <update id="startProductionIfUnderReview">
         UPDATE orders
-        SET status = 'READY_FOR_PICKUP',
-            approved_by = #{approvedBy},
-            ready_at = #{readyAt}
+        SET status = 'IN_PRODUCTION',
+            approved_at = #{approvedAt},
+            approved_by = #{approvedBy}
         WHERE id = #{orderId}
           AND order_type = 'CUSTOM'
           AND status = 'UNDER_REVIEW'
+          AND EXISTS (
+              SELECT 1
+              FROM payments AS payment
+              WHERE payment.order_id = orders.id
+                AND payment.status = 'DONE'
+          )
+          AND NOT EXISTS (
+              SELECT 1
+              FROM payments AS cancel_payment
+              INNER JOIN payment_cancellations AS cancellation
+                  ON cancellation.payment_id = cancel_payment.id
+              WHERE cancel_payment.order_id = orders.id
+                AND cancellation.status = 'REQUESTED'
+          )
+    </update>
+
+    <update id="markReadyForPickupIfInProduction">
+        UPDATE orders
+        SET status = 'READY_FOR_PICKUP',
+            ready_at = #{readyAt}
+        WHERE id = #{orderId}
+          AND order_type = 'CUSTOM'
+          AND status = 'IN_PRODUCTION'
           AND EXISTS (
               SELECT 1
               FROM payments AS payment
@@ -634,6 +662,23 @@
           AND order_type = 'GENERAL'
           AND status = 'READY_FOR_PICKUP'
           AND #{requestedAt} &lt; pickup_at
+    </update>
+
+    <update id="cancelCustomIfUnderReview">
+        UPDATE orders
+        SET status = 'CANCELED',
+            canceled_by = #{canceledBy},
+            cancel_reason = #{cancelReason},
+            canceled_at = #{canceledAt}
+        WHERE id = #{orderId}
+          AND order_type = 'CUSTOM'
+          AND status = 'UNDER_REVIEW'
+          AND EXISTS (
+              SELECT 1
+              FROM payments AS payment
+              WHERE payment.order_id = orders.id
+                AND payment.status = 'CANCELED'
+          )
     </update>
 
 </mapper>

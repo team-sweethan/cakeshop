@@ -71,6 +71,30 @@ class OrderPaymentCancellationCommandServiceTests {
     }
 
     @Test
+    void isPaymentCancellationAvailable_underReviewCustomOrder_allowsCustomerAndAdminRejection() {
+        Order order = order(3L);
+        order.setOrderType(OrderType.CUSTOM);
+        order.setStatus(OrderStatus.UNDER_REVIEW);
+        when(orderMapper.findOrderById(10L)).thenReturn(Optional.of(order));
+
+        assertThat(service.isPaymentCancellationAvailable(10L, "CUSTOMER", REQUESTED_AT)).isTrue();
+        assertThat(service.isPaymentCancellationAvailable(10L, "ADMIN_REJECTION", REQUESTED_AT)).isTrue();
+        assertThat(service.isPaymentCancellationAvailable(10L, "ADMIN", REQUESTED_AT)).isFalse();
+    }
+
+    @Test
+    void isPaymentCancellationAvailable_inProductionCustomOrder_blocksEveryRefundAction() {
+        Order order = order(3L);
+        order.setOrderType(OrderType.CUSTOM);
+        order.setStatus(OrderStatus.IN_PRODUCTION);
+        when(orderMapper.findOrderById(10L)).thenReturn(Optional.of(order));
+
+        assertThat(service.isPaymentCancellationAvailable(10L, "CUSTOMER", REQUESTED_AT)).isFalse();
+        assertThat(service.isPaymentCancellationAvailable(10L, "ADMIN_REJECTION", REQUESTED_AT)).isFalse();
+        assertThat(service.isPaymentCancellationAvailable(10L, "ADMIN", REQUESTED_AT)).isFalse();
+    }
+
+    @Test
     void completeGeneralPaymentCancellation_restoresOnlyRecordedStock() {
         Order order = order(3L);
         OrderItem deductedItem = deductedItem();

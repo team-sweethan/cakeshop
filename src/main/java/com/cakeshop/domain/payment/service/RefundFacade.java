@@ -47,6 +47,19 @@ public class RefundFacade {
         cancel(request);
     }
 
+    /** 관리자가 승인 전 수제 주문을 반려하고 결제를 전액 환불한다. */
+    public void rejectCustomOrder(long adminMemberId, long orderId, String reason) {
+        if (refundService.rejectCustomZeroAmountOrder(adminMemberId, orderId, reason)) {
+            return;
+        }
+        RefundRequest request = refundService.prepareAdminRejection(
+                adminMemberId,
+                orderId,
+                reason
+        );
+        cancel(request);
+    }
+
     /** 남은 고객·관리자 취소 요청을 같은 멱등키로 재시도한다. */
     public void recoverPendingCancellations(int batchSize) {
         for (RefundRequest request : refundService.getRequestedCancellations(batchSize)) {

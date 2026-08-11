@@ -83,6 +83,9 @@ public class OrderViewAssembler {
     }
 
     private boolean isCancellationRequestAvailable(Order order, LocalDateTime now) {
+        if (order.getOrderType() == OrderType.CUSTOM) {
+            return order.getStatus() == OrderStatus.UNDER_REVIEW;
+        }
         return order.getOrderType() == OrderType.GENERAL
                 && order.getStatus() == OrderStatus.READY_FOR_PICKUP
                 && order.getPickupAt() != null

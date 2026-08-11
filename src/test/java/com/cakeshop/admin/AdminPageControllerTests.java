@@ -48,6 +48,7 @@ import com.cakeshop.domain.order.controller.admin.FulfillmentAdminController;
 import com.cakeshop.domain.order.controller.admin.OrderAdminController;
 import com.cakeshop.domain.order.dto.view.admin.FulfillmentListView;
 import com.cakeshop.domain.order.service.admin.AdminOrderService;
+import com.cakeshop.domain.order.service.admin.AdminCustomOrderService;
 import com.cakeshop.domain.order.service.admin.FulfillmentService;
 import com.cakeshop.domain.payment.controller.PaymentAdminController;
 import com.cakeshop.domain.payment.dto.view.PaymentAdminListView;
@@ -176,7 +177,9 @@ class AdminPageControllerTests {
                         Mockito.mock(AdminOrderService.class),
                         Mockito.mock(RefundFacade.class)),
                 new FulfillmentAdminController(
-                        fulfillmentService),
+                        fulfillmentService,
+                        Mockito.mock(AdminCustomOrderService.class),
+                        Mockito.mock(RefundFacade.class)),
                 new PaymentAdminController(paymentAdminQueryService),
                 new MemberAdminController(
                         Mockito.mock(MemberAdminService.class),

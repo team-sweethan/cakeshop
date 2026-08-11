@@ -191,18 +191,19 @@ class OrderMapperTests {
     }
 
     @Test
-    void approveIfUnderReview_recordsStatusTimeAndProcessorConditionally() {
+    void customProductionTransitions_recordStatusTimeAndProcessorConditionally() {
         Order order = newOrder();
         orderMapper.insertOrder(order);
         LocalDateTime underReviewAt =
                 LocalDateTime.of(2026, 8, 1, 12, 1);
-        LocalDateTime readyAt =
+        LocalDateTime approvedAt =
                 LocalDateTime.of(2026, 8, 1, 12, 5);
+        LocalDateTime readyAt = approvedAt.plusMinutes(10);
 
-        assertThat(orderMapper.approveIfUnderReview(
+        assertThat(orderMapper.startProductionIfUnderReview(
                 order.getId(),
                 memberId,
-                readyAt
+                approvedAt
         )).isZero();
 
         assertThat(orderMapper.markUnderReviewAfterPaymentIfPending(
@@ -219,30 +220,29 @@ class OrderMapperTests {
         assertThat(underReview.getStatus()).isEqualTo(OrderStatus.UNDER_REVIEW);
         assertThat(underReview.getUnderReviewAt()).isEqualTo(underReviewAt);
 
-        assertThat(orderMapper.approveIfUnderReview(
+        assertThat(orderMapper.startProductionIfUnderReview(
                 order.getId(),
                 memberId,
-                readyAt
+                approvedAt
         )).isEqualTo(1);
         Order approved = orderMapper.findOrderById(order.getId())
                 .orElseThrow();
-        assertThat(approved.getStatus()).isEqualTo(OrderStatus.READY_FOR_PICKUP);
+        assertThat(approved.getStatus()).isEqualTo(OrderStatus.IN_PRODUCTION);
         assertThat(approved.getApprovedBy()).isEqualTo(memberId);
-        assertThat(approved.getReadyAt()).isEqualTo(readyAt);
+        assertThat(approved.getApprovedAt()).isEqualTo(approvedAt);
+        assertThat(approved.getReadyAt()).isNull();
 
-        assertThat(orderMapper.approveIfUnderReview(
+        assertThat(orderMapper.startProductionIfUnderReview(
                 order.getId(),
                 memberId,
                 readyAt.plusMinutes(1)
         )).isZero();
-        assertThat(orderMapper.cancelIfCurrent(
+        assertThat(orderMapper.markReadyForPickupIfInProduction(
                 order.getId(),
-                OrderStatus.READY_FOR_PICKUP,
-                "CUSTOMER",
-                "승인 후 취소 시도",
-                readyAt.plusMinutes(1),
-                readyAt.plusMinutes(1)
-        )).isZero();
+                readyAt
+        )).isEqualTo(1);
+        assertThat(orderMapper.findOrderById(order.getId()).orElseThrow().getStatus())
+                .isEqualTo(OrderStatus.READY_FOR_PICKUP);
     }
 
     @Test
@@ -365,6 +365,29 @@ class OrderMapperTests {
                 rejectedAt.plusMinutes(1),
                 "다시 반려"
         )).isZero();
+    }
+
+    @Test
+    void cancelCustomIfUnderReview_afterPaymentCancellation_marksOrderCanceled() {
+        Order order = newOrder();
+        orderMapper.insertOrder(order);
+        LocalDateTime underReviewAt = LocalDateTime.of(2026, 8, 1, 12, 1);
+        LocalDateTime canceledAt = underReviewAt.plusMinutes(5);
+        long paymentId = insertPayment(order.getId(), "DONE", "CUSTOMER-CUSTOM-CANCEL");
+        assertThat(orderMapper.markUnderReviewAfterPaymentIfPending(order.getId(), underReviewAt))
+                .isEqualTo(1);
+
+        assertThat(orderMapper.cancelCustomIfUnderReview(
+                order.getId(), "CUSTOMER", "단순 변심", canceledAt
+        )).isZero();
+
+        cancelPayment(paymentId, canceledAt);
+        assertThat(orderMapper.cancelCustomIfUnderReview(
+                order.getId(), "CUSTOMER", "단순 변심", canceledAt
+        )).isEqualTo(1);
+        Order canceled = orderMapper.findOrderById(order.getId()).orElseThrow();
+        assertThat(canceled.getStatus()).isEqualTo(OrderStatus.CANCELED);
+        assertThat(canceled.getCanceledBy()).isEqualTo("CUSTOMER");
     }
 
     @Test

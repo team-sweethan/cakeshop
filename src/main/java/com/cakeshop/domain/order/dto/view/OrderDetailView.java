@@ -38,6 +38,7 @@ public record OrderDetailView(
         return switch (status) {
             case PENDING_PAYMENT -> "결제 대기";
             case UNDER_REVIEW -> "승인 대기";
+            case IN_PRODUCTION -> "제작 중";
             case READY_FOR_PICKUP -> "픽업 준비";
             case PICKED_UP -> "픽업 완료";
             case CANCELED -> "취소 완료";
@@ -50,8 +51,20 @@ public record OrderDetailView(
         return status == OrderStatus.READY_FOR_PICKUP;
     }
 
+    public boolean fulfillmentManageable() {
+        return status == OrderStatus.READY_FOR_PICKUP
+                || (orderType == OrderType.CUSTOM
+                && (status == OrderStatus.UNDER_REVIEW || status == OrderStatus.IN_PRODUCTION));
+    }
+
     public boolean adminCancellationAvailable() {
-        return cancelRequestAvailable();
+        return orderType == OrderType.GENERAL && cancelRequestAvailable();
+    }
+
+    public String customerCancellationGuide() {
+        return orderType == OrderType.CUSTOM
+                ? "주문 제작은 관리자 승인 전까지 전액 취소할 수 있습니다."
+                : "일반 상품은 픽업 예정 시각 전까지 전액 취소할 수 있습니다.";
     }
 
     public record Item(

@@ -33,6 +33,7 @@ class OrderPaymentEntitySchemaTests {
         assertThat(OrderStatus.values()).containsExactly(
                 OrderStatus.PENDING_PAYMENT,
                 OrderStatus.UNDER_REVIEW,
+                OrderStatus.IN_PRODUCTION,
                 OrderStatus.READY_FOR_PICKUP,
                 OrderStatus.PICKED_UP,
                 OrderStatus.CANCELED,
@@ -76,6 +77,7 @@ class OrderPaymentEntitySchemaTests {
                 Map.entry("requestMessage", String.class),
                 Map.entry("rejectReason", String.class),
                 Map.entry("underReviewAt", LocalDateTime.class),
+                Map.entry("approvedAt", LocalDateTime.class),
                 Map.entry("rejectedAt", LocalDateTime.class),
                 Map.entry("rejectedBy", Long.class),
                 Map.entry("readyAt", LocalDateTime.class),

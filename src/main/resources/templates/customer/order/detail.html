@@ -76,7 +76,9 @@
             <textarea class="form-control form-control--textarea" id="cancel-reason" name="reason"
                       maxlength="200" required></textarea>
             <button class="btn btn--danger" type="submit">주문 취소</button>
-            <p class="note">일반 상품은 픽업 예정 시각 전까지 전액 취소할 수 있습니다.</p>
+            <p class="note" th:text="${order.customerCancellationGuide()}">
+              일반 상품은 픽업 예정 시각 전까지 전액 취소할 수 있습니다.
+            </p>
           </form>
         </div>
       </section>

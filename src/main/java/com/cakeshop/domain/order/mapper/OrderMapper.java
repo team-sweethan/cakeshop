@@ -140,13 +140,19 @@ public interface OrderMapper {
     );
 
     /**
-     * DONE 결제가 유지되는 UNDER_REVIEW 주문제작을 승인하고 픽업 대기 상태로 변경한다.
+     * DONE 결제가 유지되는 UNDER_REVIEW 주문제작을 승인하고 제작 중 상태로 변경한다.
      *
      * @return 상태를 변경했으면 1, 조건이 맞지 않으면 0
      */
-    int approveIfUnderReview(
+    int startProductionIfUnderReview(
             @Param("orderId") long orderId,
             @Param("approvedBy") long approvedBy,
+            @Param("approvedAt") LocalDateTime approvedAt
+    );
+
+    /** DONE 결제가 유지되는 제작 중 주문제작을 제작 완료 후 픽업 대기로 변경한다. */
+    int markReadyForPickupIfInProduction(
+            @Param("orderId") long orderId,
             @Param("readyAt") LocalDateTime readyAt
     );
 
@@ -205,6 +211,14 @@ public interface OrderMapper {
             @Param("canceledBy") String canceledBy,
             @Param("cancelReason") String cancelReason,
             @Param("requestedAt") LocalDateTime requestedAt,
+            @Param("canceledAt") LocalDateTime canceledAt
+    );
+
+    /** 결제가 CANCELED인 UNDER_REVIEW 주문제작을 고객 취소 상태로 변경한다. */
+    int cancelCustomIfUnderReview(
+            @Param("orderId") long orderId,
+            @Param("canceledBy") String canceledBy,
+            @Param("cancelReason") String cancelReason,
             @Param("canceledAt") LocalDateTime canceledAt
     );
 }
