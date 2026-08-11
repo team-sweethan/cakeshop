@@ -30,14 +30,14 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 class ProductControllerTests {
 
     @Test
-    void listBindsSearchConditionAndUsesSixItemsPerPage() throws Exception {
+    void listBindsSearchConditionAndUsesEightItemsPerPage() throws Exception {
         ProductService productService =
                 mock(ProductService.class);
 
         PageResult<ProductListView> pageResult =
                 new PageResult<>(
                         List.of(),
-                        new PageRequest(2, 6),
+                        new PageRequest(2, 8),
                         8
                 );
 
@@ -95,8 +95,8 @@ class ProductControllerTests {
                 .isEqualTo(ProductSort.PRICE_ASC);
 
         assertThat(pageCaptor.getValue().getPage()).isEqualTo(2);
-        assertThat(pageCaptor.getValue().getSize()).isEqualTo(6);
-        assertThat(pageCaptor.getValue().getOffset()).isEqualTo(6);
+        assertThat(pageCaptor.getValue().getSize()).isEqualTo(8);
+        assertThat(pageCaptor.getValue().getOffset()).isEqualTo(8);
     }
 
     @Test
@@ -107,7 +107,7 @@ class ProductControllerTests {
         PageResult<ProductListView> pageResult =
                 new PageResult<>(
                         List.of(),
-                        new PageRequest(1, 6),
+                        new PageRequest(1, 8),
                         0
                 );
 
@@ -158,6 +158,6 @@ class ProductControllerTests {
                 .isEqualByComparingTo("100000");
 
         assertThat(pageCaptor.getValue().getPage()).isEqualTo(1);
-        assertThat(pageCaptor.getValue().getSize()).isEqualTo(6);
+        assertThat(pageCaptor.getValue().getSize()).isEqualTo(8);
     }
 }

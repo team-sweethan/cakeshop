@@ -237,6 +237,10 @@ class CustomerPageControllerTests {
 
         assertThat(productDetailTemplate)
                 .contains("and product.productType.name() == 'GENERAL'")
+                .containsSubsequence(
+                        "data-product-option-groups",
+                        "th:if=\"${product.productType.name() == 'GENERAL'}\""
+                )
                 .contains("th:href=\"@{/orders/custom/options}\"");
     }
 

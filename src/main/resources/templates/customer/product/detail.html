@@ -243,7 +243,10 @@
       </div>
 
       <!-- 실제 상품 옵션 -->
-      <div class="section" style="margin-top:16px">
+      <div class="section"
+           data-product-option-groups
+           th:if="${product.productType.name() == 'GENERAL'}"
+           style="margin-top:16px">
         <h3 class="form-label">선택 가능한 옵션</h3>
 
         <div class="stack"
