@@ -1,6 +1,7 @@
 package com.cakeshop.domain.coupon.dto.form;
 
 import com.cakeshop.domain.coupon.dto.view.CouponDisplayStatus;
+import com.cakeshop.domain.coupon.entity.CouponTargetType;
 import com.cakeshop.domain.coupon.entity.DiscountType;
 import java.time.LocalDateTime;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -15,6 +16,8 @@ public class CouponSearchCondition {
     private CouponDisplayStatus status;
     // 쿠폰 등록·수정 Form의 discountType과 이름 충돌 없이 목록 검색에만 바인딩한다.
     private DiscountType discountTypeFilter;
+    // 등록 Form의 targetType과 이름 충돌 없이 목록 검색에만 바인딩한다.
+    private CouponTargetType targetTypeFilter;
 
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
     private LocalDateTime periodStart;

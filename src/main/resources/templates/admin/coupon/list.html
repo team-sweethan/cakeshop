@@ -44,7 +44,7 @@
                             <option value="SCHEDULED">발급 예정</option>
                             <option value="ACTIVE">발급 중</option>
                             <option value="INACTIVE">발급 중지</option>
-                            <option value="EXHAUSTED">수량 소진</option>
+                            <option value="EXHAUSTED">발급 완료</option>
                             <option value="ENDED">종료</option>
                         </select>
                     </div>
@@ -58,6 +58,21 @@
                             <option value="">전체 할인 유형</option>
                             <option value="FIXED_AMOUNT">금액 할인</option>
                             <option value="PERCENTAGE">비율 할인</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="targetTypeFilter">발급 대상</label>
+
+                        <select id="targetTypeFilter"
+                                class="form-control"
+                                th:field="*{targetTypeFilter}">
+                            <option value="">전체 발급 대상</option>
+                            <option value="ALL_MEMBERS">전체 회원</option>
+                            <option value="NEW_MEMBERS">신규 회원</option>
+                            <option value="FIRST_ORDER">첫 주문 회원</option>
+                            <option value="BIRTHDAY">생일 회원</option>
+                            <option value="SPECIFIC_MEMBERS">특정 회원</option>
                         </select>
                     </div>
 
@@ -124,6 +139,7 @@
                                     keyword=${condition.keyword},
                                     status=${condition.status},
                                     discountTypeFilter=${condition.discountTypeFilter},
+                                    targetTypeFilter=${condition.targetTypeFilter},
                                     periodStart=${condition.periodStart},
                                     periodEnd=${condition.periodEnd},
                                     page=${pageResult.page}
@@ -162,14 +178,14 @@
                             <span th:case="'SCHEDULED'" class="badge badge--info" th:text="${coupon.displayStatus.description}">발급 예정</span>
                             <span th:case="'ACTIVE'" class="badge badge--success" th:text="${coupon.displayStatus.description}">발급 중</span>
                             <span th:case="'INACTIVE'" class="badge badge--warning" th:text="${coupon.displayStatus.description}">발급 중지</span>
-                            <span th:case="'EXHAUSTED'" class="badge badge--warning" th:text="${coupon.displayStatus.description}">수량 소진</span>
+                            <span th:case="'EXHAUSTED'" class="badge badge--warning" th:text="${coupon.displayStatus.description}">발급 완료</span>
                             <span th:case="'ENDED'" class="badge badge--danger" th:text="${coupon.displayStatus.description}">종료</span>
                         </td>
 
                         <td>
                             <div class="cluster">
                                  <a class="btn" th:if="${#strings.toString(coupon.displayStatus) != 'ENDED'}"
-                                    th:href="@{/admin/coupons/{couponId}/edit(couponId=${coupon.id}, keyword=${condition.keyword}, status=${condition.status}, discountTypeFilter=${condition.discountTypeFilter}, periodStart=${condition.periodStart}, periodEnd=${condition.periodEnd}, page=${pageResult.page}, origin='LIST')}">수정</a>
+                                    th:href="@{/admin/coupons/{couponId}/edit(couponId=${coupon.id}, keyword=${condition.keyword}, status=${condition.status}, discountTypeFilter=${condition.discountTypeFilter}, targetTypeFilter=${condition.targetTypeFilter}, periodStart=${condition.periodStart}, periodEnd=${condition.periodEnd}, page=${pageResult.page}, origin='LIST')}">수정</a>
 
                                 <form th:if="${#strings.toString(coupon.adminStatus) == 'ACTIVE'
                                         && #strings.toString(coupon.displayStatus) != 'ENDED'}"
@@ -178,6 +194,7 @@
                                      <input type="hidden" name="keyword" th:value="${condition.keyword}">
                                      <input type="hidden" name="status" th:value="${condition.status}">
                                      <input type="hidden" name="discountTypeFilter" th:value="${condition.discountTypeFilter}">
+                                     <input type="hidden" name="targetTypeFilter" th:value="${condition.targetTypeFilter}">
                                      <input type="hidden" name="periodStart" th:value="${condition.periodStart}">
                                      <input type="hidden" name="periodEnd" th:value="${condition.periodEnd}">
                                      <input type="hidden" name="page" th:value="${pageResult.page}">
@@ -192,6 +209,7 @@
                                      <input type="hidden" name="keyword" th:value="${condition.keyword}">
                                      <input type="hidden" name="status" th:value="${condition.status}">
                                      <input type="hidden" name="discountTypeFilter" th:value="${condition.discountTypeFilter}">
+                                     <input type="hidden" name="targetTypeFilter" th:value="${condition.targetTypeFilter}">
                                      <input type="hidden" name="periodStart" th:value="${condition.periodStart}">
                                      <input type="hidden" name="periodEnd" th:value="${condition.periodEnd}">
                                      <input type="hidden" name="page" th:value="${pageResult.page}">
@@ -217,6 +235,7 @@
                     keyword=${condition.keyword},
                     status=${condition.status},
                     discountTypeFilter=${condition.discountTypeFilter},
+                    targetTypeFilter=${condition.targetTypeFilter},
                     periodStart=${condition.periodStart},
                     periodEnd=${condition.periodEnd},
                     page=${pageNavigation.previousPage}
@@ -238,6 +257,7 @@
                     keyword=${condition.keyword},
                     status=${condition.status},
                     discountTypeFilter=${condition.discountTypeFilter},
+                    targetTypeFilter=${condition.targetTypeFilter},
                     periodStart=${condition.periodStart},
                     periodEnd=${condition.periodEnd},
                     page=${pageNumber}
@@ -251,6 +271,7 @@
                     keyword=${condition.keyword},
                     status=${condition.status},
                     discountTypeFilter=${condition.discountTypeFilter},
+                    targetTypeFilter=${condition.targetTypeFilter},
                     periodStart=${condition.periodStart},
                     periodEnd=${condition.periodEnd},
                     page=${pageNavigation.nextPage}

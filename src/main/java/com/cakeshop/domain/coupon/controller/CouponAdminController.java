@@ -358,6 +358,7 @@ public class CouponAdminController {
         redirectAttributes.addAttribute("keyword", condition.getKeyword());
         redirectAttributes.addAttribute("status", condition.getStatus());
         redirectAttributes.addAttribute("discountTypeFilter", condition.getDiscountTypeFilter());
+        redirectAttributes.addAttribute("targetTypeFilter", condition.getTargetTypeFilter());
         redirectAttributes.addAttribute("periodStart", condition.getPeriodStart());
         redirectAttributes.addAttribute("periodEnd", condition.getPeriodEnd());
         redirectAttributes.addAttribute("page", page);

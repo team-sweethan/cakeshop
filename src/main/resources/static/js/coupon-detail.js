@@ -3,7 +3,7 @@
     if (!detail) return;
 
     const {
-        couponId, keyword, status, discountTypeFilter, periodStart, periodEnd,
+        couponId, keyword, status, discountTypeFilter, targetTypeFilter, periodStart, periodEnd,
         page, csrfName, csrfToken, specificMembers
     } = detail.dataset;
     configureTargetMemberHeader();
@@ -136,6 +136,7 @@
             ['keyword', keyword],
             ['status', status],
             ['discountTypeFilter', discountTypeFilter],
+            ['targetTypeFilter', targetTypeFilter],
             ['periodStart', periodStart],
             ['periodEnd', periodEnd],
             ['page', page]
