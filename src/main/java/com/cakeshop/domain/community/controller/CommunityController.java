@@ -8,6 +8,7 @@ import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
 import com.cakeshop.domain.community.dto.view.PostSort;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
+import com.cakeshop.domain.community.service.CommunityNoticeService;
 import com.cakeshop.domain.community.service.CommunityService;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.common.paging.PageNavigation;
@@ -45,6 +46,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class CommunityController {
 
     private final CommunityService communityService;
+    private final CommunityNoticeService communityNoticeService;
 
     @GetMapping("/community")
     public String list(
@@ -74,6 +76,10 @@ public class CommunityController {
         model.addAttribute("selectedSort", selectedSort);
         model.addAttribute("sortOptions", PostSort.values());
 
+        model.addAttribute(
+                "noticeSection",
+                communityNoticeService.getListSection(selectedCategoryId, pageRequest)
+        );
         model.addAttribute(
                 "popularSection",
                 communityService.getPopularSection(selectedCategoryId, pageRequest)

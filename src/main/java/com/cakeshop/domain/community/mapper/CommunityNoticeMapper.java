@@ -1,10 +1,13 @@
 package com.cakeshop.domain.community.mapper;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import com.cakeshop.domain.community.dto.command.NoticeUpdateCommand;
 import com.cakeshop.domain.community.dto.query.AdminNoticeDetailRow;
 import com.cakeshop.domain.community.dto.query.AdminNoticeListRow;
+import com.cakeshop.domain.community.dto.query.NoticeDetailRow;
+import com.cakeshop.domain.community.dto.query.NoticeListRow;
 import com.cakeshop.domain.community.dto.query.NoticeLockRow;
 import com.cakeshop.domain.community.entity.Notice;
 
@@ -22,6 +25,21 @@ import org.apache.ibatis.annotations.Param;
  */
 @Mapper
 public interface CommunityNoticeMapper {
+
+    List<NoticeListRow> selectVisibleNotices(
+            @Param("now") LocalDateTime now,
+            @Param("size") int size,
+            @Param("offset") int offset
+    );
+
+    long countVisibleNotices(
+            @Param("now") LocalDateTime now
+    );
+
+    NoticeDetailRow selectVisibleNoticeById(
+            @Param("noticeId") long noticeId,
+            @Param("now") LocalDateTime now
+    );
 
     List<AdminNoticeListRow> selectAdminNotices(
             @Param("size") int size,
