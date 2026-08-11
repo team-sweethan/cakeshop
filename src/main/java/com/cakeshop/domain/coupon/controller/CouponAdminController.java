@@ -6,6 +6,7 @@ import com.cakeshop.domain.coupon.dto.form.CouponUpdateForm;
 import com.cakeshop.domain.coupon.dto.view.CouponView;
 import com.cakeshop.domain.coupon.dto.view.CouponDetailView;
 import com.cakeshop.domain.coupon.dto.view.CouponIssueCandidateView;
+import com.cakeshop.domain.coupon.dto.view.CouponUpdateView;
 import com.cakeshop.domain.coupon.error.CouponErrorCode;
 import com.cakeshop.domain.coupon.service.CouponAdminService;
 import com.cakeshop.global.common.paging.PageNavigation;
@@ -141,10 +142,9 @@ public class CouponAdminController {
                                    RedirectAttributes redirectAttributes) {
         try {
             // 서비스에서 종료 쿠폰을 차단하므로, 수정 화면에는 수정 가능한 쿠폰만 진입한다.
-            model.addAttribute(
-                    "couponForm",
-                    couponAdminService.getUpdateForm(couponId)
-            );
+            CouponUpdateView updateView = couponAdminService.getUpdateView(couponId);
+            model.addAttribute("couponForm", updateView.toForm());
+            model.addAttribute("couponUpdateView", updateView);
             model.addAttribute("couponId", couponId);
             model.addAttribute("formMode", "update");
             addUpdateNavigation(model, condition, page, origin);
@@ -176,9 +176,7 @@ public class CouponAdminController {
             addUpdateNavigation(model, condition, page, origin);
             try {
                 // 요청 Form에는 fullEdit가 없으므로, DB 기준 수정 가능 범위를 다시 채운다.
-                CouponUpdateForm originalForm = couponAdminService.getUpdateForm(couponId);
-                form.setFullEdit(originalForm.isFullEdit());
-                form.setDisplayTargetType(originalForm.getDisplayTargetType());
+                model.addAttribute("couponUpdateView", couponAdminService.getUpdateView(couponId));
             } catch (BusinessException e) {
                 // 검증 오류를 재렌더링하기 전에 만료됐다면 수정 Form을 만들지 않고 원래 화면으로 보낸다.
                 redirectAttributes.addFlashAttribute("errorMessage", e.getErrorCode().message());
@@ -204,11 +202,7 @@ public class CouponAdminController {
                 );
 
                 // 비활성화할 필드를 결정할 수 있도록 현재 수정 범위를 다시 조회한다.
-                CouponUpdateForm originalForm =
-                        couponAdminService.getUpdateCoupon(couponId);
-
-                form.setFullEdit(originalForm.isFullEdit());
-                form.setDisplayTargetType(originalForm.getDisplayTargetType());
+                model.addAttribute("couponUpdateView", couponAdminService.getUpdateView(couponId));
                 model.addAttribute("couponId", couponId);
                 model.addAttribute("formMode", "update");
                 addUpdateNavigation(model, condition, page, origin);

@@ -1,9 +1,13 @@
-package com.cakeshop.domain.coupon.entity;
+package com.cakeshop.domain.coupon.dto.view;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.LocalDateTime;
+
 import org.junit.jupiter.api.Test;
+
+import com.cakeshop.domain.coupon.entity.Coupon;
+import com.cakeshop.domain.coupon.entity.CouponStatus;
 
 class CouponDisplayStatusTests {
 

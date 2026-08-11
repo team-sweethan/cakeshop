@@ -4,7 +4,6 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import com.cakeshop.domain.coupon.entity.Coupon;
-import com.cakeshop.domain.coupon.entity.CouponDisplayStatus;
 import com.cakeshop.domain.coupon.entity.CouponTargetType;
 import com.cakeshop.domain.coupon.entity.DiscountType;
 

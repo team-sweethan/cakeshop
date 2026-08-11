@@ -1,6 +1,12 @@
 package com.cakeshop.domain.coupon.service;
 
+import com.cakeshop.domain.coupon.entity.Coupon;
+import com.cakeshop.domain.coupon.entity.CouponTargetType;
+import com.cakeshop.domain.coupon.error.CouponErrorCode;
+import com.cakeshop.domain.coupon.mapper.CouponMapper;
+import com.cakeshop.global.error.BusinessException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * ******************************
@@ -14,14 +20,20 @@ import org.springframework.stereotype.Service;
 @Service
 public class CouponMemberCommandService {
 
-    private final CouponIssueService couponIssueService;
+    private final CouponMapper couponMapper;
 
-    public CouponMemberCommandService(CouponIssueService couponIssueService) {
-        this.couponIssueService = couponIssueService;
+    public CouponMemberCommandService(CouponMapper couponMapper) {
+        this.couponMapper = couponMapper;
     }
 
     /** 회원가입 트랜잭션에 참여해 NEW_MEMBERS 대상 쿠폰을 발급한다. */
+    @Transactional
     public void issueNewMemberCoupons(long memberId) {
-        couponIssueService.issueNewMemberCoupons(memberId);
+        for (Coupon coupon : couponMapper.findCouponsByTargetType(CouponTargetType.NEW_MEMBERS)) {
+            if (couponMapper.insertMemberCouponIfAbsent(coupon.getId(), memberId, false) == 1
+                    && couponMapper.increaseIssuedQuantityIfAvailable(coupon.getId()) != 1) {
+                throw new BusinessException(CouponErrorCode.UPDATE_FAILED);
+            }
+        }
     }
 }

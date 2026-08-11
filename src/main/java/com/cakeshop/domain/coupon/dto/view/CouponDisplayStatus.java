@@ -1,5 +1,7 @@
-package com.cakeshop.domain.coupon.entity;
+package com.cakeshop.domain.coupon.dto.view;
 
+import com.cakeshop.domain.coupon.entity.Coupon;
+import com.cakeshop.domain.coupon.entity.CouponStatus;
 import java.time.LocalDateTime;
 
 /** DB 관리 상태, 발급 기간, 수량을 조합해 화면에 표시하는 쿠폰 상태다. */
