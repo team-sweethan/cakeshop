@@ -3,6 +3,7 @@ package com.cakeshop.domain.chat.dto.form;
 import java.util.List;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -22,5 +23,6 @@ public class ChatMessageSendRequest {
     private Long productId; // 문의 대상 상품 id (선택)
 
     @Valid
+    @Size(max = 5, message = "첨부파일은 메시지당 최대 5개까지만 전송 가능합니다.")
     private List<@NotNull @Valid ChatMessageAttachmentRequest> attachments; // 첨부 정보 목록 (선택)
 }

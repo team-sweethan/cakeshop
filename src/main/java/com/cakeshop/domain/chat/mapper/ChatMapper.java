@@ -14,6 +14,7 @@ import com.cakeshop.domain.chat.entity.ChatRoomOrder;
 import com.cakeshop.domain.chat.entity.ChatRoomReadCursor;
 import com.cakeshop.domain.chat.entity.ChatRoomStatus;
 import com.cakeshop.domain.chat.entity.CustomerAdminNote;
+import com.cakeshop.domain.chat.dto.view.ChatUnreadCountDto;
 
 @Mapper
 public interface ChatMapper {
@@ -70,6 +71,9 @@ public interface ChatMapper {
         @Param("lastReadMessageId") Long lastReadMessageId,
         @Param("customerId") Long customerId
     );
+
+    // 채팅방 ID 목록별 안 읽은 메시지 수 일괄 배치 조회 (N+1 방지)
+    List<ChatUnreadCountDto> countUnreadMessagesByRoomIds(@Param("roomIds") List<Long> roomIds);
 
 
     // ==========================================

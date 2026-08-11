@@ -126,6 +126,23 @@
           AND sender_id = #{customerId}
     </select>
 
+    <!-- 채팅방 ID 목록별 안 읽은 메시지 수 일괄 배치 조회 (N+1 방지) -->
+    <select id="countUnreadMessagesByRoomIds" resultType="com.cakeshop.domain.chat.dto.view.ChatUnreadCountDto">
+        SELECT 
+            m.chat_room_id AS chatRoomId,
+            COUNT(*) AS unreadCount
+        FROM chat_messages m
+        INNER JOIN chat_rooms r ON m.chat_room_id = r.id
+        LEFT JOIN chat_room_read_cursors c ON c.chat_room_id = r.id AND c.reader_side = 'ADMIN'
+        WHERE r.id IN
+        <foreach item="roomId" collection="roomIds" open="(" separator="," close=")">
+            #{roomId}
+        </foreach>
+          AND m.sender_id = r.customer_id
+          AND m.id &gt; COALESCE(c.last_read_message_id, 0)
+        GROUP BY m.chat_room_id
+    </select>
+
     <!-- 채팅방 대화 목록 조회 -->
     <select id="findMessageByChatRoomId" resultType="ChatMessage">
         SELECT *

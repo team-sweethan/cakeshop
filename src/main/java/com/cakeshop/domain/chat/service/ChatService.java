@@ -6,6 +6,7 @@ import com.cakeshop.domain.chat.dto.view.ChatMessageResponse;
 import com.cakeshop.domain.chat.dto.view.ChatRoomListResponse;
 import com.cakeshop.domain.chat.dto.view.ChatRoomOrderResponse;
 import com.cakeshop.domain.chat.dto.view.ChatRoomSidePanelResponse;
+import com.cakeshop.domain.chat.dto.view.ChatUnreadCountDto;
 import com.cakeshop.domain.chat.dto.view.CustomerAdminNoteResponse;
 import com.cakeshop.domain.chat.entity.ChatMessage;
 import com.cakeshop.domain.chat.entity.ChatMessageAttachment;
@@ -99,14 +100,19 @@ public class ChatService {
     public ChatMessage createMessage(Long roomId, Long senderId, boolean isAdmin, Long productId, 
         String content, List<ChatMessageAttachmentRequest> attachments) {
 
-            // 1. 텅 빈 메시지 저장 차단 및 null 첨부 항목 거절
+            // 1. 텅 빈 메시지 저장 차단 및 첨부파일 최대 5개 상한선 제한
             boolean hasContent = content != null && !content.trim().isEmpty();
             boolean hasAttachments = attachments != null && !attachments.isEmpty();
             if (!hasContent && !hasAttachments) {
                 throw new BusinessException(CommonErrorCode.INVALID_INPUT);
             }
-            if (hasAttachments && attachments.stream().anyMatch(Objects::isNull)) {
-                throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+            if (hasAttachments) {
+                if (attachments.size() > 5) {
+                    throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+                }
+                if (attachments.stream().anyMatch(Objects::isNull)) {
+                    throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+                }
             }
 
             // 2. 문의 상품(productId) 존재 및 공개 상태 검증
@@ -162,9 +168,12 @@ public class ChatService {
         return fileStorageClient.store(file, "chat");
     }
 
-    // 채팅방 연동 주문 목록 조회
+    // 채팅방 연동 주문 목록 조회 (권한 검증 포함)
     @Transactional(readOnly = true)
-    public List<ChatRoomOrderResponse> getChatRoomOrders(Long chatRoomId) {
+    public List<ChatRoomOrderResponse> getChatRoomOrders(Long chatRoomId, Long currentUserId, boolean isAdmin) {
+        ChatRoom room = chatMapper.findChatRoomById(chatRoomId);
+        validateRoomAccess(room, currentUserId, isAdmin);
+
         List<ChatRoomOrder> roomOrders = chatMapper.findChatRoomOrderByChatRoomId(chatRoomId);
         if (roomOrders == null || roomOrders.isEmpty()) {
             return Collections.emptyList();
@@ -263,7 +272,7 @@ public class ChatService {
     // ==========================================
     
     // 채팅 목록 조회
-    // 관리자 좌측 배너 채팅방 목록 조회 (탭 필터링 + PageRequest 정규화 페이징)
+    // 관리자 좌측 배너 채팅방 목록 조회 (탭 필터링 + PageRequest 정규화 페이징 + 미읽음 배치 집계)
     @Transactional(readOnly = true)
     public List<ChatRoomListResponse> getAdminChatRooms(ChatResponseStatus responseStatus, int page, int size) {
         PageRequest pageRequest = new PageRequest(page, size);
@@ -304,7 +313,14 @@ public class ChatService {
         Map<Long, ChatMessage> lastMessageMap = lastMessages.stream()
                 .collect(Collectors.toMap(ChatMessage::getId, m -> m, (a, b) -> a));
 
-        // 4. 각 채팅방을 ChatRoomListResponse DTO로 변환
+        // 4. 안 읽은 메시지 수 일괄 GROUP BY 배치 조회 (방 100개당 100번 N+1 쿼리 나가던 문제 완벽 제거!)
+        List<Long> roomIds = rooms.stream().map(ChatRoom::getId).collect(Collectors.toList());
+        List<ChatUnreadCountDto> unreadDtos = chatMapper.countUnreadMessagesByRoomIds(roomIds);
+        Map<Long, Integer> unreadCountMap = (unreadDtos != null && !unreadDtos.isEmpty())
+                ? unreadDtos.stream().collect(Collectors.toMap(ChatUnreadCountDto::getChatRoomId, ChatUnreadCountDto::getUnreadCount, (a, b) -> a))
+                : Collections.emptyMap();
+
+        // 5. 각 채팅방을 ChatRoomListResponse DTO로 변환
         return rooms.stream().map(room -> {
             // 마지막 메시지 정보 Map에서 꺼내기
             ChatMessage lastMessage = room.getLastMessageId() != null 
@@ -321,13 +337,7 @@ public class ChatService {
                 }
             }
 
-            // 관리자의 읽음 커서 위치 조회 및 안 읽은 메시지 개수 계산
-            ChatRoomReadCursor adminCursor = chatMapper.findReadCursor(room.getId(), ChatReaderSide.ADMIN);
-            Long lastReadMessageId = (adminCursor != null && adminCursor.getLastReadMessageId() != null) 
-                    ? adminCursor.getLastReadMessageId() 
-                    : 0L;
-            
-            int unreadCount = chatMapper.countUnreadMessages(room.getId(), lastReadMessageId, room.getCustomerId());
+            int unreadCount = unreadCountMap.getOrDefault(room.getId(), 0);
             String customerName = customerNameMap.getOrDefault(room.getCustomerId(), "고객");
 
             // DTO 조립
@@ -359,11 +369,9 @@ public class ChatService {
 
     // 관리자 우측 패널 정보 조회 (고객 메모 + 연동 주문 카드 목록)
     @Transactional(readOnly = true)
-    public ChatRoomSidePanelResponse getAdminSidePanel(Long chatRoomId) {
+    public ChatRoomSidePanelResponse getAdminSidePanel(Long chatRoomId, Long currentUserId, boolean isAdmin) {
         ChatRoom room = chatMapper.findChatRoomById(chatRoomId);
-        if (room == null) {
-            throw new BusinessException(ChatErrorCode.ROOM_NOT_FOUND);
-        }
+        validateRoomAccess(room, currentUserId, isAdmin);
 
         // 1. 고객 메모 조회
         CustomerAdminNote noteEntity = chatMapper.findCustomerAdminNoteByCustomerId(room.getCustomerId());
@@ -374,7 +382,7 @@ public class ChatService {
                 : null;
 
         // 2. 연동 주문 목록 조회
-        List<ChatRoomOrderResponse> orders = getChatRoomOrders(chatRoomId);
+        List<ChatRoomOrderResponse> orders = getChatRoomOrders(chatRoomId, currentUserId, isAdmin);
 
         return ChatRoomSidePanelResponse.builder()
                 .note(noteResponse)
