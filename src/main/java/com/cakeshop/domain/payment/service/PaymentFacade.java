@@ -51,6 +51,8 @@ public class PaymentFacade {
         ResolvedApproval resolved = resolvePreparedOrNewApproval(payment, form, orderId);
 
         try {
+            // Toss 승인 응답을 받은 뒤에도 내부 완료 직전에 만료 경계를 다시 확인한다.
+            validatePaymentExpiration(order.paymentExpiresAt());
             paymentService.completeGeneralPayment(order, resolved.payment(), resolved.approval().approval());
         } catch (RuntimeException exception) {
             Payment concurrentlyCompleted = findConcurrentlyCompleted(orderId);

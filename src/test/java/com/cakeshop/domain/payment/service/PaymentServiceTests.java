@@ -11,15 +11,17 @@ import com.cakeshop.domain.payment.mapper.PaymentMapper;
 import com.cakeshop.domain.product.service.ProductStockService;
 import com.cakeshop.global.error.BusinessException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -32,6 +34,8 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class PaymentServiceTests {
+
+    private static final LocalDateTime NOW = LocalDateTime.of(2026, 8, 1, 10, 0);
 
     @Mock
     private PaymentMapper paymentMapper;
@@ -48,8 +52,22 @@ class PaymentServiceTests {
     @Mock
     private CouponOrderCommandService couponOrderCommandService;
 
-    @InjectMocks
     private PaymentService paymentService;
+
+    @BeforeEach
+    void setUp() {
+        paymentService = new PaymentService(
+                paymentMapper,
+                productStockService,
+                orderPaymentCommandService,
+                paymentRecoveryService,
+                Clock.fixed(
+                        NOW.atZone(ZoneId.of("Asia/Seoul")).toInstant(),
+                        ZoneId.of("Asia/Seoul")
+                ),
+                couponOrderCommandService
+        );
+    }
 
     @Test
     void completeGeneralPayment_validApproval_updatesStockPaymentAndOrderInOrder() {
@@ -125,6 +143,34 @@ class PaymentServiceTests {
         verify(orderPaymentCommandService, never()).completeGeneralOrderAfterPayment(
                 1L,
                 approval.approvedAt()
+        );
+    }
+
+    @Test
+    void completeGeneralPayment_expiredAfterOrderLock_doesNotChangeInternalState() {
+        PaymentExecutionOrder order = new PaymentExecutionOrder(
+                1L,
+                BigDecimal.valueOf(30_000),
+                NOW,
+                List.of(new PaymentProduct(200L, 100L, 2))
+        );
+
+        assertThatThrownBy(() -> paymentService.completeGeneralPayment(
+                order,
+                payment(),
+                approval()
+        )).isInstanceOfSatisfying(
+                BusinessException.class,
+                exception -> assertThat(exception.getErrorCode())
+                        .isEqualTo(PaymentErrorCode.PAYMENT_EXPIRED)
+        );
+
+        verify(orderPaymentCommandService).lockGeneralOrderForPayment(1L);
+        verifyNoInteractions(
+                productStockService,
+                paymentMapper,
+                couponOrderCommandService,
+                paymentRecoveryService
         );
     }
 

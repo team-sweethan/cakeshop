@@ -41,10 +41,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.when;
 
 @MybatisTest
 @Import({
@@ -115,6 +117,8 @@ class PaymentCompletionIntegrationTests {
 
     @BeforeEach
     void setUp() {
+        when(clock.instant()).thenReturn(APPROVED_AT.atZone(ZoneId.of("Asia/Seoul")).toInstant());
+        when(clock.getZone()).thenReturn(ZoneId.of("Asia/Seoul"));
         suffix = Long.toString(System.nanoTime());
         memberId = insertMember();
         productId = insertProduct();

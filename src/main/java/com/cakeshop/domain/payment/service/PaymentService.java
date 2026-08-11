@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 /** READY 결제 조회와 승인 후 내부 결제 상태 확정을 담당한다. */
@@ -27,6 +28,7 @@ public class PaymentService {
     private final ProductStockService productStockService;
     private final OrderPaymentCommandService orderPaymentCommandService;
     private final PaymentRecoveryService paymentRecoveryService;
+    private final Clock clock;
     // 쿠폰 담당자의 공개 계약으로 결제 성공 시 RESERVED 쿠폰을 USED로 확정한다.
     private final CouponOrderCommandService couponOrderCommandService;
 
@@ -61,6 +63,7 @@ public class PaymentService {
     ) {
         // 주문 행을 먼저 잠가 스케줄러의 EXPIRED 전이와 동일한 잠금 순서를 사용한다.
         orderPaymentCommandService.lockGeneralOrderForPayment(order.orderId());
+        validatePaymentExpiration(order.paymentExpiresAt());
 
         // products는 주문 생성 시점에 GENERAL로 저장된 주문 항목 스냅샷이다.
         for (PaymentProduct product : order.products()) {
@@ -123,6 +126,12 @@ public class PaymentService {
             throw new BusinessException(
                     PaymentErrorCode.PAYMENT_COMPLETE_FAILED
             );
+        }
+    }
+
+    private void validatePaymentExpiration(LocalDateTime paymentExpiresAt) {
+        if (paymentExpiresAt == null || !LocalDateTime.now(clock).isBefore(paymentExpiresAt)) {
+            throw new BusinessException(PaymentErrorCode.PAYMENT_EXPIRED);
         }
     }
 }

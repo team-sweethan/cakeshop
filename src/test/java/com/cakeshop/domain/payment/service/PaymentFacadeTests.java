@@ -22,6 +22,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -518,6 +519,51 @@ class PaymentFacadeTests {
     }
 
     @Test
+    void confirmGeneralPayment_expiredDuringApproval_compensatesWithoutInternalCompletion() {
+        MutableClock clock = new MutableClock(NOW, ZoneId.of("Asia/Seoul"));
+        paymentFacade = new PaymentFacade(
+                orderPaymentQueryService,
+                paymentService,
+                new PaymentCompensationProcessor(paymentRecoveryService, tossPaymentClient),
+                new TossPaymentApprovalResolver(tossPaymentClient),
+                clock
+        );
+        PaymentExecutionOrder order = order(NOW.plusSeconds(1));
+        Payment payment = payment();
+        PaymentConfirmForm form = form(BigDecimal.valueOf(30_000));
+        ApprovalResult approval = approval();
+        CompensationRequest request = compensationRequest();
+        CancellationResult cancellation = cancellation();
+
+        when(orderPaymentQueryService.getMemberGeneralPaymentOrder(10L, 1L)).thenReturn(order);
+        when(paymentService.getReadyPayment(1L)).thenReturn(payment);
+        when(tossPaymentClient.approve(
+                "payment-key",
+                "ORD-100",
+                30_000L,
+                "PAY-1"
+        )).thenAnswer(invocation -> {
+            clock.setInstant(NOW.plusSeconds(1));
+            return approval;
+        });
+        when(paymentRecoveryService.createRequest(payment, "payment-key")).thenReturn(request);
+        when(tossPaymentClient.cancel(
+                "payment-key",
+                request.reason(),
+                request.idempotencyKey()
+        )).thenReturn(cancellation);
+
+        assertPaymentError(
+                () -> paymentFacade.confirmGeneralPayment(10L, 1L, form),
+                PaymentErrorCode.PAYMENT_COMPENSATED
+        );
+
+        verify(paymentService, never()).completeGeneralPayment(order, payment, approval);
+        verify(paymentRecoveryService, times(2)).prepareCompensation(request);
+        verify(paymentRecoveryService).completeCompensation(request, cancellation);
+    }
+
+    @Test
     void confirmGeneralPayment_compensationPrepareFailure_doesNotCancelWithoutRecoveryRecord() {
         PaymentExecutionOrder order = order(NOW.plusMinutes(5));
         Payment payment = payment();
@@ -925,5 +971,39 @@ class PaymentFacadeTests {
                         exception -> assertThat(exception.getErrorCode())
                                 .isEqualTo(expected)
                 );
+    }
+
+    private static final class MutableClock extends Clock {
+
+        private Instant instant;
+        private final ZoneId zone;
+
+        private MutableClock(LocalDateTime dateTime, ZoneId zone) {
+            this(dateTime.atZone(zone).toInstant(), zone);
+        }
+
+        private MutableClock(Instant instant, ZoneId zone) {
+            this.instant = instant;
+            this.zone = zone;
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return zone;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return new MutableClock(instant, zone);
+        }
+
+        @Override
+        public Instant instant() {
+            return instant;
+        }
+
+        private void setInstant(LocalDateTime dateTime) {
+            instant = dateTime.atZone(zone).toInstant();
+        }
     }
 }
