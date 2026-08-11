@@ -5,7 +5,11 @@
 
 ## 실행 전 확인
 
-- Flyway migration이 모두 적용되어 있어야 한다. 애플리케이션 시작 시 Flyway가 자동으로 적용한다.
+- 실행 대상 DB에 필요한 Flyway migration이 적용되어 있어야 한다.
+- `local` 프로필은 애플리케이션 시작 시 Flyway migration을 자동 적용한다.
+- `rds` 프로필은 Flyway가 비활성화되어 있으므로 승인된 별도 스키마 반영 절차로 migration을 먼저
+  적용한다. REBUILD 실행 전에는 `V20260811_101818__add_statistics_rebuild_batch_type.sql` 적용 여부를
+  확인한다.
 - 초기 백필과 수동 재집계는 동시에 활성화하지 않는다.
 - 정기 일별 집계, 초기 백필과 수동 재집계는 하나의 실행 잠금을 공유한다.
 - 오늘 통계는 집계하지 않으며 모든 날짜는 `Asia/Seoul` 기준이다.
