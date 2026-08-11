@@ -6,8 +6,11 @@
 ## 저장소 구조
 
 현재 상품·매장 업로드 호출부는 저장 위치를 직접 다루지 않고 공통
-[`FileStorageClient`](../src/main/java/com/cakeshop/global/infra/FileStorageClient.java)를 사용한다. 활성 프로필에
-따라 다음 구현체 중 하나가 선택된다.
+[`FileStorageClient`](../src/main/java/com/cakeshop/global/infra/FileStorageClient.java)를 사용한다.
+
+도메인 Service는 `S3StorageService`나 `LocalFileStorageClient` 같은 구체 구현체를 직접 참조하거나
+주입하지 않고 반드시 `FileStorageClient` 인터페이스에만 의존한다. Spring은 활성 프로필에 따라 다음
+구현체 중 하나를 `FileStorageClient`로 선택한다.
 
 - `s3` 프로필 활성화: [`S3StorageService`](../src/main/java/com/cakeshop/global/storage/S3StorageService.java)
 - `s3` 프로필 비활성화: [`LocalFileStorageClient`](../src/main/java/com/cakeshop/global/infra/LocalFileStorageClient.java)
@@ -107,7 +110,9 @@ RDS에 S3 URL을 저장하기 시작한 뒤에는 로컬 경로와 S3 URL이 섞
   저장 경로
 - [`AwsS3Config`](../src/main/java/com/cakeshop/global/config/AwsS3Config.java): AWS 자격 증명 공급자와 S3 Client
   구성
-- [`S3StorageService`](../src/main/java/com/cakeshop/global/storage/S3StorageService.java): S3 저장·삭제와 객체 키
-  생성
-- [`LocalFileStorageClient`](../src/main/java/com/cakeshop/global/infra/LocalFileStorageClient.java): 로컬 디스크
-  저장·삭제
+- [`S3StorageService`](../src/main/java/com/cakeshop/global/storage/S3StorageService.java): `s3` 프로필에서
+  Spring이 선택하는 S3 저장·삭제 및 객체 키 생성용 `FileStorageClient` 내부 구현체. 도메인 Service에서
+  직접 참조하거나 주입하지 않는다.
+- [`LocalFileStorageClient`](../src/main/java/com/cakeshop/global/infra/LocalFileStorageClient.java): `s3`
+  프로필이 비활성화됐을 때 Spring이 선택하는 로컬 디스크 저장·삭제용 `FileStorageClient` 내부 구현체.
+  도메인 Service에서 직접 참조하거나 주입하지 않는다.
