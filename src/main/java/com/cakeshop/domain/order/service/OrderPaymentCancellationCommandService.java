@@ -123,6 +123,26 @@ public class OrderPaymentCancellationCommandService {
             LocalDateTime canceledAt
     ) {
         Order order = findOrderForUpdate(orderId);
+        return completePaymentCancellation(
+                order,
+                orderId,
+                requestType,
+                requestedBy,
+                reason,
+                requestedAt,
+                canceledAt
+        );
+    }
+
+    private boolean completePaymentCancellation(
+            Order order,
+            long orderId,
+            String requestType,
+            long requestedBy,
+            String reason,
+            LocalDateTime requestedAt,
+            LocalDateTime canceledAt
+    ) {
         if (isPaymentCancellationCompleted(order, requestType)) {
             restoreCancellationSideEffects(orderId, canceledAt);
             return true;
@@ -221,7 +241,12 @@ public class OrderPaymentCancellationCommandService {
             LocalDateTime requestedAt,
             LocalDateTime canceledAt
     ) {
+        Order order = findOrderForUpdate(orderId);
+        if (order.getOrderType() != OrderType.GENERAL) {
+            return false;
+        }
         return completePaymentCancellation(
+                order,
                 orderId,
                 canceledBy,
                 1L,

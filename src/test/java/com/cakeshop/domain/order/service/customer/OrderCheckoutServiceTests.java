@@ -7,6 +7,7 @@ import com.cakeshop.domain.order.service.OrderOptionValidator.ValidatedOption;
 import com.cakeshop.domain.product.dto.view.ProductSalesInfo;
 import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.service.ProductQueryService;
+import com.cakeshop.domain.product.service.ProductService;
 import com.cakeshop.domain.store.dto.view.StoreView;
 import com.cakeshop.domain.store.entity.StoreHoliday;
 import com.cakeshop.domain.store.service.StoreService;
@@ -44,6 +45,9 @@ class OrderCheckoutServiceTests {
     private ProductQueryService productQueryService;
 
     @Mock
+    private ProductService productService;
+
+    @Mock
     private OrderOptionValidator orderOptionValidator;
 
     @Mock
@@ -55,6 +59,7 @@ class OrderCheckoutServiceTests {
     void setUp() {
         orderCheckoutService = new OrderCheckoutService(
                 productQueryService,
+                productService,
                 orderOptionValidator,
                 storeService,
                 FIXED_CLOCK

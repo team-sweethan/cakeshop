@@ -3,10 +3,14 @@ package com.cakeshop.domain.order.controller.customer;
 import com.cakeshop.domain.member.dto.view.MemberProfileView;
 import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.coupon.service.CouponOrderQueryService;
+import com.cakeshop.domain.coupon.service.CouponOrderQuoteQueryService;
 import com.cakeshop.domain.order.dto.form.CancelForm;
+import com.cakeshop.domain.order.dto.form.customer.CustomOrderForm;
 import com.cakeshop.domain.order.dto.form.customer.GeneralOrderForm;
 import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
+import com.cakeshop.domain.order.service.customer.CustomerCustomOrderService;
+import com.cakeshop.domain.product.service.ProductQueryService;
 import com.cakeshop.domain.order.service.customer.OrderCustomerService;
 import com.cakeshop.domain.order.service.OrderService;
 import com.cakeshop.domain.payment.service.RefundFacade;
@@ -38,6 +42,9 @@ public class OrderController {
     private final MemberService memberService;
     private final RefundFacade refundFacade;
     private final CouponOrderQueryService couponOrderQueryService;
+    private final CouponOrderQuoteQueryService couponOrderQuoteQueryService;
+    private final CustomerCustomOrderService customerCustomOrderService;
+    private final ProductQueryService productQueryService;
 
     /** 장바구니 항목의 픽업 일시 수정용 목업 경로다. 일반 주문은 checkout에서 선택한다. */
     @GetMapping(value = "/pickup", params = "intent=cart-edit")
@@ -46,13 +53,39 @@ public class OrderController {
     }
 
     @GetMapping("/custom/options")
-    public String customOptions() {
+    public String customOptions(
+            @org.springframework.web.bind.annotation.RequestParam("productId") Long productId,
+            Model model
+    ) {
+        model.addAttribute("customProduct", productQueryService.getSalesInfo(productId));
+        model.addAttribute("optionGroups", orderCheckoutService.getCustomOptionGroups(productId));
         return "customer/order/custom-option";
     }
 
     @GetMapping("/custom/request")
-    public String customRequest() {
-        return "customer/order/custom-request";
+    public String customRequest(
+            @AuthenticationPrincipal MemberDetails member,
+            @ModelAttribute("orderForm") CustomOrderForm form,
+            Model model
+    ) {
+        prefillMemberContact(form, member);
+        form.setRequestKey(UUID.randomUUID().toString());
+        return renderCustomOrderForm(form, model, requireMemberId(member));
+    }
+
+    @PostMapping("/custom")
+    public String createCustomOrder(
+            @AuthenticationPrincipal MemberDetails member,
+            @Valid @ModelAttribute("orderForm") CustomOrderForm form,
+            BindingResult bindingResult,
+            Model model
+    ) {
+        long memberId = requireMemberId(member);
+        if (bindingResult.hasErrors()) {
+            return renderCustomOrderForm(form, model, memberId);
+        }
+        long orderId = customerCustomOrderService.createCustomOrder(memberId, form);
+        return "redirect:/orders/" + orderId + "/payment";
     }
 
     // 일반 상품 주문서 화면
@@ -155,6 +188,22 @@ public class OrderController {
         return "customer/order/form";
     }
 
+    private String renderCustomOrderForm(CustomOrderForm form, Model model, long memberId) {
+        var checkout = orderCheckoutService.getCustomCheckout(
+                form.getProductId(),
+                form.getOptionIds()
+        );
+        model.addAttribute("checkout", checkout);
+        model.addAttribute(
+                "availableCoupons",
+                couponOrderQuoteQueryService.getPositiveFinalAmountQuotes(
+                        memberId,
+                        checkout.originalAmount()
+                )
+        );
+        return "customer/order/custom-request";
+    }
+
     /** 유효한 아이템인지 확인. **/
     private boolean hasInvalidOrderItem(BindingResult bindingResult) {
         return bindingResult.hasFieldErrors("productId")
@@ -170,6 +219,17 @@ public class OrderController {
         MemberProfileView profile = memberService.getMemberProfile(
                 member.getUsername()
         );
+        form.setOrdererName(profile.name());
+        form.setOrdererPhone(profile.phone());
+        form.setPickupName(profile.name());
+        form.setPickupPhone(profile.phone());
+    }
+
+    private void prefillMemberContact(
+            CustomOrderForm form,
+            MemberDetails member
+    ) {
+        MemberProfileView profile = memberService.getMemberProfile(member.getUsername());
         form.setOrdererName(profile.name());
         form.setOrdererPhone(profile.phone());
         form.setPickupName(profile.name());

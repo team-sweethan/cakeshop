@@ -89,6 +89,12 @@ public interface OrderMapper {
             @Param("limit") int limit
     );
 
+    /** 준비 기간이 지난 제작 중 수제 주문을 오래된 제작 시작 시각 순으로 조회한다. */
+    List<Long> findDueCustomProductionOrderIds(
+            @Param("now") LocalDateTime now,
+            @Param("limit") int limit
+    );
+
     /** 주문이 존재하고 지정한 회원의 소유인지 확인한다. */
     boolean existsByIdAndMemberId(@Param("orderId") long orderId, @Param("memberId") long memberId);
 

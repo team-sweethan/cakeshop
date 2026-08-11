@@ -1,6 +1,7 @@
 package com.cakeshop.domain.order.service.customer;
 
 import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView;
+import com.cakeshop.domain.order.dto.view.customer.CustomOrderCheckoutView;
 import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView.PickupDateView;
 import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView.PickupTimeView;
 import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView.SelectedOptionView;
@@ -9,9 +10,11 @@ import com.cakeshop.domain.order.service.OrderAmountCalculator;
 import com.cakeshop.domain.order.service.OrderOptionValidator;
 import com.cakeshop.domain.order.service.OrderOptionValidator.ValidatedOption;
 import com.cakeshop.domain.product.dto.view.ProductSalesInfo;
+import com.cakeshop.domain.product.dto.view.ProductOptionGroupView;
 import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.error.ProductErrorCode;
 import com.cakeshop.domain.product.service.ProductQueryService;
+import com.cakeshop.domain.product.service.ProductService;
 import com.cakeshop.domain.store.dto.view.StoreView;
 import com.cakeshop.domain.store.service.StoreService;
 import com.cakeshop.global.error.BusinessException;
@@ -43,6 +46,7 @@ public class OrderCheckoutService {
             DateTimeFormatter.ofPattern("HH:mm");
 
     private final ProductQueryService productQueryService;
+    private final ProductService productService;
     private final OrderOptionValidator orderOptionValidator;
     private final StoreService storeService;
     private final Clock clock;
@@ -95,6 +99,71 @@ public class OrderCheckoutService {
                 amounts.totalAmount(),
                 createPickupDates(storeService.getStoreView())
         );
+    }
+
+    /** 수제 주문 요청 화면의 서버 기준 상품·옵션·금액·픽업 정보를 만든다. */
+    @Transactional(readOnly = true)
+    public CustomOrderCheckoutView getCustomCheckout(
+            Long productId,
+            List<Long> optionIds
+    ) {
+        if (productId == null || productId <= 0) {
+            throw new BusinessException(OrderErrorCode.EMPTY_ORDER_ITEMS);
+        }
+
+        ProductSalesInfo product = productQueryService.getSalesInfo(productId);
+        if (product.productType() != ProductType.CUSTOM) {
+            throw new BusinessException(OrderErrorCode.CUSTOM_PRODUCT_REQUIRED);
+        }
+        if (!product.available()) {
+            throw new BusinessException(ProductErrorCode.INSUFFICIENT_STOCK);
+        }
+        if (product.basePrice() == null || product.basePrice().signum() < 0
+                || product.preparationDays() < 0) {
+            throw new BusinessException(CommonErrorCode.INTERNAL_ERROR);
+        }
+
+        List<ValidatedOption> selectedOptions = orderOptionValidator.validate(productId, optionIds);
+        OrderAmountCalculator.OrderAmounts amounts = OrderAmountCalculator.calculate(
+                product.basePrice(),
+                1,
+                selectedOptions
+        );
+        if (amounts.totalAmount().signum() <= 0) {
+            throw new BusinessException(OrderErrorCode.INVALID_ORDER_AMOUNT);
+        }
+
+        return new CustomOrderCheckoutView(
+                product.productId(),
+                product.productName(),
+                product.preparationDays(),
+                selectedOptions.stream()
+                        .map(option -> new SelectedOptionView(
+                                option.optionId(),
+                                option.groupName(),
+                                option.optionName(),
+                                option.additionalPrice()
+                        ))
+                        .toList(),
+                amounts.totalAmount(),
+                createPickupDates(storeService.getStoreView())
+        );
+    }
+
+    /** 수제 옵션 선택 화면에 필요한 현재 판매 상품과 활성 옵션 그룹을 제공한다. */
+    @Transactional(readOnly = true)
+    public List<ProductOptionGroupView> getCustomOptionGroups(Long productId) {
+        if (productId == null || productId <= 0) {
+            throw new BusinessException(OrderErrorCode.EMPTY_ORDER_ITEMS);
+        }
+        ProductSalesInfo product = productQueryService.getSalesInfo(productId);
+        if (product.productType() != ProductType.CUSTOM) {
+            throw new BusinessException(OrderErrorCode.CUSTOM_PRODUCT_REQUIRED);
+        }
+        if (!product.available()) {
+            throw new BusinessException(ProductErrorCode.INSUFFICIENT_STOCK);
+        }
+        return productService.getPublicOptionGroups(productId);
     }
 
     private void validateProduct(ProductSalesInfo product, int quantity) {

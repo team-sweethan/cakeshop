@@ -388,6 +388,19 @@
          LIMIT #{limit}
     </select>
 
+    <select id="findDueCustomProductionOrderIds" resultType="long">
+        SELECT DISTINCT orders.id
+          FROM orders
+          INNER JOIN order_items
+             ON order_items.order_id = orders.id
+         WHERE orders.order_type = 'CUSTOM'
+           AND orders.status = 'IN_PRODUCTION'
+           AND orders.approved_at IS NOT NULL
+           AND TIMESTAMPADD(DAY, order_items.preparation_days, orders.approved_at) &lt;= #{now}
+         ORDER BY orders.approved_at, orders.id
+         LIMIT #{limit}
+    </select>
+
     <select id="existsByIdAndMemberId" resultType="boolean">
         SELECT EXISTS (
             SELECT 1

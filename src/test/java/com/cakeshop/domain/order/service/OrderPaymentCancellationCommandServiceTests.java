@@ -147,6 +147,30 @@ class OrderPaymentCancellationCommandServiceTests {
         );
     }
 
+    @Test
+    void completeGeneralPaymentCancellation_underReviewCustomOrder_doesNotUseCustomCancellationPath() {
+        Order order = order(3L);
+        order.setOrderType(OrderType.CUSTOM);
+        order.setStatus(OrderStatus.UNDER_REVIEW);
+        when(orderMapper.findOrderByIdForUpdate(10L)).thenReturn(Optional.of(order));
+
+        assertThat(service.completeGeneralPaymentCancellation(
+                10L,
+                "CUSTOMER",
+                "단순 변심",
+                REQUESTED_AT,
+                CANCELED_AT
+        )).isFalse();
+
+        verify(orderMapper, never()).cancelCustomIfUnderReview(
+                anyLong(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any()
+        );
+        verify(couponOrderCommandService, never()).restoreCouponForCanceledOrder(10L);
+    }
+
     private Order order(long memberId) {
         Order order = new Order();
         order.setId(10L);
