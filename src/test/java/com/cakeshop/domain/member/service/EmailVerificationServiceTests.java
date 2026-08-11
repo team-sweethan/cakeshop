@@ -160,6 +160,22 @@ class EmailVerificationServiceTests {
     }
 
     @Test
+    void verifySignupCode_alreadyVerifiedStillRequiresMatchingCode() {
+        EmailVerification latest = verification(
+                "user@example.com",
+                passwordEncoder.encode("123456"));
+        latest.setVerifiedAt(NOW.minusMinutes(1));
+        when(emailVerificationMapper.findLatest(
+                "user@example.com", EmailVerificationPurpose.SIGNUP))
+                .thenReturn(Optional.of(latest));
+
+        assertMemberError(
+                () -> emailVerificationService.verifySignupCode(
+                        "user@example.com", "654321"),
+                MemberErrorCode.EMAIL_VERIFICATION_INVALID);
+    }
+
+    @Test
     void consumeSignupVerification_verifiedRequest_consumesOnce() {
         EmailVerification verified = verification("user@example.com", "hash");
         verified.setVerifiedAt(NOW.minusMinutes(1));
@@ -169,21 +185,21 @@ class EmailVerificationServiceTests {
                 NOW.minusMinutes(10))).thenReturn(Optional.of(verified));
         when(emailVerificationMapper.markConsumed(verified.getId(), NOW)).thenReturn(1);
 
-        emailVerificationService.consumeSignupVerification("user@example.com");
+        assertThat(emailVerificationService.consumeSignupVerification("user@example.com"))
+                .isTrue();
 
         verify(emailVerificationMapper).markConsumed(verified.getId(), NOW);
     }
 
     @Test
-    void consumeSignupVerification_withoutVerification_rejectsSignup() {
+    void consumeSignupVerification_withoutVerification_returnsFalse() {
         when(emailVerificationMapper.findVerifiedForUpdate(
                 "user@example.com",
                 EmailVerificationPurpose.SIGNUP,
                 NOW.minusMinutes(10))).thenReturn(Optional.empty());
 
-        assertMemberError(
-                () -> emailVerificationService.consumeSignupVerification("user@example.com"),
-                MemberErrorCode.EMAIL_VERIFICATION_REQUIRED);
+        assertThat(emailVerificationService.consumeSignupVerification("user@example.com"))
+                .isFalse();
     }
 
     @Test

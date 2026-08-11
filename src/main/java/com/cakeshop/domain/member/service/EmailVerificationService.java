@@ -16,6 +16,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 @RequiredArgsConstructor
@@ -49,10 +51,16 @@ public class EmailVerificationService {
                 email, purpose, REQUEST_LOCK_TIMEOUT_SECONDS) != 1) {
             throw new BusinessException(MemberErrorCode.EMAIL_VERIFICATION_RATE_LIMITED);
         }
+        boolean releaseImmediately = !TransactionSynchronizationManager.isSynchronizationActive();
+        if (!releaseImmediately) {
+            releaseRequestLockAfterTransaction(email, purpose);
+        }
         try {
             sendCodeWithinLock(email, purpose);
         } finally {
-            emailVerificationMapper.releaseRequestLock(email, purpose);
+            if (releaseImmediately) {
+                emailVerificationMapper.releaseRequestLock(email, purpose);
+            }
         }
     }
 
@@ -98,7 +106,14 @@ public class EmailVerificationService {
                         MemberErrorCode.EMAIL_VERIFICATION_INVALID));
 
         if (verification.getVerifiedAt() != null) {
-            return email;
+            if (verification.getConsumedAt() == null
+                    && verification.getVerifiedAt().plus(VERIFIED_TTL).isAfter(now)
+                    && code != null
+                    && code.matches("\\d{6}")
+                    && passwordEncoder.matches(code, verification.getCodeHash())) {
+                return email;
+            }
+            throw new BusinessException(MemberErrorCode.EMAIL_VERIFICATION_INVALID);
         }
         if (verification.getConsumedAt() != null
                 || !verification.getExpiresAt().isAfter(now)
@@ -123,18 +138,16 @@ public class EmailVerificationService {
 
     /** 인증된 이메일을 회원가입에서 한 번만 사용 처리한다. */
     @Transactional
-    public void consumeSignupVerification(String rawEmail) {
+    public boolean consumeSignupVerification(String rawEmail) {
         String email = normalizeAndValidateEmail(rawEmail);
         LocalDateTime now = LocalDateTime.now(clock);
-        EmailVerification verification = emailVerificationMapper.findVerifiedForUpdate(
+        return emailVerificationMapper.findVerifiedForUpdate(
                         email,
                         EmailVerificationPurpose.SIGNUP,
                         now.minus(VERIFIED_TTL))
-                .orElseThrow(() -> new BusinessException(
-                        MemberErrorCode.EMAIL_VERIFICATION_REQUIRED));
-        if (emailVerificationMapper.markConsumed(verification.getId(), now) != 1) {
-            throw new BusinessException(MemberErrorCode.EMAIL_VERIFICATION_REQUIRED);
-        }
+                .map(verification ->
+                        emailVerificationMapper.markConsumed(verification.getId(), now) == 1)
+                .orElse(false);
     }
 
     /** 보관 기간이 지난 이메일 인증 요청을 삭제한다. */
@@ -152,5 +165,16 @@ public class EmailVerificationService {
             throw new BusinessException(MemberErrorCode.INVALID_EMAIL);
         }
         return email;
+    }
+
+    private void releaseRequestLockAfterTransaction(
+            String email,
+            EmailVerificationPurpose purpose) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                emailVerificationMapper.releaseRequestLock(email, purpose);
+            }
+        });
     }
 }

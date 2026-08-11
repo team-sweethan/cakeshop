@@ -138,7 +138,13 @@ public class AuthController {
 
         String verifiedEmail = (String) session.getAttribute(
                 EmailVerificationController.SIGNUP_VERIFIED_EMAIL_SESSION_KEY);
-        memberService.join(form, verifiedEmail);
+        if (!memberService.join(form, verifiedEmail)) {
+            bindingResult.rejectValue(
+                    "email",
+                    MemberErrorCode.EMAIL_VERIFICATION_REQUIRED.code(),
+                    MemberErrorCode.EMAIL_VERIFICATION_REQUIRED.message());
+            return "customer/member/signup";
+        }
         session.removeAttribute(EmailVerificationController.SIGNUP_VERIFIED_EMAIL_SESSION_KEY);
         redirectAttributes.addFlashAttribute("successMessage", "회원가입이 완료되었습니다!");
         return "redirect:/login";

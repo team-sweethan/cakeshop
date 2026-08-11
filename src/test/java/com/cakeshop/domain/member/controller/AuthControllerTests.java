@@ -71,6 +71,8 @@ class AuthControllerTests {
         session.setAttribute(
                 EmailVerificationController.SIGNUP_VERIFIED_EMAIL_SESSION_KEY,
                 "member@example.com");
+        when(memberService.join(any(SignupForm.class), eq("member@example.com")))
+                .thenReturn(true);
 
         mockMvc.perform(post("/join")
                         .session(session)
@@ -88,6 +90,23 @@ class AuthControllerTests {
         verify(memberService).join(any(SignupForm.class), eq("member@example.com"));
         assertThat(session.getAttribute(
                 EmailVerificationController.SIGNUP_VERIFIED_EMAIL_SESSION_KEY)).isNull();
+    }
+
+    @Test
+    void join_expiredEmailVerification_rendersSignupWithEmailError() throws Exception {
+        when(memberService.join(any(SignupForm.class), any())).thenReturn(false);
+
+        mockMvc.perform(post("/join")
+                        .param("email", "member@example.com")
+                        .param("password", "Password1!")
+                        .param("passwordConfirm", "Password1!")
+                        .param("name", "홍길동")
+                        .param("nickname", "길동이")
+                        .param("phone", "010-1234-5678")
+                        .param("birthDate", "2000-01-15"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("customer/member/signup"))
+                .andExpect(model().attributeHasFieldErrors("signupForm", "email"));
     }
 
     @Test

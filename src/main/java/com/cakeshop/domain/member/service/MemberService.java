@@ -35,15 +35,17 @@ public class MemberService {
      * 회원가입 로직
      */
     @Transactional
-    public void join(SignupForm form, String verifiedEmail) {
+    public boolean join(SignupForm form, String verifiedEmail) {
         String email = form.getEmail().trim().toLowerCase(java.util.Locale.ROOT);
         if (memberMapper.findByEmail(email).isPresent()) {
             throw new BusinessException(MemberErrorCode.DUPLICATE_EMAIL);
         }
         if (!email.equals(verifiedEmail)) {
-            throw new BusinessException(MemberErrorCode.EMAIL_VERIFICATION_REQUIRED);
+            return false;
         }
-        emailVerificationService.consumeSignupVerification(email);
+        if (!emailVerificationService.consumeSignupVerification(email)) {
+            return false;
+        }
 
         String encodedPassword = passwordEncoder.encode(form.getPassword());
 
@@ -62,6 +64,7 @@ public class MemberService {
         }
         // 회원 INSERT와 신규 회원 대상 쿠폰 발급은 같은 트랜잭션에서 함께 확정한다.
         couponMemberCommandService.issueNewMemberCoupons(member.getId());
+        return true;
     }
 
     /**

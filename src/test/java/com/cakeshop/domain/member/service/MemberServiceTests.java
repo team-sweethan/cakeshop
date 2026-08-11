@@ -81,10 +81,7 @@ class MemberServiceTests {
         form.setEmail("member@cakeshop.local");
         when(memberMapper.findByEmail(form.getEmail())).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> memberService.join(form, null))
-                .isInstanceOf(BusinessException.class)
-                .extracting(exception -> ((BusinessException) exception).getErrorCode())
-                .isEqualTo(MemberErrorCode.EMAIL_VERIFICATION_REQUIRED);
+        assertThat(memberService.join(form, null)).isFalse();
 
         verify(emailVerificationService, never())
                 .consumeSignupVerification(form.getEmail());
@@ -101,13 +98,15 @@ class MemberServiceTests {
         form.setPhone("010-1234-5678");
         form.setBirthDate(LocalDate.of(2000, 1, 15));
         when(memberMapper.findByEmail(form.getEmail())).thenReturn(Optional.empty());
+        when(emailVerificationService.consumeSignupVerification(form.getEmail()))
+                .thenReturn(true);
         when(passwordEncoder.encode(form.getPassword())).thenReturn("encoded-password");
         org.mockito.Mockito.doAnswer(invocation -> {
             invocation.getArgument(0, Member.class).setId(1L);
             return 1;
         }).when(memberMapper).join(any(Member.class));
 
-        memberService.join(form, form.getEmail());
+        assertThat(memberService.join(form, form.getEmail())).isTrue();
 
         ArgumentCaptor<Member> captor = ArgumentCaptor.forClass(Member.class);
         verify(memberMapper).join(captor.capture());
