@@ -2,6 +2,7 @@ package com.cakeshop.domain.order.service.admin;
 
 import com.cakeshop.domain.member.service.MemberOrderQueryService;
 import com.cakeshop.domain.order.entity.Order;
+import com.cakeshop.domain.order.entity.OrderItem;
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.order.error.OrderErrorCode;
@@ -29,10 +30,12 @@ public class AdminCustomOrderService {
         requireActiveAdmin(adminMemberId);
         Order order = findCustomOrderForUpdate(orderId);
         requireTransition(order, OrderStatus.IN_PRODUCTION);
+        LocalDateTime approvedAt = LocalDateTime.now(clock);
+        requirePickupTimeAfterPreparation(order, approvedAt);
         requireOneRow(orderMapper.startProductionIfUnderReview(
                 orderId,
                 adminMemberId,
-                LocalDateTime.now(clock)
+                approvedAt
         ));
     }
 
@@ -63,6 +66,19 @@ public class AdminCustomOrderService {
     private void requireTransition(Order order, OrderStatus next) {
         if (order.getStatus() == null || !order.getStatus().canTransitionTo(next)) {
             throw new BusinessException(OrderErrorCode.INVALID_STATUS_TRANSITION);
+        }
+    }
+
+    private void requirePickupTimeAfterPreparation(Order order, LocalDateTime approvedAt) {
+        int preparationDays = orderMapper.findOrderItemsByOrderId(order.getId())
+                .stream()
+                .map(OrderItem::getPreparationDays)
+                .filter(days -> days != null && days >= 0)
+                .max(Integer::compareTo)
+                .orElseThrow(() -> new BusinessException(OrderErrorCode.INVALID_STATUS_TRANSITION));
+        if (order.getPickupAt() == null
+                || order.getPickupAt().isBefore(approvedAt.plusDays(preparationDays))) {
+            throw new BusinessException(OrderErrorCode.PICKUP_TIME_UNAVAILABLE);
         }
     }
 
