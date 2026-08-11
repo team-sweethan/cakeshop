@@ -1,4 +1,4 @@
-package com.cakeshop.domain.community.dto.view;
+package com.cakeshop.domain.community.dto.query;
 
 import com.cakeshop.domain.community.entity.PostStatus;
 
@@ -34,7 +34,7 @@ public record PostDetailRow(
     /**
      * 화면의 {@code (수정됨)} 표기와 같은 판단이다.
      *
-     * <p>{@link PostDetailView#isEdited()}와 같은 규칙을 여기에도 둔 것은, 차단·해제와
+     * <p>화면의 수정 여부와 같은 규칙을 여기에도 둔 것은, 차단·해제와
      * 조회수·좋아요가 {@code updated_at}을 보존하는지를 SQL 층에서 바로 확인하기
      * 위해서다. 작성자를 채우지 않고도 볼 수 있어야 하는 검사다.</p>
      */

@@ -140,6 +140,37 @@
       </div>
     </section>
 
+    <!--/*
+      커뮤니티가 확정한 어제의 인기글이다. 실시간 순위가 아니므로 확정일을 함께 적는다.
+      그릴 것이 없으면 제목만 남기지 않고 영역을 통째로 뺀다
+      (docs/community/specs/community-popular.md B5).
+    */-->
+    <section id="popular-posts"
+             class="section"
+             aria-labelledby="popular-posts-title"
+             th:if="${!popularSection.isEmpty()}">
+
+      <!-- 확정일은 제목 안에 둔다. 밖으로 빼면 section-title 의 밑줄이 글자 폭에서 끊긴다. -->
+      <h2 id="popular-posts-title" class="section-title">
+        커뮤니티 인기글
+        <span th:text="|· ${#temporals.format(
+            popularSection.rankingDate,
+            'yyyy.MM.dd'
+        )} 기준|">· 2026.01.01 기준</span>
+      </h2>
+
+      <div class="stack">
+        <!-- 순위를 누르면 해당 게시글 상세로 이동한다. -->
+        <a class="panel cluster"
+           th:each="popular : ${popularSection.posts}"
+           th:href="@{/community/{postId}(postId=${popular.postId})}">
+          <span class="text-muted" th:text="${popular.ranking}">1</span>
+          <span class="badge badge--info" th:text="${popular.categoryName}">카테고리</span>
+          <strong th:text="${popular.title}">제목</strong>
+        </a>
+      </div>
+    </section>
+
     <section class="section" aria-labelledby="store-title">
       <h2 id="store-title" class="section-title">매장 정보</h2>
 

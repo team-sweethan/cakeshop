@@ -9,11 +9,18 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.core.session.SessionRegistryImpl;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.security.web.DefaultRedirectStrategy;
+import org.springframework.security.web.RedirectStrategy;
+import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.security.web.access.AccessDeniedHandlerImpl;
+import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 import org.springframework.security.web.util.matcher.AndRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
@@ -42,6 +49,31 @@ public class SecurityConfig {
         requestCache.setRequestMatcher(request ->
                 !"/cart/count".equals(request.getRequestURI()
                         .substring(request.getContextPath().length())));
+        LoginUrlAuthenticationEntryPoint customerLoginEntryPoint =
+                new LoginUrlAuthenticationEntryPoint("/login");
+        LoginUrlAuthenticationEntryPoint adminLoginEntryPoint =
+                new LoginUrlAuthenticationEntryPoint("/admin/login");
+        AuthenticationEntryPoint portalLoginEntryPoint = (request, response, exception) -> {
+            String path = request.getRequestURI()
+                    .substring(request.getContextPath().length());
+            if ("/admin".equals(path) || path.startsWith("/admin/")) {
+                adminLoginEntryPoint.commence(request, response, exception);
+                return;
+            }
+            customerLoginEntryPoint.commence(request, response, exception);
+        };
+        AccessDeniedHandler defaultAccessDeniedHandler = new AccessDeniedHandlerImpl();
+        RedirectStrategy redirectStrategy = new DefaultRedirectStrategy();
+        AccessDeniedHandler portalAccessDeniedHandler = (request, response, exception) -> {
+            boolean admin = request.getUserPrincipal() instanceof Authentication auth
+                    && auth.getAuthorities().stream()
+                    .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
+            if (admin && HttpMethod.GET.matches(request.getMethod())) {
+                redirectStrategy.sendRedirect(request, response, "/admin");
+                return;
+            }
+            defaultAccessDeniedHandler.handle(request, response, exception);
+        };
 
         http
             // 웹훅 경로만 CSRF 제외 — 전체 비활성화 금지
@@ -56,8 +88,9 @@ public class SecurityConfig {
                         "/", "/login", "/signup", "/join", "/emailCheck", "/find-email",
                         "/find-email/login", "/api/notifications/unread-count", "/api/notifications/test-sms",
                         "/products/**", "/screens", "/favicon.ico",
-                        "/css/**", "/js/**", "/images/**", "/uploads/**", "/error")
+                        "/css/**", "/js/**", "/webjars/**", "/images/**", "/uploads/**", "/error")
                         .permitAll();
+                auth.requestMatchers("/admin/login").permitAll();
                 // 로드밸런서/헬스체크가 인증 없이 호출할 수 있도록 허용 (그 외 actuator 엔드포인트는 미노출)
                 auth.requestMatchers("/actuator/health", "/actuator/health/**").permitAll();
                 auth.requestMatchers(HttpMethod.GET, "/community", "/community/{id:\\d+}").permitAll();
@@ -78,16 +111,22 @@ public class SecurityConfig {
                 }
 
                 // ② 관리자. 모든 관리자 화면은 관리자 로그인을 요구한다.
-                auth.requestMatchers("/admin/**").hasRole("ADMIN");
-                // ③ 나머지는 로그인 회원
-                auth.anyRequest().authenticated();
+                auth.requestMatchers("/admin", "/admin/**").hasRole("ADMIN");
+                // 고객과 관리자가 각자 받은 알림을 같은 API에서 조회하고 읽음 처리한다.
+                auth.requestMatchers("/api/notifications", "/api/notifications/**")
+                        .hasAnyRole("USER", "ADMIN");
+                // ③ 나머지 회원 전용 기능은 일반 회원만 사용한다.
+                auth.anyRequest().hasRole("USER");
             })
+            .exceptionHandling(exception -> exception
+                .authenticationEntryPoint(portalLoginEntryPoint)
+                .accessDeniedHandler(portalAccessDeniedHandler))
             .formLogin(form -> form
                 .loginPage("/login")
                 // 화면과 도메인 모두 이메일을 로그인 식별자로 사용한다.
                 .usernameParameter("email")
-                .failureUrl("/login?error")
-                // 역할별 기본 진입점 분기: 관리자 → /admin, 고객 → /mypage (저장된 요청이 있으면 그 경로 우선)
+                .failureHandler(new PortalAuthenticationFailureHandler())
+                // 역할별 기본 진입점 분기: 관리자 → /admin, 고객 → / (저장된 요청이 있으면 그 경로 우선)
                 .successHandler(new RoleBasedAuthenticationSuccessHandler())
                 .permitAll()
             )
@@ -97,7 +136,7 @@ public class SecurityConfig {
             )
             .logout(logout -> logout
                 .logoutUrl("/logout")
-                .logoutSuccessUrl("/?logout")
+                .logoutSuccessHandler(new PortalLogoutSuccessHandler())
                 .invalidateHttpSession(true)
                 .clearAuthentication(true)
                 .deleteCookies("JSESSIONID")

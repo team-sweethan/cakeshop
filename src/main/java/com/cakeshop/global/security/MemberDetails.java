@@ -9,12 +9,14 @@ import org.springframework.security.core.userdetails.User;
 public class MemberDetails extends User {
 
     private final Long memberId;
+    private final String displayName;
 
     public MemberDetails(MemberAuthenticationView member) {
         super(member.email(), member.password(),
                 List.of(new SimpleGrantedAuthority("ROLE_" + member.role())));
 
         this.memberId = member.id();
+        this.displayName = member.displayName();
     }
 
     public Long getMemberId() {
@@ -24,5 +26,9 @@ public class MemberDetails extends User {
     public boolean isAdmin() {
         return getAuthorities().stream()
                 .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+    }
+
+    public String getDisplayName() {
+        return displayName;
     }
 }

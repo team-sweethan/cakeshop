@@ -8,7 +8,8 @@
 ******************************
 */-->
 <!doctype html>
-<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<html lang="ko" xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -26,7 +27,8 @@
 
     <div class="cluster cluster--between">
       <h1>커뮤니티</h1>
-      <a class="btn btn--primary" th:href="@{/community/new}">글쓰기</a>
+      <a class="btn btn--primary" sec:authorize="!hasRole('ADMIN')"
+         th:href="@{/community/new}">글쓰기</a>
     </div>
 
     <section class="section" th:if="${!popularSection.isEmpty()}">
@@ -63,12 +65,10 @@
 
     <div class="cluster section">
       <a class="btn"
-         th:classappend="${selectedSort.name() == 'LATEST'} ? ' is-active'"
-         th:href="@{/community(categoryId=${selectedCategoryId}, sort='LATEST')}">최신순</a>
-
-      <a class="btn"
-         th:classappend="${selectedSort.name() == 'VIEWS'} ? ' is-active'"
-         th:href="@{/community(categoryId=${selectedCategoryId}, sort='VIEWS')}">조회수순</a>
+         th:each="sortOption : ${sortOptions}"
+         th:classappend="${selectedSort == sortOption} ? ' is-active'"
+         th:href="@{/community(categoryId=${selectedCategoryId}, sort=${sortOption.parameter})}"
+         th:text="${sortOption.label}">정렬</a>
     </div>
 
     <div class="stack">

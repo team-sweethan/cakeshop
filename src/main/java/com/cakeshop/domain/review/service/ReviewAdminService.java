@@ -18,12 +18,12 @@ import com.cakeshop.domain.order.dto.view.OrderReviewSnapshotView;
 import com.cakeshop.domain.order.service.OrderReviewQueryService;
 import com.cakeshop.domain.product.service.ProductReviewCommandService;
 import com.cakeshop.domain.review.dto.form.ReviewReplyForm;
+import com.cakeshop.domain.review.dto.query.AdminReviewFilter;
+import com.cakeshop.domain.review.dto.query.ReviewRow;
 import com.cakeshop.domain.review.dto.view.AdminReviewDetailView;
-import com.cakeshop.domain.review.dto.view.AdminReviewFilter;
 import com.cakeshop.domain.review.dto.view.AdminReviewListView;
 import com.cakeshop.domain.review.dto.view.AdminReviewRating;
 import com.cakeshop.domain.review.dto.view.ReviewReplyView;
-import com.cakeshop.domain.review.dto.view.ReviewRow;
 import com.cakeshop.domain.review.entity.ReviewReply;
 import com.cakeshop.domain.review.entity.ReviewStatus;
 import com.cakeshop.domain.review.error.ReviewErrorCode;
@@ -53,7 +53,11 @@ public class ReviewAdminService {
             PageRequest pageRequest) {
 
         AdminReviewFilter filter = new AdminReviewFilter(
-                searchMemberIds(writer), searchOrderItemIds(product), rating, status);
+                searchMemberIds(writer),
+                searchOrderItemIds(product),
+                rating == null ? null : rating.getMin(),
+                rating == null ? null : rating.getMax(),
+                status);
 
         long total = reviewAdminMapper.countForAdmin(filter);
         if (total <= pageRequest.getOffset()) {
@@ -68,7 +72,7 @@ public class ReviewAdminService {
 
         List<AdminReviewListView> content = rows.stream()
                 .map(row -> AdminReviewListView.from(
-                        row, authors.get(row.getMemberId()), snapshots.get(row.getOrderItemId())))
+                        row, authors.get(row.memberId()), snapshots.get(row.orderItemId())))
                 .toList();
 
         return new PageResult<>(content, pageRequest, total);
@@ -82,9 +86,9 @@ public class ReviewAdminService {
 
         return AdminReviewDetailView.from(
                 review,
-                findAuthors(rows).get(review.getMemberId()),
-                findOrderSnapshots(rows).get(review.getOrderItemId()),
-                reviewReplyMapper.findByReviewId(reviewId));
+                findAuthors(rows).get(review.memberId()),
+                findOrderSnapshots(rows).get(review.orderItemId()),
+                ReviewReplyView.from(reviewReplyMapper.findByReviewId(reviewId)));
     }
 
     @Transactional
@@ -107,7 +111,7 @@ public class ReviewAdminService {
 
         // 저장이 성공했으니 후기는 존재하고 PUBLISHED 다. 작성자만 다시 읽어 받는 사람을 정한다.
         reviewNotificationService.notifyReviewReply(
-                reviewId, reply.getId(), requireFound(reviewMapper.findById(reviewId)).getMemberId(),
+                reviewId, reply.getId(), requireFound(reviewMapper.findById(reviewId)).memberId(),
                 adminId);
     }
 
@@ -127,11 +131,11 @@ public class ReviewAdminService {
     private void requirePublished(long reviewId) {
         ReviewRow review = reviewMapper.findByIdForUpdate(reviewId);
 
-        if (review == null || review.getStatus() == ReviewStatus.DELETED) {
+        if (review == null || review.status() == ReviewStatus.DELETED) {
             throw new BusinessException(ReviewErrorCode.REVIEW_NOT_FOUND);
         }
 
-        if (review.getStatus() == ReviewStatus.BLOCKED) {
+        if (review.status() == ReviewStatus.BLOCKED) {
             throw new BusinessException(ReviewErrorCode.BLOCKED_REVIEW);
         }
     }
@@ -151,11 +155,11 @@ public class ReviewAdminService {
     private void changeStatus(long reviewId, ReviewStatus expected, ReviewStatus next) {
         ReviewRow review = requireFound(reviewMapper.findById(reviewId));
 
-        if (!review.getStatus().canTransitionTo(next)) {
+        if (!review.status().canTransitionTo(next)) {
             throw new BusinessException(ReviewErrorCode.INVALID_REVIEW_TRANSITION);
         }
 
-        productReviewCommandService.lockForRating(review.getProductId());
+        productReviewCommandService.lockForRating(review.productId());
 
         if (reviewAdminMapper.updateStatus(reviewId, expected, next) == 0) {
             // 잠금을 기다리는 동안 커밋된 조치는 검증 시점의 스냅샷에 없다. 최신 행을 다시 읽어야
@@ -165,7 +169,7 @@ public class ReviewAdminService {
             throw new BusinessException(ReviewErrorCode.INVALID_REVIEW_TRANSITION);
         }
 
-        reviewService.recalculateRating(review.getProductId());
+        reviewService.recalculateRating(review.productId());
     }
 
     private ReviewRow requireFound(ReviewRow review) {
@@ -200,7 +204,7 @@ public class ReviewAdminService {
 
     private Map<Long, MemberReviewView> findAuthors(List<ReviewRow> rows) {
         List<Long> memberIds = rows.stream()
-                .map(ReviewRow::getMemberId)
+                .map(ReviewRow::memberId)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
@@ -211,7 +215,7 @@ public class ReviewAdminService {
 
     private Map<Long, OrderReviewSnapshotView> findOrderSnapshots(List<ReviewRow> rows) {
         List<Long> orderItemIds = rows.stream()
-                .map(ReviewRow::getOrderItemId)
+                .map(ReviewRow::orderItemId)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();

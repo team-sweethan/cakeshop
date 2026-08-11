@@ -71,7 +71,7 @@ class ScreenRenderingTests {
     @Test
     void publicScreensRenderWithoutAuthentication() throws Exception {
         String[] paths = {
-            "/screens", "/login", "/signup", "/find-email",
+            "/screens", "/login", "/admin/login", "/signup", "/find-email",
             "/products", "/products/1"
         };
 
@@ -210,6 +210,48 @@ class ScreenRenderingTests {
             .andExpect(status().isOk())
             .andExpect(content().string(containsString("data-server-cart-form")))
             .andExpect(content().string(not(containsString("로그인 후 장바구니 담기"))));
+    }
+
+    @Test
+    @WithUserDetails(
+        value = "admin@cakeshop.local",
+        userDetailsServiceBeanName = "memberDetailsService"
+    )
+    void commonHeader_adminAccount_rendersOnlyAdminAccountMenu() throws Exception {
+        mockMvc.perform(get("/"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(not(containsString(">관리자</a>"))))
+            .andExpect(content().string(not(containsString("href=\"/mypage\""))))
+            .andExpect(content().string(not(containsString("data-cart-count"))))
+            .andExpect(content().string(not(containsString("href=\"/notifications\""))))
+            .andExpect(content().string(containsString("관리자 계정 ·")));
+
+        mockMvc.perform(get("/products/1"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(not(containsString("주문서 작성하기"))))
+            .andExpect(content().string(not(containsString("data-server-cart-form"))))
+            .andExpect(content().string(not(containsString("data-product-option-groups"))))
+            .andExpect(content().string(not(containsString("data-quantity"))))
+            .andExpect(content().string(not(containsString("data-product-price-summary"))))
+            .andExpect(content().string(not(containsString("href=\"/mypage/reviews/writable\""))));
+
+        mockMvc.perform(get("/community"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(not(containsString("href=\"/community/new\""))));
+    }
+
+    @Test
+    @WithUserDetails(
+        value = "user@cakeshop.local",
+        userDetailsServiceBeanName = "memberDetailsService"
+    )
+    void commonHeader_customerAccount_rendersCustomerAccountMenu() throws Exception {
+        mockMvc.perform(get("/"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("href=\"/mypage\"")))
+            .andExpect(content().string(containsString("data-account-identity")))
+            .andExpect(content().string(containsString("data-cart-count")))
+            .andExpect(content().string(not(containsString(">관리자</a>"))));
     }
 
     @Test

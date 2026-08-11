@@ -32,26 +32,18 @@
            th:href="@{/admin/community(sort=${selectedSort})}">상태 전체</a>
 
         <a class="btn"
-           th:classappend="${selectedStatus?.name() == 'PUBLISHED'} ? ' is-active'"
-           th:href="@{/admin/community(status='PUBLISHED', sort=${selectedSort})}">노출 중</a>
-
-        <a class="btn"
-           th:classappend="${selectedStatus?.name() == 'BLOCKED'} ? ' is-active'"
-           th:href="@{/admin/community(status='BLOCKED', sort=${selectedSort})}">차단됨</a>
-
-        <a class="btn"
-           th:classappend="${selectedStatus?.name() == 'DELETED'} ? ' is-active'"
-           th:href="@{/admin/community(status='DELETED', sort=${selectedSort})}">삭제됨</a>
+           th:each="statusOption : ${statusOptions}"
+           th:classappend="${selectedStatus == statusOption} ? ' is-active'"
+           th:href="@{/admin/community(status=${statusOption.name()}, sort=${selectedSort})}"
+           th:text="${statusOption.label}">상태</a>
       </div>
 
       <div class="cluster section">
         <a class="btn"
-           th:classappend="${selectedSort.name() == 'LATEST'} ? ' is-active'"
-           th:href="@{/admin/community(status=${selectedStatus}, sort='LATEST')}">최신순</a>
-
-        <a class="btn"
-           th:classappend="${selectedSort.name() == 'REPORTS'} ? ' is-active'"
-           th:href="@{/admin/community(status=${selectedStatus}, sort='REPORTS')}">신고 많은 순</a>
+           th:each="sortOption : ${sortOptions}"
+           th:classappend="${selectedSort == sortOption} ? ' is-active'"
+           th:href="@{/admin/community(status=${selectedStatus}, sort=${sortOption.parameter})}"
+           th:text="${sortOption.label}">정렬</a>
       </div>
 
       <div class="table-wrap">
@@ -76,11 +68,11 @@
               </td>
               <td>
                 <span th:if="${post.status.name() == 'PUBLISHED'}"
-                      class="badge badge--success">노출 중</span>
+                      class="badge badge--success" th:text="${post.status.label}">상태</span>
                 <span th:if="${post.status.name() == 'BLOCKED'}"
-                      class="badge badge--danger">차단됨</span>
+                      class="badge badge--danger" th:text="${post.status.label}">상태</span>
                 <span th:if="${post.status.name() == 'DELETED'}"
-                      class="badge">삭제됨</span>
+                      class="badge" th:text="${post.status.label}">상태</span>
               </td>
               <td>
                 <a class="btn" th:href="@{/admin/community/{postId}(postId=${post.id})}">상세보기</a>

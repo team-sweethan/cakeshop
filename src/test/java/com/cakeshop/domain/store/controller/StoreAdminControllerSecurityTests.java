@@ -53,7 +53,7 @@ class StoreAdminControllerSecurityTests {
     void adminStore_redirectsToLogin_whenNotAuthenticated() throws Exception {
         mockMvc.perform(get("/admin/store"))
             .andExpect(status().is3xxRedirection())
-            .andExpect(redirectedUrl("/login"));
+            .andExpect(redirectedUrl("/admin/login"));
     }
 
     @Test

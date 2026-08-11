@@ -1,5 +1,6 @@
 package com.cakeshop.domain.statistics.controller;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
@@ -7,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import com.cakeshop.domain.statistics.dto.view.PeriodStatisticsView;
+import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
 import com.cakeshop.domain.statistics.service.DashboardReadModelQueryService;
 import com.cakeshop.domain.statistics.service.PeriodStatisticsReadModelQueryService;
 import com.cakeshop.global.security.SecurityConfig;
@@ -40,7 +42,7 @@ class StatisticsAdminControllerSecurityTests {
     void statistics_notAuthenticated_redirectsToLogin() throws Exception {
         mockMvc.perform(get("/admin/statistics"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/login"));
+                .andExpect(redirectedUrl("/admin/login"));
     }
 
     @Test
@@ -52,10 +54,30 @@ class StatisticsAdminControllerSecurityTests {
 
     @Test
     @WithMockUser(roles = "ADMIN")
+    void dashboard_adminRole_isAccessible() throws Exception {
+        when(dashboardReadModelQueryService.getDashboard())
+                .thenReturn(new StatisticsDashboardView(
+                        0L,
+                        BigDecimal.ZERO,
+                        0L,
+                        0L,
+                        0L,
+                        List.of(),
+                        List.of(),
+                        List.of()
+                ));
+
+        mockMvc.perform(get("/admin"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("admin/dashboard"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
     void statistics_adminRole_isAccessible() throws Exception {
         LocalDate startDate = LocalDate.of(2026, 8, 4);
         LocalDate endDate = LocalDate.of(2026, 8, 10);
-        when(periodStatisticsReadModelQueryService.getStatistics(startDate, endDate))
+        when(periodStatisticsReadModelQueryService.getStatistics(any()))
                 .thenReturn(new PeriodStatisticsView(
                         startDate,
                         endDate,

@@ -10,9 +10,19 @@ package com.cakeshop.domain.community.entity;
  * ******************************
  */
 public enum PostStatus {
-    PUBLISHED,
-    DELETED,
-    BLOCKED;
+    PUBLISHED("노출 중"),
+    DELETED("삭제됨"),
+    BLOCKED("차단됨");
+
+    private final String label;
+
+    PostStatus(String label) {
+        this.label = label;
+    }
+
+    public String getLabel() {
+        return label;
+    }
 
     public boolean canTransitionTo(PostStatus next) {
         if (next == null) {

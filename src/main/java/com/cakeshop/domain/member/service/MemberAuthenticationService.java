@@ -26,6 +26,17 @@ public class MemberAuthenticationService {
                 member.getEmail(),
                 member.getPassword(),
                 member.getRole(),
-                member.getStatus() == MemberStatus.ACTIVE);
+                member.getStatus() == MemberStatus.ACTIVE,
+                resolveDisplayName(member));
+    }
+
+    private String resolveDisplayName(Member member) {
+        if (member.getNickname() != null && !member.getNickname().isBlank()) {
+            return member.getNickname();
+        }
+        if (member.getName() != null && !member.getName().isBlank()) {
+            return member.getName();
+        }
+        return member.getEmail();
     }
 }

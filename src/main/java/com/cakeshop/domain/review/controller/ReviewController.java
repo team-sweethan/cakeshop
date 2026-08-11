@@ -133,11 +133,11 @@ public class ReviewController {
         MyReviewView review =
                 reviewService.getEditableReview(reviewId, memberDetails.getMemberId());
 
-        reviewEditForm.setOverallRating(review.getOverallRating());
-        reviewEditForm.setTasteRating(review.getTasteRating());
-        reviewEditForm.setDesignRating(review.getDesignRating());
-        reviewEditForm.setServiceRating(review.getServiceRating());
-        reviewEditForm.setContent(review.getContent());
+        reviewEditForm.setOverallRating(review.overallRating());
+        reviewEditForm.setTasteRating(review.tasteRating());
+        reviewEditForm.setDesignRating(review.designRating());
+        reviewEditForm.setServiceRating(review.serviceRating());
+        reviewEditForm.setContent(review.content());
         model.addAttribute("review", review);
 
         return "customer/review/edit";

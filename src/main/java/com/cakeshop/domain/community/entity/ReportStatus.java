@@ -10,9 +10,19 @@ package com.cakeshop.domain.community.entity;
  * ******************************
  */
 public enum ReportStatus {
-    PENDING,
-    RESOLVED,
-    REJECTED;
+    PENDING("미처리"),
+    RESOLVED("처리 완료"),
+    REJECTED("기각됨");
+
+    private final String label;
+
+    ReportStatus(String label) {
+        this.label = label;
+    }
+
+    public String getLabel() {
+        return label;
+    }
 
     public boolean canTransitionTo(ReportStatus next) {
         if (next == null) {

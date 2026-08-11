@@ -2,7 +2,10 @@
     const detail = document.querySelector('[data-coupon-detail]');
     if (!detail) return;
 
-    const { couponId, keyword, status, page, csrfName, csrfToken, specificMembers } = detail.dataset;
+    const {
+        couponId, keyword, status, discountTypeFilter, targetTypeFilter, periodStart, periodEnd,
+        page, csrfName, csrfToken, specificMembers
+    } = detail.dataset;
     configureTargetMemberHeader();
     configureIssuedMemberHeader();
     bindSearch('targetMember', `/admin/coupons/${couponId}/target-members`, true, true);
@@ -128,7 +131,16 @@
             const message = action === 'issue' ? '선택한 회원에게 쿠폰을 발급하시겠습니까?' : '선택한 회원의 쿠폰 발급을 취소하시겠습니까?';
             if (!window.confirm(message)) event.preventDefault();
         });
-        [[csrfName, csrfToken], ['keyword', keyword], ['status', status], ['page', page]].forEach(([name, value]) => {
+        [
+            [csrfName, csrfToken],
+            ['keyword', keyword],
+            ['status', status],
+            ['discountTypeFilter', discountTypeFilter],
+            ['targetTypeFilter', targetTypeFilter],
+            ['periodStart', periodStart],
+            ['periodEnd', periodEnd],
+            ['page', page]
+        ].forEach(([name, value]) => {
             const input = document.createElement('input'); input.type = 'hidden'; input.name = name; input.value = value ?? ''; form.appendChild(input);
         });
         const button = document.createElement('button'); button.type = 'submit'; button.className = className; button.textContent = text; form.appendChild(button);

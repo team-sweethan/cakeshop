@@ -6,6 +6,17 @@ public record MemberAuthenticationView(
         String email,
         String password,
         String role,
-        boolean loginAllowed
+        boolean loginAllowed,
+        String displayName
 ) {
+
+    public MemberAuthenticationView(
+            Long id,
+            String email,
+            String password,
+            String role,
+            boolean loginAllowed
+    ) {
+        this(id, email, password, role, loginAllowed, email);
+    }
 }

@@ -55,6 +55,8 @@ public class ReviewAdminController {
         model.addAttribute("product", product);
         model.addAttribute("selectedRating", selectedRating);
         model.addAttribute("selectedStatus", selectedStatus);
+        model.addAttribute("ratingOptions", AdminReviewRating.values());
+        model.addAttribute("statusOptions", ReviewStatus.values());
 
         return "admin/review/list";
     }
@@ -67,8 +69,8 @@ public class ReviewAdminController {
     ) {
         AdminReviewDetailView review = reviewAdminService.getReviewDetail(reviewId);
 
-        if (review.getReply() != null) {
-            reviewReplyForm.setContent(review.getReply().getContent());
+        if (review.reply() != null) {
+            reviewReplyForm.setContent(review.reply().content());
         }
 
         model.addAttribute("review", review);

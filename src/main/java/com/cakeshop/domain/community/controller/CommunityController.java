@@ -18,6 +18,8 @@ import com.cakeshop.global.security.MemberDetails;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -39,13 +41,10 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * ******************************
  */
 @Controller
+@RequiredArgsConstructor
 public class CommunityController {
 
     private final CommunityService communityService;
-
-    public CommunityController(CommunityService communityService) {
-        this.communityService = communityService;
-    }
 
     @GetMapping("/community")
     public String list(
@@ -73,6 +72,7 @@ public class CommunityController {
         model.addAttribute("categories", communityService.getActiveCategories());
         model.addAttribute("selectedCategoryId", selectedCategoryId);
         model.addAttribute("selectedSort", selectedSort);
+        model.addAttribute("sortOptions", PostSort.values());
 
         model.addAttribute(
                 "popularSection",

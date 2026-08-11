@@ -25,17 +25,18 @@
                placeholder="상품명 검색" th:value="${product}">
 
         <select class="form-control" name="rating" aria-label="평점">
-          <option value="" th:selected="${selectedRating.name() == 'ALL'}">평점 전체</option>
-          <option value="5" th:selected="${selectedRating.name() == 'FIVE'}">5점</option>
-          <option value="4" th:selected="${selectedRating.name() == 'FOUR'}">4점</option>
-          <option value="3" th:selected="${selectedRating.name() == 'THREE_OR_LESS'}">3점 이하</option>
+          <option th:each="ratingOption : ${ratingOptions}"
+                  th:value="${ratingOption.parameter}"
+                  th:selected="${selectedRating == ratingOption}"
+                  th:text="${ratingOption.label}">평점</option>
         </select>
 
         <select class="form-control" name="status" aria-label="상태">
           <option value="" th:selected="${selectedStatus == null}">상태 전체</option>
-          <option value="PUBLISHED" th:selected="${selectedStatus?.name() == 'PUBLISHED'}">노출 중</option>
-          <option value="BLOCKED" th:selected="${selectedStatus?.name() == 'BLOCKED'}">숨김</option>
-          <option value="DELETED" th:selected="${selectedStatus?.name() == 'DELETED'}">삭제됨</option>
+          <option th:each="statusOption : ${statusOptions}"
+                  th:value="${statusOption.name()}"
+                  th:selected="${selectedStatus == statusOption}"
+                  th:text="${statusOption.label}">상태</option>
         </select>
 
         <button class="btn" type="submit">검색</button>
@@ -55,11 +56,11 @@
               <td th:text="${#temporals.format(review.createdAt, 'yyyy.MM.dd')}">2026.01.01</td>
               <td>
                 <span th:if="${review.status.name() == 'PUBLISHED'}"
-                      class="badge badge--success">노출 중</span>
+                      class="badge badge--success" th:text="${review.status.label}">상태</span>
                 <span th:if="${review.status.name() == 'BLOCKED'}"
-                      class="badge badge--danger">숨김</span>
+                      class="badge badge--danger" th:text="${review.status.label}">상태</span>
                 <span th:if="${review.status.name() == 'DELETED'}"
-                      class="badge">삭제됨</span>
+                      class="badge" th:text="${review.status.label}">상태</span>
               </td>
               <td>
                 <a class="btn" th:href="@{/admin/reviews/{reviewId}(reviewId=${review.id})}">상세보기</a>

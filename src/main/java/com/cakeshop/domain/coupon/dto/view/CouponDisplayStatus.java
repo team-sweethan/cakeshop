@@ -26,15 +26,15 @@ public enum CouponDisplayStatus {
         if (!coupon.getExpiresAt().isAfter(now)) {
             return ENDED;
         }
-        if (coupon.getTotalQuantity() != null
-                && coupon.getIssuedQuantity() >= coupon.getTotalQuantity()) {
-            return EXHAUSTED;
-        }
         if (coupon.getStatus() == CouponStatus.INACTIVE) {
             return INACTIVE;
         }
         if (coupon.getStartsAt().isAfter(now)) {
             return SCHEDULED;
+        }
+        if (coupon.getTotalQuantity() != null
+                && coupon.getIssuedQuantity() >= coupon.getTotalQuantity()) {
+            return EXHAUSTED;
         }
         return ACTIVE;
     }

@@ -22,6 +22,7 @@
 
 | 조건 | 추가 컨텍스트 |
 |---|---|
+| Entity·Form·Query·Command·View 구조 변경 | `docs/community/community_conventions.md` |
 | 상태·전이·권한·입력 검증 | `DOMAIN.md` 4·5·7절의 필요한 절 |
 | 회원 정보·탈퇴 회원·도메인 경계 | `DOMAIN.md` 8·11절, `docs/conventions.md` 12절 |
 | 화면·문구·Thymeleaf 변경 | 해당 spec과 `docs/frontend-template-format.md` |

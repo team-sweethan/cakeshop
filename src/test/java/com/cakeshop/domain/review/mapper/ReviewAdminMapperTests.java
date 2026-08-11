@@ -12,9 +12,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-import com.cakeshop.domain.review.dto.view.AdminReviewFilter;
+import com.cakeshop.domain.review.dto.query.AdminReviewFilter;
 import com.cakeshop.domain.review.dto.view.AdminReviewRating;
-import com.cakeshop.domain.review.dto.view.ReviewRow;
+import com.cakeshop.domain.review.dto.query.ReviewRow;
 import com.cakeshop.domain.review.entity.Review;
 import com.cakeshop.domain.review.entity.ReviewStatus;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
@@ -61,7 +61,7 @@ class ReviewAdminMapperTests {
         insertReview(5, ReviewStatus.PUBLISHED);
 
         AdminReviewFilter filter =
-                new AdminReviewFilter(List.of(), null, AdminReviewRating.ALL, null);
+                new AdminReviewFilter(List.of(), null, null, null, null);
 
         assertThat(findAll(filter)).isEmpty();
         assertThat(reviewAdminMapper.countForAdmin(filter)).isZero();
@@ -72,7 +72,7 @@ class ReviewAdminMapperTests {
         long reviewId = insertReview(5, ReviewStatus.PUBLISHED);
 
         AdminReviewFilter filter =
-                new AdminReviewFilter(null, null, AdminReviewRating.ALL, null);
+                new AdminReviewFilter(null, null, null, null, null);
 
         assertThat(idsOf(findAll(filter))).contains(reviewId);
     }
@@ -122,7 +122,7 @@ class ReviewAdminMapperTests {
         long first = insertReview(5, ReviewStatus.PUBLISHED);
         insertReview(5, ReviewStatus.PUBLISHED);
 
-        long orderItemId = reviewMapper.findById(first).getOrderItemId();
+        long orderItemId = reviewMapper.findById(first).orderItemId();
 
         List<ReviewRow> rows =
                 findAll(mine(List.of(orderItemId), AdminReviewRating.ALL, null));
@@ -153,7 +153,7 @@ class ReviewAdminMapperTests {
 
         assertThat(reviewAdminMapper.updateStatus(
                 reviewId, ReviewStatus.PUBLISHED, ReviewStatus.BLOCKED)).isEqualTo(1);
-        assertThat(reviewMapper.findById(reviewId).getStatus()).isEqualTo(ReviewStatus.BLOCKED);
+        assertThat(reviewMapper.findById(reviewId).status()).isEqualTo(ReviewStatus.BLOCKED);
     }
 
     @Test
@@ -162,7 +162,7 @@ class ReviewAdminMapperTests {
 
         assertThat(reviewAdminMapper.updateStatus(
                 reviewId, ReviewStatus.PUBLISHED, ReviewStatus.BLOCKED)).isZero();
-        assertThat(reviewMapper.findById(reviewId).getStatus()).isEqualTo(ReviewStatus.DELETED);
+        assertThat(reviewMapper.findById(reviewId).status()).isEqualTo(ReviewStatus.DELETED);
     }
 
     @Test
@@ -175,7 +175,8 @@ class ReviewAdminMapperTests {
 
     private AdminReviewFilter mine(
             List<Long> orderItemIds, AdminReviewRating rating, ReviewStatus status) {
-        return new AdminReviewFilter(List.of(memberId), orderItemIds, rating, status);
+        return new AdminReviewFilter(
+                List.of(memberId), orderItemIds, rating.getMin(), rating.getMax(), status);
     }
 
     private List<ReviewRow> findAll(AdminReviewFilter filter) {
@@ -183,7 +184,7 @@ class ReviewAdminMapperTests {
     }
 
     private List<Long> idsOf(List<ReviewRow> rows) {
-        return rows.stream().map(ReviewRow::getId).toList();
+        return rows.stream().map(ReviewRow::id).toList();
     }
 
     private long insertReview(int overallRating, ReviewStatus status) {

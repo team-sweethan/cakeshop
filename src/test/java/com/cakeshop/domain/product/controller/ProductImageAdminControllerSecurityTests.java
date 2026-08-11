@@ -46,7 +46,7 @@ class ProductImageAdminControllerSecurityTests {
             throws Exception {
         mockMvc.perform(post(DELETE_URL).with(csrf()))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/login"));
+                .andExpect(redirectedUrl("/admin/login"));
 
         verify(productImageService, never())
                 .deleteImage(1L, 10L);
@@ -97,7 +97,7 @@ class ProductImageAdminControllerSecurityTests {
                                 .with(csrf())
                 )
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/login"));
+                .andExpect(redirectedUrl("/admin/login"));
 
         verify(productImageService, never()).replaceImage(
                 eq(1L),

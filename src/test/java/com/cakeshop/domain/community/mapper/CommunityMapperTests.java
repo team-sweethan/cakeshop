@@ -9,18 +9,19 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.cakeshop.domain.community.dto.view.AdminPostDetailRow;
-import com.cakeshop.domain.community.dto.view.AdminPostListRow;
+import com.cakeshop.domain.community.dto.command.PostUpdateCommand;
+import com.cakeshop.domain.community.dto.query.AdminPostDetailRow;
+import com.cakeshop.domain.community.dto.query.AdminPostListRow;
 import com.cakeshop.domain.community.dto.view.AdminPostSort;
-import com.cakeshop.domain.community.dto.view.CommentCountView;
-import com.cakeshop.domain.community.dto.view.CommentRow;
-import com.cakeshop.domain.community.dto.view.ReportRow;
+import com.cakeshop.domain.community.dto.query.CommentCountRow;
+import com.cakeshop.domain.community.dto.query.CommentRow;
+import com.cakeshop.domain.community.dto.query.ReportRow;
 import com.cakeshop.domain.community.dto.view.PopularPostView;
 import com.cakeshop.domain.community.dto.view.PostCategoryView;
-import com.cakeshop.domain.community.dto.view.PostDetailRow;
-import com.cakeshop.domain.community.dto.view.PostListRow;
+import com.cakeshop.domain.community.dto.query.PostDetailRow;
+import com.cakeshop.domain.community.dto.query.PostListRow;
 import com.cakeshop.domain.community.dto.view.PostSort;
-import com.cakeshop.domain.community.dto.view.PostLockView;
+import com.cakeshop.domain.community.dto.query.PostLockRow;
 import com.cakeshop.domain.community.dto.view.ReportView;
 import com.cakeshop.domain.community.entity.Comment;
 import com.cakeshop.domain.community.entity.CommentStatus;
@@ -244,9 +245,10 @@ class CommunityMapperTests {
     @Test
     void updatePost_author_updatesFieldsAndMarksPostAsEdited() {
         long postId = insertPost("원래 제목", PostStatus.PUBLISHED, BASE_TIME);
-        Post post = editOf(postId, memberId, otherCategoryId, "고친 제목", "고친 본문");
+        PostUpdateCommand command =
+                updateCommandOf(postId, memberId, otherCategoryId, "고친 제목", "고친 본문");
 
-        int updated = communityMapper.updatePost(post);
+        int updated = communityMapper.updatePost(command);
 
         assertThat(updated).isEqualTo(1);
         PostDetailRow saved = communityMapper.findPostById(postId);
@@ -268,7 +270,7 @@ class CommunityMapperTests {
         long editorId = asAuthor ? memberId : withdrawnMemberId;
 
         assertThat(communityMapper.updatePost(
-                editOf(postId, editorId, categoryId, "가로챈 제목", "본문"))).isZero();
+                updateCommandOf(postId, editorId, categoryId, "가로챈 제목", "본문"))).isZero();
         assertThat(communityMapper.findPostById(postId).title()).isEqualTo(title);
     }
 
@@ -342,8 +344,8 @@ class CommunityMapperTests {
         insertComment(postId, CommentStatus.PUBLISHED);
         insertComment(postId, CommentStatus.DELETED);
 
-        CommentCountView counts = communityMapper.countComments(postId);
-        CommentCountView emptyCounts = communityMapper.countComments(emptyPostId);
+        CommentCountRow counts = communityMapper.countComments(postId);
+        CommentCountRow emptyCounts = communityMapper.countComments(emptyPostId);
 
         assertThat(counts.rowCount()).isEqualTo(3);
         assertThat(counts.publishedCount()).isEqualTo(2);
@@ -418,7 +420,7 @@ class CommunityMapperTests {
     void lockPost_returnsAuthorAndStatus() {
         long blocked = insertPost("차단됨", PostStatus.BLOCKED, BASE_TIME);
 
-        PostLockView locked = communityMapper.lockPost(blocked);
+        PostLockRow locked = communityMapper.lockPost(blocked);
 
         assertThat(locked).isNotNull();
         assertThat(locked.memberId()).isEqualTo(memberId);
@@ -494,9 +496,9 @@ class CommunityMapperTests {
         return Post.create(authorId, postCategoryId, title, content);
     }
 
-    private Post editOf(
+    private PostUpdateCommand updateCommandOf(
             long postId, long authorId, long postCategoryId, String title, String content) {
-        return Post.edit(postId, authorId, postCategoryId, title, content);
+        return new PostUpdateCommand(postId, authorId, postCategoryId, title, content);
     }
 
     private List<PostListRow> findPage(int page, int size) {

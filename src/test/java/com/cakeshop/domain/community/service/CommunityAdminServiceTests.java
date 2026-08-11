@@ -11,13 +11,13 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.cakeshop.domain.community.dto.view.AdminPostDetailRow;
+import com.cakeshop.domain.community.dto.query.AdminPostDetailRow;
 import com.cakeshop.domain.community.dto.view.AdminPostDetailView;
-import com.cakeshop.domain.community.dto.view.AdminPostListRow;
+import com.cakeshop.domain.community.dto.query.AdminPostListRow;
 import com.cakeshop.domain.community.dto.view.AdminPostListView;
 import com.cakeshop.domain.community.dto.view.AdminPostSort;
-import com.cakeshop.domain.community.dto.view.PostLockView;
-import com.cakeshop.domain.community.dto.view.ReportRow;
+import com.cakeshop.domain.community.dto.query.PostLockRow;
+import com.cakeshop.domain.community.dto.query.ReportRow;
 import com.cakeshop.domain.community.dto.view.ReportView;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.entity.ReportStatus;
@@ -302,7 +302,7 @@ class CommunityAdminServiceTests {
 
     private void givenLockedPost(PostStatus status) {
         when(communityMapper.lockPost(POST_ID))
-                .thenReturn(new PostLockView(AUTHOR_ID, status));
+                .thenReturn(new PostLockRow(AUTHOR_ID, status));
     }
 
 }

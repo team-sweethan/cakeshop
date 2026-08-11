@@ -5,8 +5,9 @@ import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
-import com.cakeshop.domain.review.dto.view.ProductRatingAggregate;
-import com.cakeshop.domain.review.dto.view.ReviewRow;
+import com.cakeshop.domain.review.dto.command.ReviewUpdateCommand;
+import com.cakeshop.domain.review.dto.query.ProductRatingAggregate;
+import com.cakeshop.domain.review.dto.query.ReviewRow;
 import com.cakeshop.domain.review.entity.Review;
 
 @Mapper
@@ -26,7 +27,7 @@ public interface ReviewMapper {
     // 스냅샷을 보므로 그사이 커밋된 삭제·숨김이 안 보이고 원인이 400 으로 뭉개진다.
     ReviewRow findByIdForUpdate(@Param("id") long id);
 
-    int update(Review review);
+    int update(ReviewUpdateCommand command);
 
     int deleteByAuthor(@Param("reviewId") long reviewId, @Param("memberId") long memberId);
 

@@ -31,7 +31,8 @@
               <p class="text-muted" th:text="${review.orderNumber}">주문번호</p>
             </div>
             <div class="cluster">
-              <span class="badge badge--warning" th:if="${review.blocked}">숨김</span>
+              <span class="badge badge--warning" th:if="${review.blocked}"
+                    th:text="${review.status.label}">상태</span>
               <span class="text-muted"
                     th:text="${#temporals.format(review.createdAt, 'yyyy-MM-dd')}">2026-08-10</span>
             </div>
