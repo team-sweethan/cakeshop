@@ -20,13 +20,13 @@
            AND r.status = 'PUBLISHED'
     </update>
 
-    <select id="findByReviewId" resultType="com.cakeshop.domain.review.dto.view.ReviewReplyView">
+    <select id="findByReviewId" resultType="com.cakeshop.domain.review.dto.query.ReviewReplyRow">
         SELECT <include refid="replyColumns"/>
           FROM review_replies
          WHERE review_id = #{reviewId}
     </select>
 
-    <select id="findByReviewIds" resultType="com.cakeshop.domain.review.dto.view.ReviewReplyView">
+    <select id="findByReviewIds" resultType="com.cakeshop.domain.review.dto.query.ReviewReplyRow">
         SELECT <include refid="replyColumns"/>
           FROM review_replies
          WHERE review_id IN
