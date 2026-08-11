@@ -319,13 +319,9 @@ public class ChatService {
             return Collections.emptyList();
         }
 
-        // 2. 고객 이름 배치 조회 (중복 customerId 조회를 최소화하여 N+1 방지)
+        // 2. 고객 이름 배치 조회 (IN 쿼리로 단 1번만의 SELECT로 N+1 문제 완전 해소!)
         Set<Long> uniqueCustomerIds = rooms.stream().map(ChatRoom::getCustomerId).collect(Collectors.toSet());
-        Map<Long, String> customerNameMap = uniqueCustomerIds.stream().collect(Collectors.toMap(
-            id -> id,
-            id -> memberChatQueryService.getCustomerName(id),
-            (a, b) -> a
-        ));
+        Map<Long, String> customerNameMap = memberChatQueryService.getCustomerNamesMap(new java.util.ArrayList<>(uniqueCustomerIds));
 
         // 3. 마지막 메시지 일괄 배치 조회 (방 20개당 20번 단건 쿼리 나가던 N+1 문제 완전 해소!)
         List<Long> lastMessageIds = rooms.stream()

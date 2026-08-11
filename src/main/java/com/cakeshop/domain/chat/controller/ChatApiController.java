@@ -213,4 +213,25 @@ public class ChatApiController {
         return ResponseEntity.ok().build();
     }
 
+    // ==========================================
+    // 채팅 API 전용 예외 핸들러 (REST JSON 응답 보장)
+    // ==========================================
+    @ExceptionHandler(com.cakeshop.global.error.BusinessException.class)
+    public ResponseEntity<java.util.Map<String, String>> handleBusinessException(com.cakeshop.global.error.BusinessException e) {
+        return ResponseEntity.status(e.getErrorCode().status())
+                .body(java.util.Map.of("code", e.getErrorCode().code(), "message", e.getErrorCode().message()));
+    }
+
+    @ExceptionHandler({org.springframework.web.bind.MethodArgumentNotValidException.class, org.springframework.validation.BindException.class})
+    public ResponseEntity<java.util.Map<String, String>> handleValidationException() {
+        return ResponseEntity.status(400)
+                .body(java.util.Map.of("code", com.cakeshop.global.error.CommonErrorCode.INVALID_INPUT.code(), "message", com.cakeshop.global.error.CommonErrorCode.INVALID_INPUT.message()));
+    }
+
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<java.util.Map<String, String>> handleAccessDeniedException() {
+        return ResponseEntity.status(403)
+                .body(java.util.Map.of("code", com.cakeshop.global.error.CommonErrorCode.FORBIDDEN.code(), "message", com.cakeshop.global.error.CommonErrorCode.FORBIDDEN.message()));
+    }
+
 }

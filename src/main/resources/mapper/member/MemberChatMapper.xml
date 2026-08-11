@@ -1,13 +1,33 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--/**
+ * ******************************
+ * 작성자 : 김민정
+ * 담당자 : 수민
+ * 작성일 : 2026-08-11
+ * 기능 : 채팅용 고객 이름 조회 SQL 계약
+ * 설명 : 채팅방 관리자 화면에서 고객 이름을 조회하기 위해 고객 ID를 전달받아 조회한다.
+ * ******************************
+ */-->
+
 <mapper namespace="com.cakeshop.domain.member.mapper.MemberChatMapper">
 
-    <!-- 채팅방 관리자 화면 표기용 고객 이름 조회 -->
+    <!-- 채팅방 관리자 화면 표기용 고객 이름 단건 조회 -->
     <select id="findCustomerNameById" resultType="string">
         SELECT name
         FROM members
         WHERE id = #{customerId}
+    </select>
+
+    <!-- 채팅방 관리자 화면 표기용 고객 이름 일괄 배치 조회 (N+1 방지) -->
+    <select id="findCustomerNamesByIds" resultType="com.cakeshop.domain.member.dto.view.MemberChatView">
+        SELECT id, name
+        FROM members
+        WHERE id IN
+        <foreach collection="customerIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
     </select>
 
 </mapper>

@@ -1,5 +1,7 @@
 package com.cakeshop.domain.member.mapper;
 
+import com.cakeshop.domain.member.dto.view.MemberChatView;
+import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -15,4 +17,5 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 public interface MemberChatMapper {
     String findCustomerNameById(@Param("customerId") Long customerId);
+    List<MemberChatView> findCustomerNamesByIds(@Param("customerIds") List<Long> customerIds);
 }
