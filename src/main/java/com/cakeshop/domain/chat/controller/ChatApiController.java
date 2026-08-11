@@ -89,12 +89,21 @@ public class ChatApiController {
                 request.getContent(),
                 request.getAttachments()
         );
+        List<String> imageUrls = (request.getAttachments() != null && !request.getAttachments().isEmpty())
+                ? request.getAttachments().stream()
+                        .map(ChatMessageAttachmentRequest::getObjectKey)
+                        .filter(java.util.Objects::nonNull)
+                        .collect(java.util.stream.Collectors.toList())
+                : java.util.Collections.emptyList();
+
         return ResponseEntity.ok(ChatMessageResponse.builder()
                 .id(message.getId())
                 .chatRoomId(message.getChatRoomId())
                 .senderId(message.getSenderId())
+                .senderType(memberDetails.isAdmin() ? "ADMIN" : "CUSTOMER")
                 .productId(message.getProductId())
                 .content(message.getContent())
+                .imageUrls(imageUrls)
                 .createdAt(message.getCreatedAt())
                 .build());
     }

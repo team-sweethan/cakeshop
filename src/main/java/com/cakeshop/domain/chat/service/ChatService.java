@@ -75,23 +75,33 @@ public class ChatService {
     // 1. 공통 & 고객용 기능 (Customer)
     // ==========================================
     
-    // 없으면 방 만들고, 있으면 만들어져있는거 반환
+    // 없으면 방 만들고, 있으면 만들어져있는거 반환 (동시성 충돌 발생 시 기존 방 흡수)
     @Transactional
     public ChatRoom getOrMakeChatRoom(Long customerId) {
+        if (customerId == null || customerId <= 0) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
         ChatRoom chatRoom = chatMapper.findChatRoomByCustomerId(customerId);
 
         if (chatRoom != null) {
             return chatRoom;
-        } else {
-            chatRoom = ChatRoom.builder()
-                .customerId(customerId)
-                .status(ChatRoomStatus.OPEN)
-                .responseStatus(ChatResponseStatus.WAITING_ADMIN)
-                .createdAt(LocalDateTime.now())
-                .build();
-            chatMapper.insertChatRoom(chatRoom);
+        }
 
+        chatRoom = ChatRoom.builder()
+            .customerId(customerId)
+            .status(ChatRoomStatus.OPEN)
+            .responseStatus(ChatResponseStatus.WAITING_ADMIN)
+            .createdAt(LocalDateTime.now())
+            .build();
+        try {
+            chatMapper.insertChatRoom(chatRoom);
             return chatRoom;
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            ChatRoom existingRoom = chatMapper.findChatRoomByCustomerId(customerId);
+            if (existingRoom != null) {
+                return existingRoom;
+            }
+            throw e;
         }
     }
 
@@ -115,8 +125,11 @@ public class ChatService {
                 }
             }
 
-            // 2. 문의 상품(productId) 존재 및 공개 상태 검증
-            if (productId != null && productId > 0) {
+            // 2. 문의 상품(productId) 존재 및 공개 상태 검증 (0 또는 음수 ID 거절)
+            if (productId != null) {
+                if (productId <= 0) {
+                    throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+                }
                 productQueryService.getSalesInfo(productId);
             }
 
