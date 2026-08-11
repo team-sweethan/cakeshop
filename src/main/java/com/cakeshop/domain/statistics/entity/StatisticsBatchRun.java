@@ -49,4 +49,15 @@ public class StatisticsBatchRun {
         run.targetEndDate = targetEndDate;
         return run;
     }
+
+    public static StatisticsBatchRun rebuild(
+            LocalDate targetStartDate,
+            LocalDate targetEndDate
+    ) {
+        StatisticsBatchRun run = new StatisticsBatchRun();
+        run.batchType = StatisticsBatchType.REBUILD;
+        run.targetStartDate = targetStartDate;
+        run.targetEndDate = targetEndDate;
+        return run;
+    }
 }
