@@ -39,6 +39,7 @@
 - 과거 날짜용 일별 통계 집계 테이블
 - 통계 집계 배치와 재집계 기능
 - 기존 원본 데이터의 초기 통계 적재
+- 운영자 CLI를 통한 지정 기간 수동 재집계
 
 ### 2-2. 후속 구현 대상
 
@@ -184,22 +185,23 @@
 | 컬럼 | 역할 |
 |---|---|
 | `id` | 실행 기록 기본 키 |
-| `batch_type` | `DAILY` 또는 `BACKFILL` |
+| `batch_type` | `DAILY`, `BACKFILL` 또는 `REBUILD` |
 | `status` | `RUNNING`, `SUCCEEDED`, `FAILED` |
 | `source_window_started_at` | 원본 변경 탐색 시작 시각 |
 | `source_window_ended_at` | 원본 변경 탐색 종료 시각 |
 | `target_start_date` | 집계 대상 시작일 |
 | `target_end_date` | 집계 대상 종료일 |
-| `last_completed_date` | 백필이 마지막으로 완료한 날짜 |
+| `last_completed_date` | 백필 또는 수동 재집계가 마지막으로 완료한 날짜 |
 | `started_at` | 실행 시작 시각 |
 | `heartbeat_at` | 실행 생존 확인 시각 |
 | `completed_at` | 실행 완료 시각 |
 | `running_lock` | 단일 실행을 강제하는 DB 생성 컬럼 |
 
 - `source_window_started_at`과 `source_window_ended_at`은 `DAILY` 실행에만 사용하고
-  `BACKFILL` 실행에서는 `NULL`을 허용한다.
-- `last_completed_date`는 `BACKFILL` 실행에만 사용하고 `DAILY` 실행에서는 `NULL`로 둔다.
+  `BACKFILL`, `REBUILD` 실행에서는 `NULL`로 둔다.
+- `last_completed_date`는 `BACKFILL`, `REBUILD` 실행에 사용하고 `DAILY` 실행에서는 `NULL`로 둔다.
 - 성공한 `DAILY` 실행의 `source_window_ended_at`을 다음 변경 탐색의 기준으로 사용한다.
+- `REBUILD` 실행 기록은 정규 일별 집계의 변경 탐색과 누락 날짜 따라잡기 기준으로 사용하지 않는다.
 - 실패한 실행은 성공 기준 시각을 갱신하지 않는다.
 - `running_lock`은 `RUNNING`이면 `1`, 그 외에는 `NULL`이며 UNIQUE 제약으로
   `RUNNING` 실행을 하나만 허용한다.
@@ -225,7 +227,7 @@
 - 집계 대상은 직전 성공 실행의 `target_end_date` 다음 날부터 전날까지의 모든 날짜와
   변경 탐색 범위에서 발견한 과거 통계 기준 날짜의 합집합이다.
 - 배치 작업은 DB 기반 단일 실행 잠금을 사용하여 여러 애플리케이션 인스턴스의 동시 실행을 막는다.
-- 정기 배치와 초기 백필은 같은 잠금을 사용하여 동시에 실행하지 않는다.
+- 정기 배치, 초기 백필과 수동 재집계는 같은 잠금을 사용하여 동시에 실행하지 않는다.
 - 같은 날짜를 반복 실행해도 결과가 중복되지 않도록 기존 값을 교체한다.
 - 날짜별 재집계가 실패하면 해당 날짜의 기존 결과를 보존하고 실행 전체를 실패로 기록한다.
 - 실패한 실행은 다음 실행에서 같은 변경 탐색 범위를 다시 처리한다.
@@ -239,9 +241,7 @@
 - 운영자는 웹 서버 없이 아래 명령으로 백필을 실행하고 종료 결과와 `statistics_batch_runs`를 확인한다.
 
 ```bash
-java -jar cakeshop.jar \
-  --spring.main.web-application-type=none \
-  --app.statistics.backfill.enabled=true
+./gradlew bootRun --args='--spring.main.web-application-type=none --spring.devtools.restart.enabled=false --app.statistics.backfill.enabled=true'
 ```
 
 - 백필 성공 또는 이미 완료된 경우 종료 코드 `0`, 다른 집계 실행 중이거나 백필 실패인 경우
@@ -256,6 +256,32 @@ java -jar cakeshop.jar \
 - 처음부터 다시 실행해도 같은 결과가 되도록 날짜별 저장은 멱등성을 보장한다.
 - 초기 백필이 완료되기 전에는 완료된 날짜만 조회할 수 있고 미집계 날짜를 `0`으로 표시하지 않는다.
 - 원본 주문과 승인 결제가 모두 없어도 기본 최근 7일의 집계 완료 행을 생성한다.
+
+### 7-5. 운영자 수동 재집계
+
+- 성공한 초기 `BACKFILL`이 존재할 때만 `REBUILD`를 실행할 수 있다.
+- 성공한 초기 백필은 다시 실행하지 않으며, 과거 통계를 다시 계산할 때는 `REBUILD`를 사용한다.
+- `REBUILD`는 일반 애플리케이션 시작 시 자동 실행하지 않고 운영자가 CLI 명령으로 명시적으로 실행한다.
+- 시작일은 필수이고 종료일을 생략하면 DB 기준 현재 날짜의 어제를 사용한다.
+- 시작일과 종료일은 `Asia/Seoul` 기준이며 시작일과 종료일을 모두 포함한다.
+- 시작일은 종료일보다 늦을 수 없고 종료일은 어제보다 늦을 수 없다.
+- 한 번에 지정할 수 있는 기간은 시작일과 종료일을 포함하여 최대 366일이다.
+- 지정 기간의 모든 날짜를 오름차순으로 다시 집계하고 기존 `daily_statistics` 행을 교체한다.
+- 원본 주문과 승인 결제가 없는 날짜도 모든 지표가 `0`인 행으로 저장한다.
+- 날짜별 집계 저장과 `last_completed_date` 갱신은 같은 트랜잭션에서 처리한다.
+- 실행 중 오류가 발생하면 해당 실행을 `FAILED`로 기록하고 같은 명령으로 전체 지정 기간을
+  다시 실행할 수 있다.
+- 같은 기간을 반복 실행해도 날짜별 저장 결과가 중복되지 않도록 멱등성을 보장한다.
+- `app.statistics.backfill.enabled`와 `app.statistics.rebuild.enabled`는 동시에 활성화할 수 없다.
+- 재집계 성공 시 종료 코드 `0`, 잘못된 날짜·다른 집계 실행 중·재집계 실패 시 `0`이 아닌 종료 코드를 반환한다.
+
+운영자는 웹 서버 없이 다음 형식으로 수동 재집계를 실행한다.
+
+```bash
+./gradlew bootRun --args='--spring.main.web-application-type=none --spring.devtools.restart.enabled=false --app.statistics.rebuild.enabled=true --app.statistics.rebuild.start-date=2026-08-01 --app.statistics.rebuild.end-date=2026-08-10'
+```
+
+운영체제별 명령과 실행 결과 확인 방법은 [`statistics-operations.md`](statistics-operations.md)를 따른다.
 
 ## 8. 테스트 기준
 
@@ -274,4 +300,16 @@ java -jar cakeshop.jar \
 - 마지막 성공 집계 이후 원본 데이터가 없는 날짜도 빠짐없이 `0`행으로 따라잡는지 검증한다.
 - 초기 백필의 반복 실행과 중단 후 재개를 검증한다.
 - 재개 백필 성공 후 첫 일별 집계가 최초 백필 시작 이후의 변경을 다시 탐색하는지 검증한다.
+- 성공한 초기 백필이 없으면 수동 재집계를 거부하는지 검증한다.
+- 수동 재집계의 종료일 기본값, 날짜 역전, 오늘·미래 날짜와 366일 초과를 검증한다.
+- 지정 기간의 기존 값 교체, 빈 날짜 `0`행 저장과 반복 실행의 멱등성을 검증한다.
+- 수동 재집계 실패 상태와 `last_completed_date`를 검증한다.
+- `REBUILD` 실행 기록이 정규 일별 집계의 변경 탐색과 누락 날짜 따라잡기 기준으로 사용되지 않는지
+  검증한다.
+- 초기 백필과 수동 재집계 옵션을 동시에 활성화하면 실행을 거부하는지 검증한다.
 - 원본 집계와 일별 집계 테이블 결과가 같은지 검증한다.
+
+## 관련 문서
+
+- [통계 집계 운영 가이드](statistics-operations.md)
+- [통계 스키마](../schema/statistics.md)

@@ -53,6 +53,15 @@
           AND status = 'RUNNING'
     </update>
 
+    <update id="updateRebuildProgress">
+        UPDATE statistics_batch_runs
+        SET last_completed_date = #{lastCompletedDate},
+            heartbeat_at = CURRENT_TIMESTAMP(6)
+        WHERE id = #{batchRunId}
+          AND batch_type = 'REBUILD'
+          AND status = 'RUNNING'
+    </update>
+
     <update id="completeSucceeded">
         UPDATE statistics_batch_runs
         SET status = 'SUCCEEDED',
@@ -84,7 +93,8 @@
     <select id="findLatestSuccessfulTargetEndDate" resultType="java.time.LocalDate">
         SELECT target_end_date
         FROM statistics_batch_runs
-        WHERE status = 'SUCCEEDED'
+        WHERE batch_type IN ('DAILY', 'BACKFILL')
+          AND status = 'SUCCEEDED'
         ORDER BY id DESC
         LIMIT 1
     </select>

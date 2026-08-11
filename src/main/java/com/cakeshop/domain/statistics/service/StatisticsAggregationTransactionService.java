@@ -76,6 +76,21 @@ public class StatisticsAggregationTransactionService {
         }
     }
 
+    /** 한 날짜의 재집계 결과 교체와 진행일 갱신을 원자적으로 처리한다. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void replaceRebuildDate(long batchRunId, LocalDate statisticsDate) {
+        aggregationMapper.upsertDailyStatistics(
+                statisticsDate,
+                sourceReadModelMapper.findDailyStatistics(
+                        statisticsDate.atStartOfDay(),
+                        statisticsDate.plusDays(1).atStartOfDay()
+                )
+        );
+        if (batchRunMapper.updateRebuildProgress(batchRunId, statisticsDate) != 1) {
+            throw new IllegalStateException("실행 중인 통계 재집계를 찾을 수 없습니다.");
+        }
+    }
+
     /** 실행 중인 집계를 성공 처리한다. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void completeSucceeded(long batchRunId) {

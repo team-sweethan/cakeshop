@@ -27,6 +27,12 @@ public interface StatisticsBatchRunMapper {
             @Param("lastCompletedDate") LocalDate lastCompletedDate
     );
 
+    /** 수동 재집계 진행일과 생존 확인 시각을 함께 갱신한다. */
+    int updateRebuildProgress(
+            @Param("batchRunId") long batchRunId,
+            @Param("lastCompletedDate") LocalDate lastCompletedDate
+    );
+
     /** 실행 중인 배치를 성공 상태로 완료한다. */
     int completeSucceeded(@Param("batchRunId") long batchRunId);
 
