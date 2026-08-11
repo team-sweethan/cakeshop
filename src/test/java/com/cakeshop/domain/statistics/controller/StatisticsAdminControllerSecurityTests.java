@@ -1,5 +1,6 @@
 package com.cakeshop.domain.statistics.controller;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
@@ -55,7 +56,7 @@ class StatisticsAdminControllerSecurityTests {
     void statistics_adminRole_isAccessible() throws Exception {
         LocalDate startDate = LocalDate.of(2026, 8, 4);
         LocalDate endDate = LocalDate.of(2026, 8, 10);
-        when(periodStatisticsReadModelQueryService.getStatistics(startDate, endDate))
+        when(periodStatisticsReadModelQueryService.getStatistics(any()))
                 .thenReturn(new PeriodStatisticsView(
                         startDate,
                         endDate,

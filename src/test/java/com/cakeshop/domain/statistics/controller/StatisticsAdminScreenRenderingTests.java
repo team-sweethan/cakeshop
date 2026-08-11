@@ -2,6 +2,7 @@ package com.cakeshop.domain.statistics.controller;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -58,7 +59,7 @@ class StatisticsAdminScreenRenderingTests {
         LocalDate endDate = LocalDate.of(2026, 8, 9);
         when(periodStatisticsReadModelQueryService.getLatestSelectableDate())
                 .thenReturn(endDate);
-        when(periodStatisticsReadModelQueryService.getStatistics(startDate, endDate))
+        when(periodStatisticsReadModelQueryService.getStatistics(any()))
                 .thenReturn(new PeriodStatisticsView(
                         startDate,
                         endDate,
@@ -115,7 +116,7 @@ class StatisticsAdminScreenRenderingTests {
         LocalDate endDate = LocalDate.of(2026, 8, 8);
         when(periodStatisticsReadModelQueryService.getLatestSelectableDate())
                 .thenReturn(LocalDate.of(2026, 8, 9));
-        when(periodStatisticsReadModelQueryService.getStatistics(null, null))
+        when(periodStatisticsReadModelQueryService.getStatistics(any()))
                 .thenReturn(new PeriodStatisticsView(
                         startDate,
                         endDate,

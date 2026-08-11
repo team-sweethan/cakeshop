@@ -48,8 +48,7 @@ public class StatisticsAdminController {
         );
         try {
             PeriodStatisticsView statistics = periodStatisticsReadModelQueryService.getStatistics(
-                    searchForm.getStartDate(),
-                    searchForm.getEndDate()
+                    searchForm
             );
             searchForm.setStartDate(statistics.startDate());
             searchForm.setEndDate(statistics.endDate());
