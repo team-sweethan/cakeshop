@@ -27,4 +27,37 @@
             total_sales_amount = VALUES(total_sales_amount),
             aggregated_at = VALUES(aggregated_at)
     </insert>
+
+    <delete id="deleteDailyProductStatistics">
+        DELETE FROM daily_product_statistics
+        WHERE statistics_date = #{statisticsDate}
+    </delete>
+
+    <insert id="insertDailyProductStatistics">
+        INSERT INTO daily_product_statistics (
+            statistics_date,
+            product_id,
+            product_name,
+            order_count,
+            sales_quantity,
+            sales_amount
+        )
+        VALUES
+        <foreach collection="sources" item="source" separator=",">
+            (
+                #{statisticsDate},
+                #{source.productId},
+                #{source.productName},
+                #{source.orderCount},
+                #{source.salesQuantity},
+                #{source.salesAmount}
+            )
+        </foreach>
+    </insert>
+
+    <update id="updateProductAggregatedAt">
+        UPDATE daily_statistics
+        SET product_aggregated_at = CURRENT_TIMESTAMP(6)
+        WHERE statistics_date = #{statisticsDate}
+    </update>
 </mapper>
