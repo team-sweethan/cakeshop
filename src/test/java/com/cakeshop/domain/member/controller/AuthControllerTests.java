@@ -40,6 +40,13 @@ class AuthControllerTests {
     }
 
     @Test
+    void adminLogin_rendersAdminLoginView() throws Exception {
+        mockMvc.perform(get("/admin/login"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("auth/admin-login"));
+    }
+
+    @Test
     void join_invalidSignupInput_rendersFormWithoutCallingService() throws Exception {
         mockMvc.perform(post("/join")
                         .param("email", "invalid-email")

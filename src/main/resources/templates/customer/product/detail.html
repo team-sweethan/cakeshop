@@ -244,6 +244,7 @@
 
       <!-- 실제 상품 옵션 -->
       <div class="section"
+           sec:authorize="!hasRole('ADMIN')"
            data-product-option-groups
            th:if="${product.productType.name() == 'GENERAL'}"
            style="margin-top:16px">
@@ -331,6 +332,7 @@
       <div
               class="form-group"
               style="margin-top:12px"
+              sec:authorize="!hasRole('ADMIN')"
               th:if="${product.available}"
       >
           <span class="form-label">
@@ -381,6 +383,7 @@
 
       <!-- 선택 옵션과 수량이 바뀔 때 JavaScript가 금액을 다시 계산한다. -->
       <div class="panel stack"
+           sec:authorize="!hasRole('ADMIN')"
            th:if="${product.available}"
            data-product-price-summary
            style="margin-top:16px">
@@ -425,6 +428,7 @@
         <!-- 재고가 있는 경우 -->
         <div
                 class="cluster"
+                sec:authorize="!hasRole('ADMIN')"
                 th:if="${product.available
                         and product.productType.name() == 'GENERAL'}"
         >
@@ -438,7 +442,7 @@
             주문서 작성하기
           </a>
 
-          <form sec:authorize="isAuthenticated()"
+          <form sec:authorize="hasRole('USER')"
                 th:action="@{/cart/items}" method="post" data-server-cart-form>
             <input type="hidden" name="productId" th:value="${product.id}">
             <input type="hidden" name="quantity" value="1" data-server-cart-quantity>
@@ -474,6 +478,7 @@
 
         <div
                 class="cluster"
+                sec:authorize="!hasRole('ADMIN')"
                 th:if="${product.available
                         and product.productType.name() == 'CUSTOM'}"
         >
@@ -542,6 +547,7 @@
 
       <a
               class="btn"
+              sec:authorize="!hasRole('ADMIN')"
               th:href="@{/mypage/reviews/writable}"
       >
         후기 작성

@@ -56,6 +56,16 @@ class MemberLogoutSecurityTests {
     }
 
     @Test
+    void logout_adminAccount_redirectsToAdminLogin() throws Exception {
+        mockMvc.perform(post("/logout")
+                        .with(user("admin@cakeshop.local").roles("ADMIN"))
+                        .with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/admin/login?logout"))
+                .andExpect(unauthenticated());
+    }
+
+    @Test
     void passwordRecovery_remoteRequest_isForbidden() throws Exception {
         mockMvc.perform(get("/find-password")
                         .with(user("member@cakeshop.local"))

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>관리자 로그인 | 케이크 쇼핑몰</title>
+  <link rel="stylesheet" th:href="@{/css/app.css}">
+  <link rel="stylesheet" th:href="@{/css/customer-mockup.css}">
+  <script defer th:src="@{/js/app.js}"></script>
+</head>
+<body>
+<main class="page-container page-container--narrow">
+  <section class="panel auth-card section">
+    <h1>관리자 로그인</h1>
+    <p class="form-help">관리자 계정으로 로그인해 주세요.</p>
+    <p class="alert alert--success" th:if="${param.logout}">로그아웃되었습니다.</p>
+    <p class="alert alert--error" th:if="${param.error}">이메일 또는 비밀번호가 올바르지 않습니다.</p>
+
+    <!-- 인증 과정: POST /login은 컨트롤러가 아니라 Spring Security Filter가 처리한다. -->
+    <form class="form-stack" th:action="@{/login}" method="post">
+      <input type="hidden" name="loginType" value="admin">
+      <div class="form-group">
+        <label for="admin-email">이메일</label>
+        <input id="admin-email" class="form-control" type="email" name="email"
+               autocomplete="username" required autofocus>
+      </div>
+      <div class="form-group">
+        <label for="admin-password">비밀번호</label>
+        <input id="admin-password" class="form-control" type="password" name="password"
+               autocomplete="current-password" required>
+      </div>
+      <button class="btn btn--primary btn--block" type="submit">관리자 로그인</button>
+    </form>
+    <hr class="divider">
+    <a class="btn btn--block" th:href="@{/}">쇼핑몰 홈으로</a>
+  </section>
+</main>
+</body>
+</html>

@@ -8,7 +8,8 @@
 ******************************
 */-->
 <!doctype html>
-<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<html lang="ko" xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -25,7 +26,7 @@
     <div class="cluster cluster--between">
       <a class="btn" th:href="@{/community}">← 목록</a>
 
-      <div class="cluster" th:if="${canEdit}">
+      <div class="cluster" sec:authorize="!hasRole('ADMIN')" th:if="${canEdit}">
         <a class="btn" th:href="@{/community/{postId}/edit(postId=${post.id})}">수정</a>
         <form method="post" th:action="@{/community/{postId}/delete(postId=${post.id})}"
               onsubmit="return confirm('게시글을 삭제할까요? 되돌릴 수 없습니다.');">
@@ -57,7 +58,7 @@
         <p th:text="${post.content}" style="white-space:pre-wrap">본문</p>
       </div>
 
-      <div class="cluster section">
+      <div class="cluster section" sec:authorize="!hasRole('ADMIN')">
         <span class="text-muted" th:text="'좋아요 ' + ${post.likeCount}">좋아요 0</span>
 
         <form method="post" th:if="${canLike and likedByViewer}"
@@ -73,7 +74,8 @@
         </form>
       </div>
 
-      <details class="section" th:if="${canReport and !alreadyReported}"
+      <details class="section" sec:authorize="!hasRole('ADMIN')"
+               th:if="${canReport and !alreadyReported}"
                th:object="${reportForm}"
                th:attr="open=${#fields.hasErrors('reason')} ? 'open' : null">
         <summary>이 게시글 신고</summary>
@@ -95,7 +97,7 @@
         </form>
       </details>
 
-      <p class="note" th:if="${alreadyReported}">
+      <p class="note" sec:authorize="!hasRole('ADMIN')" th:if="${alreadyReported}">
         이미 신고한 게시글입니다.
       </p>
     </article>
@@ -135,6 +137,7 @@
               </span>
 
               <form method="post"
+                    sec:authorize="!hasRole('ADMIN')"
                     th:if="${canComment and viewerId == comment.memberId}"
                     th:action="@{/community/{postId}/comments/{commentId}/delete(
                         postId=${post.id},
@@ -158,6 +161,7 @@
       </div>
 
       <form class="section" method="post"
+            sec:authorize="!hasRole('ADMIN')"
             th:if="${canComment}"
             th:object="${commentForm}"
             th:action="@{/community/{postId}/comments(postId=${post.id})}">
@@ -175,7 +179,8 @@
         </div>
       </form>
 
-      <p class="note" th:if="${!canComment and !post.blocked}">
+      <p class="note" sec:authorize="isAnonymous()"
+         th:if="${!canComment and !post.blocked}">
         <a th:href="@{/login}">로그인하면 댓글을 쓸 수 있습니다.</a>
       </p>
     </section>
