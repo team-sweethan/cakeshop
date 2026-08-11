@@ -9,7 +9,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 주문 담당자가 일반 주문서에 표시할 사용 가능 쿠폰과 예상 할인 금액을 조회할 때 사용한다.
+ * ******************************
+ * 작성자 : 주환(이정후)
+ * 담당자 : 이정후
+ * 작성일 : 2026-08-10
+ * 기능 : 주문서 사용 가능 쿠폰 조회 계약
+ * 설명 : order 도메인이 주문 금액을 전달하면, 선택 가능한 쿠폰과 예상 할인 계산에 필요한 최소 정보를 제공한다.
+ * ******************************
  */
 @Service
 @RequiredArgsConstructor

@@ -67,6 +67,7 @@ class CouponAdminServiceTests {
     void insertCopiesFormValuesAndCreatorId() {
         CouponCreateForm form = createForm();
         form.setName(" 여름 할인 ");
+        form.setMaximumDiscountAmount(BigDecimal.valueOf(5_000));
         when(couponMapper.insertCoupon(any())).thenReturn(1);
 
         couponAdminService.insertCoupon(form, 7L);
@@ -79,6 +80,7 @@ class CouponAdminServiceTests {
         assertThat(saved.getDiscountType()).isEqualTo(DiscountType.FIXED_AMOUNT);
         assertThat(saved.getDiscountValue()).isEqualByComparingTo("3000");
         assertThat(saved.getMinimumOrderAmount()).isEqualByComparingTo("10000");
+        assertThat(saved.getMaximumDiscountAmount()).isNull();
         assertThat(saved.getTotalQuantity()).isEqualTo(100);
         assertThat(saved.getCreatedBy()).isEqualTo(7L);
     }
@@ -95,6 +97,22 @@ class CouponAdminServiceTests {
         ArgumentCaptor<Coupon> couponCaptor = ArgumentCaptor.forClass(Coupon.class);
         verify(couponMapper).insertCoupon(couponCaptor.capture());
         assertThat(couponCaptor.getValue().getTotalQuantity()).isNull();
+    }
+
+    @Test
+    void insertPercentageDiscountStoresMaximumDiscountAmount() {
+        CouponCreateForm form = createForm();
+        form.setDiscountType(DiscountType.PERCENTAGE);
+        form.setDiscountValue(BigDecimal.valueOf(10));
+        form.setMaximumDiscountAmount(BigDecimal.valueOf(5_000));
+        when(couponMapper.insertCoupon(any())).thenReturn(1);
+
+        couponAdminService.insertCoupon(form, 7L);
+
+        ArgumentCaptor<Coupon> couponCaptor = ArgumentCaptor.forClass(Coupon.class);
+        verify(couponMapper).insertCoupon(couponCaptor.capture());
+        assertThat(couponCaptor.getValue().getMaximumDiscountAmount())
+                .isEqualByComparingTo("5000");
     }
 
     @Test

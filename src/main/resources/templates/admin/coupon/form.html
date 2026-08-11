@@ -105,7 +105,7 @@
                         <p class="field-error" th:errors="*{minimumOrderAmount}"></p>
                     </div>
 
-                    <div class="form-group">
+                    <div id="maximumDiscountAmountGroup" class="form-group">
                         <label for="maximumDiscountAmount">
                             최대 할인 금액
                         </label>
@@ -116,7 +116,7 @@
                                min="0"
                                step="1"
                                th:field="*{maximumDiscountAmount}"
-                               placeholder="비율 할인에만 사용"
+                               placeholder="비율 할인 최대 할인 금액 입력"
                                th:disabled="${formMode == 'update' && !couponUpdateView.fullEdit}">
                         <input type="hidden" name="maximumDiscountAmount" th:value="*{maximumDiscountAmount}" th:if="${formMode == 'update' && !couponUpdateView.fullEdit}">
 

@@ -5,6 +5,8 @@
     const guide = document.querySelector('#targetTypeGuide');
     const quantity = document.querySelector('#totalQuantity');
     const quantityGroup = quantity?.closest('.form-group');
+    const maximumDiscountAmount = document.querySelector('#maximumDiscountAmount');
+    const maximumDiscountAmountGroup = document.querySelector('#maximumDiscountAmountGroup');
     const guides = {
         ALL_MEMBERS: '전체 회원에게 모두 지급합니다. 발급 수량 제한은 없습니다.',
         NEW_MEMBERS: '유효기간 중 가입한 신규 회원에게 모두 지급합니다. 발급 수량 제한은 없습니다.',
@@ -23,5 +25,28 @@
     };
 
     document.querySelectorAll('input[name="targetType"]').forEach(input => input.addEventListener('change', refreshTargetPolicy));
+
+    const selectedDiscountType = () => document.querySelector('input[name="discountType"]:checked')?.value;
+    const refreshDiscountPolicy = () => {
+        const isPercentage = selectedDiscountType() === 'PERCENTAGE';
+        const canChangeDiscountType = Array.from(document.querySelectorAll('input[name="discountType"]'))
+            .some(input => !input.disabled);
+
+        maximumDiscountAmountGroup.hidden = !isPercentage;
+
+        // 금액 할인에서는 값 자체가 정책에 사용되지 않으므로 화면·요청값 모두 비운다.
+        if (!isPercentage && canChangeDiscountType) {
+            maximumDiscountAmount.value = '';
+            maximumDiscountAmount.disabled = true;
+            return;
+        }
+
+        if (isPercentage && canChangeDiscountType) {
+            maximumDiscountAmount.disabled = false;
+        }
+    };
+
+    document.querySelectorAll('input[name="discountType"]').forEach(input => input.addEventListener('change', refreshDiscountPolicy));
     refreshTargetPolicy();
+    refreshDiscountPolicy();
 })();
