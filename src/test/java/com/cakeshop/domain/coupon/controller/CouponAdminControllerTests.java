@@ -19,7 +19,8 @@ import com.cakeshop.domain.coupon.dto.form.CouponSearchCondition;
 import com.cakeshop.domain.coupon.dto.form.CouponUpdateForm;
 import com.cakeshop.domain.coupon.dto.view.CouponView;
 import com.cakeshop.domain.coupon.dto.view.CouponDetailView;
-import com.cakeshop.domain.coupon.entity.CouponDisplayStatus;
+import com.cakeshop.domain.coupon.dto.view.CouponDisplayStatus;
+import com.cakeshop.domain.coupon.dto.view.CouponUpdateView;
 import com.cakeshop.domain.coupon.entity.CouponTargetType;
 import com.cakeshop.domain.coupon.entity.DiscountType;
 import com.cakeshop.domain.coupon.error.CouponErrorCode;
@@ -172,7 +173,7 @@ class CouponAdminControllerTests {
     @Test
     void invalidUpdateRedirectsWhenCouponExpiresBeforeFormRerender() throws Exception {
         doThrow(new BusinessException(CouponErrorCode.CANNOT_EDIT_ENDED_COUPON))
-                .when(couponAdminService).getUpdateForm(3L);
+                .when(couponAdminService).getUpdateView(3L);
 
         mockMvc.perform(post("/admin/coupons/3/edit")
                         .param("name", ""))
@@ -232,17 +233,18 @@ class CouponAdminControllerTests {
 
     @Test
     void editFormLoadsCouponValues() throws Exception {
-        CouponUpdateForm form = validUpdateForm();
-        when(couponAdminService.getUpdateForm(3L)).thenReturn(form);
+        CouponUpdateView updateView = validUpdateView();
+        when(couponAdminService.getUpdateView(3L)).thenReturn(updateView);
 
         mockMvc.perform(get("/admin/coupons/3/edit"))
             .andExpect(status().isOk())
             .andExpect(view().name("admin/coupon/form"))
-            .andExpect(model().attribute("couponForm", form))
+            .andExpect(model().attributeExists("couponForm"))
+            .andExpect(model().attribute("couponUpdateView", updateView))
             .andExpect(model().attribute("couponId", 3L))
             .andExpect(model().attribute("formMode", "update"));
 
-        verify(couponAdminService).getUpdateForm(3L);
+        verify(couponAdminService).getUpdateView(3L);
     }
 
     @Test
@@ -331,7 +333,7 @@ class CouponAdminControllerTests {
     @Test
     void editEndedCouponFormRedirectsWithErrorMessage() throws Exception {
         doThrow(new BusinessException(CouponErrorCode.CANNOT_EDIT_ENDED_COUPON))
-            .when(couponAdminService).getUpdateForm(3L);
+            .when(couponAdminService).getUpdateView(3L);
 
         mockMvc.perform(get("/admin/coupons/3/edit"))
             .andExpect(status().is3xxRedirection())
@@ -464,5 +466,14 @@ class CouponAdminControllerTests {
         form.setStartsAt(LocalDateTime.of(2026, 8, 1, 9, 0));
         form.setExpiresAt(LocalDateTime.of(2026, 8, 31, 23, 59));
         return form;
+    }
+
+    private CouponUpdateView validUpdateView() {
+        CouponUpdateForm form = validUpdateForm();
+        return new CouponUpdateView(
+                form.getName(), form.getDiscountType(), form.getDiscountValue(), form.getMinimumOrderAmount(),
+                form.getMaximumDiscountAmount(), form.getTotalQuantity(), form.getStartsAt(), form.getExpiresAt(),
+                CouponTargetType.SPECIFIC_MEMBERS, CouponDisplayStatus.ACTIVE, true
+        );
     }
 }

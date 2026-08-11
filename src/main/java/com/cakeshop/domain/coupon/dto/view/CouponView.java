@@ -2,7 +2,6 @@ package com.cakeshop.domain.coupon.dto.view;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import com.cakeshop.domain.coupon.entity.CouponDisplayStatus;
 import com.cakeshop.domain.coupon.entity.CouponStatus;
 
 /**

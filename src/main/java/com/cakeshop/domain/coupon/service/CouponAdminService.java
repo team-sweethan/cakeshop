@@ -14,12 +14,13 @@ import com.cakeshop.domain.coupon.dto.form.CouponSearchCondition;
 import com.cakeshop.domain.coupon.dto.form.CouponUpdateForm;
 import com.cakeshop.domain.coupon.dto.view.CouponView;
 import com.cakeshop.domain.coupon.dto.view.CouponDetailView;
+import com.cakeshop.domain.coupon.dto.view.CouponDisplayStatus;
 import com.cakeshop.domain.coupon.dto.view.CouponIssuedMemberHistoryView;
 import com.cakeshop.domain.coupon.dto.view.CouponIssuedMemberView;
 import com.cakeshop.domain.coupon.dto.view.CouponIssueCandidateView;
+import com.cakeshop.domain.coupon.dto.view.CouponUpdateView;
 import com.cakeshop.domain.coupon.entity.Coupon;
 import com.cakeshop.domain.coupon.entity.CouponTargetType;
-import com.cakeshop.domain.coupon.entity.CouponDisplayStatus;
 import com.cakeshop.domain.coupon.entity.CouponStatus;
 import com.cakeshop.domain.coupon.error.CouponErrorCode;
 import com.cakeshop.domain.coupon.mapper.CouponMapper;
@@ -196,20 +197,16 @@ public class CouponAdminService {
      * 종료 쿠폰은 수정 대상이 아니며, 시작 시각을 기준으로 전체/제한 수정 범위를 계산한다.
      */
     @Transactional(readOnly = true)
-    public CouponUpdateForm getUpdateForm(Long couponId) {
+    public CouponUpdateView getUpdateView(Long couponId) {
         Coupon coupon = findCoupon(couponId);
 
         if (displayStatusOf(coupon) == CouponDisplayStatus.ENDED) {
             throw new BusinessException(CouponErrorCode.CANNOT_EDIT_ENDED_COUPON);
         }
 
-        CouponUpdateForm form = CouponUpdateForm.from(coupon);
-        form.setDisplayStatus(displayStatusOf(coupon));
         // 시작 전에는 정책을 자유롭게 바꿀 수 있고, 시작 후에는 발급 조건 변경을 막는다.
         boolean isFullEdit = coupon.getStartsAt().isAfter(now());
-        form.setFullEdit(isFullEdit);
-
-        return form;
+        return CouponUpdateView.from(coupon, displayStatusOf(coupon), isFullEdit);
     }
 
     /** 이미 발급한 수량보다 총 발급 수량을 낮추지 못하도록 검증한 뒤 수정한다. */
@@ -420,22 +417,6 @@ public class CouponAdminService {
         return couponMapper.findCouponByIdForUpdate(couponId)
                 .orElseThrow(() -> new BusinessException(CouponErrorCode.NOT_FOUND));
     }
-
-
-    /**
-     * 종료 쿠폰도 포함해 상세 화면에 필요한 Form을 반환한다.
-     * 수정 화면 조회와 달리 ENDED 상태를 예외로 처리하지 않는다.
-     */
-    @Transactional(readOnly = true)
-    public CouponUpdateForm getUpdateCoupon(Long couponId) {
-        Coupon coupon = findCoupon(couponId);
-        CouponUpdateForm form = CouponUpdateForm.from(coupon);
-        boolean isFullEdit = coupon.getStartsAt().isAfter(now());
-        form.setFullEdit(isFullEdit);
-        form.setDisplayStatus(displayStatusOf(coupon));
-        return form;
-    }
-
     /** 종료 여부와 관계없이 관리자 상세 화면에 표시할 읽기 전용 데이터를 반환한다. */
     @Transactional(readOnly = true)
     public CouponDetailView getCouponDetail(Long couponId) {
