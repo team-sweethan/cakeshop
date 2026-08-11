@@ -37,7 +37,7 @@ public class StatisticsStartupCatchupListener {
             if (!catchupPolicy.shouldCatchUp()) {
                 return;
             }
-            aggregationService.aggregateDailyStatistics();
+            aggregationService.catchUpMissingDailyStatistics();
         } catch (RuntimeException exception) {
             log.error(
                     "애플리케이션 시작 시 누락된 일별 통계 따라잡기에 실패했습니다.",

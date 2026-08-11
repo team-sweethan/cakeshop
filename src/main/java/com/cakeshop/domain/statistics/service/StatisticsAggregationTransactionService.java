@@ -35,6 +35,26 @@ public class StatisticsAggregationTransactionService {
         return requireBatchRunId(batchRun);
     }
 
+    /** 실행 잠금 획득 후 누락 여부를 다시 확인하고 시작 시 일별 집계를 등록한다. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public Long startDailyCatchupRun(
+            StatisticsBatchRun batchRun,
+            LocalDate latestStatisticsDate
+    ) {
+        batchRunMapper.failExpiredRunningBatch();
+        batchRunMapper.insertRunningBatch(batchRun);
+        long batchRunId = requireBatchRunId(batchRun);
+
+        LocalDate latestSuccessfulDate = batchRunMapper.findLatestSuccessfulTargetEndDate();
+        if (latestSuccessfulDate != null && !latestSuccessfulDate.isBefore(latestStatisticsDate)) {
+            if (batchRunMapper.deleteRunningDailyBatch(batchRunId) != 1) {
+                throw new IllegalStateException("취소할 시작 시 통계 집계를 찾을 수 없습니다.");
+            }
+            return null;
+        }
+        return batchRunId;
+    }
+
     /** 성공 백필을 다시 확인한 뒤 새 백필 실행 잠금을 획득한다. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Long startBackfillRun(StatisticsBatchRun batchRun) {

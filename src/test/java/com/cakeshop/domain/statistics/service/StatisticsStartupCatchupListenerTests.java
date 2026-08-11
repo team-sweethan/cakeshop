@@ -40,7 +40,7 @@ class StatisticsStartupCatchupListenerTests {
 
         listener.catchUpMissingDailyStatistics();
 
-        verify(service).aggregateDailyStatistics();
+        verify(service).catchUpMissingDailyStatistics();
     }
 
     @Test
@@ -63,13 +63,13 @@ class StatisticsStartupCatchupListenerTests {
         when(policy.shouldCatchUp()).thenReturn(true);
         doThrow(new IllegalStateException("집계 실패"))
                 .when(service)
-                .aggregateDailyStatistics();
+                .catchUpMissingDailyStatistics();
         StatisticsStartupCatchupListener listener =
                 new StatisticsStartupCatchupListener(policy, service);
 
         assertThatCode(listener::catchUpMissingDailyStatistics).doesNotThrowAnyException();
 
-        verify(service).aggregateDailyStatistics();
+        verify(service).catchUpMissingDailyStatistics();
     }
 
     @Test

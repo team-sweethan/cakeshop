@@ -112,6 +112,30 @@ class DailyStatisticsAggregationServiceTests {
     }
 
     @Test
+    void catchUpMissingDailyStatistics_anotherInstanceCompletedAfterPolicy_skipsNewDailyRun() {
+        LocalDate yesterday = findYesterday();
+        insertSuccessfulBackfill(yesterday.minusDays(1));
+        assertThat(service.aggregateDailyStatistics()).isTrue();
+        int batchRunCountBeforeCatchup = countBatchRuns();
+
+        boolean executed = service.catchUpMissingDailyStatistics();
+
+        assertThat(executed).isFalse();
+        assertThat(countBatchRuns()).isEqualTo(batchRunCountBeforeCatchup);
+    }
+
+    @Test
+    void catchUpMissingDailyStatistics_latestDateBeforeYesterday_executesDailyRun() {
+        LocalDate yesterday = findYesterday();
+        insertSuccessfulBackfill(yesterday.minusDays(2));
+
+        boolean executed = service.catchUpMissingDailyStatistics();
+
+        assertThat(executed).isTrue();
+        assertThat(findLatestDailyRun().status()).isEqualTo("SUCCEEDED");
+    }
+
+    @Test
     void aggregateDailyStatistics_resumedBackfill_usesFirstAttemptAsChangeWindowStart() {
         LocalDate yesterday = findYesterday();
         StatisticsBatchRun failedRun = StatisticsBatchRun.backfill(
