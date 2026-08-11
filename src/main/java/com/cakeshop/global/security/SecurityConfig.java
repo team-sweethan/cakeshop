@@ -56,7 +56,7 @@ public class SecurityConfig {
         AuthenticationEntryPoint portalLoginEntryPoint = (request, response, exception) -> {
             String path = request.getRequestURI()
                     .substring(request.getContextPath().length());
-            if (path.startsWith("/admin/")) {
+            if ("/admin".equals(path) || path.startsWith("/admin/")) {
                 adminLoginEntryPoint.commence(request, response, exception);
                 return;
             }
@@ -88,7 +88,7 @@ public class SecurityConfig {
                         "/", "/login", "/signup", "/join", "/emailCheck", "/find-email",
                         "/find-email/login", "/api/notifications/unread-count", "/api/notifications/test-sms",
                         "/products/**", "/screens", "/favicon.ico",
-                        "/css/**", "/js/**", "/images/**", "/uploads/**", "/error")
+                        "/css/**", "/js/**", "/webjars/**", "/images/**", "/uploads/**", "/error")
                         .permitAll();
                 auth.requestMatchers("/admin/login").permitAll();
                 // 로드밸런서/헬스체크가 인증 없이 호출할 수 있도록 허용 (그 외 actuator 엔드포인트는 미노출)

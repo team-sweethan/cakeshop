@@ -56,6 +56,13 @@ class PortalLoginSecurityTests {
     }
 
     @Test
+    void adminDashboard_anonymousUser_redirectsToAdminLogin() throws Exception {
+        mockMvc.perform(get("/admin"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/admin/login"));
+    }
+
+    @Test
     void customerPortal_customerAccount_redirectsToHome() throws Exception {
         stubMember("user@example.com", "USER");
 
