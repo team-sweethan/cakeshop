@@ -32,14 +32,15 @@ import org.springframework.web.context.WebApplicationContext;
  * 빈 칸은 사용자에게 고장으로 보이지만 서버에는 오류가 없어 로그에도 안 남는다
  * (docs/community/specs/community-popular.md H27이 목록 화면에서 같은 자리를 문다).
  *
- * <p>영역의 존재는 낱말이 아니라 {@code id}로 본다. Thymeleaf는 HTML 주석을 응답에 그대로
- * 내보내므로 "인기글"이라는 낱말은 영역이 빠진 응답에도 남는다.
+ * <p>영역의 존재는 낱말이 아니라 {@code id}로 본다. 템플릿의 내부 설명은 Thymeleaf parser-level
+ * 주석으로 두어 응답에 저장소 경로가 노출되지 않게 한다.
  */
 @SpringBootTest
 @MariaDbIntegrationTest
 class HomeScreenRenderingTests {
 
     private static final String POPULAR_SECTION = "id=\"popular-posts\"";
+    private static final String INTERNAL_SPEC_PATH = "docs/community/specs/community-popular.md";
 
     private static final LocalDate RANKING_DATE = LocalDate.of(2026, 3, 9);
 
@@ -68,7 +69,8 @@ class HomeScreenRenderingTests {
                 .andExpect(content().string(containsString(POPULAR_SECTION)))
                 .andExpect(content().string(containsString("메인에 실린 인기글")))
                 .andExpect(content().string(containsString("2026.03.09")))
-                .andExpect(content().string(containsString("/community/11")));
+                .andExpect(content().string(containsString("/community/11")))
+                .andExpect(content().string(not(containsString(INTERNAL_SPEC_PATH))));
     }
 
     @Test
