@@ -218,4 +218,16 @@ class StatisticsAdminScreenRenderingTests {
 
         verifyNoInteractions(periodStatisticsReadModelQueryService);
     }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void statistics_blankPeriodType_rendersValidationMessageWithoutStatistics() throws Exception {
+        mockMvc.perform(get("/admin/statistics")
+                        .param("periodType", ""))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("조회 유형을 선택해 주세요.")))
+                .andExpect(content().string(not(containsString("총 주문 건수"))));
+
+        verifyNoInteractions(periodStatisticsReadModelQueryService);
+    }
 }
