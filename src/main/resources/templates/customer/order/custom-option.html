@@ -23,7 +23,7 @@
       </div>
     </section>
 
-    <form method="get" th:action="@{/orders/custom/request}">
+    <form id="custom-option-form" method="get" th:action="@{/orders/custom/request}">
       <input type="hidden" name="productId" th:value="${customProduct.productId}">
       <section class="section">
         <h2 class="section-title">제작 옵션</h2>
@@ -36,8 +36,9 @@
             <div class="choice-list">
               <label class="choice" th:each="option, optionStat : ${group.options}">
                 <input th:type="${group.selectionType == 'MULTIPLE' ? 'checkbox' : 'radio'}"
-                       name="optionIds"
+                       th:name="|customOptionGroup-${group.id}|"
                        th:value="${option.id}"
+                       data-custom-option
                        th:required="${group.required and optionStat.first}">
                 <span th:text="${option.name}">옵션명</span>
                 <span th:if="${option.additionalPrice.signum() > 0}"
@@ -53,5 +54,18 @@
     </form>
   </main>
   <footer th:replace="~{fragments/common/footer :: footer(${store})}"></footer>
+  <script>
+    document.getElementById("custom-option-form").addEventListener("submit", function () {
+      this.querySelectorAll("[data-selected-option]").forEach((input) => input.remove());
+      this.querySelectorAll("input[data-custom-option]:checked").forEach((input) => {
+        const hidden = document.createElement("input");
+        hidden.type = "hidden";
+        hidden.name = "optionIds";
+        hidden.value = input.value;
+        hidden.dataset.selectedOption = "";
+        this.append(hidden);
+      });
+    });
+  </script>
 </body>
 </html>

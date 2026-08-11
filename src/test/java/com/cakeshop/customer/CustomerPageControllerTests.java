@@ -217,6 +217,8 @@ class CustomerPageControllerTests {
         assertThat(customOrderTemplate)
                 .contains("th:action=\"@{/orders/custom/request}\"")
                 .contains("name=\"productId\"")
+                .contains("th:name=\"|customOptionGroup-${group.id}|\"")
+                .contains("hidden.name = \"optionIds\";")
                 .doesNotContain("data-mock-form");
     }
 

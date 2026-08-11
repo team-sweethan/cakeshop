@@ -23,6 +23,7 @@ import com.cakeshop.domain.product.dto.view.ProductSalesInfo;
 import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.service.ProductQueryService;
 import com.cakeshop.global.error.BusinessException;
+import com.cakeshop.global.error.CommonErrorCode;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
@@ -136,6 +137,27 @@ class CustomerCustomOrderServiceTests {
         verify(paymentPreparationCommandService, never()).prepareReadyPayment(anyLong(), any(), any());
     }
 
+    @Test
+    void createCustomOrder_pickupBeforePreparationPeriod_rejectsBeforeSavingOrder() {
+        when(memberCouponQueryService.lockActiveCouponIssuableMember(10L)).thenReturn(true);
+        when(memberService.isActiveMember(10L)).thenReturn(true);
+        when(orderMapper.findOrderByMemberIdAndRequestKey(eq(10L), any())).thenReturn(Optional.empty());
+        when(productQueryService.getSalesInfo(6L)).thenReturn(new ProductSalesInfo(
+                6L, "레터링 케이크", ProductType.CUSTOM, 2, true,
+                BigDecimal.valueOf(55_000), null
+        ));
+        when(orderOptionValidator.validate(6L, List.of())).thenReturn(List.of());
+        CustomOrderForm form = form();
+        form.setPickupAt(LocalDateTime.of(2026, 8, 11, 10, 30));
+
+        assertThatThrownBy(() -> service.createCustomOrder(10L, form))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(CommonErrorCode.INVALID_INPUT);
+
+        verify(orderMapper, never()).insertOrder(any());
+    }
+
     private CustomOrderForm form() {
         CustomOrderForm form = new CustomOrderForm();
         form.setRequestKey(UUID.randomUUID().toString());
@@ -145,7 +167,7 @@ class CustomerCustomOrderServiceTests {
         form.setOrdererPhone("010-1111-2222");
         form.setPickupName("픽업자");
         form.setPickupPhone("010-3333-4444");
-        form.setPickupAt(LocalDateTime.of(2026, 8, 11, 10, 30));
+        form.setPickupAt(LocalDateTime.of(2026, 8, 13, 10, 30));
         return form;
     }
 }

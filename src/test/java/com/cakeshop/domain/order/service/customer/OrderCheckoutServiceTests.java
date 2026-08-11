@@ -113,6 +113,32 @@ class OrderCheckoutServiceTests {
                 .noneMatch(date -> date.date().equals(LocalDate.of(2026, 8, 5)));
     }
 
+    @Test
+    void getCustomCheckout_onlyOffersPickupSlotsAfterPreparationPeriod() {
+        when(productQueryService.getSalesInfo(6L)).thenReturn(
+                new ProductSalesInfo(
+                        6L,
+                        "레터링 케이크",
+                        ProductType.CUSTOM,
+                        2,
+                        true,
+                        BigDecimal.valueOf(55_000),
+                        null
+                )
+        );
+        when(orderOptionValidator.validate(6L, List.of())).thenReturn(List.of());
+        when(storeService.getStoreView()).thenReturn(storeView());
+
+        var checkout = orderCheckoutService.getCustomCheckout(6L, List.of());
+
+        assertThat(checkout.pickupDates().getFirst().date())
+                .isEqualTo(LocalDate.of(2026, 8, 6));
+        assertThat(checkout.pickupDates().stream()
+                .flatMap(date -> date.times().stream())
+                .map(GeneralOrderCheckoutView.PickupTimeView::value))
+                .allMatch(value -> value.isAfter(LocalDateTime.of(2026, 8, 5, 10, 25)));
+    }
+
     private StoreView storeView() {
         StoreHoliday holiday = new StoreHoliday();
         holiday.setHolidayDate(LocalDate.of(2026, 8, 5));

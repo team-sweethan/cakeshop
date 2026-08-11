@@ -280,7 +280,7 @@ class OrderControllerTests {
                         .param("pickupAt", "2099-08-05T14:00")
                         .param("lettering", "생일 축하해"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/orders/43/payment"));
+                .andExpect(redirectedUrl("/orders/43"));
 
         verify(customerCustomOrderService).createCustomOrder(eq(10L), argThat(form ->
                 form.getProductId().equals(6L)

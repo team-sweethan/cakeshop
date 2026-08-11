@@ -85,7 +85,7 @@ public class OrderController {
             return renderCustomOrderForm(form, model, memberId);
         }
         long orderId = customerCustomOrderService.createCustomOrder(memberId, form);
-        return "redirect:/orders/" + orderId + "/payment";
+        return "redirect:/orders/" + orderId;
     }
 
     // 일반 상품 주문서 화면

@@ -67,8 +67,8 @@ public class CustomerCustomOrderService {
         }
 
         LocalDateTime now = LocalDateTime.now(clock);
-        validatePickupAt(form.getPickupAt(), now);
         PreparedCustomItem preparedItem = prepareCustomItem(form);
+        validatePickupAt(form.getPickupAt(), now, preparedItem.product().preparationDays());
 
         Order order = createOrder(memberId, form, preparedItem.totalAmount(), now);
         int insertedRows = orderMapper.insertOrder(order);
@@ -134,9 +134,14 @@ public class CustomerCustomOrderService {
         }
     }
 
-    private void validatePickupAt(LocalDateTime pickupAt, LocalDateTime now) {
+    private void validatePickupAt(
+            LocalDateTime pickupAt,
+            LocalDateTime now,
+            int preparationDays
+    ) {
         if (pickupAt == null
-                || !pickupAt.isAfter(now.plusMinutes(PAYMENT_EXPIRATION_MINUTES))
+                || !pickupAt.isAfter(now.plusMinutes(PAYMENT_EXPIRATION_MINUTES)
+                        .plusDays(preparationDays))
                 || !pickupAvailabilityPolicy.isAvailable(pickupAt)) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
@@ -151,7 +156,7 @@ public class CustomerCustomOrderService {
             throw new BusinessException(ProductErrorCode.INSUFFICIENT_STOCK);
         }
         if (product.basePrice() == null || product.basePrice().signum() < 0
-                || product.preparationDays() < 0) {
+                || product.preparationDays() < 1) {
             throw new BusinessException(CommonErrorCode.INTERNAL_ERROR);
         }
 

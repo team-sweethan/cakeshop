@@ -97,7 +97,7 @@ public class OrderCheckoutService {
                 amounts.productAmount(),
                 amounts.optionAmount(),
                 amounts.totalAmount(),
-                createPickupDates(storeService.getStoreView())
+                createPickupDates(storeService.getStoreView(), 0)
         );
     }
 
@@ -119,7 +119,7 @@ public class OrderCheckoutService {
             throw new BusinessException(ProductErrorCode.INSUFFICIENT_STOCK);
         }
         if (product.basePrice() == null || product.basePrice().signum() < 0
-                || product.preparationDays() < 0) {
+                || product.preparationDays() < 1) {
             throw new BusinessException(CommonErrorCode.INTERNAL_ERROR);
         }
 
@@ -146,7 +146,7 @@ public class OrderCheckoutService {
                         ))
                         .toList(),
                 amounts.totalAmount(),
-                createPickupDates(storeService.getStoreView())
+                createPickupDates(storeService.getStoreView(), product.preparationDays())
         );
     }
 
@@ -180,13 +180,15 @@ public class OrderCheckoutService {
         }
     }
 
-    private List<PickupDateView> createPickupDates(StoreView store) {
+    private List<PickupDateView> createPickupDates(StoreView store, int preparationDays) {
         LocalDateTime now = LocalDateTime.now(clock);
+        LocalDateTime availableFrom = now.plusMinutes(PAYMENT_EXPIRATION_MINUTES)
+                .plusDays(preparationDays);
         List<PickupDateView> pickupDates = new ArrayList<>();
 
         for (int dayOffset = 0; dayOffset < PICKUP_WINDOW_DAYS; dayOffset++) {
             LocalDate date = now.toLocalDate().plusDays(dayOffset);
-            List<PickupTimeView> times = createPickupTimes(date, now, store);
+            List<PickupTimeView> times = createPickupTimes(date, availableFrom, store);
             if (!times.isEmpty()) {
                 pickupDates.add(new PickupDateView(
                         date,
@@ -201,7 +203,7 @@ public class OrderCheckoutService {
 
     private List<PickupTimeView> createPickupTimes(
             LocalDate date,
-            LocalDateTime now,
+            LocalDateTime availableFrom,
             StoreView store
     ) {
         if (isClosed(date, store)
@@ -231,7 +233,7 @@ public class OrderCheckoutService {
 
         while (!cursor.isAfter(lastPickup)) {
             LocalTime time = cursor.toLocalTime();
-            if (cursor.isAfter(now.plusMinutes(PAYMENT_EXPIRATION_MINUTES))
+            if (cursor.isAfter(availableFrom)
                     && !time.isBefore(businessStart)
                     && !time.isAfter(businessEnd)) {
                 times.add(new PickupTimeView(
