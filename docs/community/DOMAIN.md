@@ -49,7 +49,7 @@
 | **B5** | 인기글 영역 | 누구나 | (B1과 메인 `GET /`에 포함) | **완료** | 7c · 13 | `community-popular.md` |
 | **B6** | 검색 | 누구나 | (B1의 파라미터) | **없음** | 2차 | `community-read.md` |
 | **B7** | 무한 스크롤 | 누구나 | (B1의 페이징 대체) | **없음** | 2차 | `community-read.md` |
-| **B8** | 공지 상단 영역 | 누구나 | (B1과 메인 `GET /`에 포함) | **목록만** | 14b · 14c | `community-notice.md` |
+| **B8** | 공지 상단 영역 | 누구나 | (B1과 메인 `GET /`에 포함) | **완료** | 14b · 14c | `community-notice.md` |
 | **B9** | 공지 전체보기 | 누구나 | `GET /community/notices` | **완료** | 14b | `community-notice.md` |
 | **B10** | 공지 상세 | 누구나 | `GET /community/notices/{id}` | **완료** | 14b | `community-notice.md` |
 | **C1** | 관리자 목록 | 관리자 | `GET /admin/community` | **완료** | 5 | `community-admin.md` |
@@ -61,7 +61,7 @@
 | **C7** | 공지 삭제 | 관리자 | `POST /admin/community/notices/{id}/delete` | **완료** | 14a | `community-notice.md` |
 | **D1** | 작성자 표시명 | — | (Service 계약) | **완료** | 10 | 이 문서 8절 |
 | **D2** | 메인 인기글 계약 | — | (Service 계약) | **완료** | 13 | `community-popular.md` |
-| **D3** | 메인 공지 계약 | — | (D2와 같은 계약에 추가) | **없음** | 14c | `community-notice.md` |
+| **D3** | 메인 공지 계약 | — | (D2와 같은 계약에 추가) | **완료** | 14c | `community-notice.md` |
 | **E1** | 상태 enum + `CHECK` | — | — | **완료** | 0 | 이 문서 4절 |
 | **E2** | 카테고리 주입 | — | — | **완료** | 0 | 이 문서 10절 |
 | **E3** | 인기글 집계 배치 | — | (스케줄러) | **완료** | 7b | `community-popular.md` |

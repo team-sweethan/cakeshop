@@ -1,5 +1,6 @@
 package com.cakeshop.domain.community.service;
 
+import com.cakeshop.domain.community.dto.view.NoticeSectionView;
 import com.cakeshop.domain.community.dto.view.PopularSectionView;
 
 import lombok.RequiredArgsConstructor;
@@ -13,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 담당자 : 현규
  * 작성일 : 2026-08-11
  * 기능 : 메인 화면용 커뮤니티 조회 계약
- * 설명 : 메인에 실을 인기글을 커뮤니티가 정한 건수만큼 확정된 스냅샷에서 조회한다.
+ * 설명 : 메인에 실을 인기글과 공지를 커뮤니티가 정한 건수만큼 조회한다.
  * ******************************
  */
 @Service
@@ -29,7 +30,17 @@ public class CommunityHomeQueryService {
      */
     private static final int POPULAR_POST_LIMIT = 5;
 
+    /*
+     * 메인에 실을 공지 건수. 목록 상단의 10건과 다른 값인 것이 의도이고, 인기글의 5건과도
+     * 다르다 — 공지는 메인 최상단이라 자리를 덜 차지해야 한다.
+     *
+     * <p>건수를 부르는 쪽(`home`)이 아니라 커뮤니티가 갖는 이유는 인기글과 같다.
+     */
+    private static final int NOTICE_LIMIT = 3;
+
     private final PopularPostReader popularPostReader;
+
+    private final CommunityNoticeService communityNoticeService;
 
     /*
      * 메인에 실을 인기글을 확정일과 함께 조회한다.
@@ -41,5 +52,18 @@ public class CommunityHomeQueryService {
     @Transactional(readOnly = true)
     public PopularSectionView getPopularSection() {
         return popularPostReader.read(POPULAR_POST_LIMIT);
+    }
+
+    /*
+     * 메인에 실을 공지를 조회한다.
+     *
+     * <p>목록 상단의 "1쪽 + 필터 없음"은 가져오지 않는다 — 메인에는 쪽도 필터도 없어서 조건이
+     * 성립하지 않는다. 인기글에서 같은 결정을 했고 이유도 같다.
+     *
+     * <p><b>새 계약 클래스를 만들지 않는다.</b> 소비 도메인이 같으면 계약도 하나다.
+     */
+    @Transactional(readOnly = true)
+    public NoticeSectionView getNoticeSection() {
+        return communityNoticeService.readSection(NOTICE_LIMIT);
     }
 }
