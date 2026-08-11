@@ -20,4 +20,9 @@ public class MemberDetails extends User {
     public Long getMemberId() {
         return memberId;
     }
+
+    public boolean isAdmin() {
+        return getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+    }
 }

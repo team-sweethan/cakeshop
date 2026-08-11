@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 public class ChatAdminController {
 
     @GetMapping("/admin/chat")
-    public String list() {
+    public String adminChatPage() {
         return "admin/chat/list";
     }
 }
