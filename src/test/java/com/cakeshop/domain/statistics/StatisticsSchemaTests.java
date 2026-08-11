@@ -69,6 +69,42 @@ class StatisticsSchemaTests {
     }
 
     @Test
+    void dailyStatistics_productAggregationNotCompleted_allowsNullCompletedAt() {
+        insertDailyStatistics(10, new BigDecimal("100000"));
+
+        LocalDateTime productAggregatedAt = jdbcTemplate.queryForObject(
+                "SELECT product_aggregated_at FROM daily_statistics WHERE statistics_date = ?",
+                LocalDateTime.class,
+                TARGET_DATE
+        );
+
+        assertThat(productAggregatedAt).isNull();
+    }
+
+    @Test
+    void dailyProductStatistics_sameDateAndProduct_rejectsDuplicateRow() {
+        insertDailyProductStatistics(1L, 2L, 3L, new BigDecimal("50000"));
+
+        assertThatThrownBy(() ->
+                insertDailyProductStatistics(1L, 1L, 1L, new BigDecimal("10000"))
+        ).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void dailyProductStatistics_negativeMetric_rejectsRow() {
+        assertThatThrownBy(() ->
+                insertDailyProductStatistics(1L, -1L, 0L, BigDecimal.ZERO)
+        ).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void dailyProductStatistics_negativeSalesAmount_rejectsRow() {
+        assertThatThrownBy(() ->
+                insertDailyProductStatistics(1L, 0L, 0L, new BigDecimal("-1"))
+        ).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
     void statisticsBatchRuns_runningExists_rejectsAnotherRunningRun() {
         insertRunningBatch("DAILY", TARGET_DATE);
 
@@ -231,6 +267,32 @@ class StatisticsSchemaTests {
                 totalOrderCount,
                 totalSalesAmount,
                 STARTED_AT
+        );
+    }
+
+    private void insertDailyProductStatistics(
+            long productId,
+            long orderCount,
+            long salesQuantity,
+            BigDecimal salesAmount
+    ) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO daily_product_statistics (
+                    statistics_date,
+                    product_id,
+                    product_name,
+                    order_count,
+                    sales_quantity,
+                    sales_amount
+                )
+                VALUES (?, ?, '딸기 생크림 케이크', ?, ?, ?)
+                """,
+                TARGET_DATE,
+                productId,
+                orderCount,
+                salesQuantity,
+                salesAmount
         );
     }
 

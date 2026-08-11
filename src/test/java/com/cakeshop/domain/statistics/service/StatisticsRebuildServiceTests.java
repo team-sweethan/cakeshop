@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 @MybatisTest
 @Import({
         StatisticsRebuildService.class,
+        DailyProductStatisticsSourceReadModelQueryService.class,
         StatisticsAggregationTransactionService.class
 })
 @MariaDbIntegrationTest
@@ -73,6 +74,8 @@ class StatisticsRebuildServiceTests {
 
         assertThat(result).isEqualTo(StatisticsRebuildResult.SUCCEEDED);
         assertThat(countDailyStatisticsBetween(yesterday.minusDays(2), yesterday)).isEqualTo(3);
+        assertThat(countCompletedProductStatisticsBetween(yesterday.minusDays(2), yesterday))
+                .isEqualTo(3);
         BatchRunRow run = findLatestRebuildRun();
         assertThat(run.status()).isEqualTo("SUCCEEDED");
         assertThat(run.targetStartDate()).isEqualTo(yesterday.minusDays(2));
@@ -241,6 +244,20 @@ class StatisticsRebuildServiceTests {
         );
     }
 
+    private int countCompletedProductStatisticsBetween(LocalDate startDate, LocalDate endDate) {
+        return jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM daily_statistics
+                WHERE statistics_date BETWEEN ? AND ?
+                  AND product_aggregated_at IS NOT NULL
+                """,
+                Integer.class,
+                startDate,
+                endDate
+        );
+    }
+
     private int countRebuildRuns() {
         return jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM statistics_batch_runs WHERE batch_type = 'REBUILD'",
@@ -249,6 +266,7 @@ class StatisticsRebuildServiceTests {
     }
 
     private void deleteAggregationData() {
+        jdbcTemplate.update("DELETE FROM daily_product_statistics");
         jdbcTemplate.update("DELETE FROM daily_statistics");
         jdbcTemplate.update("DELETE FROM statistics_batch_runs");
     }

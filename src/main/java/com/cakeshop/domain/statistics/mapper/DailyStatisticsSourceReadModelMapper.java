@@ -1,5 +1,6 @@
 package com.cakeshop.domain.statistics.mapper;
 
+import com.cakeshop.domain.statistics.dto.view.DailyProductStatisticsSourceView;
 import com.cakeshop.domain.statistics.dto.view.DailyStatisticsSourceView;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -12,6 +13,18 @@ public interface DailyStatisticsSourceReadModelMapper {
 
     /** 원본 주문·결제에서 해당 날짜의 통계 집계값을 조회한다. */
     DailyStatisticsSourceView findDailyStatistics(
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end
+    );
+
+    /** 원본 주문·결제에서 해당 날짜의 상품별 통계 집계값을 조회한다. */
+    List<DailyProductStatisticsSourceView> findDailyProductStatistics(
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end
+    );
+
+    /** 상품별 매출을 배분할 수 없는 결제 주문이 있는지 조회한다. */
+    boolean existsInvalidProductSalesAllocationOrder(
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end
     );

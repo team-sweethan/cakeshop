@@ -9,11 +9,43 @@
 - `local` 프로필은 애플리케이션 시작 시 Flyway migration을 자동 적용한다.
 - `rds` 프로필은 Flyway가 비활성화되어 있으므로 승인된 별도 스키마 반영 절차로 migration을 먼저
   적용한다. REBUILD 실행 전에는 `V20260811_101818__add_statistics_rebuild_batch_type.sql` 적용 여부를
-  확인한다.
+  확인하고, 상품별 통계 재집계 전에는
+  `V20260811_163316__add_daily_product_statistics.sql` 적용 여부도 확인한다.
 - 초기 백필과 수동 재집계는 동시에 활성화하지 않는다.
 - 정기 일별 집계, 초기 백필과 수동 재집계는 하나의 실행 잠금을 공유한다.
 - 오늘 통계는 집계하지 않으며 모든 날짜는 `Asia/Seoul` 기준이다.
 - 로컬 `bootRun`의 `--args` 값은 줄바꿈 없이 한 줄로 전달한다.
+
+## 상품별 통계 도입 시 필수 재집계
+
+상품별 통계 migration은 기존 `daily_statistics.product_aggregated_at`을 `NULL`로 유지한다. 실제 상품별
+집계 없이 완료 시각만 기록하지 않으며, migration 실행 중 원본 전체 기간을 조회하지 않는다.
+
+기존 집계일은 애플리케이션 시작 시 자동 따라잡기 대상이 아니므로 다음 배포 절차로 직접 재집계한다.
+
+1. 실행 대상 DB에 `V20260811_163316__add_daily_product_statistics.sql`을 적용한다.
+2. 상품별 통계 집계 기능이 포함된 애플리케이션 버전을 배포한다.
+3. 아래 SQL로 재집계할 최초일과 최종일을 확인한다.
+4. 해당 전체 기간을 366일 이하의 겹치지 않는 연속 구간으로 나누어 이 문서의 REBUILD 명령을 실행한다.
+5. 모든 구간이 성공한 뒤 아래 완료 확인 SQL의 결과가 `0`인지 확인한다.
+
+```sql
+SELECT
+    MIN(statistics_date) AS rebuild_start_date,
+    MAX(statistics_date) AS rebuild_end_date,
+    COUNT(*) AS incomplete_date_count
+FROM daily_statistics
+WHERE product_aggregated_at IS NULL;
+```
+
+```sql
+SELECT COUNT(*) AS incomplete_date_count
+FROM daily_statistics
+WHERE product_aggregated_at IS NULL;
+```
+
+재집계가 완료되기 전에도 기존 주문·매출 통계는 조회할 수 있지만, `product_aggregated_at IS NULL`인 날짜가
+조회 기간에 포함되면 상품별 통계 영역은 미집계 상태로 표시된다.
 
 ## 애플리케이션 시작 시 자동 따라잡기
 

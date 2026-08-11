@@ -1,7 +1,7 @@
 # 통계 스키마
 
 - 담당: 시은
-- 물리 테이블: 2개
+- 물리 테이블: 3개
 - 성격: 여러 소유 도메인의 원본을 읽어 재생성 가능한 파생 집계 데이터를 관리한다.
 
 ## `daily_statistics`
@@ -17,11 +17,33 @@
 | `canceled_order_count` | `BIGINT` | X | `0` | CHECK |
 | `total_sales_amount` | `DECIMAL(18, 0)` | X | `0` | CHECK |
 | `aggregated_at` | `DATETIME(6)` | X | 없음 |  |
+| `product_aggregated_at` | `DATETIME(6)` | O | `NULL` | 상품별 집계 완료 시각 |
 
 ### 제약조건
 
 - `chk_daily_statistics_counts`: 주문 건수 지표는 모두 `0` 이상이다.
 - `chk_daily_statistics_sales_amount`: 총매출은 `0` 이상이다.
+
+## `daily_product_statistics`
+
+날짜와 상품별 주문·판매·매출 집계 결과를 저장한다. 상품 활동이 없는 날짜에는 행을 생성하지 않으며,
+해당 날짜의 상품별 집계 완료 여부는 `daily_statistics.product_aggregated_at`으로 판단한다.
+
+| 컬럼 | 타입 | Null | 기본값 | 키·속성 |
+|---|---|---|---|---|
+| `statistics_date` | `DATE` | X | 없음 | PK |
+| `product_id` | `BIGINT` | X | 없음 | PK |
+| `product_name` | `VARCHAR(150)` | X | 없음 | 상품명 스냅샷 |
+| `order_count` | `BIGINT` | X | `0` | CHECK |
+| `sales_quantity` | `BIGINT` | X | `0` | CHECK |
+| `sales_amount` | `DECIMAL(18, 0)` | X | `0` | CHECK |
+
+### 제약조건
+
+- 기본 키: (`statistics_date`, `product_id`)
+- `chk_daily_product_statistics_counts`: 주문 건수와 판매 수량은 `0` 이상이다.
+- `chk_daily_product_statistics_sales_amount`: 상품별 매출액은 `0` 이상이다.
+- `product_id`는 파생 집계의 원본 식별값이며 상품 원본의 수명 주기와 결합하는 FK는 두지 않는다.
 
 ## `statistics_batch_runs`
 
@@ -71,6 +93,7 @@
 
 - `V20260810_163646__create_statistics_aggregation_tables.sql`
 - `V20260811_101818__add_statistics_rebuild_batch_type.sql`
+- `V20260811_163316__add_daily_product_statistics.sql`
 
 ## 관련 문서
 

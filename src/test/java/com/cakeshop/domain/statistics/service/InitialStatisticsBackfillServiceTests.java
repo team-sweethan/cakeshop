@@ -29,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 @MybatisTest
 @Import({
         InitialStatisticsBackfillService.class,
+        DailyProductStatisticsSourceReadModelQueryService.class,
         StatisticsAggregationTransactionService.class
 })
 @MariaDbIntegrationTest
@@ -76,6 +77,7 @@ class InitialStatisticsBackfillServiceTests {
         assertThat(result).isEqualTo(StatisticsBackfillResult.SUCCEEDED);
         assertThat(countDailyStatistics()).isEqualTo(7);
         assertThat(countDailyStatisticsBetween(yesterday.minusDays(6), yesterday)).isEqualTo(7);
+        assertThat(countCompletedProductStatistics()).isEqualTo(7);
         BatchRunRow run = findLatestBackfillRun();
         assertThat(run.status()).isEqualTo("SUCCEEDED");
         assertThat(run.targetStartDate()).isEqualTo(yesterday.minusDays(6));
@@ -263,6 +265,13 @@ class InitialStatisticsBackfillServiceTests {
         );
     }
 
+    private int countCompletedProductStatistics() {
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM daily_statistics WHERE product_aggregated_at IS NOT NULL",
+                Integer.class
+        );
+    }
+
     private int countBatchRuns() {
         return jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM statistics_batch_runs",
@@ -271,6 +280,7 @@ class InitialStatisticsBackfillServiceTests {
     }
 
     private void deleteAggregationData() {
+        jdbcTemplate.update("DELETE FROM daily_product_statistics");
         jdbcTemplate.update("DELETE FROM daily_statistics");
         jdbcTemplate.update("DELETE FROM statistics_batch_runs");
     }

@@ -10,9 +10,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.cakeshop.domain.statistics.dto.view.PeriodStatisticsView;
+import com.cakeshop.domain.statistics.dto.view.ProductStatisticsView;
 import com.cakeshop.domain.statistics.dto.view.StatisticsTrendView;
+import com.cakeshop.domain.statistics.error.StatisticsErrorCode;
 import com.cakeshop.domain.statistics.service.DashboardReadModelQueryService;
 import com.cakeshop.domain.statistics.service.PeriodStatisticsReadModelQueryService;
+import com.cakeshop.domain.statistics.service.ProductPeriodStatisticsReadModelQueryService;
+import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.security.SecurityConfig;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -37,6 +41,9 @@ class StatisticsAdminScreenRenderingTests {
 
     @MockitoBean
     private PeriodStatisticsReadModelQueryService periodStatisticsReadModelQueryService;
+
+    @MockitoBean
+    private ProductPeriodStatisticsReadModelQueryService productStatisticsQueryService;
 
     @Test
     @WithMockUser(roles = "ADMIN")
@@ -115,6 +122,89 @@ class StatisticsAdminScreenRenderingTests {
                 .andExpect(content().string(not(containsString("<table"))))
                 .andExpect(content().string(not(containsString("딸기 생크림 케이크"))))
                 .andExpect(content().string(not(containsString("주별"))));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void statistics_productStatisticsReturned_rendersProductRankingTable() throws Exception {
+        LocalDate startDate = LocalDate.of(2026, 8, 8);
+        LocalDate endDate = LocalDate.of(2026, 8, 9);
+        when(periodStatisticsReadModelQueryService.getStatistics(any()))
+                .thenReturn(new PeriodStatisticsView(
+                        startDate,
+                        endDate,
+                        4L,
+                        2L,
+                        0L,
+                        new BigDecimal("62000"),
+                        List.of()
+                ));
+        when(productStatisticsQueryService.getProductStatistics(startDate, endDate))
+                .thenReturn(List.of(
+                        new ProductStatisticsView(
+                                1L,
+                                6L,
+                                "딸기 생크림 케이크",
+                                3L,
+                                5L,
+                                new BigDecimal("50000")
+                        ),
+                        new ProductStatisticsView(
+                                2L,
+                                7L,
+                                "초코 케이크",
+                                1L,
+                                2L,
+                                new BigDecimal("12000")
+                        )
+                ));
+
+        mockMvc.perform(get("/admin/statistics")
+                        .param("startDate", startDate.toString())
+                        .param("endDate", endDate.toString()))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("상품별 주문 · 판매 · 매출 순위")))
+                .andExpect(content().string(containsString("<table")))
+                .andExpect(content().string(containsString("순위")))
+                .andExpect(content().string(containsString("판매 수량")))
+                .andExpect(content().string(containsString("딸기 생크림 케이크")))
+                .andExpect(content().string(containsString("3건")))
+                .andExpect(content().string(containsString("5개")))
+                .andExpect(content().string(containsString("50,000원")))
+                .andExpect(content().string(containsString("초코 케이크")));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void statistics_productStatisticsNotReady_rendersMainStatisticsAndNotice() throws Exception {
+        LocalDate startDate = LocalDate.of(2026, 8, 8);
+        LocalDate endDate = LocalDate.of(2026, 8, 9);
+        when(periodStatisticsReadModelQueryService.getStatistics(any()))
+                .thenReturn(new PeriodStatisticsView(
+                        startDate,
+                        endDate,
+                        12L,
+                        8L,
+                        2L,
+                        new BigDecimal("123456"),
+                        List.of()
+                ));
+        when(productStatisticsQueryService.getProductStatistics(startDate, endDate))
+                .thenThrow(new BusinessException(
+                        StatisticsErrorCode.PRODUCT_STATISTICS_NOT_READY
+                ));
+
+        mockMvc.perform(get("/admin/statistics")
+                        .param("startDate", startDate.toString())
+                        .param("endDate", endDate.toString()))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("12건")))
+                .andExpect(content().string(containsString("123,456원")))
+                .andExpect(content().string(containsString("상품별 주문 · 판매 · 매출 순위")))
+                .andExpect(content().string(containsString(
+                        StatisticsErrorCode.PRODUCT_STATISTICS_NOT_READY.message()
+                )))
+                .andExpect(content().string(not(containsString("<table"))));
     }
 
     @Test

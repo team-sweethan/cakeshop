@@ -17,6 +17,62 @@
         ORDER BY daily_statistics.statistics_date
     </select>
 
+    <select id="countIncompleteProductStatisticsDates" resultType="int">
+        SELECT
+            DATEDIFF(#{endDate}, #{startDate}) + 1
+                - COUNT(CASE
+                    WHEN daily_statistics.product_aggregated_at IS NOT NULL THEN 1
+                    ELSE NULL
+                END)
+        FROM daily_statistics
+        WHERE daily_statistics.statistics_date &gt;= #{startDate}
+          AND daily_statistics.statistics_date &lt;= #{endDate}
+    </select>
+
+    <select id="findProductStatistics"
+            resultType="com.cakeshop.domain.statistics.dto.view.ProductStatisticsView">
+        WITH ranked_product_name AS (
+            SELECT
+                daily_product_statistics.*,
+                ROW_NUMBER() OVER (
+                    PARTITION BY daily_product_statistics.product_id
+                    ORDER BY daily_product_statistics.statistics_date DESC
+                ) AS product_name_rank
+            FROM daily_product_statistics
+            WHERE daily_product_statistics.statistics_date &gt;= #{startDate}
+              AND daily_product_statistics.statistics_date &lt;= #{endDate}
+        ),
+        aggregated_product_statistics AS (
+            SELECT
+                ranked_product_name.product_id,
+                MAX(CASE
+                    WHEN ranked_product_name.product_name_rank = 1
+                        THEN ranked_product_name.product_name
+                    ELSE NULL
+                END) AS product_name,
+                SUM(ranked_product_name.order_count) AS order_count,
+                SUM(ranked_product_name.sales_quantity) AS sales_quantity,
+                SUM(ranked_product_name.sales_amount) AS sales_amount
+            FROM ranked_product_name
+            GROUP BY ranked_product_name.product_id
+        )
+        SELECT
+            ROW_NUMBER() OVER (
+                ORDER BY
+                    aggregated_product_statistics.sales_amount DESC,
+                    aggregated_product_statistics.sales_quantity DESC,
+                    aggregated_product_statistics.order_count DESC,
+                    aggregated_product_statistics.product_id
+            ) AS ranking,
+            aggregated_product_statistics.product_id,
+            aggregated_product_statistics.product_name,
+            aggregated_product_statistics.order_count,
+            aggregated_product_statistics.sales_quantity,
+            aggregated_product_statistics.sales_amount
+        FROM aggregated_product_statistics
+        ORDER BY ranking
+    </select>
+
     <select id="findLatestContinuousStatisticsDate" resultType="java.time.LocalDate">
         WITH backfill_start AS (
             SELECT MIN(statistics_batch_run.target_start_date) AS start_date
