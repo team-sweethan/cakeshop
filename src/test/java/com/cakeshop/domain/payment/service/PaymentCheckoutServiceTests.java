@@ -1,16 +1,16 @@
 package com.cakeshop.domain.payment.service;
 
-import com.cakeshop.domain.order.dto.view.OrderDetailView;
-import com.cakeshop.domain.order.entity.OrderStatus;
-import com.cakeshop.domain.order.entity.OrderType;
-import com.cakeshop.domain.order.service.customer.CustomerOrderQueryService;
+import com.cakeshop.domain.order.service.OrderPaymentQueryService;
+import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentOrder;
+import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentOrderItem;
+import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentOrderOption;
 import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.payment.dto.form.TossPaymentSuccessForm;
 import com.cakeshop.domain.payment.dto.view.PaymentCheckoutView;
 import com.cakeshop.domain.payment.dto.view.PaymentCompletionView;
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.entity.PaymentStatus;
-import com.cakeshop.domain.product.entity.ProductType;
+import com.cakeshop.domain.payment.infra.TossPaymentAvailability;
 import com.cakeshop.domain.store.dto.view.StoreView;
 import com.cakeshop.domain.store.service.StoreService;
 import com.cakeshop.global.error.BusinessException;
@@ -36,7 +36,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class PaymentQueryServiceTests {
+class PaymentCheckoutServiceTests {
 
     private static final LocalDateTime NOW =
             LocalDateTime.of(2026, 8, 3, 10, 0);
@@ -46,7 +46,7 @@ class PaymentQueryServiceTests {
     );
 
     @Mock
-    private CustomerOrderQueryService orderQueryService;
+    private OrderPaymentQueryService orderPaymentQueryService;
 
     @Mock
     private MemberService memberService;
@@ -57,30 +57,34 @@ class PaymentQueryServiceTests {
     @Mock
     private StoreService storeService;
 
-    private PaymentQueryService paymentQueryService;
+    @Mock
+    private TossPaymentAvailability tossPaymentAvailability;
+
+    private PaymentCheckoutService paymentCheckoutService;
 
     @BeforeEach
     void setUp() {
-        paymentQueryService = new PaymentQueryService(
-                orderQueryService,
+        paymentCheckoutService = new PaymentCheckoutService(
+                orderPaymentQueryService,
                 memberService,
                 paymentService,
                 storeService,
                 CLOCK,
-                "test-client-key",
-                "test-secret-key"
+                tossPaymentAvailability
         );
         lenient().when(memberService.isActiveMember(10L)).thenReturn(true);
+        lenient().when(tossPaymentAvailability.clientKey()).thenReturn("test-client-key");
+        lenient().when(tossPaymentAvailability.isEnabled()).thenReturn(true);
     }
 
     @Test
     void getCheckout_ownedPendingOrder_returnsActualPaymentView() {
-        OrderDetailView order = order(OrderStatus.PENDING_PAYMENT);
+        PaymentOrder order = order(true, true);
         Payment payment = payment(PaymentStatus.READY, null);
-        when(orderQueryService.getMemberOrder(10L, 1L)).thenReturn(order);
+        when(orderPaymentQueryService.getMemberPaymentOrder(10L, 1L)).thenReturn(order);
         when(paymentService.getReadyPayment(1L)).thenReturn(payment);
 
-        PaymentCheckoutView checkout = paymentQueryService.getCheckout(
+        PaymentCheckoutView checkout = paymentCheckoutService.getCheckout(
                 10L,
                 "member@example.com",
                 1L
@@ -103,11 +107,11 @@ class PaymentQueryServiceTests {
     @Test
     void getCheckout_productNameOver100Characters_truncatesOrderName() {
         String longProductName = "가".repeat(101);
-        when(orderQueryService.getMemberOrder(10L, 1L))
-                .thenReturn(order(OrderStatus.PENDING_PAYMENT, longProductName));
+        when(orderPaymentQueryService.getMemberPaymentOrder(10L, 1L))
+                .thenReturn(order(true, true, longProductName));
         when(paymentService.getReadyPayment(1L)).thenReturn(payment(PaymentStatus.READY, null));
 
-        PaymentCheckoutView checkout = paymentQueryService.getCheckout(
+        PaymentCheckoutView checkout = paymentCheckoutService.getCheckout(
                 10L,
                 "member@example.com",
                 1L
@@ -117,20 +121,12 @@ class PaymentQueryServiceTests {
     }
 
     @Test
-    void getCheckout_missingSecretKey_disablesPayment() {
-        PaymentQueryService serviceWithoutSecretKey = new PaymentQueryService(
-                orderQueryService,
-                memberService,
-                paymentService,
-                storeService,
-                CLOCK,
-                "test-client-key",
-                ""
-        );
-        when(orderQueryService.getMemberOrder(10L, 1L)).thenReturn(order(OrderStatus.PENDING_PAYMENT));
+    void getCheckout_paymentConfigurationDisabled_disablesPayment() {
+        when(tossPaymentAvailability.isEnabled()).thenReturn(false);
+        when(orderPaymentQueryService.getMemberPaymentOrder(10L, 1L)).thenReturn(order(true, true));
         when(paymentService.getReadyPayment(1L)).thenReturn(payment(PaymentStatus.READY, null));
 
-        PaymentCheckoutView checkout = serviceWithoutSecretKey.getCheckout(10L, "member@example.com", 1L);
+        PaymentCheckoutView checkout = paymentCheckoutService.getCheckout(10L, "member@example.com", 1L);
 
         assertThat(checkout.paymentAvailable()).isFalse();
     }
@@ -139,7 +135,7 @@ class PaymentQueryServiceTests {
     void getCheckout_inactiveMember_rejectsBeforeOpeningPayment() {
         when(memberService.isActiveMember(10L)).thenReturn(false);
 
-        assertThatThrownBy(() -> paymentQueryService.getCheckout(
+        assertThatThrownBy(() -> paymentCheckoutService.getCheckout(
                 10L,
                 "member@example.com",
                 1L
@@ -151,12 +147,12 @@ class PaymentQueryServiceTests {
 
     @Test
     void validateSuccessCallback_completedSamePayment_acceptsCallback() {
-        OrderDetailView order = order(OrderStatus.READY_FOR_PICKUP);
+        PaymentOrder order = order(true, false);
         Payment payment = payment(PaymentStatus.DONE, "payment-key");
-        when(orderQueryService.getMemberOrder(10L, 1L)).thenReturn(order);
+        when(orderPaymentQueryService.getMemberPaymentOrder(10L, 1L)).thenReturn(order);
         when(paymentService.findDonePayment(1L)).thenReturn(Optional.of(payment));
 
-        paymentQueryService.validateSuccessCallback(
+        paymentCheckoutService.validateSuccessCallback(
                 10L,
                 1L,
                 successForm()
@@ -165,10 +161,10 @@ class PaymentQueryServiceTests {
 
     @Test
     void getFailure_providerMessage_returnsOnlyMappedSafeMessage() {
-        when(orderQueryService.getMemberOrder(10L, 1L))
-                .thenReturn(order(OrderStatus.PENDING_PAYMENT));
+        when(orderPaymentQueryService.getMemberPaymentOrder(10L, 1L))
+                .thenReturn(order(true, true));
 
-        var failure = paymentQueryService.getFailure(
+        var failure = paymentCheckoutService.getFailure(
                 10L,
                 1L,
                 "PAY_PROCESS_CANCELED"
@@ -180,14 +176,14 @@ class PaymentQueryServiceTests {
 
     @Test
     void getCompletion_donePayment_returnsActualMethodAndPickupPlace() {
-        when(orderQueryService.getMemberOrder(10L, 1L))
-                .thenReturn(order(OrderStatus.READY_FOR_PICKUP));
+        when(orderPaymentQueryService.getMemberPaymentOrder(10L, 1L))
+                .thenReturn(order(true, false));
         when(paymentService.getDonePayment(1L))
                 .thenReturn(payment(PaymentStatus.DONE, "payment-key"));
         when(storeService.getStoreView()).thenReturn(storeView());
 
         PaymentCompletionView completion =
-                paymentQueryService.getCompletion(10L, 1L);
+                paymentCheckoutService.getCompletion(10L, 1L);
 
         assertThat(completion.orderNumber()).isEqualTo("ORD-100");
         assertThat(completion.method()).isEqualTo("카드");
@@ -197,49 +193,31 @@ class PaymentQueryServiceTests {
         );
     }
 
-    private OrderDetailView order(OrderStatus status) {
-        return order(status, "딸기 생크림 케이크");
+    private PaymentOrder order(boolean generalOrder, boolean pendingPayment) {
+        return order(generalOrder, pendingPayment, "딸기 생크림 케이크");
     }
 
-    private OrderDetailView order(OrderStatus status, String productName) {
-        return new OrderDetailView(
+    private PaymentOrder order(boolean generalOrder, boolean pendingPayment, String productName) {
+        return new PaymentOrder(
                 1L,
                 "ORD-100",
-                10L,
-                OrderType.GENERAL,
-                status,
-                "홍길동",
-                "010-1111-2222",
-                "홍길동",
-                "010-1111-2222",
+                generalOrder,
+                pendingPayment,
                 BigDecimal.valueOf(30_000),
                 BigDecimal.ZERO,
                 BigDecimal.valueOf(30_000),
                 NOW.plusDays(1),
                 NOW.plusMinutes(10),
-                status == OrderStatus.PENDING_PAYMENT,
-                null,
-                null,
-                null,
-                null,
-                NOW.minusMinutes(1),
-                false,
-                List.of(new OrderDetailView.Item(
-                        100L,
-                        1L,
+                "홍길동",
+                "010-1111-2222",
+                List.of(new PaymentOrderItem(
                         productName,
-                        ProductType.GENERAL,
                         1,
                         BigDecimal.valueOf(30_000),
-                        BigDecimal.ZERO,
-                        BigDecimal.valueOf(30_000),
-                        null,
-                        List.of(new OrderDetailView.Option(
+                        List.of(new PaymentOrderOption(
                                 "케이크 크기",
-                                "1호",
-                                BigDecimal.ZERO
-                        )),
-                        List.of()
+                                "1호"
+                        ))
                 ))
         );
     }

@@ -86,39 +86,48 @@
     });
   }
 
-  function initializeCouponPreview() {
+  function initializeCouponAmountDisplay() {
     const select = document.getElementById("memberCouponId");
     const total = document.querySelector("[data-order-total]");
     const discount = document.querySelector("[data-coupon-discount]");
     const finalAmount = document.querySelector("[data-final-amount]");
     if (!select || !total || !discount || !finalAmount) return;
-    const original = total.dataset.originalAmount;
+
+    const originalAmount = Number(total.dataset.originalAmount);
     const format = value => Number(value).toLocaleString("ko-KR") + "원";
-    select.addEventListener("change", function () {
-      if (!select.value) { discount.textContent = "0원"; finalAmount.textContent = format(original); return; }
-      const form = select.form;
-      // 미리보기 계산에는 상품·수량·옵션·선택 쿠폰만 필요하다. 폼 전체를 URL에 담지 않는다.
-      const params = new URLSearchParams();
-      ["productId", "quantity", "memberCouponId"].forEach(function (name) {
-        const value = form.elements[name] && form.elements[name].value;
-        if (value) params.set(name, value);
-      });
-      form.querySelectorAll("[name='optionIds']").forEach(function (option) {
-        if (option.type !== "checkbox" || option.checked) {
-          params.append("optionIds", option.value);
-        }
-      });
-      fetch("/orders/coupon-preview?" + params.toString())
-        .then(response => response.ok ? response.json() : Promise.reject())
-        .then(result => { discount.textContent = "-" + format(result.discountAmount); finalAmount.textContent = format(result.finalAmount); })
-        .catch(() => { discount.textContent = "적용할 수 없는 쿠폰"; finalAmount.textContent = format(original); });
-    });
+
+    function updateAmountDisplay() {
+      const selectedCoupon = select.selectedOptions[0];
+      if (!selectedCoupon || !selectedCoupon.dataset.discountType) {
+        discount.textContent = "0원";
+        finalAmount.textContent = format(originalAmount);
+        return;
+      }
+
+      const discountValue = Number(selectedCoupon.dataset.discountValue);
+      const maximumDiscountAmount = selectedCoupon.dataset.maximumDiscountAmount
+        ? Number(selectedCoupon.dataset.maximumDiscountAmount)
+        : null;
+      let discountAmount = selectedCoupon.dataset.discountType === "PERCENTAGE"
+        ? Math.floor(originalAmount * discountValue / 100)
+        : Math.floor(discountValue);
+      if (maximumDiscountAmount !== null) {
+        discountAmount = Math.min(discountAmount, maximumDiscountAmount);
+      }
+      discountAmount = Math.min(discountAmount, originalAmount);
+
+      discount.textContent = "-" + format(discountAmount);
+      finalAmount.textContent = format(originalAmount - discountAmount);
+    }
+
+    select.addEventListener("change", updateAmountDisplay);
+    updateAmountDisplay();
   }
 
   document.addEventListener("DOMContentLoaded", function () {
     initializePickupScheduler();
     initializeOrdererContact();
     initializeSingleSubmit();
-    initializeCouponPreview();
+    initializeCouponAmountDisplay();
   });
 })();

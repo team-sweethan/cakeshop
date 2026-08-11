@@ -52,7 +52,7 @@ import com.cakeshop.domain.order.service.admin.FulfillmentService;
 import com.cakeshop.domain.payment.controller.PaymentAdminController;
 import com.cakeshop.domain.payment.dto.view.PaymentAdminListView;
 import com.cakeshop.domain.payment.dto.view.PaymentAdminSummaryView;
-import com.cakeshop.domain.payment.service.PaymentAdminQueryService;
+import com.cakeshop.domain.payment.service.PaymentAdminService;
 import com.cakeshop.domain.payment.service.RefundFacade;
 import com.cakeshop.domain.product.controller.ProductAdminController;
 import com.cakeshop.domain.review.controller.ReviewAdminController;
@@ -104,8 +104,8 @@ class AdminPageControllerTests {
                         List.of()
                 ));
 
-        PaymentAdminQueryService paymentAdminQueryService =
-                Mockito.mock(PaymentAdminQueryService.class);
+        PaymentAdminService paymentAdminQueryService =
+                Mockito.mock(PaymentAdminService.class);
         when(paymentAdminQueryService.getPayments(any()))
                 .thenReturn(new PaymentAdminListView(
                         null,

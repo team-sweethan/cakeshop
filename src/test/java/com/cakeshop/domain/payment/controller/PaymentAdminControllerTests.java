@@ -4,7 +4,7 @@ import com.cakeshop.domain.payment.dto.form.PaymentAdminSearchCondition;
 import com.cakeshop.domain.payment.dto.view.PaymentAdminListView;
 import com.cakeshop.domain.payment.dto.view.PaymentAdminSummaryView;
 import com.cakeshop.domain.payment.entity.PaymentStatus;
-import com.cakeshop.domain.payment.service.PaymentAdminQueryService;
+import com.cakeshop.domain.payment.service.PaymentAdminService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -25,12 +25,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class PaymentAdminControllerTests {
 
-    private PaymentAdminQueryService paymentAdminQueryService;
+    private PaymentAdminService paymentAdminQueryService;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        paymentAdminQueryService = Mockito.mock(PaymentAdminQueryService.class);
+        paymentAdminQueryService = Mockito.mock(PaymentAdminService.class);
         mockMvc = MockMvcBuilders.standaloneSetup(
                 new PaymentAdminController(paymentAdminQueryService)
         ).build();

@@ -307,6 +307,20 @@
         ORDER BY created_at DESC, id DESC
     </select>
 
+    <select id="findPaymentAdminOrders"
+            resultType="com.cakeshop.domain.order.dto.view.OrderPaymentAdminView">
+        SELECT
+            id AS order_id,
+            order_number,
+            orderer_name,
+            order_type
+        FROM orders
+        WHERE id IN
+        <foreach collection="orderIds" item="orderId" open="(" separator="," close=")">
+            #{orderId}
+        </foreach>
+    </select>
+
     <select id="findFulfillmentOrders" resultType="com.cakeshop.domain.order.entity.Order">
         SELECT
             id,
@@ -619,7 +633,7 @@
           )
           AND order_type = 'GENERAL'
           AND status = 'READY_FOR_PICKUP'
-          AND #{canceledAt} &lt; pickup_at
+          AND #{requestedAt} &lt; pickup_at
     </update>
 
 </mapper>

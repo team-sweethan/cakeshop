@@ -2,11 +2,9 @@ package com.cakeshop.domain.coupon.service;
 
 import com.cakeshop.domain.coupon.mapper.CouponOrderMapper;
 import com.cakeshop.domain.coupon.dto.view.CouponOrderDiscount;
-import com.cakeshop.domain.coupon.entity.DiscountType;
 import com.cakeshop.domain.coupon.error.CouponErrorCode;
 import com.cakeshop.global.error.BusinessException;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,10 +26,7 @@ public class CouponOrderCommandService {
         CouponOrderDiscount coupon = couponOrderMapper
                 .findAvailableCouponForOrderForUpdate(memberCouponId, memberId)
                 .orElseThrow(() -> new BusinessException(CouponErrorCode.ORDER_COUPON_UNAVAILABLE));
-        if (originalAmount.compareTo(coupon.minimumOrderAmount()) < 0) {
-            throw new BusinessException(CouponErrorCode.MINIMUM_ORDER_AMOUNT_NOT_MET);
-        }
-        BigDecimal discountAmount = calculateDiscount(coupon, originalAmount);
+        BigDecimal discountAmount = CouponDiscountCalculator.calculate(coupon, originalAmount);
         if (couponOrderMapper.reserveCouponForOrder(memberCouponId, orderId) != 1) {
             throw new BusinessException(CouponErrorCode.ORDER_COUPON_UNAVAILABLE);
         }
@@ -57,15 +52,5 @@ public class CouponOrderCommandService {
     @Transactional
     public void restoreCouponForCanceledOrder(long orderId) {
         couponOrderMapper.restoreCouponForCanceledOrder(orderId);
-    }
-
-    private BigDecimal calculateDiscount(CouponOrderDiscount coupon, BigDecimal originalAmount) {
-        BigDecimal discount = coupon.discountType() == DiscountType.PERCENTAGE
-                ? originalAmount.multiply(coupon.discountValue()).divide(BigDecimal.valueOf(100), 0, RoundingMode.DOWN)
-                : coupon.discountValue().setScale(0, RoundingMode.DOWN);
-        if (coupon.maximumDiscountAmount() != null) {
-            discount = discount.min(coupon.maximumDiscountAmount());
-        }
-        return discount.min(originalAmount);
     }
 }

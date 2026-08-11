@@ -5,6 +5,7 @@ import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView.Pick
 import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView.PickupTimeView;
 import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView.SelectedOptionView;
 import com.cakeshop.domain.order.error.OrderErrorCode;
+import com.cakeshop.domain.order.service.OrderAmountCalculator;
 import com.cakeshop.domain.order.service.OrderOptionValidator;
 import com.cakeshop.domain.order.service.OrderOptionValidator.ValidatedOption;
 import com.cakeshop.domain.product.dto.view.ProductSalesInfo;
@@ -19,7 +20,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -37,7 +37,6 @@ public class OrderCheckoutService {
 
     private static final int PICKUP_WINDOW_DAYS = 14;
     private static final long PAYMENT_EXPIRATION_MINUTES = 10L;
-    private static final BigDecimal MAX_ORDER_AMOUNT = new BigDecimal("999999999999");
     private static final DateTimeFormatter DATE_LABEL_FORMATTER =
             DateTimeFormatter.ofPattern("M월 d일 (E)", Locale.KOREAN);
     private static final DateTimeFormatter TIME_LABEL_FORMATTER =
@@ -72,17 +71,9 @@ public class OrderCheckoutService {
                 optionIds
         );
 
-        BigDecimal productAmount = product.basePrice()
-                .multiply(BigDecimal.valueOf(quantity));
-        BigDecimal optionAmount = validatedOptions.stream()
-                .map(ValidatedOption::additionalPrice)
-                .reduce(BigDecimal.ZERO, BigDecimal::add)
-                .multiply(BigDecimal.valueOf(quantity));
-        BigDecimal totalAmount = productAmount.add(optionAmount);
-
-        if (totalAmount.compareTo(MAX_ORDER_AMOUNT) > 0) {
-            throw new BusinessException(OrderErrorCode.ORDER_AMOUNT_EXCEEDED);
-        }
+        OrderAmountCalculator.OrderAmounts amounts = OrderAmountCalculator.calculate(
+                product.basePrice(), quantity, validatedOptions
+        );
 
         List<SelectedOptionView> selectedOptions = validatedOptions.stream()
                 .map(option -> new SelectedOptionView(
@@ -99,9 +90,9 @@ public class OrderCheckoutService {
                 product.productType().getDisplayName(),
                 quantity,
                 selectedOptions,
-                productAmount,
-                optionAmount,
-                totalAmount,
+                amounts.productAmount(),
+                amounts.optionAmount(),
+                amounts.totalAmount(),
                 createPickupDates(storeService.getStoreView())
         );
     }

@@ -7,7 +7,7 @@ import com.cakeshop.domain.coupon.service.CouponOrderQueryService;
 import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
 import com.cakeshop.domain.order.controller.customer.OrderController;
-import com.cakeshop.domain.order.service.customer.CustomerOrderQueryService;
+import com.cakeshop.domain.order.service.customer.OrderCustomerService;
 import com.cakeshop.domain.order.service.OrderService;
 import com.cakeshop.domain.payment.service.RefundFacade;
 import com.cakeshop.global.security.MemberDetails;
@@ -23,11 +23,13 @@ import org.springframework.security.web.method.annotation.AuthenticationPrincipa
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.time.LocalDate;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.equalTo;
@@ -52,7 +54,7 @@ class OrderControllerTests {
     private OrderService orderService;
 
     @Mock
-    private CustomerOrderQueryService orderQueryService;
+    private OrderCustomerService orderQueryService;
 
     @Mock
     private MemberService memberService;
@@ -108,6 +110,7 @@ class OrderControllerTests {
     @Test
     void checkout_validSelection_addsActualCheckoutToModel() throws Exception {
         GeneralOrderCheckoutView checkout = mock(GeneralOrderCheckoutView.class);
+        when(checkout.totalAmount()).thenReturn(BigDecimal.valueOf(40_000));
         when(memberService.getMemberProfile("member@example.com"))
                 .thenReturn(new MemberProfileView(
                         "member@example.com",
@@ -137,7 +140,8 @@ class OrderControllerTests {
                         hasProperty("pickupPhone", equalTo("010-1111-2222")),
                         hasProperty("requestKey", org.hamcrest.Matchers.matchesPattern(
                                 "^[0-9a-f-]{36}$"
-                        ))
+                        )),
+                        hasProperty("displayedOriginalAmount", equalTo(BigDecimal.valueOf(40_000)))
                 )));
 
         verify(orderCheckoutService).getGeneralCheckout(
@@ -162,6 +166,7 @@ class OrderControllerTests {
                         .param("productId", "1")
                         .param("quantity", "2")
                         .param("optionIds", "101")
+                        .param("displayedOriginalAmount", "40000")
                         .param("ordererName", "홍길동")
                         .param("ordererPhone", "010-1111-2222")
                         .param("pickupName", "홍길동")
@@ -176,10 +181,38 @@ class OrderControllerTests {
                 argThat(form ->
                         form.getPickupAt() != null
                                 && requestKey.equals(form.getRequestKey())
+                                && BigDecimal.valueOf(40_000).compareTo(form.getDisplayedOriginalAmount()) == 0
                                 && "홍길동".equals(form.getPickupName())
                                 && "초는 빼주세요".equals(form.getRequestMessage())
                 )
         );
+    }
+
+    @Test
+    void createGeneralOrder_changedDisplayedAmount_rendersUpdatedOrderForm() throws Exception {
+        GeneralOrderCheckoutView checkout = mock(GeneralOrderCheckoutView.class);
+        when(checkout.totalAmount()).thenReturn(BigDecimal.valueOf(40_000));
+        when(orderCheckoutService.getGeneralCheckout(1L, 2, List.of(101L))).thenReturn(checkout);
+        when(orderService.createGeneralOrder(eq(10L), any()))
+                .thenThrow(new com.cakeshop.global.error.BusinessException(
+                        com.cakeshop.domain.order.error.OrderErrorCode.ORDER_AMOUNT_CHANGED
+                ));
+
+        mockMvc.perform(post("/orders/general")
+                        .param("requestKey", UUID.randomUUID().toString())
+                        .param("productId", "1")
+                        .param("quantity", "2")
+                        .param("optionIds", "101")
+                        .param("displayedOriginalAmount", "30000")
+                        .param("ordererName", "홍길동")
+                        .param("ordererPhone", "010-1111-2222")
+                        .param("pickupName", "홍길동")
+                        .param("pickupPhone", "010-1111-2222")
+                        .param("pickupAt", "2099-08-05T14:00"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("customer/order/form"))
+                .andExpect(model().attribute("checkout", checkout))
+                .andExpect(model().attributeHasErrors("orderForm"));
     }
 
     @Test

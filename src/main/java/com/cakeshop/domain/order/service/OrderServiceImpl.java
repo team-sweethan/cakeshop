@@ -12,13 +12,11 @@ import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.order.mapper.OrderMapper;
 import com.cakeshop.domain.order.service.OrderOptionValidator.ValidatedOption;
-import com.cakeshop.domain.payment.service.PaymentPreparationService;
+import com.cakeshop.domain.payment.service.PaymentOrderPreparationCommandService;
 import com.cakeshop.domain.product.dto.view.ProductSalesInfo;
 import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.error.ProductErrorCode;
 import com.cakeshop.domain.product.service.ProductQueryService;
-import com.cakeshop.domain.store.dto.view.StoreView;
-import com.cakeshop.domain.store.service.StoreService;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.error.CommonErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -27,10 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Clock;
-import java.time.DayOfWeek;
-import java.time.Duration;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -40,15 +35,14 @@ import java.util.UUID;
 public class OrderServiceImpl implements OrderService {
 
     private static final BigDecimal ZERO = BigDecimal.ZERO;
-    private static final BigDecimal MAX_ORDER_AMOUNT = new BigDecimal("999999999999");
     private static final int MAX_UNLIMITED_STOCK_QUANTITY = 10;
     private static final long PAYMENT_EXPIRATION_MINUTES = 10L;
 
-    private final StoreService storeService;
+    private final PickupAvailabilityPolicy pickupAvailabilityPolicy;
     private final ProductQueryService productQueryService;
     private final OrderOptionValidator orderOptionValidator;
     private final OrderMapper orderMapper;
-    private final PaymentPreparationService paymentPreparationService;
+    private final PaymentOrderPreparationCommandService paymentOrderPreparationCommandService;
     private final MemberService memberService;
     private final MemberCouponQueryService memberCouponQueryService;
     // 쿠폰 담당자가 제공하는 공개 명령 계약이다. 주문 도메인은 쿠폰 Mapper를 직접 사용하지 않는다.
@@ -81,6 +75,7 @@ public class OrderServiceImpl implements OrderService {
         // 클라이언트가 전달한 가격을 사용하지 않고 현재 상품·옵션 정보로 금액을 다시 계산한다.
         PreparedOrderItem preparedItem = prepareItem(form);
         BigDecimal originalAmount = preparedItem.totalAmount();
+        validateDisplayedOriginalAmount(form.getDisplayedOriginalAmount(), originalAmount);
 
         // 주문과 하위 스냅샷 중 하나라도 저장에 실패하면 전체 트랜잭션을 rollback한다.
         Order order = createOrder(memberId, form, originalAmount, now);
@@ -116,91 +111,13 @@ public class OrderServiceImpl implements OrderService {
 
         saveOrderItem(order.getId(), preparedItem);
 
-        paymentPreparationService.prepareReadyPayment(
+        paymentOrderPreparationCommandService.prepareReadyPayment(
                 order.getId(),
                 order.getOrderNumber(),
                 order.getFinalAmount()
         );
 
         return order.getId();
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public GeneralPaymentOrder getGeneralPaymentOrder(
-            long memberId,
-            long orderId
-    ) {
-        validateActiveMember(memberId);
-
-        Order order = orderMapper.findOrderById(orderId)
-                .orElseThrow(() ->
-                        new BusinessException(CommonErrorCode.NOT_FOUND));
-
-        if (!Long.valueOf(memberId).equals(order.getMemberId())) {
-            // 주문 존재 여부를 다른 회원에게 노출하지 않는다.
-            throw new BusinessException(CommonErrorCode.NOT_FOUND);
-        }
-        if (order.getOrderType() != OrderType.GENERAL
-                || order.getStatus() != OrderStatus.PENDING_PAYMENT) {
-            throw new BusinessException(
-                    OrderErrorCode.INVALID_STATUS_TRANSITION
-            );
-        }
-
-        List<PaymentProduct> products = orderMapper
-                .findOrderItemsByOrderId(orderId)
-                .stream()
-                .map(this::toPaymentProduct)
-                .toList();
-        if (products.isEmpty()) {
-            throw new BusinessException(OrderErrorCode.EMPTY_ORDER_ITEMS);
-        }
-
-        return new GeneralPaymentOrder(
-                order.getId(),
-                order.getFinalAmount(),
-                order.getPaymentExpiresAt(),
-                products
-        );
-    }
-
-    @Override
-    @Transactional
-    public void completeGeneralOrderAfterPayment(
-            long orderId,
-            LocalDateTime readyAt
-    ) {
-        requireOneRow(
-                orderMapper.markReadyForPickupAfterPaymentIfPending(
-                        orderId,
-                        readyAt
-                ),
-                OrderErrorCode.INVALID_STATUS_TRANSITION
-        );
-    }
-
-    @Override
-    @Transactional
-    public void lockGeneralOrderForPayment(long orderId) {
-        Order order = orderMapper.findOrderByIdForUpdate(orderId)
-                .orElseThrow(() -> new BusinessException(CommonErrorCode.NOT_FOUND));
-        if (order.getOrderType() != OrderType.GENERAL
-                || order.getStatus() != OrderStatus.PENDING_PAYMENT) {
-            throw new BusinessException(OrderErrorCode.INVALID_STATUS_TRANSITION);
-        }
-    }
-
-    @Override
-    @Transactional
-    public void recordGeneralStockDeduction(long orderItemId, LocalDateTime deductedAt) {
-        if (orderItemId <= 0 || deductedAt == null) {
-            throw new BusinessException(CommonErrorCode.INTERNAL_ERROR);
-        }
-        requireOneRow(
-                orderMapper.markStockDeductedIfUnset(orderItemId, deductedAt),
-                OrderErrorCode.INVALID_STATUS_TRANSITION
-        );
     }
 
     /** 세션 값만 신뢰하지 않고 현재 ACTIVE 회원인지 DB 기준으로 검증한다. */
@@ -217,43 +134,9 @@ public class OrderServiceImpl implements OrderService {
         if (pickupAt == null
                 || !pickupAt.isAfter(now)
                 || !pickupAt.isAfter(now.plusMinutes(PAYMENT_EXPIRATION_MINUTES))
-                || !isPickupAvailable(pickupAt, storeService.getStoreView())) {
+                || !pickupAvailabilityPolicy.isAvailable(pickupAt)) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
-    }
-
-    private boolean isPickupAvailable(LocalDateTime pickupAt, StoreView store) {
-        DayOfWeek dayOfWeek = pickupAt.getDayOfWeek();
-        if (store.closedDays().contains(dayOfWeek)
-                || store.holidays().stream()
-                        .anyMatch(holiday -> holiday.getHolidayDate().equals(pickupAt.toLocalDate()))) {
-            return false;
-        }
-
-        boolean weekend = dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY;
-        LocalTime businessStart = weekend ? store.weekendOpenTime() : store.weekdayOpenTime();
-        LocalTime businessEnd = weekend ? store.weekendCloseTime() : store.weekdayCloseTime();
-        LocalTime pickupTime = pickupAt.toLocalTime();
-
-        if (!isWithin(pickupTime, businessStart, businessEnd)
-                || !isWithin(pickupTime, store.pickupStartTime(), store.pickupEndTime())
-                || store.pickupIntervalMinutes() == null
-                || store.pickupIntervalMinutes() <= 0
-                || pickupTime.getSecond() != 0
-                || pickupTime.getNano() != 0) {
-            return false;
-        }
-
-        long minutesFromStart = Duration.between(store.pickupStartTime(), pickupTime).toMinutes();
-        return minutesFromStart % store.pickupIntervalMinutes() == 0;
-    }
-
-    private boolean isWithin(LocalTime value, LocalTime start, LocalTime end) {
-        return value != null
-                && start != null
-                && end != null
-                && !value.isBefore(start)
-                && !value.isAfter(end);
     }
 
     private void validateForm(GeneralOrderForm form) {
@@ -269,6 +152,17 @@ public class OrderServiceImpl implements OrderService {
         }
         if (form.getProductId() == null) {
             throw new BusinessException(OrderErrorCode.EMPTY_ORDER_ITEMS);
+        }
+    }
+
+    /** 표시 시점 이후 가격이 바뀌면 주문을 저장하지 않고 최신 주문서를 다시 보여준다. */
+    private void validateDisplayedOriginalAmount(
+            BigDecimal displayedOriginalAmount,
+            BigDecimal currentOriginalAmount
+    ) {
+        if (displayedOriginalAmount != null
+                && displayedOriginalAmount.compareTo(currentOriginalAmount) != 0) {
+            throw new BusinessException(OrderErrorCode.ORDER_AMOUNT_CHANGED);
         }
     }
 
@@ -298,26 +192,19 @@ public class OrderServiceImpl implements OrderService {
                         form.getOptionIds()
                 );
 
-        BigDecimal optionAmount = selectedOptions.stream()
-                .map(ValidatedOption::additionalPrice)
-                .reduce(ZERO, BigDecimal::add);
-
-        BigDecimal totalAmount = product.basePrice()
-                .add(optionAmount)
-                .multiply(BigDecimal.valueOf(form.getQuantity()));
-        if (totalAmount.signum() <= 0) {
+        OrderAmountCalculator.OrderAmounts amounts = OrderAmountCalculator.calculate(
+                product.basePrice(), form.getQuantity(), selectedOptions
+        );
+        if (amounts.totalAmount().signum() <= 0) {
             throw new BusinessException(OrderErrorCode.INVALID_ORDER_AMOUNT);
-        }
-        if (totalAmount.compareTo(MAX_ORDER_AMOUNT) > 0) {
-            throw new BusinessException(OrderErrorCode.ORDER_AMOUNT_EXCEEDED);
         }
 
         return new PreparedOrderItem(
                 product,
                 form.getQuantity(),
                 selectedOptions,
-                optionAmount,
-                totalAmount
+                amounts.unitOptionAmount(),
+                amounts.totalAmount()
         );
     }
 
@@ -332,21 +219,6 @@ public class OrderServiceImpl implements OrderService {
                 || stockQuantity != null && stockQuantity < quantity) {
             throw new BusinessException(ProductErrorCode.INSUFFICIENT_STOCK);
         }
-    }
-
-    private PaymentProduct toPaymentProduct(OrderItem orderItem) {
-        if (orderItem.getProductType() != ProductType.GENERAL
-                || orderItem.getProductId() == null
-                || orderItem.getQuantity() == null
-                || orderItem.getQuantity() <= 0) {
-            throw new BusinessException(CommonErrorCode.INTERNAL_ERROR);
-        }
-
-        return new PaymentProduct(
-                orderItem.getId(),
-                orderItem.getProductId(),
-                orderItem.getQuantity()
-        );
     }
 
     /** 결제 대기 상태와 결제 만료 시각이 설정된 일반 주문을 구성한다. */

@@ -16,7 +16,7 @@ import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.order.mapper.OrderMapper;
 import com.cakeshop.domain.order.service.OrderViewAssembler;
-import com.cakeshop.domain.order.service.customer.CustomerOrderQueryService;
+import com.cakeshop.domain.order.service.customer.OrderCustomerService;
 import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.error.CommonErrorCode;
@@ -33,7 +33,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-class CustomerOrderQueryServiceTests {
+class OrderCustomerServiceTests {
 
     private static final Clock CLOCK = Clock.fixed(
             LocalDateTime.of(2026, 8, 3, 10, 0).atZone(ZoneId.of("Asia/Seoul")).toInstant(),
@@ -43,11 +43,11 @@ class CustomerOrderQueryServiceTests {
     @Mock
     private OrderMapper orderMapper;
 
-    private CustomerOrderQueryService orderQueryService;
+    private OrderCustomerService orderQueryService;
 
     @BeforeEach
     void setUp() {
-        orderQueryService = new CustomerOrderQueryService(new OrderViewAssembler(orderMapper, CLOCK));
+        orderQueryService = new OrderCustomerService(new OrderViewAssembler(orderMapper, CLOCK));
     }
 
     @Test

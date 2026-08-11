@@ -146,7 +146,6 @@ class RefundFacadeTests {
         return new RefundRequest(
                 30L,
                 10L,
-                OrderStatus.READY_FOR_PICKUP,
                 "payment-key",
                 "idempotency-key",
                 reason,
