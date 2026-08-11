@@ -20,7 +20,7 @@ import com.cakeshop.domain.chat.entity.CustomerAdminNote;
 import com.cakeshop.domain.chat.error.ChatErrorCode;
 import com.cakeshop.domain.chat.mapper.ChatMapper;
 import com.cakeshop.domain.member.service.MemberChatQueryService;
-import com.cakeshop.domain.order.entity.Order;
+import com.cakeshop.domain.order.dto.view.OrderChatView;
 import com.cakeshop.domain.order.service.OrderChatQueryService;
 import com.cakeshop.domain.product.service.ProductChatQueryService;
 import com.cakeshop.global.common.paging.PageRequest;
@@ -195,23 +195,21 @@ public class ChatService {
         }
 
         return roomOrders.stream().map(ro -> {
-            Order order;
+            OrderChatView order;
             try {
                 order = orderChatQueryService.findOrder(ro.getOrderId());
             } catch (Exception e) {
                 order = null;
             }
 
-            String representativeName = orderChatQueryService.getRepresentativeProductName(ro.getOrderId());
-
             return ChatRoomOrderResponse.builder()
                     .orderId(ro.getOrderId())
-                    .orderNumber(order != null ? order.getOrderNumber() : "ORD-UNKNOWN")
-                    .productName(representativeName)
-                    .productType(order != null && order.getOrderType() != null ? order.getOrderType().name() : "GENERAL")
-                    .totalAmount(order != null ? order.getFinalAmount() : BigDecimal.ZERO)
-                    .orderStatus(order != null && order.getStatus() != null ? order.getStatus().name() : "UNKNOWN")
-                    .pickupDateTime(order != null ? order.getPickupAt() : null)
+                    .orderNumber(order != null && order.orderNumber() != null ? order.orderNumber() : "ORD-UNKNOWN")
+                    .productName(order != null && order.representativeProductName() != null ? order.representativeProductName() : "연동 주문 상품")
+                    .productType(order != null && order.orderType() != null ? order.orderType() : "GENERAL")
+                    .totalAmount(order != null && order.finalAmount() != null ? order.finalAmount() : BigDecimal.ZERO)
+                    .orderStatus(order != null && order.status() != null ? order.status() : "UNKNOWN")
+                    .pickupDateTime(order != null ? order.pickupAt() : null)
                     .conversationAnchorMessageId(ro.getConversationAnchorMessageId())
                     .createdAt(ro.getCreatedAt())
                     .build();
@@ -224,17 +222,26 @@ public class ChatService {
         ChatRoom chatRoom = chatMapper.findChatRoomById(chatRoomId);
         validateRoomAccess(chatRoom, currentUserId, isAdmin);
 
-        // anchorMessageId가 전달된 경우, 해당 메시지가 이 채팅방의 메시지인지 검증!
-        if (anchorMessageId != null && anchorMessageId > 0) {
+        // anchorMessageId가 전달된 경우, 비양수 거절 및 해당 메시지가 이 채팅방의 메시지인지 검증!
+        if (anchorMessageId != null) {
+            if (anchorMessageId <= 0) {
+                throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+            }
             ChatMessage anchorMsg = chatMapper.findChatMessageById(anchorMessageId);
             if (anchorMsg == null || !chatRoomId.equals(anchorMsg.getChatRoomId())) {
                 throw new BusinessException(CommonErrorCode.INVALID_INPUT);
             }
         }
 
-        // OrderChatQueryService를 통한 소유권 검증
-        Order order = orderChatQueryService.findOrder(orderId);
-        if (order != null && !chatRoom.getCustomerId().equals(order.getMemberId())) {
+        // orderId 비양수 거절, 존재 여부 검증 및 OrderChatQueryService를 통한 소유권 검증
+        if (orderId == null || orderId <= 0) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+        OrderChatView order = orderChatQueryService.findOrder(orderId);
+        if (order == null) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+        if (!chatRoom.getCustomerId().equals(order.memberId())) {
             throw new AccessDeniedException("해당 채팅방 고객의 주문만 연동할 수 있습니다.");
         }
 
