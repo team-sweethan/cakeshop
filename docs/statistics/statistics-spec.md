@@ -241,9 +241,7 @@
 - 운영자는 웹 서버 없이 아래 명령으로 백필을 실행하고 종료 결과와 `statistics_batch_runs`를 확인한다.
 
 ```bash
-java -jar cakeshop.jar \
-  --spring.main.web-application-type=none \
-  --app.statistics.backfill.enabled=true
+./gradlew bootRun --args='--spring.main.web-application-type=none --spring.devtools.restart.enabled=false --app.statistics.backfill.enabled=true'
 ```
 
 - 백필 성공 또는 이미 완료된 경우 종료 코드 `0`, 다른 집계 실행 중이거나 백필 실패인 경우
@@ -280,12 +278,10 @@ java -jar cakeshop.jar \
 운영자는 웹 서버 없이 다음 형식으로 수동 재집계를 실행한다.
 
 ```bash
-java -jar cakeshop.jar \
-  --spring.main.web-application-type=none \
-  --app.statistics.rebuild.enabled=true \
-  --app.statistics.rebuild.start-date=2026-08-01 \
-  --app.statistics.rebuild.end-date=2026-08-10
+./gradlew bootRun --args='--spring.main.web-application-type=none --spring.devtools.restart.enabled=false --app.statistics.rebuild.enabled=true --app.statistics.rebuild.start-date=2026-08-01 --app.statistics.rebuild.end-date=2026-08-10'
 ```
+
+운영체제별 명령과 실행 결과 확인 방법은 [`statistics-operations.md`](statistics-operations.md)를 따른다.
 
 ## 8. 테스트 기준
 
@@ -312,3 +308,8 @@ java -jar cakeshop.jar \
   검증한다.
 - 초기 백필과 수동 재집계 옵션을 동시에 활성화하면 실행을 거부하는지 검증한다.
 - 원본 집계와 일별 집계 테이블 결과가 같은지 검증한다.
+
+## 관련 문서
+
+- [통계 집계 운영 가이드](statistics-operations.md)
+- [통계 스키마](../schema/statistics.md)
