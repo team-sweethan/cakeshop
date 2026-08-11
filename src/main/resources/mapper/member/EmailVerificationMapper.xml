@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cakeshop.domain.member.mapper.EmailVerificationMapper">
+    <resultMap id="emailVerificationResultMap"
+               type="com.cakeshop.domain.member.entity.EmailVerification">
+        <id property="id" column="id"/>
+        <result property="email" column="email"/>
+        <result property="purpose" column="purpose"
+                javaType="com.cakeshop.domain.member.entity.EmailVerificationPurpose"/>
+        <result property="codeHash" column="code_hash"/>
+        <result property="expiresAt" column="expires_at"/>
+        <result property="attemptCount" column="attempt_count"/>
+        <result property="verifiedAt" column="verified_at"/>
+        <result property="consumedAt" column="consumed_at"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <sql id="emailVerificationColumns">
+        id,
+        email,
+        purpose,
+        code_hash,
+        expires_at,
+        attempt_count,
+        verified_at,
+        consumed_at,
+        created_at,
+        updated_at
+    </sql>
+
+    <insert id="insert"
+            parameterType="com.cakeshop.domain.member.entity.EmailVerification"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO email_verifications (
+            email,
+            purpose,
+            code_hash,
+            expires_at
+        ) VALUES (
+            #{email},
+            #{purpose},
+            #{codeHash},
+            #{expiresAt}
+        )
+    </insert>
+
+    <select id="findLatest" resultMap="emailVerificationResultMap">
+        SELECT <include refid="emailVerificationColumns"/>
+          FROM email_verifications
+         WHERE email = #{email}
+           AND purpose = #{purpose}
+         ORDER BY created_at DESC, id DESC
+         LIMIT 1
+    </select>
+
+    <select id="countRequestsSince" resultType="int">
+        SELECT COUNT(*)
+          FROM email_verifications
+         WHERE email = #{email}
+           AND purpose = #{purpose}
+           AND created_at &gt;= #{since}
+    </select>
+
+    <update id="incrementAttemptCount">
+        UPDATE email_verifications
+           SET attempt_count = attempt_count + 1
+         WHERE id = #{id}
+           AND verified_at IS NULL
+           AND consumed_at IS NULL
+           AND expires_at &gt; #{now}
+           AND attempt_count &lt; 5
+    </update>
+
+    <update id="markVerified">
+        UPDATE email_verifications
+           SET verified_at = #{verifiedAt}
+         WHERE id = #{id}
+           AND id = (
+               SELECT latest_verification.id
+                 FROM (
+                     SELECT id
+                       FROM email_verifications
+                      WHERE email = #{email}
+                        AND purpose = #{purpose}
+                      ORDER BY created_at DESC, id DESC
+                      LIMIT 1
+                 ) latest_verification
+           )
+           AND verified_at IS NULL
+           AND consumed_at IS NULL
+           AND expires_at &gt; #{verifiedAt}
+           AND attempt_count &lt; 5
+    </update>
+
+    <select id="findVerifiedForUpdate" resultMap="emailVerificationResultMap">
+        SELECT <include refid="emailVerificationColumns"/>
+          FROM email_verifications
+         WHERE id = (
+               SELECT latest_verification.id
+                 FROM (
+                     SELECT id
+                       FROM email_verifications
+                      WHERE email = #{email}
+                        AND purpose = #{purpose}
+                      ORDER BY created_at DESC, id DESC
+                      LIMIT 1
+                 ) latest_verification
+           )
+           AND verified_at &gt;= #{verifiedSince}
+           AND consumed_at IS NULL
+         ORDER BY created_at DESC, id DESC
+         LIMIT 1
+           FOR UPDATE
+    </select>
+
+    <update id="markConsumed">
+        UPDATE email_verifications
+           SET consumed_at = #{consumedAt}
+         WHERE id = #{id}
+           AND verified_at IS NOT NULL
+           AND consumed_at IS NULL
+    </update>
+
+    <delete id="deleteExpiredBefore">
+        DELETE FROM email_verifications
+         WHERE expires_at &lt; #{cutoff}
+    </delete>
+</mapper>

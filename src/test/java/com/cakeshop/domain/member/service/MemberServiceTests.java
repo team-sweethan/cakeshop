@@ -43,6 +43,9 @@ class MemberServiceTests {
     @Mock
     private CouponMemberCommandService couponMemberCommandService;
 
+    @Mock
+    private EmailVerificationService emailVerificationService;
+
     @InjectMocks
     private MemberService memberService;
 
@@ -93,6 +96,7 @@ class MemberServiceTests {
         ArgumentCaptor<Member> captor = ArgumentCaptor.forClass(Member.class);
         verify(memberMapper).join(captor.capture());
         assertThat(captor.getValue().getBirthDate()).isEqualTo(form.getBirthDate());
+        verify(emailVerificationService).consumeSignupVerification(form.getEmail());
         verify(couponMemberCommandService).issueNewMemberCoupons(1L);
     }
 

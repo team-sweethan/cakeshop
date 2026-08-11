@@ -42,10 +42,22 @@
                pattern="^[A-Za-z0-9.!#$%&amp;'*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$"
                placeholder="example@email.com" style="flex:1" required>
         <button class="btn" type="button" onclick="checkEmail()">중복 확인</button>
+        <button class="btn" id="email-code-send-button" type="button" disabled>인증번호 발송</button>
       </div>
       <p class="form-error" th:if="${#fields.hasErrors('email')}" th:errors="*{email}"></p>
       <p class="form-error" id="email-format-message" aria-live="polite"></p>
       <p class="form-help" id="email-result-msg" aria-live="polite"></p>
+    </div>
+
+    <div class="form-group" id="email-verification-group" hidden>
+      <label class="form-label" for="signup-email-code">이메일 인증번호 <span class="required">*</span></label>
+      <div class="cluster">
+        <input class="form-control" id="signup-email-code" type="text" inputmode="numeric"
+               autocomplete="one-time-code" maxlength="6" pattern="\d{6}"
+               placeholder="6자리 인증번호" style="flex:1">
+        <button class="btn" id="email-code-verify-button" type="button">인증 확인</button>
+      </div>
+      <p class="form-help" id="email-verification-message" aria-live="polite"></p>
     </div>
 
     <div class="form-group">
@@ -103,7 +115,7 @@
       <p class="form-error" th:if="${#fields.hasErrors('nickname')}" th:errors="*{nickname}"></p>
     </div>
 
-    <button class="btn btn--primary btn--block" type="submit">가입하기</button>
+    <button class="btn btn--primary btn--block" id="signup-submit-button" type="submit" disabled>가입하기</button>
   </form>
 </main>
 
@@ -114,8 +126,46 @@
   const emailInput = document.getElementById('signup-email');
   const emailFormatMessage = document.getElementById('email-format-message');
   const emailResultMessage = document.getElementById('email-result-msg');
+  const emailCodeSendButton = document.getElementById('email-code-send-button');
+  const emailVerificationGroup = document.getElementById('email-verification-group');
+  const emailCodeInput = document.getElementById('signup-email-code');
+  const emailCodeVerifyButton = document.getElementById('email-code-verify-button');
+  const emailVerificationMessage = document.getElementById('email-verification-message');
+  const signupSubmitButton = document.getElementById('signup-submit-button');
+  const signupForm = document.querySelector('form[th\\:action], form[action="/join"]');
   const emailPattern = /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/;
   let emailFormatTouched = false;
+  let availableEmail = '';
+  let verifiedEmail = '';
+
+  function resetEmailVerification() {
+    availableEmail = '';
+    verifiedEmail = '';
+    emailCodeSendButton.disabled = true;
+    emailVerificationGroup.hidden = true;
+    emailCodeInput.value = '';
+    emailVerificationMessage.innerText = '';
+    emailVerificationMessage.className = 'form-help';
+    signupSubmitButton.disabled = true;
+  }
+
+  function csrfHeaders() {
+    const csrfInput = document.querySelector('input[name="_csrf"]');
+    return csrfInput ? {'X-CSRF-TOKEN': csrfInput.value} : {};
+  }
+
+  async function requestEmailVerification(url, body) {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', ...csrfHeaders()},
+      body: JSON.stringify(body)
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || '이메일 인증 처리 중 오류가 발생했습니다.');
+    }
+    return data;
+  }
 
   function updateEmailFormatMessage() {
     const email = emailInput.value.trim();
@@ -133,6 +183,7 @@
   });
 
   emailInput.addEventListener('input', () => {
+    resetEmailVerification();
     emailResultMessage.innerText = "";
     emailResultMessage.className = "form-help";
     if (emailFormatTouched) {
@@ -163,12 +214,71 @@
               emailResultMessage.className = data.available
                       ? "form-success"
                       : "form-error";
+              if (data.available) {
+                availableEmail = email;
+                emailCodeSendButton.disabled = false;
+              } else {
+                resetEmailVerification();
+              }
             })
             .catch(error => {
               console.error('Error:', error);
               alert("중복 확인 중 오류가 발생했습니다.");
             });
   }
+
+  emailCodeSendButton.addEventListener('click', async () => {
+    const email = emailInput.value.trim();
+    if (!availableEmail || email !== availableEmail) {
+      emailResultMessage.innerText = '이메일 중복 확인을 먼저 완료해 주세요.';
+      emailResultMessage.className = 'form-error';
+      return;
+    }
+    emailCodeSendButton.disabled = true;
+    try {
+      const data = await requestEmailVerification('/email-verifications/signup/send', {email});
+      emailVerificationGroup.hidden = false;
+      emailVerificationMessage.innerText = data.message;
+      emailVerificationMessage.className = 'form-success';
+      emailCodeInput.focus();
+      window.setTimeout(() => {
+        if (verifiedEmail !== email) emailCodeSendButton.disabled = false;
+      }, 60000);
+    } catch (error) {
+      emailVerificationMessage.innerText = error.message;
+      emailVerificationMessage.className = 'form-error';
+      emailVerificationGroup.hidden = false;
+      emailCodeSendButton.disabled = false;
+    }
+  });
+
+  emailCodeVerifyButton.addEventListener('click', async () => {
+    const email = emailInput.value.trim();
+    const code = emailCodeInput.value.trim();
+    try {
+      const data = await requestEmailVerification(
+              '/email-verifications/signup/verify', {email, code});
+      verifiedEmail = email;
+      emailVerificationMessage.innerText = data.message;
+      emailVerificationMessage.className = 'form-success';
+      emailInput.readOnly = true;
+      emailCodeInput.readOnly = true;
+      emailCodeVerifyButton.disabled = true;
+      emailCodeSendButton.disabled = true;
+      signupSubmitButton.disabled = false;
+    } catch (error) {
+      emailVerificationMessage.innerText = error.message;
+      emailVerificationMessage.className = 'form-error';
+    }
+  });
+
+  signupForm.addEventListener('submit', (event) => {
+    if (verifiedEmail !== emailInput.value.trim()) {
+      event.preventDefault();
+      emailVerificationMessage.innerText = '이메일 인증을 완료해 주세요.';
+      emailVerificationMessage.className = 'form-error';
+    }
+  });
 </script>
 <script>
   const passwordInput = document.getElementById('signup-password');

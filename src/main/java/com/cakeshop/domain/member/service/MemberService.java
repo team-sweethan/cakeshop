@@ -29,20 +29,23 @@ public class MemberService {
     private final MemberMapper memberMapper;
     private final PasswordEncoder passwordEncoder;
     private final CouponMemberCommandService couponMemberCommandService;
+    private final EmailVerificationService emailVerificationService;
 
     /**
      * 회원가입 로직
      */
     @Transactional
     public void join(SignupForm form) {
-        if (memberMapper.findByEmail(form.getEmail()).isPresent()) {
+        String email = form.getEmail().trim().toLowerCase(java.util.Locale.ROOT);
+        if (memberMapper.findByEmail(email).isPresent()) {
             throw new BusinessException(MemberErrorCode.DUPLICATE_EMAIL);
         }
+        emailVerificationService.consumeSignupVerification(email);
 
         String encodedPassword = passwordEncoder.encode(form.getPassword());
 
         Member member = Member.builder()
-                .email(form.getEmail())
+                .email(email)
                 .password(encodedPassword)
                 .name(form.getName())
                 .nickname(form.getNickname())
