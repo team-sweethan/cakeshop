@@ -17,10 +17,26 @@ package com.cakeshop.domain.community.dto.view;
 public enum PostSort {
 
     /** 최신순. 기본값이다. */
-    LATEST,
+    LATEST("LATEST", "최신순"),
 
     /** 조회수 많은 순. */
-    VIEWS;
+    VIEWS("VIEWS", "조회수순");
+
+    private final String parameter;
+    private final String label;
+
+    PostSort(String parameter, String label) {
+        this.parameter = parameter;
+        this.label = label;
+    }
+
+    public String getParameter() {
+        return parameter;
+    }
+
+    public String getLabel() {
+        return label;
+    }
 
     /** 주소에서 받은 값을 정렬 기준으로 바꾼다. 모르는 값과 빈 값은 기본값이다. */
     public static PostSort from(String value) {

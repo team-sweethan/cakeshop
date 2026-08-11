@@ -1,4 +1,4 @@
-package com.cakeshop.domain.community.dto.view;
+package com.cakeshop.domain.community.dto.query;
 
 import com.cakeshop.domain.community.entity.CommentStatus;
 

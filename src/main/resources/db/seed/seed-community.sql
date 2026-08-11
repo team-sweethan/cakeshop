@@ -16,7 +16,7 @@
 --     < src/main/resources/db/seed/seed-community.sql
 --
 -- 확인용 경로 (id 는 재실행해도 그대로다)
---   /community              목록 2페이지, 카테고리 필터, 탈퇴 회원 표시
+--   /community              목록 2페이지, 카테고리 필터, 탈퇴 회원 표시, 상단 인기글
 --   /community/33           댓글 25건 — "이전 댓글 더 보기", 오래된 순 정렬, (수정됨) 표시
 --   /community/34           본문 HTML 이스케이프와 줄바꿈, 댓글 수(삭제 댓글 제외), 자리 표시
 --   /community/35           차단된 글 — 비로그인은 404, 작성자(user@cakeshop.local)는 사유 표시
@@ -25,6 +25,41 @@
 -- id 가 1..36 사이에서 띄엄띄엄한 것은 정상이다. InnoDB 는 INSERT ... SELECT 처럼
 -- 행 수를 미리 모르는 삽입에서 auto_increment 를 넉넉히 잡아 두어 빈 번호가 생긴다.
 -- 매번 같은 값이 나오므로 위 경로는 안정적이다.
+
+-- ---------------------------------------------------------------------------
+-- 기준 시각 — 아래 모든 시각은 실행한 날에서 거꾸로 센다.
+--
+-- 고정 날짜를 박아 두면 인기글이 **시드를 고치지 않는 한 언젠가 반드시 사라진다.**
+-- 배치는 대상일 기준 7일 창만 집계하므로(DOMAIN.md 6.9), 박아 둔 날짜가 창을 벗어난
+-- 다음 날부터 로컬의 인기글 영역이 통째로 비고 — 그런데 화면은 "활동이 없는 정상 상태"
+-- 와 똑같이 생겨서(그릴 것이 없으면 영역이 통째로 사라진다, 6.9) 시드가 낡은 것인지
+-- 기능이 깨진 것인지 구분되지 않는다.
+--
+-- 활동을 어제에 두는 이유: 배치의 대상일은 언제나 **전날**이다(PLAN.md D3). 활동을
+-- 오늘에 두면 오늘 밤 배치가 도는 대상일(오늘)에는 들어가지만, 아래 8절이 미리 확정해
+-- 두는 어제치에는 한 건도 안 잡혀 시드 직후 화면이 빈다.
+--
+-- 글은 활동보다 하루 앞에 둔다. 창이 보는 것은 활동(post_views·post_likes·comments)의
+-- created_at 뿐이라 글 날짜는 창과 무관하고, 하루 벌려 두어야 목록의 작성일과 활동일이
+-- 눈으로 갈린다.
+--
+-- 시드를 다시 깔지 않아도 **엿새는 버틴다.** 활동이 어제에 있으므로 이후 배치가 매일
+-- 새 대상일로 돌아도 창(대상일 −6일)에 계속 걸린다. 이레째부터는 빈다 — 그때는 활동이
+-- 실제로 오래된 것이므로 6.9 대로 안 보이는 것이 맞다.
+--
+-- 세션 시간대를 고정하는 이유: CURDATE() 는 DB 세션 시간대를 따른다. 앱은 JDBC URL 로
+-- +09:00 을 걸지만(application.yml, PLAN.md D10) 이 파일은 mariadb CLI 로 직접 실행되고
+-- 그 세션은 서버 기본값(대개 UTC)을 쓴다. 그대로 두면 한국 시각 오전 9시 이전에 시드를
+-- 깐 날 '어제' 가 하루 밀려, 배치가 넘기는 날짜와 어긋난다.
+-- ---------------------------------------------------------------------------
+
+SET time_zone = '+09:00';
+
+SET @today        := CURDATE();
+-- 활동(조회·좋아요·댓글)이 일어난 날이자 8절이 확정하는 인기글의 대상일이다.
+SET @activity_day := @today - INTERVAL 1 DAY;
+-- 글이 올라온 날.
+SET @posted_day   := @today - INTERVAL 2 DAY;
 
 -- ---------------------------------------------------------------------------
 -- 0. 초기화 — 커뮤니티 데이터만 자식 → 부모 순으로 지운다.
@@ -40,6 +75,7 @@ DELETE FROM `post_views`;
 DELETE FROM `daily_popular_posts`;
 -- 실행 기록에는 FK 가 없지만 함께 지운다. 남겨 두면 글을 새로 깔아도 배치가
 -- "이미 확정한 날짜" 로 판단해 건너뛰어서(D4) 인기글이 채워지지 않는다.
+-- 지운 자리는 8절이 어제치로 다시 채운다.
 DELETE FROM `popular_post_batch_runs`;
 DELETE FROM `comments`;
 DELETE FROM `posts`;
@@ -92,7 +128,7 @@ INSERT INTO `members` (`email`, `password`, `name`, `nickname`, `phone`,
 SELECT 'withdrawn@cakeshop.local',
        '$2a$10$wRIE78x8sm..uLtbp9LHde7l6wUWQD3NjPvThQaXvZ3PpXfW6wwX.',
        '탈퇴회원', '떠난회원', '010-0000-0003',
-       'USER', 'WITHDRAWN', '2026-07-20 09:00:00'
+       'USER', 'WITHDRAWN', TIMESTAMP(@posted_day - INTERVAL 5 DAY, '09:00:00')
  WHERE NOT EXISTS (
         SELECT 1 FROM `members` WHERE `email` = 'withdrawn@cakeshop.local'
        );
@@ -121,8 +157,8 @@ SELECT @member_id,
        'PUBLISHED',
        seq * 3,
        0,
-       DATE_ADD('2026-07-25 09:00:00', INTERVAL seq MINUTE),
-       DATE_ADD('2026-07-25 09:00:00', INTERVAL seq MINUTE)
+       DATE_ADD(TIMESTAMP(@posted_day, '09:00:00'), INTERVAL seq MINUTE),
+       DATE_ADD(TIMESTAMP(@posted_day, '09:00:00'), INTERVAL seq MINUTE)
   FROM (
         SELECT 1 AS seq UNION ALL SELECT 2  UNION ALL SELECT 3  UNION ALL SELECT 4
         UNION ALL SELECT 5  UNION ALL SELECT 6  UNION ALL SELECT 7  UNION ALL SELECT 8
@@ -140,7 +176,7 @@ VALUES (@withdrawn_id, @review_id,
         '탈퇴한 회원이 남긴 후기입니다',
         '작성자는 탈퇴했지만 글은 남는다. 표시명만 가린다.',
         'PUBLISHED', 12, 0,
-        '2026-07-25 09:30:00', '2026-07-25 09:30:00');
+        TIMESTAMP(@posted_day, '09:30:00'), TIMESTAMP(@posted_day, '09:30:00'));
 
 -- 수정된 글: updated_at 이 created_at 보다 뒤면 화면에 "(수정됨)"이 붙는다(DOMAIN.md 6.3).
 -- 조회수 증가로는 이 값이 바뀌지 않아야 한다.
@@ -150,7 +186,7 @@ VALUES (@member_id, @qna_id,
         '한 번 수정한 글입니다',
         '수정 표시를 확인하는 글이다.',
         'PUBLISHED', 7, 0,
-        '2026-07-25 09:35:00', '2026-07-26 11:00:00');
+        TIMESTAMP(@posted_day, '09:35:00'), TIMESTAMP(@activity_day, '11:00:00'));
 
 -- 본문은 순수 텍스트다. HTML 이 실행되지 않고 줄바꿈이 유지되어야 한다(DOMAIN.md 7).
 INSERT INTO `posts` (`member_id`, `category_id`, `title`, `content`, `status`,
@@ -159,7 +195,7 @@ VALUES (@member_id, @free_id,
         'HTML 이스케이프 확인용 글',
         '아래 줄은 스크립트 태그다.\n<script>alert("xss")</script>\n\n빈 줄도 유지되어야 한다.',
         'PUBLISHED', 5, 0,
-        '2026-07-25 09:40:00', '2026-07-25 09:40:00');
+        TIMESTAMP(@posted_day, '09:40:00'), TIMESTAMP(@posted_day, '09:40:00'));
 
 -- 차단된 글: 남에게는 404, 작성자에게는 본문과 사유가 보여야 한다(DOMAIN.md 4.3).
 INSERT INTO `posts` (`member_id`, `category_id`, `title`, `content`, `status`,
@@ -170,8 +206,8 @@ VALUES (@member_id, @free_id,
         '차단된 글',
         '관리자가 차단한 글의 본문이다.',
         'BLOCKED', 3, 0,
-        '2026-07-26 10:00:00', '광고성 게시물로 판단되어 차단되었습니다.', @admin_id,
-        '2026-07-25 09:45:00', '2026-07-25 09:45:00');
+        TIMESTAMP(@activity_day, '10:00:00'), '광고성 게시물로 판단되어 차단되었습니다.', @admin_id,
+        TIMESTAMP(@posted_day, '09:45:00'), TIMESTAMP(@posted_day, '09:45:00'));
 
 -- 삭제된 글: 작성자에게도 404다. 목록에도 나오지 않는다.
 INSERT INTO `posts` (`member_id`, `category_id`, `title`, `content`, `status`,
@@ -180,7 +216,7 @@ VALUES (@member_id, @free_id,
         '삭제된 글',
         '작성자가 삭제한 글의 본문이다.',
         'DELETED', 2, 0,
-        '2026-07-25 09:50:00', '2026-07-25 09:50:00');
+        TIMESTAMP(@posted_day, '09:50:00'), TIMESTAMP(@posted_day, '09:50:00'));
 
 -- ---------------------------------------------------------------------------
 -- 4. 댓글
@@ -195,13 +231,13 @@ SET @withdrawn_post_id := (SELECT `id` FROM `posts` WHERE `title` = '탈퇴한 �
 
 INSERT INTO `comments` (`post_id`, `member_id`, `content`, `status`, `created_at`, `updated_at`)
 VALUES (@escaped_post_id, @member_id, '첫 번째 댓글입니다.', 'PUBLISHED',
-        '2026-07-26 10:00:00', '2026-07-26 10:00:00'),
+        TIMESTAMP(@activity_day, '10:00:00'), TIMESTAMP(@activity_day, '10:00:00')),
        (@escaped_post_id, @admin_id, '두 번째 댓글입니다.', 'PUBLISHED',
-        '2026-07-26 10:01:00', '2026-07-26 10:01:00'),
+        TIMESTAMP(@activity_day, '10:01:00'), TIMESTAMP(@activity_day, '10:01:00')),
        (@escaped_post_id, @member_id, '지워진 댓글의 본문입니다.', 'DELETED',
-        '2026-07-26 10:02:00', '2026-07-26 10:02:00'),
+        TIMESTAMP(@activity_day, '10:02:00'), TIMESTAMP(@activity_day, '10:02:00')),
        (@withdrawn_post_id, @admin_id, '탈퇴 회원 글에 달린 댓글입니다.', 'PUBLISHED',
-        '2026-07-26 10:03:00', '2026-07-26 10:03:00');
+        TIMESTAMP(@activity_day, '10:03:00'), TIMESTAMP(@activity_day, '10:03:00'));
 
 -- "이전 댓글 더 보기"는 댓글이 한 화면 분량(20건)을 넘어야 나타난다(DOMAIN.md 6.4).
 -- 넘는 글이 하나도 없으면 그 블록을 로컬에서 볼 방법이 없다. 25건을 넣어 두면
@@ -217,8 +253,8 @@ SELECT @many_comment_post_id,
        CASE WHEN seq % 2 = 0 THEN @admin_id ELSE @member_id END,
        CONCAT('더보기 확인용 댓글 ', LPAD(seq, 2, '0')),
        'PUBLISHED',
-       DATE_ADD('2026-07-26 13:00:00', INTERVAL seq MINUTE),
-       DATE_ADD('2026-07-26 13:00:00', INTERVAL seq MINUTE)
+       DATE_ADD(TIMESTAMP(@activity_day, '13:00:00'), INTERVAL seq MINUTE),
+       DATE_ADD(TIMESTAMP(@activity_day, '13:00:00'), INTERVAL seq MINUTE)
   FROM (
         SELECT 1 AS seq UNION ALL SELECT 2  UNION ALL SELECT 3  UNION ALL SELECT 4
         UNION ALL SELECT 5  UNION ALL SELECT 6  UNION ALL SELECT 7  UNION ALL SELECT 8
@@ -237,7 +273,7 @@ SELECT @many_comment_post_id,
 -- ---------------------------------------------------------------------------
 
 INSERT INTO `post_likes` (`post_id`, `member_id`, `created_at`)
-SELECT p.`id`, m.`id`, '2026-07-26 12:00:00'
+SELECT p.`id`, m.`id`, TIMESTAMP(@activity_day, '12:00:00')
   FROM `posts` p
   CROSS JOIN `members` m
  WHERE p.`status` = 'PUBLISHED'
@@ -276,7 +312,7 @@ UPDATE `posts` p
 INSERT INTO `post_views` (`post_id`, `viewer_key`, `created_at`)
 SELECT p.`id`,
        CONCAT('S:seed-', nums.`n`),
-       '2026-07-26 12:00:00'
+       TIMESTAMP(@activity_day, '12:00:00')
   FROM `posts` p
   JOIN (
         SELECT (tens.`n` - 1) * 10 + ones.`n` AS `n`
@@ -326,7 +362,7 @@ SELECT r.`post_id`,
        IF(p.`member_id` = @member_id, @admin_id, @member_id),
        r.`reason`,
        r.`status`,
-       '2026-07-26 15:00:00'
+       TIMESTAMP(@activity_day, '15:00:00')
   FROM (
         SELECT @pending_report_post_id  AS `post_id`,
                '광고성 링크가 반복해서 올라옵니다.' AS `reason`, 'PENDING'  AS `status`
@@ -340,11 +376,98 @@ SELECT r.`post_id`,
   JOIN `posts` p ON p.`id` = r.`post_id`;
 
 -- ---------------------------------------------------------------------------
--- 8. 확인
+-- 8. 인기글 확정 스냅샷
+--
+-- 배치가 어제치를 이미 돌린 상태를 만든다. 이 절이 없으면 시드 직후 인기글 영역이
+-- **비어 있는 것이 정상**이다 — 화면은 확정된 스냅샷만 읽고(DOMAIN.md 6.9), 배치는
+-- 다음 날 00:05 에야 처음 돈다(PLAN.md D3). 로컬에서 하루를 기다릴 수는 없다.
+--
+-- ▸ 집계식의 정본은 여기가 아니다
+--
+-- 아래 SELECT 는 CommunityMapper.xml 의 insertDailyRanking 을 그대로 옮긴 것이고,
+-- 가중치(1·25·15)와 창 경계와 PUBLISHED 조건이 전부 그쪽 정본을 따른다. **정본이
+-- 바뀌면 이 절도 함께 고쳐야 한다** — 갈라져도 시드는 조용히 성공하고 로컬 순위만
+-- 운영과 달라진다. 재현하지 않고 손으로 고른 순위를 넣지 않는 이유가 그것이다.
+-- 순위가 왜 그 순서인지 로컬에서 설명되지 않으면 확인용 데이터가 아니다.
+--
+-- ▸ 배치가 이 날짜를 다시 돌리지 않는다
+--
+-- 실행 기록을 함께 남기므로 D4(확정된 날짜는 재집계하지 않는다)에 따라 오늘 밤
+-- 배치는 어제를 건너뛴다. 그것이 맞다 — 여기서 넣은 것이 곧 그날의 확정 결과다.
+-- 0절이 두 표를 함께 지우는 것과 짝이다.
+-- ---------------------------------------------------------------------------
+
+INSERT INTO `daily_popular_posts`
+        (`ranking_date`, `ranking`, `post_id`, `popularity_score`,
+         `view_count`, `like_count`, `comment_count`)
+SELECT @activity_day,
+       ROW_NUMBER() OVER (ORDER BY s.`popularity_score` DESC, s.`post_id` DESC),
+       s.`post_id`,
+       s.`popularity_score`,
+       s.`view_count`,
+       s.`like_count`,
+       s.`comment_count`
+  FROM (
+        SELECT e.`post_id`,
+               SUM(e.`view_count`)    AS `view_count`,
+               SUM(e.`like_count`)    AS `like_count`,
+               SUM(e.`comment_count`) AS `comment_count`,
+               SUM(e.`view_count`) * 1
+                 + SUM(e.`like_count`) * 25
+                 + SUM(e.`comment_count`) * 15 AS `popularity_score`
+          FROM (
+                SELECT `post_id`, 1 AS `view_count`, 0 AS `like_count`, 0 AS `comment_count`
+                  FROM `post_views`
+                 WHERE `created_at` >= @activity_day - INTERVAL 6 DAY
+                   AND `created_at` <  @activity_day + INTERVAL 1 DAY
+
+                UNION ALL
+
+                SELECT `post_id`, 0, 1, 0
+                  FROM `post_likes`
+                 WHERE `created_at` >= @activity_day - INTERVAL 6 DAY
+                   AND `created_at` <  @activity_day + INTERVAL 1 DAY
+
+                UNION ALL
+
+                -- 댓글은 건수가 아니라 **쓴 사람 수**다(DOMAIN.md 6.9). 25건짜리 글이
+                -- 계수 15 를 25번 받으면 나머지 신호가 통째로 묻힌다.
+                SELECT `post_id`, 0, 0, 1
+                  FROM (
+                        SELECT `post_id`, `member_id`
+                          FROM `comments`
+                         WHERE `status` = 'PUBLISHED'
+                           AND `created_at` >= @activity_day - INTERVAL 6 DAY
+                           AND `created_at` <  @activity_day + INTERVAL 1 DAY
+                         GROUP BY `post_id`, `member_id`
+                       ) commenters
+               ) e
+
+          -- 선정 단계에서도 노출 중인 글만 본다. 지운 글도 활동 이력은 그대로 남아
+          -- 있어서(DOMAIN.md 4.5) 안 거르면 상위 20칸을 먹는다.
+          JOIN `posts` p
+            ON p.`id` = e.`post_id`
+           AND p.`status` = 'PUBLISHED'
+
+         GROUP BY e.`post_id`
+         ORDER BY `popularity_score` DESC, e.`post_id` DESC
+         LIMIT 20
+       ) s;
+
+-- 순위 행 수를 다시 세어 기록한다. ROW_COUNT() 를 쓰지 않는 것은 중간에 문장이 하나만
+-- 끼어도 값이 조용히 바뀌기 때문이다.
+INSERT INTO `popular_post_batch_runs` (`ranking_date`, `post_count`)
+SELECT @activity_day, COUNT(*)
+  FROM `daily_popular_posts`
+ WHERE `ranking_date` = @activity_day;
+
+-- ---------------------------------------------------------------------------
+-- 9. 확인
 --
 -- 조회수불일치 는 반드시 0 이어야 한다. 0 이 아니면 view_count 와 post_views 가
 -- 갈라진 것이고, 그 상태의 조회수는 순위에 쓸 수 없다(DOMAIN.md 6.2).
 -- 수정표시글 은 1 이다 — '한 번 수정한 글입니다' 하나뿐이어야 한다.
+-- 인기글 은 0 이면 안 된다. 0 이면 화면에서 영역이 통째로 사라진다(DOMAIN.md 6.9).
 -- ---------------------------------------------------------------------------
 
 SELECT (SELECT COUNT(*) FROM `post_categories` WHERE `is_active` = 1) AS `활성카테고리`,
@@ -359,4 +482,6 @@ SELECT (SELECT COUNT(*) FROM `post_categories` WHERE `is_active` = 1) AS `활성
        (SELECT COUNT(*) FROM `posts` p
          WHERE p.`view_count` <> (SELECT COUNT(*) FROM `post_views` pv
                                    WHERE pv.`post_id` = p.`id`))      AS `조회수불일치`,
-       (SELECT COUNT(*) FROM `posts` WHERE `updated_at` > `created_at`) AS `수정표시글`;
+       (SELECT COUNT(*) FROM `posts` WHERE `updated_at` > `created_at`) AS `수정표시글`,
+       (SELECT COUNT(*) FROM `daily_popular_posts`)                   AS `인기글`,
+       (SELECT MAX(`ranking_date`) FROM `popular_post_batch_runs`)    AS `인기글확정일`;

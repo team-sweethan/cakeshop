@@ -129,7 +129,8 @@ class CommunityControllerTests {
         mockMvc.perform(request)
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("selectedCategoryId", expectedCategoryId))
-                .andExpect(model().attribute("selectedSort", expectedSort));
+                .andExpect(model().attribute("selectedSort", expectedSort))
+                .andExpect(model().attributeExists("sortOptions"));
 
         verify(communityService).getPosts(eq(expectedCategoryId), eq(expectedSort), any());
         assertThat(capturedPageRequest().getPage()).isEqualTo(expectedPage);

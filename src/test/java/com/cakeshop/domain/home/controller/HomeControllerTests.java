@@ -9,14 +9,22 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.cakeshop.domain.community.dto.view.PopularPostView;
+import com.cakeshop.domain.community.dto.view.PopularSectionView;
 import com.cakeshop.domain.home.service.HomeService;
 import com.cakeshop.domain.store.dto.view.StorePublicView;
+import java.time.LocalDate;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 class HomeControllerTests {
+
+    private static final PopularSectionView POPULAR_SECTION = new PopularSectionView(
+            LocalDate.of(2026, 3, 9),
+            List.of(new PopularPostView(1, 11L, "질문", "인기글 제목")));
 
     private MockMvc mockMvc;
 
@@ -27,7 +35,15 @@ class HomeControllerTests {
             "스위트온 케이크", "소개", "/uploads/store/202607/photo.jpg", "서울시", "02-0000-0000",
             "평일 10:00 ~ 20:00", "일요일 휴무", "1층", "10:00 ~ 19:00"
         ));
+        when(homeService.getPopularSection()).thenReturn(POPULAR_SECTION);
         mockMvc = MockMvcBuilders.standaloneSetup(new HomeController(homeService)).build();
+    }
+
+    @Test
+    void home_addsPopularSectionToModel() throws Exception {
+        mockMvc.perform(get("/"))
+            .andExpect(status().isOk())
+            .andExpect(model().attribute("popularSection", POPULAR_SECTION));
     }
 
     @Test

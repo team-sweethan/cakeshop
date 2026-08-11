@@ -1,30 +1,28 @@
 package com.cakeshop.domain.community.service;
 
-import java.time.Clock;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import lombok.RequiredArgsConstructor;
+
+import com.cakeshop.domain.community.dto.command.PostUpdateCommand;
 import com.cakeshop.domain.community.dto.form.CommentForm;
 import com.cakeshop.domain.community.dto.form.PostForm;
 import com.cakeshop.domain.community.dto.form.ReportForm;
-import com.cakeshop.domain.community.dto.view.CommentCountView;
+import com.cakeshop.domain.community.dto.query.CommentCountRow;
 import com.cakeshop.domain.community.dto.view.CommentSectionView;
-import com.cakeshop.domain.community.dto.view.CommentRow;
+import com.cakeshop.domain.community.dto.query.CommentRow;
 import com.cakeshop.domain.community.dto.view.CommentView;
-import com.cakeshop.domain.community.dto.view.PopularPostView;
 import com.cakeshop.domain.community.dto.view.PopularSectionView;
 import com.cakeshop.domain.community.dto.view.PostCategoryView;
-import com.cakeshop.domain.community.dto.view.PostDetailRow;
+import com.cakeshop.domain.community.dto.query.PostDetailRow;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
-import com.cakeshop.domain.community.dto.view.PostListRow;
+import com.cakeshop.domain.community.dto.query.PostListRow;
 import com.cakeshop.domain.community.dto.view.PostListView;
-import com.cakeshop.domain.community.dto.view.PostLockView;
+import com.cakeshop.domain.community.dto.query.PostLockRow;
 import com.cakeshop.domain.community.dto.view.PostSort;
 import com.cakeshop.domain.community.entity.Comment;
 import com.cakeshop.domain.community.entity.CommentStatus;
@@ -38,8 +36,6 @@ import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,29 +50,17 @@ import org.springframework.transaction.annotation.Transactional;
  * ******************************
  */
 @Service
+@RequiredArgsConstructor
 public class CommunityService {
 
-    private static final Logger log = LoggerFactory.getLogger(CommunityService.class);
-
+    /* 목록 화면이 쓰는 건수. 메인은 다른 값을 쓴다(`CommunityHomeQueryService`). */
     private static final int POPULAR_POST_LIMIT = 10;
 
     private static final int FIRST_PAGE = 1;
 
-    private static final LocalTime STALE_WARNING_GRACE_UNTIL = LocalTime.of(1, 0);
-
     private final CommunityMapper communityMapper;
     private final MemberCommunityQueryService memberCommunityQueryService;
-    private final Clock clock;
-
-    public CommunityService(
-            CommunityMapper communityMapper,
-            MemberCommunityQueryService memberCommunityQueryService,
-            Clock clock
-    ) {
-        this.communityMapper = communityMapper;
-        this.memberCommunityQueryService = memberCommunityQueryService;
-        this.clock = clock;
-    }
+    private final PopularPostReader popularPostReader;
 
     @Transactional(readOnly = true)
     public PageResult<PostListView> getPosts(
@@ -109,41 +93,7 @@ public class CommunityService {
             return PopularSectionView.empty();
         }
 
-        LocalDate rankingDate = communityMapper.findLatestRankingDate();
-
-        if (rankingDate == null) {
-            return PopularSectionView.empty();
-        }
-
-        warnIfRankingIsStale(rankingDate);
-
-        List<PopularPostView> popularPosts =
-                communityMapper.findPopularPosts(rankingDate, POPULAR_POST_LIMIT);
-
-        if (popularPosts.isEmpty()) {
-            return PopularSectionView.empty();
-        }
-
-        return new PopularSectionView(rankingDate, popularPosts);
-    }
-
-    private void warnIfRankingIsStale(LocalDate rankingDate) {
-        LocalDateTime now = LocalDateTime.now(clock);
-
-        if (!rankingDate.isBefore(now.toLocalDate().minusDays(1))) {
-            return;
-        }
-
-        if (now.toLocalTime().isBefore(STALE_WARNING_GRACE_UNTIL)) {
-            return;
-        }
-
-        log.warn(
-                "인기글 확정 날짜가 어제보다 오래됐습니다. 배치가 돌지 않았을 수 있습니다."
-                        + " latestRankingDate={}, now={}",
-                rankingDate,
-                now
-        );
+        return popularPostReader.read(POPULAR_POST_LIMIT);
     }
 
     @Transactional
@@ -191,7 +141,7 @@ public class CommunityService {
         requireEditablePost(postId, editorId);
         requireActiveCategory(form.getCategoryId());
 
-        Post post = Post.edit(
+        PostUpdateCommand command = new PostUpdateCommand(
                 postId,
                 editorId,
                 form.getCategoryId(),
@@ -199,7 +149,7 @@ public class CommunityService {
                 form.getContent()
         );
 
-        requireApplied(communityMapper.updatePost(post), postId, editorId);
+        requireApplied(communityMapper.updatePost(command), postId, editorId);
     }
 
     @Transactional
@@ -214,7 +164,7 @@ public class CommunityService {
         int limit = CommentSectionView.clampLimit(requestedLimit);
 
         List<CommentRow> rows = communityMapper.findRecentComments(postId, limit);
-        CommentCountView counts = communityMapper.countComments(postId);
+        CommentCountRow counts = communityMapper.countComments(postId);
 
         Map<Long, MemberCommunityView> authors =
                 findAuthors(rows.stream().map(CommentRow::memberId).toList());
@@ -315,7 +265,7 @@ public class CommunityService {
     }
 
     private void requireLikeablePost(long postId, long memberId) {
-        PostLockView post = communityMapper.lockPost(postId);
+        PostLockRow post = communityMapper.lockPost(postId);
 
         if (post == null
                 || post.status() == PostStatus.DELETED
