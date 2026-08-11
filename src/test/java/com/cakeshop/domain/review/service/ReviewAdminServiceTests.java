@@ -199,8 +199,8 @@ class ReviewAdminServiceTests {
 
         verify(memberReviewQueryService, never()).findMemberIdsByNickname(any());
         verify(orderReviewQueryService, never()).findOrderItemIdsByProductName(any());
-        assertThat(capturedFilter().memberIds()).isNull();
-        assertThat(capturedFilter().orderItemIds()).isNull();
+        assertThat(capturedFilter().getMemberIds()).isNull();
+        assertThat(capturedFilter().getOrderItemIds()).isNull();
     }
 
     @Test
@@ -211,7 +211,7 @@ class ReviewAdminServiceTests {
         PageResult<AdminReviewListView> result = reviewAdminService.getReviews(
                 "없는사람", null, AdminReviewRating.ALL, null, new PageRequest(null, null));
 
-        assertThat(capturedFilter().memberIds())
+        assertThat(capturedFilter().getMemberIds())
                 .as("빈 목록은 조건 없음이 아니라 '일치하는 회원이 없다'는 답이다")
                 .isNotNull()
                 .isEmpty();
@@ -230,10 +230,10 @@ class ReviewAdminServiceTests {
                 new PageRequest(null, null));
 
         AdminReviewFilter filter = capturedFilter();
-        assertThat(filter.memberIds()).containsExactly(1L, 2L);
-        assertThat(filter.orderItemIds()).containsExactly(11L);
-        assertThat(filter.rating()).isEqualTo(AdminReviewRating.FIVE);
-        assertThat(filter.status()).isEqualTo(ReviewStatus.BLOCKED);
+        assertThat(filter.getMemberIds()).containsExactly(1L, 2L);
+        assertThat(filter.getOrderItemIds()).containsExactly(11L);
+        assertThat(filter.getRating()).isEqualTo(AdminReviewRating.FIVE);
+        assertThat(filter.getStatus()).isEqualTo(ReviewStatus.BLOCKED);
     }
 
     @Test
@@ -265,8 +265,8 @@ class ReviewAdminServiceTests {
         assertThat(result.getContent())
                 .singleElement()
                 .satisfies(view -> {
-                    assertThat(view.authorName()).isEqualTo("탈퇴한 회원");
-                    assertThat(view.productName()).isEqualTo("딸기 케이크");
+                    assertThat(view.getAuthorName()).isEqualTo("탈퇴한 회원");
+                    assertThat(view.getProductName()).isEqualTo("딸기 케이크");
                 });
     }
 
@@ -290,7 +290,7 @@ class ReviewAdminServiceTests {
         AdminReviewDetailView detail = reviewAdminService.getReviewDetail(REVIEW_ID);
 
         assertThat(detail.isBlocked()).isTrue();
-        assertThat(detail.orderNumber()).isEqualTo("20260809-0001");
+        assertThat(detail.getOrderNumber()).isEqualTo("20260809-0001");
     }
 
     private AdminReviewFilter capturedFilter() {
