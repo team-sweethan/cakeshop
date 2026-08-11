@@ -217,6 +217,20 @@ class ScreenRenderingTests {
         value = "user@cakeshop.local",
         userDetailsServiceBeanName = "memberDetailsService"
     )
+    void myPage_linksToOrderListWithoutMockOrders() throws Exception {
+        mockMvc.perform(get("/mypage"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("href=\"/orders\"")))
+            .andExpect(content().string(not(containsString("/orders/1"))))
+            .andExpect(content().string(not(containsString("ORD-001"))))
+            .andExpect(content().string(not(containsString("ORD-004"))));
+    }
+
+    @Test
+    @WithUserDetails(
+        value = "user@cakeshop.local",
+        userDetailsServiceBeanName = "memberDetailsService"
+    )
     void customProductDetail_showsCustomOptionFlowWithoutServerCartForm() throws Exception {
         mockMvc.perform(get("/products/6"))
             .andExpect(status().isOk())
