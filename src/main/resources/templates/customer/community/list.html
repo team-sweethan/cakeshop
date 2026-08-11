@@ -63,12 +63,10 @@
 
     <div class="cluster section">
       <a class="btn"
-         th:classappend="${selectedSort.name() == 'LATEST'} ? ' is-active'"
-         th:href="@{/community(categoryId=${selectedCategoryId}, sort='LATEST')}">최신순</a>
-
-      <a class="btn"
-         th:classappend="${selectedSort.name() == 'VIEWS'} ? ' is-active'"
-         th:href="@{/community(categoryId=${selectedCategoryId}, sort='VIEWS')}">조회수순</a>
+         th:each="sortOption : ${sortOptions}"
+         th:classappend="${selectedSort == sortOption} ? ' is-active'"
+         th:href="@{/community(categoryId=${selectedCategoryId}, sort=${sortOption.parameter})}"
+         th:text="${sortOption.label}">정렬</a>
     </div>
 
     <div class="stack">

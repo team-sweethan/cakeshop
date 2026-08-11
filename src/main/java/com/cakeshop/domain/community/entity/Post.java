@@ -35,8 +35,4 @@ public class Post {
         return new Post(null, memberId, categoryId, title, content);
     }
 
-    public static Post edit(
-            Long id, Long memberId, Long categoryId, String title, String content) {
-        return new Post(id, memberId, categoryId, title, content);
-    }
 }

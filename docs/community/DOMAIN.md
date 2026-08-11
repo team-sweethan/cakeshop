@@ -46,7 +46,7 @@
 | **B2** | 게시글 상세 | 누구나 | `GET /community/{id}` | **완료** | 1 | `community-read.md` |
 | **B3** | 조회수와 중복 방지 | — | (B2에 포함) | **완료** | 6 | `community-read.md` |
 | **B4** | 댓글 정렬·분량 (`더 보기`) | 누구나 | `GET /community/{id}?comments=N` | **완료** | 3 · 6 | `community-comment.md` |
-| **B5** | 인기글 영역 | 누구나 | (B1에 포함) | **완료** | 7c | `community-popular.md` |
+| **B5** | 인기글 영역 | 누구나 | (B1과 메인 `GET /`에 포함) | **완료** | 7c · 13 | `community-popular.md` |
 | **B6** | 검색 | 누구나 | (B1의 파라미터) | **없음** | 2차 | `community-read.md` |
 | **B7** | 무한 스크롤 | 누구나 | (B1의 페이징 대체) | **없음** | 2차 | `community-read.md` |
 | **C1** | 관리자 목록 | 관리자 | `GET /admin/community` | **완료** | 5 | `community-admin.md` |
@@ -54,6 +54,7 @@
 | **C3** | 차단·해제 | 관리자 | `POST /admin/community/{id}/block` · `/unblock` | **완료** | 5 | `community-admin.md` |
 | **C4** | 신고 기각 | 관리자 | `POST /admin/community/{id}/reports/reject` | **완료** | 5 | `community-admin.md` |
 | **D1** | 작성자 표시명 | — | (Service 계약) | **완료** | 10 | 이 문서 8절 |
+| **D2** | 메인 인기글 계약 | — | (Service 계약) | **완료** | 13 | `community-popular.md` |
 | **E1** | 상태 enum + `CHECK` | — | — | **완료** | 0 | 이 문서 4절 |
 | **E2** | 카테고리 주입 | — | — | **완료** | 0 | 이 문서 10절 |
 | **E3** | 인기글 집계 배치 | — | (스케줄러) | **완료** | 7b | `community-popular.md` |

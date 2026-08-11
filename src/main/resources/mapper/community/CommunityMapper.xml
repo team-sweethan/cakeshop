@@ -19,7 +19,7 @@
     </sql>
 
     <select id="findPublishedPosts"
-            resultType="com.cakeshop.domain.community.dto.view.PostListRow">
+            resultType="com.cakeshop.domain.community.dto.query.PostListRow">
 
         SELECT
         p.id,
@@ -60,7 +60,7 @@
     </select>
 
     <select id="findPostById"
-            resultType="com.cakeshop.domain.community.dto.view.PostDetailRow">
+            resultType="com.cakeshop.domain.community.dto.query.PostDetailRow">
 
         SELECT
         p.id,
@@ -140,7 +140,7 @@
         SET category_id = #{categoryId},
         title = #{title},
         content = #{content}
-        WHERE id = #{id}
+        WHERE id = #{postId}
         AND member_id = #{memberId}
         AND status = 'PUBLISHED'
     </update>
@@ -155,7 +155,7 @@
     </update>
 
     <select id="findRecentComments"
-            resultType="com.cakeshop.domain.community.dto.view.CommentRow">
+            resultType="com.cakeshop.domain.community.dto.query.CommentRow">
 
         SELECT
         c.id,
@@ -174,7 +174,7 @@
     </select>
 
     <select id="countComments"
-            resultType="com.cakeshop.domain.community.dto.view.CommentCountView">
+            resultType="com.cakeshop.domain.community.dto.query.CommentCountRow">
 
         SELECT
         COUNT(*) AS row_count,
@@ -185,7 +185,7 @@
     </select>
 
     <select id="findCommentById"
-            resultType="com.cakeshop.domain.community.dto.view.CommentRow">
+            resultType="com.cakeshop.domain.community.dto.query.CommentRow">
 
         SELECT
         c.id,
@@ -217,7 +217,7 @@
     </update>
 
     <select id="lockPost"
-            resultType="com.cakeshop.domain.community.dto.view.PostLockView">
+            resultType="com.cakeshop.domain.community.dto.query.PostLockRow">
 
         SELECT
         p.member_id,

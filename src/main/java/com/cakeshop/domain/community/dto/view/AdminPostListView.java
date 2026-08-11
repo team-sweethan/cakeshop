@@ -1,5 +1,6 @@
 package com.cakeshop.domain.community.dto.view;
 
+import com.cakeshop.domain.community.dto.query.AdminPostListRow;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.member.dto.view.MemberCommunityView;
 

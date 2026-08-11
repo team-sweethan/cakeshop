@@ -1,5 +1,6 @@
 package com.cakeshop.domain.community.dto.view;
 
+import com.cakeshop.domain.community.dto.query.ReportRow;
 import com.cakeshop.domain.community.entity.ReportStatus;
 import com.cakeshop.domain.member.dto.view.MemberCommunityView;
 

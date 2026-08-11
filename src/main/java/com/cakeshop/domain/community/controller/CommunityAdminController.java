@@ -17,6 +17,8 @@ import jakarta.validation.Valid;
 
 import java.util.List;
 
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -38,16 +40,11 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * ******************************
  */
 @Controller
+@RequiredArgsConstructor
 public class CommunityAdminController {
 
     private final CommunityAdminService communityAdminService;
     private final CommunityService communityService;
-
-    public CommunityAdminController(
-            CommunityAdminService communityAdminService, CommunityService communityService) {
-        this.communityAdminService = communityAdminService;
-        this.communityService = communityService;
-    }
 
     @GetMapping("/admin/community")
     public String list(
@@ -72,6 +69,8 @@ public class CommunityAdminController {
         );
         model.addAttribute("selectedStatus", selectedStatus);
         model.addAttribute("selectedSort", selectedSort);
+        model.addAttribute("statusOptions", PostStatus.values());
+        model.addAttribute("sortOptions", AdminPostSort.values());
 
         return "admin/community/list";
     }

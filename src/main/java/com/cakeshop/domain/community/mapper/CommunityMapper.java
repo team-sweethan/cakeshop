@@ -3,13 +3,14 @@ package com.cakeshop.domain.community.mapper;
 import java.time.LocalDate;
 import java.util.List;
 
-import com.cakeshop.domain.community.dto.view.CommentCountView;
-import com.cakeshop.domain.community.dto.view.CommentRow;
+import com.cakeshop.domain.community.dto.command.PostUpdateCommand;
+import com.cakeshop.domain.community.dto.query.CommentCountRow;
+import com.cakeshop.domain.community.dto.query.CommentRow;
 import com.cakeshop.domain.community.dto.view.PopularPostView;
 import com.cakeshop.domain.community.dto.view.PostCategoryView;
-import com.cakeshop.domain.community.dto.view.PostDetailRow;
-import com.cakeshop.domain.community.dto.view.PostListRow;
-import com.cakeshop.domain.community.dto.view.PostLockView;
+import com.cakeshop.domain.community.dto.query.PostDetailRow;
+import com.cakeshop.domain.community.dto.query.PostListRow;
+import com.cakeshop.domain.community.dto.query.PostLockRow;
 import com.cakeshop.domain.community.dto.view.PostSort;
 import com.cakeshop.domain.community.entity.Comment;
 import com.cakeshop.domain.community.entity.Post;
@@ -62,7 +63,7 @@ public interface CommunityMapper {
 
     int insertPost(Post post);
 
-    int updatePost(Post post);
+    int updatePost(PostUpdateCommand command);
 
     int deletePost(
             @Param("postId") long postId,
@@ -74,7 +75,7 @@ public interface CommunityMapper {
             @Param("limit") int limit
     );
 
-    CommentCountView countComments(
+    CommentCountRow countComments(
             @Param("postId") long postId
     );
 
@@ -90,7 +91,7 @@ public interface CommunityMapper {
             @Param("memberId") long memberId
     );
 
-    PostLockView lockPost(
+    PostLockRow lockPost(
             @Param("postId") long postId
     );
 

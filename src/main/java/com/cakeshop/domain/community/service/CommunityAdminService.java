@@ -7,13 +7,15 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import com.cakeshop.domain.community.dto.view.AdminPostDetailRow;
+import lombok.RequiredArgsConstructor;
+
+import com.cakeshop.domain.community.dto.query.AdminPostDetailRow;
 import com.cakeshop.domain.community.dto.view.AdminPostDetailView;
-import com.cakeshop.domain.community.dto.view.AdminPostListRow;
+import com.cakeshop.domain.community.dto.query.AdminPostListRow;
 import com.cakeshop.domain.community.dto.view.AdminPostListView;
 import com.cakeshop.domain.community.dto.view.AdminPostSort;
-import com.cakeshop.domain.community.dto.view.PostLockView;
-import com.cakeshop.domain.community.dto.view.ReportRow;
+import com.cakeshop.domain.community.dto.query.PostLockRow;
+import com.cakeshop.domain.community.dto.query.ReportRow;
 import com.cakeshop.domain.community.dto.view.ReportView;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.entity.ReportStatus;
@@ -39,6 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
  * ******************************
  */
 @Service
+@RequiredArgsConstructor
 public class CommunityAdminService {
 
     private final CommunityAdminMapper communityAdminMapper;
@@ -46,16 +49,6 @@ public class CommunityAdminService {
     private final CommunityMapper communityMapper;
 
     private final MemberCommunityQueryService memberCommunityQueryService;
-
-    public CommunityAdminService(
-            CommunityAdminMapper communityAdminMapper,
-            CommunityMapper communityMapper,
-            MemberCommunityQueryService memberCommunityQueryService) {
-
-        this.communityAdminMapper = communityAdminMapper;
-        this.communityMapper = communityMapper;
-        this.memberCommunityQueryService = memberCommunityQueryService;
-    }
 
     @Transactional(readOnly = true)
     public PageResult<AdminPostListView> getPosts(
@@ -146,7 +139,7 @@ public class CommunityAdminService {
 
     @Transactional
     public void rejectReports(long postId) {
-        PostLockView post = communityMapper.lockPost(postId);
+        PostLockRow post = communityMapper.lockPost(postId);
 
         if (post == null) {
             throw new BusinessException(CommunityErrorCode.POST_NOT_FOUND);
@@ -170,7 +163,7 @@ public class CommunityAdminService {
     }
 
     private void requireTransition(long postId, PostStatus next) {
-        PostLockView post = communityMapper.lockPost(postId);
+        PostLockRow post = communityMapper.lockPost(postId);
 
         if (post == null) {
             throw new BusinessException(CommunityErrorCode.POST_NOT_FOUND);

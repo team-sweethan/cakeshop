@@ -2,10 +2,10 @@ package com.cakeshop.domain.community.mapper;
 
 import java.util.List;
 
-import com.cakeshop.domain.community.dto.view.AdminPostDetailRow;
-import com.cakeshop.domain.community.dto.view.AdminPostListRow;
+import com.cakeshop.domain.community.dto.query.AdminPostDetailRow;
+import com.cakeshop.domain.community.dto.query.AdminPostListRow;
 import com.cakeshop.domain.community.dto.view.AdminPostSort;
-import com.cakeshop.domain.community.dto.view.ReportRow;
+import com.cakeshop.domain.community.dto.query.ReportRow;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.entity.ReportStatus;
 

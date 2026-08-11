@@ -2,6 +2,8 @@ package com.cakeshop.domain.community.service;
 
 import java.time.LocalDate;
 
+import lombok.RequiredArgsConstructor;
+
 import com.cakeshop.domain.community.mapper.CommunityMapper;
 
 import org.slf4j.Logger;
@@ -16,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 날짜만 집계한다 — 갈라 둬야 테스트가 임의의 날짜로 직접 부를 수 있다.
  */
 @Service
+@RequiredArgsConstructor
 public class PopularPostBatchService {
 
     private static final Logger log = LoggerFactory.getLogger(PopularPostBatchService.class);
@@ -30,10 +33,6 @@ public class PopularPostBatchService {
     private static final int SNAPSHOT_SIZE = 20;
 
     private final CommunityMapper communityMapper;
-
-    public PopularPostBatchService(CommunityMapper communityMapper) {
-        this.communityMapper = communityMapper;
-    }
 
     /**
      * 이 날짜의 인기글을 확정한다. 이미 확정된 날짜면 아무것도 하지 않는다.

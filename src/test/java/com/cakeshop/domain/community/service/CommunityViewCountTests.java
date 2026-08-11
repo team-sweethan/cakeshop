@@ -23,7 +23,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @MariaDbIntegrationTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 // Service 시계 설정을 함께 로드한다.
-@Import({CommunityService.class, MemberCommunityQueryService.class, ClockConfig.class})
+@Import({
+        CommunityService.class,
+        MemberCommunityQueryService.class,
+        PopularPostReader.class,
+        ClockConfig.class})
 class CommunityViewCountTests {
 
     private static final LocalDateTime BASE_TIME = LocalDateTime.of(2026, 3, 1, 10, 0);
