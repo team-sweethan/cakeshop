@@ -34,9 +34,12 @@
               <div class="data-row">
                 <span class="data-row__label">상태</span>
                 <span>
-                  <span th:if="${review.published}" class="badge badge--success">노출 중</span>
-                  <span th:if="${review.blocked}" class="badge badge--danger">숨김</span>
-                  <span th:if="${review.deleted}" class="badge">삭제됨</span>
+                  <span th:if="${review.published}" class="badge badge--success"
+                        th:text="${review.status.label}">상태</span>
+                  <span th:if="${review.blocked}" class="badge badge--danger"
+                        th:text="${review.status.label}">상태</span>
+                  <span th:if="${review.deleted}" class="badge"
+                        th:text="${review.status.label}">상태</span>
                 </span>
               </div>
             </div>

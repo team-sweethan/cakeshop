@@ -18,6 +18,9 @@
 
 ## 선택적 문서 로딩
 
+Entity·Form·Query·Command·View의 로컬 패키지 경계는 `docs/review/review_conventions.md`를 먼저 따른다.
+이 규칙은 review 도메인에만 적용하며 공통 정본을 바꾸지 않는다.
+
 1. `docs/review/PLAN.md`의 작업 방식과 조각 표에서 현재 조각을 확인한다.
 2. `docs/review/DOMAIN.md` 0~1절에서 기능 ID와 연결된 `spec`을 찾는다.
 3. 해당 `docs/review/specs/*.md` 한 파일과 `DOMAIN.md`의 관련 공통 규칙만 읽는다.

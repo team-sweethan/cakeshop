@@ -6,7 +6,7 @@ import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
-import com.cakeshop.domain.review.dto.view.ReviewReplyView;
+import com.cakeshop.domain.review.dto.query.ReviewReplyRow;
 import com.cakeshop.domain.review.entity.ReviewReply;
 
 @Mapper
@@ -20,7 +20,7 @@ public interface ReviewReplyMapper {
     int updateContentForPublishedReview(
             @Param("reviewId") long reviewId, @Param("content") String content);
 
-    ReviewReplyView findByReviewId(@Param("reviewId") long reviewId);
+    ReviewReplyRow findByReviewId(@Param("reviewId") long reviewId);
 
-    List<ReviewReplyView> findByReviewIds(@Param("reviewIds") Collection<Long> reviewIds);
+    List<ReviewReplyRow> findByReviewIds(@Param("reviewIds") Collection<Long> reviewIds);
 }

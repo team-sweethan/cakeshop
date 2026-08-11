@@ -25,10 +25,10 @@ import com.cakeshop.domain.order.dto.view.OrderReviewSnapshotView;
 import com.cakeshop.domain.order.service.OrderReviewQueryService;
 import com.cakeshop.domain.product.service.ProductReviewCommandService;
 import com.cakeshop.domain.review.dto.view.AdminReviewDetailView;
-import com.cakeshop.domain.review.dto.view.AdminReviewFilter;
+import com.cakeshop.domain.review.dto.query.AdminReviewFilter;
 import com.cakeshop.domain.review.dto.view.AdminReviewListView;
 import com.cakeshop.domain.review.dto.view.AdminReviewRating;
-import com.cakeshop.domain.review.dto.view.ReviewRow;
+import com.cakeshop.domain.review.dto.query.ReviewRow;
 import com.cakeshop.domain.review.entity.ReviewStatus;
 import com.cakeshop.domain.review.error.ReviewErrorCode;
 import com.cakeshop.domain.review.mapper.ReviewAdminMapper;
@@ -199,8 +199,8 @@ class ReviewAdminServiceTests {
 
         verify(memberReviewQueryService, never()).findMemberIdsByNickname(any());
         verify(orderReviewQueryService, never()).findOrderItemIdsByProductName(any());
-        assertThat(capturedFilter().getMemberIds()).isNull();
-        assertThat(capturedFilter().getOrderItemIds()).isNull();
+        assertThat(capturedFilter().memberIds()).isNull();
+        assertThat(capturedFilter().orderItemIds()).isNull();
     }
 
     @Test
@@ -211,7 +211,7 @@ class ReviewAdminServiceTests {
         PageResult<AdminReviewListView> result = reviewAdminService.getReviews(
                 "없는사람", null, AdminReviewRating.ALL, null, new PageRequest(null, null));
 
-        assertThat(capturedFilter().getMemberIds())
+        assertThat(capturedFilter().memberIds())
                 .as("빈 목록은 조건 없음이 아니라 '일치하는 회원이 없다'는 답이다")
                 .isNotNull()
                 .isEmpty();
@@ -230,10 +230,11 @@ class ReviewAdminServiceTests {
                 new PageRequest(null, null));
 
         AdminReviewFilter filter = capturedFilter();
-        assertThat(filter.getMemberIds()).containsExactly(1L, 2L);
-        assertThat(filter.getOrderItemIds()).containsExactly(11L);
-        assertThat(filter.getRating()).isEqualTo(AdminReviewRating.FIVE);
-        assertThat(filter.getStatus()).isEqualTo(ReviewStatus.BLOCKED);
+        assertThat(filter.memberIds()).containsExactly(1L, 2L);
+        assertThat(filter.orderItemIds()).containsExactly(11L);
+        assertThat(filter.minimumRating()).isEqualTo(5);
+        assertThat(filter.maximumRating()).isEqualTo(5);
+        assertThat(filter.status()).isEqualTo(ReviewStatus.BLOCKED);
     }
 
     @Test
@@ -265,8 +266,8 @@ class ReviewAdminServiceTests {
         assertThat(result.getContent())
                 .singleElement()
                 .satisfies(view -> {
-                    assertThat(view.getAuthorName()).isEqualTo("탈퇴한 회원");
-                    assertThat(view.getProductName()).isEqualTo("딸기 케이크");
+                    assertThat(view.authorName()).isEqualTo("탈퇴한 회원");
+                    assertThat(view.productName()).isEqualTo("딸기 케이크");
                 });
     }
 
@@ -290,7 +291,7 @@ class ReviewAdminServiceTests {
         AdminReviewDetailView detail = reviewAdminService.getReviewDetail(REVIEW_ID);
 
         assertThat(detail.isBlocked()).isTrue();
-        assertThat(detail.getOrderNumber()).isEqualTo("20260809-0001");
+        assertThat(detail.orderNumber()).isEqualTo("20260809-0001");
     }
 
     private AdminReviewFilter capturedFilter() {

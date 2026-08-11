@@ -39,18 +39,18 @@
                 AND status = #{filter.status}
             </if>
 
-            <if test="filter.rating.min != null">
-                AND overall_rating &gt;= #{filter.rating.min}
+            <if test="filter.minimumRating != null">
+                AND overall_rating &gt;= #{filter.minimumRating}
             </if>
 
-            <if test="filter.rating.max != null">
-                AND overall_rating &lt;= #{filter.rating.max}
+            <if test="filter.maximumRating != null">
+                AND overall_rating &lt;= #{filter.maximumRating}
             </if>
         </where>
     </sql>
 
     <!-- 상태를 가리지 않는다. 숨긴 후기가 목록에 없으면 해제할 방법이 없다 (C1). -->
-    <select id="findForAdmin" resultType="com.cakeshop.domain.review.dto.view.ReviewRow">
+    <select id="findForAdmin" resultType="com.cakeshop.domain.review.dto.query.ReviewRow">
         SELECT <include refid="com.cakeshop.domain.review.mapper.ReviewMapper.reviewRowColumns"/>
           FROM reviews
         <include refid="adminConditions"/>
