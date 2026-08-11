@@ -31,4 +31,13 @@
           FROM members
          WHERE nickname LIKE CONCAT('%', #{keyword}, '%') ESCAPE '!'
     </select>
+
+    <!-- 탈퇴·정지된 관리자는 뺀다. 받을 사람이 없는 알림 행이 쌓이고, 계정을 되살리면 그동안의
+         알림이 한꺼번에 보인다. -->
+    <select id="findActiveAdminIds" resultType="long">
+        SELECT id
+          FROM members
+         WHERE role = 'ADMIN'
+           AND status = 'ACTIVE'
+    </select>
 </mapper>

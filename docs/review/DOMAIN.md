@@ -85,7 +85,7 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 | **A3** | 후기 등록 | 고객 | `POST /reviews` | **완료** | 1 | `review-write.md` |
 | **A4** | 후기 수정 | 고객 | `GET·POST /reviews/{id}/edit` | **완료** | 4 | `review-edit-delete.md` |
 | **A5** | 후기 삭제 | 고객 | `POST /reviews/{id}/delete` | **완료** | 4 | `review-edit-delete.md` |
-| **A6** | 이미지 첨부 | 고객 | (A2·A3에 포함) | 목업 입력만 | 8 (2차) | `review-write.md` |
+| **A6** | 이미지 첨부 | 고객 | (A2·A3에 포함) | **없음** — 목업 입력은 조각 1에서 걷어냈다 | 8 (2차) | `review-write.md` |
 | **B1** | 상품 후기 목록 | 누구나 | 미리보기 3개(상품 상세 안) · 전체 `GET /products/{id}/reviews` | **완료** | 3 | `review-read.md` |
 | **B2** | 상품 평균 평점·후기 수 | 누구나 | (상품 상세에 포함) | **완료** | 2 | `review-read.md` |
 | **B3** | 내가 쓴 후기 목록 | 고객 | `GET /mypage/reviews` | **완료** | 3 | `review-read.md` |
@@ -97,7 +97,7 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 | **C5** | 답글 작성 | 관리자 | `POST /admin/reviews/{id}/replies` | **완료** | 6 | `review-reply.md` |
 | **C6** | 답글 수정 | 관리자 | `POST /admin/reviews/{id}/replies/edit` | **완료** | 6 | `review-reply.md` |
 | **D1** | 상품 평점 집계 | — | (Service 계약) | **완료** | 2 (#33) | `product-rating.md` |
-| **D2** | 알림 발송 | — | (Service 계약) | 없음 | 7 | `review-notification.md` |
+| **D2** | 알림 발송 | — | (Service 계약) | **완료** | 7 | `review-notification.md` |
 | **E1** | `ReviewStatus` enum + `CHECK` | — | — | **완료** (#125) | 0 | `history/2026-08-slice-0-schema.md` |
 | **E2** | 평점 범위 `CHECK` | — | — | **완료** (#125) | 0 | `history/2026-08-slice-0-schema.md` |
 | **E3** | `Review`·`ReviewReply` 엔티티 | — | — | **완료** (#125) | 0 | `history/2026-08-slice-0-schema.md` |
@@ -240,6 +240,8 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 | 작성자 표시명(`nickname`, 탈퇴 여부) | B1·C1·C3 | `member` | 수민 | `MemberReviewQueryService.getMembersByIds(Collection<Long>)` → `List<MemberReviewView>` |
 | 관리자 검색의 작성자명 조건 | C2 | `member` | 수민 | `MemberReviewQueryService.findMemberIdsByNickname(String)` → `List<Long>` |
 | 관리자 검색의 상품명 조건 | C2 | `order` | 주환 | `OrderReviewQueryService.findOrderItemIdsByProductName(String)` → `List<Long>` |
+| 신규 후기 알림을 받을 관리자 | D2 | `member` | 수민 | `MemberReviewQueryService.findActiveAdminIds()` → `List<Long>` |
+| 알림 발송 | D2(`specs/review-notification.md`) | `notification` | 민정 | `NotificationService.makeNotification` (기존) |
 | 상품 판매 여부 | B1 | `product` | 시은 | `ProductQueryService.getSalesInfo` (기존) |
 | 평점 갱신 | D1(`specs/product-rating.md`) | `product` | 시은 | `ProductReviewCommandService` |
 
@@ -305,10 +307,10 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 
 | 항목 | 결정 시점 |
 |---|---|
-| D2 `event_key` 규격 | 조각 7 |
-| D2 `NEW_REVIEW` 수신 관리자 | 조각 7, 민정님과 합의 |
 | 관리자 숨김 사유·조치 이력 기록 여부 | 필요해지면 새 migration (C1) |
 | A6 이미지 첨부 | 2차 |
+
+**조각 7에서 해소된 것**: D2 `event_key` 규격과 `NEW_REVIEW` 수신 관리자. 둘 다 `specs/review-notification.md` D2가 정본이고, 정한 날짜는 `PLAN.md` 결정 로그에 있다.
 
 ---
 

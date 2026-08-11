@@ -107,6 +107,7 @@ LIMIT #{size} OFFSET #{offset}
 - `reviews.member_id`는 인증 사용자에서 가져온다. 요청값을 받지 않는다.
 - `status`는 `PUBLISHED`로 저장한다.
 - INSERT는 `uk_reviews_order_item`에 걸릴 수 있다. **`DuplicateKeyException`을 잡아 `ALREADY_REVIEWED`로 바꾼다** — 4번 검증과 INSERT 사이의 동시 요청은 검증만으로 막히지 않는다(커뮤니티 신고 선례).
+- **저장 후 D2(알림)를 호출** — `NEW_REVIEW`가 활성 관리자 전원에게 간다. 조각 7에서 붙었고, 위 세 단계와 달리 **같은 트랜잭션이 아니다.** 커밋 이후에 나가고 실패해도 후기는 남는다(`review-notification.md` D2).
 - **순서가 정해져 있다: ① 상품 행 잠금(`ProductReviewCommandService.lockForRating`) → ② `reviews` INSERT → ③ D1 집계.** 셋 다 같은 트랜잭션이다. **뒤집으면 교착이고, 순서를 지켜도 집계 SELECT가 잠금 읽기가 아니면 값이 어긋난다** — 둘 다 A3의 검증 4가지가 평범한 SELECT인 데서 나오며, 근거와 계약은 **D1이 정본이다.**
 
 **성공 후**: `/mypage/reviews`(B3)로 redirect. 방금 쓴 후기가 목록 맨 위에 있는 것으로 완료를 확인한다.

@@ -3,40 +3,44 @@
 <mapper namespace="com.cakeshop.domain.statistics.mapper.PeriodStatisticsReadModelMapper">
     <!-- 사용자 입력은 #{}만 사용하고 ${}는 사용하지 않는다. -->
 
-    <select id="findDailyOrderStatistics"
-            resultType="com.cakeshop.domain.statistics.dto.view.DailyOrderStatisticsView">
+    <select id="findDailyStatistics"
+            resultType="com.cakeshop.domain.statistics.dto.view.DailyStatisticsRow">
         SELECT
-            DATE(statistics_order.created_at) AS date,
-            COUNT(*) AS total_order_count,
-            SUM(
-                CASE
-                    WHEN statistics_order.status = 'PICKED_UP' THEN 1
-                    ELSE 0
-                END
-            ) AS completed_order_count,
-            SUM(
-                CASE
-                    WHEN statistics_order.status IN ('CANCELED', 'REJECTED') THEN 1
-                    ELSE 0
-                END
-            ) AS canceled_order_count
-        FROM orders AS statistics_order
-        WHERE statistics_order.created_at &gt;= #{start}
-          AND statistics_order.created_at &lt; #{end}
-        GROUP BY DATE(statistics_order.created_at)
-        ORDER BY DATE(statistics_order.created_at)
+            daily_statistics.statistics_date AS date,
+            daily_statistics.total_order_count,
+            daily_statistics.completed_order_count,
+            daily_statistics.canceled_order_count,
+            daily_statistics.total_sales_amount
+        FROM daily_statistics
+        WHERE daily_statistics.statistics_date &gt;= #{startDate}
+          AND daily_statistics.statistics_date &lt;= #{endDate}
+        ORDER BY daily_statistics.statistics_date
     </select>
 
-    <select id="findDailySalesStatistics"
-            resultType="com.cakeshop.domain.statistics.dto.view.DailySalesStatisticsView">
-        SELECT
-            DATE(statistics_payment.approved_at) AS date,
-            SUM(statistics_payment.amount) AS sales_amount
-        FROM payments AS statistics_payment
-        WHERE statistics_payment.status = 'DONE'
-          AND statistics_payment.approved_at &gt;= #{start}
-          AND statistics_payment.approved_at &lt; #{end}
-        GROUP BY DATE(statistics_payment.approved_at)
-        ORDER BY DATE(statistics_payment.approved_at)
+    <select id="findLatestContinuousStatisticsDate" resultType="java.time.LocalDate">
+        WITH backfill_start AS (
+            SELECT MIN(statistics_batch_run.target_start_date) AS start_date
+            FROM statistics_batch_runs AS statistics_batch_run
+            WHERE statistics_batch_run.batch_type = 'BACKFILL'
+        ),
+        numbered_statistics AS (
+            SELECT
+                daily_statistics.statistics_date,
+                backfill_start.start_date,
+                ROW_NUMBER() OVER (
+                    ORDER BY daily_statistics.statistics_date
+                ) AS sequence_number
+            FROM daily_statistics
+            JOIN backfill_start
+              ON backfill_start.start_date IS NOT NULL
+            WHERE daily_statistics.statistics_date &gt;= backfill_start.start_date
+              AND daily_statistics.statistics_date &lt;= #{latestStatisticsDate}
+        )
+        SELECT MAX(numbered_statistics.statistics_date)
+        FROM numbered_statistics
+        WHERE DATEDIFF(
+                  numbered_statistics.statistics_date,
+                  numbered_statistics.start_date
+              ) = numbered_statistics.sequence_number - 1
     </select>
 </mapper>
