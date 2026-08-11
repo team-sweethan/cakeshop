@@ -210,12 +210,7 @@ public class ChatService {
         }
 
         return roomOrders.stream().map(ro -> {
-            OrderChatView order;
-            try {
-                order = orderChatQueryService.findOrder(ro.getOrderId());
-            } catch (Exception e) {
-                order = null;
-            }
+            OrderChatView order = orderChatQueryService.findOrder(ro.getOrderId());
 
             return ChatRoomOrderResponse.builder()
                     .orderId(ro.getOrderId())
@@ -391,6 +386,9 @@ public class ChatService {
         if (customerId == null || customerId <= 0 || !memberChatQueryService.existsCustomer(customerId)) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
+        if (request.getContent() != null && request.getContent().length() > 2000) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
 
         CustomerAdminNote note = CustomerAdminNote.builder()
                 .customerId(customerId)
@@ -465,14 +463,7 @@ public class ChatService {
                             .map(att -> {
                                 String key = att.getObjectKey();
                                 if (key == null || key.isBlank()) return "";
-                                // 1. 로컬 저장소 경로 (/uploads/...)
-                                if (key.startsWith("/uploads/")) return key;
-                                // 2. S3 공개 저장소 버킷 주소
-                                if (key.startsWith("https://sweethan-cakeshop-images.s3.ap-northeast-2.amazonaws.com/")) return key;
-                                // 3. 외부 도메인(http:// 또는 https://)으로 시작하는 해커 트래킹 URL은 무조건 거부!
-                                if (key.startsWith("http://") || key.startsWith("https://")) return "";
-                                // 4. 상대 경로 key인 경우 S3 버킷 주소 결합
-                                return "https://sweethan-cakeshop-images.s3.ap-northeast-2.amazonaws.com/" + key;
+                                return key;
                             })
                             .filter(url -> !url.isBlank())
                             .collect(Collectors.toList())
