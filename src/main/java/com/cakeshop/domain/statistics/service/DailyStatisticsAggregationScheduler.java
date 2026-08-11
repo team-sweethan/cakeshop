@@ -7,9 +7,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class DailyStatisticsAggregationScheduler {
 
-    static final String DAILY_AT_00_10 = "0 10 0 * * *";
-    static final String SEOUL_TIME_ZONE = "Asia/Seoul";
-
     private final DailyStatisticsAggregationService aggregationService;
 
     public DailyStatisticsAggregationScheduler(
@@ -19,7 +16,10 @@ public class DailyStatisticsAggregationScheduler {
     }
 
     /** 매일 00:10에 전날과 변경된 과거 날짜의 통계를 집계한다. */
-    @Scheduled(cron = DAILY_AT_00_10, zone = SEOUL_TIME_ZONE)
+    @Scheduled(
+            cron = DailyStatisticsAggregationSchedule.CRON,
+            zone = DailyStatisticsAggregationSchedule.TIME_ZONE
+    )
     public void aggregateDailyStatistics() {
         aggregationService.aggregateDailyStatistics();
     }
