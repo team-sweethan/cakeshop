@@ -28,7 +28,8 @@
       <section class="section">
         <h2 class="section-title">제작 옵션</h2>
         <div class="panel stack">
-          <fieldset th:each="group, groupStat : ${optionGroups}">
+          <fieldset th:each="group, groupStat : ${optionGroups}"
+                    th:classappend="${group.required and group.selectionType == 'MULTIPLE'} ? ' js-required-multiple' : ''">
             <legend class="form-label">
               <span th:text="${group.name}">옵션</span>
               <span class="required" th:if="${group.required}">*</span>
@@ -39,7 +40,7 @@
                        th:name="|customOptionGroup-${group.id}|"
                        th:value="${option.id}"
                        data-custom-option
-                       th:required="${group.required and optionStat.first}">
+                       th:required="${group.required and group.selectionType != 'MULTIPLE' and optionStat.first}">
                 <span th:text="${option.name}">옵션명</span>
                 <span th:if="${option.additionalPrice.signum() > 0}"
                       th:text="| +${#numbers.formatInteger(option.additionalPrice, 1, 'COMMA')}원|">
@@ -55,7 +56,33 @@
   </main>
   <footer th:replace="~{fragments/common/footer :: footer(${store})}"></footer>
   <script>
-    document.getElementById("custom-option-form").addEventListener("submit", function () {
+    const customOptionForm = document.getElementById("custom-option-form");
+
+    customOptionForm.addEventListener("change", function (event) {
+      const requiredMultipleGroup = event.target.closest(".js-required-multiple");
+      if (requiredMultipleGroup) {
+        requiredMultipleGroup.querySelector("input[data-custom-option]").setCustomValidity("");
+      }
+    });
+
+    customOptionForm.addEventListener("submit", function (event) {
+      let invalidOption = null;
+      this.querySelectorAll(".js-required-multiple").forEach((group) => {
+        const firstOption = group.querySelector("input[data-custom-option]");
+        if (!firstOption) {
+          return;
+        }
+        const selected = group.querySelector("input[data-custom-option]:checked");
+        firstOption.setCustomValidity(selected ? "" : "필수 옵션을 하나 이상 선택하세요.");
+        if (!selected && !invalidOption) {
+          invalidOption = firstOption;
+        }
+      });
+      if (invalidOption) {
+        event.preventDefault();
+        invalidOption.reportValidity();
+        return;
+      }
       this.querySelectorAll("[data-selected-option]").forEach((input) => input.remove());
       this.querySelectorAll("input[data-custom-option]:checked").forEach((input) => {
         const hidden = document.createElement("input");

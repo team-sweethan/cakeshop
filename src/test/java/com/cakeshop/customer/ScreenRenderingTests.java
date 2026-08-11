@@ -199,6 +199,7 @@ class ScreenRenderingTests {
     void memberScreensRenderWithSeededUser() throws Exception {
         String[] paths = {
             "/cart", "/orders/checkout?productId=1&quantity=1&optionIds=1",
+            "/orders/custom/options?productId=6",
             "/mypage",
             "/orders", "/notifications", "/mypage/reviews/writable", "/mypage/coupons",
             "/mypage/profile"

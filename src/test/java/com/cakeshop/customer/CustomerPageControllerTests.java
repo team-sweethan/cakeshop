@@ -218,6 +218,9 @@ class CustomerPageControllerTests {
                 .contains("th:action=\"@{/orders/custom/request}\"")
                 .contains("name=\"productId\"")
                 .contains("th:name=\"|customOptionGroup-${group.id}|\"")
+                .contains("group.selectionType != 'MULTIPLE'")
+                .contains("js-required-multiple")
+                .contains("필수 옵션을 하나 이상 선택하세요.")
                 .contains("hidden.name = \"optionIds\";")
                 .doesNotContain("data-mock-form");
     }
