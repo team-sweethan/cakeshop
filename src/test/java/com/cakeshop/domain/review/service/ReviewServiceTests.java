@@ -32,10 +32,11 @@ import com.cakeshop.domain.product.service.ProductQueryService;
 import com.cakeshop.domain.product.service.ProductReviewCommandService;
 import com.cakeshop.domain.review.dto.form.ReviewEditForm;
 import com.cakeshop.domain.review.dto.form.ReviewWriteForm;
+import com.cakeshop.domain.review.dto.command.ReviewUpdateCommand;
 import com.cakeshop.domain.review.dto.view.MyReviewView;
-import com.cakeshop.domain.review.dto.view.ProductRatingAggregate;
+import com.cakeshop.domain.review.dto.query.ProductRatingAggregate;
 import com.cakeshop.domain.review.dto.view.ProductReviewView;
-import com.cakeshop.domain.review.dto.view.ReviewRow;
+import com.cakeshop.domain.review.dto.query.ReviewRow;
 import com.cakeshop.domain.review.entity.Review;
 import com.cakeshop.domain.review.entity.ReviewStatus;
 import com.cakeshop.domain.review.error.ReviewErrorCode;
@@ -117,8 +118,8 @@ class ReviewServiceTests {
                 reviewService.getProductReviews(PRODUCT_ID, new PageRequest(1, null));
 
         assertThat(reviews.getContent()).singleElement().satisfies(review -> {
-            assertThat(review.getAuthorName()).isEqualTo(ProductReviewView.WITHDRAWN_AUTHOR_NAME);
-            assertThat(review.getContent()).isEqualTo("맛있게 잘 먹었습니다.");
+            assertThat(review.authorName()).isEqualTo(ProductReviewView.WITHDRAWN_AUTHOR_NAME);
+            assertThat(review.content()).isEqualTo("맛있게 잘 먹었습니다.");
         });
     }
 
@@ -133,7 +134,7 @@ class ReviewServiceTests {
                 reviewService.getProductReviews(PRODUCT_ID, new PageRequest(1, null));
 
         assertThat(reviews.getContent()).singleElement()
-                .extracting(ProductReviewView::getAuthorName)
+                .extracting(ProductReviewView::authorName)
                 .isEqualTo(ProductReviewView.WITHDRAWN_AUTHOR_NAME);
     }
 
@@ -174,9 +175,9 @@ class ReviewServiceTests {
 
         assertThat(reviews.getContent()).singleElement().satisfies(review -> {
             assertThat(review.isBlocked()).isTrue();
-            assertThat(review.getProductId()).isEqualTo(PRODUCT_ID);
-            assertThat(review.getProductName()).isEqualTo("딸기 생크림 케이크");
-            assertThat(review.getOrderNumber()).isEqualTo("ORD-0001");
+            assertThat(review.productId()).isEqualTo(PRODUCT_ID);
+            assertThat(review.productName()).isEqualTo("딸기 생크림 케이크");
+            assertThat(review.orderNumber()).isEqualTo("ORD-0001");
         });
     }
 
@@ -192,11 +193,11 @@ class ReviewServiceTests {
                 reviewService.getMyReviews(MEMBER_ID, new PageRequest(1, null));
 
         assertThat(reviews.getContent()).singleElement().satisfies(review -> {
-            assertThat(review.getProductName()).isNull();
-            assertThat(review.getProductId())
+            assertThat(review.productName()).isNull();
+            assertThat(review.productId())
                     .as("상품 링크는 후기가 가진 값이라 스냅샷이 비어도 살아 있어야 한다")
                     .isEqualTo(PRODUCT_ID);
-            assertThat(review.getContent()).isEqualTo("맛있게 잘 먹었습니다.");
+            assertThat(review.content()).isEqualTo("맛있게 잘 먹었습니다.");
         });
     }
 
@@ -363,13 +364,12 @@ class ReviewServiceTests {
 
         reviewService.edit(REVIEW_ID, editForm(3), MEMBER_ID);
 
-        ArgumentCaptor<Review> updated = ArgumentCaptor.forClass(Review.class);
+        ArgumentCaptor<ReviewUpdateCommand> updated =
+                ArgumentCaptor.forClass(ReviewUpdateCommand.class);
         verify(reviewMapper).update(updated.capture());
-        assertThat(updated.getValue().getId()).isEqualTo(REVIEW_ID);
-        assertThat(updated.getValue().getMemberId()).isEqualTo(MEMBER_ID);
-        assertThat(updated.getValue().getOverallRating()).isEqualTo(3);
-        assertThat(updated.getValue().getOrderItemId()).isNull();
-        assertThat(updated.getValue().getProductId()).isNull();
+        assertThat(updated.getValue().id()).isEqualTo(REVIEW_ID);
+        assertThat(updated.getValue().memberId()).isEqualTo(MEMBER_ID);
+        assertThat(updated.getValue().overallRating()).isEqualTo(3);
     }
 
     @Test

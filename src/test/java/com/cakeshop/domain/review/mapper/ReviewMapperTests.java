@@ -17,8 +17,9 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-import com.cakeshop.domain.review.dto.view.ProductRatingAggregate;
-import com.cakeshop.domain.review.dto.view.ReviewRow;
+import com.cakeshop.domain.review.dto.query.ProductRatingAggregate;
+import com.cakeshop.domain.review.dto.query.ReviewRow;
+import com.cakeshop.domain.review.dto.command.ReviewUpdateCommand;
 import com.cakeshop.domain.review.entity.Review;
 import com.cakeshop.domain.review.entity.ReviewStatus;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
@@ -130,8 +131,8 @@ class ReviewMapperTests {
 
         ProductRatingAggregate aggregate = reviewMapper.aggregateForUpdate(productId);
 
-        assertThat(aggregate.getAverageRating()).isEqualByComparingTo("0");
-        assertThat(aggregate.getReviewCount()).isZero();
+        assertThat(aggregate.averageRating()).isEqualByComparingTo("0");
+        assertThat(aggregate.reviewCount()).isZero();
     }
 
     @Test
@@ -143,8 +144,8 @@ class ReviewMapperTests {
 
         ProductRatingAggregate aggregate = reviewMapper.aggregateForUpdate(productId);
 
-        assertThat(aggregate.getAverageRating()).isEqualByComparingTo("4");
-        assertThat(aggregate.getReviewCount()).isEqualTo(2);
+        assertThat(aggregate.averageRating()).isEqualByComparingTo("4");
+        assertThat(aggregate.reviewCount()).isEqualTo(2);
     }
 
     @Test
@@ -152,7 +153,7 @@ class ReviewMapperTests {
         insertReviewWithStatus(5, "PUBLISHED");
         long otherProductId = insertProduct();
 
-        assertThat(reviewMapper.aggregateForUpdate(otherProductId).getReviewCount()).isZero();
+        assertThat(reviewMapper.aggregateForUpdate(otherProductId).reviewCount()).isZero();
     }
 
     @Test
@@ -164,7 +165,7 @@ class ReviewMapperTests {
         List<ReviewRow> rows = reviewMapper.findPublishedByProductId(productId, 0, 20);
 
         assertThat(rows).singleElement()
-                .extracting(ReviewRow::getStatus)
+                .extracting(ReviewRow::status)
                 .isEqualTo(ReviewStatus.PUBLISHED);
         assertThat(reviewMapper.countPublishedByProductId(productId)).isEqualTo(1L);
     }
@@ -200,7 +201,7 @@ class ReviewMapperTests {
 
         List<ReviewRow> rows = reviewMapper.findByMemberId(memberId, 0, 20);
 
-        assertThat(rows).extracting(ReviewRow::getStatus)
+        assertThat(rows).extracting(ReviewRow::status)
                 .containsExactlyInAnyOrder(ReviewStatus.PUBLISHED, ReviewStatus.BLOCKED);
         assertThat(reviewMapper.countByMemberId(memberId)).isEqualTo(2L);
     }
@@ -235,7 +236,7 @@ class ReviewMapperTests {
         jdbcTemplate.update("UPDATE reviews SET status = 'DELETED' WHERE id = ?", review.getId());
 
         assertThat(reviewMapper.findById(review.getId()))
-                .extracting(ReviewRow::getStatus)
+                .extracting(ReviewRow::status)
                 .isEqualTo(ReviewStatus.DELETED);
     }
 
@@ -251,32 +252,32 @@ class ReviewMapperTests {
                 orderItemId, productId, memberId, 5, 5, 4, 4, "고치기 전 후기입니다.");
         reviewMapper.insert(review);
 
-        int affectedRows = reviewMapper.update(Review.edit(
+        int affectedRows = reviewMapper.update(new ReviewUpdateCommand(
                 review.getId(), memberId, 3, 2, 1, 4, "고친 뒤 후기입니다."));
 
         assertThat(affectedRows).isEqualTo(1);
 
         ReviewRow updated = reviewMapper.findById(review.getId());
-        assertThat(updated.getOverallRating()).isEqualTo(3);
-        assertThat(updated.getTasteRating()).isEqualTo(2);
-        assertThat(updated.getDesignRating()).isEqualTo(1);
-        assertThat(updated.getServiceRating()).isEqualTo(4);
-        assertThat(updated.getContent()).isEqualTo("고친 뒤 후기입니다.");
-        assertThat(updated.getOrderItemId()).isEqualTo(orderItemId);
-        assertThat(updated.getProductId()).isEqualTo(productId);
-        assertThat(updated.getMemberId()).isEqualTo(memberId);
-        assertThat(updated.getStatus()).isEqualTo(ReviewStatus.PUBLISHED);
+        assertThat(updated.overallRating()).isEqualTo(3);
+        assertThat(updated.tasteRating()).isEqualTo(2);
+        assertThat(updated.designRating()).isEqualTo(1);
+        assertThat(updated.serviceRating()).isEqualTo(4);
+        assertThat(updated.content()).isEqualTo("고친 뒤 후기입니다.");
+        assertThat(updated.orderItemId()).isEqualTo(orderItemId);
+        assertThat(updated.productId()).isEqualTo(productId);
+        assertThat(updated.memberId()).isEqualTo(memberId);
+        assertThat(updated.status()).isEqualTo(ReviewStatus.PUBLISHED);
     }
 
     @Test
     void update_blockedReview_affectsNoRowSoTheAuthorCannotOverwriteIt() {
         long reviewId = insertReviewWithStatus(5, "BLOCKED");
 
-        assertThat(reviewMapper.update(Review.edit(
+        assertThat(reviewMapper.update(new ReviewUpdateCommand(
                 reviewId, memberId, 1, 1, 1, 1, "숨겨진 뒤 덮어쓴 후기입니다.")))
                 .isZero();
 
-        assertThat(reviewMapper.findById(reviewId).getContent()).isEqualTo("후기 본문입니다.");
+        assertThat(reviewMapper.findById(reviewId).content()).isEqualTo("후기 본문입니다.");
     }
 
     @Test
@@ -284,7 +285,7 @@ class ReviewMapperTests {
         long reviewId = insertReviewWithStatus(5, "PUBLISHED");
         long otherMemberId = insertMember();
 
-        assertThat(reviewMapper.update(Review.edit(
+        assertThat(reviewMapper.update(new ReviewUpdateCommand(
                 reviewId, otherMemberId, 1, 1, 1, 1, "남이 고쳐 쓴 후기입니다.")))
                 .isZero();
     }
@@ -293,7 +294,7 @@ class ReviewMapperTests {
     void update_ratingOutOfRange_isRejectedByCheckConstraint() {
         long reviewId = insertReviewWithStatus(5, "PUBLISHED");
 
-        assertThatThrownBy(() -> reviewMapper.update(Review.edit(
+        assertThatThrownBy(() -> reviewMapper.update(new ReviewUpdateCommand(
                 reviewId, memberId, 6, 5, 4, 4, "범위 밖으로 고친 후기입니다.")))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
@@ -307,7 +308,7 @@ class ReviewMapperTests {
 
         assertThat(reviewMapper.deleteByAuthor(review.getId(), memberId)).isEqualTo(1);
 
-        assertThat(reviewMapper.findById(review.getId()).getStatus())
+        assertThat(reviewMapper.findById(review.getId()).status())
                 .isEqualTo(ReviewStatus.DELETED);
         assertThatThrownBy(() -> reviewMapper.insert(Review.create(
                 orderItemId, productId, memberId, 4, 4, 4, 4, "다시 쓴 후기입니다.")))
@@ -319,7 +320,7 @@ class ReviewMapperTests {
         long reviewId = insertReviewWithStatus(5, "BLOCKED");
 
         assertThat(reviewMapper.deleteByAuthor(reviewId, memberId)).isZero();
-        assertThat(reviewMapper.findById(reviewId).getStatus()).isEqualTo(ReviewStatus.BLOCKED);
+        assertThat(reviewMapper.findById(reviewId).status()).isEqualTo(ReviewStatus.BLOCKED);
     }
 
     @Test
@@ -335,11 +336,11 @@ class ReviewMapperTests {
         long otherMemberId = insertMember();
 
         assertThat(reviewMapper.deleteByAuthor(reviewId, otherMemberId)).isZero();
-        assertThat(reviewMapper.findById(reviewId).getStatus()).isEqualTo(ReviewStatus.PUBLISHED);
+        assertThat(reviewMapper.findById(reviewId).status()).isEqualTo(ReviewStatus.PUBLISHED);
     }
 
     private List<Long> idsOf(List<ReviewRow> rows) {
-        return rows.stream().map(ReviewRow::getId).toList();
+        return rows.stream().map(ReviewRow::id).toList();
     }
 
     private List<Long> insertPublishedReviewsAtSameInstant(int count) {
