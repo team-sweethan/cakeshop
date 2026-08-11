@@ -64,13 +64,24 @@ class StatisticsSearchFormTests {
     }
 
     @Test
-    void validate_weeklySearch_acceptsOptionalReferenceDate() {
+    void validate_weeklySearch_acceptsOptionalWeek() {
         StatisticsSearchForm form = new StatisticsSearchForm();
         form.setPeriodType(StatisticsPeriodType.WEEKLY);
-        form.setWeekReferenceDate(LocalDate.of(2026, 7, 30));
+        form.setWeek("2026-W31");
         form.setStartDate(LocalDate.of(2026, 8, 1));
 
         assertThat(validator.validate(form)).isEmpty();
+    }
+
+    @Test
+    void validate_weeklySearchWithInvalidFormat_rejectsWeek() {
+        StatisticsSearchForm form = new StatisticsSearchForm();
+        form.setPeriodType(StatisticsPeriodType.WEEKLY);
+        form.setWeek("2026-31");
+
+        assertThat(validator.validate(form))
+                .extracting(violation -> violation.getPropertyPath().toString())
+                .contains("week");
     }
 
     @Test

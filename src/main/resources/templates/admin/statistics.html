@@ -19,15 +19,49 @@
         통계는 집계가 완료된 어제까지 제공됩니다.
       </div>
 
-      <form method="get" th:action="@{/admin/statistics}" th:object="${searchForm}">
+      <form method="get"
+            th:action="@{/admin/statistics}"
+            th:object="${searchForm}"
+            data-statistics-search-form>
+        <input type="hidden" th:field="*{periodType}" data-statistics-period-type>
         <div class="admin-toolbar">
           <label for="startDate">시작일</label>
           <input id="startDate" class="form-control" type="date"
-                 th:field="*{startDate}" th:max="${latestSelectableDate}">
+                 th:field="*{startDate}" th:max="${latestSelectableDate}"
+                 data-statistics-range-input>
           <span>~</span>
           <label for="endDate">종료일</label>
           <input id="endDate" class="form-control" type="date"
-                 th:field="*{endDate}" th:max="${latestSelectableDate}">
+                 th:field="*{endDate}" th:max="${latestSelectableDate}"
+                 data-statistics-range-input>
+
+          <a class="btn"
+             data-statistics-period-link
+             th:classappend="${searchForm.periodType.name() == 'WEEKLY'} ? ' is-active'"
+             th:attr="aria-current=${searchForm.periodType.name() == 'WEEKLY'} ? 'page' : null"
+             th:href="@{/admin/statistics(periodType='WEEKLY')}">주간</a>
+          <a class="btn"
+             data-statistics-period-link
+             th:classappend="${searchForm.periodType.name() == 'MONTHLY'} ? ' is-active'"
+             th:attr="aria-current=${searchForm.periodType.name() == 'MONTHLY'} ? 'page' : null"
+             th:href="@{/admin/statistics(periodType='MONTHLY')}">월간</a>
+
+          <div class="cluster"
+               data-statistics-mode-input
+               th:if="${searchForm.periodType.name() == 'WEEKLY'}">
+            <label for="week">조회 주</label>
+            <input id="week" class="form-control" type="week"
+                   th:field="*{week}">
+          </div>
+
+          <div class="cluster"
+               data-statistics-mode-input
+               th:if="${searchForm.periodType.name() == 'MONTHLY'}">
+            <label for="yearMonth">조회 월</label>
+            <input id="yearMonth" class="form-control" type="month"
+                   th:field="*{yearMonth}">
+          </div>
+
           <button class="btn btn--primary" type="submit">조회</button>
         </div>
 
@@ -75,17 +109,37 @@
           </div>
           <div class="grid grid--2 statistics-chart-grid">
             <section>
-              <h2 class="section-title">일별 주문 추이</h2>
+              <h2 class="section-title"
+                  th:text="${searchForm.periodType.name() == 'MONTHLY'
+                            ? '주차별 주문 추이'
+                            : '일별 주문 추이'}">일별 주문 추이</h2>
               <div class="statistics-chart">
-                <canvas id="daily-order-chart" role="img" aria-label="일별 주문 건수 꺾은선그래프">
+                <canvas id="statistics-order-chart"
+                        role="img"
+                        th:attr="aria-label=${searchForm.periodType.name() == 'MONTHLY'
+                                  ? '주차별 주문 건수 꺾은선그래프'
+                                  : '일별 주문 건수 꺾은선그래프'}"
+                        th:text="${searchForm.periodType.name() == 'MONTHLY'
+                                  ? '주차별 주문 건수 추이'
+                                  : '일별 주문 건수 추이'}">
                   일별 주문 건수 추이
                 </canvas>
               </div>
             </section>
             <section>
-              <h2 class="section-title">일별 매출 추이</h2>
+              <h2 class="section-title"
+                  th:text="${searchForm.periodType.name() == 'MONTHLY'
+                            ? '주차별 매출 추이'
+                            : '일별 매출 추이'}">일별 매출 추이</h2>
               <div class="statistics-chart">
-                <canvas id="daily-sales-chart" role="img" aria-label="일별 매출 꺾은선그래프">
+                <canvas id="statistics-sales-chart"
+                        role="img"
+                        th:attr="aria-label=${searchForm.periodType.name() == 'MONTHLY'
+                                  ? '주차별 매출 꺾은선그래프'
+                                  : '일별 매출 꺾은선그래프'}"
+                        th:text="${searchForm.periodType.name() == 'MONTHLY'
+                                  ? '주차별 매출 추이'
+                                  : '일별 매출 추이'}">
                   일별 매출 추이
                 </canvas>
               </div>
@@ -97,6 +151,7 @@
   </div>
 </div>
 <script th:src="@{/webjars/chart.js/4.5.1/dist/chart.umd.js}"></script>
+<script th:src="@{/js/statistics-period.js}"></script>
 <script th:src="@{/js/statistics-chart.js}"></script>
 </body>
 </html>

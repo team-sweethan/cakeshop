@@ -100,7 +100,7 @@ class PeriodStatisticsReadModelQueryServiceTests {
         LocalDate endDate = LocalDate.of(2026, 8, 2);
         StatisticsSearchForm form = new StatisticsSearchForm();
         form.setPeriodType(StatisticsPeriodType.WEEKLY);
-        form.setWeekReferenceDate(LocalDate.of(2026, 7, 30));
+        form.setWeek("2026-W31");
         when(mapper.findLatestContinuousStatisticsDate(YESTERDAY)).thenReturn(YESTERDAY);
         when(mapper.findDailyStatistics(startDate, endDate)).thenReturn(rows(startDate, endDate));
 

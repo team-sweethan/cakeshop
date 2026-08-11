@@ -118,8 +118,8 @@ class StatisticsAdminControllerTests {
     }
 
     @Test
-    void statistics_weeklyRequest_bindsReferenceDate() throws Exception {
-        LocalDate weekReferenceDate = LocalDate.of(2026, 7, 30);
+    void statistics_weeklyRequest_bindsWeek() throws Exception {
+        String week = "2026-W31";
         PeriodStatisticsView statistics = statistics(
                 LocalDate.of(2026, 7, 27),
                 LocalDate.of(2026, 8, 2)
@@ -128,7 +128,7 @@ class StatisticsAdminControllerTests {
 
         mockMvc.perform(get("/admin/statistics")
                         .param("periodType", "WEEKLY")
-                        .param("weekReferenceDate", weekReferenceDate.toString()))
+                        .param("week", week))
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("searchForm", org.hamcrest.Matchers.allOf(
                         org.hamcrest.Matchers.hasProperty(
@@ -136,14 +136,14 @@ class StatisticsAdminControllerTests {
                                 org.hamcrest.Matchers.is(StatisticsPeriodType.WEEKLY)
                         ),
                         org.hamcrest.Matchers.hasProperty(
-                                "weekReferenceDate",
-                                org.hamcrest.Matchers.is(weekReferenceDate)
+                                "week",
+                                org.hamcrest.Matchers.is(week)
                         )
                 )));
 
         verify(periodStatisticsReadModelQueryService).getStatistics(argThat(form ->
                 form.getPeriodType() == StatisticsPeriodType.WEEKLY
-                        && weekReferenceDate.equals(form.getWeekReferenceDate())
+                        && week.equals(form.getWeek())
         ));
     }
 

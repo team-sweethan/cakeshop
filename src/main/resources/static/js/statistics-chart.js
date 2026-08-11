@@ -66,14 +66,14 @@
     }
 
     createChart(
-        "daily-order-chart",
+        "statistics-order-chart",
         "주문 건수",
         rows.map(function (row) { return Number(row.dataset.orderCount); }),
         "#2563eb",
         "건"
     );
     createChart(
-        "daily-sales-chart",
+        "statistics-sales-chart",
         "매출",
         rows.map(function (row) { return Number(row.dataset.salesAmount); }),
         "#dc2626",

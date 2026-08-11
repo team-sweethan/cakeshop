@@ -58,10 +58,10 @@ class StatisticsPeriodResolverTests {
     }
 
     @Test
-    void resolve_weeklyReferenceAtMonthEnd_includesDatesAcrossMonthBoundary() {
+    void resolve_weekAcrossMonthEnd_includesDatesAcrossMonthBoundary() {
         StatisticsSearchForm form = new StatisticsSearchForm();
         form.setPeriodType(StatisticsPeriodType.WEEKLY);
-        form.setWeekReferenceDate(LocalDate.of(2026, 7, 30));
+        form.setWeek("2026-W31");
 
         StatisticsDateRange range = resolver.resolve(form, LATEST_SELECTABLE_DATE);
 
@@ -72,10 +72,19 @@ class StatisticsPeriodResolverTests {
     }
 
     @Test
-    void resolve_weeklyReferenceInCurrentWeek_rejectsIncompleteWeek() {
+    void resolve_currentWeek_rejectsIncompleteWeek() {
         StatisticsSearchForm form = new StatisticsSearchForm();
         form.setPeriodType(StatisticsPeriodType.WEEKLY);
-        form.setWeekReferenceDate(LATEST_SELECTABLE_DATE);
+        form.setWeek("2026-W33");
+
+        assertInvalidDateRange(() -> resolver.resolve(form, LATEST_SELECTABLE_DATE));
+    }
+
+    @Test
+    void resolve_nonexistentIsoWeek_rejectsWeek() {
+        StatisticsSearchForm form = new StatisticsSearchForm();
+        form.setPeriodType(StatisticsPeriodType.WEEKLY);
+        form.setWeek("2025-W53");
 
         assertInvalidDateRange(() -> resolver.resolve(form, LATEST_SELECTABLE_DATE));
     }

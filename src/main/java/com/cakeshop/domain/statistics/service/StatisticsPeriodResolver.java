@@ -1,6 +1,5 @@
 package com.cakeshop.domain.statistics.service;
 
-import static java.time.DayOfWeek.MONDAY;
 import static java.time.DayOfWeek.SUNDAY;
 import static java.time.temporal.TemporalAdjusters.previousOrSame;
 
@@ -10,6 +9,8 @@ import com.cakeshop.domain.statistics.error.StatisticsErrorCode;
 import com.cakeshop.global.error.BusinessException;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import org.springframework.stereotype.Component;
 
@@ -63,8 +64,8 @@ public class StatisticsPeriodResolver {
             StatisticsSearchForm form,
             LocalDate latestSelectableDate
     ) {
-        LocalDate referenceDate = form.getWeekReferenceDate();
-        if (referenceDate == null) {
+        String week = form.getWeek();
+        if (week == null) {
             LocalDate lastCompletedSunday = latestSelectableDate.with(previousOrSame(SUNDAY));
             return new StatisticsDateRange(
                     lastCompletedSunday.minusDays(6),
@@ -72,7 +73,12 @@ public class StatisticsPeriodResolver {
             );
         }
 
-        LocalDate startDate = referenceDate.with(previousOrSame(MONDAY));
+        LocalDate startDate;
+        try {
+            startDate = LocalDate.parse(week + "-1", DateTimeFormatter.ISO_WEEK_DATE);
+        } catch (DateTimeParseException exception) {
+            throw invalidDateRange();
+        }
         LocalDate endDate = startDate.plusDays(6);
         if (endDate.isAfter(latestSelectableDate)) {
             throw invalidDateRange();

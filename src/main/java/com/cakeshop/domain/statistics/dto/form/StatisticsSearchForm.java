@@ -2,6 +2,7 @@ package com.cakeshop.domain.statistics.dto.form;
 
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
@@ -26,9 +27,12 @@ public class StatisticsSearchForm {
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
     private LocalDate endDate;
 
-    /** 선택한 날짜가 속한 월요일부터 일요일까지를 주간 조회한다. */
-    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-    private LocalDate weekReferenceDate;
+    /** ISO 주차 형식으로 선택한 월요일부터 일요일까지를 주간 조회한다. */
+    @Pattern(
+            regexp = "\\d{4}-W\\d{2}",
+            message = "조회 주는 yyyy-Www 형식으로 입력해 주세요."
+    )
+    private String week;
 
     /** 선택한 연·월의 1일부터 말일까지를 월간 조회한다. */
     @DateTimeFormat(pattern = "yyyy-MM")

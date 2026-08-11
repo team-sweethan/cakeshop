@@ -1,5 +1,6 @@
 package com.cakeshop.domain.statistics.controller;
 
+import com.cakeshop.domain.statistics.dto.form.StatisticsPeriodType;
 import com.cakeshop.domain.statistics.dto.form.StatisticsSearchForm;
 import com.cakeshop.domain.statistics.dto.view.PeriodStatisticsView;
 import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
@@ -8,6 +9,10 @@ import com.cakeshop.domain.statistics.service.DashboardReadModelQueryService;
 import com.cakeshop.domain.statistics.service.PeriodStatisticsReadModelQueryService;
 import com.cakeshop.global.error.BusinessException;
 import jakarta.validation.Valid;
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
+import java.time.temporal.IsoFields;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -18,6 +23,12 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 @Controller
 @RequiredArgsConstructor
 public class StatisticsAdminController {
+
+    private static final DateTimeFormatter WEEK_FORMATTER = new DateTimeFormatterBuilder()
+            .appendValue(IsoFields.WEEK_BASED_YEAR, 4)
+            .appendLiteral("-W")
+            .appendValue(IsoFields.WEEK_OF_WEEK_BASED_YEAR, 2)
+            .toFormatter();
 
     private final DashboardReadModelQueryService dashboardReadModelQueryService;
     private final PeriodStatisticsReadModelQueryService periodStatisticsReadModelQueryService;
@@ -52,6 +63,14 @@ public class StatisticsAdminController {
             );
             searchForm.setStartDate(statistics.startDate());
             searchForm.setEndDate(statistics.endDate());
+            if (searchForm.getPeriodType() == StatisticsPeriodType.WEEKLY
+                    && searchForm.getWeek() == null) {
+                searchForm.setWeek(statistics.startDate().format(WEEK_FORMATTER));
+            }
+            if (searchForm.getPeriodType() == StatisticsPeriodType.MONTHLY
+                    && searchForm.getYearMonth() == null) {
+                searchForm.setYearMonth(YearMonth.from(statistics.startDate()));
+            }
             model.addAttribute("statistics", statistics);
         } catch (BusinessException e) {
             if (e.getErrorCode() != StatisticsErrorCode.INVALID_DATE_RANGE
