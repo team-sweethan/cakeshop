@@ -20,20 +20,21 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.stream.Stream;
 
+import com.cakeshop.domain.community.dto.command.PostUpdateCommand;
 import com.cakeshop.domain.community.dto.form.CommentForm;
 import com.cakeshop.domain.community.dto.form.PostForm;
 import com.cakeshop.domain.community.dto.form.ReportForm;
-import com.cakeshop.domain.community.dto.view.CommentCountView;
+import com.cakeshop.domain.community.dto.query.CommentCountRow;
 import com.cakeshop.domain.community.dto.view.CommentSectionView;
-import com.cakeshop.domain.community.dto.view.CommentRow;
+import com.cakeshop.domain.community.dto.query.CommentRow;
 import com.cakeshop.domain.community.dto.view.CommentView;
 import com.cakeshop.domain.community.dto.view.PopularPostView;
 import com.cakeshop.domain.community.dto.view.PopularSectionView;
-import com.cakeshop.domain.community.dto.view.PostDetailRow;
+import com.cakeshop.domain.community.dto.query.PostDetailRow;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
-import com.cakeshop.domain.community.dto.view.PostListRow;
+import com.cakeshop.domain.community.dto.query.PostListRow;
 import com.cakeshop.domain.community.dto.view.PostListView;
-import com.cakeshop.domain.community.dto.view.PostLockView;
+import com.cakeshop.domain.community.dto.query.PostLockRow;
 import com.cakeshop.domain.community.dto.view.PostSort;
 import com.cakeshop.domain.community.entity.Comment;
 import com.cakeshop.domain.community.entity.CommentStatus;
@@ -95,7 +96,11 @@ class CommunityServiceTests {
         memberCommunityQueryService = mock(MemberCommunityQueryService.class);
         when(memberCommunityQueryService.getMembersByIds(anyList())).thenReturn(List.of());
         communityService = new CommunityService(
-                communityMapper, memberCommunityQueryService, fixedClockAt(NOW));
+                communityMapper, memberCommunityQueryService, readerAt(NOW));
+    }
+
+    private PopularPostReader readerAt(LocalDateTime now) {
+        return new PopularPostReader(communityMapper, fixedClockAt(now));
     }
 
     /** 서울 기준 고정 시계를 만든다. */
@@ -321,7 +326,7 @@ class CommunityServiceTests {
     void getPopularSection_staleRanking_warnsOnlyAfterGrace(
             LocalDate rankingDate, LocalDateTime now, boolean expectWarning) {
         CommunityService serviceAt = new CommunityService(
-                communityMapper, memberCommunityQueryService, fixedClockAt(now));
+                communityMapper, memberCommunityQueryService, readerAt(now));
         givenConfirmedRanking(rankingDate, popular(1, 11L));
 
         List<String> warnings = warningsWhile(() -> serviceAt.getPopularSection(null, FIRST_PAGE));
@@ -383,10 +388,10 @@ class CommunityServiceTests {
 
         communityService.updatePost(POST_ID, formOf(CATEGORY_ID, "고친 제목", "고친 본문"), AUTHOR_ID);
 
-        Post updated = capturedUpdate();
-        assertThat(updated.getId()).isEqualTo(POST_ID);
-        assertThat(updated.getMemberId()).isEqualTo(AUTHOR_ID);
-        assertThat(updated.getTitle()).isEqualTo("고친 제목");
+        PostUpdateCommand updated = capturedUpdate();
+        assertThat(updated.postId()).isEqualTo(POST_ID);
+        assertThat(updated.memberId()).isEqualTo(AUTHOR_ID);
+        assertThat(updated.title()).isEqualTo("고친 제목");
     }
 
     /** 다른 작성자의 글과 삭제 글은 찾을 수 없는 것으로, 차단 글은 작성자에게도 차단으로 처리한다. */
@@ -500,7 +505,7 @@ class CommunityServiceTests {
     void getComments_countsPlaceholdersForLoadMoreButNotForDisplayedCount() {
         when(communityMapper.findRecentComments(anyLong(), anyInt()))
                 .thenReturn(List.of(commentOf(1L, CommentStatus.DELETED)));
-        when(communityMapper.countComments(POST_ID)).thenReturn(new CommentCountView(5L, 3L));
+        when(communityMapper.countComments(POST_ID)).thenReturn(new CommentCountRow(5L, 3L));
 
         CommentSectionView section = communityService.getComments(POST_ID, null);
 
@@ -671,7 +676,7 @@ class CommunityServiceTests {
     /** status가 null이면 없는 글로 둔다. */
     private void givenLockedPost(PostStatus status) {
         when(communityMapper.lockPost(POST_ID))
-                .thenReturn(status == null ? null : new PostLockView(AUTHOR_ID, status));
+                .thenReturn(status == null ? null : new PostLockRow(AUTHOR_ID, status));
     }
 
     private Comment capturedComment() {
@@ -690,7 +695,7 @@ class CommunityServiceTests {
         when(communityMapper.findRecentComments(anyLong(), anyInt()))
                 .thenReturn(List.of(comments));
         when(communityMapper.countComments(POST_ID))
-                .thenReturn(new CommentCountView(comments.length, comments.length));
+                .thenReturn(new CommentCountRow(comments.length, comments.length));
     }
 
     private void givenComment(long authorId, CommentStatus status) {
@@ -746,7 +751,7 @@ class CommunityServiceTests {
     /** 실행 중 발생한 CommunityService 경고를 모은다. */
     private List<String> warningsWhile(Runnable action) {
         ch.qos.logback.classic.Logger logger = (ch.qos.logback.classic.Logger)
-                LoggerFactory.getLogger(CommunityService.class);
+                LoggerFactory.getLogger(PopularPostReader.class);
         ListAppender<ILoggingEvent> appender = new ListAppender<>();
         appender.start();
         logger.addAppender(appender);
@@ -851,8 +856,9 @@ class CommunityServiceTests {
         return form;
     }
 
-    private Post capturedUpdate() {
-        ArgumentCaptor<Post> captor = ArgumentCaptor.forClass(Post.class);
+    private PostUpdateCommand capturedUpdate() {
+        ArgumentCaptor<PostUpdateCommand> captor =
+                ArgumentCaptor.forClass(PostUpdateCommand.class);
         verify(communityMapper).updatePost(captor.capture());
 
         return captor.getValue();

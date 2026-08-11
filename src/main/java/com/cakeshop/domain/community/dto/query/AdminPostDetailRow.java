@@ -1,4 +1,4 @@
-package com.cakeshop.domain.community.dto.view;
+package com.cakeshop.domain.community.dto.query;
 
 import com.cakeshop.domain.community.entity.PostStatus;
 
@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
  * ******************************
  *
  * <p>차단 관리자를 닉네임이 아니라 {@code blockedBy} ID 로 들고 있다. 차단 기록이 없으면
- * null 이고, 그 자리는 {@link AdminPostDetailView#of}가 처리한다. 원래 SQL 도 LEFT JOIN
+ * null 이고, 그 자리는 Service의 화면 조립 단계가 처리한다. 원래 SQL도 LEFT JOIN
  * 이었으므로 null 이 정상인 것은 그대로다.</p>
  */
 public record AdminPostDetailRow(

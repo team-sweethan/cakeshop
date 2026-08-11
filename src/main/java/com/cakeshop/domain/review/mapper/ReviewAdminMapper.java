@@ -5,8 +5,8 @@ import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
-import com.cakeshop.domain.review.dto.view.AdminReviewFilter;
-import com.cakeshop.domain.review.dto.view.ReviewRow;
+import com.cakeshop.domain.review.dto.query.AdminReviewFilter;
+import com.cakeshop.domain.review.dto.query.ReviewRow;
 import com.cakeshop.domain.review.entity.ReviewStatus;
 
 @Mapper

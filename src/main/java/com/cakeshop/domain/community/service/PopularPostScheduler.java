@@ -3,6 +3,8 @@ package com.cakeshop.domain.community.service;
 import java.time.Clock;
 import java.time.LocalDate;
 
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -18,6 +20,7 @@ import org.springframework.stereotype.Component;
  * 실패까지 하루가 걸린다. 대신 고정한 시계로 '어제'를 넘기는지만 본다.
  */
 @Component
+@RequiredArgsConstructor
 public class PopularPostScheduler {
 
     /**
@@ -34,11 +37,6 @@ public class PopularPostScheduler {
 
     private final PopularPostBatchService popularPostBatchService;
     private final Clock clock;
-
-    public PopularPostScheduler(PopularPostBatchService popularPostBatchService, Clock clock) {
-        this.popularPostBatchService = popularPostBatchService;
-        this.clock = clock;
-    }
 
     /**
      * 대상은 <b>전날</b>이다. 오늘을 집계하면 아직 끝나지 않은 하루를 확정하게 되고,

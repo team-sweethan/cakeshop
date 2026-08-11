@@ -23,11 +23,12 @@ import com.cakeshop.domain.product.service.ProductQueryService;
 import com.cakeshop.domain.product.service.ProductReviewCommandService;
 import com.cakeshop.domain.review.dto.form.ReviewEditForm;
 import com.cakeshop.domain.review.dto.form.ReviewWriteForm;
+import com.cakeshop.domain.review.dto.command.ReviewUpdateCommand;
+import com.cakeshop.domain.review.dto.query.ProductRatingAggregate;
+import com.cakeshop.domain.review.dto.query.ReviewRow;
 import com.cakeshop.domain.review.dto.view.MyReviewView;
-import com.cakeshop.domain.review.dto.view.ProductRatingAggregate;
 import com.cakeshop.domain.review.dto.view.ProductReviewView;
 import com.cakeshop.domain.review.dto.view.ReviewReplyView;
-import com.cakeshop.domain.review.dto.view.ReviewRow;
 import com.cakeshop.domain.review.entity.Review;
 import com.cakeshop.domain.review.entity.ReviewStatus;
 import com.cakeshop.domain.review.error.ReviewErrorCode;
@@ -107,7 +108,7 @@ public class ReviewService {
 
         List<MyReviewView> content = rows.stream()
                 .map(row -> MyReviewView.from(
-                        row, snapshots.get(row.getOrderItemId()), replies.get(row.getId())))
+                        row, snapshots.get(row.orderItemId()), replies.get(row.id())))
                 .toList();
 
         return new PageResult<>(content, pageRequest, total);
@@ -119,7 +120,7 @@ public class ReviewService {
 
         return MyReviewView.from(
                 review,
-                findOrderSnapshots(List.of(review)).get(review.getOrderItemId()),
+                findOrderSnapshots(List.of(review)).get(review.orderItemId()),
                 null);
     }
 
@@ -159,10 +160,10 @@ public class ReviewService {
     public void edit(long reviewId, ReviewEditForm form, long memberId) {
         ReviewRow review = requireEditableReview(reviewId, memberId);
 
-        productReviewCommandService.lockForRating(review.getProductId());
+        productReviewCommandService.lockForRating(review.productId());
 
         requireApplied(
-                reviewMapper.update(Review.edit(
+                reviewMapper.update(new ReviewUpdateCommand(
                         reviewId,
                         memberId,
                         form.getOverallRating(),
@@ -173,18 +174,18 @@ public class ReviewService {
                 reviewId,
                 memberId);
 
-        recalculateRating(review.getProductId());
+        recalculateRating(review.productId());
     }
 
     @Transactional
     public void delete(long reviewId, long memberId) {
         ReviewRow review = requireEditableReview(reviewId, memberId);
 
-        productReviewCommandService.lockForRating(review.getProductId());
+        productReviewCommandService.lockForRating(review.productId());
 
         requireApplied(reviewMapper.deleteByAuthor(reviewId, memberId), reviewId, memberId);
 
-        recalculateRating(review.getProductId());
+        recalculateRating(review.productId());
     }
 
     private ReviewRow requireEditableReview(long reviewId, long memberId) {
@@ -193,12 +194,12 @@ public class ReviewService {
 
     private ReviewRow requireEditable(ReviewRow review, long memberId) {
         if (review == null
-                || !Objects.equals(review.getMemberId(), memberId)
-                || review.getStatus() == ReviewStatus.DELETED) {
+                || !Objects.equals(review.memberId(), memberId)
+                || review.status() == ReviewStatus.DELETED) {
             throw new BusinessException(ReviewErrorCode.REVIEW_NOT_FOUND);
         }
 
-        if (review.getStatus() == ReviewStatus.BLOCKED) {
+        if (review.status() == ReviewStatus.BLOCKED) {
             throw new BusinessException(ReviewErrorCode.BLOCKED_REVIEW);
         }
 
@@ -223,7 +224,7 @@ public class ReviewService {
         ProductRatingAggregate aggregate = reviewMapper.aggregateForUpdate(productId);
 
         productReviewCommandService.applyReviewAggregate(
-                productId, aggregate.getAverageRating(), aggregate.getReviewCount());
+                productId, aggregate.averageRating(), aggregate.reviewCount());
     }
 
     private void requireVisibleProduct(long productId) {
@@ -240,13 +241,13 @@ public class ReviewService {
 
         return rows.stream()
                 .map(row -> ProductReviewView.from(
-                        row, authors.get(row.getMemberId()), replies.get(row.getId())))
+                        row, authors.get(row.memberId()), replies.get(row.id())))
                 .toList();
     }
 
     private Map<Long, ReviewReplyView> findReplies(List<ReviewRow> rows) {
         List<Long> reviewIds = rows.stream()
-                .map(ReviewRow::getId)
+                .map(ReviewRow::id)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
@@ -256,12 +257,13 @@ public class ReviewService {
         }
 
         return reviewReplyMapper.findByReviewIds(reviewIds).stream()
-                .collect(Collectors.toMap(ReviewReplyView::getReviewId, Function.identity()));
+                .map(ReviewReplyView::from)
+                .collect(Collectors.toMap(ReviewReplyView::reviewId, Function.identity()));
     }
 
     private Map<Long, MemberReviewView> findAuthors(List<ReviewRow> rows) {
         List<Long> memberIds = rows.stream()
-                .map(ReviewRow::getMemberId)
+                .map(ReviewRow::memberId)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
@@ -272,7 +274,7 @@ public class ReviewService {
 
     private Map<Long, OrderReviewSnapshotView> findOrderSnapshots(List<ReviewRow> rows) {
         List<Long> orderItemIds = rows.stream()
-                .map(ReviewRow::getOrderItemId)
+                .map(ReviewRow::orderItemId)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();

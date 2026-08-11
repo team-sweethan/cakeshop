@@ -155,7 +155,7 @@ class AdminPageControllerTests {
                         List.of(),
                         List.of()
                 ));
-        when(periodStatisticsReadModelQueryService.getStatistics(null, null))
+        when(periodStatisticsReadModelQueryService.getStatistics(any()))
                 .thenReturn(new PeriodStatisticsView(
                         LocalDate.of(2026, 7, 28),
                         LocalDate.of(2026, 8, 3),

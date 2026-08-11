@@ -83,10 +83,11 @@ class CommunityAdminControllerTests {
     @Test
     void list_statusAndSort_arePassedToService() throws Exception {
         mockMvc.perform(get("/admin/community")
-                        .param("status", "BLOCKED")
+                .param("status", "BLOCKED")
                         .param("sort", "REPORTS"))
                 .andExpect(status().isOk())
-                .andExpect(view().name("admin/community/list"));
+                .andExpect(view().name("admin/community/list"))
+                .andExpect(model().attributeExists("statusOptions", "sortOptions"));
 
         verify(communityAdminService)
                 .getPosts(eq(PostStatus.BLOCKED), eq(AdminPostSort.REPORTS), any());

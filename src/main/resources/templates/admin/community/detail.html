@@ -43,9 +43,12 @@
               <div class="data-row">
                 <span class="data-row__label">상태</span>
                 <span>
-                  <span th:if="${post.status.name() == 'PUBLISHED'}" class="badge badge--success">노출 중</span>
-                  <span th:if="${post.status.name() == 'BLOCKED'}" class="badge badge--danger">차단됨</span>
-                  <span th:if="${post.status.name() == 'DELETED'}" class="badge">삭제됨</span>
+                  <span th:if="${post.status.name() == 'PUBLISHED'}" class="badge badge--success"
+                        th:text="${post.status.label}">상태</span>
+                  <span th:if="${post.status.name() == 'BLOCKED'}" class="badge badge--danger"
+                        th:text="${post.status.label}">상태</span>
+                  <span th:if="${post.status.name() == 'DELETED'}" class="badge"
+                        th:text="${post.status.label}">상태</span>
                 </span>
               </div>
             </div>
@@ -118,9 +121,12 @@
                   <span class="cluster">
                     <span class="text-muted"
                           th:text="${#temporals.format(report.createdAt, 'yyyy.MM.dd')}">2026.01.01</span>
-                    <span th:if="${report.status.name() == 'PENDING'}" class="badge badge--danger">미처리</span>
-                    <span th:if="${report.status.name() == 'RESOLVED'}" class="badge badge--success">처리 완료</span>
-                    <span th:if="${report.status.name() == 'REJECTED'}" class="badge">기각됨</span>
+                    <span th:if="${report.status.name() == 'PENDING'}" class="badge badge--danger"
+                          th:text="${report.status.label}">상태</span>
+                    <span th:if="${report.status.name() == 'RESOLVED'}" class="badge badge--success"
+                          th:text="${report.status.label}">상태</span>
+                    <span th:if="${report.status.name() == 'REJECTED'}" class="badge"
+                          th:text="${report.status.label}">상태</span>
                   </span>
                 </div>
                 <p th:text="${report.reason}" style="white-space:pre-wrap">신고 사유</p>

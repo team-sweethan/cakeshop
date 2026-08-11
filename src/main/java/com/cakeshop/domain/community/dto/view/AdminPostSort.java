@@ -11,9 +11,25 @@ package com.cakeshop.domain.community.dto.view;
  */
 public enum AdminPostSort {
 
-    LATEST,
+    LATEST("LATEST", "최신순"),
 
-    REPORTS;
+    REPORTS("REPORTS", "신고 많은 순");
+
+    private final String parameter;
+    private final String label;
+
+    AdminPostSort(String parameter, String label) {
+        this.parameter = parameter;
+        this.label = label;
+    }
+
+    public String getParameter() {
+        return parameter;
+    }
+
+    public String getLabel() {
+        return label;
+    }
 
     public static AdminPostSort from(String value) {
         if (value == null) {

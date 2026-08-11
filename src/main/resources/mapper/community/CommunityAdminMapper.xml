@@ -11,7 +11,7 @@
 -->
 <mapper namespace="com.cakeshop.domain.community.mapper.CommunityAdminMapper">
     <select id="findReportsByPost"
-            resultType="com.cakeshop.domain.community.dto.view.ReportRow">
+            resultType="com.cakeshop.domain.community.dto.query.ReportRow">
 
         SELECT
         pr.id,
@@ -44,7 +44,7 @@
     </sql>
 
     <select id="findPostsForAdmin"
-            resultType="com.cakeshop.domain.community.dto.view.AdminPostListRow">
+            resultType="com.cakeshop.domain.community.dto.query.AdminPostListRow">
 
         SELECT
         p.id,
@@ -84,7 +84,7 @@
     </select>
 
     <select id="findPostByIdForAdmin"
-            resultType="com.cakeshop.domain.community.dto.view.AdminPostDetailRow">
+            resultType="com.cakeshop.domain.community.dto.query.AdminPostDetailRow">
 
         SELECT
         p.id,
