@@ -152,6 +152,9 @@ spring:
     url: "jdbc:mariadb://${RDS_ENDPOINT}:${RDS_PORT:3306}/${RDS_DATABASE}?sslMode=trust&connectionTimeZone=+09:00&forceConnectionTimeZoneToSession=true"
     username: ${RDS_USERNAME}
     password: ${RDS_PASSWORD}
+    hikari:
+      maximum-pool-size: 3
+      minimum-idle: 1
   flyway:
     # 애플리케이션 기동으로 공용 RDS 스키마가 변경되지 않도록 차단한다.
     # RDS 스키마 변경은 검토·승인된 별도 반영 절차로만 수행한다.
