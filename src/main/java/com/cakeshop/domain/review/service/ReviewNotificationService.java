@@ -1,7 +1,8 @@
 package com.cakeshop.domain.review.service;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -10,15 +11,11 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 // rollback-only 로 만들어, 잡아도 후기가 함께 사라진다. 그래서 커밋 이후로 미루고 실패는 여기서
 // 삼킨다 (specs/review-notification.md D2).
 @Service
+@Slf4j
+@RequiredArgsConstructor
 public class ReviewNotificationService {
 
-    private static final Logger log = LoggerFactory.getLogger(ReviewNotificationService.class);
-
     private final ReviewNotificationSender reviewNotificationSender;
-
-    public ReviewNotificationService(ReviewNotificationSender reviewNotificationSender) {
-        this.reviewNotificationSender = reviewNotificationSender;
-    }
 
     public void notifyNewReview(long reviewId, long authorId) {
         afterCommit(

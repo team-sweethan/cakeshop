@@ -2,7 +2,7 @@ package com.cakeshop.domain.payment.controller;
 
 import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
 import com.cakeshop.domain.payment.service.PaymentFacade;
-import com.cakeshop.domain.payment.service.PaymentQueryService;
+import com.cakeshop.domain.payment.service.PaymentCheckoutService;
 import com.cakeshop.domain.payment.dto.view.PaymentCheckoutView;
 import com.cakeshop.domain.payment.dto.view.PaymentCompletionView;
 import com.cakeshop.domain.payment.dto.view.PaymentFailureView;
@@ -41,7 +41,7 @@ class PaymentControllerTests {
     private PaymentFacade paymentFacade;
 
     @Mock
-    private PaymentQueryService paymentQueryService;
+    private PaymentCheckoutService paymentQueryService;
 
     private MockMvc mockMvc;
 

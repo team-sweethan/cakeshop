@@ -4,7 +4,11 @@
 
     <select id="findAvailableCouponsForMember"
             resultType="com.cakeshop.domain.coupon.dto.view.CouponOrderAvailableView">
-        SELECT mc.id AS memberCouponId, c.name
+        SELECT mc.id AS memberCouponId,
+               c.name,
+               c.discount_type AS discountType,
+               c.discount_value AS discountValue,
+               c.maximum_discount_amount AS maximumDiscountAmount
         FROM member_coupons mc INNER JOIN coupons c ON c.id = mc.coupon_id
         WHERE mc.member_id = #{memberId} AND mc.status = 'AVAILABLE'
           AND c.status = 'ACTIVE' AND c.starts_at &lt;= NOW(6) AND c.expires_at &gt; NOW(6)

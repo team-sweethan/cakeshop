@@ -2,6 +2,8 @@ package com.cakeshop.domain.review.controller;
 
 import jakarta.validation.Valid;
 
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -25,13 +27,10 @@ import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.security.MemberDetails;
 
 @Controller
+@RequiredArgsConstructor
 public class ReviewController {
 
     private final ReviewService reviewService;
-
-    public ReviewController(ReviewService reviewService) {
-        this.reviewService = reviewService;
-    }
 
     @GetMapping("/mypage/reviews/writable")
     public String writableList(
@@ -134,11 +133,11 @@ public class ReviewController {
         MyReviewView review =
                 reviewService.getEditableReview(reviewId, memberDetails.getMemberId());
 
-        reviewEditForm.setOverallRating(review.overallRating());
-        reviewEditForm.setTasteRating(review.tasteRating());
-        reviewEditForm.setDesignRating(review.designRating());
-        reviewEditForm.setServiceRating(review.serviceRating());
-        reviewEditForm.setContent(review.content());
+        reviewEditForm.setOverallRating(review.getOverallRating());
+        reviewEditForm.setTasteRating(review.getTasteRating());
+        reviewEditForm.setDesignRating(review.getDesignRating());
+        reviewEditForm.setServiceRating(review.getServiceRating());
+        reviewEditForm.setContent(review.getContent());
         model.addAttribute("review", review);
 
         return "customer/review/edit";

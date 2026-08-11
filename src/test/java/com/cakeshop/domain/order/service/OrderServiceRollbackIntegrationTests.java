@@ -5,7 +5,7 @@ import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.member.service.MemberCouponQueryService;
 import com.cakeshop.domain.order.dto.form.customer.GeneralOrderForm;
 import com.cakeshop.domain.payment.error.PaymentErrorCode;
-import com.cakeshop.domain.payment.service.PaymentPreparationService;
+import com.cakeshop.domain.payment.service.PaymentOrderPreparationCommandService;
 import com.cakeshop.domain.product.dto.view.ProductOptionGroupView;
 import com.cakeshop.domain.product.dto.view.ProductOptionItemView;
 import com.cakeshop.domain.product.dto.view.ProductSalesInfo;
@@ -48,6 +48,7 @@ import static org.mockito.Mockito.when;
 @MybatisTest
 @Import({
         OrderServiceImpl.class,
+        PickupAvailabilityPolicy.class,
         OrderOptionValidator.class
 })
 @MariaDbIntegrationTest
@@ -75,7 +76,7 @@ class OrderServiceRollbackIntegrationTests {
     private StoreService storeService;
 
     @MockitoBean
-    private PaymentPreparationService paymentPreparationService;
+    private PaymentOrderPreparationCommandService paymentPreparationService;
 
     @MockitoBean
     private Clock clock;

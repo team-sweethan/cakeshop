@@ -1,13 +1,8 @@
 package com.cakeshop.domain.payment.service;
 
-import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
 import com.cakeshop.domain.member.service.MemberService;
-import com.cakeshop.domain.order.entity.Order;
-import com.cakeshop.domain.order.entity.OrderItem;
-import com.cakeshop.domain.order.entity.OrderStatus;
-import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.order.error.OrderErrorCode;
-import com.cakeshop.domain.order.mapper.OrderMapper;
+import com.cakeshop.domain.order.service.OrderPaymentCancellationCommandService;
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.entity.PaymentCancellation;
 import com.cakeshop.domain.payment.entity.PaymentCancellationStatus;
@@ -15,7 +10,6 @@ import com.cakeshop.domain.payment.entity.PaymentStatus;
 import com.cakeshop.domain.payment.error.PaymentErrorCode;
 import com.cakeshop.domain.payment.infra.TossPaymentClient.CancellationResult;
 import com.cakeshop.domain.payment.mapper.PaymentMapper;
-import com.cakeshop.domain.product.service.ProductStockService;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.error.CommonErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -36,12 +30,9 @@ public class RefundService {
     private static final String CUSTOMER = "CUSTOMER";
     private static final String ADMIN = "ADMIN";
 
-    private final OrderMapper orderMapper;
     private final PaymentMapper paymentMapper;
-    private final ProductStockService productStockService;
+    private final OrderPaymentCancellationCommandService orderPaymentCancellationCommandService;
     private final MemberService memberService;
-    // 쿠폰 담당자의 공개 계약으로 취소·환불 완료 주문에 사용된 쿠폰을 복구한다.
-    private final CouponOrderCommandService couponOrderCommandService;
     private final Clock clock;
 
     /** 회원 소유권과 현재 상태를 검증하고 PG 호출 전에 취소 요청을 저장한다. */
@@ -49,17 +40,16 @@ public class RefundService {
     public RefundRequest prepareCustomerCancellation(long memberId, long orderId, String reason) {
         validateCancellationInput(memberId, reason);
         validateActiveMember(memberId);
-        Order order = findOwnedOrder(memberId, orderId);
-        return prepareCancellation(memberId, order, reason, CUSTOMER);
+        orderPaymentCancellationCommandService.lockCustomerOrderForPaymentCancellation(memberId, orderId);
+        return prepareCancellation(memberId, orderId, reason, CUSTOMER);
     }
 
     /** 인증된 관리자 식별자와 현재 상태를 검증하고 일반 상품 취소 요청을 저장한다. */
     @Transactional
     public RefundRequest prepareAdminCancellation(long adminMemberId, long orderId, String reason) {
         validateCancellationInput(adminMemberId, reason);
-        Order order = orderMapper.findOrderByIdForUpdate(orderId)
-                .orElseThrow(() -> new BusinessException(CommonErrorCode.NOT_FOUND));
-        return prepareCancellation(adminMemberId, order, reason, ADMIN);
+        orderPaymentCancellationCommandService.lockOrderForPaymentCancellation(orderId);
+        return prepareCancellation(adminMemberId, orderId, reason, ADMIN);
     }
 
     /**
@@ -70,27 +60,26 @@ public class RefundService {
     public boolean cancelCustomerZeroAmountOrder(long memberId, long orderId, String reason) {
         validateCancellationInput(memberId, reason);
         validateActiveMember(memberId);
-        return cancelZeroAmountOrder(findOwnedOrder(memberId, orderId), reason, CUSTOMER);
+        orderPaymentCancellationCommandService.lockCustomerOrderForPaymentCancellation(memberId, orderId);
+        return cancelZeroAmountOrder(orderId, reason, CUSTOMER);
     }
 
     /** 관리자가 요청한 0원 일반 주문 취소를 PG 호출 없이 완료한다. */
     @Transactional
     public boolean cancelAdminZeroAmountOrder(long adminMemberId, long orderId, String reason) {
         validateCancellationInput(adminMemberId, reason);
-        Order order = orderMapper.findOrderByIdForUpdate(orderId)
-                .orElseThrow(() -> new BusinessException(CommonErrorCode.NOT_FOUND));
-        return cancelZeroAmountOrder(order, reason, ADMIN);
+        orderPaymentCancellationCommandService.lockOrderForPaymentCancellation(orderId);
+        return cancelZeroAmountOrder(orderId, reason, ADMIN);
     }
 
     private RefundRequest prepareCancellation(
             long requestedBy,
-            Order order,
+            long orderId,
             String reason,
             String canceledBy
     ) {
         LocalDateTime now = LocalDateTime.now(clock);
-        requireGeneralReadyForPickup(order);
-        Payment payment = paymentMapper.findDonePaymentByOrderId(order.getId())
+        Payment payment = paymentMapper.findDonePaymentByOrderId(orderId)
                 .orElseThrow(() -> new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_NOT_AVAILABLE));
         if (payment.getPaymentKey() == null || payment.getPaymentKey().isBlank()) {
             throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_NOT_AVAILABLE);
@@ -100,19 +89,14 @@ public class RefundService {
                 .findRequestedCancellationByPaymentId(payment.getId())
                 .orElse(null);
         if (requestedCancellation != null) {
-            OrderStatus expectedStatus = requireGeneralCancelableStatus(
-                    order,
-                    requestedCancellation.getRequestedAt()
-            );
             return reuseRequestedCancellation(
                     requestedCancellation,
                     payment,
-                    order,
-                    expectedStatus
+                    orderId
             );
         }
 
-        OrderStatus expectedStatus = requireGeneralCancelableStatus(order, now);
+        requireGeneralPaymentCancellationAvailable(orderId, now);
         PaymentCancellation cancellation = new PaymentCancellation();
         cancellation.setPaymentId(payment.getId());
         cancellation.setIdempotencyKey("CANCEL-" + UUID.randomUUID());
@@ -126,8 +110,7 @@ public class RefundService {
 
         return new RefundRequest(
                 cancellation.getId(),
-                order.getId(),
-                expectedStatus,
+                orderId,
                 payment.getPaymentKey(),
                 cancellation.getIdempotencyKey(),
                 cancellation.getCancelReason(),
@@ -136,30 +119,24 @@ public class RefundService {
         );
     }
 
-    private boolean cancelZeroAmountOrder(Order order, String reason, String canceledBy) {
-        requireGeneralReadyForPickup(order);
-        Payment payment = paymentMapper.findDonePaymentByOrderId(order.getId())
+    private boolean cancelZeroAmountOrder(long orderId, String reason, String canceledBy) {
+        Payment payment = paymentMapper.findDonePaymentByOrderId(orderId)
                 .orElseThrow(() -> new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_NOT_AVAILABLE));
         if (payment.getAmount() == null || payment.getAmount().signum() != 0) {
             return false;
         }
 
         LocalDateTime canceledAt = LocalDateTime.now(clock);
-        OrderStatus expectedStatus = requireGeneralCancelableStatus(order, canceledAt);
+        requireGeneralPaymentCancellationAvailable(orderId, canceledAt);
         requireOneRow(paymentMapper.cancelIfDone(payment.getId(), "ZERO_AMOUNT_CANCELED", canceledAt));
-        requireOneRow(orderMapper.cancelIfCurrent(
-                order.getId(), expectedStatus, canceledBy, reason.trim(), canceledAt
-        ));
-        couponOrderCommandService.restoreCouponForCanceledOrder(order.getId());
-        restoreDeductedStock(order, canceledAt);
+        completeOrderCancellation(orderId, canceledBy, reason.trim(), canceledAt, canceledAt);
         return true;
     }
 
     private RefundRequest reuseRequestedCancellation(
             PaymentCancellation cancellation,
             Payment payment,
-            Order order,
-            OrderStatus expectedStatus
+            long orderId
     ) {
         if (cancellation.getStatus() != PaymentCancellationStatus.REQUESTED
                 || !Long.valueOf(payment.getId()).equals(cancellation.getPaymentId())
@@ -173,10 +150,10 @@ public class RefundService {
                 || cancellation.getRequestedAt() == null) {
             throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_NOT_AVAILABLE);
         }
+        requireGeneralPaymentCancellationAvailable(orderId, cancellation.getRequestedAt());
         return new RefundRequest(
                 cancellation.getId(),
-                order.getId(),
-                expectedStatus,
+                orderId,
                 payment.getPaymentKey(),
                 cancellation.getIdempotencyKey(),
                 cancellation.getCancelReason(),
@@ -209,45 +186,37 @@ public class RefundService {
             throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_COMPLETE_FAILED);
         }
 
-        Order order = orderMapper.findOrderById(request.orderId())
-                .orElseThrow(() -> new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_COMPLETE_FAILED));
         if (cancellation.getStatus() == PaymentCancellationStatus.DONE) {
             if (payment.getStatus() != PaymentStatus.CANCELED
-                    || order.getStatus() != OrderStatus.CANCELED
+                    || !orderPaymentCancellationCommandService.isGeneralPaymentCancellationCompleted(request.orderId())
                     || !Objects.equals(cancellation.getTransactionKey(), result.transactionKey())) {
                 throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_COMPLETE_FAILED);
             }
-            // 이전 완료 요청을 재처리해도 쿠폰 복구는 주문 ID 기준으로 멱등 수행한다.
-            couponOrderCommandService.restoreCouponForCanceledOrder(order.getId());
+            completeOrderCancellation(
+                    request.orderId(),
+                    request.canceledBy(),
+                    cancellation.getCancelReason(),
+                    request.requestedAt(),
+                    result.canceledAt()
+            );
             return;
         }
         if (cancellation.getStatus() != PaymentCancellationStatus.REQUESTED) {
             throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_COMPLETE_FAILED);
         }
         LocalDateTime canceledAt = result.canceledAt();
-        OrderStatus currentExpectedStatus = requireGeneralCancelableStatus(
-                order,
-                request.requestedAt()
-        );
-        if (currentExpectedStatus != request.expectedStatus()) {
-            throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_COMPLETE_FAILED);
-        }
-
         requirePositive(paymentMapper.completeCancellationIfRequested(
                 cancellation.getId(),
                 result.transactionKey(),
                 canceledAt
         ));
-        requireOneRow(orderMapper.cancelIfCurrent(
-                order.getId(),
-                currentExpectedStatus,
+        completeOrderCancellation(
+                request.orderId(),
                 request.canceledBy(),
                 cancellation.getCancelReason(),
-                request.requestedAt()
-        ));
-        // 쿠폰 도메인 공개 계약: 취소가 확정된 주문에 사용한 쿠폰만 복구한다.
-        couponOrderCommandService.restoreCouponForCanceledOrder(order.getId());
-        restoreDeductedStock(order, canceledAt);
+                request.requestedAt(),
+                canceledAt
+        );
     }
 
     @Transactional
@@ -273,35 +242,8 @@ public class RefundService {
     private RefundRequest toRefundRequest(PaymentCancellation cancellation) {
         Payment payment = paymentMapper.findPaymentById(cancellation.getPaymentId())
                 .orElseThrow(() -> new BusinessException(PaymentErrorCode.PAYMENT_RECOVERY_PENDING));
-        Order order = orderMapper.findOrderById(payment.getOrderId())
-                .orElseThrow(() -> new BusinessException(PaymentErrorCode.PAYMENT_RECOVERY_PENDING));
-        OrderStatus expectedStatus = requireGeneralCancelableStatus(order, cancellation.getRequestedAt());
-        return reuseRequestedCancellation(cancellation, payment, order, expectedStatus);
-    }
-
-    private Order findOwnedOrder(long memberId, long orderId) {
-        Order order = orderMapper.findOrderByIdForUpdate(orderId)
-                .orElseThrow(() -> new BusinessException(CommonErrorCode.NOT_FOUND));
-        if (!Long.valueOf(memberId).equals(order.getMemberId())) {
-            throw new BusinessException(CommonErrorCode.NOT_FOUND);
-        }
-        return order;
-    }
-
-    private OrderStatus requireGeneralCancelableStatus(Order order, LocalDateTime canceledAt) {
-        requireGeneralReadyForPickup(order);
-        if (canceledAt != null && canceledAt.isBefore(order.getPickupAt())) {
-            return OrderStatus.READY_FOR_PICKUP;
-        }
-        throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_NOT_AVAILABLE);
-    }
-
-    private void requireGeneralReadyForPickup(Order order) {
-        if (order.getOrderType() != OrderType.GENERAL
-                || order.getStatus() != OrderStatus.READY_FOR_PICKUP
-                || order.getPickupAt() == null) {
-            throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_NOT_AVAILABLE);
-        }
+        requireGeneralPaymentCancellationAvailable(payment.getOrderId(), cancellation.getRequestedAt());
+        return reuseRequestedCancellation(cancellation, payment, payment.getOrderId());
     }
 
     private void validateCancellationInput(long requestedBy, String reason) {
@@ -316,17 +258,23 @@ public class RefundService {
         }
     }
 
-    private void restoreDeductedStock(Order order, LocalDateTime restoredAt) {
-        if (order.getOrderType() != OrderType.GENERAL) {
-            return;
+    private void requireGeneralPaymentCancellationAvailable(long orderId, LocalDateTime requestedAt) {
+        if (!orderPaymentCancellationCommandService.isGeneralPaymentCancellationAvailable(orderId, requestedAt)) {
+            throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_NOT_AVAILABLE);
         }
-        List<OrderItem> items = orderMapper.findStockDeductedItemsForRestore(order.getId());
-        for (OrderItem item : items) {
-            if (item.getProductId() == null || item.getQuantity() == null || item.getQuantity() <= 0) {
-                throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_COMPLETE_FAILED);
-            }
-            productStockService.restoreStock(item.getProductId(), item.getQuantity());
-            requireOneRow(orderMapper.markStockRestoredIfDeducted(item.getId(), restoredAt));
+    }
+
+    private void completeOrderCancellation(
+            long orderId,
+            String canceledBy,
+            String reason,
+            LocalDateTime requestedAt,
+            LocalDateTime canceledAt
+    ) {
+        if (!orderPaymentCancellationCommandService.completeGeneralPaymentCancellation(
+                orderId, canceledBy, reason, requestedAt, canceledAt
+        )) {
+            throw new BusinessException(PaymentErrorCode.PAYMENT_CANCEL_COMPLETE_FAILED);
         }
     }
 
@@ -345,7 +293,6 @@ public class RefundService {
     public record RefundRequest(
             long cancellationId,
             long orderId,
-            OrderStatus expectedStatus,
             String paymentKey,
             String idempotencyKey,
             String reason,

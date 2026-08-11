@@ -4,14 +4,11 @@
     <!-- 사용자 입력은 #{} 만 사용 (${} 금지) -->
 
     <select id="findPaymentsForAdmin"
-            resultType="com.cakeshop.domain.payment.dto.view.PaymentAdminListRow">
+            resultType="com.cakeshop.domain.payment.dto.view.PaymentAdminPaymentRow">
         SELECT
             payment.id AS payment_id,
             payment.order_id,
-            current_order.order_number,
             payment.toss_order_id,
-            current_order.orderer_name,
-            current_order.order_type,
             payment.amount,
             payment.method,
             payment.status,
@@ -21,8 +18,6 @@
             payment.approved_at,
             payment.canceled_at
         FROM payments AS payment
-        INNER JOIN orders AS current_order
-            ON current_order.id = payment.order_id
         LEFT JOIN payment_cancellations AS cancellation
             ON cancellation.id = (
                 SELECT MAX(recent_cancellation.id)
@@ -79,7 +74,7 @@
             failure_code,
             failure_message
         )
-        SELECT
+        VALUES (
             #{orderId},
             #{tossOrderId},
             #{paymentKey},
@@ -90,10 +85,7 @@
             #{providerStatus},
             #{failureCode},
             #{failureMessage}
-        FROM orders AS current_order
-        WHERE current_order.id = #{orderId}
-          AND current_order.status = 'PENDING_PAYMENT'
-          AND current_order.final_amount = #{amount}
+        )
     </insert>
 
     <select id="findPaymentsByOrderId"
@@ -198,37 +190,30 @@
     </select>
 
     <update id="completeIfReady">
-        UPDATE payments AS payment
-        INNER JOIN orders AS current_order
-            ON current_order.id = payment.order_id
-        SET payment.status = 'DONE',
-            payment.payment_key = #{paymentKey},
-            payment.method = #{method},
-            payment.provider_status = #{providerStatus},
-            payment.approved_at = #{approvedAt},
-            payment.failure_code = NULL,
-            payment.failure_message = NULL
-        WHERE payment.id = #{paymentId}
-          AND payment.status = 'READY'
-          AND current_order.status = 'PENDING_PAYMENT'
+        UPDATE payments
+        SET status = 'DONE',
+            payment_key = #{paymentKey},
+            method = #{method},
+            provider_status = #{providerStatus},
+            approved_at = #{approvedAt},
+            failure_code = NULL,
+            failure_message = NULL
+        WHERE id = #{paymentId}
+          AND status = 'READY'
     </update>
 
     <update id="completeZeroAmountIfReady">
-        UPDATE payments AS payment
-        INNER JOIN orders AS current_order
-            ON current_order.id = payment.order_id
-        SET payment.status = 'DONE',
-            payment.payment_key = CONCAT('ZERO-', payment.id),
-            payment.method = 'ZERO_AMOUNT',
-            payment.provider_status = 'ZERO_AMOUNT',
-            payment.approved_at = #{approvedAt},
-            payment.failure_code = NULL,
-            payment.failure_message = NULL
-        WHERE payment.id = #{paymentId}
-          AND payment.status = 'READY'
-          AND payment.amount = 0
-          AND current_order.status = 'PENDING_PAYMENT'
-          AND current_order.final_amount = 0
+        UPDATE payments
+        SET status = 'DONE',
+            payment_key = CONCAT('ZERO-', id),
+            method = 'ZERO_AMOUNT',
+            provider_status = 'ZERO_AMOUNT',
+            approved_at = #{approvedAt},
+            failure_code = NULL,
+            failure_message = NULL
+        WHERE id = #{paymentId}
+          AND status = 'READY'
+          AND amount = 0
     </update>
 
     <update id="abortIfReady">

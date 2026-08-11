@@ -15,6 +15,9 @@ public interface StatisticsBatchRunMapper {
     /** RUNNING 실행을 등록하고 생성된 식별자를 전달받는다. */
     int insertRunningBatch(StatisticsBatchRun batchRun);
 
+    /** 아직 시작하지 않은 일별 RUNNING 실행을 제거한다. */
+    int deleteRunningDailyBatch(@Param("batchRunId") long batchRunId);
+
     /** heartbeat가 1시간 이상 지난 RUNNING 실행을 실패 처리한다. */
     int failExpiredRunningBatch();
 
@@ -23,6 +26,12 @@ public interface StatisticsBatchRunMapper {
 
     /** 백필 진행일과 생존 확인 시각을 함께 갱신한다. */
     int updateBackfillProgress(
+            @Param("batchRunId") long batchRunId,
+            @Param("lastCompletedDate") LocalDate lastCompletedDate
+    );
+
+    /** 수동 재집계 진행일과 생존 확인 시각을 함께 갱신한다. */
+    int updateRebuildProgress(
             @Param("batchRunId") long batchRunId,
             @Param("lastCompletedDate") LocalDate lastCompletedDate
     );

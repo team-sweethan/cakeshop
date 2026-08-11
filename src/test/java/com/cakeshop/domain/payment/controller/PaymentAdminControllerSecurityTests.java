@@ -2,7 +2,7 @@ package com.cakeshop.domain.payment.controller;
 
 import com.cakeshop.domain.payment.dto.view.PaymentAdminListView;
 import com.cakeshop.domain.payment.dto.view.PaymentAdminSummaryView;
-import com.cakeshop.domain.payment.service.PaymentAdminQueryService;
+import com.cakeshop.domain.payment.service.PaymentAdminService;
 import com.cakeshop.global.security.SecurityConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,7 +27,7 @@ class PaymentAdminControllerSecurityTests {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private PaymentAdminQueryService paymentAdminQueryService;
+    private PaymentAdminService paymentAdminQueryService;
 
     @Test
     @WithMockUser(roles = "USER")

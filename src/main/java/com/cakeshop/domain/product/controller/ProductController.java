@@ -27,7 +27,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 public class ProductController {
 
     /** 고객 상품 목록의 기본 페이지 크기. */
-    private static final int DEFAULT_PRODUCT_PAGE_SIZE = 6;
+    private static final int DEFAULT_PRODUCT_PAGE_SIZE = 8;
 
     /** 고객에게 공개할 상품 조회 기능을 제공하는 Service. */
     private final ProductService productService;
@@ -88,7 +88,7 @@ public class ProductController {
         Integer requestedPage = parsePositiveInteger(page);
         Integer requestedSize = parsePositiveInteger(size);
 
-        // size가 없으면 상품 카드 그리드에 맞춰 한 페이지에 6개를 표시한다.
+        // size가 없으면 상품 카드 그리드에 맞춰 한 페이지에 8개를 표시한다.
         Integer productPageSize =
                 requestedSize == null
                         ? DEFAULT_PRODUCT_PAGE_SIZE

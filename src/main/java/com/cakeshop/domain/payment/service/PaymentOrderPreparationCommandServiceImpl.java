@@ -15,7 +15,7 @@ import java.util.UUID;
 /** 주문에 연결된 READY 결제 생성을 구현한다. */
 @Service
 @RequiredArgsConstructor
-public class PaymentPreparationServiceImpl implements PaymentPreparationService {
+public class PaymentOrderPreparationCommandServiceImpl implements PaymentOrderPreparationCommandService {
 
     private final PaymentMapper paymentMapper;
 
@@ -29,16 +29,12 @@ public class PaymentPreparationServiceImpl implements PaymentPreparationService 
         Payment payment = new Payment();
         payment.setOrderId(orderId);
         payment.setTossOrderId(orderNumber);
-        payment.setIdempotencyKey("PAY-" + compactUuid());
+        payment.setIdempotencyKey("PAY-" + UUID.randomUUID());
         payment.setAmount(amount);
         payment.setStatus(PaymentStatus.READY);
 
         if (paymentMapper.insertReadyPayment(payment) != 1) {
             throw new BusinessException(PaymentErrorCode.PAYMENT_PREPARATION_FAILED);
         }
-    }
-
-    private String compactUuid() {
-        return UUID.randomUUID().toString().replace("-", "");
     }
 }

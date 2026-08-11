@@ -2,7 +2,7 @@ package com.cakeshop.domain.payment.controller;
 
 import com.cakeshop.domain.payment.dto.form.PaymentAdminSearchCondition;
 import com.cakeshop.domain.payment.dto.view.PaymentAdminListView;
-import com.cakeshop.domain.payment.service.PaymentAdminQueryService;
+import com.cakeshop.domain.payment.service.PaymentAdminService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 @RequiredArgsConstructor
 public class PaymentAdminController {
 
-    private final PaymentAdminQueryService paymentAdminQueryService;
+    private final PaymentAdminService paymentAdminService;
 
     @GetMapping("/admin/payments")
     public String payments(
@@ -26,7 +26,7 @@ public class PaymentAdminController {
         if (bindingResult.hasFieldErrors("status")) {
             condition.setStatus(null);
         }
-        PaymentAdminListView paymentList = paymentAdminQueryService.getPayments(condition);
+        PaymentAdminListView paymentList = paymentAdminService.getPayments(condition);
         condition.setStatus(paymentList.selectedStatus());
         model.addAttribute("paymentList", paymentList);
         return "admin/payment/list";

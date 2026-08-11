@@ -1,10 +1,9 @@
 package com.cakeshop.domain.payment.service;
 
-import com.cakeshop.domain.order.service.OrderService;
-import com.cakeshop.domain.order.service.customer.CustomerOrderQueryService;
-import com.cakeshop.domain.order.dto.view.OrderDetailView;
-import com.cakeshop.domain.order.service.OrderService.GeneralPaymentOrder;
-import com.cakeshop.domain.order.service.OrderService.PaymentProduct;
+import com.cakeshop.domain.order.service.OrderPaymentQueryService;
+import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentOrder;
+import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentExecutionOrder;
+import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentProduct;
 import com.cakeshop.domain.payment.dto.form.PaymentConfirmForm;
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.entity.PaymentStatus;
@@ -23,6 +22,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -47,13 +47,9 @@ class PaymentFacadeTests {
     );
 
     @Mock
-    private OrderService orderService;
+    private OrderPaymentQueryService orderPaymentQueryService;
 
-    @Mock
-    private CustomerOrderQueryService orderQueryService;
-
-    @Mock
-    private OrderDetailView ownedOrder;
+    private PaymentOrder ownedOrder;
 
     @Mock
     private PaymentService paymentService;
@@ -69,28 +65,38 @@ class PaymentFacadeTests {
     @BeforeEach
     void setUp() {
         paymentFacade = new PaymentFacade(
-                orderService,
-                orderQueryService,
+                orderPaymentQueryService,
                 paymentService,
-                paymentRecoveryService,
-                tossPaymentClient,
+                new PaymentCompensationProcessor(paymentRecoveryService, tossPaymentClient),
+                new TossPaymentApprovalResolver(tossPaymentClient),
                 CLOCK
         );
-        lenient().when(orderQueryService.getMemberOrder(10L, 1L))
+        ownedOrder = new PaymentOrder(
+                1L,
+                "ORD-100",
+                true,
+                true,
+                BigDecimal.valueOf(30_000),
+                BigDecimal.ZERO,
+                BigDecimal.valueOf(30_000),
+                NOW.plusDays(1),
+                NOW.plusMinutes(5),
+                "홍길동",
+                "010-1111-2222",
+                List.of()
+        );
+        lenient().when(orderPaymentQueryService.getMemberPaymentOrder(10L, 1L))
                 .thenReturn(ownedOrder);
-        lenient().when(ownedOrder.orderNumber()).thenReturn("ORD-100");
-        lenient().when(ownedOrder.finalAmount())
-                .thenReturn(BigDecimal.valueOf(30_000));
     }
 
     @Test
     void confirmGeneralPayment_validRequest_approvesAndCompletesPayment() {
-        GeneralPaymentOrder order = order(NOW.plusMinutes(5));
+        PaymentExecutionOrder order = order(NOW.plusMinutes(5));
         Payment payment = payment();
         PaymentConfirmForm form = form(BigDecimal.valueOf(30_000));
         ApprovalResult approval = approval();
 
-        when(orderService.getGeneralPaymentOrder(10L, 1L))
+        when(orderPaymentQueryService.getMemberGeneralPaymentOrder(10L, 1L))
                 .thenReturn(order);
         when(paymentService.getReadyPayment(1L)).thenReturn(payment);
         when(tossPaymentClient.approve(
@@ -111,10 +117,10 @@ class PaymentFacadeTests {
 
     @Test
     void completeZeroAmountGeneralPayment_expiredOrder_rejectsBeforeCompleting() {
-        GeneralPaymentOrder order = new GeneralPaymentOrder(
+        PaymentExecutionOrder order = new PaymentExecutionOrder(
                 1L, BigDecimal.ZERO, NOW, List.of()
         );
-        when(orderService.getGeneralPaymentOrder(10L, 1L)).thenReturn(order);
+        when(orderPaymentQueryService.getMemberGeneralPaymentOrder(10L, 1L)).thenReturn(order);
 
         assertPaymentError(
                 () -> paymentFacade.completeZeroAmountGeneralPayment(10L, 1L),
@@ -133,17 +139,17 @@ class PaymentFacadeTests {
 
         paymentFacade.completeZeroAmountGeneralPayment(10L, 1L);
 
-        verify(orderService, never()).getGeneralPaymentOrder(10L, 1L);
+        verify(orderPaymentQueryService, never()).getMemberGeneralPaymentOrder(10L, 1L);
         verify(paymentService, never()).getReadyPayment(1L);
     }
 
     @Test
     void confirmGeneralPayment_amountMismatch_doesNotCallToss() {
-        GeneralPaymentOrder order = order(NOW.plusMinutes(5));
+        PaymentExecutionOrder order = order(NOW.plusMinutes(5));
         Payment payment = payment();
         PaymentConfirmForm form = form(BigDecimal.valueOf(29_000));
 
-        when(orderService.getGeneralPaymentOrder(10L, 1L))
+        when(orderPaymentQueryService.getMemberGeneralPaymentOrder(10L, 1L))
                 .thenReturn(order);
         when(paymentService.getReadyPayment(1L)).thenReturn(payment);
 
@@ -171,9 +177,9 @@ class PaymentFacadeTests {
 
     @Test
     void confirmGeneralPayment_expiredOrder_doesNotLoadPayment() {
-        GeneralPaymentOrder order = order(NOW);
+        PaymentExecutionOrder order = order(NOW);
 
-        when(orderService.getGeneralPaymentOrder(10L, 1L))
+        when(orderPaymentQueryService.getMemberGeneralPaymentOrder(10L, 1L))
                 .thenReturn(order);
 
         assertPaymentError(
@@ -196,12 +202,12 @@ class PaymentFacadeTests {
 
     @Test
     void confirmGeneralPayment_tossOrderIdMismatch_doesNotCallToss() {
-        GeneralPaymentOrder order = order(NOW.plusMinutes(5));
+        PaymentExecutionOrder order = order(NOW.plusMinutes(5));
         Payment payment = payment();
         PaymentConfirmForm form = form(BigDecimal.valueOf(30_000));
         form.setTossOrderId("ORD-OTHER");
 
-        when(orderService.getGeneralPaymentOrder(10L, 1L))
+        when(orderPaymentQueryService.getMemberGeneralPaymentOrder(10L, 1L))
                 .thenReturn(order);
         when(paymentService.getReadyPayment(1L)).thenReturn(payment);
 
@@ -224,7 +230,7 @@ class PaymentFacadeTests {
 
     @Test
     void confirmGeneralPayment_approvalPaymentKeyMismatch_doesNotCompletePayment() {
-        GeneralPaymentOrder order = order(NOW.plusMinutes(5));
+        PaymentExecutionOrder order = order(NOW.plusMinutes(5));
         Payment payment = payment();
         PaymentConfirmForm form = form(BigDecimal.valueOf(30_000));
         ApprovalResult mismatchedApproval = new ApprovalResult(
@@ -236,7 +242,7 @@ class PaymentFacadeTests {
                 NOW.plusSeconds(10)
         );
 
-        when(orderService.getGeneralPaymentOrder(10L, 1L))
+        when(orderPaymentQueryService.getMemberGeneralPaymentOrder(10L, 1L))
                 .thenReturn(order);
         when(paymentService.getReadyPayment(1L)).thenReturn(payment);
         when(tossPaymentClient.approve(
@@ -287,7 +293,7 @@ class PaymentFacadeTests {
                 form(BigDecimal.valueOf(30_000))
         );
 
-        verify(orderService, never()).getGeneralPaymentOrder(10L, 1L);
+        verify(orderPaymentQueryService, never()).getMemberGeneralPaymentOrder(10L, 1L);
         verify(tossPaymentClient, never()).approve(
                 "payment-key",
                 "ORD-100",
@@ -334,7 +340,7 @@ class PaymentFacadeTests {
 
     @Test
     void confirmGeneralPayment_approvalTimeout_lookupDone_completesPayment() {
-        GeneralPaymentOrder order = order(NOW.plusMinutes(5));
+        PaymentExecutionOrder order = order(NOW.plusMinutes(5));
         Payment payment = payment();
         PaymentConfirmForm form = form(BigDecimal.valueOf(30_000));
         PaymentLookupResult lookup = new PaymentLookupResult(
@@ -346,7 +352,7 @@ class PaymentFacadeTests {
                 NOW.plusSeconds(10),
                 null
         );
-        when(orderService.getGeneralPaymentOrder(10L, 1L)).thenReturn(order);
+        when(orderPaymentQueryService.getMemberGeneralPaymentOrder(10L, 1L)).thenReturn(order);
         when(paymentService.getReadyPayment(1L)).thenReturn(payment);
         when(tossPaymentClient.find("payment-key"))
                 .thenReturn(Optional.empty())
@@ -369,11 +375,11 @@ class PaymentFacadeTests {
 
     @Test
     void confirmGeneralPayment_approvalAndLookupFailure_persistsRecoveryTarget() {
-        GeneralPaymentOrder order = order(NOW.plusMinutes(5));
+        PaymentExecutionOrder order = order(NOW.plusMinutes(5));
         Payment payment = payment();
         PaymentConfirmForm form = form(BigDecimal.valueOf(30_000));
         CompensationRequest request = compensationRequest();
-        when(orderService.getGeneralPaymentOrder(10L, 1L)).thenReturn(order);
+        when(orderPaymentQueryService.getMemberGeneralPaymentOrder(10L, 1L)).thenReturn(order);
         when(paymentService.getReadyPayment(1L)).thenReturn(payment);
         when(tossPaymentClient.find("payment-key"))
                 .thenReturn(Optional.empty())
@@ -404,10 +410,10 @@ class PaymentFacadeTests {
 
     @Test
     void confirmGeneralPayment_approvalFailureLookupEmpty_persistsRecoveryTarget() {
-        GeneralPaymentOrder order = order(NOW.plusMinutes(5));
+        PaymentExecutionOrder order = order(NOW.plusMinutes(5));
         Payment payment = payment();
         CompensationRequest request = compensationRequest();
-        when(orderService.getGeneralPaymentOrder(10L, 1L)).thenReturn(order);
+        when(orderPaymentQueryService.getMemberGeneralPaymentOrder(10L, 1L)).thenReturn(order);
         when(paymentService.getReadyPayment(1L)).thenReturn(payment);
         when(tossPaymentClient.find("payment-key")).thenReturn(Optional.empty());
         when(tossPaymentClient.approve(
@@ -433,7 +439,7 @@ class PaymentFacadeTests {
 
     @Test
     void confirmGeneralPayment_lookupInProgress_usesSameIdempotentApproval() {
-        GeneralPaymentOrder order = order(NOW.plusMinutes(5));
+        PaymentExecutionOrder order = order(NOW.plusMinutes(5));
         Payment payment = payment();
         ApprovalResult approval = approval();
         PaymentLookupResult inProgress = new PaymentLookupResult(
@@ -445,7 +451,7 @@ class PaymentFacadeTests {
                 null,
                 null
         );
-        when(orderService.getGeneralPaymentOrder(10L, 1L)).thenReturn(order);
+        when(orderPaymentQueryService.getMemberGeneralPaymentOrder(10L, 1L)).thenReturn(order);
         when(paymentService.getReadyPayment(1L)).thenReturn(payment);
         when(tossPaymentClient.find("payment-key"))
                 .thenReturn(Optional.of(inProgress));
@@ -467,7 +473,7 @@ class PaymentFacadeTests {
 
     @Test
     void confirmGeneralPayment_internalFailure_cancelsApprovedPayment() {
-        GeneralPaymentOrder order = order(NOW.plusMinutes(5));
+        PaymentExecutionOrder order = order(NOW.plusMinutes(5));
         Payment payment = payment();
         PaymentConfirmForm form = form(BigDecimal.valueOf(30_000));
         ApprovalResult approval = approval();
@@ -484,7 +490,7 @@ class PaymentFacadeTests {
                 "cancel-transaction",
                 NOW.plusSeconds(20)
         );
-        when(orderService.getGeneralPaymentOrder(10L, 1L)).thenReturn(order);
+        when(orderPaymentQueryService.getMemberGeneralPaymentOrder(10L, 1L)).thenReturn(order);
         when(paymentService.getReadyPayment(1L)).thenReturn(payment);
         when(tossPaymentClient.approve(
                 "payment-key",
@@ -513,12 +519,57 @@ class PaymentFacadeTests {
     }
 
     @Test
+    void confirmGeneralPayment_expiredDuringApproval_compensatesWithoutInternalCompletion() {
+        MutableClock clock = new MutableClock(NOW, ZoneId.of("Asia/Seoul"));
+        paymentFacade = new PaymentFacade(
+                orderPaymentQueryService,
+                paymentService,
+                new PaymentCompensationProcessor(paymentRecoveryService, tossPaymentClient),
+                new TossPaymentApprovalResolver(tossPaymentClient),
+                clock
+        );
+        PaymentExecutionOrder order = order(NOW.plusSeconds(1));
+        Payment payment = payment();
+        PaymentConfirmForm form = form(BigDecimal.valueOf(30_000));
+        ApprovalResult approval = approval();
+        CompensationRequest request = compensationRequest();
+        CancellationResult cancellation = cancellation();
+
+        when(orderPaymentQueryService.getMemberGeneralPaymentOrder(10L, 1L)).thenReturn(order);
+        when(paymentService.getReadyPayment(1L)).thenReturn(payment);
+        when(tossPaymentClient.approve(
+                "payment-key",
+                "ORD-100",
+                30_000L,
+                "PAY-1"
+        )).thenAnswer(invocation -> {
+            clock.setInstant(NOW.plusSeconds(1));
+            return approval;
+        });
+        when(paymentRecoveryService.createRequest(payment, "payment-key")).thenReturn(request);
+        when(tossPaymentClient.cancel(
+                "payment-key",
+                request.reason(),
+                request.idempotencyKey()
+        )).thenReturn(cancellation);
+
+        assertPaymentError(
+                () -> paymentFacade.confirmGeneralPayment(10L, 1L, form),
+                PaymentErrorCode.PAYMENT_COMPENSATED
+        );
+
+        verify(paymentService, never()).completeGeneralPayment(order, payment, approval);
+        verify(paymentRecoveryService, times(2)).prepareCompensation(request);
+        verify(paymentRecoveryService).completeCompensation(request, cancellation);
+    }
+
+    @Test
     void confirmGeneralPayment_compensationPrepareFailure_doesNotCancelWithoutRecoveryRecord() {
-        GeneralPaymentOrder order = order(NOW.plusMinutes(5));
+        PaymentExecutionOrder order = order(NOW.plusMinutes(5));
         Payment payment = payment();
         ApprovalResult approval = approval();
         CompensationRequest request = compensationRequest();
-        when(orderService.getGeneralPaymentOrder(10L, 1L)).thenReturn(order);
+        when(orderPaymentQueryService.getMemberGeneralPaymentOrder(10L, 1L)).thenReturn(order);
         when(paymentService.getReadyPayment(1L)).thenReturn(payment);
         when(paymentRecoveryService.createRequest(payment, "payment-key")).thenReturn(request);
         org.mockito.Mockito.doThrow(new BusinessException(PaymentErrorCode.PAYMENT_RECOVERY_PENDING))
@@ -538,7 +589,7 @@ class PaymentFacadeTests {
 
     @Test
     void confirmGeneralPayment_concurrentCompletion_doesNotCancelPayment() {
-        GeneralPaymentOrder order = order(NOW.plusMinutes(5));
+        PaymentExecutionOrder order = order(NOW.plusMinutes(5));
         Payment readyPayment = payment();
         Payment donePayment = payment();
         donePayment.setStatus(PaymentStatus.DONE);
@@ -547,7 +598,7 @@ class PaymentFacadeTests {
         when(paymentService.findDonePayment(1L))
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.of(donePayment));
-        when(orderService.getGeneralPaymentOrder(10L, 1L)).thenReturn(order);
+        when(orderPaymentQueryService.getMemberGeneralPaymentOrder(10L, 1L)).thenReturn(order);
         when(paymentService.getReadyPayment(1L)).thenReturn(readyPayment);
         when(tossPaymentClient.approve(
                 "payment-key",
@@ -574,7 +625,7 @@ class PaymentFacadeTests {
 
     @Test
     void confirmGeneralPayment_cancelTimeout_lookupCanceled_completesRecovery() {
-        GeneralPaymentOrder order = order(NOW.plusMinutes(5));
+        PaymentExecutionOrder order = order(NOW.plusMinutes(5));
         Payment payment = payment();
         ApprovalResult approval = approval();
         CompensationRequest request = compensationRequest();
@@ -588,7 +639,7 @@ class PaymentFacadeTests {
                 NOW.plusSeconds(10),
                 cancellation
         );
-        when(orderService.getGeneralPaymentOrder(10L, 1L)).thenReturn(order);
+        when(orderPaymentQueryService.getMemberGeneralPaymentOrder(10L, 1L)).thenReturn(order);
         when(paymentService.getReadyPayment(1L)).thenReturn(payment);
         when(tossPaymentClient.find("payment-key"))
                 .thenReturn(Optional.empty())
@@ -624,7 +675,7 @@ class PaymentFacadeTests {
 
     @Test
     void confirmGeneralPayment_duplicateCallbackDuringCompletion_resumesInternalCompletion() {
-        GeneralPaymentOrder order = order(NOW.plusMinutes(5));
+        PaymentExecutionOrder order = order(NOW.plusMinutes(5));
         Payment payment = payment();
         CompensationRequest request = compensationRequest();
         ApprovalResult approval = new ApprovalResult(
@@ -635,7 +686,7 @@ class PaymentFacadeTests {
                 30_000L,
                 NOW
         );
-        when(orderService.getGeneralPaymentOrder(10L, 1L)).thenReturn(order);
+        when(orderPaymentQueryService.getMemberGeneralPaymentOrder(10L, 1L)).thenReturn(order);
         when(paymentService.getReadyPayment(1L)).thenReturn(payment);
         when(paymentRecoveryService.findPreparedCompensation(payment))
                 .thenReturn(Optional.of(request));
@@ -673,7 +724,7 @@ class PaymentFacadeTests {
 
     @Test
     void confirmGeneralPayment_unapprovedPreparedCompensation_releasesAndApprovesNewPayment() {
-        GeneralPaymentOrder order = order(NOW.plusMinutes(5));
+        PaymentExecutionOrder order = order(NOW.plusMinutes(5));
         Payment payment = payment();
         payment.setPaymentKey("stale-payment-key");
         Payment refreshedPayment = payment();
@@ -687,7 +738,7 @@ class PaymentFacadeTests {
                 "자동 취소"
         );
         ApprovalResult approval = approval();
-        when(orderService.getGeneralPaymentOrder(10L, 1L)).thenReturn(order);
+        when(orderPaymentQueryService.getMemberGeneralPaymentOrder(10L, 1L)).thenReturn(order);
         when(paymentService.getReadyPayment(1L)).thenReturn(payment, refreshedPayment);
         when(paymentRecoveryService.findPreparedCompensation(payment))
                 .thenReturn(Optional.of(request));
@@ -708,7 +759,7 @@ class PaymentFacadeTests {
 
     @Test
     void confirmGeneralPayment_inProgressPreparedCompensation_keepsRecoveryRequest() {
-        GeneralPaymentOrder order = order(NOW.plusMinutes(5));
+        PaymentExecutionOrder order = order(NOW.plusMinutes(5));
         Payment payment = payment();
         payment.setPaymentKey("stale-payment-key");
         CompensationRequest request = new CompensationRequest(
@@ -719,7 +770,7 @@ class PaymentFacadeTests {
                 BigDecimal.valueOf(30_000),
                 "자동 취소"
         );
-        when(orderService.getGeneralPaymentOrder(10L, 1L)).thenReturn(order);
+        when(orderPaymentQueryService.getMemberGeneralPaymentOrder(10L, 1L)).thenReturn(order);
         when(paymentService.getReadyPayment(1L)).thenReturn(payment);
         when(paymentRecoveryService.findPreparedCompensation(payment))
                 .thenReturn(Optional.of(request));
@@ -852,8 +903,8 @@ class PaymentFacadeTests {
         );
     }
 
-    private GeneralPaymentOrder order(LocalDateTime expiresAt) {
-        return new GeneralPaymentOrder(
+    private PaymentExecutionOrder order(LocalDateTime expiresAt) {
+        return new PaymentExecutionOrder(
                 1L,
                 BigDecimal.valueOf(30_000),
                 expiresAt,
@@ -920,5 +971,39 @@ class PaymentFacadeTests {
                         exception -> assertThat(exception.getErrorCode())
                                 .isEqualTo(expected)
                 );
+    }
+
+    private static final class MutableClock extends Clock {
+
+        private Instant instant;
+        private final ZoneId zone;
+
+        private MutableClock(LocalDateTime dateTime, ZoneId zone) {
+            this(dateTime.atZone(zone).toInstant(), zone);
+        }
+
+        private MutableClock(Instant instant, ZoneId zone) {
+            this.instant = instant;
+            this.zone = zone;
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return zone;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return new MutableClock(instant, zone);
+        }
+
+        @Override
+        public Instant instant() {
+            return instant;
+        }
+
+        private void setInstant(LocalDateTime dateTime) {
+            instant = dateTime.atZone(zone).toInstant();
+        }
     }
 }

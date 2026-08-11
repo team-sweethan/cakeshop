@@ -14,9 +14,10 @@ import com.cakeshop.domain.coupon.dto.form.CouponUpdateForm;
 import com.cakeshop.domain.coupon.dto.view.CouponView;
 import com.cakeshop.domain.coupon.dto.view.CouponIssueCandidateView;
 import com.cakeshop.domain.coupon.dto.view.CouponIssuedMemberView;
+import com.cakeshop.domain.coupon.dto.view.CouponDisplayStatus;
+import com.cakeshop.domain.coupon.dto.view.CouponUpdateView;
 import com.cakeshop.domain.coupon.entity.CustomerCouponStatus;
 import com.cakeshop.domain.coupon.entity.Coupon;
-import com.cakeshop.domain.coupon.entity.CouponDisplayStatus;
 import com.cakeshop.domain.coupon.entity.CouponStatus;
 import com.cakeshop.domain.coupon.entity.CouponTargetType;
 import com.cakeshop.domain.coupon.entity.DiscountType;
@@ -265,18 +266,18 @@ class CouponAdminServiceTests {
     }
 
     @Test
-    void getUpdateFormThrowsWhenCouponIsEnded() {
+    void getUpdateViewThrowsWhenCouponIsEnded() {
         Coupon coupon = coupon(CouponStatus.ACTIVE, 10, 0, LocalDateTime.now().minusDays(1));
         when(couponMapper.findCouponById(1L)).thenReturn(Optional.of(coupon));
 
-        assertThatThrownBy(() -> couponAdminService.getUpdateForm(1L))
+        assertThatThrownBy(() -> couponAdminService.getUpdateView(1L))
             .isInstanceOf(BusinessException.class)
             .extracting(exception -> ((BusinessException) exception).getErrorCode())
             .isEqualTo(CouponErrorCode.CANNOT_EDIT_ENDED_COUPON);
     }
 
     @Test
-    void getUpdateForm_seoulClockBeforeStartsAt_marksFullEdit() {
+    void getUpdateView_seoulClockBeforeStartsAt_marksFullEdit() {
         Clock seoulClock = Clock.fixed(Instant.parse("2026-08-06T15:30:00Z"), ZoneId.of("Asia/Seoul"));
         CouponAdminService service = new CouponAdminService(
                 couponMapper, couponIssueService, memberCouponQueryService, seoulClock
@@ -287,10 +288,10 @@ class CouponAdminServiceTests {
         coupon.setStartsAt(LocalDateTime.of(2026, 8, 7, 1, 0));
         when(couponMapper.findCouponById(1L)).thenReturn(Optional.of(coupon));
 
-        CouponUpdateForm form = service.getUpdateForm(1L);
+        CouponUpdateView view = service.getUpdateView(1L);
 
-        assertThat(form.isFullEdit()).isTrue();
-        assertThat(form.getDisplayStatus()).isEqualTo(CouponDisplayStatus.SCHEDULED);
+        assertThat(view.fullEdit()).isTrue();
+        assertThat(view.displayStatus()).isEqualTo(CouponDisplayStatus.SCHEDULED);
     }
 
     @Test

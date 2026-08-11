@@ -113,6 +113,48 @@ class StatisticsSchemaTests {
     }
 
     @Test
+    void statisticsBatchRuns_rebuildWithProgress_acceptsRun() {
+        long runId = insertRunningBatch("REBUILD", TARGET_DATE.minusDays(3));
+
+        int updated = jdbcTemplate.update(
+                "UPDATE statistics_batch_runs SET last_completed_date = ? WHERE id = ?",
+                TARGET_DATE.minusDays(1),
+                runId
+        );
+
+        assertThat(updated).isOne();
+    }
+
+    @Test
+    void statisticsBatchRuns_rebuildWithSourceWindow_rejectsRun() {
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                """
+                INSERT INTO statistics_batch_runs (
+                    batch_type,
+                    status,
+                    source_window_started_at,
+                    source_window_ended_at,
+                    target_start_date,
+                    target_end_date,
+                    started_at
+                )
+                VALUES ('REBUILD', 'RUNNING', ?, ?, ?, ?, ?)
+                """,
+                STARTED_AT.minusMinutes(10),
+                STARTED_AT,
+                TARGET_DATE.minusDays(3),
+                TARGET_DATE,
+                STARTED_AT
+        )).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void statisticsBatchRuns_unknownBatchType_rejectsRun() {
+        assertThatThrownBy(() -> insertRunningBatch("IMPORT", TARGET_DATE))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
     void statisticsBatchRuns_invalidStatus_rejectsRun() {
         assertThatThrownBy(() -> jdbcTemplate.update(
                 """

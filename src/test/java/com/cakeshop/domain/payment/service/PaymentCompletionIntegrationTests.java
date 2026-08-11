@@ -7,11 +7,12 @@ import com.cakeshop.domain.member.service.MemberCouponQueryService;
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.mapper.OrderMapper;
 import com.cakeshop.domain.order.service.OrderOptionValidator;
+import com.cakeshop.domain.order.service.OrderPaymentCommandService;
 import com.cakeshop.domain.order.service.OrderPaymentRecoveryService;
-import com.cakeshop.domain.order.service.OrderService;
 import com.cakeshop.domain.order.service.OrderServiceImpl;
-import com.cakeshop.domain.order.service.OrderService.GeneralPaymentOrder;
-import com.cakeshop.domain.order.service.OrderService.PaymentProduct;
+import com.cakeshop.domain.order.service.PickupAvailabilityPolicy;
+import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentExecutionOrder;
+import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentProduct;
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.entity.PaymentCancellation;
 import com.cakeshop.domain.payment.entity.PaymentCancellationStatus;
@@ -40,18 +41,22 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.when;
 
 @MybatisTest
 @Import({
         PaymentService.class,
         PaymentRecoveryService.class,
         OrderPaymentRecoveryService.class,
+        OrderPaymentCommandService.class,
         OrderServiceImpl.class,
-        PaymentPreparationServiceImpl.class,
+        PickupAvailabilityPolicy.class,
+        PaymentOrderPreparationCommandServiceImpl.class,
         ProductStockService.class
 })
 @MariaDbIntegrationTest
@@ -112,6 +117,8 @@ class PaymentCompletionIntegrationTests {
 
     @BeforeEach
     void setUp() {
+        when(clock.instant()).thenReturn(APPROVED_AT.atZone(ZoneId.of("Asia/Seoul")).toInstant());
+        when(clock.getZone()).thenReturn(ZoneId.of("Asia/Seoul"));
         suffix = Long.toString(System.nanoTime());
         memberId = insertMember();
         productId = insertProduct();
@@ -124,7 +131,7 @@ class PaymentCompletionIntegrationTests {
     void completeGeneralPayment_readyPayment_updatesStockPaymentAndOrder() {
         assertThat(AopUtils.isAopProxy(paymentService)).isTrue();
         Payment readyPayment = paymentService.getReadyPayment(orderId);
-        GeneralPaymentOrder order = new GeneralPaymentOrder(
+        PaymentExecutionOrder order = new PaymentExecutionOrder(
                 orderId,
                 BigDecimal.valueOf(40_000),
                 APPROVED_AT.plusMinutes(10),
@@ -173,7 +180,7 @@ class PaymentCompletionIntegrationTests {
     @Test
     void completeCompensation_donePayment_cancelsOrderAndRestoresStockIdempotently() {
         Payment readyPayment = paymentService.getReadyPayment(orderId);
-        GeneralPaymentOrder order = new GeneralPaymentOrder(
+        PaymentExecutionOrder order = new PaymentExecutionOrder(
                 orderId,
                 BigDecimal.valueOf(40_000),
                 APPROVED_AT.plusMinutes(10),

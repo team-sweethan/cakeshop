@@ -1,9 +1,9 @@
 package com.cakeshop.domain.payment.service;
 
-import com.cakeshop.domain.order.service.OrderService;
+import com.cakeshop.domain.order.service.OrderPaymentCommandService;
 import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
-import com.cakeshop.domain.order.service.OrderService.GeneralPaymentOrder;
-import com.cakeshop.domain.order.service.OrderService.PaymentProduct;
+import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentExecutionOrder;
+import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentProduct;
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.error.PaymentErrorCode;
 import com.cakeshop.domain.payment.infra.TossPaymentClient.ApprovalResult;
@@ -11,15 +11,17 @@ import com.cakeshop.domain.payment.mapper.PaymentMapper;
 import com.cakeshop.domain.product.service.ProductStockService;
 import com.cakeshop.global.error.BusinessException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -33,6 +35,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class PaymentServiceTests {
 
+    private static final LocalDateTime NOW = LocalDateTime.of(2026, 8, 1, 10, 0);
+
     @Mock
     private PaymentMapper paymentMapper;
 
@@ -40,7 +44,7 @@ class PaymentServiceTests {
     private ProductStockService productStockService;
 
     @Mock
-    private OrderService orderService;
+    private OrderPaymentCommandService orderPaymentCommandService;
 
     @Mock
     private PaymentRecoveryService paymentRecoveryService;
@@ -48,12 +52,26 @@ class PaymentServiceTests {
     @Mock
     private CouponOrderCommandService couponOrderCommandService;
 
-    @InjectMocks
     private PaymentService paymentService;
+
+    @BeforeEach
+    void setUp() {
+        paymentService = new PaymentService(
+                paymentMapper,
+                productStockService,
+                orderPaymentCommandService,
+                paymentRecoveryService,
+                Clock.fixed(
+                        NOW.atZone(ZoneId.of("Asia/Seoul")).toInstant(),
+                        ZoneId.of("Asia/Seoul")
+                ),
+                couponOrderCommandService
+        );
+    }
 
     @Test
     void completeGeneralPayment_validApproval_updatesStockPaymentAndOrderInOrder() {
-        GeneralPaymentOrder order = order();
+        PaymentExecutionOrder order = order();
         Payment payment = payment();
         ApprovalResult approval = approval();
         when(productStockService.decreaseStock(100L, 2)).thenReturn(true);
@@ -70,13 +88,13 @@ class PaymentServiceTests {
         InOrder inOrder = inOrder(
                 productStockService,
                 paymentMapper,
-                orderService,
+                orderPaymentCommandService,
                 couponOrderCommandService,
                 paymentRecoveryService
         );
-        inOrder.verify(orderService).lockGeneralOrderForPayment(1L);
+        inOrder.verify(orderPaymentCommandService).lockGeneralOrderForPayment(1L);
         inOrder.verify(productStockService).decreaseStock(100L, 2);
-        inOrder.verify(orderService).recordGeneralStockDeduction(
+        inOrder.verify(orderPaymentCommandService).recordGeneralStockDeduction(
                 200L,
                 approval.approvedAt()
         );
@@ -87,7 +105,7 @@ class PaymentServiceTests {
                 "DONE",
                 approval.approvedAt()
         );
-        inOrder.verify(orderService).completeGeneralOrderAfterPayment(
+        inOrder.verify(orderPaymentCommandService).completeGeneralOrderAfterPayment(
                 1L,
                 approval.approvedAt()
         );
@@ -97,7 +115,7 @@ class PaymentServiceTests {
 
     @Test
     void completeGeneralPayment_paymentUpdateFails_doesNotUpdateOrder() {
-        GeneralPaymentOrder order = order();
+        PaymentExecutionOrder order = order();
         Payment payment = payment();
         ApprovalResult approval = approval();
         when(productStockService.decreaseStock(100L, 2)).thenReturn(true);
@@ -120,11 +138,39 @@ class PaymentServiceTests {
         );
 
         verify(productStockService).decreaseStock(100L, 2);
-        verify(orderService).lockGeneralOrderForPayment(1L);
-        verify(orderService).recordGeneralStockDeduction(200L, approval.approvedAt());
-        verify(orderService, never()).completeGeneralOrderAfterPayment(
+        verify(orderPaymentCommandService).lockGeneralOrderForPayment(1L);
+        verify(orderPaymentCommandService).recordGeneralStockDeduction(200L, approval.approvedAt());
+        verify(orderPaymentCommandService, never()).completeGeneralOrderAfterPayment(
                 1L,
                 approval.approvedAt()
+        );
+    }
+
+    @Test
+    void completeGeneralPayment_expiredAfterOrderLock_doesNotChangeInternalState() {
+        PaymentExecutionOrder order = new PaymentExecutionOrder(
+                1L,
+                BigDecimal.valueOf(30_000),
+                NOW,
+                List.of(new PaymentProduct(200L, 100L, 2))
+        );
+
+        assertThatThrownBy(() -> paymentService.completeGeneralPayment(
+                order,
+                payment(),
+                approval()
+        )).isInstanceOfSatisfying(
+                BusinessException.class,
+                exception -> assertThat(exception.getErrorCode())
+                        .isEqualTo(PaymentErrorCode.PAYMENT_EXPIRED)
+        );
+
+        verify(orderPaymentCommandService).lockGeneralOrderForPayment(1L);
+        verifyNoInteractions(
+                productStockService,
+                paymentMapper,
+                couponOrderCommandService,
+                paymentRecoveryService
         );
     }
 
@@ -133,7 +179,7 @@ class PaymentServiceTests {
         Transactional transactional = PaymentService.class
                 .getMethod(
                         "completeGeneralPayment",
-                        GeneralPaymentOrder.class,
+                        PaymentExecutionOrder.class,
                         Payment.class,
                         ApprovalResult.class
                 )
@@ -144,7 +190,7 @@ class PaymentServiceTests {
 
     @Test
     void completeZeroAmountGeneralPayment_zeroAmount_completesWithoutPgApproval() {
-        GeneralPaymentOrder order = new GeneralPaymentOrder(
+        PaymentExecutionOrder order = new PaymentExecutionOrder(
                 1L, BigDecimal.ZERO, LocalDateTime.of(2026, 8, 1, 10, 10),
                 List.of(new PaymentProduct(200L, 100L, 2))
         );
@@ -156,15 +202,15 @@ class PaymentServiceTests {
 
         paymentService.completeZeroAmountGeneralPayment(order, payment, completedAt);
 
-        verify(orderService).lockGeneralOrderForPayment(1L);
+        verify(orderPaymentCommandService).lockGeneralOrderForPayment(1L);
         verify(paymentMapper).completeZeroAmountIfReady(20L, completedAt);
-        verify(orderService).completeGeneralOrderAfterPayment(1L, completedAt);
+        verify(orderPaymentCommandService).completeGeneralOrderAfterPayment(1L, completedAt);
         verify(couponOrderCommandService).useReservedCouponForOrder(1L);
         verifyNoInteractions(paymentRecoveryService);
     }
 
-    private GeneralPaymentOrder order() {
-        return new GeneralPaymentOrder(
+    private PaymentExecutionOrder order() {
+        return new PaymentExecutionOrder(
                 1L,
                 BigDecimal.valueOf(30_000),
                 LocalDateTime.of(2026, 8, 1, 10, 10),

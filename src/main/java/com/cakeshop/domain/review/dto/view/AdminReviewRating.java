@@ -1,5 +1,10 @@
 package com.cakeshop.domain.review.dto.view;
 
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+
+@Getter
+@RequiredArgsConstructor
 public enum AdminReviewRating {
 
     ALL(null, null, null),
@@ -10,12 +15,6 @@ public enum AdminReviewRating {
     private final String parameter;
     private final Integer min;
     private final Integer max;
-
-    AdminReviewRating(String parameter, Integer min, Integer max) {
-        this.parameter = parameter;
-        this.min = min;
-        this.max = max;
-    }
 
     // 모르는 값은 오류가 아니라 전체로 떨어뜨린다 (specs/review-admin.md C2).
     public static AdminReviewRating from(String parameter) {
@@ -34,15 +33,4 @@ public enum AdminReviewRating {
         return ALL;
     }
 
-    public String getParameter() {
-        return parameter;
-    }
-
-    public Integer getMin() {
-        return min;
-    }
-
-    public Integer getMax() {
-        return max;
-    }
 }

@@ -28,11 +28,11 @@ import com.cakeshop.domain.order.controller.customer.OrderController;
 import com.cakeshop.domain.order.dto.view.OrderDetailView;
 import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
-import com.cakeshop.domain.order.service.customer.CustomerOrderQueryService;
+import com.cakeshop.domain.order.service.customer.OrderCustomerService;
 import com.cakeshop.domain.order.service.OrderService;
 import com.cakeshop.domain.payment.controller.PaymentController;
 import com.cakeshop.domain.payment.service.PaymentFacade;
-import com.cakeshop.domain.payment.service.PaymentQueryService;
+import com.cakeshop.domain.payment.service.PaymentCheckoutService;
 import com.cakeshop.domain.payment.service.RefundFacade;
 import com.cakeshop.domain.product.controller.ProductController;
 import com.cakeshop.domain.product.service.ProductService;
@@ -82,7 +82,7 @@ class CustomerPageControllerTests {
                         "010-1234-5678",
                         LocalDate.of(2000, 1, 15)));
 
-        CustomerOrderQueryService orderQueryService = mock(CustomerOrderQueryService.class);
+        OrderCustomerService orderQueryService = mock(OrderCustomerService.class);
         when(orderQueryService.getMemberOrders(1L)).thenReturn(List.of());
         when(orderQueryService.getMemberOrder(1L, 1L))
                 .thenReturn(mock(OrderDetailView.class));
@@ -126,7 +126,7 @@ class CustomerPageControllerTests {
                         ),
                         new PaymentController(
                                 mock(PaymentFacade.class),
-                                mock(PaymentQueryService.class)
+                                mock(PaymentCheckoutService.class)
                         ),
                         new MyPageController(
                                 memberService,
@@ -237,6 +237,10 @@ class CustomerPageControllerTests {
 
         assertThat(productDetailTemplate)
                 .contains("and product.productType.name() == 'GENERAL'")
+                .containsSubsequence(
+                        "data-product-option-groups",
+                        "th:if=\"${product.productType.name() == 'GENERAL'}\""
+                )
                 .contains("th:href=\"@{/orders/custom/options}\"");
     }
 

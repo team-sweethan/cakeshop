@@ -16,7 +16,11 @@ import java.util.List;
 import java.util.Map;
 
 import com.cakeshop.domain.coupon.dto.form.CouponSearchCondition;
+import com.cakeshop.domain.coupon.dto.view.CouponDisplayStatus;
+import com.cakeshop.domain.coupon.dto.view.CouponUpdateView;
 import com.cakeshop.domain.coupon.dto.view.CouponView;
+import com.cakeshop.domain.coupon.entity.CouponTargetType;
+import com.cakeshop.domain.coupon.entity.DiscountType;
 import com.cakeshop.domain.product.service.ProductAdminService;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
@@ -48,7 +52,7 @@ import com.cakeshop.domain.order.service.admin.FulfillmentService;
 import com.cakeshop.domain.payment.controller.PaymentAdminController;
 import com.cakeshop.domain.payment.dto.view.PaymentAdminListView;
 import com.cakeshop.domain.payment.dto.view.PaymentAdminSummaryView;
-import com.cakeshop.domain.payment.service.PaymentAdminQueryService;
+import com.cakeshop.domain.payment.service.PaymentAdminService;
 import com.cakeshop.domain.payment.service.RefundFacade;
 import com.cakeshop.domain.product.controller.ProductAdminController;
 import com.cakeshop.domain.review.controller.ReviewAdminController;
@@ -83,6 +87,13 @@ class AdminPageControllerTests {
                 new PageRequest(null, null),
                 0
         ));
+        when(couponAdminService.getUpdateView(1L)).thenReturn(new CouponUpdateView(
+                "테스트 쿠폰", DiscountType.FIXED_AMOUNT, BigDecimal.valueOf(1000),
+                BigDecimal.ZERO, null, 10L,
+                LocalDateTime.of(2026, 8, 1, 9, 0),
+                LocalDateTime.of(2026, 8, 31, 23, 59),
+                CouponTargetType.SPECIFIC_MEMBERS, CouponDisplayStatus.ACTIVE, true
+        ));
 
         FulfillmentService fulfillmentService =
                 Mockito.mock(FulfillmentService.class);
@@ -93,8 +104,8 @@ class AdminPageControllerTests {
                         List.of()
                 ));
 
-        PaymentAdminQueryService paymentAdminQueryService =
-                Mockito.mock(PaymentAdminQueryService.class);
+        PaymentAdminService paymentAdminQueryService =
+                Mockito.mock(PaymentAdminService.class);
         when(paymentAdminQueryService.getPayments(any()))
                 .thenReturn(new PaymentAdminListView(
                         null,

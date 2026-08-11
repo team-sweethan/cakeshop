@@ -1,6 +1,6 @@
 package com.cakeshop.domain.coupon.dto.form;
 
-import com.cakeshop.domain.coupon.entity.CouponDisplayStatus;
+import com.cakeshop.domain.coupon.dto.view.CouponDisplayStatus;
 import lombok.Getter;
 import lombok.Setter;
 

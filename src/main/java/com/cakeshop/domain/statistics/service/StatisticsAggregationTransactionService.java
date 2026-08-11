@@ -35,6 +35,26 @@ public class StatisticsAggregationTransactionService {
         return requireBatchRunId(batchRun);
     }
 
+    /** 실행 잠금 획득 후 누락 여부를 다시 확인하고 시작 시 일별 집계를 등록한다. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public Long startDailyCatchupRun(
+            StatisticsBatchRun batchRun,
+            LocalDate latestStatisticsDate
+    ) {
+        batchRunMapper.failExpiredRunningBatch();
+        batchRunMapper.insertRunningBatch(batchRun);
+        long batchRunId = requireBatchRunId(batchRun);
+
+        LocalDate latestSuccessfulDate = batchRunMapper.findLatestSuccessfulTargetEndDate();
+        if (latestSuccessfulDate != null && !latestSuccessfulDate.isBefore(latestStatisticsDate)) {
+            if (batchRunMapper.deleteRunningDailyBatch(batchRunId) != 1) {
+                throw new IllegalStateException("취소할 시작 시 통계 집계를 찾을 수 없습니다.");
+            }
+            return null;
+        }
+        return batchRunId;
+    }
+
     /** 성공 백필을 다시 확인한 뒤 새 백필 실행 잠금을 획득한다. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Long startBackfillRun(StatisticsBatchRun batchRun) {
@@ -73,6 +93,21 @@ public class StatisticsAggregationTransactionService {
         );
         if (batchRunMapper.updateBackfillProgress(batchRunId, statisticsDate) != 1) {
             throw new IllegalStateException("실행 중인 통계 백필을 찾을 수 없습니다.");
+        }
+    }
+
+    /** 한 날짜의 재집계 결과 교체와 진행일 갱신을 원자적으로 처리한다. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void replaceRebuildDate(long batchRunId, LocalDate statisticsDate) {
+        aggregationMapper.upsertDailyStatistics(
+                statisticsDate,
+                sourceReadModelMapper.findDailyStatistics(
+                        statisticsDate.atStartOfDay(),
+                        statisticsDate.plusDays(1).atStartOfDay()
+                )
+        );
+        if (batchRunMapper.updateRebuildProgress(batchRunId, statisticsDate) != 1) {
+            throw new IllegalStateException("실행 중인 통계 재집계를 찾을 수 없습니다.");
         }
     }
 

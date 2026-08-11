@@ -48,6 +48,21 @@ class StatisticsBatchRunMapperTests {
     }
 
     @Test
+    void deleteRunningDailyBatch_dailyRunningRun_deletesRun() {
+        StatisticsBatchRun dailyRun = newDailyRun(WINDOW_START, WINDOW_END);
+        mapper.insertRunningBatch(dailyRun);
+
+        int deleted = mapper.deleteRunningDailyBatch(dailyRun.getId());
+
+        assertThat(deleted).isOne();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM statistics_batch_runs WHERE id = ?",
+                Integer.class,
+                dailyRun.getId()
+        )).isZero();
+    }
+
+    @Test
     void failExpiredRunningBatch_heartbeatOlderThanOneHour_marksRunFailed() {
         StatisticsBatchRun run = newDailyRun(WINDOW_START, WINDOW_END);
         mapper.insertRunningBatch(run);
@@ -114,6 +129,18 @@ class StatisticsBatchRunMapperTests {
     }
 
     @Test
+    void updateRebuildProgress_rebuildRun_updatesProgress() {
+        StatisticsBatchRun run = StatisticsBatchRun.rebuild(
+                TARGET_DATE.minusDays(2),
+                TARGET_DATE
+        );
+        mapper.insertRunningBatch(run);
+
+        assertThat(mapper.updateRebuildProgress(run.getId(), TARGET_DATE.minusDays(1))).isOne();
+        assertThat(mapper.updateBackfillProgress(run.getId(), TARGET_DATE)).isZero();
+    }
+
+    @Test
     void findLatestSuccessfulBackfillStartedAt_failedNewerRun_returnsLatestSuccessStart() {
         StatisticsBatchRun successfulRun = newBackfillRun();
         mapper.insertRunningBatch(successfulRun);
@@ -176,6 +203,22 @@ class StatisticsBatchRunMapperTests {
         );
         mapper.insertRunningBatch(failedRun);
         assertThat(mapper.completeFailed(failedRun.getId())).isOne();
+
+        assertThat(mapper.findLatestSuccessfulTargetEndDate()).isEqualTo(TARGET_DATE);
+    }
+
+    @Test
+    void findLatestSuccessfulTargetEndDate_successfulRebuild_ignoresRebuildRun() {
+        StatisticsBatchRun successfulBackfill = newBackfillRun();
+        mapper.insertRunningBatch(successfulBackfill);
+        assertThat(mapper.completeSucceeded(successfulBackfill.getId())).isOne();
+
+        StatisticsBatchRun successfulRebuild = StatisticsBatchRun.rebuild(
+                TARGET_DATE.minusDays(30),
+                TARGET_DATE.minusDays(20)
+        );
+        mapper.insertRunningBatch(successfulRebuild);
+        assertThat(mapper.completeSucceeded(successfulRebuild.getId())).isOne();
 
         assertThat(mapper.findLatestSuccessfulTargetEndDate()).isEqualTo(TARGET_DATE);
     }
