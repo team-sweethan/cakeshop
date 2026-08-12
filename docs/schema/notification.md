@@ -10,7 +10,7 @@
 
 | 컬럼 | 타입 | 키 | Null | 기본값 | 의미 |
 |---|---|---|---|---|---|
-| `id` | BIGINT | PK | X | AUTO_INCREMENT | 알림 식별자 |
+| `id` | BIGINT | PK, INDEX | X | AUTO_INCREMENT | 알림 식별자 |
 | `receiver_id` | BIGINT | FK, UK, INDEX | X | 없음 | 수신 회원 식별자 |
 | `actor_id` | BIGINT | FK | O | NULL | 알림 발생 회원 또는 관리자 식별자 |
 | `order_id` | BIGINT | FK | O | NULL | 관련 주문 식별자 |

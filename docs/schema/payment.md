@@ -23,10 +23,10 @@
 | `failure_code` | VARCHAR(100) |  | O | NULL | 실패 코드 |
 | `failure_message` | VARCHAR(500) |  | O | NULL | 실패 메시지 |
 | `requested_at` | DATETIME(6) |  | X | `CURRENT_TIMESTAMP(6)` | 요청 시각 |
-| `approved_at` | DATETIME(6) |  | O | NULL | 승인 시각 |
+| `approved_at` | DATETIME(6) | INDEX | O | NULL | 승인 시각 |
 | `canceled_at` | DATETIME(6) |  | O | NULL | 취소 시각 |
 | `created_at` | DATETIME(6) |  | X | `CURRENT_TIMESTAMP(6)` | 생성 시각 |
-| `updated_at` | DATETIME(6) |  | X | `CURRENT_TIMESTAMP(6)` | 수정 시각, 수정 시 자동 갱신 |
+| `updated_at` | DATETIME(6) | INDEX | X | `CURRENT_TIMESTAMP(6)` | 수정 시각, 수정 시 자동 갱신 |
 
 - UK: `toss_order_id`, `payment_key`, `idempotency_key` 각각 개별 유니크
 - UK: `uk_payments_active_order` (`active_payment_order_id`) — 주문별 진행/완료 결제 1건 제한
@@ -34,6 +34,8 @@
 - CHECK: `status IN ('READY', 'DONE', 'CANCELED', 'PARTIAL_CANCELED', 'ABORTED', 'EXPIRED')`
 - CHECK: `amount >= 0`
 - INDEX: `idx_payments_status` (`status`)
+- INDEX: `idx_payments_status_approved_at` (`status`, `approved_at`)
+- INDEX: `idx_payments_updated_at_approved_at` (`updated_at`, `approved_at`)
 
 ## `payment_cancellations`
 
@@ -72,3 +74,4 @@
 - `V20260729_184356__align_order_payment_schema.sql`
 - `V20260730_170822__add_payment_request_guards.sql`
 - `V20260731_091629__unify_active_payment_guard.sql`
+- `V20260810_200833__add_statistics_source_indexes.sql`
