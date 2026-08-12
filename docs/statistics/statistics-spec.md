@@ -199,11 +199,12 @@
 
 | 지표 | 정의 | 기준 시각 | 포함 조건 | 상태 |
 |---|---|---|---|---|
-| 쿠폰 사용 건수 | 조회 기간에 결제가 완료되어 현재도 유효한 쿠폰 사용 건수 | `member_coupons.used_at` | `status = 'USED'` | 확정 |
+| 쿠폰 사용 건수 | 조회 기간에 결제가 완료되어 현재도 유효한 쿠폰 사용 건수 | `payments.approved_at` | 회원 쿠폰 `USED`, 결제 `DONE` | 확정 |
 
 - 회원 쿠폰 ID를 기준으로 중복 없이 집계하고 모든 쿠폰 종류를 포함한다.
-- `RESERVED`, `AVAILABLE`, `ENDED` 상태와 `used_at`이 `NULL`인 회원 쿠폰은 제외한다.
-- 주문 취소·환불로 쿠폰이 복구되면 기존 사용일의 통계에서도 제외하고 재집계로 반영한다.
+- `member_coupons.applied_order_id`로 주문의 유효한 결제와 연결한다.
+- `RESERVED`, `AVAILABLE`, `ENDED` 상태의 회원 쿠폰과 `DONE`이 아닌 결제는 제외한다.
+- 주문 취소·환불로 쿠폰이 복구되면 기존 결제 승인일의 통계에서도 제외하고 재집계로 반영한다.
 - 일별 집계 범위는 서울 시간 기준으로 집계일 00:00 이상, 다음 날 00:00 미만으로 한다.
 
 ### 4-8. 환불 통계
@@ -354,9 +355,10 @@
 | `members` | `idx_members_role_created_at` (`role`, `created_at`) | 신규 회원 수 |
 | `members` | `idx_members_role_status_withdrawn_at` (`role`, `status`, `withdrawn_at`) | 탈퇴 회원 수 |
 | `posts` | `idx_posts_created_at` (`created_at`) | 새 게시글 수 |
-| `member_coupons` | `idx_member_coupons_status_used_at` (`status`, `used_at`) | 쿠폰 사용 건수 |
 | `payment_cancellations` | `idx_payment_cancellations_status_canceled_at` (`status`, `canceled_at`) | 환불 금액 |
-| `payments` | 기존 `idx_payments_status_approved_at` (`status`, `approved_at`) | 총매출·평균 주문 금액 |
+| `payment_cancellations` | `idx_payment_cancellations_updated_at_canceled_at` (`updated_at`, `canceled_at`) | 지연 완료된 환불 변경 탐색 |
+| `member_coupons` | 기존 `uk_member_coupons_applied_order` (`applied_order_id`) | 쿠폰 사용 결제 연결 |
+| `payments` | 기존 `idx_payments_status_approved_at` (`status`, `approved_at`) | 총매출·쿠폰 사용·평균 주문 금액 |
 
 - 새 인덱스는 기존 컬럼의 조회 성능만 보완하며 업무 데이터와 컬럼을 변경하지 않는다.
 - 새 인덱스는 기타 지표 구현 코드와 함께 새 Flyway migration으로 추가한다.
@@ -415,8 +417,15 @@
 - 첫 `DAILY` 실행은 직전 성공 실행이 없으므로 최초 `BACKFILL` 시도의 시작 시각을
   변경 탐색 시작 시각으로 사용한다.
 - 재개 백필 이전에 이미 처리된 날짜에서 발생한 원본 변경도 첫 `DAILY` 실행에서 다시 탐색한다.
-- 변경 탐지는 `orders.updated_at`과 `payments.updated_at`을 기준으로 한다.
-- 주문 변경은 `orders.created_at`, 결제 변경은 `payments.approved_at` 날짜를 재집계한다.
+- 전날과 누락된 새 날짜는 주문·결제 존재 여부와 관계없이 모든 지표의 원본을 조회하여 집계한다.
+- 변경 탐지는 과거 날짜의 결과에 영향을 주는 `orders.updated_at`, `payments.updated_at`과
+  `payment_cancellations.updated_at`을 기준으로 한다.
+- 주문 변경은 `orders.created_at`, 결제 변경은 `payments.approved_at`, 완료된 결제 취소 변경은
+  `payment_cancellations.canceled_at` 날짜를 재집계한다.
+- 회원 가입·탈퇴와 게시글 작성은 각 기준 시각의 새 날짜 집계에서 처리하며, 이후 상태 변경은
+  해당 지표의 결과를 바꾸지 않는다.
+- 쿠폰 사용·복구는 결제 완료·취소와 같은 흐름에서 처리하므로 `payments.updated_at` 변경을 탐색하여
+  해당 결제의 `approved_at` 날짜를 재집계한다.
 - 집계 대상은 직전 성공 실행의 `target_end_date` 다음 날부터 전날까지의 모든 날짜와
   변경 탐색 범위에서 발견한 과거 통계 기준 날짜의 합집합이다.
 - 배치 작업은 DB 기반 단일 실행 잠금을 사용하여 여러 애플리케이션 인스턴스의 동시 실행을 막는다.
@@ -441,7 +450,7 @@
   `0`이 아닌 종료 코드를 반환한다.
 - 성공한 백필 실행이 이미 있으면 초기 백필을 다시 시작하지 않는다.
 - 백필 시작일은 집계 대상인 `orders.created_at`, `payments.approved_at`, `members.created_at`,
-  `members.withdrawn_at`, `posts.created_at`, `member_coupons.used_at`,
+  `members.withdrawn_at`, `posts.created_at`,
   `payment_cancellations.canceled_at`의 가장 이른 날짜와 어제에서 6일 전 가운데 가장 이른 날짜로 한다.
 - 백필 종료일은 실행 시점의 어제로 한다.
 - 날짜 오름차순으로 집계하며 날짜별 집계 저장과 `last_completed_date` 갱신을 같은 트랜잭션에서 처리한다.
@@ -465,8 +474,9 @@
 - 한 번에 지정할 수 있는 기간은 시작일과 종료일을 포함하여 최대 366일이다.
 - 지정 기간의 모든 날짜를 오름차순으로 다시 집계하고 기존 `daily_statistics`와
   `daily_product_statistics` 행을 교체한다.
-- 원본 주문과 승인 결제가 없는 날짜도 `daily_statistics`에는 모든 지표가 `0`인 행을 저장하고,
-  `daily_product_statistics`에는 상품 행을 저장하지 않는다.
+- 원본 주문과 승인 결제가 없는 날짜도 회원·게시글·쿠폰·환불 원본을 각각 조회한다.
+- 개별 지표의 집계 대상 데이터가 없을 때만 해당 지표를 `0`으로 저장하고,
+  상품 주문·판매가 없으면 `daily_product_statistics`에는 상품 행을 저장하지 않는다.
 - 날짜별 집계 저장과 `last_completed_date` 갱신은 같은 트랜잭션에서 처리한다.
 - 실행 중 오류가 발생하면 해당 실행을 `FAILED`로 기록하고 같은 명령으로 전체 지정 기간을
   다시 실행할 수 있다.
@@ -500,8 +510,11 @@
 - 시작일·종료일 역전, 오늘·미래 날짜, 366일 초과 요청을 검증한다.
 - 주문 상태별 총 주문·완료·취소 건수의 포함 및 제외 조건을 검증한다.
 - `DONE` 결제만 총매출에 포함되고 취소·환불 결제가 제외되는지 검증한다.
-- 신규·탈퇴 회원, 새 게시글과 쿠폰 사용 건수가 각 지표의 기준 시각과 포함 조건대로 집계되는지 검증한다.
+- 신규·탈퇴 회원과 새 게시글이 각 지표의 기준 시각과 포함 조건대로 집계되는지 검증한다.
+- 쿠폰 사용 건수가 결제 승인일과 회원 쿠폰 `USED`·결제 `DONE` 조건으로 집계되는지 검증한다.
+- 쿠폰 복구 후 결제 변경 탐색으로 기존 승인일의 쿠폰 사용 건수가 다시 집계되는지 검증한다.
 - 완료된 결제 취소만 환불 금액에 포함되고 요청·실패 취소가 제외되는지 검증한다.
+- 지연 완료된 결제 취소의 변경을 탐색하여 `canceled_at` 날짜의 환불 금액을 다시 집계하는지 검증한다.
 - 평균 주문 금액이 0원 결제를 포함한 유효 결제 주문 수로 계산되고 원 단위로 반올림되는지 검증한다.
 - 기간 평균이 일별 평균의 평균이 아니라 총매출 합계와 유효 결제 주문 수 합계로 계산되는지 검증한다.
 - 상품별 주문 건수가 주문 생성일과 모든 주문 상태를 기준으로 중복 없이 집계되는지 검증한다.
@@ -533,6 +546,7 @@
 - 여러 애플리케이션 인스턴스에서 배치가 중복 실행되지 않는지 검증한다.
 - 변경 탐색 범위의 시작·종료 경계가 누락이나 중복 없이 처리되는지 검증한다.
 - 마지막 성공 집계 이후 원본 데이터가 없는 날짜도 빠짐없이 `0`행으로 따라잡는지 검증한다.
+- 주문·승인 결제가 없는 날짜에도 회원·게시글·쿠폰·환불 지표를 원본 기준으로 집계하는지 검증한다.
 - 애플리케이션 시작 시 DB 기준 00:10 이전에는 따라잡기를 요청하지 않고, 00:10 이상이면서 마지막
   성공 집계일이 어제보다 이전일 때만 한 번 요청하는지 검증한다.
 - 마지막 성공 집계일이 어제 이상이면 애플리케이션을 다시 시작해도 새 `DAILY` 실행을 만들지 않는지
