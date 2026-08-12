@@ -13,8 +13,9 @@
 | `id` | BIGINT | PK | X | AUTO_INCREMENT | 채팅방 식별자 |
 | `customer_id` | BIGINT | FK, UK | X | 없음 | 고객 회원 식별자 |
 | `status` | VARCHAR(30) |  | X | `'OPEN'` | 방 업무 상태 (`OPEN`, `CLOSED`) |
-| `response_status` | VARCHAR(30) |  | X | `'WAITING_ADMIN'` | 답변 상태 (`WAITING_ADMIN`, `WAITING_CUSTOMER`, `RESOLVED`) |
+| `response_status` | VARCHAR(30) |  | X | 없음 | 답변 상태 (`WAITING_ADMIN`, `WAITING_CUSTOMER`, `RESOLVED`) |
 | `last_message_id` | BIGINT | FK | O | NULL | 최신 메시지 식별자 |
+| `last_message_at` | DATETIME(6) |  | O | NULL | 최신 메시지 생성 시각 |
 | `created_at` | DATETIME(6) |  | X | `CURRENT_TIMESTAMP(6)` | 생성 시각 |
 | `updated_at` | DATETIME(6) |  | X | `CURRENT_TIMESTAMP(6)` | 최종 수정 시각 |
 

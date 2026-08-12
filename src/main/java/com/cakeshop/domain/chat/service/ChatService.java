@@ -107,6 +107,15 @@ public class ChatService {
         }
     }
 
+    // 고객 ID로 기존 채팅방 단순 조회 (생성 부작용 없음)
+    @Transactional(readOnly = true)
+    public ChatRoom getChatRoomByCustomerId(Long customerId) {
+        if (customerId == null || customerId <= 0) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+        return chatMapper.findChatRoomByCustomerId(customerId);
+    }
+
     // 메시지 만들고 저장, 방 상태 갱신
     @Transactional
     public ChatMessage createMessage(Long roomId, Long senderId, boolean isAdmin, Long productId, 

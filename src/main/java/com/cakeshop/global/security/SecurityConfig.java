@@ -56,7 +56,7 @@ public class SecurityConfig {
         AuthenticationEntryPoint portalLoginEntryPoint = (request, response, exception) -> {
             String path = request.getRequestURI()
                     .substring(request.getContextPath().length());
-            if ("/admin".equals(path) || path.startsWith("/admin/")) {
+            if ("/admin".equals(path) || path.startsWith("/admin/") || path.startsWith("/api/admin/")) {
                 adminLoginEntryPoint.commence(request, response, exception);
                 return;
             }

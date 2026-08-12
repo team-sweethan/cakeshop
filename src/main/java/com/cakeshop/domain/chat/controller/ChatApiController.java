@@ -37,14 +37,31 @@ public class ChatApiController {
         return ResponseEntity.ok(room);
     }
 
-    // 관리자가 특정 고객(customerId)과의 1:1 채팅방 조회 및 신규 생성
+    // 관리자가 특정 고객(customerId)과의 1:1 채팅방 단순 조회 (방이 없으면 404, 생성 부작용 없음)
     @GetMapping("/api/admin/chat/room")
-    public ResponseEntity<ChatRoom> getOrMakeRoomAdmin(
+    public ResponseEntity<ChatRoom> getRoomAdmin(
             @RequestParam Long customerId,
             @AuthenticationPrincipal MemberDetails memberDetails) {
 
         if (memberDetails == null || !memberDetails.isAdmin()) {
-            return ResponseEntity.status(403).build(); // 관리자 아니면 거절
+            return ResponseEntity.status(403).build();
+        }
+
+        ChatRoom room = chatService.getChatRoomByCustomerId(customerId);
+        if (room == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(room);
+    }
+
+    // 관리자가 특정 고객(customerId)과의 1:1 채팅방 신규 생성 및 조회 (POST)
+    @PostMapping("/api/admin/chat/room")
+    public ResponseEntity<ChatRoom> createOrGetRoomAdmin(
+            @RequestParam Long customerId,
+            @AuthenticationPrincipal MemberDetails memberDetails) {
+
+        if (memberDetails == null || !memberDetails.isAdmin()) {
+            return ResponseEntity.status(403).build();
         }
 
         ChatRoom room = chatService.getOrMakeChatRoom(customerId);
