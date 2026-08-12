@@ -277,4 +277,23 @@ class CustomerPageControllerTests {
                 .contains("url.searchParams.set(\"productId\"")
                 .contains("url.searchParams.append(\"optionIds\"");
     }
+
+    @Test
+    void productDetail_loginRequiredAction_warnsWithoutStoppingProtectedNavigation()
+            throws IOException {
+        String productDetail = new ClassPathResource(
+                "templates/customer/product/detail.html"
+        ).getContentAsString(StandardCharsets.UTF_8);
+        String authScript = new ClassPathResource(
+                "static/js/product-detail-auth.js"
+        ).getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(productDetail)
+                .contains("data-login-required")
+                .contains("th:src=\"@{/js/product-detail-auth.js}\"");
+        assertThat(authScript)
+                .contains("closest(\"[data-login-required]\")")
+                .contains("window.alert(\"로그인 후 이용할 수 있습니다.\")")
+                .doesNotContain("preventDefault");
+    }
 }

@@ -101,6 +101,13 @@ public class SecurityConfig {
                                 "/community/notices", "/community/notices/{id:\\d+}")
                         .permitAll();
                 auth.requestMatchers(HttpMethod.POST, "/webhooks/toss").permitAll();
+                // 상품 상세에서 시작하는 주문·문의 흐름은 local 공개 미리보기에서도 회원 로그인이 필요하다.
+                auth.requestMatchers(
+                        HttpMethod.GET,
+                        "/orders/checkout",
+                        "/orders/custom/options",
+                        "/chat"
+                ).hasRole("USER");
 
                 if (publicPreview) {
                     // local 프로필에서만 고객 목업 흐름을 로그인 없이 확인한다.
@@ -111,8 +118,7 @@ public class SecurityConfig {
                     // 익명 사용자는 폼을 다 채운 뒤에야 튕긴다.
                     auth.requestMatchers(
                             HttpMethod.GET,
-                            "/orders/**", "/notifications", "/api/notifications", "/api/notifications/**",
-                            "/chat")
+                            "/orders/**", "/notifications", "/api/notifications", "/api/notifications/**")
                             .permitAll();
                 }
 
