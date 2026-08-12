@@ -336,6 +336,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const file = chatImageInput.files[0];
       if (!file) return;
 
+      const currentUploadFile = file;
       if (imageFileName) imageFileName.textContent = `${file.name} (업로드 중...)`;
       isUploadingAttachment = true;
 
@@ -349,15 +350,19 @@ document.addEventListener("DOMContentLoaded", () => {
           body: formData
         });
 
-        if (!response.ok) {
-          alert("이미지 업로드에 실패했습니다. (5MB 이하 이미지 파일만 가능합니다)");
-          pendingAttachment = null;
-          if (imageFileName) imageFileName.textContent = "선택된 파일 없음";
-          if (chatImageInput) chatImageInput.value = "";
+        if (!response.ok || chatImageInput.files[0] !== currentUploadFile) {
+          if (chatImageInput.files[0] === currentUploadFile) {
+            alert("이미지 업로드에 실패했습니다. (5MB 이하 이미지 파일만 가능합니다)");
+            pendingAttachment = null;
+            if (imageFileName) imageFileName.textContent = "선택된 파일 없음";
+            if (chatImageInput) chatImageInput.value = "";
+          }
           return;
         }
 
         const objectKey = await response.text();
+        if (chatImageInput.files[0] !== currentUploadFile) return; // 새로운 파일로 바뀐 경우 이전 결과 버림!
+
         pendingAttachment = {
           objectKey: objectKey,
           originalFilename: file.name,
@@ -369,12 +374,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
       } catch (err) {
         console.error("이미지 업로드 오류:", err);
-        alert("이미지 업로드 처리 중 에러가 발생했습니다.");
-        pendingAttachment = null;
-        if (imageFileName) imageFileName.textContent = "선택된 파일 없음";
-        if (chatImageInput) chatImageInput.value = "";
+        if (chatImageInput.files[0] === currentUploadFile) {
+          alert("이미지 업로드 처리 중 에러가 발생했습니다.");
+          pendingAttachment = null;
+          if (imageFileName) imageFileName.textContent = "선택된 파일 없음";
+          if (chatImageInput) chatImageInput.value = "";
+        }
       } finally {
-        isUploadingAttachment = false;
+        if (chatImageInput.files[0] === currentUploadFile) {
+          isUploadingAttachment = false;
+        }
       }
     });
   }

@@ -267,8 +267,10 @@ document.addEventListener("DOMContentLoaded", () => {
     adminChatMessagesContainer.innerHTML = `<div class="text-muted" style="text-align:center; padding:30px;">대화 내용을 불러오는 중입니다...</div>`;
     try {
       const response = await fetch(`/api/chat/messages?chatRoomId=${roomId}&page=1&size=50`);
-      if (!response.ok || selectedChatRoomId !== roomId) {
-        if (!response.ok) {
+      if (selectedChatRoomId !== roomId) return;
+
+      if (!response.ok) {
+        if (selectedChatRoomId === roomId) {
           adminChatMessagesContainer.innerHTML = `<div class="text-muted" style="text-align:center; padding:30px;">대화 내역을 불러오는 데 실패했습니다.</div>`;
         }
         return;
@@ -279,7 +281,9 @@ document.addEventListener("DOMContentLoaded", () => {
       renderAdminTimeline(messages);
     } catch (err) {
       console.error("관리자 대화 내역 조회 실패:", err);
-      adminChatMessagesContainer.innerHTML = `<div class="text-muted" style="text-align:center; padding:30px;">대화 내역을 불러오는 중 오류가 발생했습니다.</div>`;
+      if (selectedChatRoomId === roomId) {
+        adminChatMessagesContainer.innerHTML = `<div class="text-muted" style="text-align:center; padding:30px;">대화 내역을 불러오는 중 오류가 발생했습니다.</div>`;
+      }
     }
   }
 
