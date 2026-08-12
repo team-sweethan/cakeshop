@@ -51,6 +51,7 @@ ALTER TABLE `chat_rooms`
 
     ADD COLUMN `response_status`
         VARCHAR(30) NOT NULL
+        DEFAULT 'WAITING_ADMIN'
         COMMENT '답변 상태: WAITING_ADMIN, WAITING_CUSTOMER, RESOLVED'
         AFTER `status`,
 

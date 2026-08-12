@@ -3,7 +3,8 @@
  */
 document.addEventListener("DOMContentLoaded", () => {
   let currentChatRoomId = null;
-  let pendingAttachmentKey = null;
+  let pendingAttachment = null;
+  let lastFetchedMessageId = 0;
 
   // URL QueryString에서 productId 파라미터 추출
   const urlParams = new URLSearchParams(window.location.search);
@@ -47,7 +48,9 @@ document.addEventListener("DOMContentLoaded", () => {
       // 대화 목록 및 연동 주문 조회
       await loadMessages(currentChatRoomId);
       await loadOrderBanners(currentChatRoomId);
-      await updateReadCursor(currentChatRoomId);
+      if (lastFetchedMessageId > 0) {
+        await updateReadCursor(currentChatRoomId, lastFetchedMessageId);
+      }
 
     } catch (err) {
       console.error(err);
@@ -78,6 +81,8 @@ document.addEventListener("DOMContentLoaded", () => {
       chatMessagesContainer.innerHTML = `<div class="text-muted" style="text-align:center; padding:30px;">아직 주고받은 메시지가 없습니다. 문의사항을 남겨보세요!</div>`;
       return;
     }
+
+    lastFetchedMessageId = messages[messages.length - 1].id;
 
     messages.forEach((msg) => {
       const msgEl = createMessageDOM(msg);
@@ -166,13 +171,17 @@ document.addEventListener("DOMContentLoaded", () => {
       itemDiv.className = "panel chat-order-item";
       itemDiv.style.cssText = "cursor:pointer; padding:10px; margin-bottom:8px;";
 
+      const oNum = ord.orderNumber || ord.orderNo || `주문 #${ord.orderId}`;
+      const pName = ord.productName || ord.productSummary || "케이크 주문건";
+      const pTime = ord.pickupDateTime || ord.pickupAt || "-";
+
       itemDiv.innerHTML = `
         <div class="cluster cluster--between" style="margin-bottom:4px;">
-          <strong>${escapeHtml(ord.orderNo || `주문 #${ord.orderId}`)}</strong>
+          <strong>${escapeHtml(oNum)}</strong>
           <span class="badge badge--warning">${escapeHtml(ord.orderStatus || "접수")}</span>
         </div>
-        <p class="text-muted" style="margin:0;">${escapeHtml(ord.productSummary || "케이크 주문건")}</p>
-        <p class="text-muted" style="font-size:11px;">금액: ${ord.totalAmount ? ord.totalAmount.toLocaleString() + "원" : "-"}</p>
+        <p class="text-muted" style="margin:0;">${escapeHtml(pName)}</p>
+        <p class="text-muted" style="font-size:11px;">픽업: ${escapeHtml(typeof pTime === "string" ? pTime : formatTime(pTime))}</p>
         <a class="btn btn--block" href="/orders/${ord.orderId}" style="margin-top:6px;">주문 상세 보기</a>
       `;
       orderSidebarStack.appendChild(itemDiv);
@@ -189,7 +198,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       const contentText = chatInput.value.trim();
-      if (!contentText && !pendingAttachmentKey) {
+      if (!contentText && !pendingAttachment) {
         alert("메시지 내용 또는 이미지를 첨부해주세요.");
         return;
       }
@@ -198,7 +207,7 @@ document.addEventListener("DOMContentLoaded", () => {
         chatRoomId: currentChatRoomId,
         content: contentText,
         productId: currentProductId,
-        attachments: pendingAttachmentKey ? [{ objectKey: pendingAttachmentKey }] : []
+        attachments: pendingAttachment ? [pendingAttachment] : []
       };
 
       try {
@@ -217,10 +226,11 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         const sentMsg = await response.json();
+        lastFetchedMessageId = sentMsg.id;
 
         // 폼 초기화
         chatInput.value = "";
-        pendingAttachmentKey = null;
+        pendingAttachment = null;
         if (imageFileName) imageFileName.textContent = "선택된 파일 없음";
         if (chatImageInput) chatImageInput.value = "";
 
@@ -230,6 +240,8 @@ document.addEventListener("DOMContentLoaded", () => {
           chatMessagesContainer.appendChild(msgEl);
           scrollToBottom();
         }
+
+        await updateReadCursor(currentChatRoomId, sentMsg.id);
 
       } catch (err) {
         console.error("전송 에러:", err);
@@ -262,7 +274,14 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
 
-        pendingAttachmentKey = await response.text(); // S3 objectKey 또는 로컬 파일경로 반환
+        const objectKey = await response.text();
+        pendingAttachment = {
+          objectKey: objectKey,
+          originalFilename: file.name,
+          contentType: file.type || "image/jpeg",
+          fileSize: file.size
+        };
+
         if (imageFileName) imageFileName.textContent = `✔ ${file.name} (첨부 준비 완료)`;
 
       } catch (err) {
@@ -272,16 +291,13 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // 6. 읽음 커서 갱신
-  async function updateReadCursor(roomId) {
+  // 6. 읽음 커서 갱신 (쿼리 파라미터로 전달)
+  async function updateReadCursor(roomId, lastMsgId) {
+    if (!roomId || !lastMsgId) return;
     try {
-      await fetch("/api/chat/read-cursor", {
+      await fetch(`/api/chat/read-cursor?chatRoomId=${roomId}&lastReadMessageId=${lastMsgId}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          ...getCsrfHeaders()
-        },
-        body: JSON.stringify({ chatRoomId: roomId })
+        headers: getCsrfHeaders()
       });
     } catch (err) {
       console.error("읽음 커서 갱신 실패:", err);

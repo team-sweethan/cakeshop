@@ -6,7 +6,8 @@ document.addEventListener("DOMContentLoaded", () => {
   let selectedCustomerId = null;
   let currentFilter = "all";
   let adminRoomsData = [];
-  let pendingAttachmentKey = null;
+  let pendingAttachment = null;
+  let lastFetchedMessageId = 0;
 
   const adminRoomListContainer = document.getElementById("adminChatRoomList");
   const adminChatMessagesContainer = document.getElementById("adminChatMessages");
@@ -44,9 +45,11 @@ document.addEventListener("DOMContentLoaded", () => {
       adminRoomsData = await response.json();
       renderRoomList();
 
-      // 첫 번째 방 자동 선택
+      // 첫 번째 방 자동 선택 (chatRoomId 필드명 사용)
       if (adminRoomsData && adminRoomsData.length > 0 && !selectedChatRoomId) {
-        selectChatRoom(adminRoomsData[0].id, adminRoomsData[0].customerId);
+        const firstRoom = adminRoomsData[0];
+        const rId = firstRoom.chatRoomId || firstRoom.id;
+        selectChatRoom(rId, firstRoom.customerId);
       }
 
     } catch (err) {
@@ -81,7 +84,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     filteredRooms.forEach((room) => {
-      const isSelected = room.id === selectedChatRoomId;
+      const rId = room.chatRoomId || room.id;
+      const isSelected = rId === selectedChatRoomId;
       const itemDiv = document.createElement("div");
       itemDiv.className = `panel admin-chat-room-item ${isSelected ? "is-selected" : ""}`;
       itemDiv.style.cssText = "cursor:pointer; padding:10px; margin-bottom:8px;";
@@ -95,6 +99,8 @@ document.addEventListener("DOMContentLoaded", () => {
         ? `<span class="badge badge--danger">${room.unreadCount}</span>`
         : "";
 
+      const msgTime = room.lastMessageCreatedAt || room.lastMessageTime;
+
       itemDiv.innerHTML = `
         <div class="cluster cluster--between" style="margin-bottom:4px;">
           <strong>${escapeHtml(room.customerName || `고객 #${room.customerId}`)}</strong>
@@ -104,13 +110,13 @@ document.addEventListener("DOMContentLoaded", () => {
           ${escapeHtml(room.lastMessageContent || "대화 내용 없음")}
         </p>
         <div class="cluster cluster--between" style="margin-top:6px; font-size:11px;">
-          <span class="text-muted">${room.lastMessageTime ? formatTime(room.lastMessageTime) : ""}</span>
+          <span class="text-muted">${msgTime ? formatTime(msgTime) : ""}</span>
           ${unreadBadge}
         </div>
       `;
 
       itemDiv.addEventListener("click", () => {
-        selectChatRoom(room.id, room.customerId);
+        selectChatRoom(rId, room.customerId);
       });
 
       adminRoomListContainer.appendChild(itemDiv);
@@ -119,6 +125,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // 방 선택 조작
   async function selectChatRoom(roomId, customerId) {
+    if (!roomId) return;
     selectedChatRoomId = roomId;
     selectedCustomerId = customerId;
 
@@ -126,7 +133,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     await loadAdminMessages(roomId);
     await loadAdminSidePanel(roomId);
-    await markRead(roomId);
+    if (lastFetchedMessageId > 0) {
+      await markRead(roomId, lastFetchedMessageId);
+    }
   }
 
   // 2. 대화 타임라인 렌더링
@@ -150,6 +159,8 @@ document.addEventListener("DOMContentLoaded", () => {
       adminChatMessagesContainer.innerHTML = `<div class="text-muted" style="text-align:center; padding:30px;">대화 기록이 없습니다.</div>`;
       return;
     }
+
+    lastFetchedMessageId = messages[messages.length - 1].id;
 
     messages.forEach((msg) => {
       const isAdminSender = msg.senderType === "ADMIN";
@@ -212,9 +223,9 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!response.ok) return;
       const data = await response.json();
 
-      // 고객 특이사항 메모 세팅
+      // 고객 특이사항 메모 세팅 (note.content 읽기)
       if (adminCustomerNote) {
-        adminCustomerNote.value = data.customerNote || "";
+        adminCustomerNote.value = data.note ? (data.note.content || "") : "";
       }
 
       // 연동 주문 목록 렌더링
@@ -231,13 +242,17 @@ document.addEventListener("DOMContentLoaded", () => {
           cardDiv.className = "panel section admin-order-item";
           cardDiv.style.cssText = "cursor:pointer; padding:10px; margin-bottom:12px; background:var(--color-background-soft);";
 
+          const oNum = ord.orderNumber || ord.orderNo || `주문 #${ord.orderId}`;
+          const pName = ord.productName || ord.productSummary || "주문 제작 케이크";
+          const pTime = ord.pickupDateTime || ord.pickupAt || "-";
+
           cardDiv.innerHTML = `
             <div class="cluster cluster--between" style="margin-bottom:6px;">
-              <strong>${escapeHtml(ord.orderNo || `주문 #${ord.orderId}`)}</strong>
+              <strong>${escapeHtml(oNum)}</strong>
               <span class="badge badge--warning">${escapeHtml(ord.orderStatus || "접수")}</span>
             </div>
-            <p style="margin:0; font-weight:600;">${escapeHtml(ord.productSummary || "주문 제작 케이크")}</p>
-            <p class="text-muted" style="font-size:12px; margin:2px 0;">픽업: ${ord.pickupDatetime || "-"}</p>
+            <p style="margin:0; font-weight:600;">${escapeHtml(pName)}</p>
+            <p class="text-muted" style="font-size:12px; margin:2px 0;">픽업: ${escapeHtml(typeof pTime === "string" ? pTime : formatTime(pTime))}</p>
             <p style="font-size:13px; font-weight:700; margin-top:4px;">금액: ${ord.totalAmount ? ord.totalAmount.toLocaleString() + "원" : "-"}</p>
             <a class="btn btn--outline btn--block btn--xs" href="/admin/orders/${ord.orderId}" style="margin-top:8px;">주문 상세서 보기</a>
           `;
@@ -263,7 +278,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       const contentText = adminChatInput.value.trim();
-      if (!contentText && !pendingAttachmentKey) {
+      if (!contentText && !pendingAttachment) {
         alert("메시지 내용 또는 이미지를 첨부해주세요.");
         return;
       }
@@ -271,7 +286,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const payload = {
         chatRoomId: selectedChatRoomId,
         content: contentText,
-        attachments: pendingAttachmentKey ? [{ objectKey: pendingAttachmentKey }] : []
+        attachments: pendingAttachment ? [pendingAttachment] : []
       };
 
       try {
@@ -290,16 +305,18 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         const sentMsg = await response.json();
+        lastFetchedMessageId = sentMsg.id;
 
         // 폼 초기화
         adminChatInput.value = "";
-        pendingAttachmentKey = null;
+        pendingAttachment = null;
         if (adminImageFileName) adminImageFileName.textContent = "선택된 파일 없음";
         if (adminChatImageInput) adminChatImageInput.value = "";
 
         // 재조회 및 스크롤
         await loadAdminMessages(selectedChatRoomId);
         await loadAdminRooms(); // 방 목록 미답변 상태 갱신
+        await markRead(selectedChatRoomId, sentMsg.id);
 
       } catch (err) {
         console.error("관리자 답장 전송 오류:", err);
@@ -308,7 +325,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // 5. 관리자 고객 메모 저장
+  // 5. 관리자 고객 메모 저장 ({ content: noteText } 수신)
   if (saveAdminNoteBtn) {
     saveAdminNoteBtn.addEventListener("click", async () => {
       if (!selectedCustomerId) {
@@ -325,7 +342,7 @@ document.addEventListener("DOMContentLoaded", () => {
             "Content-Type": "application/json",
             ...getCsrfHeaders()
           },
-          body: JSON.stringify({ noteContent: noteText })
+          body: JSON.stringify({ content: noteText })
         });
 
         if (!response.ok) {
@@ -365,7 +382,13 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
 
-        pendingAttachmentKey = await response.text();
+        const objectKey = await response.text();
+        pendingAttachment = {
+          objectKey: objectKey,
+          originalFilename: file.name,
+          contentType: file.type || "image/jpeg",
+          fileSize: file.size
+        };
         if (adminImageFileName) adminImageFileName.textContent = `✔ ${file.name} (첨부 완료)`;
 
       } catch (err) {
@@ -402,16 +425,13 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // 읽음 커서 갱신
-  async function markRead(roomId) {
+  // 읽음 커서 갱신 (쿼리 파라미터 전달)
+  async function markRead(roomId, lastMsgId) {
+    if (!roomId || !lastMsgId) return;
     try {
-      await fetch("/api/chat/read-cursor", {
+      await fetch(`/api/chat/read-cursor?chatRoomId=${roomId}&lastReadMessageId=${lastMsgId}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          ...getCsrfHeaders()
-        },
-        body: JSON.stringify({ chatRoomId: roomId })
+        headers: getCsrfHeaders()
       });
     } catch (err) {
       console.error("읽음 처리 실패:", err);
