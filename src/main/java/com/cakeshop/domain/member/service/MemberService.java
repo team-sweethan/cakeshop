@@ -8,6 +8,7 @@ import com.cakeshop.domain.member.dto.view.MemberProfileView;
 import com.cakeshop.domain.member.dto.view.PasswordRecoveryTarget;
 import com.cakeshop.domain.member.dto.view.PasswordResetResult;
 import com.cakeshop.domain.member.dto.view.RecoveredEmailView;
+import com.cakeshop.domain.member.dto.view.SignupEmailVerification;
 import com.cakeshop.domain.member.entity.Member;
 import com.cakeshop.domain.member.entity.MemberStatus;
 import com.cakeshop.domain.member.error.MemberErrorCode;
@@ -29,20 +30,29 @@ public class MemberService {
     private final MemberMapper memberMapper;
     private final PasswordEncoder passwordEncoder;
     private final CouponMemberCommandService couponMemberCommandService;
+    private final EmailVerificationService emailVerificationService;
 
     /**
      * 회원가입 로직
      */
     @Transactional
-    public void join(SignupForm form) {
-        if (memberMapper.findByEmail(form.getEmail()).isPresent()) {
+    public boolean join(SignupForm form, SignupEmailVerification verification) {
+        String email = form.getEmail().trim().toLowerCase(java.util.Locale.ROOT);
+        if (memberMapper.findByEmail(email).isPresent()) {
             throw new BusinessException(MemberErrorCode.DUPLICATE_EMAIL);
+        }
+        if (verification == null || !email.equals(verification.email())) {
+            return false;
+        }
+        if (!emailVerificationService.consumeSignupVerification(
+                verification.verificationId(), email)) {
+            return false;
         }
 
         String encodedPassword = passwordEncoder.encode(form.getPassword());
 
         Member member = Member.builder()
-                .email(form.getEmail())
+                .email(email)
                 .password(encodedPassword)
                 .name(form.getName())
                 .nickname(form.getNickname())
@@ -56,6 +66,7 @@ public class MemberService {
         }
         // 회원 INSERT와 신규 회원 대상 쿠폰 발급은 같은 트랜잭션에서 함께 확정한다.
         couponMemberCommandService.issueNewMemberCoupons(member.getId());
+        return true;
     }
 
     /**

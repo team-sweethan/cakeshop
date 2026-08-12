@@ -86,7 +86,8 @@ public class SecurityConfig {
                 auth.requestMatchers(passwordRecoveryRequest).denyAll();
                 auth.requestMatchers(
                         "/", "/login", "/signup", "/join", "/emailCheck", "/find-email",
-                        "/find-email/login", "/api/notifications/unread-count", "/api/notifications/test-sms",
+                        "/find-email/login", "/email-verifications/signup/**",
+                        "/api/notifications/unread-count", "/api/notifications/test-sms",
                         "/products/**", "/screens", "/favicon.ico",
                         "/css/**", "/js/**", "/webjars/**", "/images/**", "/uploads/**", "/error")
                         .permitAll();

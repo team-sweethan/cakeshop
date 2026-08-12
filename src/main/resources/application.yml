@@ -22,6 +22,18 @@ spring:
     # 파일명의 타임스탬프는 '만든 시각'이라 머지 순서와 다를 수 있다.
     # 늦게 머지된 낮은 버전도 받아들이지 않으면 validate가 실패한다.
     out-of-order: true
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    default-encoding: UTF-8
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
 
 server:
   tomcat:
@@ -50,6 +62,9 @@ app:
       pf-id: ${KAKAO_ALIMTALK_PF_ID:}
   member:
     simple-password-reset-enabled: false
+    mail:
+      from-address: ${MAIL_FROM_ADDRESS:${MAIL_USERNAME:}}
+      from-name: ${MAIL_FROM_NAME:SweetHan}
   order:
     expiration:
       fixed-delay-ms: ${ORDER_EXPIRATION_FIXED_DELAY_MS:60000}
