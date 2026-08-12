@@ -1,5 +1,6 @@
 package com.cakeshop.domain.home.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.Mockito.when;
@@ -9,8 +10,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
+import com.cakeshop.domain.community.dto.view.NoticeSectionView;
+import com.cakeshop.domain.community.dto.view.NoticeView;
 import com.cakeshop.domain.community.dto.view.PopularPostView;
 import com.cakeshop.domain.community.dto.view.PopularSectionView;
 import com.cakeshop.domain.community.service.CommunityHomeQueryService;
@@ -40,9 +44,14 @@ import org.springframework.web.context.WebApplicationContext;
 class HomeScreenRenderingTests {
 
     private static final String POPULAR_SECTION = "id=\"popular-posts\"";
+    private static final String NOTICE_SECTION = "id=\"notices\"";
     private static final String INTERNAL_SPEC_PATH = "docs/community/specs/community-popular.md";
+    private static final String INTERNAL_NOTICE_SPEC_PATH =
+            "docs/community/specs/community-notice.md";
 
     private static final LocalDate RANKING_DATE = LocalDate.of(2026, 3, 9);
+
+    private static final LocalDateTime NOTICE_DATE = LocalDateTime.of(2026, 3, 9, 10, 0);
 
     @Autowired
     private WebApplicationContext context;
@@ -55,6 +64,11 @@ class HomeScreenRenderingTests {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+
+        when(communityHomeQueryService.getPopularSection())
+                .thenReturn(PopularSectionView.empty());
+        when(communityHomeQueryService.getNoticeSection())
+                .thenReturn(NoticeSectionView.empty());
     }
 
     @Test
@@ -75,11 +89,54 @@ class HomeScreenRenderingTests {
 
     @Test
     void home_noConfirmedRanking_dropsPopularSectionEntirely() throws Exception {
-        when(communityHomeQueryService.getPopularSection())
-                .thenReturn(PopularSectionView.empty());
-
         mockMvc.perform(get("/"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(not(containsString(POPULAR_SECTION))));
+    }
+
+    @Test
+    void home_visibleNotice_showsNoticeSectionWithFullListLink() throws Exception {
+        when(communityHomeQueryService.getNoticeSection()).thenReturn(
+                new NoticeSectionView(List.of(
+                        new NoticeView(7L, "메인에 실린 공지", NOTICE_DATE))));
+
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(NOTICE_SECTION)))
+                .andExpect(content().string(containsString("메인에 실린 공지")))
+                .andExpect(content().string(containsString("2026.03.09")))
+                .andExpect(content().string(containsString("/community/notices/7")))
+                .andExpect(content().string(containsString("/community/notices\"")))
+                .andExpect(content().string(not(containsString(INTERNAL_NOTICE_SPEC_PATH))));
+    }
+
+    @Test
+    void home_noVisibleNotice_dropsNoticeSectionEntirely() throws Exception {
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString(NOTICE_SECTION))));
+    }
+
+    /** 공지는 메인 최상단이다. 자리가 밀리면 지금 읽어야 하는 안내가 스크롤 뒤로 숨는다. */
+    @Test
+    void home_noticeSection_comesBeforeEveryOtherSection() throws Exception {
+        when(communityHomeQueryService.getNoticeSection()).thenReturn(
+                new NoticeSectionView(List.of(
+                        new NoticeView(7L, "메인에 실린 공지", NOTICE_DATE))));
+        when(communityHomeQueryService.getPopularSection()).thenReturn(
+                new PopularSectionView(
+                        RANKING_DATE,
+                        List.of(new PopularPostView(1, 11L, "질문", "메인에 실린 인기글"))));
+
+        String html = mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(html.indexOf(NOTICE_SECTION))
+                .isLessThan(html.indexOf("id=\"service-title\""))
+                .isLessThan(html.indexOf("id=\"recommended-products\""))
+                .isLessThan(html.indexOf(POPULAR_SECTION));
     }
 }

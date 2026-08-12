@@ -9,11 +9,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.cakeshop.domain.community.dto.view.NoticeSectionView;
+import com.cakeshop.domain.community.dto.view.NoticeView;
 import com.cakeshop.domain.community.dto.view.PopularPostView;
 import com.cakeshop.domain.community.dto.view.PopularSectionView;
 import com.cakeshop.domain.home.service.HomeService;
 import com.cakeshop.domain.store.dto.view.StorePublicView;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,6 +29,9 @@ class HomeControllerTests {
             LocalDate.of(2026, 3, 9),
             List.of(new PopularPostView(1, 11L, "질문", "인기글 제목")));
 
+    private static final NoticeSectionView NOTICE_SECTION = new NoticeSectionView(
+            List.of(new NoticeView(7L, "공지 제목", LocalDateTime.of(2026, 3, 9, 10, 0))));
+
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -36,6 +42,7 @@ class HomeControllerTests {
             "평일 10:00 ~ 20:00", "일요일 휴무", "1층", "10:00 ~ 19:00"
         ));
         when(homeService.getPopularSection()).thenReturn(POPULAR_SECTION);
+        when(homeService.getNoticeSection()).thenReturn(NOTICE_SECTION);
         mockMvc = MockMvcBuilders.standaloneSetup(new HomeController(homeService)).build();
     }
 
@@ -44,6 +51,13 @@ class HomeControllerTests {
         mockMvc.perform(get("/"))
             .andExpect(status().isOk())
             .andExpect(model().attribute("popularSection", POPULAR_SECTION));
+    }
+
+    @Test
+    void home_addsNoticeSectionToModel() throws Exception {
+        mockMvc.perform(get("/"))
+            .andExpect(status().isOk())
+            .andExpect(model().attribute("noticeSection", NOTICE_SECTION));
     }
 
     @Test

@@ -2,6 +2,7 @@ package com.cakeshop.domain.home.service;
 
 import java.util.List;
 
+import com.cakeshop.domain.community.dto.view.NoticeSectionView;
 import com.cakeshop.domain.community.dto.view.PopularSectionView;
 import com.cakeshop.domain.community.service.CommunityHomeQueryService;
 import com.cakeshop.domain.product.dto.form.ProductSearchCondition;
@@ -63,5 +64,17 @@ public class HomeService {
      */
     public PopularSectionView getPopularSection() {
         return communityHomeQueryService.getPopularSection();
+    }
+
+    /*
+     * 홈 화면 최상단에 노출할 공지를 조회한다.
+     *
+     * <p>인기글과 같은 계약을 쓴다. 건수도 커뮤니티가 정한다
+     * (specs/community-notice.md B8·D3).
+     *
+     * @return 노출 중인 공지 영역. 노출 중인 공지가 없으면 비어 있다
+     */
+    public NoticeSectionView getNoticeSection() {
+        return communityHomeQueryService.getNoticeSection();
     }
 }
