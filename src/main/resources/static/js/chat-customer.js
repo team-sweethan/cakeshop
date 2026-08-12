@@ -193,10 +193,25 @@ document.addEventListener("DOMContentLoaded", () => {
         ? ord.totalAmount.toLocaleString() + "원"
         : "-";
 
+  function formatOrderStatus(status) {
+    if (!status) return "접수";
+    switch (String(status).toUpperCase()) {
+      case "READY_FOR_PICKUP": return "픽업 대기";
+      case "IN_PRODUCTION": return "제작 중";
+      case "UNDER_REVIEW": return "주문 확인 중";
+      case "PENDING_PAYMENT": return "결제 대기";
+      case "PICKED_UP": return "픽업 완료";
+      case "CANCELED": return "주문 취소";
+      case "REJECTED": return "주문 거절";
+      case "EXPIRED": return "만료";
+      default: return status;
+    }
+  }
+
       itemDiv.innerHTML = `
         <div class="cluster cluster--between" style="margin-bottom:4px;">
           <strong>${escapeHtml(oNum)}</strong>
-          <span class="badge badge--warning">${escapeHtml(ord.orderStatus || "접수")}</span>
+          <span class="badge badge--warning">${escapeHtml(formatOrderStatus(ord.orderStatus))}</span>
         </div>
         <p class="text-muted" style="margin:0;">${escapeHtml(pName)}</p>
         <p class="text-muted" style="font-size:11px;">금액: ${amtStr} | 픽업: ${escapeHtml(typeof pTime === "string" ? pTime : formatTime(pTime))}</p>
@@ -226,12 +241,19 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  let isUploadingAttachment = false;
+
   // 4. 메시지 전송
   if (chatForm) {
     chatForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       if (!currentChatRoomId) {
         alert("채팅방이 활성화되지 않았습니다.");
+        return;
+      }
+
+      if (isUploadingAttachment) {
+        alert("이미지 업로드 중입니다. 잠시만 기다려주세요.");
         return;
       }
 
@@ -299,7 +321,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const file = chatImageInput.files[0];
       if (!file) return;
 
-      if (imageFileName) imageFileName.textContent = file.name;
+      if (imageFileName) imageFileName.textContent = `${file.name} (업로드 중...)`;
+      isUploadingAttachment = true;
 
       const formData = new FormData();
       formData.append("file", file);
@@ -335,6 +358,8 @@ document.addEventListener("DOMContentLoaded", () => {
         pendingAttachment = null;
         if (imageFileName) imageFileName.textContent = "선택된 파일 없음";
         if (chatImageInput) chatImageInput.value = "";
+      } finally {
+        isUploadingAttachment = false;
       }
     });
   }

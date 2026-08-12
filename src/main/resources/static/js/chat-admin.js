@@ -372,10 +372,25 @@ document.addEventListener("DOMContentLoaded", () => {
             ? ord.totalAmount.toLocaleString() + "원"
             : "-";
 
+  function formatOrderStatus(status) {
+    if (!status) return "접수";
+    switch (String(status).toUpperCase()) {
+      case "READY_FOR_PICKUP": return "픽업 대기";
+      case "IN_PRODUCTION": return "제작 중";
+      case "UNDER_REVIEW": return "주문 확인 중";
+      case "PENDING_PAYMENT": return "결제 대기";
+      case "PICKED_UP": return "픽업 완료";
+      case "CANCELED": return "주문 취소";
+      case "REJECTED": return "주문 거절";
+      case "EXPIRED": return "만료";
+      default: return status;
+    }
+  }
+
           cardDiv.innerHTML = `
             <div class="cluster cluster--between" style="margin-bottom:6px;">
               <strong>${escapeHtml(oNum)}</strong>
-              <span class="badge badge--warning">${escapeHtml(ord.orderStatus || "접수")}</span>
+              <span class="badge badge--warning">${escapeHtml(formatOrderStatus(ord.orderStatus))}</span>
             </div>
             <p style="margin:0; font-weight:600;">${escapeHtml(pName)}</p>
             <p class="text-muted" style="font-size:12px; margin:2px 0;">픽업: ${escapeHtml(typeof pTime === "string" ? pTime : formatTime(pTime))}</p>
