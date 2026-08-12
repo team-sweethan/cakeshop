@@ -9,6 +9,7 @@ import com.cakeshop.domain.statistics.service.DashboardReadModelQueryService;
 import com.cakeshop.domain.statistics.service.PeriodStatisticsReadModelQueryService;
 import com.cakeshop.domain.statistics.service.ProductPeriodStatisticsReadModelQueryService;
 import com.cakeshop.global.error.BusinessException;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
@@ -34,6 +35,19 @@ public class StatisticsAdminController {
     private final DashboardReadModelQueryService dashboardReadModelQueryService;
     private final PeriodStatisticsReadModelQueryService periodStatisticsReadModelQueryService;
     private final ProductPeriodStatisticsReadModelQueryService productStatisticsQueryService;
+
+    /** 조회 유형이 생략된 기존 날짜 URL은 직접 기간 조회로 호환한다. */
+    @ModelAttribute("searchForm")
+    public StatisticsSearchForm searchForm(HttpServletRequest request) {
+        StatisticsSearchForm searchForm = new StatisticsSearchForm();
+        boolean periodTypeOmitted = !request.getParameterMap().containsKey("periodType");
+        boolean dateRangeProvided = request.getParameterMap().containsKey("startDate")
+                || request.getParameterMap().containsKey("endDate");
+        if (periodTypeOmitted && dateRangeProvided) {
+            searchForm.setPeriodType(StatisticsPeriodType.RANGE);
+        }
+        return searchForm;
+    }
 
     /** 관리자 대시보드의 오늘 통계를 조회한다. */
     @GetMapping("/admin")

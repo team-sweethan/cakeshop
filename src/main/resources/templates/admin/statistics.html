@@ -23,7 +23,12 @@
             th:action="@{/admin/statistics}"
             th:object="${searchForm}"
             data-statistics-search-form>
-        <input type="hidden" th:field="*{periodType}" data-statistics-period-type>
+        <input type="hidden"
+               name="periodType"
+               th:value="${searchForm.periodType?.name() == 'RECENT_WEEK'
+                         ? 'RANGE'
+                         : searchForm.periodType?.name()}"
+               data-statistics-period-type>
         <div class="admin-toolbar">
           <label for="startDate">시작일</label>
           <input id="startDate" class="form-control" type="date"
@@ -35,6 +40,11 @@
                  th:field="*{endDate}" th:max="${latestSelectableDate}"
                  data-statistics-range-input>
 
+          <a class="btn"
+             data-statistics-period-link
+             th:classappend="${searchForm.periodType?.name() == 'RECENT_WEEK'} ? ' is-active'"
+             th:attr="aria-current=${searchForm.periodType?.name() == 'RECENT_WEEK'} ? 'page' : null"
+             th:href="@{/admin/statistics(periodType='RECENT_WEEK')}">최근 일주일</a>
           <a class="btn"
              data-statistics-period-link
              th:classappend="${searchForm.periodType?.name() == 'WEEKLY'} ? ' is-active'"
@@ -163,7 +173,7 @@
 
           <div class="table-wrap"
                th:if="${productStatisticsError == null and !#lists.isEmpty(productStatistics)}">
-            <table class="data-table">
+            <table id="product-statistics-table" class="data-table">
               <thead>
               <tr>
                 <th scope="col">순위</th>
@@ -174,7 +184,9 @@
               </tr>
               </thead>
               <tbody>
-              <tr th:each="product : ${productStatistics}">
+              <tr th:each="product : ${productStatistics}"
+                  th:hidden="${product.ranking > 5}"
+                  th:attr="data-product-ranking-overflow=${product.ranking > 5}">
                 <td th:text="${#numbers.formatInteger(product.ranking, 0, 'COMMA')}"></td>
                 <td th:text="${product.productName}"></td>
                 <td th:text="|${#numbers.formatInteger(product.orderCount, 0, 'COMMA')}건|"></td>
@@ -184,6 +196,19 @@
               </tbody>
             </table>
           </div>
+
+          <div class="statistics-product-ranking-actions"
+               th:if="${productStatisticsError == null
+                        and productStatistics != null
+                        and productStatistics.size() > 5}">
+            <button class="btn"
+                    type="button"
+                    aria-controls="product-statistics-table"
+                    aria-expanded="false"
+                    data-product-ranking-toggle>
+              전체보기
+            </button>
+          </div>
         </section>
       </th:block>
     </main>
@@ -192,5 +217,6 @@
 <script th:src="@{/webjars/chart.js/4.5.1/dist/chart.umd.js}"></script>
 <script th:src="@{/js/statistics-period.js}"></script>
 <script th:src="@{/js/statistics-chart.js}"></script>
+<script th:src="@{/js/statistics-product-ranking.js}"></script>
 </body>
 </html>
