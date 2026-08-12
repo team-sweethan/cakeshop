@@ -1,0 +1,87 @@
+<!--/*
+******************************
+작성자 : HyunGyu-Cho
+담당자 : 현규
+작성일 : 2026-08-12
+기능 : 관리자 공지사항 화면
+설명 : form 공지사항 화면을 구성한다.
+******************************
+*/-->
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title th:text="${notice} != null ? '공지 수정 | 관리자' : '공지 등록 | 관리자'">공지 등록 | 관리자</title>
+  <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<div class="admin-layout">
+  <aside th:replace="~{fragments/admin/sidebar :: sidebar('community')}"></aside>
+  <div class="admin-main">
+    <header th:replace="~{fragments/admin/header :: header('공지사항 관리')}"></header>
+    <main class="admin-content">
+
+      <div th:replace="~{fragments/common/alert :: alert}"></div>
+
+      <div class="cluster cluster--between section">
+        <h1 class="admin-page-title"
+            th:text="${notice} != null ? '공지 수정' : '공지 등록'">공지 등록</h1>
+        <a class="btn" th:href="@{/admin/community/notices}">목록으로</a>
+      </div>
+
+      <form method="post"
+            th:object="${noticeForm}"
+            th:action="${notice} != null
+                       ? @{/admin/community/notices/{noticeId}/edit(noticeId=${notice.id})}
+                       : @{/admin/community/notices/new}">
+
+        <div class="form-group">
+          <label class="form-label" for="title">제목 <span class="required">*</span></label>
+          <input class="form-control" id="title" type="text" th:field="*{title}"
+                 placeholder="제목을 입력하세요" maxlength="100" required>
+          <p class="field-error" th:errors="*{title}"></p>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="content">내용 <span class="required">*</span></label>
+          <textarea class="form-control form-control--textarea" id="content" th:field="*{content}"
+                    style="min-height:220px" placeholder="내용을 입력하세요"
+                    maxlength="5000" required></textarea>
+          <p class="field-error" th:errors="*{content}"></p>
+        </div>
+
+        <div class="grid grid--2">
+          <div class="form-group">
+            <label class="form-label" for="startsAt">노출 시작</label>
+            <input class="form-control" id="startsAt" type="datetime-local" th:field="*{startsAt}">
+            <p class="note">비워 두면 즉시 노출됩니다.</p>
+            <p class="field-error" th:errors="*{startsAt}"></p>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="endsAt">노출 종료</label>
+            <input class="form-control" id="endsAt" type="datetime-local" th:field="*{endsAt}">
+            <p class="note">비워 두면 무기한 노출됩니다.</p>
+            <p class="field-error" th:errors="*{endsAt}"></p>
+          </div>
+        </div>
+
+        <p class="field-error" th:errors="*{validPeriod}"></p>
+
+        <div class="cluster cluster--between section">
+          <a class="btn" th:href="@{/admin/community/notices}">취소</a>
+          <button class="btn btn--primary" type="submit"
+                  th:text="${notice} != null ? '수정' : '등록'">등록</button>
+        </div>
+      </form>
+
+      <p class="note">
+        지난 종료일도 그대로 저장됩니다 — 지금부터 감추려는 경우가 있기 때문입니다.
+        대신 목록에서 <strong>종료</strong> 상태로 보입니다.
+      </p>
+    </main>
+  </div>
+</div>
+</body>
+</html>

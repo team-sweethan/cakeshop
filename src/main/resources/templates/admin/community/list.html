@@ -24,7 +24,10 @@
 
       <div th:replace="~{fragments/common/alert :: alert}"></div>
 
-      <h1 class="admin-page-title">커뮤니티 관리</h1>
+      <div class="cluster cluster--between section">
+        <h1 class="admin-page-title">커뮤니티 관리</h1>
+        <a class="btn" th:href="@{/admin/community/notices}">공지사항 관리</a>
+      </div>
 
       <div class="cluster section">
         <a class="btn"

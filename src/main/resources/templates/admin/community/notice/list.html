@@ -1,0 +1,126 @@
+<!--/*
+******************************
+작성자 : HyunGyu-Cho
+담당자 : 현규
+작성일 : 2026-08-12
+기능 : 관리자 공지사항 화면
+설명 : list 공지사항 화면을 구성한다.
+******************************
+*/-->
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>공지사항 관리 | 관리자</title>
+  <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<div class="admin-layout">
+  <aside th:replace="~{fragments/admin/sidebar :: sidebar('community')}"></aside>
+  <div class="admin-main">
+    <header th:replace="~{fragments/admin/header :: header('공지사항 관리')}"></header>
+    <main class="admin-content">
+
+      <div th:replace="~{fragments/common/alert :: alert}"></div>
+
+      <div class="cluster cluster--between section">
+        <h1 class="admin-page-title">공지사항 관리</h1>
+        <div class="cluster">
+          <a class="btn" th:href="@{/admin/community}">게시글 관리</a>
+          <a class="btn btn--primary" th:href="@{/admin/community/notices/new}">공지 등록</a>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th>번호</th><th>제목</th><th>노출 시작</th><th>노출 종료</th><th>등록일</th><th>상태</th><th>관리</th></tr>
+          </thead>
+          <tbody>
+            <tr th:each="notice : ${pageResult.content}">
+              <td th:text="${notice.id}">0</td>
+              <td th:text="${notice.title}">제목</td>
+              <td>
+                <span th:if="${notice.startsAt != null}"
+                      th:text="${#temporals.format(notice.startsAt, 'yyyy.MM.dd HH:mm')}">2026.01.01 00:00</span>
+                <span th:if="${notice.startsAt == null}" class="text-muted">즉시</span>
+              </td>
+              <td>
+                <span th:if="${notice.endsAt != null}"
+                      th:text="${#temporals.format(notice.endsAt, 'yyyy.MM.dd HH:mm')}">2026.01.01 00:00</span>
+                <span th:if="${notice.endsAt == null}" class="text-muted">무기한</span>
+              </td>
+              <td th:text="${#temporals.format(notice.createdAt, 'yyyy.MM.dd')}">2026.01.01</td>
+              <td>
+                <span th:if="${notice.displayStatus.name() == 'VISIBLE'}"
+                      class="badge badge--success" th:text="${notice.displayStatus.label}">상태</span>
+                <span th:if="${notice.displayStatus.name() == 'SCHEDULED'}"
+                      class="badge badge--info" th:text="${notice.displayStatus.label}">상태</span>
+                <span th:if="${notice.displayStatus.name() == 'ENDED'}"
+                      class="badge" th:text="${notice.displayStatus.label}">상태</span>
+                <span th:if="${notice.displayStatus.name() == 'DELETED'}"
+                      class="badge" th:text="${notice.displayStatus.label}">상태</span>
+              </td>
+              <td>
+                <div class="cluster" th:if="${notice.deletable()}">
+                  <a class="btn"
+                     th:href="@{/admin/community/notices/{noticeId}/edit(noticeId=${notice.id})}">수정</a>
+                  <form method="post"
+                        th:action="@{/admin/community/notices/{noticeId}/delete(noticeId=${notice.id})}"
+                        onsubmit="return confirm('이 공지를 삭제합니다. 되돌릴 수 없습니다.');">
+                    <button class="btn btn--danger" type="submit">삭제</button>
+                  </form>
+                </div>
+                <span th:unless="${notice.deletable()}" class="text-muted">-</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="panel panel--dashed text-muted"
+           th:if="${pageResult.content.isEmpty()}"
+           style="text-align:center">
+        등록된 공지사항이 없습니다.
+      </div>
+
+      <nav th:if="${pageResult.totalPages > 1}"
+           class="cluster section"
+           aria-label="페이지 이동"
+           style="justify-content:center">
+
+        <a class="btn"
+           th:if="${pageNavigation.hasPreviousBlock}"
+           th:href="@{/admin/community/notices(page=${pageNavigation.previousPage})}">
+          이전
+        </a>
+
+        <span class="btn btn--disabled" th:unless="${pageNavigation.hasPreviousBlock}">이전</span>
+
+        <a class="btn"
+           th:each="pageNumber :
+               ${#numbers.sequence(pageNavigation.startPage, pageNavigation.endPage)}"
+           th:text="${pageNumber}"
+           th:classappend="${pageNumber == pageResult.page} ? ' is-active'"
+           th:href="@{/admin/community/notices(page=${pageNumber})}">
+          1
+        </a>
+
+        <a class="btn"
+           th:if="${pageNavigation.hasNextBlock}"
+           th:href="@{/admin/community/notices(page=${pageNavigation.nextPage})}">
+          다음
+        </a>
+
+        <span class="btn btn--disabled" th:unless="${pageNavigation.hasNextBlock}">다음</span>
+      </nav>
+
+      <p class="note">
+        <strong>종료</strong>는 노출 기간이 지난 공지입니다. 고객 화면에서는 보이지 않지만 기록은 남습니다.
+      </p>
+    </main>
+  </div>
+</div>
+</body>
+</html>
