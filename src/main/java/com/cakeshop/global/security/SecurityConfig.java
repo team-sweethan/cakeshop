@@ -46,9 +46,10 @@ public class SecurityConfig {
                 passwordRecoveryRequest,
                 SecurityConfig::isLoopbackRequest);
         HttpSessionRequestCache requestCache = new HttpSessionRequestCache();
-        requestCache.setRequestMatcher(request ->
-                !"/cart/count".equals(request.getRequestURI()
-                        .substring(request.getContextPath().length())));
+        requestCache.setRequestMatcher(request -> {
+            String path = request.getRequestURI().substring(request.getContextPath().length());
+            return !"/cart/count".equals(path) && !path.startsWith("/api/");
+        });
         LoginUrlAuthenticationEntryPoint customerLoginEntryPoint =
                 new LoginUrlAuthenticationEntryPoint("/login");
         LoginUrlAuthenticationEntryPoint adminLoginEntryPoint =
