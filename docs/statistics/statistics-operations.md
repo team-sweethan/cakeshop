@@ -10,7 +10,8 @@
 - `rds` 프로필은 Flyway가 비활성화되어 있으므로 승인된 별도 스키마 반영 절차로 migration을 먼저
   적용한다. REBUILD 실행 전에는 `V20260811_101818__add_statistics_rebuild_batch_type.sql` 적용 여부를
   확인하고, 상품별 통계 재집계 전에는
-  `V20260811_163316__add_daily_product_statistics.sql` 적용 여부도 확인한다.
+  `V20260811_163316__add_daily_product_statistics.sql` 적용 여부도 확인한다. 활동·금액 지표 재집계
+  전에는 기타 지표 컬럼과 원본 조회 인덱스를 추가하는 migration 적용 여부도 확인한다.
 - 초기 백필과 수동 재집계는 동시에 활성화하지 않는다.
 - 정기 일별 집계, 초기 백필과 수동 재집계는 하나의 실행 잠금을 공유한다.
 - 오늘 통계는 집계하지 않으며 모든 날짜는 `Asia/Seoul` 기준이다.
@@ -46,6 +47,76 @@ WHERE product_aggregated_at IS NULL;
 
 재집계가 완료되기 전에도 기존 주문·매출 통계는 조회할 수 있지만, `product_aggregated_at IS NULL`인 날짜가
 조회 기간에 포함되면 상품별 통계 영역은 미집계 상태로 표시된다.
+
+## 활동·금액 지표 도입 시 필수 재집계
+
+기타 지표 migration은 기존 `daily_statistics.additional_metrics_aggregated_at`을 `NULL`로 유지한다.
+실제 활동·금액 지표 집계 없이 완료 시각만 기록하지 않으며, migration 실행 중 원본 전체 기간을
+조회하지 않는다.
+
+기존 집계일은 애플리케이션 시작 시 자동 따라잡기 대상이 아니므로 다음 배포 절차로 직접 재집계한다.
+
+1. 실행 대상 DB에 기타 지표 컬럼과 원본 조회 인덱스를 추가하는 migration을 적용한다.
+2. 기타 지표 집계 기능이 포함된 애플리케이션 버전을 배포한다.
+3. 아래 SQL로 재집계할 최초일과 최종일을 확인한다.
+4. 해당 전체 기간을 366일 이하의 겹치지 않는 연속 구간으로 나누어 이 문서의 REBUILD 명령을 실행한다.
+5. 모든 구간이 성공한 뒤 아래 완료 확인 SQL에서 두 미집계 날짜 수가 모두 `0`인지 확인한다.
+
+```sql
+SELECT
+    MIN(statistics_source.source_date) AS rebuild_start_date,
+    CURRENT_DATE - INTERVAL 1 DAY AS rebuild_end_date
+FROM (
+    SELECT statistics_date AS source_date
+    FROM daily_statistics
+
+    UNION ALL
+
+    SELECT DATE(created_at)
+    FROM orders
+
+    UNION ALL
+
+    SELECT DATE(approved_at)
+    FROM payments
+    WHERE approved_at IS NOT NULL
+
+    UNION ALL
+
+    SELECT DATE(created_at)
+    FROM members
+
+    UNION ALL
+
+    SELECT DATE(withdrawn_at)
+    FROM members
+    WHERE withdrawn_at IS NOT NULL
+
+    UNION ALL
+
+    SELECT DATE(created_at)
+    FROM posts
+
+    UNION ALL
+
+    SELECT DATE(canceled_at)
+    FROM payment_cancellations
+    WHERE canceled_at IS NOT NULL
+) AS statistics_source;
+```
+
+```sql
+SELECT
+    COALESCE(SUM(product_aggregated_at IS NULL), 0) AS incomplete_product_date_count,
+    COALESCE(SUM(additional_metrics_aggregated_at IS NULL), 0) AS incomplete_additional_metrics_date_count
+FROM daily_statistics;
+```
+
+재집계가 완료되기 전에도 기존 주문·매출 통계는 조회할 수 있지만,
+`additional_metrics_aggregated_at IS NULL`인 날짜가 조회 기간에 포함되면 활동·금액 지표 영역은
+미집계 상태로 표시된다. 상품별 통계와 활동·금액 지표를 함께 도입하면 두 미집계 날짜 수가 모두
+`0`인 것을 확인한 뒤 사용한다. 시작일이 기존 `daily_statistics`의 최초일보다 이르면 REBUILD가
+앞쪽 날짜의 `daily_statistics` 행도 새로 생성한다.
 
 ## 애플리케이션 시작 시 자동 따라잡기
 
