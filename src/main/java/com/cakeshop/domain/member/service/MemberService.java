@@ -5,7 +5,6 @@ import com.cakeshop.domain.member.dto.form.ProfileUpdateForm;
 import com.cakeshop.domain.member.dto.form.SignupForm;
 import com.cakeshop.domain.member.dto.view.EmailRecoveryResult;
 import com.cakeshop.domain.member.dto.view.MemberProfileView;
-import com.cakeshop.domain.member.dto.view.PasswordRecoveryTarget;
 import com.cakeshop.domain.member.dto.view.PasswordResetResult;
 import com.cakeshop.domain.member.dto.view.RecoveredEmailView;
 import com.cakeshop.domain.member.dto.view.SignupEmailVerification;
@@ -95,22 +94,12 @@ public class MemberService {
         return new EmailRecoveryResult(emails, views);
     }
 
-    @Transactional(readOnly = true)
-    public Optional<PasswordRecoveryTarget> findPasswordRecoveryMember(
-            String email,
-            String name,
-            LocalDate birthDate,
-            String phone) {
-        return memberMapper.findPasswordRecoveryMember(
-                        email.trim(),
-                        name.trim(),
-                        birthDate,
-                        phone.replace("-", ""))
-                .map(member -> new PasswordRecoveryTarget(member.getId(), member.getEmail()));
-    }
-
     @Transactional
-    public PasswordResetResult resetPassword(Long memberId, String newPassword) {
+    public PasswordResetResult resetPassword(
+            Long verificationId,
+            Long memberId,
+            String email,
+            String newPassword) {
         Optional<String> currentPassword =
                 memberMapper.findActivePasswordForUpdate(memberId);
         if (currentPassword.isEmpty()) {
@@ -119,10 +108,14 @@ public class MemberService {
         if (passwordEncoder.matches(newPassword, currentPassword.get())) {
             return PasswordResetResult.SAME_AS_CURRENT;
         }
+        if (!emailVerificationService.consumePasswordResetVerification(
+                verificationId, email)) {
+            return PasswordResetResult.UNAVAILABLE;
+        }
 
         String encodedPassword = passwordEncoder.encode(newPassword);
         if (memberMapper.updatePasswordForActiveMember(memberId, encodedPassword) != 1) {
-            return PasswordResetResult.UNAVAILABLE;
+            throw new BusinessException(MemberErrorCode.UPDATE_FAILED);
         }
         return PasswordResetResult.SUCCESS;
     }
