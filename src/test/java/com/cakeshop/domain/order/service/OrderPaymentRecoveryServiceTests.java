@@ -5,10 +5,12 @@ import static org.mockito.Mockito.when;
 
 import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
 import com.cakeshop.domain.order.entity.Order;
+import com.cakeshop.domain.order.entity.OrderItem;
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.mapper.OrderMapper;
 import com.cakeshop.domain.product.service.ProductStockService;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,5 +52,31 @@ class OrderPaymentRecoveryServiceTests {
         );
 
         verify(couponOrderCommandService).restoreCouponForCanceledOrder(10L);
+    }
+
+    @Test
+    void cancelAfterPaymentCompensation_customUnderReviewOrder_restoresDeductedStock() {
+        Order order = new Order();
+        order.setId(10L);
+        order.setStatus(OrderStatus.UNDER_REVIEW);
+        OrderItem deductedItem = new OrderItem();
+        deductedItem.setId(100L);
+        deductedItem.setProductId(200L);
+        deductedItem.setQuantity(2);
+        when(orderMapper.findOrderByIdForUpdate(10L)).thenReturn(Optional.of(order));
+        when(orderMapper.cancelAfterPaymentCompensation(10L, CANCELED_AT, "PG 승인 보상 취소"))
+                .thenReturn(1);
+        when(orderMapper.findStockDeductedItemsForRestore(10L)).thenReturn(List.of(deductedItem));
+        when(orderMapper.markStockRestoredIfDeducted(100L, CANCELED_AT)).thenReturn(1);
+
+        orderPaymentRecoveryService.cancelAfterPaymentCompensation(
+                10L,
+                CANCELED_AT,
+                "PG 승인 보상 취소"
+        );
+
+        verify(couponOrderCommandService).restoreCouponForCanceledOrder(10L);
+        verify(productStockService).restoreStock(200L, 2);
+        verify(orderMapper).markStockRestoredIfDeducted(100L, CANCELED_AT);
     }
 }
