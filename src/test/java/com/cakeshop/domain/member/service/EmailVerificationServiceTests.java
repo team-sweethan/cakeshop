@@ -49,6 +49,9 @@ class EmailVerificationServiceTests {
     private EmailVerificationMapper emailVerificationMapper;
 
     @Mock
+    private EmailVerificationAttemptService emailVerificationAttemptService;
+
+    @Mock
     private MemberMapper memberMapper;
 
     @Mock
@@ -63,6 +66,7 @@ class EmailVerificationServiceTests {
                 any(), any(), anyInt())).thenReturn(1);
         emailVerificationService = new EmailVerificationService(
                 emailVerificationMapper,
+                emailVerificationAttemptService,
                 memberMapper,
                 emailSender,
                 passwordEncoder,
@@ -203,7 +207,7 @@ class EmailVerificationServiceTests {
                 () -> emailVerificationService.verifySignupCode(
                         "user@example.com", "654321"),
                 MemberErrorCode.EMAIL_VERIFICATION_INVALID);
-        verify(emailVerificationMapper).incrementAttemptCount(latest.getId(), NOW);
+        verify(emailVerificationAttemptService).recordFailure(latest.getId(), NOW);
     }
 
     @Test
@@ -220,7 +224,7 @@ class EmailVerificationServiceTests {
                 () -> emailVerificationService.verifySignupCode(
                         "user@example.com", "654321"),
                 MemberErrorCode.EMAIL_VERIFICATION_INVALID);
-        verify(emailVerificationMapper).incrementAttemptCount(latest.getId(), NOW);
+        verify(emailVerificationAttemptService).recordFailure(latest.getId(), NOW);
     }
 
     @Test

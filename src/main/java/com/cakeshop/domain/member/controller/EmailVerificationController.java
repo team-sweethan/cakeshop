@@ -5,8 +5,8 @@ import com.cakeshop.domain.member.dto.form.EmailVerificationRequest;
 import com.cakeshop.domain.member.dto.view.EmailVerificationResponse;
 import com.cakeshop.domain.member.dto.view.SignupEmailVerification;
 import com.cakeshop.domain.member.dto.view.PasswordResetEmailVerification;
-import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.domain.member.service.EmailVerificationService;
+import com.cakeshop.domain.member.service.PasswordResetEmailDispatchService;
 import jakarta.validation.Valid;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
@@ -25,6 +25,7 @@ public class EmailVerificationController {
     private static final Duration PASSWORD_RESET_SESSION_TTL = Duration.ofMinutes(10);
 
     private final EmailVerificationService emailVerificationService;
+    private final PasswordResetEmailDispatchService passwordResetEmailDispatchService;
 
     // 회원가입 이메일 인증번호 발송
     @PostMapping("/email-verifications/signup/send")
@@ -49,11 +50,7 @@ public class EmailVerificationController {
     @PostMapping("/email-verifications/password-reset/send")
     public EmailVerificationResponse sendPasswordResetCode(
             @Valid @RequestBody EmailVerificationRequest request) {
-        try {
-            emailVerificationService.sendPasswordResetCode(request.email());
-        } catch (BusinessException ignored) {
-            // 회원 존재 여부와 SMTP 상태를 공개 응답의 차이로 노출하지 않는다.
-        }
+        passwordResetEmailDispatchService.dispatch(request.email());
         return EmailVerificationResponse.success(
                 "입력한 이메일로 인증번호 발송을 요청했습니다.");
     }

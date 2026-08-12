@@ -39,6 +39,7 @@ public class EmailVerificationService {
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final EmailVerificationMapper emailVerificationMapper;
+    private final EmailVerificationAttemptService emailVerificationAttemptService;
     private final MemberMapper memberMapper;
     private final EmailSender emailSender;
     private final PasswordEncoder passwordEncoder;
@@ -162,7 +163,7 @@ public class EmailVerificationService {
                     && verification.getVerifiedAt().plus(VERIFIED_TTL).isAfter(now)
                     && code != null
                     && code.matches("\\d{6}")) {
-                emailVerificationMapper.incrementAttemptCount(verification.getId(), now);
+                emailVerificationAttemptService.recordFailure(verification.getId(), now);
             }
             throw new BusinessException(MemberErrorCode.EMAIL_VERIFICATION_INVALID);
         }
@@ -174,7 +175,7 @@ public class EmailVerificationService {
             throw new BusinessException(MemberErrorCode.EMAIL_VERIFICATION_INVALID);
         }
         if (!passwordEncoder.matches(code, verification.getCodeHash())) {
-            emailVerificationMapper.incrementAttemptCount(verification.getId(), now);
+            emailVerificationAttemptService.recordFailure(verification.getId(), now);
             throw new BusinessException(MemberErrorCode.EMAIL_VERIFICATION_INVALID);
         }
         if (emailVerificationMapper.markVerified(
