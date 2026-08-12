@@ -393,6 +393,17 @@ class CommunityScreenRenderingTests {
                 .andExpect(content().string(containsString("2026-03-09T09:00")));
     }
 
+    /** 삭제된 공지는 수정 폼 자체가 열리지 않는다. 목록에 링크가 없어도 주소로는 닿는다. */
+    @Test
+    void communityAdminNoticeEditForm_deletedNotice_isRejectedBeforeRendering() throws Exception {
+        long noticeId = insertNotice("지운 공지", NoticeStatus.DELETED, null, null);
+
+        mockMvc.perform(get("/admin/community/notices/" + noticeId + "/edit")
+                        .with(authentication(admin())))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(not(containsString("지운 공지"))));
+    }
+
     /** 뒤집힌 노출 기간은 폼 오류로 되돌아오고 아무것도 저장하지 않는다. */
     @Test
     void communityAdminNoticeCreate_invertedPeriod_rendersFormErrorAndWritesNothing()

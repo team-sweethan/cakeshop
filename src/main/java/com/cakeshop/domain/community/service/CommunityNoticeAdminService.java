@@ -70,6 +70,24 @@ public class CommunityNoticeAdminService {
         return AdminNoticeDetailView.of(row, LocalDateTime.now(clock));
     }
 
+    /**
+     * 수정 화면이 열어도 되는 공지인지 확인하고 돌려준다.
+     *
+     * <p>`DELETED`는 종착 상태라 <b>폼 자체가 닫힌다</b>. 조회로 막지 않으면 목록에 링크가 없어도
+     * 주소를 직접 친 관리자에게 제목·본문이 채워진 폼이 열리고, 실제 거절은 제출한 뒤에야 일어난다.
+     * 게시글의 {@code getEditablePost}와 같은 자리다.</p>
+     */
+    @Transactional(readOnly = true)
+    public AdminNoticeDetailView getEditableNotice(long noticeId) {
+        AdminNoticeDetailView notice = getNotice(noticeId);
+
+        if (!notice.editable()) {
+            throw new BusinessException(CommunityErrorCode.INVALID_NOTICE_TRANSITION);
+        }
+
+        return notice;
+    }
+
     @Transactional
     public void createNotice(NoticeForm form, long adminId) {
         communityNoticeMapper.insertNotice(Notice.create(

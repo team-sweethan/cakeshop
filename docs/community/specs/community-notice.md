@@ -19,7 +19,7 @@
 | `id` | `BIGINT` PK AUTO_INCREMENT | |
 | `title` | `VARCHAR(200)` NOT NULL | 화면 허용은 100자(`../DOMAIN.md` 7절) |
 | `content` | `TEXT` NOT NULL | 순수 텍스트. HTML 금지 |
-| `status` | `VARCHAR(20)` NOT NULL | `PUBLISHED` / `DELETED` |
+| `status` | `VARCHAR(20)` NOT NULL | `PUBLISHED` / `DELETED`. 기본값 `PUBLISHED` |
 | `starts_at` | `DATETIME(6)` NULL | **NULL = 즉시 노출** |
 | `ends_at` | `DATETIME(6)` NULL | **NULL = 무기한** |
 | `created_by` | `BIGINT` NOT NULL FK `members(id)` | 감사용. 화면에 쓰지 않는다 |
@@ -28,7 +28,7 @@
 
 표는 `V20260812_065639__add_community_notices.sql`이 만든다.
 
-- `CHECK (status IN ('PUBLISHED','DELETED'))`를 건다(선례: `V20260802_113219__add_post_status_constraint.sql`).
+- `chk_community_notices_status`로 `CHECK (status IN ('PUBLISHED','DELETED'))`를 건다. 이름과 `DEFAULT`는 `docs/conventions.md` 11절이 정본이다(선례: `V20260802_113219__add_post_status_constraint.sql`).
 - **뒤집힌 기간도 `CHECK`로 막는다** — `starts_at IS NULL OR ends_at IS NULL OR starts_at < ends_at`.
   화면 입력은 `NoticeForm`이 먼저 거르지만, 뒤집힌 기간은 **공지를 영영 안 보이게 만들면서 등록은
   성공으로 끝난다.** 조건문이 아니라 표가 정책을 지킨다는 이 spec의 방식과 같은 자리다.

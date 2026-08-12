@@ -161,13 +161,36 @@ class CommunityNoticeAdminServiceTests {
     }
 
     @Test
-    void getNotice_deletedNotice_isNotEditable() {
-        when(communityNoticeMapper.selectAdminNoticeById(NOTICE_ID)).thenReturn(
-                new AdminNoticeDetailRow(
-                        NOTICE_ID, "제목", "본문", NoticeStatus.DELETED,
-                        null, null, CREATED_AT, CREATED_AT));
+    void getNotice_deletedNotice_isStillReadableForTheAdminList() {
+        when(communityNoticeMapper.selectAdminNoticeById(NOTICE_ID))
+                .thenReturn(detailRow(NoticeStatus.DELETED));
 
         assertThat(communityNoticeAdminService.getNotice(NOTICE_ID).editable()).isFalse();
+    }
+
+    @Test
+    void getEditableNotice_deletedNotice_isRejectedBeforeTheFormOpens() {
+        when(communityNoticeMapper.selectAdminNoticeById(NOTICE_ID))
+                .thenReturn(detailRow(NoticeStatus.DELETED));
+
+        assertThatThrownBy(() -> communityNoticeAdminService.getEditableNotice(NOTICE_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(CommunityErrorCode.INVALID_NOTICE_TRANSITION);
+    }
+
+    @Test
+    void getEditableNotice_publishedNotice_isReturned() {
+        when(communityNoticeMapper.selectAdminNoticeById(NOTICE_ID))
+                .thenReturn(detailRow(NoticeStatus.PUBLISHED));
+
+        assertThat(communityNoticeAdminService.getEditableNotice(NOTICE_ID).id())
+                .isEqualTo(NOTICE_ID);
+    }
+
+    private AdminNoticeDetailRow detailRow(NoticeStatus status) {
+        return new AdminNoticeDetailRow(
+                NOTICE_ID, "제목", "본문", status, null, null, CREATED_AT, CREATED_AT);
     }
 
     private void assertDisplayStatus(

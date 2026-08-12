@@ -89,7 +89,7 @@ public class CommunityNoticeAdminController {
             @ModelAttribute("noticeForm") NoticeForm noticeForm,
             Model model
     ) {
-        AdminNoticeDetailView notice = communityNoticeAdminService.getNotice(noticeId);
+        AdminNoticeDetailView notice = communityNoticeAdminService.getEditableNotice(noticeId);
 
         noticeForm.setTitle(notice.title());
         noticeForm.setContent(notice.content());
@@ -108,7 +108,7 @@ public class CommunityNoticeAdminController {
             RedirectAttributes redirectAttributes
     ) {
         if (bindingResult.hasErrors()) {
-            return prepareForm(model, communityNoticeAdminService.getNotice(noticeId));
+            return prepareForm(model, communityNoticeAdminService.getEditableNotice(noticeId));
         }
 
         communityNoticeAdminService.updateNotice(noticeId, noticeForm);

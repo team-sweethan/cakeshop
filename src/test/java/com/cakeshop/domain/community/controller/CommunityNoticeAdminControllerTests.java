@@ -55,7 +55,8 @@ class CommunityNoticeAdminControllerTests {
         when(communityNoticeAdminService.getNotices(any(PageRequest.class)))
                 .thenReturn(new PageResult<AdminNoticeListView>(
                         List.of(), new PageRequest(1, PageRequest.DEFAULT_SIZE), 0));
-        when(communityNoticeAdminService.getNotice(anyLong())).thenReturn(publishedNotice());
+        when(communityNoticeAdminService.getEditableNotice(anyLong()))
+                .thenReturn(publishedNotice());
 
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new CommunityNoticeAdminController(communityNoticeAdminService))
@@ -146,6 +147,8 @@ class CommunityNoticeAdminControllerTests {
                 .andExpect(view().name("admin/community/notice/form"))
                 .andExpect(model().attribute("notice", publishedNotice()))
                 .andExpect(model().attributeExists("noticeForm"));
+
+        verify(communityNoticeAdminService).getEditableNotice(NOTICE_ID);
     }
 
     @Test
