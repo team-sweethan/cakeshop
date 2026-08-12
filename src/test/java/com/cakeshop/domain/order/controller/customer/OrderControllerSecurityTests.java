@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
 import com.cakeshop.domain.member.service.MemberService;
+import com.cakeshop.domain.cart.service.CartOrderQueryService;
 import com.cakeshop.domain.coupon.service.CouponOrderQueryService;
 import com.cakeshop.domain.coupon.service.CouponOrderQuoteQueryService;
 import com.cakeshop.domain.order.service.OrderService;
@@ -65,6 +66,9 @@ class OrderControllerSecurityTests {
 
     @MockitoBean
     private ProductQueryService productQueryService;
+
+    @MockitoBean
+    private CartOrderQueryService cartOrderQueryService;
 
     @Test
     void checkout_anonymousUser_redirectsToLoginEvenInPublicPreview() throws Exception {
