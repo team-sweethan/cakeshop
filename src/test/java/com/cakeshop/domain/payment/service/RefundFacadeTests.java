@@ -124,6 +124,23 @@ class RefundFacadeTests {
     }
 
     @Test
+    void rejectCustomOrder_tossSuccess_completesWithDedicatedRequestType() {
+        RefundRequest request = request("ADMIN_REJECTION", "제작 일정이 부족합니다.");
+        CancellationResult result = new CancellationResult(
+                "CANCELED", "transaction-key", request.requestedAt().plusSeconds(1));
+        when(refundService.rejectCustomZeroAmountOrder(7L, 10L, "제작 일정이 부족합니다."))
+                .thenReturn(false);
+        when(refundService.prepareAdminRejection(7L, 10L, "제작 일정이 부족합니다."))
+                .thenReturn(request);
+        when(tossPaymentClient.cancel("payment-key", "제작 일정이 부족합니다.", "idempotency-key"))
+                .thenReturn(result);
+
+        refundFacade.rejectCustomOrder(7L, 10L, "제작 일정이 부족합니다.");
+
+        verify(refundService).completeCancellation(request, result);
+    }
+
+    @Test
     void recoverPendingCancellations_requestedCancellation_retriesWithOriginalIdempotencyKey() {
         RefundRequest request = request();
         CancellationResult result = new CancellationResult(

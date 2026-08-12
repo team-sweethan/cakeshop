@@ -39,7 +39,7 @@ class PeriodStatisticsReadModelQueryServiceTests {
     private PeriodStatisticsReadModelMapper mapper;
 
     @Test
-    void getStatistics_noDateRange_returnsYesterdayRecentSevenDays() {
+    void getStatistics_recentWeek_returnsYesterdayRecentSevenDays() {
         LocalDate startDate = YESTERDAY.minusDays(6);
         List<DailyStatisticsRow> rows = rows(startDate, YESTERDAY);
         when(mapper.findLatestContinuousStatisticsDate(YESTERDAY)).thenReturn(YESTERDAY);
@@ -54,7 +54,22 @@ class PeriodStatisticsReadModelQueryServiceTests {
     }
 
     @Test
-    void getStatistics_defaultRangeHasOnlyThreeCompletedDays_returnsAvailableRange() {
+    void getStatistics_recentWeekWithDateRange_rejectsBeforeQuery() {
+        StatisticsSearchForm form = new StatisticsSearchForm();
+        form.setStartDate(LocalDate.of(2026, 8, 1));
+        form.setEndDate(YESTERDAY);
+
+        assertThatThrownBy(() -> service().getStatistics(form))
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(StatisticsErrorCode.INVALID_DATE_RANGE)
+                );
+        verifyNoInteractions(mapper);
+    }
+
+    @Test
+    void getStatistics_recentWeekHasOnlyThreeCompletedDays_returnsAvailableRange() {
         LocalDate latestCompletedDate = YESTERDAY.minusDays(1);
         LocalDate completedStartDate = latestCompletedDate.minusDays(2);
         LocalDate requestedStartDate = latestCompletedDate.minusDays(6);
@@ -206,6 +221,9 @@ class PeriodStatisticsReadModelQueryServiceTests {
 
     private StatisticsSearchForm form(LocalDate startDate, LocalDate endDate) {
         StatisticsSearchForm form = new StatisticsSearchForm();
+        if (startDate != null || endDate != null) {
+            form.setPeriodType(StatisticsPeriodType.RANGE);
+        }
         form.setStartDate(startDate);
         form.setEndDate(endDate);
         return form;

@@ -1,17 +1,16 @@
 package com.cakeshop.domain.coupon.service;
 
-import com.cakeshop.domain.coupon.entity.Coupon;
-import com.cakeshop.domain.coupon.entity.CouponTargetType;
 import com.cakeshop.domain.coupon.error.CouponErrorCode;
-import com.cakeshop.domain.coupon.mapper.CouponMapper;
+import com.cakeshop.domain.coupon.mapper.CouponMemberMapper;
+import com.cakeshop.domain.member.service.MemberCouponQueryService;
 import com.cakeshop.global.error.BusinessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * ******************************
- * 작성자 : 이정후
- * 담당자 : 수민
+ * 작성자 : 수민(이정후)
+ * 담당자 : 이정후
  * 작성일 : 2026-08-10
  * 기능 : 신규 회원 쿠폰 발급 명령 제공
  * 설명 : member 도메인이 회원가입 완료 뒤 신규 회원 발급 정책을 실행할 때 호출한다.
@@ -20,18 +19,26 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class CouponMemberCommandService {
 
-    private final CouponMapper couponMapper;
+    private final CouponMemberMapper couponMemberMapper;
+    private final MemberCouponQueryService memberCouponQueryService;
 
-    public CouponMemberCommandService(CouponMapper couponMapper) {
-        this.couponMapper = couponMapper;
+    public CouponMemberCommandService(CouponMemberMapper couponMemberMapper,
+                                      MemberCouponQueryService memberCouponQueryService) {
+        this.couponMemberMapper = couponMemberMapper;
+        this.memberCouponQueryService = memberCouponQueryService;
     }
 
     /** 회원가입 트랜잭션에 참여해 NEW_MEMBERS 대상 쿠폰을 발급한다. */
     @Transactional
     public void issueNewMemberCoupons(long memberId) {
-        for (Coupon coupon : couponMapper.findCouponsByTargetType(CouponTargetType.NEW_MEMBERS)) {
-            if (couponMapper.insertMemberCouponIfAbsent(coupon.getId(), memberId, false) == 1
-                    && couponMapper.increaseIssuedQuantityIfAvailable(coupon.getId()) != 1) {
+        // 회원 상태·역할은 소유 도메인의 공개 조회 계약으로 확인한다.
+        if (!memberCouponQueryService.isActiveCouponIssuableMember(memberId)) {
+            return;
+        }
+
+        for (Long couponId : couponMemberMapper.findAvailableNewMemberCouponIds()) {
+            if (couponMemberMapper.insertNewMemberCouponIfAbsent(couponId, memberId) == 1
+                    && couponMemberMapper.increaseNewMemberCouponIssuedQuantity(couponId) != 1) {
                 throw new BusinessException(CouponErrorCode.UPDATE_FAILED);
             }
         }

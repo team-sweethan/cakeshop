@@ -31,10 +31,24 @@ public class StatisticsPeriodResolver {
         }
 
         return switch (form.getPeriodType()) {
+            case RECENT_WEEK -> resolveRecentWeek(form, latestSelectableDate);
             case RANGE -> resolveRange(form, latestSelectableDate);
             case WEEKLY -> resolveWeekly(form, latestSelectableDate);
             case MONTHLY -> resolveMonthly(form, latestSelectableDate);
         };
+    }
+
+    private StatisticsDateRange resolveRecentWeek(
+            StatisticsSearchForm form,
+            LocalDate latestSelectableDate
+    ) {
+        if (form.getStartDate() != null || form.getEndDate() != null) {
+            throw invalidDateRange();
+        }
+        return new StatisticsDateRange(
+                latestSelectableDate.minusDays(DEFAULT_RANGE_DAYS - 1),
+                latestSelectableDate
+        );
     }
 
     private StatisticsDateRange resolveRange(
@@ -43,12 +57,6 @@ public class StatisticsPeriodResolver {
     ) {
         LocalDate startDate = form.getStartDate();
         LocalDate endDate = form.getEndDate();
-        if (startDate == null && endDate == null) {
-            return new StatisticsDateRange(
-                    latestSelectableDate.minusDays(DEFAULT_RANGE_DAYS - 1),
-                    latestSelectableDate
-            );
-        }
         if (startDate == null
                 || endDate == null
                 || startDate.isAfter(endDate)

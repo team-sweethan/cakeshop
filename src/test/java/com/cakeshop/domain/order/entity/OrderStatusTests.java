@@ -14,6 +14,7 @@ class OrderStatusTests {
             .containsExactlyInAnyOrder(
                 OrderStatus.PENDING_PAYMENT,
                 OrderStatus.UNDER_REVIEW,
+                OrderStatus.IN_PRODUCTION,
                 OrderStatus.READY_FOR_PICKUP,
                 OrderStatus.PICKED_UP,
                 OrderStatus.CANCELED,
@@ -29,15 +30,20 @@ class OrderStatusTests {
         assertThat(OrderStatus.PENDING_PAYMENT.canTransitionTo(OrderStatus.EXPIRED)).isTrue();
         assertThat(OrderStatus.PENDING_PAYMENT.canTransitionTo(OrderStatus.CANCELED)).isTrue();
 
-        assertThat(OrderStatus.UNDER_REVIEW.canTransitionTo(OrderStatus.READY_FOR_PICKUP)).isTrue();
+        assertThat(OrderStatus.UNDER_REVIEW.canTransitionTo(OrderStatus.IN_PRODUCTION)).isTrue();
         assertThat(OrderStatus.UNDER_REVIEW.canTransitionTo(OrderStatus.REJECTED)).isTrue();
         assertThat(OrderStatus.UNDER_REVIEW.canTransitionTo(OrderStatus.CANCELED)).isTrue();
+
+        assertThat(OrderStatus.IN_PRODUCTION.canTransitionTo(OrderStatus.READY_FOR_PICKUP)).isTrue();
 
         assertThat(OrderStatus.READY_FOR_PICKUP.canTransitionTo(OrderStatus.PICKED_UP)).isTrue();
         assertThat(OrderStatus.READY_FOR_PICKUP.canTransitionTo(OrderStatus.CANCELED)).isTrue();
 
         assertThat(OrderStatus.PENDING_PAYMENT.canTransitionTo(OrderStatus.PICKED_UP)).isFalse();
         assertThat(OrderStatus.UNDER_REVIEW.canTransitionTo(OrderStatus.PICKED_UP)).isFalse();
+        assertThat(OrderStatus.IN_PRODUCTION.canTransitionTo(OrderStatus.PICKED_UP)).isFalse();
+        assertThat(OrderStatus.IN_PRODUCTION.canTransitionTo(OrderStatus.CANCELED)).isFalse();
+        assertThat(OrderStatus.IN_PRODUCTION.canTransitionTo(OrderStatus.REJECTED)).isFalse();
         assertThat(OrderStatus.READY_FOR_PICKUP.canTransitionTo(OrderStatus.REJECTED)).isFalse();
     }
 
@@ -59,6 +65,7 @@ class OrderStatusTests {
         assertThat(Set.of(
             OrderStatus.PENDING_PAYMENT,
             OrderStatus.UNDER_REVIEW,
+            OrderStatus.IN_PRODUCTION,
             OrderStatus.READY_FOR_PICKUP
         )).allSatisfy(status -> assertThat(status.isFinal()).isFalse());
     }

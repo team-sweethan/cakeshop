@@ -1,0 +1,23 @@
+/* 시작 후 수정할 수 없는 쿠폰 입력 요소만 읽기 전용 색으로 구분한다. */
+#couponForm .form-control:disabled,
+#couponForm select:disabled {
+    background: #e5e7eb;
+    border-color: #d1d5db;
+    color: #6b7280;
+}
+
+#couponForm input[type="radio"]:disabled {
+    cursor: not-allowed;
+    opacity: .55;
+}
+
+/* 쿠폰 목록의 사용 기간은 시작·종료 입력을 같은 행의 범위로 배치한다. */
+.coupon-period-range {
+    display: grid;
+    gap: var(--space-2);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.coupon-period-range .form-control {
+    min-width: 0;
+}

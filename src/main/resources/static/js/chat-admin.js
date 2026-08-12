@@ -323,13 +323,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // 3. 우측 사이드 패널 (메모 + 연동 주문) 렌더링 (0원 결제 금액 정상 표시)
   async function loadAdminSidePanel(roomId) {
+    const infoPanel = document.querySelector(".admin-chat-info-panel");
+    if (infoPanel) {
+      const existingCards = infoPanel.querySelectorAll(".admin-order-item");
+      existingCards.forEach((card) => card.remove());
+    }
+    const inputMemo = document.getElementById("adminCustomerNote");
+    if (inputMemo) {
+      inputMemo.value = "";
+    }
+
     try {
       const response = await fetch(`/api/admin/chat/rooms/${roomId}/side-panel`);
-      if (!response.ok) return;
+      if (!response.ok || selectedChatRoomId !== roomId) return;
       const data = await response.json();
+      if (selectedChatRoomId !== roomId) return;
 
       // 고객 특이사항 메모 세팅 (note.content 읽기)
-      const inputMemo = document.getElementById("adminCustomerNote");
       if (inputMemo) {
         inputMemo.value = data.note ? (data.note.content || "") : "";
       }

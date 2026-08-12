@@ -17,9 +17,9 @@ public class StatisticsSearchForm {
 
     private static final long MAX_RANGE_DAYS = 366;
 
-    /** 조회 유형이 없으면 기존 기간 조회로 처리한다. */
+    /** 조회 유형이 없으면 기존 기본 조회인 최근 일주일로 처리한다. */
     @NotNull(message = "조회 유형을 선택해 주세요.")
-    private StatisticsPeriodType periodType = StatisticsPeriodType.RANGE;
+    private StatisticsPeriodType periodType = StatisticsPeriodType.RECENT_WEEK;
 
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
     private LocalDate startDate;

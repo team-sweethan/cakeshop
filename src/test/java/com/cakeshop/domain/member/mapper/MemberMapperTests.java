@@ -131,57 +131,6 @@ class MemberMapperTests {
     }
 
     @Test
-    void findPasswordRecoveryMember_matchingActiveMember_returnsCanonicalMember() {
-        String email = uniqueEmail("password-recovery");
-        Long memberId = insertMember(email, MemberStatus.ACTIVE);
-        LocalDate birthDate = LocalDate.of(2000, 1, 15);
-        jdbcTemplate.update(
-                "UPDATE members SET birth_date = ?, phone = ? WHERE id = ?",
-                birthDate,
-                "010-1234-5678",
-                memberId);
-
-        assertThat(memberMapper.findPasswordRecoveryMember(
-                email,
-                "매퍼 테스트",
-                birthDate,
-                "01012345678"))
-                .hasValueSatisfying(member -> {
-                    assertThat(member.getId()).isEqualTo(memberId);
-                    assertThat(member.getEmail()).isEqualTo(email);
-                });
-    }
-
-    @Test
-    void findPasswordRecoveryMember_withdrawnOrPasswordlessMember_returnsEmpty() {
-        LocalDate birthDate = LocalDate.of(2000, 1, 15);
-        String withdrawnEmail = uniqueEmail("password-recovery-withdrawn");
-        Long withdrawnId = insertMember(withdrawnEmail, MemberStatus.WITHDRAWN);
-        String passwordlessEmail = uniqueEmail("password-recovery-oauth");
-        Long passwordlessId = insertMember(passwordlessEmail, MemberStatus.ACTIVE);
-        jdbcTemplate.update(
-                "UPDATE members SET birth_date = ?, phone = ? WHERE id IN (?, ?)",
-                birthDate,
-                "010-1234-5678",
-                withdrawnId,
-                passwordlessId);
-        jdbcTemplate.update(
-                "UPDATE members SET password = NULL WHERE id = ?",
-                passwordlessId);
-
-        assertThat(memberMapper.findPasswordRecoveryMember(
-                withdrawnEmail,
-                "매퍼 테스트",
-                birthDate,
-                "01012345678")).isEmpty();
-        assertThat(memberMapper.findPasswordRecoveryMember(
-                passwordlessEmail,
-                "매퍼 테스트",
-                birthDate,
-                "01012345678")).isEmpty();
-    }
-
-    @Test
     void withdrawById_activeMember_updatesStatusAndTimestamps() {
         String email = uniqueEmail("withdraw");
         Long memberId = insertMember(email, MemberStatus.ACTIVE);

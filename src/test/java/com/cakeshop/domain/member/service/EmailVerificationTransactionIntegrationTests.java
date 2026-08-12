@@ -6,12 +6,17 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
 import com.cakeshop.domain.member.entity.EmailVerificationPurpose;
+import com.cakeshop.domain.member.entity.Member;
 import com.cakeshop.domain.member.error.EmailVerificationSendException;
 import com.cakeshop.domain.member.mapper.EmailVerificationMapper;
+import com.cakeshop.domain.member.mapper.MemberMapper;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mybatis.spring.boot.test.autoconfigure.MybatisTest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
@@ -27,7 +32,11 @@ import org.springframework.transaction.annotation.Transactional;
 @MybatisTest
 @MariaDbIntegrationTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({EmailVerificationService.class, EmailVerificationTransactionIntegrationTests.Config.class})
+@Import({
+        EmailVerificationService.class,
+        EmailVerificationAttemptService.class,
+        EmailVerificationTransactionIntegrationTests.Config.class
+})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class EmailVerificationTransactionIntegrationTests {
 
@@ -39,6 +48,9 @@ class EmailVerificationTransactionIntegrationTests {
 
     @Autowired
     private EmailVerificationMapper emailVerificationMapper;
+
+    @Autowired
+    private MemberMapper memberMapper;
 
     @MockitoBean
     private EmailSender emailSender;
@@ -75,6 +87,69 @@ class EmailVerificationTransactionIntegrationTests {
                 FAILURE_EMAIL, EmailVerificationPurpose.SIGNUP, 0)).isOne();
         assertThat(emailVerificationMapper.releaseRequestLock(
                 FAILURE_EMAIL, EmailVerificationPurpose.SIGNUP)).isOne();
+    }
+
+    @Test
+    void sendPasswordResetCode_smtpFailure_rollsBackUndeliveredCode() {
+        String email = "reset-" + UUID.randomUUID() + "@example.com";
+        Member member = Member.builder()
+                .email(email)
+                .password("encoded-password")
+                .name("reset member")
+                .nickname("reset-" + UUID.randomUUID())
+                .phone("010-1234-5678")
+                .birthDate(LocalDate.of(2000, 1, 1))
+                .role("USER")
+                .build();
+        memberMapper.join(member);
+        doThrow(new EmailVerificationSendException())
+                .when(emailSender)
+                .sendVerificationCode(
+                        org.mockito.ArgumentMatchers.eq(email),
+                        org.mockito.ArgumentMatchers.anyString(),
+                        org.mockito.ArgumentMatchers.any());
+
+        assertThatThrownBy(() -> emailVerificationService.sendPasswordResetCode(email))
+                .isInstanceOf(EmailVerificationSendException.class);
+
+        assertThat(emailVerificationMapper.findLatest(
+                email, EmailVerificationPurpose.PASSWORD_RESET)).isEmpty();
+        assertThat(emailVerificationMapper.acquireRequestLock(
+                email, EmailVerificationPurpose.PASSWORD_RESET, 0)).isOne();
+        assertThat(emailVerificationMapper.releaseRequestLock(
+                email, EmailVerificationPurpose.PASSWORD_RESET)).isOne();
+    }
+
+    @Test
+    void verifyPasswordResetCode_wrongCode_commitsFailureAttempt() {
+        String email = "attempt-" + UUID.randomUUID() + "@example.com";
+        Member member = Member.builder()
+                .email(email)
+                .password("encoded-password")
+                .name("attempt member")
+                .nickname("attempt-" + UUID.randomUUID())
+                .phone("010-1234-5678")
+                .birthDate(LocalDate.of(2000, 1, 1))
+                .role("USER")
+                .build();
+        memberMapper.join(member);
+        emailVerificationService.sendPasswordResetCode(email);
+        ArgumentCaptor<String> codeCaptor = ArgumentCaptor.forClass(String.class);
+        verify(emailSender).sendVerificationCode(
+                org.mockito.ArgumentMatchers.eq(email),
+                codeCaptor.capture(),
+                org.mockito.ArgumentMatchers.any());
+        String wrongCode = "000000".equals(codeCaptor.getValue()) ? "000001" : "000000";
+
+        assertThatThrownBy(() ->
+                emailVerificationService.verifyPasswordResetCode(email, wrongCode))
+                .isInstanceOf(com.cakeshop.global.error.BusinessException.class);
+
+        assertThat(emailVerificationMapper.findLatest(
+                email, EmailVerificationPurpose.PASSWORD_RESET))
+                .get()
+                .extracting(com.cakeshop.domain.member.entity.EmailVerification::getAttemptCount)
+                .isEqualTo(1);
     }
 
     @TestConfiguration

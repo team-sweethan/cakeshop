@@ -16,6 +16,7 @@ import com.cakeshop.domain.coupon.dto.view.CustomerCouponView;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.domain.coupon.service.CouponOrderQueryService;
+import com.cakeshop.domain.coupon.service.CouponOrderQuoteQueryService;
 import com.cakeshop.domain.home.controller.HomeController;
 import com.cakeshop.domain.home.service.HomeService;
 import com.cakeshop.domain.member.controller.AuthController;
@@ -30,10 +31,12 @@ import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
 import com.cakeshop.domain.order.service.customer.OrderCustomerService;
 import com.cakeshop.domain.order.service.OrderService;
+import com.cakeshop.domain.order.service.customer.CustomerCustomOrderService;
 import com.cakeshop.domain.payment.controller.PaymentController;
 import com.cakeshop.domain.payment.service.PaymentFacade;
 import com.cakeshop.domain.payment.service.PaymentCheckoutService;
 import com.cakeshop.domain.payment.service.RefundFacade;
+import com.cakeshop.domain.product.service.ProductQueryService;
 import com.cakeshop.domain.product.controller.ProductController;
 import com.cakeshop.domain.product.service.ProductService;
 import com.cakeshop.domain.review.service.ReviewProductQueryService;
@@ -122,7 +125,10 @@ class CustomerPageControllerTests {
                                 orderQueryService,
                                 memberService,
                                 mock(RefundFacade.class),
-                                couponOrderQueryService
+                                couponOrderQueryService,
+                                mock(CouponOrderQuoteQueryService.class),
+                                mock(CustomerCustomOrderService.class),
+                                mock(ProductQueryService.class)
                         ),
                         new PaymentController(
                                 mock(PaymentFacade.class),
@@ -203,14 +209,39 @@ class CustomerPageControllerTests {
     }
 
     @Test
-    void customOrderViewDoesNotUseBrowserLocalCart() throws IOException {
+    void customOrderViewUsesServerBackedOptionSubmission() throws IOException {
         String customOrderTemplate =
                 new ClassPathResource("templates/customer/order/custom-option.html")
                         .getContentAsString(StandardCharsets.UTF_8);
 
         assertThat(customOrderTemplate)
-                .contains("장바구니 연동 준비 중")
-                .doesNotContain("data-add-custom-cart");
+                .contains("th:action=\"@{/orders/custom/request}\"")
+                .contains("name=\"productId\"")
+                .contains("th:name=\"|customOptionGroup-${group.id}|\"")
+                .contains("group.selectionType != 'MULTIPLE'")
+                .contains("js-required-multiple")
+                .contains("필수 옵션을 하나 이상 선택하세요.")
+                .contains("hidden.name = \"optionIds\";")
+                .doesNotContain("data-mock-form");
+    }
+
+    @Test
+    void customRequestViewSubmitsDisplayedOriginalAmount() throws IOException {
+        String customRequestTemplate =
+                new ClassPathResource("templates/customer/order/custom-request.html")
+                        .getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(customRequestTemplate)
+                .contains("th:field=\"*{displayedOriginalAmount}\"");
+    }
+
+    @Test
+    void orderDetailOnlyShowsPaymentButtonForGeneralPaymentFlow() throws IOException {
+        String orderDetailTemplate =
+                new ClassPathResource("templates/customer/order/detail.html")
+                        .getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(orderDetailTemplate).contains("order.generalPaymentPending");
     }
 
     @Test
@@ -241,7 +272,7 @@ class CustomerPageControllerTests {
                         "data-product-option-groups",
                         "th:if=\"${product.productType.name() == 'GENERAL'}\""
                 )
-                .contains("th:href=\"@{/orders/custom/options}\"");
+                .contains("th:href=\"@{/orders/custom/options(productId=${product.id})}\"");
     }
 
     @Test

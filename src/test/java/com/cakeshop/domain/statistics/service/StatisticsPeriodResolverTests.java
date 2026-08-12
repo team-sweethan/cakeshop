@@ -18,7 +18,7 @@ class StatisticsPeriodResolverTests {
     private final StatisticsPeriodResolver resolver = new StatisticsPeriodResolver();
 
     @Test
-    void resolve_defaultRange_returnsSevenDaysEndingOnLatestSelectableDate() {
+    void resolve_recentWeek_returnsSevenDaysEndingOnLatestSelectableDate() {
         StatisticsDateRange range = resolver.resolve(
                 new StatisticsSearchForm(),
                 LATEST_SELECTABLE_DATE
@@ -31,8 +31,18 @@ class StatisticsPeriodResolverTests {
     }
 
     @Test
+    void resolve_recentWeekWithDateRange_rejectsAmbiguousRequest() {
+        StatisticsSearchForm form = new StatisticsSearchForm();
+        form.setStartDate(LocalDate.of(2026, 8, 1));
+        form.setEndDate(LocalDate.of(2026, 8, 10));
+
+        assertInvalidDateRange(() -> resolver.resolve(form, LATEST_SELECTABLE_DATE));
+    }
+
+    @Test
     void resolve_requestedRange_returnsInputDates() {
         StatisticsSearchForm form = new StatisticsSearchForm();
+        form.setPeriodType(StatisticsPeriodType.RANGE);
         form.setStartDate(LocalDate.of(2026, 7, 1));
         form.setEndDate(LocalDate.of(2026, 7, 31));
 
@@ -128,6 +138,7 @@ class StatisticsPeriodResolverTests {
     @Test
     void resolve_reversedRange_rejectsRange() {
         StatisticsSearchForm form = new StatisticsSearchForm();
+        form.setPeriodType(StatisticsPeriodType.RANGE);
         form.setStartDate(LocalDate.of(2026, 8, 2));
         form.setEndDate(LocalDate.of(2026, 8, 1));
 
@@ -137,6 +148,7 @@ class StatisticsPeriodResolverTests {
     @Test
     void resolve_rangeOver366Days_rejectsRange() {
         StatisticsSearchForm form = new StatisticsSearchForm();
+        form.setPeriodType(StatisticsPeriodType.RANGE);
         form.setStartDate(LocalDate.of(2025, 1, 1));
         form.setEndDate(LocalDate.of(2026, 1, 2));
 

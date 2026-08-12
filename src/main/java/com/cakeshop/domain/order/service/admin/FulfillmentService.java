@@ -28,6 +28,7 @@ public class FulfillmentService {
 
     private static final Set<OrderStatus> FULFILLMENT_STATUSES = Set.of(
             OrderStatus.UNDER_REVIEW,
+            OrderStatus.IN_PRODUCTION,
             OrderStatus.READY_FOR_PICKUP,
             OrderStatus.PICKED_UP
     );
@@ -99,6 +100,7 @@ public class FulfillmentService {
                 ))
                 .toList();
 
+        boolean requestedRefund = orderMapper.hasRequestedRefundCancellation(order.getId());
         return new FulfillmentListView.FulfillmentOrder(
                 order.getId(),
                 order.getOrderNumber(),
@@ -107,14 +109,29 @@ public class FulfillmentService {
                 order.getPickupName(),
                 order.getPickupPhone(),
                 order.getPickupAt(),
-                isPickupCompletable(order),
+                isProductionStartable(order, requestedRefund),
+                isProductionCompletable(order, requestedRefund),
+                isProductionStartable(order, requestedRefund),
+                isPickupCompletable(order, requestedRefund),
                 items
         );
     }
 
-    private boolean isPickupCompletable(Order order) {
+    private boolean isProductionStartable(Order order, boolean requestedRefund) {
+        return order.getOrderType() == com.cakeshop.domain.order.entity.OrderType.CUSTOM
+                && order.getStatus() == OrderStatus.UNDER_REVIEW
+                && !requestedRefund;
+    }
+
+    private boolean isProductionCompletable(Order order, boolean requestedRefund) {
+        return order.getOrderType() == com.cakeshop.domain.order.entity.OrderType.CUSTOM
+                && order.getStatus() == OrderStatus.IN_PRODUCTION
+                && !requestedRefund;
+    }
+
+    private boolean isPickupCompletable(Order order, boolean requestedRefund) {
         return order.getStatus() == OrderStatus.READY_FOR_PICKUP
                 && order.getPickupAt() != null
-                && !orderMapper.hasRequestedRefundCancellation(order.getId());
+                && !requestedRefund;
     }
 }

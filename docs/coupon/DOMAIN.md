@@ -116,7 +116,7 @@
 ### 4.1 등록
 
 1. 관리자가 할인 정책, 사용 기간, 발급 대상을 입력한다.
-2. 비율 할인에는 최대 할인 금액이 필수이며, 할인율은 100 이하로 제한한다.
+2. 최대 할인 금액은 비율 할인에만 입력·저장하며, 비율 할인에는 필수다. 금액 할인에서는 해당 값을 비워 저장하고 할인율은 100 이하로 제한한다.
 3. 특정 회원을 선택한 경우에만 총 발급 수량을 입력한다.
 4. 등록 성공 뒤 `ALL_MEMBERS`, `FIRST_ORDER`는 시작 시각과 관계없이 기존 대상에게 발급 이력을 즉시 생성한다. 실제 쿠폰 사용 가능 여부는 `startsAt` 이후인지로 판단한다.
 5. `NEW_MEMBERS`, `BIRTHDAY`, `SPECIFIC_MEMBERS`는 등록 시점에 일괄 발급하지 않는다.
@@ -172,7 +172,7 @@ SPECIFIC_MEMBERS
 관리자 상세 화면 -> CouponAdminService.issueSpecificMember() -> member_coupons
 ```
 
-### 5.1 도메인 간 공개 조회 계약
+### 5.1 도메인 간 공개 계약
 
 | 제공 도메인 | 공개 Service | 쿠폰 도메인 사용 목적 |
 | --- | --- | --- |
@@ -181,7 +181,10 @@ SPECIFIC_MEMBERS
 
 신규 회원 발급은 member 도메인이 회원가입 트랜잭션에서 `Member` INSERT로 생성된 ID를
 `CouponMemberCommandService.issueNewMemberCoupons(memberId)`에 전달해 연결한다. 쿠폰 발급에 실패하면
-회원가입도 함께 롤백한다.
+회원가입도 함께 롤백한다. 이 공개 명령은 member 도메인 사용을 위한 계약이므로,
+`CouponMemberMapper`와 `CouponMemberMapper.xml`에서 신규 회원 쿠폰 조회·발급 이력 생성·발급 수량 증가 SQL을
+분리해 관리한다. 회원 상태·역할 검증은 `MemberCouponQueryService` 공개 조회 계약이 소유하며,
+쿠폰 SQL은 쿠폰 정책·사용 기간·중복 발급 여부만 검증한다.
 
 첫 주문 대상은 회원 행 잠금 뒤 `OrderCouponQueryService`로 주문 이력을 다시 확인한다.
 일반 주문 생성도 동일한 회원 행 잠금을 먼저 획득하므로, 쿠폰 발급 후보 조회와 주문 생성이 경합해도
