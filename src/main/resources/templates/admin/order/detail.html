@@ -26,6 +26,26 @@
             <div class="data-row"><span class="data-row__label">픽업 연락처</span><span th:text="${order.pickupPhone}">연락처</span></div>
             <div class="data-row"><span class="data-row__label">픽업 일시</span><span th:text="${#temporals.format(order.pickupAt, 'yyyy.MM.dd HH:mm')}">픽업 일시</span></div>
           </div></section>
+          <section th:if="${order.orderType.name() == 'CUSTOM'}">
+            <h2 class="section-title">제작 요청사항</h2>
+            <div class="panel">
+              <p th:if="${order.requestMessage != null and !order.requestMessage.isBlank()}"
+                 style="white-space:pre-wrap" th:text="${order.requestMessage}">제작 요청사항</p>
+              <p class="text-muted" th:unless="${order.requestMessage != null and !order.requestMessage.isBlank()}">
+                입력된 제작 요청사항이 없습니다.
+              </p>
+            </div>
+          </section>
+          <section th:if="${order.orderType.name() == 'CUSTOM'}">
+            <h2 class="section-title">레터링 문구</h2>
+            <div class="panel" th:each="item : ${order.items}">
+              <p th:if="${item.requirements != null and !item.requirements.isBlank()}"
+                 style="white-space:pre-wrap" th:text="${item.requirements}">레터링 문구</p>
+              <p class="text-muted" th:unless="${item.requirements != null and !item.requirements.isBlank()}">
+                입력된 레터링 문구가 없습니다.
+              </p>
+            </div>
+          </section>
           <section><h2 class="section-title">주문 상품</h2>
             <article class="panel" th:each="item : ${order.items}">
               <strong th:text="${item.productName}">상품명</strong>

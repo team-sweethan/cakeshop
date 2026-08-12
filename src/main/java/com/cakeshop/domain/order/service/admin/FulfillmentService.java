@@ -92,6 +92,7 @@ public class FulfillmentService {
                 .map(item -> new FulfillmentListView.Item(
                         item.getProductName(),
                         item.getQuantity(),
+                        item.getRequirements(),
                         optionsByItem.getOrDefault(item.getId(), List.of())
                                 .stream()
                                 .map(option -> option.getOptionGroupName()
@@ -109,6 +110,7 @@ public class FulfillmentService {
                 order.getPickupName(),
                 order.getPickupPhone(),
                 order.getPickupAt(),
+                order.getRequestMessage(),
                 isProductionStartable(order, requestedRefund),
                 isProductionCompletable(order, requestedRefund),
                 isProductionStartable(order, requestedRefund),

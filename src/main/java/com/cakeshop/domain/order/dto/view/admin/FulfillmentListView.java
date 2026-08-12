@@ -22,6 +22,7 @@ public record FulfillmentListView(
             String pickupName,
             String pickupPhone,
             LocalDateTime pickupAt,
+            String requestMessage,
             boolean productionStartable,
             boolean productionCompletable,
             boolean rejectionAvailable,
@@ -58,6 +59,7 @@ public record FulfillmentListView(
     public record Item(
             String productName,
             int quantity,
+            String requirements,
             List<String> options
     ) {
 

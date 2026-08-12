@@ -544,6 +544,35 @@ class ScreenRenderingTests {
         value = "admin@cakeshop.local",
         userDetailsServiceBeanName = "memberDetailsService"
     )
+    void fulfillmentAdminScreen_customOrder_rendersRequestMessageAndLettering()
+            throws Exception {
+        long orderId = createGeneralOrder();
+        jdbcTemplate.update(
+            "UPDATE orders SET order_type = 'CUSTOM', status = 'UNDER_REVIEW', request_message = ? WHERE id = ?",
+            "문구는 짧게\n초는 하늘색으로",
+            orderId
+        );
+        jdbcTemplate.update(
+            "UPDATE order_items SET requirements = ? WHERE order_id = ?",
+            "생일 축하해\n사랑해",
+            orderId
+        );
+
+        mockMvc.perform(get("/admin/fulfillment"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("제작 요청사항")))
+            .andExpect(content().string(containsString("문구는 짧게\n초는 하늘색으로")))
+            .andExpect(content().string(containsString("레터링 문구")))
+            .andExpect(content().string(containsString("생일 축하해\n사랑해")))
+            .andExpect(content().string(containsString("style=\"white-space:pre-wrap\"")));
+    }
+
+    @Test
+    @Transactional
+    @WithUserDetails(
+        value = "admin@cakeshop.local",
+        userDetailsServiceBeanName = "memberDetailsService"
+    )
     void paymentAdminScreen_donePayment_rendersActualPaymentHistory()
             throws Exception {
         long orderId = createGeneralOrder();
@@ -628,6 +657,64 @@ class ScreenRenderingTests {
                 "/admin/orders/" + orderId + "/cancel"
             )))
             .andExpect(content().string(containsString("name=\"_csrf\"")));
+    }
+
+    @Test
+    @Transactional
+    @WithUserDetails(
+        value = "admin@cakeshop.local",
+        userDetailsServiceBeanName = "memberDetailsService"
+    )
+    void adminOrderDetail_customOrder_rendersEscapedRequestMessageWithLineBreaks()
+            throws Exception {
+        long orderId = createGeneralOrder();
+        String requestMessage = "문구는 짧게\n초는 하늘색으로 <script>alert('xss')</script>";
+        jdbcTemplate.update(
+            "UPDATE orders SET order_type = 'CUSTOM', request_message = ? WHERE id = ?",
+            requestMessage,
+            orderId
+        );
+        jdbcTemplate.update(
+            "UPDATE order_items SET requirements = ? WHERE order_id = ?",
+            "생일 축하해\n사랑해",
+            orderId
+        );
+
+        mockMvc.perform(get("/admin/orders/{orderId}", orderId))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("제작 요청사항")))
+            .andExpect(content().string(containsString("문구는 짧게\n초는 하늘색으로")))
+            .andExpect(content().string(containsString("레터링 문구")))
+            .andExpect(content().string(containsString("생일 축하해\n사랑해")))
+            .andExpect(content().string(containsString("style=\"white-space:pre-wrap\"")))
+            .andExpect(content().string(containsString("&lt;script&gt;")))
+            .andExpect(content().string(not(containsString("<script>alert('xss')</script>"))));
+    }
+
+    @Test
+    @Transactional
+    @WithUserDetails(
+        value = "admin@cakeshop.local",
+        userDetailsServiceBeanName = "memberDetailsService"
+    )
+    void adminOrderDetail_customOrderWithoutRequestMessage_rendersEmptyState()
+            throws Exception {
+        long orderId = createGeneralOrder();
+        jdbcTemplate.update(
+            "UPDATE orders SET order_type = 'CUSTOM', request_message = NULL WHERE id = ?",
+            orderId
+        );
+        jdbcTemplate.update(
+            "UPDATE order_items SET requirements = NULL WHERE order_id = ?",
+            orderId
+        );
+
+        mockMvc.perform(get("/admin/orders/{orderId}", orderId))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("제작 요청사항")))
+            .andExpect(content().string(containsString("입력된 제작 요청사항이 없습니다.")))
+            .andExpect(content().string(containsString("레터링 문구")))
+            .andExpect(content().string(containsString("입력된 레터링 문구가 없습니다.")));
     }
 
     @Test
