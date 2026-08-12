@@ -6,8 +6,8 @@
 
 ## 문서 기준
 
-- 기준 migration: `V0__initial_schema.sql`부터 `V20260812_065639__add_community_notices.sql`까지 31개
-- 최종 물리 테이블: 44개
+- 기준 migration: `V0__initial_schema.sql`부터 `V20260812_065639__add_community_notices.sql`까지 34개
+- 최종 물리 테이블: 46개
 - migration의 중간 상태, 데이터 보정용 임시 테이블과 이미 삭제된 컬럼·인덱스는 기록하지 않는다.
 - 담당자 이름은 현재 리뷰 경계를 나타낸다. 파일명과 경로는 담당 변경과 무관하게 도메인명을 유지한다.
 - 통계처럼 여러 도메인의 테이블을 읽는 ReadModel은 자체 테이블이 없더라도 별도 문서로 경계를 남긴다.
@@ -33,7 +33,7 @@
 
 | 담당 | 도메인 | 테이블 수 | 문서 |
 |---|---|---:|---|
-| 수민 | 회원 | 3 | [member](schema/member.md) |
+| 수민 | 회원 | 4 | [member](schema/member.md) |
 | 수민 | 장바구니 | 4 | [cart](schema/cart.md) |
 | 주환 | 주문 | 4 | [order](schema/order.md) |
 | 주환 | 결제 | 2 | [payment](schema/payment.md) |
@@ -43,7 +43,7 @@
 | 현규 | 커뮤니티 | 10 | [community](schema/community.md) |
 | 현규 | 리뷰 | 3 | [review](schema/review.md) |
 | 시은 | 상품 | 5 | [product](schema/product.md) |
-| 시은 | 통계 | 2 | [statistics](schema/statistics.md) |
+| 시은 | 통계 | 3 | [statistics](schema/statistics.md) |
 | 공통 협의 | 매장 | 3 | [store](schema/store.md) |
 
 ## 갱신 규칙
