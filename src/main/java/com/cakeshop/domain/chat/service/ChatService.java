@@ -154,6 +154,11 @@ public class ChatService {
             ChatRoom chatRoom = chatMapper.findChatRoomById(roomId);
             validateRoomAccess(chatRoom, senderId, isAdmin);
 
+            // 고객 발신 경로인 경우 DB 기준 현재 사용자가 활성 USER 회원인지 재확인 (정지/탈퇴 회원 차단)
+            if (!isAdmin && !memberChatQueryService.existsCustomer(senderId)) {
+                throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+            }
+
             ChatMessage message = ChatMessage.builder()
                 .chatRoomId(roomId)
                 .senderId(senderId)
