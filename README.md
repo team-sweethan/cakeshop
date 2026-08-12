@@ -124,15 +124,50 @@ CREATE DATABASE `cakeshop`
 
 ### 4. 애플리케이션 실행
 
+로컬 MariaDB와 로컬 파일 저장소만 사용하려면 다음과 같이 `local` 프로필을 지정합니다.
+
 ```powershell
 # Windows
-.\gradlew.bat bootRun
+.\gradlew.bat bootRun --args="--spring.profiles.active=local"
 ```
 
 ```bash
 # macOS / Linux
+./gradlew bootRun --args="--spring.profiles.active=local"
+```
+
+공용 S3 설정까지 `.env`에 입력했다면 기본 프로필인 `local,s3`로 실행할 수 있습니다.
+
+```powershell
+# Windows (`local,s3`가 기본값)
+.\gradlew.bat bootRun
+```
+
+```bash
+# macOS / Linux (`local,s3`가 기본값)
 ./gradlew bootRun
 ```
+
+다른 프로필 조합은 다음 명령으로 실행합니다.
+
+```powershell
+# Windows: 공용 RDS + 로컬 파일 저장소
+.\gradlew.bat bootRun --args="--spring.profiles.active=rds"
+
+# Windows: 공용 RDS + 공용 S3
+.\gradlew.bat bootRun --args="--spring.profiles.active=rds,s3"
+```
+
+```bash
+# macOS / Linux: 공용 RDS + 로컬 파일 저장소
+./gradlew bootRun --args="--spring.profiles.active=rds"
+
+# macOS / Linux: 공용 RDS + 공용 S3
+./gradlew bootRun --args="--spring.profiles.active=rds,s3"
+```
+
+`s3`가 포함된 조합은 `AWS_S3_BUCKET`, `AWS_S3_BASE_URL`, `AWS_S3_KEY_PREFIX`와 AWS 자격 증명이 필요합니다.
+`rds`가 포함된 조합은 `RDS_ENDPOINT`, `RDS_DATABASE`, `RDS_USERNAME`, `RDS_PASSWORD`가 필요합니다.
 
 `http://localhost:8080`에 접속해 화면이 열리는지 확인합니다.
 
