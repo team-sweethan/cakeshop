@@ -52,7 +52,7 @@ public class EmailVerificationService {
     }
 
     /** 비밀번호 재설정 이메일로 새 인증번호를 발송한다. */
-    @Transactional(noRollbackFor = EmailVerificationSendException.class)
+    @Transactional
     public void sendPasswordResetCode(String rawEmail) {
         String email = normalizeAndValidateEmail(rawEmail);
         sendCodeWithLock(email, EmailVerificationPurpose.PASSWORD_RESET);
@@ -136,7 +136,7 @@ public class EmailVerificationService {
                 .orElseThrow(() -> new BusinessException(
                         MemberErrorCode.EMAIL_VERIFICATION_INVALID));
         return new PasswordResetEmailVerification(
-                verification.getId(), member.getId(), email);
+                verification.getId(), member.getId(), member.getEmail());
     }
 
     private EmailVerification verifyCode(

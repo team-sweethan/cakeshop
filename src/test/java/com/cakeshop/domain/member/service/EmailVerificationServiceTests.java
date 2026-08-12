@@ -246,6 +246,29 @@ class EmailVerificationServiceTests {
     }
 
     @Test
+    void verifyPasswordResetCode_differentInputCase_usesStoredMemberEmail() {
+        EmailVerification latest = verification(
+                "user@example.com", passwordEncoder.encode("123456"));
+        latest.setPurpose(EmailVerificationPurpose.PASSWORD_RESET);
+        when(emailVerificationMapper.findLatest(
+                "user@example.com", EmailVerificationPurpose.PASSWORD_RESET))
+                .thenReturn(Optional.of(latest));
+        when(emailVerificationMapper.markVerified(
+                latest.getId(), latest.getEmail(), EmailVerificationPurpose.PASSWORD_RESET, NOW))
+                .thenReturn(1);
+        Member member = passwordMember();
+        member.setEmail("User@Example.com");
+        when(memberMapper.findByEmail("user@example.com"))
+                .thenReturn(Optional.of(member));
+
+        PasswordResetEmailVerification result =
+                emailVerificationService.verifyPasswordResetCode(
+                        "USER@example.com", "123456");
+
+        assertThat(result.email()).isEqualTo("User@Example.com");
+    }
+
+    @Test
     void consumeSignupVerification_verifiedRequest_consumesOnce() {
         EmailVerification verified = verification("user@example.com", "hash");
         verified.setVerifiedAt(NOW.minusMinutes(1));

@@ -8,6 +8,23 @@ if (recoveryForm) {
   const codeInput = document.getElementById('recovery-code');
   const verifyButton = document.getElementById('recovery-code-verify-button');
   const codeMessage = document.getElementById('recovery-code-message');
+  const sendButtonLabel = sendButton.innerText;
+
+  function startResendCountdown() {
+    let remainingSeconds = 60;
+    sendButton.disabled = true;
+    sendButton.innerText = `재발송 (${remainingSeconds}초)`;
+    const timer = window.setInterval(() => {
+      remainingSeconds -= 1;
+      if (remainingSeconds <= 0) {
+        window.clearInterval(timer);
+        sendButton.disabled = false;
+        sendButton.innerText = '인증번호 재발송';
+        return;
+      }
+      sendButton.innerText = `재발송 (${remainingSeconds}초)`;
+    }, 1000);
+  }
 
   function csrfHeaders() {
     const csrfInput = recoveryForm.querySelector('input[name="_csrf"]');
@@ -27,8 +44,7 @@ if (recoveryForm) {
     return data;
   }
 
-  recoveryForm.addEventListener('submit', async (event) => {
-    event.preventDefault();
+  async function sendCode() {
     const email = emailInput.value.trim();
     if (!emailInput.checkValidity()) {
       emailInput.reportValidity();
@@ -36,6 +52,7 @@ if (recoveryForm) {
     }
 
     sendButton.disabled = true;
+    sendButton.innerText = '발송 중...';
     emailMessage.className = 'form-help';
     try {
       const data = await requestVerification(
@@ -44,13 +61,14 @@ if (recoveryForm) {
       emailMessage.className = 'form-success';
       codeGroup.hidden = false;
       codeInput.focus();
-      window.setTimeout(() => sendButton.disabled = false, 60000);
+      startResendCountdown();
     } catch (error) {
       emailMessage.innerText = error.message;
       emailMessage.className = 'form-error';
       sendButton.disabled = false;
+      sendButton.innerText = sendButtonLabel;
     }
-  });
+  }
 
   emailInput.addEventListener('input', () => {
     codeGroup.hidden = true;
@@ -59,7 +77,7 @@ if (recoveryForm) {
     codeMessage.innerText = '';
   });
 
-  verifyButton.addEventListener('click', async () => {
+  async function verifyCode() {
     const email = emailInput.value.trim();
     const code = codeInput.value.trim();
     if (!/^\d{6}$/.test(code)) {
@@ -80,5 +98,24 @@ if (recoveryForm) {
       codeMessage.className = 'form-error';
       verifyButton.disabled = false;
     }
+  }
+
+  recoveryForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (codeGroup.hidden) {
+      await sendCode();
+      return;
+    }
+    await verifyCode();
+  });
+
+  sendButton.addEventListener('click', sendCode);
+  verifyButton.addEventListener('click', verifyCode);
+  codeInput.addEventListener('keydown', async (event) => {
+    if (event.key !== 'Enter') {
+      return;
+    }
+    event.preventDefault();
+    await verifyCode();
   });
 }
