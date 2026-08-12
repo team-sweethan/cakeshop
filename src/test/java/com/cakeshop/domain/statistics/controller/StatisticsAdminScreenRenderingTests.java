@@ -68,6 +68,15 @@ class StatisticsAdminScreenRenderingTests {
 
     @Test
     @WithMockUser(roles = "ADMIN")
+    void statisticsProductRankingAsset_request_isServed() throws Exception {
+        mockMvc.perform(get("/js/statistics-product-ranking.js"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("data-product-ranking-toggle")))
+                .andExpect(content().string(containsString("aria-expanded")));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
     void statistics_statisticsReturned_rendersSummaryAndDailyTrend() throws Exception {
         LocalDate startDate = LocalDate.of(2026, 8, 8);
         LocalDate endDate = LocalDate.of(2026, 8, 9);
@@ -121,6 +130,7 @@ class StatisticsAdminScreenRenderingTests {
                 .andExpect(content().string(not(containsString("data-date-label"))))
                 .andExpect(content().string(not(containsString("data-statistics-metric"))))
                 .andExpect(content().string(not(containsString("<table"))))
+                .andExpect(content().string(not(containsString("data-product-ranking-toggle"))))
                 .andExpect(content().string(not(containsString("딸기 생크림 케이크"))))
                 .andExpect(content().string(not(containsString("주별"))));
     }
@@ -201,7 +211,54 @@ class StatisticsAdminScreenRenderingTests {
                 .andExpect(content().string(containsString("3건")))
                 .andExpect(content().string(containsString("5개")))
                 .andExpect(content().string(containsString("50,000원")))
-                .andExpect(content().string(containsString("초코 케이크")));
+                .andExpect(content().string(containsString("초코 케이크")))
+                .andExpect(content().string(not(containsString("data-product-ranking-toggle"))));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void statistics_moreThanFiveProducts_hidesOverflowAndRendersToggle() throws Exception {
+        LocalDate startDate = LocalDate.of(2026, 8, 8);
+        LocalDate endDate = LocalDate.of(2026, 8, 9);
+        when(periodStatisticsReadModelQueryService.getStatistics(any()))
+                .thenReturn(new PeriodStatisticsView(
+                        startDate,
+                        endDate,
+                        6L,
+                        0L,
+                        0L,
+                        BigDecimal.ZERO,
+                        List.of()
+                ));
+        when(productStatisticsQueryService.getProductStatistics(startDate, endDate))
+                .thenReturn(java.util.stream.LongStream.rangeClosed(1, 6)
+                        .mapToObj(ranking -> new ProductStatisticsView(
+                                ranking,
+                                ranking,
+                                "상품 " + ranking,
+                                1L,
+                                1L,
+                                BigDecimal.valueOf(7 - ranking)
+                        ))
+                        .toList());
+
+        mockMvc.perform(get("/admin/statistics")
+                        .param("periodType", "RANGE")
+                        .param("startDate", startDate.toString())
+                        .param("endDate", endDate.toString()))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("상품 5")))
+                .andExpect(content().string(containsString("상품 6")))
+                .andExpect(content().string(containsString(
+                        "data-product-ranking-overflow=\"true\""
+                )))
+                .andExpect(content().string(containsString("hidden")))
+                .andExpect(content().string(containsString("data-product-ranking-toggle")))
+                .andExpect(content().string(containsString("aria-expanded=\"false\"")))
+                .andExpect(content().string(containsString("전체보기")))
+                .andExpect(content().string(containsString(
+                        "/js/statistics-product-ranking.js"
+                )));
     }
 
     @Test
@@ -235,7 +292,8 @@ class StatisticsAdminScreenRenderingTests {
                 .andExpect(content().string(containsString(
                         StatisticsErrorCode.PRODUCT_STATISTICS_NOT_READY.message()
                 )))
-                .andExpect(content().string(not(containsString("<table"))));
+                .andExpect(content().string(not(containsString("<table"))))
+                .andExpect(content().string(not(containsString("data-product-ranking-toggle"))));
     }
 
     @Test
