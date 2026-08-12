@@ -30,4 +30,11 @@ public class ProductChatQueryService {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
     }
+
+    public String getProductName(Long productId) {
+        if (productId == null || productId <= 0) {
+            return null;
+        }
+        return productChatMapper.findProductNameById(productId);
+    }
 }

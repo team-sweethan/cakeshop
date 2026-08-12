@@ -24,29 +24,11 @@
     <div class="chat-layout">
       <!-- 좌측 사이드바: 연동 주문 목록 -->
       <aside class="panel chat-sidebar">
-        <strong style="display:block; margin-bottom:4px;">연동 주문 내역 (2건)</strong>
+        <strong style="display:block; margin-bottom:4px;">연동 주문 내역</strong>
         <p class="text-muted" style="margin-bottom:12px;">주문 카드를 클릭하면 해당 대화 위치로 이동합니다.</p>
 
         <div class="stack">
-          <div class="panel chat-order-item" data-scroll-to="msg-start-ord-001" style="cursor:pointer; padding:10px;">
-            <div class="cluster cluster--between" style="margin-bottom:4px;">
-              <strong>ORD-001</strong>
-              <span class="badge badge--warning">승인 대기</span>
-            </div>
-            <p class="text-muted" style="margin:0;">레터링 주문 케이크</p>
-            <p class="text-muted" style="font-size:11px;">픽업: 01.20 14:00</p>
-            <a class="btn btn--block" th:href="@{/orders/custom/request}" style="margin-top:6px;">주문 상세 보기</a>
-          </div>
-
-          <div class="panel chat-order-item" data-scroll-to="msg-start-ord-002" style="cursor:pointer; padding:10px;">
-            <div class="cluster cluster--between" style="margin-bottom:4px;">
-              <strong>ORD-002</strong>
-              <span class="badge badge--info">제작 중</span>
-            </div>
-            <p class="text-muted" style="margin:0;">딸기 생크림 케이크</p>
-            <p class="text-muted" style="font-size:11px;">픽업: 01.22 15:00</p>
-            <a class="btn btn--block" th:href="@{/orders/1}" style="margin-top:6px;">주문 상세 보기</a>
-          </div>
+          <p class="text-muted" style="font-size:12px;">주문 내역을 불러오는 중입니다...</p>
         </div>
       </aside>
 
@@ -63,77 +45,7 @@
 
         <!-- 채팅 타임라인 (chat-messages) -->
         <div class="chat-messages" id="chatMessages">
-          <div class="chat-date-divider" id="msg-start-ord-001"><span>2026년 1월 18일</span></div>
-
-          <!-- 내 메시지 -->
-          <div class="chat-msg chat-msg--me">
-            <div class="chat-msg__body">
-              <div class="chat-msg__content">
-                안녕하세요! 레터링 문구 '생일 축하해' 작업 시 파란색 글씨 가능한지 문의드립니다.
-              </div>
-            </div>
-            <div class="chat-msg__meta">
-              <span class="chat-msg__read">읽음</span>
-              <span class="chat-msg__time">14:20</span>
-            </div>
-          </div>
-
-          <!-- 상대방 메시지 (판매자) -->
-          <div class="chat-msg chat-msg--other">
-            <div class="chat-msg__sender">케이크샵 (담당자)</div>
-            <div class="chat-msg--other__content-wrap">
-              <div class="chat-msg__body">
-                <div class="chat-msg__content">
-                  안녕하세요 고객님! 파란색 레터링 가능합니다. 원하시는 이미지 참고 사진 있으시면 올려주시면 더 정확하게 확인해 드릴 수 있습니다.
-                </div>
-              </div>
-              <div class="chat-msg__meta">
-                <span class="chat-msg__time">14:25</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- 내 메시지 (이미지 첨부 예시) -->
-          <div class="chat-msg chat-msg--me">
-            <div class="chat-msg__body">
-              <div class="placeholder-image placeholder-image--sm" style="width:140px; height:100px; margin-bottom:4px;">
-                [참고 이미지]
-              </div>
-              <div class="chat-msg__content">
-                이 정도 톤의 파란색으로 부탁드립니다!
-              </div>
-            </div>
-            <div class="chat-msg__meta">
-              <span class="chat-msg__read">읽음</span>
-              <span class="chat-msg__time">14:28</span>
-            </div>
-          </div>
-
-          <!-- 시스템 카드 메시지 (제작 승인 완료 및 결제 안내) -->
-          <div class="chat-msg chat-msg--system">
-            <div class="chat-msg__content">
-              <strong>[시스템] 주문(ORD-001) 제작 승인이 완료되었습니다.</strong><br>
-              아래 버튼을 눌러 결제를 진행해 주세요.<br>
-              <button class="btn btn--primary" type="button" disabled style="margin-top:6px; display:inline-block;">주문제작 결제 준비 중</button>
-            </div>
-          </div>
-
-          <div class="chat-date-divider" id="msg-start-ord-002"><span>2026년 1월 20일</span></div>
-
-          <!-- 상대방 메시지 -->
-          <div class="chat-msg chat-msg--other">
-            <div class="chat-msg__sender">케이크샵 (담당자)</div>
-            <div class="chat-msg--other__content-wrap">
-              <div class="chat-msg__body">
-                <div class="chat-msg__content">
-                  네, 확인했습니다! 요청하신 색상으로 예쁘게 만들어 드리겠습니다. 추가 확인사항이 생기면 이 대화방으로 연락드릴게요!
-                </div>
-              </div>
-              <div class="chat-msg__meta">
-                <span class="chat-msg__time">15:30</span>
-              </div>
-            </div>
-          </div>
+          <div class="text-muted empty-chat-notice" style="text-align:center; padding:30px;">아직 주고받은 메시지가 없습니다. 문의사항을 남겨보세요!</div>
         </div>
 
         <!-- 채팅 입력 영역 (채팅방 안쪽에 위치) -->

@@ -20,4 +20,11 @@
           AND status = 'ACTIVE'
     </select>
 
+    <!-- 문의 대상 상품명 단건 조회 -->
+    <select id="findProductNameById" resultType="string">
+        SELECT name
+        FROM products
+        WHERE id = #{productId}
+    </select>
+
 </mapper>

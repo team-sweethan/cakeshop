@@ -23,18 +23,6 @@ document.addEventListener("DOMContentLoaded", () => {
     adminChatForm = freshForm;
   }
 
-  // 폼 클로닝 후 빠른 답변 드롭다운 다시 조회 및 리스너 등록
-  const quickTemplateSelect = document.getElementById("quickTemplateSelect");
-  if (quickTemplateSelect) {
-    quickTemplateSelect.addEventListener("change", () => {
-      const val = quickTemplateSelect.value;
-      const inputEl = document.getElementById("adminChatInput");
-      if (val && inputEl) {
-        inputEl.value = val;
-      }
-    });
-  }
-
   // CSRF 메타 태그 획득 헬퍼
   function getCsrfHeaders() {
     const tokenMeta = document.querySelector('meta[name="_csrf"]');
@@ -44,6 +32,19 @@ document.addEventListener("DOMContentLoaded", () => {
       headers[headerMeta.content] = tokenMeta.content;
     }
     return headers;
+  }
+
+  // 미답변 탭 빨간 배지 동적 업데이트 헬퍼
+  function updateUnreadTabBadge(count) {
+    const badge = document.getElementById("adminUnreadCountBadge");
+    if (badge) {
+      if (count > 0) {
+        badge.textContent = count;
+        badge.style.display = "inline-block";
+      } else {
+        badge.style.display = "none";
+      }
+    }
   }
 
   // 1. 관리자 전체 채팅방 목록 서버 필터 조회 (완료 탭: RESOLVED)
@@ -67,6 +68,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
       adminRoomsData = await response.json();
       renderRoomList();
+
+      // 미답변 방 개수 동적 갱신
+      if (currentFilter === "unread") {
+        updateUnreadTabBadge(adminRoomsData.length);
+      } else if (currentFilter === "all") {
+        const unreadCount = adminRoomsData.filter(r => r.responseStatus === "WAITING_ADMIN").length;
+        updateUnreadTabBadge(unreadCount);
+      }
 
       // 현재 탭 목록 결과에 기존 선택된 방이 없거나 비어있는 경우 갱신
       if (adminRoomsData && adminRoomsData.length > 0) {
@@ -222,13 +231,18 @@ document.addEventListener("DOMContentLoaded", () => {
   // 2. 대화 타임라인 렌더링
   async function loadAdminMessages(roomId) {
     if (!adminChatMessagesContainer) return;
+    adminChatMessagesContainer.innerHTML = `<div class="text-muted" style="text-align:center; padding:30px;">대화 내용을 불러오는 중입니다...</div>`;
     try {
       const response = await fetch(`/api/chat/messages?chatRoomId=${roomId}&page=1&size=50`);
-      if (!response.ok) return;
+      if (!response.ok) {
+        adminChatMessagesContainer.innerHTML = `<div class="text-muted" style="text-align:center; padding:30px;">대화 내역을 불러오는 데 실패했습니다.</div>`;
+        return;
+      }
       const messages = await response.json();
       renderAdminTimeline(messages);
     } catch (err) {
       console.error("관리자 대화 내역 조회 실패:", err);
+      adminChatMessagesContainer.innerHTML = `<div class="text-muted" style="text-align:center; padding:30px;">대화 내역을 불러오는 중 오류가 발생했습니다.</div>`;
     }
   }
 
@@ -245,6 +259,8 @@ document.addEventListener("DOMContentLoaded", () => {
     lastFetchedMessageId = messages[messages.length - 1].id;
 
     messages.forEach((msg) => {
+      appendProductBannerDOM(msg, adminChatMessagesContainer);
+
       const isAdminSender = msg.senderType === "ADMIN";
       const msgDiv = document.createElement("div");
       msgDiv.className = `chat-msg ${isAdminSender ? "chat-msg--me" : "chat-msg--other"}`;
@@ -258,16 +274,9 @@ document.addEventListener("DOMContentLoaded", () => {
         });
       }
 
-      let productTagHtml = "";
-      if (msg.productId) {
-        const pName = msg.productName ? escapeHtml(msg.productName) : `상품 #${msg.productId}`;
-        productTagHtml = `<div style="font-size:12px; margin-bottom:4px; opacity:0.9;"><span class="badge badge--info">🛒 문의 상품: ${pName}</span></div>`;
-      }
-
       if (isAdminSender) {
         msgDiv.innerHTML = `
           <div class="chat-msg__body">
-            ${productTagHtml}
             ${attachmentsHtml}
             <div class="chat-msg__content">${escapeHtml(msg.content || "")}</div>
           </div>
@@ -281,7 +290,6 @@ document.addEventListener("DOMContentLoaded", () => {
           <div class="chat-msg__sender">${escapeHtml(msg.senderName || "고객")}</div>
           <div class="chat-msg--other__content-wrap">
             <div class="chat-msg__body">
-              ${productTagHtml}
               ${attachmentsHtml}
               <div class="chat-msg__content">${escapeHtml(msg.content || "")}</div>
             </div>
@@ -296,6 +304,21 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     scrollToBottom();
+  }
+
+  // 문의 상품 중앙 시스템 배너 카드 생성 헬퍼
+  function appendProductBannerDOM(msg, container) {
+    if (!msg || !msg.productId || !container) return;
+    const pName = msg.productName ? escapeHtml(msg.productName) : `상품 #${msg.productId}`;
+    const bannerDiv = document.createElement("div");
+    bannerDiv.className = "chat-msg chat-msg--system";
+    bannerDiv.style.cssText = "margin: 14px 0 8px 0; text-align: center;";
+    bannerDiv.innerHTML = `
+      <div class="chat-msg__content" style="display: inline-block; background: #fff8eb; border: 1px solid #ffe0b2; border-radius: 20px; padding: 6px 16px; font-size: 12px; color: #e65100; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+        <strong>[문의 상품]: </strong> <span style="font-weight: 700;">${pName}</span>
+      </div>
+    `;
+    container.appendChild(bannerDiv);
   }
 
   // 3. 우측 사이드 패널 (메모 + 연동 주문) 렌더링 (0원 결제 금액 정상 표시)
@@ -343,6 +366,16 @@ document.addEventListener("DOMContentLoaded", () => {
             <a class="btn btn--outline btn--block btn--xs" href="/admin/orders/${ord.orderId}" style="margin-top:8px;">주문 상세서 보기</a>
           `;
 
+          cardDiv.addEventListener("click", (e) => {
+            if (e.target.tagName === "A" || e.target.tagName === "BUTTON") return;
+            const targetAnchor = document.getElementById(`msg-ord-${ord.orderId}`);
+            if (targetAnchor) {
+              targetAnchor.scrollIntoView({ behavior: "smooth", block: "center" });
+            } else if (adminChatMessagesContainer) {
+              adminChatMessagesContainer.scrollTop = adminChatMessagesContainer.scrollHeight;
+            }
+          });
+
           const targetNote = document.getElementById("adminCustomerNote");
           if (targetNote && targetNote.parentElement) {
             infoPanel.insertBefore(cardDiv, targetNote.parentElement);
@@ -353,6 +386,17 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (err) {
       console.error("우측 사이드 패널 조회 실패:", err);
     }
+  }
+
+  // Enter 키 전송 이벤트 연동 (Shift+Enter는 줄바꿈)
+  const adminChatInput = document.getElementById("adminChatInput");
+  if (adminChatInput && adminChatForm) {
+    adminChatInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+        e.preventDefault();
+        adminChatForm.requestSubmit();
+      }
+    });
   }
 
   // 4. 답변 메시지 전송

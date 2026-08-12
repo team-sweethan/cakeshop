@@ -19,6 +19,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.cakeshop.domain.product.service.ProductChatQueryService;
+
 import java.util.List;
 
 @RestController
@@ -26,6 +28,7 @@ import java.util.List;
 public class ChatApiController {
 
     private final ChatService chatService;
+    private final ProductChatQueryService productChatQueryService;
 
     // 1-1. 내 1:1 채팅방 단순 조회 (고객용, 방이 없으면 404, 생성 부작용 없음)
     @GetMapping("/api/chat/room")
@@ -126,12 +129,18 @@ public class ChatApiController {
                         .collect(java.util.stream.Collectors.toList())
                 : java.util.Collections.emptyList();
 
+        String productName = null;
+        if (message.getProductId() != null) {
+            productName = productChatQueryService.getProductName(message.getProductId());
+        }
+
         return ResponseEntity.ok(ChatMessageResponse.builder()
                 .id(message.getId())
                 .chatRoomId(message.getChatRoomId())
                 .senderId(message.getSenderId())
                 .senderType(memberDetails.isAdmin() ? "ADMIN" : "CUSTOMER")
                 .productId(message.getProductId())
+                .productName(productName)
                 .content(message.getContent())
                 .imageUrls(imageUrls)
                 .createdAt(message.getCreatedAt())

@@ -85,11 +85,27 @@ document.addEventListener("DOMContentLoaded", () => {
     lastFetchedMessageId = messages[messages.length - 1].id;
 
     messages.forEach((msg) => {
+      appendProductBannerDOM(msg, chatMessagesContainer);
       const msgEl = createMessageDOM(msg);
       chatMessagesContainer.appendChild(msgEl);
     });
 
     scrollToBottom();
+  }
+
+  // 문의 상품 중앙 시스템 배너 카드 생성 헬퍼
+  function appendProductBannerDOM(msg, container) {
+    if (!msg || !msg.productId || !container) return;
+    const pName = msg.productName ? escapeHtml(msg.productName) : `상품 #${msg.productId}`;
+    const bannerDiv = document.createElement("div");
+    bannerDiv.className = "chat-msg chat-msg--system";
+    bannerDiv.style.cssText = "margin: 14px 0 8px 0; text-align: center;";
+    bannerDiv.innerHTML = `
+      <div class="chat-msg__content" style="display: inline-block; background: #fff8eb; border: 1px solid #ffe0b2; border-radius: 20px; padding: 6px 16px; font-size: 12px; color: #e65100; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+        <strong>[문의 상품]: </strong> <span style="font-weight: 700;">${pName}</span>
+      </div>
+    `;
+    container.appendChild(bannerDiv);
   }
 
   // 메시지 단일 DOM 생성
@@ -107,16 +123,9 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
-    let productTagHtml = "";
-    if (msg.productId) {
-      const pName = msg.productName ? escapeHtml(msg.productName) : `상품 #${msg.productId}`;
-      productTagHtml = `<div style="font-size:12px; margin-bottom:4px; opacity:0.9;"><span class="badge badge--info">🛒 문의 상품: ${pName}</span></div>`;
-    }
-
     if (isMe) {
       msgDiv.innerHTML = `
         <div class="chat-msg__body">
-          ${productTagHtml}
           ${attachmentsHtml}
           <div class="chat-msg__content">${escapeHtml(msg.content || "")}</div>
         </div>
@@ -130,7 +139,6 @@ document.addEventListener("DOMContentLoaded", () => {
         <div class="chat-msg__sender">${escapeHtml(msg.senderName || "관리자")}</div>
         <div class="chat-msg--other__content-wrap">
           <div class="chat-msg__body">
-            ${productTagHtml}
             ${attachmentsHtml}
             <div class="chat-msg__content">${escapeHtml(msg.content || "")}</div>
           </div>
@@ -194,7 +202,27 @@ document.addEventListener("DOMContentLoaded", () => {
         <p class="text-muted" style="font-size:11px;">금액: ${amtStr} | 픽업: ${escapeHtml(typeof pTime === "string" ? pTime : formatTime(pTime))}</p>
         <a class="btn btn--block" href="/orders/${ord.orderId}" style="margin-top:6px;">주문 상세 보기</a>
       `;
+      itemDiv.addEventListener("click", (e) => {
+        if (e.target.tagName === "A" || e.target.tagName === "BUTTON") return;
+        const targetAnchor = document.getElementById(`msg-ord-${ord.orderId}`);
+        if (targetAnchor) {
+          targetAnchor.scrollIntoView({ behavior: "smooth", block: "center" });
+        } else if (chatMessagesContainer) {
+          chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
+        }
+      });
+
       orderSidebarStack.appendChild(itemDiv);
+    });
+  }
+
+  // Enter 키 전송 이벤트 연동 (Shift+Enter는 줄바꿈)
+  if (chatInput && chatForm) {
+    chatInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+        e.preventDefault();
+        chatForm.requestSubmit();
+      }
     });
   }
 
@@ -250,6 +278,7 @@ document.addEventListener("DOMContentLoaded", () => {
           if (noticeEl) {
             chatMessagesContainer.innerHTML = "";
           }
+          appendProductBannerDOM(sentMsg, chatMessagesContainer);
           const msgEl = createMessageDOM(sentMsg);
           chatMessagesContainer.appendChild(msgEl);
           scrollToBottom();

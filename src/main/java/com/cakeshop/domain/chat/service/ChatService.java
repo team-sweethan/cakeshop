@@ -243,8 +243,11 @@ public class ChatService {
         }
         // 3. 외부 URL인 경우 설정된 자사 S3 / CloudFront Base URL 또는 신뢰 호스트만 통과 허용!
         if (key.startsWith("http://") || key.startsWith("https://")) {
-            if (StringUtils.hasText(s3BaseUrl) && key.startsWith(s3BaseUrl)) {
-                return;
+            if (StringUtils.hasText(s3BaseUrl)) {
+                String normalizedBaseUrl = s3BaseUrl.endsWith("/") ? s3BaseUrl : s3BaseUrl + "/";
+                if (key.startsWith(normalizedBaseUrl) || key.equals(s3BaseUrl)) {
+                    return;
+                }
             }
             try {
                 java.net.URI uri = java.net.URI.create(key);
@@ -551,6 +554,11 @@ public class ChatService {
             String senderType = isCustomerSender ? "CUSTOMER" : "ADMIN";
             String senderName = isCustomerSender ? "고객" : "관리자";
 
+            String productName = null;
+            if (msg.getProductId() != null) {
+                productName = productChatQueryService.getProductName(msg.getProductId());
+            }
+
             return ChatMessageResponse.builder()
                     .id(msg.getId())
                     .chatRoomId(msg.getChatRoomId())
@@ -558,6 +566,7 @@ public class ChatService {
                     .senderName(senderName)
                     .senderType(senderType)
                     .productId(msg.getProductId())
+                    .productName(productName)
                     .content(msg.getContent())
                     .imageUrls(imageUrls)
                     .isRead(isRead)

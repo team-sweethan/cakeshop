@@ -15,4 +15,5 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 public interface ProductChatMapper {
     int countActiveProductById(@Param("productId") Long productId);
+    String findProductNameById(@Param("productId") Long productId);
 }
