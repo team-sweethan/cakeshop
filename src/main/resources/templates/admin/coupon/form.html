@@ -1,6 +1,14 @@
 <!doctype html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{fragments/common/head :: head(${formMode == 'create'} ? '쿠폰 등록 | 관리자' : '쿠폰 수정 | 관리자')}"></head>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${formMode == 'create'} ? '쿠폰 등록 | 관리자' : '쿠폰 수정 | 관리자'">쿠폰 등록 | 관리자</title>
+    <link rel="icon" th:href="@{/favicon.ico}" sizes="any">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+    <link rel="stylesheet" th:href="@{/css/coupon-admin.css}">
+    <script defer th:src="@{/js/app.js}"></script>
+</head>
 <body>
 <div class="admin-layout">
     <aside th:replace="~{fragments/admin/sidebar :: sidebar('coupons')}"></aside>

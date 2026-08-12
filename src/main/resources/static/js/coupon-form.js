@@ -29,7 +29,10 @@
     const selectedDiscountType = () => document.querySelector('input[name="discountType"]:checked')?.value;
     const refreshDiscountPolicy = () => {
         const isPercentage = selectedDiscountType() === 'PERCENTAGE';
-        const canChangeDiscountType = Array.from(document.querySelectorAll('input[name="discountType"]'))
+        // hidden 전송용 값은 제외하고 실제 라디오 버튼의 disabled 상태만 확인한다.
+        const canChangeDiscountType = Array.from(
+            document.querySelectorAll('input[type="radio"][name="discountType"]')
+        )
             .some(input => !input.disabled);
 
         maximumDiscountAmountGroup.hidden = !isPercentage;
