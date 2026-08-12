@@ -90,7 +90,10 @@
                 <strong>김철수 고객님과의 1:1 상담</strong>
                 <p class="text-muted">가입일: 2025.11.10 | 총 주문: 3건 (상태: <span class="badge badge--warning">승인 대기</span>)</p>
               </div>
-              <a class="btn btn--outline" th:href="@{/admin/members}">회원 상세 정보</a>
+              <div class="cluster" style="gap:8px;">
+                <button type="button" class="btn btn--primary btn--sm" id="completeChatBtn">✓ 상담 완료</button>
+                <a class="btn btn--outline btn--sm" th:href="@{/admin/members}">회원 상세 정보</a>
+              </div>
             </div>
 
             <!-- 채팅 타임라인 (chat-messages: 관리자 입장에서 고객=좌측, 관리자=우측) -->

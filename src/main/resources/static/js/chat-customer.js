@@ -144,7 +144,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return msgDiv;
   }
 
-  // 3. 연동 주문 배너 목록 조회
+  // 3. 연동 주문 배너 목록 조회 및 동적 헤더 건수 갱신
   async function loadOrderBanners(roomId) {
     if (!orderSidebarStack) return;
     try {
@@ -161,6 +161,13 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!orderSidebarStack) return;
     orderSidebarStack.innerHTML = "";
 
+    // 주문 개수 헤더 동적 갱신
+    const sidebarTitle = document.querySelector(".chat-sidebar h3, .chat-sidebar .sidebar-title, .chat-sidebar strong");
+    const count = orders ? orders.length : 0;
+    if (sidebarTitle && sidebarTitle.textContent.includes("주문")) {
+      sidebarTitle.textContent = `연동 주문 내역 (${count}건)`;
+    }
+
     if (!orders || orders.length === 0) {
       orderSidebarStack.innerHTML = `<p class="text-muted" style="font-size:12px;">연동된 주문 내역이 없습니다.</p>`;
       return;
@@ -174,6 +181,9 @@ document.addEventListener("DOMContentLoaded", () => {
       const oNum = ord.orderNumber || ord.orderNo || `주문 #${ord.orderId}`;
       const pName = ord.productName || ord.productSummary || "케이크 주문건";
       const pTime = ord.pickupDateTime || ord.pickupAt || "-";
+      const amtStr = (ord.totalAmount !== null && ord.totalAmount !== undefined)
+        ? ord.totalAmount.toLocaleString() + "원"
+        : "-";
 
       itemDiv.innerHTML = `
         <div class="cluster cluster--between" style="margin-bottom:4px;">
@@ -181,7 +191,7 @@ document.addEventListener("DOMContentLoaded", () => {
           <span class="badge badge--warning">${escapeHtml(ord.orderStatus || "접수")}</span>
         </div>
         <p class="text-muted" style="margin:0;">${escapeHtml(pName)}</p>
-        <p class="text-muted" style="font-size:11px;">픽업: ${escapeHtml(typeof pTime === "string" ? pTime : formatTime(pTime))}</p>
+        <p class="text-muted" style="font-size:11px;">금액: ${amtStr} | 픽업: ${escapeHtml(typeof pTime === "string" ? pTime : formatTime(pTime))}</p>
         <a class="btn btn--block" href="/orders/${ord.orderId}" style="margin-top:6px;">주문 상세 보기</a>
       `;
       orderSidebarStack.appendChild(itemDiv);

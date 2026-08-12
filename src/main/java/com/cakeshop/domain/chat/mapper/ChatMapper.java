@@ -28,6 +28,13 @@ public interface ChatMapper {
 
     ChatRoom findChatRoomByCustomerId(Long customerId); //특정 고객의 채팅방 조회 (고객이 1:1 문의하기 버튼을 눌렀을 때)
 
+    // 채팅방 상태 (status: OPEN/CLOSED, response_status: RESOLVED 등) 수동 갱신
+    void updateChatRoomStatus(
+        @Param("chatRoomId") Long chatRoomId,
+        @Param("status") ChatRoomStatus status,
+        @Param("responseStatus") ChatResponseStatus responseStatus
+    );
+
     // 메시지 발송 시 최신 메시지 ID, 시각, 답변 상태 (response_status) 갱신
     void updateChatRoomLastMessage(
         @Param("chatRoomId") Long chatRoomId,

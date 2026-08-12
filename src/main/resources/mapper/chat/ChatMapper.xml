@@ -41,6 +41,16 @@
         WHERE customer_id = #{customerId}
     </select>
     
+    <!-- 채팅방 상태 (status, response_status) 수동 갱신 -->
+    <update id="updateChatRoomStatus">
+        UPDATE chat_rooms
+        SET
+            status = #{status},
+            response_status = #{responseStatus},
+            updated_at = CURRENT_TIMESTAMP(6)
+        WHERE id = #{chatRoomId}
+    </update>
+
     <!-- 메시지 발송 시 최신 메시지 ID, 시각, 답변 상태 (response_status) 갱신 (CLOSED 방 시 자동 OPEN 재오픈) -->
     <update id="updateChatRoomLastMessage">
         UPDATE chat_rooms

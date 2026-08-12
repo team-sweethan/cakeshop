@@ -264,6 +264,19 @@ public class ChatService {
         throw new BusinessException(CommonErrorCode.INVALID_INPUT);
     }
 
+    // 채팅방 상태 (status, response_status) 수동 갱신 (관리자 전용)
+    @Transactional
+    public void updateResponseStatus(Long chatRoomId, ChatResponseStatus responseStatus, Long currentUserId, boolean isAdmin) {
+        ChatRoom room = chatMapper.findChatRoomById(chatRoomId);
+        validateRoomAccess(room, currentUserId, isAdmin);
+
+        ChatRoomStatus status = (responseStatus == ChatResponseStatus.RESOLVED)
+                ? ChatRoomStatus.CLOSED
+                : ChatRoomStatus.OPEN;
+
+        chatMapper.updateChatRoomStatus(chatRoomId, status, responseStatus);
+    }
+
     // 채팅방 연동 주문 목록 조회 (권한 검증 포함)
     @Transactional(readOnly = true)
     public List<ChatRoomOrderResponse> getChatRoomOrders(Long chatRoomId, Long currentUserId, boolean isAdmin) {

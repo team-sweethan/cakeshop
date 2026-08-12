@@ -68,9 +68,10 @@ document.addEventListener("DOMContentLoaded", () => {
       adminRoomsData = await response.json();
       renderRoomList();
 
-      // 방이 존재할 때 첫 번째 방 선택, 없으면 목업 영역 완전 비우기
+      // 현재 탭 목록 결과에 기존 선택된 방이 없거나 비어있는 경우 갱신
       if (adminRoomsData && adminRoomsData.length > 0) {
-        if (!selectedChatRoomId) {
+        const existsInTab = adminRoomsData.some(r => (r.chatRoomId || r.id) === selectedChatRoomId);
+        if (!selectedChatRoomId || !existsInTab) {
           const firstRoom = adminRoomsData[0];
           const rId = firstRoom.chatRoomId || firstRoom.id;
           selectChatRoom(rId, firstRoom.customerId);
@@ -111,7 +112,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // 방 목록 렌더링 (검색어 필터 시 선택 방 지우지 않음)
+  // 방 목록 렌더링 (고객명 및 주문번호 통합 검색)
   function renderRoomList() {
     if (!adminRoomListContainer) return;
     adminRoomListContainer.innerHTML = "";
@@ -178,9 +179,21 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // 방 선택 조작, 헤더 고객명 동적 갱신 및 읽음 처리 시 목록 배지 실시간 갱신
+  // 방 선택 조작: 대화방 변경 시 기존 작성 중인 텍스트 및 첨부 파일 깨끗이 초기화!
   async function selectChatRoom(roomId, customerId) {
     if (!roomId) return;
+
+    // 방 교체 시 다른 고객에게 오전송되는 일을 막기 위해 입력창 초기화
+    if (selectedChatRoomId !== roomId) {
+      const inputEl = document.getElementById("adminChatInput");
+      if (inputEl) inputEl.value = "";
+      pendingAttachment = null;
+      const fileLabel = document.getElementById("adminImageFileName");
+      if (fileLabel) fileLabel.textContent = "선택된 파일 없음";
+      const fileInput = document.getElementById("adminChatImageInput");
+      if (fileInput) fileInput.value = "";
+    }
+
     selectedChatRoomId = roomId;
     selectedCustomerId = customerId;
 
@@ -225,6 +238,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!messages || messages.length === 0) {
       adminChatMessagesContainer.innerHTML = `<div class="text-muted" style="text-align:center; padding:30px;">대화 기록이 없습니다.</div>`;
+      lastFetchedMessageId = 0;
       return;
     }
 
@@ -284,7 +298,7 @@ document.addEventListener("DOMContentLoaded", () => {
     scrollToBottom();
   }
 
-  // 3. 우측 사이드 패널 (메모 + 연동 주문) 렌더링
+  // 3. 우측 사이드 패널 (메모 + 연동 주문) 렌더링 (0원 결제 금액 정상 표시)
   async function loadAdminSidePanel(roomId) {
     try {
       const response = await fetch(`/api/admin/chat/rooms/${roomId}/side-panel`);
@@ -314,6 +328,9 @@ document.addEventListener("DOMContentLoaded", () => {
           const oNum = ord.orderNumber || ord.orderNo || `주문 #${ord.orderId}`;
           const pName = ord.productName || ord.productSummary || "주문 제작 케이크";
           const pTime = ord.pickupDateTime || ord.pickupAt || "-";
+          const amtStr = (ord.totalAmount !== null && ord.totalAmount !== undefined)
+            ? ord.totalAmount.toLocaleString() + "원"
+            : "-";
 
           cardDiv.innerHTML = `
             <div class="cluster cluster--between" style="margin-bottom:6px;">
@@ -322,7 +339,7 @@ document.addEventListener("DOMContentLoaded", () => {
             </div>
             <p style="margin:0; font-weight:600;">${escapeHtml(pName)}</p>
             <p class="text-muted" style="font-size:12px; margin:2px 0;">픽업: ${escapeHtml(typeof pTime === "string" ? pTime : formatTime(pTime))}</p>
-            <p style="font-size:13px; font-weight:700; margin-top:4px;">금액: ${ord.totalAmount ? ord.totalAmount.toLocaleString() + "원" : "-"}</p>
+            <p style="font-size:13px; font-weight:700; margin-top:4px;">금액: ${amtStr}</p>
             <a class="btn btn--outline btn--block btn--xs" href="/admin/orders/${ord.orderId}" style="margin-top:8px;">주문 상세서 보기</a>
           `;
 
@@ -429,6 +446,40 @@ document.addEventListener("DOMContentLoaded", () => {
       } catch (err) {
         console.error("메모 저장 오류:", err);
         alert("메모 저장 중 오류가 발생했습니다.");
+      }
+    });
+  }
+
+  // 5-2. 관리자 상담 완료(RESOLVED / CLOSED) 처리 버튼 연동
+  const completeChatBtn = document.getElementById("completeChatBtn");
+  if (completeChatBtn) {
+    completeChatBtn.addEventListener("click", async () => {
+      if (!selectedChatRoomId) {
+        alert("선택된 채팅방이 없습니다.");
+        return;
+      }
+
+      if (!confirm("해당 상담을 완료(종결) 처리하시겠습니까?")) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/admin/chat/rooms/${selectedChatRoomId}/status?status=RESOLVED`, {
+          method: "PATCH",
+          headers: getCsrfHeaders()
+        });
+
+        if (!response.ok) {
+          alert("상담 완료 처리에 실패했습니다.");
+          return;
+        }
+
+        alert("상담이 성공적으로 완료(종결) 처리되었습니다!");
+        await loadAdminRooms(); // 방 목록 미답변/완료 상태 갱신
+
+      } catch (err) {
+        console.error("상담 완료 처리 오류:", err);
+        alert("상담 완료 처리 중 오류가 발생했습니다.");
       }
     });
   }

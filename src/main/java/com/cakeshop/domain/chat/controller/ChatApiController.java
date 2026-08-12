@@ -217,6 +217,21 @@ public class ChatApiController {
         return ResponseEntity.ok().build();
     }
 
+    // 7-3. 채팅방 상태 변경 API (관리자 전용: RESOLVED 등)
+    @PatchMapping("/api/admin/chat/rooms/{chatRoomId}/status")
+    public ResponseEntity<Void> updateRoomStatus(
+            @PathVariable Long chatRoomId,
+            @RequestParam ChatResponseStatus status,
+            @AuthenticationPrincipal MemberDetails memberDetails) {
+
+        if (memberDetails == null || !memberDetails.isAdmin()) {
+            return ResponseEntity.status(403).build();
+        }
+
+        chatService.updateResponseStatus(chatRoomId, status, memberDetails.getMemberId(), true);
+        return ResponseEntity.ok().build();
+    }
+
     // 8. 읽음 커서 갱신 (고객/관리자 공용)
     @PatchMapping("/api/chat/read-cursor")
     public ResponseEntity<Void> updateReadCursor(
