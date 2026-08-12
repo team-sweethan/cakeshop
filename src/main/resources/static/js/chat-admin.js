@@ -70,9 +70,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // 방이 존재할 때 첫 번째 방 선택, 없으면 목업 영역 완전 비우기
       if (adminRoomsData && adminRoomsData.length > 0) {
-        const firstRoom = adminRoomsData[0];
-        const rId = firstRoom.chatRoomId || firstRoom.id;
-        selectChatRoom(rId, firstRoom.customerId);
+        if (!selectedChatRoomId) {
+          const firstRoom = adminRoomsData[0];
+          const rId = firstRoom.chatRoomId || firstRoom.id;
+          selectChatRoom(rId, firstRoom.customerId);
+        }
       } else {
         clearMainAndSidePanel();
       }
@@ -109,7 +111,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // 방 목록 렌더링
+  // 방 목록 렌더링 (검색어 필터 시 선택 방 지우지 않음)
   function renderRoomList() {
     if (!adminRoomListContainer) return;
     adminRoomListContainer.innerHTML = "";
@@ -126,7 +128,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (filteredRooms.length === 0) {
       adminRoomListContainer.innerHTML = `<p class="text-muted" style="font-size:12px; padding:10px;">해당하는 채팅방이 없습니다.</p>`;
-      clearMainAndSidePanel();
+      // 검색어가 없을 때만 전체 초기화, 검색 중일 때는 선택된 방 및 대화 내용 유지
+      if (!searchKeyword) {
+        clearMainAndSidePanel();
+      }
       return;
     }
 
@@ -170,11 +175,19 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // 방 선택 조작 및 읽음 처리 시 목록 배지 실시간 갱신
+  // 방 선택 조작, 헤더 고객명 동적 갱신 및 읽음 처리 시 목록 배지 실시간 갱신
   async function selectChatRoom(roomId, customerId) {
     if (!roomId) return;
     selectedChatRoomId = roomId;
     selectedCustomerId = customerId;
+
+    // 대화창 상단 헤더 고객명 동적 갱신
+    const headerTitle = document.querySelector(".admin-chat-main-room .chat-room__header strong");
+    const targetRoom = adminRoomsData.find((r) => (r.chatRoomId || r.id) === roomId);
+    if (headerTitle) {
+      const cName = targetRoom ? targetRoom.customerName : `고객 #${customerId}`;
+      headerTitle.textContent = `${cName} 님과의 1:1 상담`;
+    }
 
     renderRoomList(); // 선택 하이라이트 갱신
 
@@ -183,7 +196,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (lastFetchedMessageId > 0) {
       await markRead(roomId, lastFetchedMessageId);
       // 읽음 완료 시 로컬 메모리 방의 unreadCount 0 갱신 및 배지 리렌더링
-      const targetRoom = adminRoomsData.find((r) => (r.chatRoomId || r.id) === roomId);
       if (targetRoom) {
         targetRoom.unreadCount = 0;
         renderRoomList();

@@ -27,9 +27,22 @@ public class ChatApiController {
 
     private final ChatService chatService;
 
-    // 1. 내 1:1 채팅방 조회 및 없으면 새로 생성 (고객용)
+    // 1-1. 내 1:1 채팅방 단순 조회 (고객용, 방이 없으면 404, 생성 부작용 없음)
     @GetMapping("/api/chat/room")
-    public ResponseEntity<ChatRoom> getOrMakeRoom(@AuthenticationPrincipal MemberDetails memberDetails) {
+    public ResponseEntity<ChatRoom> getRoomCustomer(@AuthenticationPrincipal MemberDetails memberDetails) {
+        if (memberDetails == null) {
+            return ResponseEntity.status(401).build();
+        }
+        ChatRoom room = chatService.getChatRoomByCustomerId(memberDetails.getMemberId());
+        if (room == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(room);
+    }
+
+    // 1-2. 내 1:1 채팅방 신규 생성 및 보장 (고객용 POST)
+    @PostMapping("/api/chat/room")
+    public ResponseEntity<ChatRoom> createRoomCustomer(@AuthenticationPrincipal MemberDetails memberDetails) {
         if (memberDetails == null) {
             return ResponseEntity.status(401).build();
         }
