@@ -22,6 +22,8 @@ import org.springframework.security.web.authentication.LoginUrlAuthenticationEnt
 import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.security.web.session.HttpSessionEventPublisher;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler;
 
 @Configuration
 @EnableWebSecurity
@@ -36,13 +38,15 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(
             HttpSecurity http,
-            SessionRegistry sessionRegistry) throws Exception {
+            SessionRegistry sessionRegistry,
+            ObjectProvider<OAuth2LoginSuccessHandler> oauth2LoginSuccessHandler) throws Exception {
         RequestMatcher passwordRecoveryRequest =
                 SecurityConfig::isPasswordRecoveryRequest;
         HttpSessionRequestCache requestCache = new HttpSessionRequestCache();
-        requestCache.setRequestMatcher(request ->
-                !"/cart/count".equals(request.getRequestURI()
-                        .substring(request.getContextPath().length())));
+        requestCache.setRequestMatcher(request -> {
+            String path = request.getRequestURI().substring(request.getContextPath().length());
+            return !"/cart/count".equals(path) && !path.startsWith("/api/");
+        });
         LoginUrlAuthenticationEntryPoint customerLoginEntryPoint =
                 new LoginUrlAuthenticationEntryPoint("/login");
         LoginUrlAuthenticationEntryPoint adminLoginEntryPoint =
@@ -50,6 +54,12 @@ public class SecurityConfig {
         AuthenticationEntryPoint portalLoginEntryPoint = (request, response, exception) -> {
             String path = request.getRequestURI()
                     .substring(request.getContextPath().length());
+            if (path.startsWith("/api/chat/") || path.startsWith("/api/admin/chat/")) {
+                response.setStatus(jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json;charset=UTF-8");
+                response.getWriter().write("{\"code\":\"UNAUTHORIZED\",\"message\":\"인증이 필요합니다.\"}");
+                return;
+            }
             if ("/admin".equals(path) || path.startsWith("/admin/")) {
                 adminLoginEntryPoint.commence(request, response, exception);
                 return;
@@ -81,6 +91,7 @@ public class SecurityConfig {
                         "/", "/login", "/signup", "/join", "/emailCheck", "/find-email",
                         "/find-email/login", "/email-verifications/signup/**",
                         "/email-verifications/password-reset/**",
+                        "/oauth/signup", "/oauth2/**", "/login/oauth2/**",
                         "/api/notifications/unread-count", "/api/notifications/test-sms",
                         "/products/**", "/screens", "/favicon.ico",
                         "/css/**", "/js/**", "/webjars/**", "/images/**", "/uploads/**", "/error")
@@ -116,10 +127,10 @@ public class SecurityConfig {
                             .permitAll();
                 }
 
-                // ② 관리자. 모든 관리자 화면은 관리자 로그인을 요구한다.
-                auth.requestMatchers("/admin", "/admin/**").hasRole("ADMIN");
-                // 고객과 관리자가 각자 받은 알림을 같은 API에서 조회하고 읽음 처리한다.
-                auth.requestMatchers("/api/notifications", "/api/notifications/**")
+                // ② 관리자. 모든 관리자 화면 및 관리자 API는 관리자 로그인을 요구한다.
+                auth.requestMatchers("/admin", "/admin/**", "/api/admin/**").hasRole("ADMIN");
+                // 고객과 관리자가 각자 받은 채팅/알림을 같은 API에서 조회하고 읽음 처리한다.
+                auth.requestMatchers("/api/chat", "/api/chat/**", "/api/notifications", "/api/notifications/**")
                         .hasAnyRole("USER", "ADMIN");
                 // ③ 나머지 회원 전용 기능은 일반 회원만 사용한다.
                 auth.anyRequest().hasRole("USER");
@@ -148,6 +159,13 @@ public class SecurityConfig {
                 .deleteCookies("JSESSIONID")
                 .permitAll()
             );
+        OAuth2LoginSuccessHandler oauthSuccessHandler = oauth2LoginSuccessHandler.getIfAvailable();
+        if (oauthSuccessHandler != null) {
+            http.oauth2Login(oauth2 -> oauth2
+                    .loginPage("/login")
+                    .successHandler(oauthSuccessHandler)
+                    .failureHandler(new SimpleUrlAuthenticationFailureHandler("/login?oauthError")));
+        }
         return http.build();
     }
 

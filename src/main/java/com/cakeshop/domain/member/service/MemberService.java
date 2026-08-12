@@ -159,12 +159,22 @@ public class MemberService {
                 member.getBirthDate());
     }
 
+    /** 현재 비밀번호를 사용하는 회원인지 확인한다. */
+    @Transactional(readOnly = true)
+    public boolean hasPasswordLogin(String email) {
+        return memberMapper.findByEmail(email)
+                .map(member -> member.getPassword() != null)
+                .orElseThrow(() -> new BusinessException(MemberErrorCode.NOT_FOUND));
+    }
+
+    /** 현재 인증된 회원을 탈퇴 처리한다. */
     @Transactional
     public void withdraw(String email, String currentPassword) {
         Member member = memberMapper.findByEmail(email)
                 .orElseThrow(() -> new BusinessException(MemberErrorCode.NOT_FOUND));
-        if (member.getPassword() == null
-                || !passwordEncoder.matches(currentPassword, member.getPassword())) {
+        if (member.getPassword() != null
+                && (currentPassword == null || currentPassword.isBlank()
+                || !passwordEncoder.matches(currentPassword, member.getPassword()))) {
             throw new BusinessException(MemberErrorCode.INVALID_CURRENT_PASSWORD);
         }
         if (member.getStatus() == null

@@ -79,14 +79,16 @@
       </ul>
       <form class="form-stack" th:action="@{/mypage/withdraw}" method="post"
             th:object="${withdrawForm}">
-        <div class="form-group">
+        <div class="form-group" th:if="${hasPasswordLogin}">
           <label class="form-label" for="withdraw-current-password">현재 비밀번호</label>
           <input class="form-control" id="withdraw-current-password" type="password"
-                 th:field="*{currentPassword}" maxlength="100"
-                 autocomplete="current-password" required>
+                 th:field="*{currentPassword}" maxlength="100" autocomplete="current-password">
           <p class="form-error" th:if="${#fields.hasErrors('currentPassword')}"
              th:errors="*{currentPassword}"></p>
         </div>
+        <p class="form-help" th:unless="${hasPasswordLogin}">
+          Google로 인증된 계정은 비밀번호 입력 없이 탈퇴할 수 있습니다.
+        </p>
         <label class="choice" for="withdrawal-confirmed">
           <input id="withdrawal-confirmed" type="checkbox"
                  th:field="*{withdrawalConfirmed}" required>

@@ -153,6 +153,11 @@
       });
     }
 
+    // 동적 채팅 관리 페이지(/admin/chat)에서는 목업 채팅 리스너를 바인딩하지 않는다.
+    if (window.location.pathname.includes("/admin/chat")) {
+      return;
+    }
+
     // 관리자 채팅 폼을 제출하면 메시지 요소를 만들어 대화창에 추가한다.
     if (chatForm && chatInput && chatMessages) {
       chatForm.addEventListener("submit", function (e) {
