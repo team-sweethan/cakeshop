@@ -38,6 +38,7 @@ public class OrderPaymentRecoveryService {
         OrderStatus previousStatus = order.getStatus();
         if (previousStatus != OrderStatus.PENDING_PAYMENT
                 && previousStatus != OrderStatus.READY_FOR_PICKUP
+                && previousStatus != OrderStatus.UNDER_REVIEW
                 && previousStatus != OrderStatus.EXPIRED) {
             throw new BusinessException(OrderErrorCode.INVALID_STATUS_TRANSITION);
         }
@@ -49,7 +50,8 @@ public class OrderPaymentRecoveryService {
         ));
         // 쿠폰 도메인 공개 계약: PG 보상 취소로 주문이 취소되면 사용 쿠폰도 함께 복구한다.
         couponOrderCommandService.restoreCouponForCanceledOrder(orderId);
-        if (previousStatus == OrderStatus.READY_FOR_PICKUP) {
+        if (previousStatus == OrderStatus.READY_FOR_PICKUP
+                || previousStatus == OrderStatus.UNDER_REVIEW) {
             restoreDeductedStock(orderId, canceledAt);
         }
     }

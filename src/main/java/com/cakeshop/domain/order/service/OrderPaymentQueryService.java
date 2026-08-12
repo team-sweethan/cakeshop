@@ -25,7 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 담당자 : 주환
  * 작성일 : 2026-08-11
  * 기능 : 결제 연동용 고객 주문 조회 계약
- * 설명 : 결제 도메인이 orders 테이블을 직접 조회하지 않고 고객 소유 일반 주문의 최소 정보를 조회하도록 제공한다.
+ * 설명 : 결제 도메인이 orders 테이블을 직접 조회하지 않고 고객 소유 결제 대상 주문의 최소 정보를 조회하도록 제공한다.
  * ******************************
  */
 @Service
@@ -42,7 +42,7 @@ public class OrderPaymentQueryService {
      * 담당자 : 주환
      * 작성일 : 2026-08-11
      * 기능 : 고객 소유 결제 대상 주문 조회
-     * 설명 : 결제 준비·승인·완료 화면에서 필요한 일반 주문 정보만 제공하고, 주문 Entity를 외부에 노출하지 않는다.
+     * 설명 : 결제 준비·승인·완료 화면에서 필요한 결제 대상 주문 정보만 제공하고, 주문 Entity를 외부에 노출하지 않는다.
      * ******************************
      */
     @Transactional(readOnly = true)
@@ -51,7 +51,7 @@ public class OrderPaymentQueryService {
         return new PaymentOrder(
                 order.orderId(),
                 order.orderNumber(),
-                order.orderType() == OrderType.GENERAL,
+                order.orderType(),
                 order.status() == OrderStatus.PENDING_PAYMENT,
                 order.originalAmount(),
                 order.discountAmount(),
@@ -81,12 +81,12 @@ public class OrderPaymentQueryService {
      * 작성자 : 주환
      * 담당자 : 주환
      * 작성일 : 2026-08-11
-     * 기능 : 고객 소유 결제 실행용 일반 주문 조회
-     * 설명 : 결제 승인과 0원 결제 완료에 필요한 주문 금액·만료 시각·재고 차감 대상만 제공한다.
+     * 기능 : 고객 소유 결제 실행용 주문 조회
+     * 설명 : Toss 승인 완료에 필요한 주문 유형·금액·만료 시각·재고 차감 대상만 제공한다.
      * ******************************
      */
     @Transactional(readOnly = true)
-    public PaymentExecutionOrder getMemberGeneralPaymentOrder(long memberId, long orderId) {
+    public PaymentExecutionOrder getMemberPaymentExecutionOrder(long memberId, long orderId) {
         if (!memberService.isActiveMember(memberId)) {
             throw new BusinessException(OrderErrorCode.MEMBER_NOT_AVAILABLE);
         }
@@ -95,26 +95,41 @@ public class OrderPaymentQueryService {
         if (!Long.valueOf(memberId).equals(order.getMemberId())) {
             throw new BusinessException(CommonErrorCode.NOT_FOUND);
         }
-        if (order.getOrderType() != OrderType.GENERAL
-                || order.getStatus() != OrderStatus.PENDING_PAYMENT) {
+        if (order.getStatus() != OrderStatus.PENDING_PAYMENT
+                || (order.getOrderType() != OrderType.GENERAL
+                && order.getOrderType() != OrderType.CUSTOM)) {
             throw new BusinessException(OrderErrorCode.INVALID_STATUS_TRANSITION);
         }
         List<PaymentProduct> products = orderMapper.findOrderItemsByOrderId(orderId).stream()
-                .map(this::toPaymentProduct)
+                .map(item -> toPaymentProduct(item, order.getOrderType()))
                 .toList();
         if (products.isEmpty()) {
             throw new BusinessException(OrderErrorCode.EMPTY_ORDER_ITEMS);
         }
         return new PaymentExecutionOrder(
                 order.getId(),
+                order.getOrderType(),
                 order.getFinalAmount(),
                 order.getPaymentExpiresAt(),
                 products
         );
     }
 
-    private PaymentProduct toPaymentProduct(OrderItem orderItem) {
-        if (orderItem.getProductType() != ProductType.GENERAL
+    /** 0원 결제는 일반 주문에만 허용한다. */
+    @Transactional(readOnly = true)
+    public PaymentExecutionOrder getMemberGeneralPaymentOrder(long memberId, long orderId) {
+        PaymentExecutionOrder order = getMemberPaymentExecutionOrder(memberId, orderId);
+        if (order.orderType() != OrderType.GENERAL) {
+            throw new BusinessException(OrderErrorCode.INVALID_STATUS_TRANSITION);
+        }
+        return order;
+    }
+
+    private PaymentProduct toPaymentProduct(OrderItem orderItem, OrderType orderType) {
+        ProductType expectedProductType = orderType == OrderType.GENERAL
+                ? ProductType.GENERAL
+                : ProductType.CUSTOM;
+        if (orderItem.getProductType() != expectedProductType
                 || orderItem.getProductId() == null
                 || orderItem.getQuantity() == null
                 || orderItem.getQuantity() <= 0) {
@@ -130,7 +145,7 @@ public class OrderPaymentQueryService {
     public record PaymentOrder(
             long orderId,
             String orderNumber,
-            boolean generalOrder,
+            OrderType orderType,
             boolean pendingPayment,
             BigDecimal originalAmount,
             BigDecimal discountAmount,
@@ -141,6 +156,42 @@ public class OrderPaymentQueryService {
             String ordererPhone,
             List<PaymentOrderItem> items
     ) {
+
+        /** 기존 일반 주문 조회 호출부의 호환용 상태다. */
+        public boolean generalOrder() {
+            return orderType == OrderType.GENERAL;
+        }
+
+        /** 기존 일반 주문 결제 테스트와 호출부의 호환용 생성자다. */
+        public PaymentOrder(
+                long orderId,
+                String orderNumber,
+                boolean generalOrder,
+                boolean pendingPayment,
+                BigDecimal originalAmount,
+                BigDecimal discountAmount,
+                BigDecimal finalAmount,
+                LocalDateTime pickupAt,
+                LocalDateTime paymentExpiresAt,
+                String ordererName,
+                String ordererPhone,
+                List<PaymentOrderItem> items
+        ) {
+            this(
+                    orderId,
+                    orderNumber,
+                    generalOrder ? OrderType.GENERAL : OrderType.CUSTOM,
+                    pendingPayment,
+                    originalAmount,
+                    discountAmount,
+                    finalAmount,
+                    pickupAt,
+                    paymentExpiresAt,
+                    ordererName,
+                    ordererPhone,
+                    items
+            );
+        }
     }
 
     public record PaymentOrderItem(
@@ -157,10 +208,21 @@ public class OrderPaymentQueryService {
     /** 결제 승인과 완료 처리에서만 사용하는 최소 주문 스냅샷이다. */
     public record PaymentExecutionOrder(
             long orderId,
+            OrderType orderType,
             BigDecimal amount,
             LocalDateTime paymentExpiresAt,
             List<PaymentProduct> products
     ) {
+
+        /** 기존 일반 주문 호출부의 호환용 생성자다. */
+        public PaymentExecutionOrder(
+                long orderId,
+                BigDecimal amount,
+                LocalDateTime paymentExpiresAt,
+                List<PaymentProduct> products
+        ) {
+            this(orderId, OrderType.GENERAL, amount, paymentExpiresAt, products);
+        }
     }
 
     /** 결제 완료 시 재고를 차감할 주문 상품이다. */

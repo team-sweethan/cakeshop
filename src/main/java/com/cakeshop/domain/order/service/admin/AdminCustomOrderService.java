@@ -2,7 +2,6 @@ package com.cakeshop.domain.order.service.admin;
 
 import com.cakeshop.domain.member.service.MemberOrderQueryService;
 import com.cakeshop.domain.order.entity.Order;
-import com.cakeshop.domain.order.entity.OrderItem;
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.order.error.OrderErrorCode;
@@ -31,7 +30,7 @@ public class AdminCustomOrderService {
         Order order = findCustomOrderForUpdate(orderId);
         requireTransition(order, OrderStatus.IN_PRODUCTION);
         LocalDateTime approvedAt = LocalDateTime.now(clock);
-        requirePickupTimeAfterPreparation(order, approvedAt);
+        // 픽업 가능 시각은 수제 주문 생성 시 결제 만료 시각 기준으로 이미 확정한다.
         requireOneRow(orderMapper.startProductionIfUnderReview(
                 orderId,
                 adminMemberId,
@@ -66,19 +65,6 @@ public class AdminCustomOrderService {
     private void requireTransition(Order order, OrderStatus next) {
         if (order.getStatus() == null || !order.getStatus().canTransitionTo(next)) {
             throw new BusinessException(OrderErrorCode.INVALID_STATUS_TRANSITION);
-        }
-    }
-
-    private void requirePickupTimeAfterPreparation(Order order, LocalDateTime approvedAt) {
-        int preparationDays = orderMapper.findOrderItemsByOrderId(order.getId())
-                .stream()
-                .map(OrderItem::getPreparationDays)
-                .filter(days -> days != null && days >= 0)
-                .max(Integer::compareTo)
-                .orElseThrow(() -> new BusinessException(OrderErrorCode.INVALID_STATUS_TRANSITION));
-        if (order.getPickupAt() == null
-                || order.getPickupAt().isBefore(approvedAt.plusDays(preparationDays))) {
-            throw new BusinessException(OrderErrorCode.PICKUP_TIME_UNAVAILABLE);
         }
     }
 

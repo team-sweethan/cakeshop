@@ -25,6 +25,11 @@ public class MemberDetails extends User {
         return memberId;
     }
 
+    public boolean isAdmin() {
+        return getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+    }
+
     public String getDisplayName() {
         return displayName;
     }
