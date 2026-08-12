@@ -4,7 +4,6 @@ import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
 import com.cakeshop.domain.member.dto.view.MemberProfileView;
 import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.coupon.service.CouponOrderQueryService;
-import com.cakeshop.domain.coupon.service.CouponOrderQuoteQueryService;
 import com.cakeshop.domain.order.dto.view.customer.CustomOrderCheckoutView;
 import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
@@ -70,9 +69,6 @@ class OrderControllerTests {
     private CouponOrderQueryService couponOrderQueryService;
 
     @Mock
-    private CouponOrderQuoteQueryService couponOrderQuoteQueryService;
-
-    @Mock
     private CustomerCustomOrderService customerCustomOrderService;
 
     @Mock
@@ -90,7 +86,6 @@ class OrderControllerTests {
                                 memberService,
                                 refundFacade,
                                 couponOrderQueryService,
-                                couponOrderQuoteQueryService,
                                 customerCustomOrderService,
                                 productQueryService
                         )
@@ -262,6 +257,11 @@ class OrderControllerTests {
                 .andExpect(status().isOk())
                 .andExpect(view().name("customer/order/custom-request"))
                 .andExpect(model().attribute("checkout", checkout));
+
+        verify(couponOrderQueryService).getAvailableCouponsForMember(
+                10L,
+                BigDecimal.valueOf(60_000)
+        );
     }
 
     @Test

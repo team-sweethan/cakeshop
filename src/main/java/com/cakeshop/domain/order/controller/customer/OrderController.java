@@ -3,7 +3,6 @@ package com.cakeshop.domain.order.controller.customer;
 import com.cakeshop.domain.member.dto.view.MemberProfileView;
 import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.coupon.service.CouponOrderQueryService;
-import com.cakeshop.domain.coupon.service.CouponOrderQuoteQueryService;
 import com.cakeshop.domain.order.dto.form.CancelForm;
 import com.cakeshop.domain.order.dto.form.customer.CustomOrderForm;
 import com.cakeshop.domain.order.dto.form.customer.GeneralOrderForm;
@@ -43,7 +42,6 @@ public class OrderController {
     private final MemberService memberService;
     private final RefundFacade refundFacade;
     private final CouponOrderQueryService couponOrderQueryService;
-    private final CouponOrderQuoteQueryService couponOrderQuoteQueryService;
     private final CustomerCustomOrderService customerCustomOrderService;
     private final ProductQueryService productQueryService;
 
@@ -206,7 +204,7 @@ public class OrderController {
         model.addAttribute("checkout", checkout);
         model.addAttribute(
                 "availableCoupons",
-                couponOrderQuoteQueryService.getPositiveFinalAmountQuotes(
+                couponOrderQueryService.getAvailableCouponsForMember(
                         memberId,
                         checkout.totalAmount()
                 )

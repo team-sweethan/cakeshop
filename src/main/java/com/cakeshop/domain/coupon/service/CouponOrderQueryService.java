@@ -9,7 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 주문 담당자가 일반 주문서에 표시할 사용 가능 쿠폰과 예상 할인 금액을 조회할 때 사용한다.
+ * 주문 담당자가 일반·수제 주문서에 표시할 사용 가능 쿠폰을 조회할 때 사용한다.
  */
 @Service
 @RequiredArgsConstructor
@@ -22,6 +22,9 @@ public class CouponOrderQueryService {
     public List<CouponOrderAvailableView> getAvailableCouponsForMember(
             long memberId, BigDecimal orderAmount
     ) {
+        if (orderAmount == null || orderAmount.signum() <= 0) {
+            return List.of();
+        }
         return couponOrderMapper.findAvailableCouponsForMember(memberId, orderAmount);
     }
 

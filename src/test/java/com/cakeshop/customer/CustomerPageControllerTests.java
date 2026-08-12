@@ -16,7 +16,6 @@ import com.cakeshop.domain.coupon.dto.view.CustomerCouponView;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.domain.coupon.service.CouponOrderQueryService;
-import com.cakeshop.domain.coupon.service.CouponOrderQuoteQueryService;
 import com.cakeshop.domain.home.controller.HomeController;
 import com.cakeshop.domain.home.service.HomeService;
 import com.cakeshop.domain.member.controller.AuthController;
@@ -126,7 +125,6 @@ class CustomerPageControllerTests {
                                 memberService,
                                 mock(RefundFacade.class),
                                 couponOrderQueryService,
-                                mock(CouponOrderQuoteQueryService.class),
                                 mock(CustomerCustomOrderService.class),
                                 mock(ProductQueryService.class)
                         ),
@@ -232,7 +230,11 @@ class CustomerPageControllerTests {
                         .getContentAsString(StandardCharsets.UTF_8);
 
         assertThat(customRequestTemplate)
-                .contains("th:field=\"*{displayedOriginalAmount}\"");
+                .contains("th:field=\"*{displayedOriginalAmount}\"")
+                .contains("/js/order-checkout.js")
+                .contains("data-discount-type=${coupon.discountType}")
+                .contains("data-order-total")
+                .contains("data-final-amount");
     }
 
     @Test
