@@ -47,7 +47,7 @@ public class OAuthSignupController {
         OAuthSignupForm form = new OAuthSignupForm();
         form.setName(oauthSession.identity().name());
         model.addAttribute("oauthSignupForm", form);
-        model.addAttribute("oauthEmail", oauthSession.identity().email());
+        addOAuthIdentity(model, oauthSession);
         return "auth/oauth-signup";
     }
 
@@ -70,7 +70,7 @@ public class OAuthSignupController {
             return "redirect:/login";
         }
         if (bindingResult.hasErrors()) {
-            model.addAttribute("oauthEmail", oauthSession.identity().email());
+            addOAuthIdentity(model, oauthSession);
             return "auth/oauth-signup";
         }
 
@@ -96,6 +96,15 @@ public class OAuthSignupController {
             return null;
         }
         return oauthSession;
+    }
+
+    private void addOAuthIdentity(Model model, OAuthSignupSession oauthSession) {
+        model.addAttribute("oauthEmail", oauthSession.identity().email());
+        model.addAttribute("oauthProviderName", providerName(oauthSession.identity().provider()));
+    }
+
+    private String providerName(String provider) {
+        return "KAKAO".equalsIgnoreCase(provider) ? "카카오" : "Google";
     }
 
     private AuthenticationSuccessHandler successHandler() {
