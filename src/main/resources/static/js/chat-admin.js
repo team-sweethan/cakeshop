@@ -121,7 +121,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const filteredRooms = adminRoomsData.filter((room) => {
       if (searchKeyword) {
         const cName = (room.customerName || "").toLowerCase();
-        if (!cName.includes(searchKeyword)) return false;
+        const oNum = (room.orderNumber || room.orderNo || "").toLowerCase();
+        if (!cName.includes(searchKeyword) && !oNum.includes(searchKeyword)) {
+          return false;
+        }
       }
       return true;
     });

@@ -29,9 +29,11 @@ import com.cakeshop.global.error.CommonErrorCode;
 import com.cakeshop.global.infra.FileStorageClient;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
@@ -56,6 +58,9 @@ public class ChatService {
     private final ChatImageValidator chatImageValidator;
     private final ProductChatQueryService productChatQueryService;
     private final ChatRoomTxHelper chatRoomTxHelper;
+
+    @Value("${aws.s3.base-url:}")
+    private String s3BaseUrl;
 
     // ==========================================
     // 0. 검증 헬퍼 메서드
@@ -236,14 +241,17 @@ public class ChatService {
         if (key.startsWith("chat/") || key.startsWith("uploads/")) {
             return;
         }
-        // 3. 외부 URL인 경우 URI 파싱을 거쳐 자사 신뢰 도메인 호스트만 통과 허용!
+        // 3. 외부 URL인 경우 설정된 자사 S3 / CloudFront Base URL 또는 신뢰 호스트만 통과 허용!
         if (key.startsWith("http://") || key.startsWith("https://")) {
+            if (StringUtils.hasText(s3BaseUrl) && key.startsWith(s3BaseUrl)) {
+                return;
+            }
             try {
                 java.net.URI uri = java.net.URI.create(key);
                 String host = uri.getHost();
                 if (host != null) {
                     host = host.toLowerCase();
-                    if (host.endsWith("amazonaws.com") || host.endsWith("cloudfront.net") || host.equals("localhost") || host.equals("127.0.0.1")) {
+                    if (host.equals("localhost") || host.equals("127.0.0.1")) {
                         return;
                     }
                 }
