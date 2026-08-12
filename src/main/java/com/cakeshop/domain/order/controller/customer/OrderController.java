@@ -7,6 +7,8 @@ import com.cakeshop.domain.coupon.service.CouponOrderQuoteQueryService;
 import com.cakeshop.domain.order.dto.form.CancelForm;
 import com.cakeshop.domain.order.dto.form.customer.CustomOrderForm;
 import com.cakeshop.domain.order.dto.form.customer.GeneralOrderForm;
+import com.cakeshop.domain.order.dto.form.customer.CartOrderForm;
+import com.cakeshop.domain.cart.service.CartOrderQueryService;
 import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
 import com.cakeshop.domain.order.service.customer.CustomerCustomOrderService;
@@ -28,6 +30,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.UUID;
 
@@ -45,6 +48,7 @@ public class OrderController {
     private final CouponOrderQuoteQueryService couponOrderQuoteQueryService;
     private final CustomerCustomOrderService customerCustomOrderService;
     private final ProductQueryService productQueryService;
+    private final CartOrderQueryService cartOrderQueryService;
 
     /** 장바구니 항목의 픽업 일시 수정용 목업 경로다. 일반 주문은 checkout에서 선택한다. */
     @GetMapping(value = "/pickup", params = "intent=cart-edit")
@@ -109,6 +113,29 @@ public class OrderController {
         return renderGeneralOrderForm(form, model, requireMemberId(member));
     }
 
+    /** 장바구니에서 선택한 여러 일반 상품의 주문서다. 선택 ID는 cart 공개 조회 계약으로 소유권을 확인한다. */
+    @GetMapping("/checkout/cart")
+    public String cartCheckout(
+            @org.springframework.web.bind.annotation.RequestParam(
+                    value = "itemIds",
+                    required = false
+            ) java.util.List<Long> itemIds,
+            @AuthenticationPrincipal MemberDetails member,
+            Model model,
+            RedirectAttributes redirectAttributes
+    ) {
+        if (itemIds == null || itemIds.isEmpty()) {
+            redirectAttributes.addFlashAttribute("errorMessage", "주문할 상품을 선택해 주세요.");
+            return "redirect:/cart";
+        }
+        long memberId = requireMemberId(member);
+        CartOrderForm form = new CartOrderForm();
+        form.setCartItemIds(itemIds);
+        form.setRequestKey(UUID.randomUUID().toString());
+        prefillMemberContact(form, member);
+        return renderCartOrderForm(form, model, memberId);
+    }
+
     // 일반 상품 주문 생성
     @PostMapping("/general")
     public String createGeneralOrder(
@@ -134,6 +161,30 @@ public class OrderController {
             }
             bindingResult.reject("orderAmountChanged", exception.getErrorCode().message());
             return renderGeneralOrderForm(form, model, memberId);
+        }
+    }
+
+    /** 장바구니 다건 일반 주문을 생성하고 결제 화면으로 이동한다. */
+    @PostMapping("/general/cart")
+    public String createCartOrder(
+            @AuthenticationPrincipal MemberDetails member,
+            @Valid @ModelAttribute("orderForm") CartOrderForm form,
+            BindingResult bindingResult,
+            Model model
+    ) {
+        long memberId = requireMemberId(member);
+        if (bindingResult.hasErrors()) {
+            return renderCartOrderForm(form, model, memberId);
+        }
+        try {
+            long orderId = orderService.createCartOrder(memberId, form);
+            return "redirect:/orders/" + orderId + "/payment";
+        } catch (BusinessException exception) {
+            if (exception.getErrorCode() != OrderErrorCode.ORDER_AMOUNT_CHANGED) {
+                throw exception;
+            }
+            bindingResult.reject("orderAmountChanged", exception.getErrorCode().message());
+            return renderCartOrderForm(form, model, memberId);
         }
     }
 
@@ -213,6 +264,19 @@ public class OrderController {
         return "customer/order/custom-request";
     }
 
+    private String renderCartOrderForm(CartOrderForm form, Model model, long memberId) {
+        var cartItems = cartOrderQueryService.getSelectedOrderItems(memberId, form.getCartItemIds());
+        var checkout = orderCheckoutService.getCartCheckout(cartItems);
+        form.setDisplayedOriginalAmount(checkout.totalAmount());
+        model.addAttribute("orderForm", form);
+        model.addAttribute("checkout", checkout);
+        model.addAttribute(
+                "availableCoupons",
+                couponOrderQueryService.getAvailableCouponsForMember(memberId, checkout.totalAmount())
+        );
+        return "customer/order/cart-form";
+    }
+
     /** 유효한 아이템인지 확인. **/
     private boolean hasInvalidOrderItem(BindingResult bindingResult) {
         return bindingResult.hasFieldErrors("productId")
@@ -228,6 +292,14 @@ public class OrderController {
         MemberProfileView profile = memberService.getMemberProfile(
                 member.getUsername()
         );
+        form.setOrdererName(profile.name());
+        form.setOrdererPhone(profile.phone());
+        form.setPickupName(profile.name());
+        form.setPickupPhone(profile.phone());
+    }
+
+    private void prefillMemberContact(CartOrderForm form, MemberDetails member) {
+        MemberProfileView profile = memberService.getMemberProfile(member.getUsername());
         form.setOrdererName(profile.name());
         form.setOrdererPhone(profile.phone());
         form.setPickupName(profile.name());

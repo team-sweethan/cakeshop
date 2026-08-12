@@ -14,6 +14,7 @@ import com.cakeshop.domain.order.service.customer.OrderCustomerService;
 import com.cakeshop.domain.order.service.OrderService;
 import com.cakeshop.domain.payment.service.RefundFacade;
 import com.cakeshop.domain.product.service.ProductQueryService;
+import com.cakeshop.domain.cart.service.CartOrderQueryService;
 import com.cakeshop.global.security.MemberDetails;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,6 +45,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
@@ -78,6 +80,9 @@ class OrderControllerTests {
     @Mock
     private ProductQueryService productQueryService;
 
+    @Mock
+    private CartOrderQueryService cartOrderQueryService;
+
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -92,7 +97,8 @@ class OrderControllerTests {
                                 couponOrderQueryService,
                                 couponOrderQuoteQueryService,
                                 customerCustomOrderService,
-                                productQueryService
+                                productQueryService,
+                                cartOrderQueryService
                         )
                 )
                 .setCustomArgumentResolvers(
@@ -165,6 +171,14 @@ class OrderControllerTests {
                 2,
                 List.of(101L, 102L)
         );
+    }
+
+    @Test
+    void cartCheckout_withoutSelectedItems_redirectsToCartWithMessage() throws Exception {
+        mockMvc.perform(get("/orders/checkout/cart"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/cart"))
+                .andExpect(flash().attribute("errorMessage", "주문할 상품을 선택해 주세요."));
     }
 
     @Test

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cakeshop.domain.cart.mapper.CartPaymentMapper">
+    <delete id="deleteOptionsByMemberIdAndItemIds">
+        DELETE cio FROM cart_item_options cio
+        INNER JOIN cart_items ci ON ci.id = cio.cart_item_id
+        INNER JOIN carts c ON c.id = ci.cart_id
+        WHERE c.member_id = #{memberId} AND ci.id IN
+        <foreach collection="itemIds" item="itemId" open="(" separator="," close=")">#{itemId}</foreach>
+    </delete>
+    <delete id="deleteImagesByMemberIdAndItemIds">
+        DELETE cii FROM cart_item_images cii
+        INNER JOIN cart_items ci ON ci.id = cii.cart_item_id
+        INNER JOIN carts c ON c.id = ci.cart_id
+        WHERE c.member_id = #{memberId} AND ci.id IN
+        <foreach collection="itemIds" item="itemId" open="(" separator="," close=")">#{itemId}</foreach>
+    </delete>
+    <delete id="deleteItemsByMemberIdAndItemIds">
+        DELETE ci FROM cart_items ci
+        INNER JOIN carts c ON c.id = ci.cart_id
+        WHERE c.member_id = #{memberId} AND ci.id IN
+        <foreach collection="itemIds" item="itemId" open="(" separator="," close=")">#{itemId}</foreach>
+    </delete>
+</mapper>

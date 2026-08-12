@@ -1,7 +1,10 @@
 package com.cakeshop.domain.order.service;
 
 import com.cakeshop.domain.order.dto.form.customer.GeneralOrderForm;
+import com.cakeshop.domain.order.dto.form.customer.CartOrderForm;
 import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
+import com.cakeshop.domain.cart.service.CartOrderQueryService;
+import com.cakeshop.domain.cart.dto.view.CartOrderItemView;
 import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.member.service.MemberCouponQueryService;
 import com.cakeshop.domain.order.entity.Order;
@@ -10,6 +13,7 @@ import com.cakeshop.domain.order.entity.OrderItemOption;
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.order.error.OrderErrorCode;
+import com.cakeshop.domain.order.mapper.OrderCartMapper;
 import com.cakeshop.domain.order.mapper.OrderMapper;
 import com.cakeshop.domain.order.service.OrderOptionValidator.ValidatedOption;
 import com.cakeshop.domain.payment.service.PaymentOrderPreparationCommandService;
@@ -88,6 +92,12 @@ class OrderServiceTests {
     @Mock
     private CouponOrderCommandService couponOrderCommandService;
 
+    @Mock
+    private CartOrderQueryService cartOrderQueryService;
+
+    @Mock
+    private OrderCartMapper orderCartMapper;
+
     private OrderService orderService;
 
     @BeforeEach
@@ -104,6 +114,8 @@ class OrderServiceTests {
                 memberService,
                 memberCouponQueryService,
                 couponOrderCommandService,
+                cartOrderQueryService,
+                orderCartMapper,
                 FIXED_CLOCK
         );
     }
@@ -198,6 +210,48 @@ class OrderServiceTests {
                 order.getOrderNumber(),
                 order.getFinalAmount()
         );
+    }
+
+    @Test
+    void createCartOrderReloadsSelectedCartItemsAndSavesEveryItem() {
+        when(cartOrderQueryService.getSelectedOrderItems(10L, List.of(11L, 12L)))
+                .thenReturn(List.of(
+                        new CartOrderItemView(11L, 1L, 1, "문 앞", List.of()),
+                        new CartOrderItemView(12L, 2L, 2, null, List.of())
+                ));
+        when(productQueryService.getSalesInfo(1L)).thenReturn(product(1L, ProductType.GENERAL, "상품1", 10_000, 5));
+        when(productQueryService.getSalesInfo(2L)).thenReturn(product(2L, ProductType.GENERAL, "상품2", 20_000, 5));
+        when(orderOptionValidator.validate(anyLong(), any())).thenReturn(List.of());
+        when(orderMapper.insertOrder(any(Order.class))).thenAnswer(invocation -> {
+            invocation.<Order>getArgument(0).setId(100L);
+            return 1;
+        });
+        when(orderMapper.insertOrderItem(any(OrderItem.class))).thenAnswer(invocation -> {
+            invocation.<OrderItem>getArgument(0).setId(200L);
+            return 1;
+        });
+        when(orderCartMapper.insertOrderCartItems(100L, List.of(11L, 12L))).thenReturn(2);
+
+        CartOrderForm form = new CartOrderForm();
+        form.setRequestKey(UUID.randomUUID().toString());
+        form.setCartItemIds(List.of(11L, 12L));
+        form.setOrdererName("주문자");
+        form.setOrdererPhone("010-1234-5678");
+        form.setPickupName("픽업자");
+        form.setPickupPhone("010-9876-5432");
+        form.setPickupAt(FIXED_NOW.plusHours(1));
+        form.setDisplayedOriginalAmount(BigDecimal.valueOf(50_000));
+
+        long orderId = orderService.createCartOrder(10L, form);
+
+        assertThat(orderId).isEqualTo(100L);
+        verify(cartOrderQueryService).getSelectedOrderItems(10L, List.of(11L, 12L));
+        verify(orderCartMapper).insertOrderCartItems(100L, List.of(11L, 12L));
+        ArgumentCaptor<OrderItem> items = ArgumentCaptor.forClass(OrderItem.class);
+        verify(orderMapper, org.mockito.Mockito.times(2)).insertOrderItem(items.capture());
+        assertThat(items.getAllValues()).extracting(OrderItem::getTotalAmount)
+                .containsExactly(BigDecimal.valueOf(10_000), BigDecimal.valueOf(40_000));
+        assertThat(items.getAllValues().getFirst().getRequirements()).isEqualTo("문 앞");
     }
 
     @Test

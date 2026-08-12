@@ -18,7 +18,7 @@ public interface CartMapper {
 
     List<CartItem> findItemsByMemberId(@Param("memberId") long memberId);
 
-    int sumQuantityByMemberId(@Param("memberId") long memberId);
+    int countItemsByMemberId(@Param("memberId") long memberId);
 
     Optional<CartItem> findItemByMemberIdAndItemId(
             @Param("memberId") long memberId,

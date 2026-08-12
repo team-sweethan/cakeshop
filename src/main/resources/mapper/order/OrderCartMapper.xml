@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cakeshop.domain.order.mapper.OrderCartMapper">
+    <insert id="insertOrderCartItems">
+        INSERT INTO order_cart_items (order_id, cart_item_id)
+        VALUES
+        <foreach collection="cartItemIds" item="cartItemId" separator=",">
+            (#{orderId}, #{cartItemId})
+        </foreach>
+    </insert>
+
+    <!-- cart 공개 Command가 소유 회원 검증과 함께 삭제할 최소 대상을 반환한다. -->
+    <select id="findCartDeletionTarget"
+            resultType="com.cakeshop.domain.order.dto.view.OrderCartDeletionRow">
+        SELECT o.member_id,
+               GROUP_CONCAT(oci.cart_item_id ORDER BY oci.cart_item_id) AS cart_item_ids
+        FROM orders o
+        INNER JOIN order_cart_items oci ON oci.order_id = o.id
+        WHERE o.id = #{orderId}
+        GROUP BY o.member_id
+    </select>
+</mapper>
