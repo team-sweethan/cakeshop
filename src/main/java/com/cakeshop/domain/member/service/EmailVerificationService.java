@@ -1,6 +1,7 @@
 package com.cakeshop.domain.member.service;
 
 import com.cakeshop.domain.member.dto.form.SignupForm;
+import com.cakeshop.domain.member.dto.view.SignupEmailVerification;
 import com.cakeshop.domain.member.entity.EmailVerification;
 import com.cakeshop.domain.member.entity.EmailVerificationPurpose;
 import com.cakeshop.domain.member.error.MemberErrorCode;
@@ -97,7 +98,7 @@ public class EmailVerificationService {
 
     /** 가장 최근 회원가입 인증번호를 확인한다. */
     @Transactional
-    public String verifySignupCode(String rawEmail, String code) {
+    public SignupEmailVerification verifySignupCode(String rawEmail, String code) {
         String email = normalizeAndValidateEmail(rawEmail);
         LocalDateTime now = LocalDateTime.now(clock);
         EmailVerification verification = emailVerificationMapper.findLatest(
@@ -113,7 +114,7 @@ public class EmailVerificationService {
                     && code != null
                     && code.matches("\\d{6}")
                     && passwordEncoder.matches(code, verification.getCodeHash())) {
-                return email;
+                return new SignupEmailVerification(verification.getId(), email);
             }
             if (verification.getAttemptCount() < 5
                     && verification.getConsumedAt() == null
@@ -142,15 +143,19 @@ public class EmailVerificationService {
                 now) != 1) {
             throw new BusinessException(MemberErrorCode.EMAIL_VERIFICATION_INVALID);
         }
-        return email;
+        return new SignupEmailVerification(verification.getId(), email);
     }
 
     /** 인증된 이메일을 회원가입에서 한 번만 사용 처리한다. */
     @Transactional
-    public boolean consumeSignupVerification(String rawEmail) {
+    public boolean consumeSignupVerification(Long verificationId, String rawEmail) {
+        if (verificationId == null) {
+            return false;
+        }
         String email = normalizeAndValidateEmail(rawEmail);
         LocalDateTime now = LocalDateTime.now(clock);
-        return emailVerificationMapper.findVerifiedForUpdate(
+        return emailVerificationMapper.findVerifiedByIdForUpdate(
+                        verificationId,
                         email,
                         EmailVerificationPurpose.SIGNUP,
                         now.minus(VERIFIED_TTL))

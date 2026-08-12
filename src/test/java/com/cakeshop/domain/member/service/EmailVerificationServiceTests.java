@@ -12,6 +12,7 @@ import static org.mockito.Mockito.inOrder;
 
 import com.cakeshop.domain.member.entity.EmailVerification;
 import com.cakeshop.domain.member.entity.EmailVerificationPurpose;
+import com.cakeshop.domain.member.dto.view.SignupEmailVerification;
 import com.cakeshop.domain.member.error.MemberErrorCode;
 import com.cakeshop.domain.member.mapper.EmailVerificationMapper;
 import com.cakeshop.domain.member.mapper.MemberMapper;
@@ -141,8 +142,11 @@ class EmailVerificationServiceTests {
                 EmailVerificationPurpose.SIGNUP,
                 NOW)).thenReturn(1);
 
-        emailVerificationService.verifySignupCode("user@example.com", "123456");
+        SignupEmailVerification result =
+                emailVerificationService.verifySignupCode("user@example.com", "123456");
 
+        assertThat(result).isEqualTo(
+                new SignupEmailVerification(latest.getId(), "user@example.com"));
         verify(emailVerificationMapper).markVerified(
                 latest.getId(),
                 latest.getEmail(),
@@ -187,13 +191,15 @@ class EmailVerificationServiceTests {
     void consumeSignupVerification_verifiedRequest_consumesOnce() {
         EmailVerification verified = verification("user@example.com", "hash");
         verified.setVerifiedAt(NOW.minusMinutes(1));
-        when(emailVerificationMapper.findVerifiedForUpdate(
+        when(emailVerificationMapper.findVerifiedByIdForUpdate(
+                verified.getId(),
                 "user@example.com",
                 EmailVerificationPurpose.SIGNUP,
                 NOW.minusMinutes(10))).thenReturn(Optional.of(verified));
         when(emailVerificationMapper.markConsumed(verified.getId(), NOW)).thenReturn(1);
 
-        assertThat(emailVerificationService.consumeSignupVerification("user@example.com"))
+        assertThat(emailVerificationService.consumeSignupVerification(
+                verified.getId(), "user@example.com"))
                 .isTrue();
 
         verify(emailVerificationMapper).markConsumed(verified.getId(), NOW);
@@ -201,12 +207,13 @@ class EmailVerificationServiceTests {
 
     @Test
     void consumeSignupVerification_withoutVerification_returnsFalse() {
-        when(emailVerificationMapper.findVerifiedForUpdate(
+        when(emailVerificationMapper.findVerifiedByIdForUpdate(
+                7L,
                 "user@example.com",
                 EmailVerificationPurpose.SIGNUP,
                 NOW.minusMinutes(10))).thenReturn(Optional.empty());
 
-        assertThat(emailVerificationService.consumeSignupVerification("user@example.com"))
+        assertThat(emailVerificationService.consumeSignupVerification(7L, "user@example.com"))
                 .isFalse();
     }
 

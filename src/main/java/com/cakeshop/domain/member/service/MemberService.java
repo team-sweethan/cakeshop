@@ -8,6 +8,7 @@ import com.cakeshop.domain.member.dto.view.MemberProfileView;
 import com.cakeshop.domain.member.dto.view.PasswordRecoveryTarget;
 import com.cakeshop.domain.member.dto.view.PasswordResetResult;
 import com.cakeshop.domain.member.dto.view.RecoveredEmailView;
+import com.cakeshop.domain.member.dto.view.SignupEmailVerification;
 import com.cakeshop.domain.member.entity.Member;
 import com.cakeshop.domain.member.entity.MemberStatus;
 import com.cakeshop.domain.member.error.MemberErrorCode;
@@ -35,15 +36,16 @@ public class MemberService {
      * 회원가입 로직
      */
     @Transactional
-    public boolean join(SignupForm form, String verifiedEmail) {
+    public boolean join(SignupForm form, SignupEmailVerification verification) {
         String email = form.getEmail().trim().toLowerCase(java.util.Locale.ROOT);
         if (memberMapper.findByEmail(email).isPresent()) {
             throw new BusinessException(MemberErrorCode.DUPLICATE_EMAIL);
         }
-        if (!email.equals(verifiedEmail)) {
+        if (verification == null || !email.equals(verification.email())) {
             return false;
         }
-        if (!emailVerificationService.consumeSignupVerification(email)) {
+        if (!emailVerificationService.consumeSignupVerification(
+                verification.verificationId(), email)) {
             return false;
         }
 

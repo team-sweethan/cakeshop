@@ -48,7 +48,8 @@ public interface EmailVerificationMapper {
             @Param("verifiedAt") LocalDateTime verifiedAt);
 
     /** 회원가입에서 사용할 인증 완료 요청을 잠그고 조회한다. */
-    Optional<EmailVerification> findVerifiedForUpdate(
+    Optional<EmailVerification> findVerifiedByIdForUpdate(
+            @Param("id") Long id,
             @Param("email") String email,
             @Param("purpose") EmailVerificationPurpose purpose,
             @Param("verifiedSince") LocalDateTime verifiedSince);

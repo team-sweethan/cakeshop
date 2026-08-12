@@ -19,6 +19,7 @@ import com.cakeshop.domain.member.dto.form.EmailRecoveryForm;
 import com.cakeshop.domain.member.dto.form.SignupForm;
 import com.cakeshop.domain.member.dto.view.EmailRecoveryResult;
 import com.cakeshop.domain.member.dto.view.RecoveredEmailView;
+import com.cakeshop.domain.member.dto.view.SignupEmailVerification;
 import com.cakeshop.domain.member.service.MemberService;
 import java.time.LocalDate;
 import java.util.List;
@@ -70,7 +71,7 @@ class AuthControllerTests {
         MockHttpSession session = new MockHttpSession();
         session.setAttribute(
                 EmailVerificationController.SIGNUP_VERIFIED_EMAIL_SESSION_KEY,
-                "member@example.com");
+                new SignupEmailVerification(7L, "member@example.com"));
 
         mockMvc.perform(post("/join")
                         .session(session)
@@ -94,8 +95,10 @@ class AuthControllerTests {
         MockHttpSession session = new MockHttpSession();
         session.setAttribute(
                 EmailVerificationController.SIGNUP_VERIFIED_EMAIL_SESSION_KEY,
-                "member@example.com");
-        when(memberService.join(any(SignupForm.class), eq("member@example.com")))
+                new SignupEmailVerification(7L, "member@example.com"));
+        SignupEmailVerification verification =
+                new SignupEmailVerification(7L, "member@example.com");
+        when(memberService.join(any(SignupForm.class), eq(verification)))
                 .thenReturn(true);
 
         mockMvc.perform(post("/join")
@@ -111,7 +114,7 @@ class AuthControllerTests {
                 .andExpect(redirectedUrl("/login"))
                 .andExpect(flash().attribute("successMessage", "회원가입이 완료되었습니다!"));
 
-        verify(memberService).join(any(SignupForm.class), eq("member@example.com"));
+        verify(memberService).join(any(SignupForm.class), eq(verification));
         assertThat(session.getAttribute(
                 EmailVerificationController.SIGNUP_VERIFIED_EMAIL_SESSION_KEY)).isNull();
     }

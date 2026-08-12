@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.cakeshop.domain.member.error.EmailVerificationExceptionHandler;
 import com.cakeshop.domain.member.error.MemberErrorCode;
+import com.cakeshop.domain.member.dto.view.SignupEmailVerification;
 import com.cakeshop.domain.member.service.EmailVerificationService;
 import com.cakeshop.global.error.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
@@ -57,7 +58,7 @@ class EmailVerificationControllerTests {
     @Test
     void verifySignupCode_validCode_bindsVerifiedEmailToSession() throws Exception {
         when(emailVerificationService.verifySignupCode("member@example.com", "123456"))
-                .thenReturn("member@example.com");
+                .thenReturn(new SignupEmailVerification(7L, "member@example.com"));
         MockHttpSession session = new MockHttpSession();
 
         mockMvc.perform(post("/email-verifications/signup/verify")
@@ -69,7 +70,7 @@ class EmailVerificationControllerTests {
 
         assertThat(session.getAttribute(
                 EmailVerificationController.SIGNUP_VERIFIED_EMAIL_SESSION_KEY))
-                .isEqualTo("member@example.com");
+                .isEqualTo(new SignupEmailVerification(7L, "member@example.com"));
     }
 
     @Test

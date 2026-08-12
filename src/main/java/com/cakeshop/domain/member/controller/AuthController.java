@@ -4,6 +4,7 @@ import com.cakeshop.domain.member.dto.form.EmailRecoveryForm;
 import com.cakeshop.domain.member.dto.form.SignupForm;
 import com.cakeshop.domain.member.dto.view.EmailAvailabilityView;
 import com.cakeshop.domain.member.dto.view.EmailRecoveryResult;
+import com.cakeshop.domain.member.dto.view.SignupEmailVerification;
 import com.cakeshop.domain.member.error.MemberErrorCode;
 import com.cakeshop.domain.member.service.MemberService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -138,9 +139,9 @@ public class AuthController {
             return "customer/member/signup";
         }
 
-        String verifiedEmail = (String) session.getAttribute(
+        SignupEmailVerification verification = (SignupEmailVerification) session.getAttribute(
                 EmailVerificationController.SIGNUP_VERIFIED_EMAIL_SESSION_KEY);
-        if (!memberService.join(form, verifiedEmail)) {
+        if (!memberService.join(form, verification)) {
             bindingResult.rejectValue(
                     "email",
                     MemberErrorCode.EMAIL_VERIFICATION_REQUIRED.code(),
@@ -178,10 +179,11 @@ public class AuthController {
             SignupForm form,
             HttpSession session,
             Model model) {
-        String verifiedEmail = (String) session.getAttribute(
+        SignupEmailVerification verification = (SignupEmailVerification) session.getAttribute(
                 EmailVerificationController.SIGNUP_VERIFIED_EMAIL_SESSION_KEY);
         if (form.getEmail() != null
-                && form.getEmail().trim().equalsIgnoreCase(verifiedEmail)) {
+                && verification != null
+                && form.getEmail().trim().equalsIgnoreCase(verification.email())) {
             model.addAttribute("signupEmailVerified", true);
         }
     }
