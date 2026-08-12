@@ -128,6 +128,10 @@ public class ChatService {
                 if (attachments.stream().anyMatch(Objects::isNull)) {
                     throw new BusinessException(CommonErrorCode.INVALID_INPUT);
                 }
+                // 첨부파일 objectKey 발급 출처 보안 검증 (외부 추적 URL 저장 차단)
+                for (ChatMessageAttachmentRequest att : attachments) {
+                    validateAttachmentObjectKey(att.getObjectKey());
+                }
                 // 중복 S3 객체 키(objectKey) 거절
                 Set<String> uniqueKeys = attachments.stream()
                         .map(ChatMessageAttachmentRequest::getObjectKey)
@@ -196,6 +200,31 @@ public class ChatService {
         // 채팅 전용 이미지 파일 검증기 사용 (확장자, MIME 타입, 파일 시그니처, 5MB 크기 검증)
         chatImageValidator.validate(file);
         return fileStorageClient.store(file, "chat");
+    }
+
+    // 첨부파일 S3 / 로컬 발급 objectKey 저장 전 보안 검증 (외부 추적 픽셀 URL 차단)
+    private void validateAttachmentObjectKey(String key) {
+        if (key == null || key.isBlank()) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+        // 1. 로컬 저장소 경로 (/uploads/...)
+        if (key.startsWith("/uploads/")) {
+            return;
+        }
+        // 2. S3 객체 키 상대 경로 (chat/..., uploads/...)
+        if (key.startsWith("chat/") || key.startsWith("uploads/")) {
+            return;
+        }
+        // 3. 외부 URL인 경우 자사 S3 / CloudFront 버킷 도메인만 통과 허용!
+        if (key.startsWith("http://") || key.startsWith("https://")) {
+            if (key.startsWith("https://sweethan-cakeshop-images.s3.ap-northeast-2.amazonaws.com/")) {
+                return;
+            }
+            // 해커/외부 서버 추적 URL(https://attacker.example/pixel.png) 차단
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+        // 그 외 미허용 형식 차단
+        throw new BusinessException(CommonErrorCode.INVALID_INPUT);
     }
 
     // 채팅방 연동 주문 목록 조회 (권한 검증 포함)
