@@ -153,6 +153,9 @@ class StatisticsAdminScreenRenderingTests {
 
         mockMvc.perform(get("/admin/statistics"))
                 .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.matchesPattern(
+                        "(?s).*name=\"periodType\"\\s+value=\"RANGE\".*"
+                )))
                 .andExpect(content().string(containsString(
                         "href=\"/admin/statistics?periodType=RECENT_WEEK\""
                 )))

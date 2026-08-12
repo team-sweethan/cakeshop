@@ -23,7 +23,12 @@
             th:action="@{/admin/statistics}"
             th:object="${searchForm}"
             data-statistics-search-form>
-        <input type="hidden" th:field="*{periodType}" data-statistics-period-type>
+        <input type="hidden"
+               name="periodType"
+               th:value="${searchForm.periodType?.name() == 'RECENT_WEEK'
+                         ? 'RANGE'
+                         : searchForm.periodType?.name()}"
+               data-statistics-period-type>
         <div class="admin-toolbar">
           <label for="startDate">시작일</label>
           <input id="startDate" class="form-control" type="date"

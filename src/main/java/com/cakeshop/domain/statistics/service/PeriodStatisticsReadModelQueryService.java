@@ -69,7 +69,9 @@ public class PeriodStatisticsReadModelQueryService {
 
     private boolean isRecentWeekSearch(StatisticsSearchForm form) {
         return form != null
-                && form.getPeriodType() == StatisticsPeriodType.RECENT_WEEK;
+                && form.getPeriodType() == StatisticsPeriodType.RECENT_WEEK
+                && form.getStartDate() == null
+                && form.getEndDate() == null;
     }
 
     private void validateCompletedRange(

@@ -31,6 +31,15 @@ class StatisticsPeriodResolverTests {
     }
 
     @Test
+    void resolve_recentWeekWithDateRange_rejectsAmbiguousRequest() {
+        StatisticsSearchForm form = new StatisticsSearchForm();
+        form.setStartDate(LocalDate.of(2026, 8, 1));
+        form.setEndDate(LocalDate.of(2026, 8, 10));
+
+        assertInvalidDateRange(() -> resolver.resolve(form, LATEST_SELECTABLE_DATE));
+    }
+
+    @Test
     void resolve_requestedRange_returnsInputDates() {
         StatisticsSearchForm form = new StatisticsSearchForm();
         form.setPeriodType(StatisticsPeriodType.RANGE);

@@ -54,6 +54,21 @@ class PeriodStatisticsReadModelQueryServiceTests {
     }
 
     @Test
+    void getStatistics_recentWeekWithDateRange_rejectsBeforeQuery() {
+        StatisticsSearchForm form = new StatisticsSearchForm();
+        form.setStartDate(LocalDate.of(2026, 8, 1));
+        form.setEndDate(YESTERDAY);
+
+        assertThatThrownBy(() -> service().getStatistics(form))
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(StatisticsErrorCode.INVALID_DATE_RANGE)
+                );
+        verifyNoInteractions(mapper);
+    }
+
+    @Test
     void getStatistics_recentWeekHasOnlyThreeCompletedDays_returnsAvailableRange() {
         LocalDate latestCompletedDate = YESTERDAY.minusDays(1);
         LocalDate completedStartDate = latestCompletedDate.minusDays(2);
