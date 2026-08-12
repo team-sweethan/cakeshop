@@ -120,6 +120,30 @@ class StatisticsAdminControllerTests {
     }
 
     @Test
+    void statistics_dateRangeWithoutPeriodType_usesRangeForExistingUrlCompatibility()
+            throws Exception {
+        LocalDate startDate = LocalDate.of(2026, 8, 1);
+        LocalDate endDate = LocalDate.of(2026, 8, 10);
+        when(periodStatisticsReadModelQueryService.getStatistics(any()))
+                .thenReturn(statistics(startDate, endDate));
+
+        mockMvc.perform(get("/admin/statistics")
+                        .param("startDate", startDate.toString())
+                        .param("endDate", endDate.toString()))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("searchForm", org.hamcrest.Matchers.hasProperty(
+                        "periodType",
+                        org.hamcrest.Matchers.is(StatisticsPeriodType.RANGE)
+                )));
+
+        verify(periodStatisticsReadModelQueryService).getStatistics(argThat(form ->
+                form.getPeriodType() == StatisticsPeriodType.RANGE
+                        && startDate.equals(form.getStartDate())
+                        && endDate.equals(form.getEndDate())
+        ));
+    }
+
+    @Test
     void statistics_productStatisticsNotReady_keepsPeriodStatisticsInModel() throws Exception {
         LocalDate startDate = LocalDate.of(2026, 8, 1);
         LocalDate endDate = LocalDate.of(2026, 8, 10);
