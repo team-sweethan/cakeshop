@@ -68,6 +68,7 @@ public class MyPageController {
 
         model.addAttribute("profileForm", ProfileUpdateForm.from(member));
         model.addAttribute("withdrawForm", new WithdrawForm());
+        model.addAttribute("hasPasswordLogin", memberService.hasPasswordLogin(email));
 
         return "customer/member/profile-edit";
     }
@@ -90,6 +91,7 @@ public class MyPageController {
             // 읽기 전용 이메일은 요청값을 신뢰하지 않고 인증된 회원 정보로 되돌린다.
             form.setEmail(memberService.getMemberProfile(email).email());
             model.addAttribute("withdrawForm", new WithdrawForm());
+            model.addAttribute("hasPasswordLogin", memberService.hasPasswordLogin(email));
             return "customer/member/profile-edit";
         }
 
@@ -106,6 +108,7 @@ public class MyPageController {
                     MemberErrorCode.INVALID_CURRENT_PASSWORD.message());
             form.setEmail(memberService.getMemberProfile(email).email());
             model.addAttribute("withdrawForm", new WithdrawForm());
+            model.addAttribute("hasPasswordLogin", memberService.hasPasswordLogin(email));
             return "customer/member/profile-edit";
         }
         return "redirect:/mypage?success=update";
@@ -128,6 +131,9 @@ public class MyPageController {
                     "profileForm",
                     ProfileUpdateForm.from(
                             memberService.getMemberProfile(memberDetails.getUsername())));
+            model.addAttribute(
+                    "hasPasswordLogin",
+                    memberService.hasPasswordLogin(memberDetails.getUsername()));
             return "customer/member/profile-edit";
         }
 
@@ -147,6 +153,9 @@ public class MyPageController {
                     "profileForm",
                     ProfileUpdateForm.from(
                             memberService.getMemberProfile(memberDetails.getUsername())));
+            model.addAttribute(
+                    "hasPasswordLogin",
+                    memberService.hasPasswordLogin(memberDetails.getUsername()));
             return "customer/member/profile-edit";
         }
 

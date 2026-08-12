@@ -19,6 +19,7 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.DefaultRedirectStrategy;
 import org.springframework.security.web.RedirectStrategy;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
+import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
@@ -33,6 +34,7 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
     private final SocialLoginService socialLoginService;
     private final MemberAuthenticationSession memberAuthenticationSession;
     private final RedirectStrategy redirectStrategy = new DefaultRedirectStrategy();
+    private final AuthenticationSuccessHandler customerSuccessHandler = successHandler();
 
     @Override
     public void onAuthenticationSuccess(
@@ -51,7 +53,12 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
         switch (result.type()) {
             case LOGIN -> {
                 memberAuthenticationSession.login(request, response, result.member());
-                redirectStrategy.sendRedirect(request, response, "/");
+                customerSuccessHandler.onAuthenticationSuccess(
+                        request,
+                        response,
+                        org.springframework.security.core.context.SecurityContextHolder
+                                .getContext()
+                                .getAuthentication());
             }
             case SIGNUP_REQUIRED -> {
                 memberAuthenticationSession.clear(request, response);
@@ -97,5 +104,12 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private AuthenticationSuccessHandler successHandler() {
+        SavedRequestAwareAuthenticationSuccessHandler handler =
+                new SavedRequestAwareAuthenticationSuccessHandler();
+        handler.setDefaultTargetUrl("/");
+        return handler;
     }
 }
