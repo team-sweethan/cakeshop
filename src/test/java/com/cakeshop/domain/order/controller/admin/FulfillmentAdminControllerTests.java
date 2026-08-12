@@ -17,6 +17,8 @@ import com.cakeshop.domain.order.dto.view.admin.FulfillmentListView;
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.controller.admin.FulfillmentAdminController;
 import com.cakeshop.domain.order.service.admin.FulfillmentService;
+import com.cakeshop.domain.order.service.admin.AdminCustomOrderService;
+import com.cakeshop.domain.payment.service.RefundFacade;
 import com.cakeshop.global.security.MemberDetails;
 import java.time.LocalDate;
 import java.util.List;
@@ -35,13 +37,21 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 class FulfillmentAdminControllerTests {
 
     private FulfillmentService fulfillmentService;
+    private AdminCustomOrderService adminCustomOrderService;
+    private RefundFacade refundFacade;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         fulfillmentService = Mockito.mock(FulfillmentService.class);
+        adminCustomOrderService = Mockito.mock(AdminCustomOrderService.class);
+        refundFacade = Mockito.mock(RefundFacade.class);
         mockMvc = MockMvcBuilders.standaloneSetup(
-                new FulfillmentAdminController(fulfillmentService)
+                new FulfillmentAdminController(
+                        fulfillmentService,
+                        adminCustomOrderService,
+                        refundFacade
+                )
         ).setCustomArgumentResolvers(
                 new AuthenticationPrincipalArgumentResolver()
         ).build();
@@ -128,5 +138,48 @@ class FulfillmentAdminControllerTests {
                 .andExpect(flash().attribute("successMessage", "픽업 완료로 변경했습니다."));
 
         verify(fulfillmentService).markPickedUp(10L, 7L);
+    }
+
+    @Test
+    void startProduction_adminRedirectsWithSuccessMessage() throws Exception {
+        authenticateAdmin();
+
+        mockMvc.perform(post("/admin/fulfillment/10/production/start")
+                        .param("pickupDate", "2026-08-10")
+                        .param("status", "UNDER_REVIEW"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/admin/fulfillment?pickupDate=2026-08-10&status=UNDER_REVIEW"))
+                .andExpect(flash().attribute("successMessage", "제작을 시작했습니다."));
+
+        verify(adminCustomOrderService).startProduction(10L, 7L);
+    }
+
+    @Test
+    void reject_adminRedirectsWithSuccessMessage() throws Exception {
+        authenticateAdmin();
+
+        mockMvc.perform(post("/admin/fulfillment/10/reject")
+                        .param("reason", "제작 일정이 부족합니다.")
+                        .param("pickupDate", "2026-08-10")
+                        .param("status", "UNDER_REVIEW"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(flash().attribute("successMessage", "주문을 반려하고 결제를 환불했습니다."));
+
+        verify(refundFacade).rejectCustomOrder(7L, 10L, "제작 일정이 부족합니다.");
+    }
+
+    private void authenticateAdmin() {
+        MemberDetails admin = new MemberDetails(new MemberAuthenticationView(
+                7L,
+                "admin@cakeshop.local",
+                "dummy",
+                "ADMIN",
+                true
+        ));
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
+                admin,
+                null,
+                admin.getAuthorities()
+        ));
     }
 }

@@ -4,6 +4,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -11,10 +12,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
 import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.coupon.service.CouponOrderQueryService;
+import com.cakeshop.domain.coupon.service.CouponOrderQuoteQueryService;
 import com.cakeshop.domain.order.service.OrderService;
+import com.cakeshop.domain.order.service.customer.CustomerCustomOrderService;
 import com.cakeshop.domain.order.service.customer.OrderCustomerService;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
 import com.cakeshop.domain.payment.service.RefundFacade;
+import com.cakeshop.domain.product.service.ProductQueryService;
 import com.cakeshop.global.security.MemberDetails;
 import com.cakeshop.global.security.SecurityConfig;
 import org.junit.jupiter.api.Test;
@@ -25,7 +29,10 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-@WebMvcTest(OrderController.class)
+@WebMvcTest(
+        controllers = OrderController.class,
+        properties = "app.mockup.public-preview=true"
+)
 @Import(SecurityConfig.class)
 class OrderControllerSecurityTests {
 
@@ -49,6 +56,29 @@ class OrderControllerSecurityTests {
 
     @MockitoBean
     private CouponOrderQueryService couponOrderQueryService;
+
+    @MockitoBean
+    private CouponOrderQuoteQueryService couponOrderQuoteQueryService;
+
+    @MockitoBean
+    private CustomerCustomOrderService customerCustomOrderService;
+
+    @MockitoBean
+    private ProductQueryService productQueryService;
+
+    @Test
+    void checkout_anonymousUser_redirectsToLoginEvenInPublicPreview() throws Exception {
+        mockMvc.perform(get("/orders/checkout"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login"));
+    }
+
+    @Test
+    void customOptions_anonymousUser_redirectsToLoginEvenInPublicPreview() throws Exception {
+        mockMvc.perform(get("/orders/custom/options"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login"));
+    }
 
     @Test
     void cancel_missingCsrf_isForbidden() throws Exception {

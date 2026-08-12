@@ -67,7 +67,7 @@
             <span th:text="${'-' + #numbers.formatInteger(order.discountAmount, 1, 'COMMA') + '원'}">-0원</span></div>
           <div class="data-row"><span class="data-row__label">최종 결제</span>
             <strong th:text="${#numbers.formatInteger(order.finalAmount, 1, 'COMMA') + '원'}">0원</strong></div>
-          <div class="cluster" th:if="${order.paymentPending}">
+          <div class="cluster" th:if="${order.generalPaymentPending}">
             <a class="btn btn--primary" th:href="@{/orders/{id}/payment(id=${order.orderId})}">결제하기</a>
           </div>
           <form class="stack" th:if="${order.cancelRequestAvailable}" method="post"
@@ -76,7 +76,9 @@
             <textarea class="form-control form-control--textarea" id="cancel-reason" name="reason"
                       maxlength="200" required></textarea>
             <button class="btn btn--danger" type="submit">주문 취소</button>
-            <p class="note">일반 상품은 픽업 예정 시각 전까지 전액 취소할 수 있습니다.</p>
+            <p class="note" th:text="${order.customerCancellationGuide()}">
+              일반 상품은 픽업 예정 시각 전까지 전액 취소할 수 있습니다.
+            </p>
           </form>
         </div>
       </section>

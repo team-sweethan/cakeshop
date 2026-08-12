@@ -11,6 +11,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
 import com.cakeshop.domain.order.controller.admin.FulfillmentAdminController;
 import com.cakeshop.domain.order.service.admin.FulfillmentService;
+import com.cakeshop.domain.order.service.admin.AdminCustomOrderService;
+import com.cakeshop.domain.payment.service.RefundFacade;
 import com.cakeshop.global.security.MemberDetails;
 import com.cakeshop.global.security.SecurityConfig;
 import org.junit.jupiter.api.Test;
@@ -31,6 +33,12 @@ class FulfillmentAdminControllerSecurityTests {
 
     @MockitoBean
     private FulfillmentService fulfillmentService;
+
+    @MockitoBean
+    private AdminCustomOrderService adminCustomOrderService;
+
+    @MockitoBean
+    private RefundFacade refundFacade;
 
     @Test
     @WithMockUser(roles = "USER")

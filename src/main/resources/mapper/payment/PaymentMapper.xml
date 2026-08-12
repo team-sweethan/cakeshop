@@ -374,7 +374,7 @@
             canceled_at, created_at, updated_at
         FROM payment_cancellations
         WHERE status = 'REQUESTED'
-          AND request_type IN ('CUSTOMER', 'ADMIN')
+          AND request_type IN ('CUSTOMER', 'ADMIN', 'ADMIN_REJECTION')
           AND requested_at &lt;= DATE_SUB(CURRENT_TIMESTAMP(6), INTERVAL 1 MINUTE)
         ORDER BY requested_at, id
         LIMIT #{limit}

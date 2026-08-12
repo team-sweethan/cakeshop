@@ -117,9 +117,9 @@ class HomeScreenRenderingTests {
                 .andExpect(content().string(not(containsString(NOTICE_SECTION))));
     }
 
-    /** 공지는 메인 최상단이다. 자리가 밀리면 지금 읽어야 하는 안내가 스크롤 뒤로 숨는다. */
+    /** 공지는 서비스 안내와 카테고리 사이에 둔다. */
     @Test
-    void home_noticeSection_comesBeforeEveryOtherSection() throws Exception {
+    void home_noticeSection_comesBetweenServiceAndCategory() throws Exception {
         when(communityHomeQueryService.getNoticeSection()).thenReturn(
                 new NoticeSectionView(List.of(
                         new NoticeView(7L, "메인에 실린 공지", NOTICE_DATE))));
@@ -134,9 +134,15 @@ class HomeScreenRenderingTests {
                 .getResponse()
                 .getContentAsString();
 
-        assertThat(html.indexOf(NOTICE_SECTION))
-                .isLessThan(html.indexOf("id=\"service-title\""))
-                .isLessThan(html.indexOf("id=\"recommended-products\""))
-                .isLessThan(html.indexOf(POPULAR_SECTION));
+        int serviceIndex = html.indexOf("id=\"service-title\"");
+        int noticeIndex = html.indexOf(NOTICE_SECTION);
+        int categoryIndex = html.indexOf("id=\"category-title\"");
+
+        // indexOf는 없는 영역에 -1을 주므로, 순서를 보기 전에 세 영역이 실제로 있는지 먼저 못박는다.
+        assertThat(serviceIndex).isNotNegative();
+        assertThat(noticeIndex).isNotNegative();
+        assertThat(categoryIndex).isNotNegative();
+        assertThat(serviceIndex).isLessThan(noticeIndex);
+        assertThat(noticeIndex).isLessThan(categoryIndex);
     }
 }

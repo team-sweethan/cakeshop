@@ -24,6 +24,9 @@
           <option value="UNDER_REVIEW"
                   th:selected="${fulfillment.selectedStatus != null
                       and fulfillment.selectedStatus.name() == 'UNDER_REVIEW'}">승인 대기</option>
+          <option value="IN_PRODUCTION"
+                  th:selected="${fulfillment.selectedStatus != null
+                      and fulfillment.selectedStatus.name() == 'IN_PRODUCTION'}">제작 중</option>
           <option value="READY_FOR_PICKUP"
                   th:selected="${fulfillment.selectedStatus != null
                       and fulfillment.selectedStatus.name() == 'READY_FOR_PICKUP'}">픽업 준비</option>
@@ -80,6 +83,41 @@
             <div class="fulfillment-order__actions">
               <a class="btn"
                  th:href="@{/admin/orders/{id}(id=${order.orderId})}">주문 상세</a>
+              <form th:if="${order.productionStartable}" method="post"
+                    th:action="@{/admin/fulfillment/{id}/production/start(id=${order.orderId})}">
+                <input type="hidden" name="pickupDate" th:value="${fulfillment.pickupDate}">
+                <input type="hidden" name="status"
+                       th:if="${fulfillment.selectedStatus != null}"
+                       th:value="${fulfillment.selectedStatus}">
+                <button class="btn btn--primary" type="submit"
+                        data-confirm="제작을 시작하면 고객 취소가 불가능합니다. 계속하시겠습니까?">
+                  제작 승인·시작
+                </button>
+              </form>
+              <form class="stack" th:if="${order.rejectionAvailable}" method="post"
+                    th:action="@{/admin/fulfillment/{id}/reject(id=${order.orderId})}">
+                <input type="hidden" name="pickupDate" th:value="${fulfillment.pickupDate}">
+                <input type="hidden" name="status"
+                       th:if="${fulfillment.selectedStatus != null}"
+                       th:value="${fulfillment.selectedStatus}">
+                <textarea class="form-control form-control--textarea" name="reason"
+                          maxlength="200" required placeholder="반려 사유"></textarea>
+                <button class="btn btn--danger" type="submit"
+                        data-confirm="주문을 반려하고 결제를 환불하시겠습니까?">
+                  반려·환불
+                </button>
+              </form>
+              <form th:if="${order.productionCompletable}" method="post"
+                    th:action="@{/admin/fulfillment/{id}/production/complete(id=${order.orderId})}">
+                <input type="hidden" name="pickupDate" th:value="${fulfillment.pickupDate}">
+                <input type="hidden" name="status"
+                       th:if="${fulfillment.selectedStatus != null}"
+                       th:value="${fulfillment.selectedStatus}">
+                <button class="btn btn--primary" type="submit"
+                        data-confirm="제작을 완료하고 픽업 대기로 변경하시겠습니까?">
+                  제작 완료
+                </button>
+              </form>
               <form th:if="${order.pickupCompletable}" method="post"
                     th:action="@{/admin/fulfillment/{id}/pickup(id=${order.orderId})}">
                 <input type="hidden" name="pickupDate" th:value="${fulfillment.pickupDate}">

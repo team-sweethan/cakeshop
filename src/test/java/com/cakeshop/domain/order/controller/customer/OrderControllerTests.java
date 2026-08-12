@@ -4,12 +4,16 @@ import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
 import com.cakeshop.domain.member.dto.view.MemberProfileView;
 import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.coupon.service.CouponOrderQueryService;
+import com.cakeshop.domain.coupon.service.CouponOrderQuoteQueryService;
+import com.cakeshop.domain.order.dto.view.customer.CustomOrderCheckoutView;
 import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
+import com.cakeshop.domain.order.service.customer.CustomerCustomOrderService;
 import com.cakeshop.domain.order.controller.customer.OrderController;
 import com.cakeshop.domain.order.service.customer.OrderCustomerService;
 import com.cakeshop.domain.order.service.OrderService;
 import com.cakeshop.domain.payment.service.RefundFacade;
+import com.cakeshop.domain.product.service.ProductQueryService;
 import com.cakeshop.global.security.MemberDetails;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -65,6 +69,15 @@ class OrderControllerTests {
     @Mock
     private CouponOrderQueryService couponOrderQueryService;
 
+    @Mock
+    private CouponOrderQuoteQueryService couponOrderQuoteQueryService;
+
+    @Mock
+    private CustomerCustomOrderService customerCustomOrderService;
+
+    @Mock
+    private ProductQueryService productQueryService;
+
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -76,7 +89,10 @@ class OrderControllerTests {
                                 orderQueryService,
                                 memberService,
                                 refundFacade,
-                                couponOrderQueryService
+                                couponOrderQueryService,
+                                couponOrderQuoteQueryService,
+                                customerCustomOrderService,
+                                productQueryService
                         )
                 )
                 .setCustomArgumentResolvers(
@@ -216,16 +232,88 @@ class OrderControllerTests {
     }
 
     @Test
-    void customOptions_returnsExistingMockupPage() throws Exception {
-        mockMvc.perform(get("/orders/custom/options"))
+    void customOptions_withProductId_rendersOptionSelectionPage() throws Exception {
+        when(productQueryService.getSalesInfo(6L)).thenReturn(new com.cakeshop.domain.product.dto.view.ProductSalesInfo(
+                6L, "레터링 케이크", com.cakeshop.domain.product.entity.ProductType.CUSTOM,
+                2, true, BigDecimal.valueOf(55_000), null
+        ));
+        when(orderCheckoutService.getCustomOptionGroups(6L)).thenReturn(List.of());
+
+        mockMvc.perform(get("/orders/custom/options").param("productId", "6"))
                 .andExpect(status().isOk())
-                .andExpect(view().name("customer/order/custom-option"));
+                .andExpect(view().name("customer/order/custom-option"))
+                .andExpect(model().attributeExists("customProduct", "optionGroups"));
     }
 
     @Test
-    void customRequest_returnsExistingMockupPage() throws Exception {
-        mockMvc.perform(get("/orders/custom/request"))
+    void customRequest_validSelection_rendersActualOrderForm() throws Exception {
+        CustomOrderCheckoutView checkout = mock(CustomOrderCheckoutView.class);
+        when(checkout.originalAmount()).thenReturn(BigDecimal.valueOf(60_000));
+        when(memberService.getMemberProfile("member@example.com"))
+                .thenReturn(new MemberProfileView(
+                        "member@example.com", "홍길동", "케이크러버", "010-1111-2222",
+                        LocalDate.of(2000, 1, 1)
+                ));
+        when(orderCheckoutService.getCustomCheckout(6L, List.of(101L))).thenReturn(checkout);
+
+        mockMvc.perform(get("/orders/custom/request")
+                        .param("productId", "6")
+                        .param("optionIds", "101"))
                 .andExpect(status().isOk())
-                .andExpect(view().name("customer/order/custom-request"));
+                .andExpect(view().name("customer/order/custom-request"))
+                .andExpect(model().attribute("checkout", checkout));
+    }
+
+    @Test
+    void createCustomOrder_validRequest_redirectsWithCreatedOrderId() throws Exception {
+        String requestKey = UUID.randomUUID().toString();
+        when(customerCustomOrderService.createCustomOrder(eq(10L), any())).thenReturn(43L);
+
+        mockMvc.perform(post("/orders/custom")
+                        .param("requestKey", requestKey)
+                        .param("productId", "6")
+                        .param("optionIds", "101")
+                        .param("displayedOriginalAmount", "55000")
+                        .param("ordererName", "홍길동")
+                        .param("ordererPhone", "010-1111-2222")
+                        .param("pickupName", "홍길동")
+                        .param("pickupPhone", "010-1111-2222")
+                        .param("pickupAt", "2099-08-05T14:00")
+                        .param("lettering", "생일 축하해"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/orders/43"));
+
+        verify(customerCustomOrderService).createCustomOrder(eq(10L), argThat(form ->
+                form.getProductId().equals(6L)
+                        && form.getOptionIds().equals(List.of(101L))
+                        && BigDecimal.valueOf(55_000).compareTo(form.getDisplayedOriginalAmount()) == 0
+                        && "생일 축하해".equals(form.getLettering())
+        ));
+    }
+
+    @Test
+    void createCustomOrder_changedDisplayedAmount_rendersUpdatedOrderForm() throws Exception {
+        CustomOrderCheckoutView checkout = mock(CustomOrderCheckoutView.class);
+        when(checkout.originalAmount()).thenReturn(BigDecimal.valueOf(60_000));
+        when(orderCheckoutService.getCustomCheckout(6L, List.of(101L))).thenReturn(checkout);
+        when(customerCustomOrderService.createCustomOrder(eq(10L), any()))
+                .thenThrow(new com.cakeshop.global.error.BusinessException(
+                        com.cakeshop.domain.order.error.OrderErrorCode.ORDER_AMOUNT_CHANGED
+                ));
+
+        mockMvc.perform(post("/orders/custom")
+                        .param("requestKey", UUID.randomUUID().toString())
+                        .param("productId", "6")
+                        .param("optionIds", "101")
+                        .param("displayedOriginalAmount", "55000")
+                        .param("ordererName", "홍길동")
+                        .param("ordererPhone", "010-1111-2222")
+                        .param("pickupName", "홍길동")
+                        .param("pickupPhone", "010-1111-2222")
+                        .param("pickupAt", "2099-08-05T14:00"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("customer/order/custom-request"))
+                .andExpect(model().attribute("checkout", checkout))
+                .andExpect(model().attributeHasErrors("orderForm"));
     }
 }
