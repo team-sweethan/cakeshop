@@ -204,7 +204,7 @@ public class OrderController {
         model.addAttribute("checkout", checkout);
         model.addAttribute(
                 "availableCoupons",
-                couponOrderQueryService.getAvailableCouponsForMember(
+                couponOrderQueryService.getAvailableCouponsWithPositiveFinalAmountForMember(
                         memberId,
                         checkout.totalAmount()
                 )

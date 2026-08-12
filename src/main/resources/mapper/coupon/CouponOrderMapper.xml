@@ -8,6 +8,7 @@
                c.name,
                c.discount_type AS discountType,
                c.discount_value AS discountValue,
+               c.minimum_order_amount AS minimumOrderAmount,
                c.maximum_discount_amount AS maximumDiscountAmount
         FROM member_coupons mc INNER JOIN coupons c ON c.id = mc.coupon_id
         WHERE mc.member_id = #{memberId} AND mc.status = 'AVAILABLE'

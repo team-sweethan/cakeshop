@@ -258,7 +258,7 @@ class OrderControllerTests {
                 .andExpect(view().name("customer/order/custom-request"))
                 .andExpect(model().attribute("checkout", checkout));
 
-        verify(couponOrderQueryService).getAvailableCouponsForMember(
+        verify(couponOrderQueryService).getAvailableCouponsWithPositiveFinalAmountForMember(
                 10L,
                 BigDecimal.valueOf(60_000)
         );
