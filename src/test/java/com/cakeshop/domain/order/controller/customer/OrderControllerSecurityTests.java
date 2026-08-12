@@ -78,6 +78,13 @@ class OrderControllerSecurityTests {
     }
 
     @Test
+    void cartCheckout_anonymousUser_redirectsToLoginEvenInPublicPreview() throws Exception {
+        mockMvc.perform(get("/orders/checkout/cart").param("itemIds", "1"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login"));
+    }
+
+    @Test
     void customOptions_anonymousUser_redirectsToLoginEvenInPublicPreview() throws Exception {
         mockMvc.perform(get("/orders/custom/options"))
                 .andExpect(status().is3xxRedirection())
