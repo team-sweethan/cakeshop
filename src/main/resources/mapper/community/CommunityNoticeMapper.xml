@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+******************************
+작성자 : HyunGyu-Cho
+담당자 : 현규
+작성일 : 2026-08-12
+기능 : 커뮤니티 데이터 접근
+설명 : CommunityNoticeMapper 기능에 필요한 조회와 변경을 수행한다.
+******************************
+
+고객 조회와 관리자 조회가 한 파일에 있다. 조각 14b 가 더할 <sql id="visibleNotice"/> 를 고객
+조회들이 <include> 로만 쓰게 하기 위해서다(specs/community-notice.md E4). 관리자 조회는 그
+조각을 쓰지 않는 쪽이라 selectAdmin* 으로 이름을 뗐다 — 모든 상태, 모든 기간이 나온다.
+-->
+<mapper namespace="com.cakeshop.domain.community.mapper.CommunityNoticeMapper">
+
+    <!--
+    고객에게 보이는 공지의 조건. **모든 고객 조회가 이 조각을 <include> 로만 쓴다.**
+
+    DOMAIN.md 4.1 은 "노출 기준은 status 하나"인데 공지는 노출 기간이 있어 조건이 셋이다.
+    4.1 이 하나로 묶은 목적(새 조회를 추가할 때 하나를 빠뜨린다)을 조각 하나로 대신 지킨다.
+    복사해서 쓰면 그 자리가 그대로 열리고, **빠뜨려도 화면은 멀쩡해 보인다.**
+
+    now 는 SQL 의 NOW() 가 아니라 Service 가 Clock 으로 만들어 넘긴 값이다. NOW() 를 박으면
+    테스트가 "시작 정각"과 "종료 정각"을 고정할 수 없어 경계 검사 자체가 불가능해진다.
+    -->
+    <sql id="visibleNotice">
+        n.status = 'PUBLISHED'
+        AND (n.starts_at IS NULL OR n.starts_at &lt;= #{now})
+        AND (n.ends_at   IS NULL OR #{now} &lt; n.ends_at)
+    </sql>
+
+    <!--
+    고객 정렬은 등록 시각이 아니라 COALESCE(starts_at, created_at) 이다. 등록 시각으로 하면
+    오늘 등록하고 다음 주로 예약한 공지가 뜨는 날 목록 한가운데에 나타난다(spec E4).
+    화면이 보여 주는 날짜도 같은 값이어야 목록이 정렬돼 보인다.
+    -->
+    <sql id="visibleNoticeOrder">
+        ORDER BY COALESCE(n.starts_at, n.created_at) DESC, n.id DESC
+    </sql>
+
+    <select id="selectVisibleNotices"
+            resultType="com.cakeshop.domain.community.dto.query.NoticeListRow">
+
+        SELECT
+        n.id,
+        n.title,
+        n.starts_at,
+        n.created_at
+
+        FROM community_notices n
+
+        WHERE <include refid="visibleNotice"/>
+
+        <include refid="visibleNoticeOrder"/>
+
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="countVisibleNotices" resultType="long">
+
+        SELECT COUNT(*)
+        FROM community_notices n
+        WHERE <include refid="visibleNotice"/>
+    </select>
+
+    <select id="selectVisibleNoticeById"
+            resultType="com.cakeshop.domain.community.dto.query.NoticeDetailRow">
+
+        SELECT
+        n.id,
+        n.title,
+        n.content,
+        n.starts_at,
+        n.created_at
+
+        FROM community_notices n
+
+        WHERE n.id = #{noticeId}
+        AND <include refid="visibleNotice"/>
+    </select>
+
+    <select id="selectAdminNotices"
+            resultType="com.cakeshop.domain.community.dto.query.AdminNoticeListRow">
+
+        SELECT
+        n.id,
+        n.title,
+        n.status,
+        n.starts_at,
+        n.ends_at,
+        n.created_at
+
+        FROM community_notices n
+
+        ORDER BY n.created_at DESC, n.id DESC
+
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="countAdminNotices" resultType="long">
+
+        SELECT COUNT(*)
+        FROM community_notices n
+    </select>
+
+    <select id="selectAdminNoticeById"
+            resultType="com.cakeshop.domain.community.dto.query.AdminNoticeDetailRow">
+
+        SELECT
+        n.id,
+        n.title,
+        n.content,
+        n.status,
+        n.starts_at,
+        n.ends_at,
+        n.created_at,
+        n.updated_at
+
+        FROM community_notices n
+
+        WHERE n.id = #{noticeId}
+    </select>
+
+    <select id="lockNotice"
+            resultType="com.cakeshop.domain.community.dto.query.NoticeLockRow">
+
+        SELECT
+        n.id,
+        n.status
+
+        FROM community_notices n
+
+        WHERE n.id = #{noticeId}
+
+        FOR UPDATE
+    </select>
+
+    <insert id="insertNotice" useGeneratedKeys="true" keyProperty="id">
+
+        INSERT INTO community_notices (
+        title,
+        content,
+        status,
+        starts_at,
+        ends_at,
+        created_by
+        ) VALUES (
+        #{title},
+        #{content},
+        'PUBLISHED',
+        #{startsAt},
+        #{endsAt},
+        #{createdBy}
+        )
+    </insert>
+
+    <update id="updateNotice">
+
+        UPDATE community_notices n
+        SET n.title = #{title},
+        n.content = #{content},
+        n.starts_at = #{startsAt},
+        n.ends_at = #{endsAt}
+        WHERE n.id = #{noticeId}
+        AND n.status = 'PUBLISHED'
+    </update>
+
+    <update id="deleteNotice">
+
+        UPDATE community_notices n
+        SET n.status = 'DELETED'
+        WHERE n.id = #{noticeId}
+        AND n.status = 'PUBLISHED'
+    </update>
+</mapper>

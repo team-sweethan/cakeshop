@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 
 import com.cakeshop.domain.community.dto.view.CommentSectionView;
 import com.cakeshop.domain.community.entity.CommentStatus;
+import com.cakeshop.domain.community.entity.NoticeStatus;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
 import com.cakeshop.global.common.paging.PageRequest;
@@ -353,6 +354,229 @@ class CommunityScreenRenderingTests {
 
         // 거절된 기각 요청은 신고 상태를 바꾸지 않는다.
         assertThat(reportStatusOf(postId)).isEqualTo("PENDING");
+    }
+
+    /** 관리자 공지 목록에 네 가지 노출 상태를 모두 렌더링한다. */
+    @Test
+    void communityAdminNoticeList_rendersEveryDisplayStatus() throws Exception {
+        LocalDateTime now = LocalDateTime.now();
+
+        insertNotice("지금 보이는 공지", NoticeStatus.PUBLISHED, null, null);
+        insertNotice("예정된 공지", NoticeStatus.PUBLISHED, now.plusDays(1), now.plusDays(2));
+        insertNotice("끝난 공지", NoticeStatus.PUBLISHED, now.minusDays(2), now.minusDays(1));
+        insertNotice("지운 공지", NoticeStatus.DELETED, null, null);
+
+        mockMvc.perform(get("/admin/community/notices").with(authentication(admin())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("지금 보이는 공지")))
+                .andExpect(content().string(containsString("노출 중")))
+                .andExpect(content().string(containsString("예정")))
+                .andExpect(content().string(containsString("종료")))
+                .andExpect(content().string(containsString("삭제됨")))
+                .andExpect(content().string(containsString("무기한")));
+    }
+
+    /** 목록 상단에 공지 영역을 인기글보다 위에 그리고, 전체보기 링크를 함께 둔다. */
+    @Test
+    void communityList_withVisibleNotice_rendersNoticeSectionAbovePopular() throws Exception {
+        insertNotice("상단에 뜨는 공지", NoticeStatus.PUBLISHED, null, null);
+
+        long postId = insertPost(memberId, "이번 주 인기 케이크", "본문", PostStatus.PUBLISHED);
+        insertRanking(1, postId);
+        insertBatchRun(1);
+
+        String html = mockMvc.perform(get("/community"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("상단에 뜨는 공지")))
+                .andExpect(content().string(containsString("/community/notices")))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(html.indexOf("공지사항")).isLessThan(html.indexOf("인기글"));
+    }
+
+    /** 카테고리를 고르면 공지 영역이 통째로 사라진다. */
+    @Test
+    void communityList_withCategoryFilter_hidesNoticeSection() throws Exception {
+        insertNotice("필터에서는 숨는 공지", NoticeStatus.PUBLISHED, null, null);
+
+        mockMvc.perform(get("/community").param("categoryId", String.valueOf(categoryId)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("필터에서는 숨는 공지"))))
+                .andExpect(content().string(not(containsString("공지사항"))));
+    }
+
+    /** 노출 중인 공지가 없으면 영역이 통째로 사라진다. */
+    @Test
+    void communityList_withoutVisibleNotice_hidesNoticeSection() throws Exception {
+        insertNotice("끝난 공지", NoticeStatus.PUBLISHED, null, LocalDateTime.now().minusDays(1));
+
+        mockMvc.perform(get("/community"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("끝난 공지"))))
+                .andExpect(content().string(not(containsString("공지사항"))));
+    }
+
+    /** 전체보기는 비로그인도 열 수 있고, 노출 중인 공지만 그린다. */
+    @Test
+    void communityNoticeList_anonymous_rendersVisibleNoticesOnly() throws Exception {
+        LocalDateTime now = LocalDateTime.now();
+
+        insertNotice("보이는 공지", NoticeStatus.PUBLISHED, null, null);
+        insertNotice("예정된 공지", NoticeStatus.PUBLISHED, now.plusDays(1), now.plusDays(2));
+        insertNotice("끝난 공지", NoticeStatus.PUBLISHED, now.minusDays(2), now.minusDays(1));
+        insertNotice("지운 공지", NoticeStatus.DELETED, null, null);
+
+        mockMvc.perform(get("/community/notices"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("보이는 공지")))
+                .andExpect(content().string(not(containsString("예정된 공지"))))
+                .andExpect(content().string(not(containsString("끝난 공지"))))
+                .andExpect(content().string(not(containsString("지운 공지"))));
+    }
+
+    /** 공지 상세에는 댓글·좋아요·신고 경로가 없다. */
+    @Test
+    void communityNoticeDetail_anonymous_rendersContentWithoutPostActions() throws Exception {
+        long noticeId = insertNotice("읽을 수 있는 공지", NoticeStatus.PUBLISHED, null, null);
+
+        mockMvc.perform(get("/community/notices/" + noticeId))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("읽을 수 있는 공지")))
+                .andExpect(content().string(containsString("본문")))
+                .andExpect(content().string(not(containsString("/likes"))))
+                .andExpect(content().string(not(containsString("/reports"))))
+                .andExpect(content().string(not(containsString("/comments"))));
+    }
+
+    /** 공지 본문의 HTML도 이스케이프한다. */
+    @Test
+    void communityNoticeDetail_htmlInContent_isEscaped() throws Exception {
+        String attack = "<script>alert('notice')</script>";
+        long noticeId = insertNotice("스크립트 공지", NoticeStatus.PUBLISHED, null, null);
+        jdbcTemplate.update(
+                "UPDATE community_notices SET content = ? WHERE id = ?", attack, noticeId);
+
+        mockMvc.perform(get("/community/notices/" + noticeId))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString(attack))))
+                .andExpect(content().string(containsString("&lt;script&gt;")));
+    }
+
+    /** 노출 기간 밖과 삭제된 공지는 관리자에게도 고객 경로에서 404다. */
+    @Test
+    void communityNoticeDetail_outsidePeriodOrDeleted_isNotFoundEvenForAdmin() throws Exception {
+        LocalDateTime now = LocalDateTime.now();
+
+        long scheduled = insertNotice("예정", NoticeStatus.PUBLISHED, now.plusDays(1), null);
+        long ended = insertNotice("종료", NoticeStatus.PUBLISHED, null, now.minusDays(1));
+        long deleted = insertNotice("삭제됨", NoticeStatus.DELETED, null, null);
+
+        for (long noticeId : new long[]{scheduled, ended, deleted}) {
+            mockMvc.perform(get("/community/notices/" + noticeId))
+                    .andExpect(status().isNotFound());
+
+            mockMvc.perform(get("/community/notices/" + noticeId)
+                            .with(authentication(admin())))
+                    .andExpect(status().isNotFound());
+        }
+    }
+
+    /** 수정 화면에 저장된 노출 기간을 채운다. */
+    @Test
+    void communityAdminNoticeEditForm_rendersStoredPeriod() throws Exception {
+        long noticeId = insertNotice(
+                "고칠 공지",
+                NoticeStatus.PUBLISHED,
+                LocalDateTime.of(2026, 3, 2, 9, 0),
+                LocalDateTime.of(2026, 3, 9, 9, 0));
+
+        mockMvc.perform(get("/admin/community/notices/" + noticeId + "/edit")
+                        .with(authentication(admin())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("고칠 공지")))
+                .andExpect(content().string(containsString("2026-03-02T09:00")))
+                .andExpect(content().string(containsString("2026-03-09T09:00")));
+    }
+
+    /** 삭제된 공지는 수정 폼 자체가 열리지 않는다. 목록에 링크가 없어도 주소로는 닿는다. */
+    @Test
+    void communityAdminNoticeEditForm_deletedNotice_isRejectedBeforeRendering() throws Exception {
+        long noticeId = insertNotice("지운 공지", NoticeStatus.DELETED, null, null);
+
+        mockMvc.perform(get("/admin/community/notices/" + noticeId + "/edit")
+                        .with(authentication(admin())))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(not(containsString("지운 공지"))));
+    }
+
+    /** 뒤집힌 노출 기간은 폼 오류로 되돌아오고 아무것도 저장하지 않는다. */
+    @Test
+    void communityAdminNoticeCreate_invertedPeriod_rendersFormErrorAndWritesNothing()
+            throws Exception {
+        mockMvc.perform(post("/admin/community/notices/new")
+                        .param("title", "뒤집힌 기간 공지")
+                        .param("content", "본문")
+                        .param("startsAt", "2026-03-09T09:00")
+                        .param("endsAt", "2026-03-02T09:00")
+                        .with(csrf())
+                        .with(authentication(admin())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("종료일은 시작일보다 뒤여야 합니다.")));
+
+        assertThat(noticeCountOf("뒤집힌 기간 공지")).isZero();
+    }
+
+    /** 일반 회원의 공지 등록 요청을 Security에서 거절한다. */
+    @Test
+    void communityAdminNoticeCreate_normalMember_isRejectedAndWritesNothing() throws Exception {
+        mockMvc.perform(post("/admin/community/notices/new")
+                        .param("title", "몰래 올린 공지")
+                        .param("content", "본문")
+                        .with(csrf())
+                        .with(authentication(authorOf(memberId))))
+                .andExpect(status().isForbidden());
+
+        assertThat(noticeCountOf("몰래 올린 공지")).isZero();
+    }
+
+    /** 일반 회원의 공지 삭제 요청도 거절하고 상태를 남긴다. */
+    @Test
+    void communityAdminNoticeDelete_normalMember_isRejectedAndLeavesStatus() throws Exception {
+        long noticeId = insertNotice("지켜져야 하는 공지", NoticeStatus.PUBLISHED, null, null);
+
+        mockMvc.perform(post("/admin/community/notices/" + noticeId + "/delete")
+                        .with(csrf())
+                        .with(authentication(authorOf(memberId))))
+                .andExpect(status().isForbidden());
+
+        assertThat(noticeStatusOf(noticeId)).isEqualTo(NoticeStatus.PUBLISHED.name());
+    }
+
+    private long insertNotice(
+            String title, NoticeStatus status, LocalDateTime startsAt, LocalDateTime endsAt) {
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO community_notices (
+                    title, content, status, starts_at, ends_at, created_by
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                title, "본문", status.name(), startsAt, endsAt, memberId);
+
+        return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+    }
+
+    private String noticeStatusOf(long noticeId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT status FROM community_notices WHERE id = ?", String.class, noticeId);
+    }
+
+    private Integer noticeCountOf(String title) {
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM community_notices WHERE title = ?", Integer.class, title);
     }
 
     private void insertRanking(int ranking, long postId) {

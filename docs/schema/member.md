@@ -1,7 +1,7 @@
 # 회원 스키마
 
 - 담당: 수민
-- 테이블: `members`, `social_accounts`, `member_status_histories`
+- 테이블: `members`, `social_accounts`, `member_status_histories`, `email_verifications`
 - 정본: Flyway migration 적용 결과
 
 ## `members`
@@ -66,6 +66,29 @@
 - CHECK: `before_status`, `after_status` 각각 `IN ('ACTIVE', 'SUSPENDED')`
 - INDEX: `idx_member_status_histories_member_processed` (`member_id`, `processed_at DESC`, `id DESC`)
 
+## `email_verifications`
+
+회원가입과 비밀번호 재설정에 사용하는 이메일 인증 요청과 처리 상태를 저장한다. 인증번호 원문은 저장하지 않고 BCrypt 해시만 저장한다.
+
+| 컬럼 | 타입 | 키 | Null | 기본값 | 설명 |
+|---|---|---|---|---|---|
+| `id` | BIGINT | PK | X | AUTO_INCREMENT | 인증 요청 식별자 |
+| `email` | VARCHAR(255) | INDEX | X | 없음 | 인증 대상 이메일 |
+| `purpose` | VARCHAR(30) | INDEX | X | 없음 | 인증 목적 |
+| `code_hash` | VARCHAR(100) |  | X | 없음 | 인증번호 BCrypt 해시 |
+| `expires_at` | DATETIME(6) | INDEX | X | 없음 | 인증번호 만료 시각 |
+| `attempt_count` | TINYINT UNSIGNED |  | X | `0` | 실패한 확인 횟수 |
+| `verified_at` | DATETIME(6) |  | O | NULL | 인증 완료 시각 |
+| `consumed_at` | DATETIME(6) |  | O | NULL | 회원가입 등에 사용된 시각 |
+| `created_at` | DATETIME(6) |  | X | `CURRENT_TIMESTAMP(6)` | 생성 시각 |
+| `updated_at` | DATETIME(6) |  | X | `CURRENT_TIMESTAMP(6)` | 수정 시각, 수정 시 자동 갱신 |
+
+- CHECK: `purpose IN ('SIGNUP', 'PASSWORD_RESET')`
+- CHECK: `attempt_count <= 5`
+- INDEX: `idx_email_verifications_lookup` (`email`, `purpose`, `created_at DESC`, `id DESC`)
+- INDEX: `idx_email_verifications_expires_at` (`expires_at`)
+- 회원가입 전 요청도 저장하므로 `members` 외래 키를 두지 않는다.
+
 ## 관련 migration
 
 - `V0__initial_schema.sql`
@@ -74,3 +97,4 @@
 - `V20260729_181617__add_member_birth_date.sql`
 - `V20260803_091727__add_member_status_histories.sql`
 - `V20260803_112954__backfill_withdrawn_member_status_histories.sql`
+- `V20260811_174339__add_email_verifications.sql`

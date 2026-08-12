@@ -4,6 +4,7 @@ import com.cakeshop.domain.member.dto.form.EmailRecoveryForm;
 import com.cakeshop.domain.member.dto.form.SignupForm;
 import com.cakeshop.domain.member.dto.view.EmailAvailabilityView;
 import com.cakeshop.domain.member.dto.view.EmailRecoveryResult;
+import com.cakeshop.domain.member.dto.view.SignupEmailVerification;
 import com.cakeshop.domain.member.error.MemberErrorCode;
 import com.cakeshop.domain.member.service.MemberService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -122,8 +123,11 @@ public class AuthController {
     @PostMapping("/join")
     public String join(@Valid @ModelAttribute("signupForm") SignupForm form,
                        BindingResult bindingResult,
+                       HttpSession session,
+                       Model model,
                        RedirectAttributes redirectAttributes) {
         if (bindingResult.hasErrors()) {
+            restoreSignupEmailVerification(form, session, model);
             return "customer/member/signup";
         }
 
@@ -135,7 +139,16 @@ public class AuthController {
             return "customer/member/signup";
         }
 
-        memberService.join(form);
+        SignupEmailVerification verification = (SignupEmailVerification) session.getAttribute(
+                EmailVerificationController.SIGNUP_VERIFIED_EMAIL_SESSION_KEY);
+        if (!memberService.join(form, verification)) {
+            bindingResult.rejectValue(
+                    "email",
+                    MemberErrorCode.EMAIL_VERIFICATION_REQUIRED.code(),
+                    MemberErrorCode.EMAIL_VERIFICATION_REQUIRED.message());
+            return "customer/member/signup";
+        }
+        session.removeAttribute(EmailVerificationController.SIGNUP_VERIFIED_EMAIL_SESSION_KEY);
         redirectAttributes.addFlashAttribute("successMessage", "회원가입이 완료되었습니다!");
         return "redirect:/login";
     }
@@ -160,5 +173,18 @@ public class AuthController {
                 available
                         ? "사용 가능한 이메일입니다."
                         : "이미 사용 중인 이메일입니다.");
+    }
+
+    private void restoreSignupEmailVerification(
+            SignupForm form,
+            HttpSession session,
+            Model model) {
+        SignupEmailVerification verification = (SignupEmailVerification) session.getAttribute(
+                EmailVerificationController.SIGNUP_VERIFIED_EMAIL_SESSION_KEY);
+        if (form.getEmail() != null
+                && verification != null
+                && form.getEmail().trim().equalsIgnoreCase(verification.email())) {
+            model.addAttribute("signupEmailVerified", true);
+        }
     }
 }

@@ -86,14 +86,20 @@ public class SecurityConfig {
                 auth.requestMatchers(passwordRecoveryRequest).denyAll();
                 auth.requestMatchers(
                         "/", "/login", "/signup", "/join", "/emailCheck", "/find-email",
-                        "/find-email/login", "/api/notifications/unread-count", "/api/notifications/test-sms",
+                        "/find-email/login", "/email-verifications/signup/**",
+                        "/api/notifications/unread-count", "/api/notifications/test-sms",
                         "/products/**", "/screens", "/favicon.ico",
                         "/css/**", "/js/**", "/webjars/**", "/images/**", "/uploads/**", "/error")
                         .permitAll();
                 auth.requestMatchers("/admin/login").permitAll();
                 // 로드밸런서/헬스체크가 인증 없이 호출할 수 있도록 허용 (그 외 actuator 엔드포인트는 미노출)
                 auth.requestMatchers("/actuator/health", "/actuator/health/**").permitAll();
-                auth.requestMatchers(HttpMethod.GET, "/community", "/community/{id:\\d+}").permitAll();
+                // 공지는 비로그인도 읽어야 하는 안내다. /community/{id:\d+}가 숫자만 받으므로
+                // "notices"는 그 규칙에 걸리지 않아 여기에 따로 적어야 한다.
+                auth.requestMatchers(HttpMethod.GET,
+                                "/community", "/community/{id:\\d+}",
+                                "/community/notices", "/community/notices/{id:\\d+}")
+                        .permitAll();
                 auth.requestMatchers(HttpMethod.POST, "/webhooks/toss").permitAll();
 
                 if (publicPreview) {

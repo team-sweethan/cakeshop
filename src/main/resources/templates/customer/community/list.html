@@ -31,6 +31,23 @@
          th:href="@{/community/new}">글쓰기</a>
     </div>
 
+    <section class="section" th:if="${!noticeSection.isEmpty()}">
+      <div class="cluster cluster--between">
+        <h2>공지사항</h2>
+        <a class="btn" th:href="@{/community/notices}">전체보기</a>
+      </div>
+
+      <div class="stack">
+        <a class="panel cluster cluster--between"
+           th:each="notice : ${noticeSection.notices}"
+           th:href="@{/community/notices/{noticeId}(noticeId=${notice.id})}">
+          <strong th:text="${notice.title}">제목</strong>
+          <span class="text-muted"
+                th:text="${#temporals.format(notice.displayedAt, 'yyyy.MM.dd')}">2026.01.01</span>
+        </a>
+      </div>
+    </section>
+
     <section class="section" th:if="${!popularSection.isEmpty()}">
       <div class="cluster">
         <h2>인기글</h2>

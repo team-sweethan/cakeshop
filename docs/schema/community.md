@@ -2,7 +2,7 @@
 
 - 담당: 현규
 - 테이블: `post_categories`, `posts`, `comments`, `post_likes`, `post_images`, `post_reports`, `post_views`,
-  `daily_popular_posts`, `popular_post_batch_runs`
+  `daily_popular_posts`, `popular_post_batch_runs`, `community_notices`
 - 정본: Flyway migration 적용 결과
 
 ## `post_categories`
@@ -154,6 +154,29 @@
 | `post_count` | INT |  | X | 없음 | 산정된 게시글 수 |
 | `executed_at` | DATETIME(6) |  | X | `CURRENT_TIMESTAMP(6)` | 실행 시각 |
 
+## `community_notices`
+
+관리자 공지사항을 저장한다. **게시글과 별도 표다** — 댓글·좋아요·신고·조회수가 구조적으로
+불가능해야 하고, 인기글 집계에서도 빠져야 하기 때문이다(`docs/community/specs/community-notice.md` E4).
+
+| 컬럼 | 타입 | 키 | Null | 기본값 | 의미 |
+|---|---|---|---|---|---|
+| `id` | BIGINT | PK | X | AUTO_INCREMENT | 공지 식별자 |
+| `title` | VARCHAR(200) |  | X | 없음 | 제목 (화면 허용은 100자) |
+| `content` | TEXT |  | X | 없음 | 본문. 순수 텍스트 |
+| `status` | VARCHAR(20) |  | X | `'PUBLISHED'` | 공지 상태 |
+| `starts_at` | DATETIME(6) |  | O | 없음 | 노출 시작 시각. NULL이면 즉시 노출 |
+| `ends_at` | DATETIME(6) |  | O | 없음 | 노출 종료 시각. NULL이면 무기한 |
+| `created_by` | BIGINT | FK | X | 없음 | 등록한 관리자. 감사용이며 화면에 쓰지 않는다 |
+| `created_at` | DATETIME(6) |  | X | `CURRENT_TIMESTAMP(6)` | 생성 시각 |
+| `updated_at` | DATETIME(6) |  | X | `CURRENT_TIMESTAMP(6)` | 수정 시각 (`ON UPDATE`) |
+
+- FK: `fk_community_notices_member` — `created_by` → `members.id`
+- CHECK: `chk_community_notices_status` — `status`는 `PUBLISHED`, `DELETED` 둘 중 하나다.
+- CHECK: `chk_community_notices_period` — 시작·종료가 **둘 다 있을 때만** `starts_at < ends_at`이다.
+  한쪽이 NULL이면 기간이 열려 있다는 뜻이라 비교 대상이 없다.
+- 인덱스를 두지 않는다. 공지는 수십 건 규모이고 고객 정렬 키가 함수식이라 일반 인덱스로는 못 탄다.
+
 ## 관련 migration
 
 - `V0__initial_schema.sql`
@@ -164,3 +187,4 @@
 - `V20260804_102934__switch_post_view_window_to_10_minutes.sql`
 - `V20260804_130038__add_post_view_count_sort_index.sql`
 - `V20260805_073107__add_daily_popular_posts.sql`
+- `V20260812_065639__add_community_notices.sql`

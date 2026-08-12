@@ -28,7 +28,11 @@ public enum CommunityErrorCode implements ErrorCode {
 
     OWN_POST_REPORT("COMMUNITY_006", "자기 글은 신고할 수 없습니다.", 400),
 
-    INVALID_POST_TRANSITION("COMMUNITY_007", "지금 상태에서 할 수 없는 조치입니다.", 400);
+    INVALID_POST_TRANSITION("COMMUNITY_007", "지금 상태에서 할 수 없는 조치입니다.", 400),
+
+    NOTICE_NOT_FOUND("COMMUNITY_008", "공지사항을 찾을 수 없습니다.", 404),
+
+    INVALID_NOTICE_TRANSITION("COMMUNITY_009", "지금 상태에서 할 수 없는 조치입니다.", 400);
 
     private final String code;
     private final String message;

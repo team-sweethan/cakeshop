@@ -31,6 +31,156 @@
           AND statistics_order.created_at &lt; #{end}
     </select>
 
+    <select id="findDailyProductStatistics"
+            resultType="com.cakeshop.domain.statistics.dto.view.DailyProductStatisticsSourceView">
+        <!-- 실제 결제액을 주문 항목 금액 비율로 나누고 원 단위 나머지는 소수 부분 순서로 배분한다. -->
+        WITH payment_item_share AS (
+            SELECT
+                statistics_payment.id AS payment_id,
+                statistics_payment.amount AS payment_amount,
+                statistics_item.product_id,
+                statistics_item.product_name,
+                statistics_order.created_at AS order_created_at,
+                statistics_item.id AS order_item_id,
+                statistics_item.quantity AS sales_quantity,
+                CAST(
+                    COALESCE(
+                        statistics_payment.amount
+                            * statistics_item.total_amount
+                            / NULLIF(statistics_order.original_amount, 0),
+                        0
+                    )
+                    AS DECIMAL(30, 10)
+                ) AS raw_sales_amount
+            FROM payments AS statistics_payment
+            INNER JOIN orders AS statistics_order
+                ON statistics_order.id = statistics_payment.order_id
+            INNER JOIN order_items AS statistics_item
+                ON statistics_item.order_id = statistics_order.id
+            WHERE statistics_payment.status = 'DONE'
+              AND statistics_payment.approved_at &gt;= #{start}
+              AND statistics_payment.approved_at &lt; #{end}
+        ),
+        payment_item_allocation_base AS (
+            SELECT
+                payment_item_share.*,
+                FLOOR(payment_item_share.raw_sales_amount) AS base_sales_amount,
+                payment_item_share.raw_sales_amount
+                    - FLOOR(payment_item_share.raw_sales_amount) AS fractional_sales_amount
+            FROM payment_item_share
+        ),
+        payment_item_allocation AS (
+            SELECT
+                payment_item_allocation_base.*,
+                payment_item_allocation_base.payment_amount
+                    - SUM(payment_item_allocation_base.base_sales_amount) OVER (
+                        PARTITION BY payment_item_allocation_base.payment_id
+                    ) AS remaining_amount,
+                ROW_NUMBER() OVER (
+                    PARTITION BY payment_item_allocation_base.payment_id
+                    ORDER BY
+                        payment_item_allocation_base.fractional_sales_amount DESC,
+                        payment_item_allocation_base.order_item_id
+                ) AS remainder_rank
+            FROM payment_item_allocation_base
+        ),
+        product_source AS (
+            SELECT
+                statistics_item.product_id,
+                statistics_item.product_name,
+                statistics_order.created_at AS order_created_at,
+                statistics_item.id AS order_item_id,
+                statistics_order.id AS order_id,
+                1 AS order_source,
+                0 AS sales_quantity,
+                CAST(0 AS DECIMAL(18, 0)) AS sales_amount
+            FROM orders AS statistics_order
+            INNER JOIN order_items AS statistics_item
+                ON statistics_item.order_id = statistics_order.id
+            WHERE statistics_order.created_at &gt;= #{start}
+              AND statistics_order.created_at &lt; #{end}
+
+            UNION ALL
+
+            SELECT
+                payment_item_allocation.product_id,
+                payment_item_allocation.product_name,
+                payment_item_allocation.order_created_at,
+                payment_item_allocation.order_item_id,
+                NULL AS order_id,
+                0 AS order_source,
+                payment_item_allocation.sales_quantity,
+                payment_item_allocation.base_sales_amount
+                    + CASE
+                        WHEN payment_item_allocation.remainder_rank
+                            &lt;= payment_item_allocation.remaining_amount THEN 1
+                        ELSE 0
+                    END AS sales_amount
+            FROM payment_item_allocation
+        ),
+        ranked_product_source AS (
+            SELECT
+                product_source.*,
+                ROW_NUMBER() OVER (
+                    PARTITION BY product_source.product_id
+                    ORDER BY
+                        product_source.order_created_at DESC,
+                        product_source.order_item_id DESC
+                ) AS product_name_rank
+            FROM product_source
+        ),
+        aggregated_product_source AS (
+            SELECT
+                product_source.product_id,
+                COUNT(DISTINCT CASE
+                    WHEN product_source.order_source = 1 THEN product_source.order_id
+                    ELSE NULL
+                END) AS order_count,
+                SUM(product_source.sales_quantity) AS sales_quantity,
+                SUM(product_source.sales_amount) AS sales_amount
+            FROM product_source
+            GROUP BY product_source.product_id
+        )
+        SELECT
+            aggregated_product_source.product_id,
+            ranked_product_source.product_name,
+            aggregated_product_source.order_count,
+            aggregated_product_source.sales_quantity,
+            aggregated_product_source.sales_amount
+        FROM aggregated_product_source
+        INNER JOIN ranked_product_source
+            ON ranked_product_source.product_id = aggregated_product_source.product_id
+           AND ranked_product_source.product_name_rank = 1
+        ORDER BY aggregated_product_source.product_id
+    </select>
+
+    <select id="existsInvalidProductSalesAllocationOrder" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+            FROM (
+                SELECT statistics_payment.id
+                FROM payments AS statistics_payment
+                INNER JOIN orders AS statistics_order
+                    ON statistics_order.id = statistics_payment.order_id
+                LEFT JOIN order_items AS statistics_item
+                    ON statistics_item.order_id = statistics_order.id
+                WHERE statistics_payment.status = 'DONE'
+                  AND statistics_payment.approved_at &gt;= #{start}
+                  AND statistics_payment.approved_at &lt; #{end}
+                GROUP BY
+                    statistics_payment.id,
+                    statistics_payment.amount,
+                    statistics_order.original_amount
+                HAVING statistics_order.original_amount
+                           &lt;&gt; COALESCE(SUM(statistics_item.total_amount), 0)
+                    OR (
+                        statistics_payment.amount &gt; 0
+                        AND statistics_order.original_amount = 0
+                    )
+            ) AS invalid_product_sales_order
+        )
+    </select>
+
     <select id="findChangedStatisticsDates" resultType="java.time.LocalDate">
         SELECT changed_statistics.statistics_date
         FROM (

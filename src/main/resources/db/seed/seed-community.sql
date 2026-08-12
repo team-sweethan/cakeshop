@@ -1,6 +1,6 @@
 -- 커뮤니티 도메인 로컬 시드 데이터
 --
--- ⚠️ 주의: 커뮤니티 데이터(게시글·댓글·좋아요·신고)를 지우고 샘플을 다시 넣는다.
+-- ⚠️ 주의: 커뮤니티 데이터(게시글·댓글·좋아요·신고·공지)를 지우고 샘플을 다시 넣는다.
 --    로컬에서 직접 작성한 글도 함께 사라진다. 운영/공용 DB에서는 절대 실행하지 않는다.
 --
 -- Flyway 관리 대상이 아니다. 스키마 마이그레이션이 모두 적용된 뒤 직접 실행한다.
@@ -21,6 +21,10 @@
 --   /community/34           본문 HTML 이스케이프와 줄바꿈, 댓글 수(삭제 댓글 제외), 자리 표시
 --   /community/35           차단된 글 — 비로그인은 404, 작성자(user@cakeshop.local)는 사유 표시
 --   /community/36           삭제된 글 — 작성자에게도 404
+--   /admin/community/notices  공지 5건 — 배지 네 종류(예정·노출 중·종료·삭제됨)와
+--                             `즉시`/`무기한` 표시
+--   /community/notices        위 5건 중 **2건만** 보인다. 나머지 셋(예정·종료·삭제됨)이
+--                             빠지는 것이 정상이고, 목록 최상단 공지 영역도 그 2건이다
 --
 -- id 가 1..36 사이에서 띄엄띄엄한 것은 정상이다. InnoDB 는 INSERT ... SELECT 처럼
 -- 행 수를 미리 모르는 삽입에서 auto_increment 를 넉넉히 잡아 두어 빈 번호가 생긴다.
@@ -79,6 +83,9 @@ DELETE FROM `daily_popular_posts`;
 DELETE FROM `popular_post_batch_runs`;
 DELETE FROM `comments`;
 DELETE FROM `posts`;
+-- 공지는 posts 와 아무 관계가 없다(별도 표, 자식 표 없음). 순서에 걸리는 것이 없어
+-- 마지막에 둔다.
+DELETE FROM `community_notices`;
 
 -- 재실행해도 /community/1 같은 경로가 그대로이도록 카운터를 되돌린다.
 ALTER TABLE `post_reports` AUTO_INCREMENT = 1;
@@ -86,6 +93,7 @@ ALTER TABLE `post_likes` AUTO_INCREMENT = 1;
 ALTER TABLE `post_views` AUTO_INCREMENT = 1;
 ALTER TABLE `comments` AUTO_INCREMENT = 1;
 ALTER TABLE `posts` AUTO_INCREMENT = 1;
+ALTER TABLE `community_notices` AUTO_INCREMENT = 1;
 
 -- ---------------------------------------------------------------------------
 -- 1. 카테고리 보충
@@ -462,7 +470,44 @@ SELECT @activity_day, COUNT(*)
  WHERE `ranking_date` = @activity_day;
 
 -- ---------------------------------------------------------------------------
--- 9. 확인
+-- 9. 공지사항 (PLAN.md 조각 14a)
+--
+-- 네 상태를 다 만든다 — 관리자 목록의 배지가 `예정`/`노출 중`/`종료`/`삭제됨` 넷이고,
+-- **판정이 틀려도 화면은 멀쩡해 보이기 때문이다.** 하나만 넣으면 그 하나가 어떤 배지로
+-- 나오든 그럴듯하다.
+--
+-- 시각은 위와 같은 이유로 실행일 기준 상대값이다. 고정 날짜를 박으면 '예정'이 언젠가
+-- 반드시 '노출 중'이 되고, 그날부터 로컬에서는 예정 상태를 볼 방법이 사라진다.
+--
+-- NULL 두 개도 함께 넣는다. 시작 NULL(즉시)과 종료 NULL(무기한)은 **컬럼이 비어 있는
+-- 것과 구분되지 않아** 목록에서 `즉시`/`무기한` 문구가 실제로 뜨는지 봐야 한다.
+-- ---------------------------------------------------------------------------
+
+INSERT INTO `community_notices`
+    (`title`, `content`, `status`, `starts_at`, `ends_at`, `created_by`, `created_at`)
+VALUES
+    ('[안내] 커뮤니티 이용 규칙',
+     '서로를 존중하는 커뮤니티를 만들어 주세요.\n광고와 비방 글은 예고 없이 차단될 수 있습니다.',
+     'PUBLISHED', NULL, NULL, @admin_id, @posted_day),
+
+    ('추석 연휴 배송 일정 안내',
+     '연휴 기간에는 픽업만 가능합니다.\n자세한 일정은 매장 공지를 확인해 주세요.',
+     'PUBLISHED', @today - INTERVAL 1 DAY, @today + INTERVAL 7 DAY, @admin_id, @posted_day),
+
+    ('[예정] 신메뉴 출시 안내',
+     '다음 주에 공개됩니다. 아직 고객 화면에 보이면 안 되는 공지입니다.',
+     'PUBLISHED', @today + INTERVAL 3 DAY, @today + INTERVAL 30 DAY, @admin_id, @posted_day),
+
+    ('[종료] 여름 한정 케이크 안내',
+     '노출 기간이 지난 공지입니다. 관리자 목록에는 남고 고객 화면에서는 빠집니다.',
+     'PUBLISHED', @today - INTERVAL 30 DAY, @today - INTERVAL 1 DAY, @admin_id, @posted_day),
+
+    ('[삭제됨] 잘못 올린 공지',
+     '삭제해도 행은 남는다(soft delete). 관리자 목록에만 보인다.',
+     'DELETED', NULL, NULL, @admin_id, @posted_day);
+
+-- ---------------------------------------------------------------------------
+-- 10. 확인
 --
 -- 조회수불일치 는 반드시 0 이어야 한다. 0 이 아니면 view_count 와 post_views 가
 -- 갈라진 것이고, 그 상태의 조회수는 순위에 쓸 수 없다(DOMAIN.md 6.2).
@@ -484,4 +529,9 @@ SELECT (SELECT COUNT(*) FROM `post_categories` WHERE `is_active` = 1) AS `활성
                                    WHERE pv.`post_id` = p.`id`))      AS `조회수불일치`,
        (SELECT COUNT(*) FROM `posts` WHERE `updated_at` > `created_at`) AS `수정표시글`,
        (SELECT COUNT(*) FROM `daily_popular_posts`)                   AS `인기글`,
-       (SELECT MAX(`ranking_date`) FROM `popular_post_batch_runs`)    AS `인기글확정일`;
+       (SELECT MAX(`ranking_date`) FROM `popular_post_batch_runs`)    AS `인기글확정일`,
+       (SELECT COUNT(*) FROM `community_notices`)                     AS `공지`,
+       (SELECT COUNT(*) FROM `community_notices`
+         WHERE `status` = 'PUBLISHED'
+           AND (`starts_at` IS NULL OR `starts_at` <= NOW(6))
+           AND (`ends_at`   IS NULL OR NOW(6) < `ends_at`))           AS `노출중공지`;

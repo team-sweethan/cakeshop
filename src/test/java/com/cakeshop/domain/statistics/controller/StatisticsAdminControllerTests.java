@@ -14,11 +14,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.cakeshop.domain.statistics.dto.form.StatisticsPeriodType;
 import com.cakeshop.domain.statistics.dto.form.StatisticsSearchForm;
 import com.cakeshop.domain.statistics.dto.view.PeriodStatisticsView;
+import com.cakeshop.domain.statistics.dto.view.ProductStatisticsView;
 import com.cakeshop.domain.statistics.dto.view.StatisticsTrendView;
 import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
 import com.cakeshop.domain.statistics.error.StatisticsErrorCode;
 import com.cakeshop.domain.statistics.service.DashboardReadModelQueryService;
 import com.cakeshop.domain.statistics.service.PeriodStatisticsReadModelQueryService;
+import com.cakeshop.domain.statistics.service.ProductPeriodStatisticsReadModelQueryService;
 import com.cakeshop.global.error.BusinessException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -41,6 +43,9 @@ class StatisticsAdminControllerTests {
     @Mock
     private PeriodStatisticsReadModelQueryService periodStatisticsReadModelQueryService;
 
+    @Mock
+    private ProductPeriodStatisticsReadModelQueryService productStatisticsQueryService;
+
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -48,7 +53,8 @@ class StatisticsAdminControllerTests {
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new StatisticsAdminController(
                         dashboardReadModelQueryService,
-                        periodStatisticsReadModelQueryService
+                        periodStatisticsReadModelQueryService,
+                        productStatisticsQueryService
                 ))
                 .build();
     }
@@ -81,7 +87,19 @@ class StatisticsAdminControllerTests {
         LocalDate startDate = LocalDate.of(2026, 8, 1);
         LocalDate endDate = LocalDate.of(2026, 8, 10);
         PeriodStatisticsView statistics = statistics(startDate, endDate);
+        List<ProductStatisticsView> productStatistics = List.of(
+                new ProductStatisticsView(
+                        1L,
+                        6L,
+                        "딸기 생크림 케이크",
+                        3L,
+                        5L,
+                        new BigDecimal("50000")
+                )
+        );
         when(periodStatisticsReadModelQueryService.getStatistics(any())).thenReturn(statistics);
+        when(productStatisticsQueryService.getProductStatistics(startDate, endDate))
+                .thenReturn(productStatistics);
 
         mockMvc.perform(get("/admin/statistics")
                         .param("startDate", startDate.toString())
@@ -89,13 +107,39 @@ class StatisticsAdminControllerTests {
                 .andExpect(status().isOk())
                 .andExpect(view().name("admin/statistics"))
                 .andExpect(model().attribute("statistics", statistics))
+                .andExpect(model().attribute("productStatistics", productStatistics))
                 .andExpect(model().attribute("searchForm", org.hamcrest.Matchers.allOf(
                         org.hamcrest.Matchers.hasProperty("startDate", org.hamcrest.Matchers.is(startDate)),
                         org.hamcrest.Matchers.hasProperty("endDate", org.hamcrest.Matchers.is(endDate))
                 )));
 
         verify(periodStatisticsReadModelQueryService).getStatistics(any());
+        verify(productStatisticsQueryService).getProductStatistics(startDate, endDate);
         verifyNoMoreInteractions(dashboardReadModelQueryService);
+    }
+
+    @Test
+    void statistics_productStatisticsNotReady_keepsPeriodStatisticsInModel() throws Exception {
+        LocalDate startDate = LocalDate.of(2026, 8, 1);
+        LocalDate endDate = LocalDate.of(2026, 8, 10);
+        PeriodStatisticsView statistics = statistics(startDate, endDate);
+        when(periodStatisticsReadModelQueryService.getStatistics(any())).thenReturn(statistics);
+        when(productStatisticsQueryService.getProductStatistics(startDate, endDate))
+                .thenThrow(new BusinessException(
+                        StatisticsErrorCode.PRODUCT_STATISTICS_NOT_READY
+                ));
+
+        mockMvc.perform(get("/admin/statistics")
+                        .param("startDate", startDate.toString())
+                        .param("endDate", endDate.toString()))
+                .andExpect(status().isOk())
+                .andExpect(view().name("admin/statistics"))
+                .andExpect(model().attribute("statistics", statistics))
+                .andExpect(model().attribute(
+                        "productStatisticsError",
+                        StatisticsErrorCode.PRODUCT_STATISTICS_NOT_READY.message()
+                ))
+                .andExpect(model().attributeDoesNotExist("productStatistics"));
     }
 
     @Test

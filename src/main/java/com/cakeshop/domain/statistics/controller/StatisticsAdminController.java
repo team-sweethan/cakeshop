@@ -7,6 +7,7 @@ import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
 import com.cakeshop.domain.statistics.error.StatisticsErrorCode;
 import com.cakeshop.domain.statistics.service.DashboardReadModelQueryService;
 import com.cakeshop.domain.statistics.service.PeriodStatisticsReadModelQueryService;
+import com.cakeshop.domain.statistics.service.ProductPeriodStatisticsReadModelQueryService;
 import com.cakeshop.global.error.BusinessException;
 import jakarta.validation.Valid;
 import java.time.YearMonth;
@@ -32,6 +33,7 @@ public class StatisticsAdminController {
 
     private final DashboardReadModelQueryService dashboardReadModelQueryService;
     private final PeriodStatisticsReadModelQueryService periodStatisticsReadModelQueryService;
+    private final ProductPeriodStatisticsReadModelQueryService productStatisticsQueryService;
 
     /** 관리자 대시보드의 오늘 통계를 조회한다. */
     @GetMapping("/admin")
@@ -72,6 +74,7 @@ public class StatisticsAdminController {
                 searchForm.setYearMonth(YearMonth.from(statistics.startDate()));
             }
             model.addAttribute("statistics", statistics);
+            addProductStatistics(model, statistics);
         } catch (BusinessException e) {
             if (e.getErrorCode() != StatisticsErrorCode.INVALID_DATE_RANGE
                     && e.getErrorCode() != StatisticsErrorCode.STATISTICS_NOT_READY) {
@@ -81,5 +84,22 @@ public class StatisticsAdminController {
         }
 
         return "admin/statistics";
+    }
+
+    private void addProductStatistics(Model model, PeriodStatisticsView statistics) {
+        try {
+            model.addAttribute(
+                    "productStatistics",
+                    productStatisticsQueryService.getProductStatistics(
+                            statistics.startDate(),
+                            statistics.endDate()
+                    )
+            );
+        } catch (BusinessException e) {
+            if (e.getErrorCode() != StatisticsErrorCode.PRODUCT_STATISTICS_NOT_READY) {
+                throw e;
+            }
+            model.addAttribute("productStatisticsError", e.getMessage());
+        }
     }
 }

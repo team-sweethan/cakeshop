@@ -47,6 +47,10 @@ DELETE FROM `post_likes`;
 DELETE FROM `comments`;
 DELETE FROM `posts`;
 DELETE FROM `post_categories`;
+-- community_notices 는 posts 가 아니라 members 를 FK 로 참조한다(조각 14a). 게시글과
+-- 함께 두는 이유는 지우는 순서가 아니라 도메인이 같아서다 — 이 줄이 없으면 공지가 한 건이라도
+-- 있는 DB 에서 아래 DELETE FROM members 가 제약에 걸려 시드가 통째로 실패한다.
+DELETE FROM `community_notices`;
 DELETE FROM `review_replies`;
 DELETE FROM `review_images`;
 DELETE FROM `reviews`;

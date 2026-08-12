@@ -15,6 +15,7 @@ import com.cakeshop.domain.member.dto.view.MemberProfileView;
 import com.cakeshop.domain.member.dto.view.PasswordRecoveryTarget;
 import com.cakeshop.domain.member.dto.view.PasswordResetResult;
 import com.cakeshop.domain.member.dto.view.RecoveredEmailView;
+import com.cakeshop.domain.member.dto.view.SignupEmailVerification;
 import com.cakeshop.domain.member.entity.Member;
 import com.cakeshop.domain.member.entity.MemberStatus;
 import com.cakeshop.domain.member.error.MemberErrorCode;
@@ -43,6 +44,9 @@ class MemberServiceTests {
     @Mock
     private CouponMemberCommandService couponMemberCommandService;
 
+    @Mock
+    private EmailVerificationService emailVerificationService;
+
     @InjectMocks
     private MemberService memberService;
 
@@ -64,12 +68,27 @@ class MemberServiceTests {
         when(memberMapper.findByEmail(form.getEmail()))
                 .thenReturn(Optional.of(Member.builder().id(1L).build()));
 
-        assertThatThrownBy(() -> memberService.join(form))
+        SignupEmailVerification verification =
+                new SignupEmailVerification(7L, form.getEmail());
+        assertThatThrownBy(() -> memberService.join(form, verification))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(MemberErrorCode.DUPLICATE_EMAIL);
 
         verify(memberMapper, never()).join(org.mockito.ArgumentMatchers.any(Member.class));
+    }
+
+    @Test
+    void join_verifiedInDifferentSession_rejectsSignup() {
+        SignupForm form = new SignupForm();
+        form.setEmail("member@cakeshop.local");
+        when(memberMapper.findByEmail(form.getEmail())).thenReturn(Optional.empty());
+
+        assertThat(memberService.join(form, null)).isFalse();
+
+        verify(emailVerificationService, never())
+                .consumeSignupVerification(any(), any());
+        verify(memberMapper, never()).join(any(Member.class));
     }
 
     @Test
@@ -82,17 +101,22 @@ class MemberServiceTests {
         form.setPhone("010-1234-5678");
         form.setBirthDate(LocalDate.of(2000, 1, 15));
         when(memberMapper.findByEmail(form.getEmail())).thenReturn(Optional.empty());
+        SignupEmailVerification verification =
+                new SignupEmailVerification(7L, form.getEmail());
+        when(emailVerificationService.consumeSignupVerification(7L, form.getEmail()))
+                .thenReturn(true);
         when(passwordEncoder.encode(form.getPassword())).thenReturn("encoded-password");
         org.mockito.Mockito.doAnswer(invocation -> {
             invocation.getArgument(0, Member.class).setId(1L);
             return 1;
         }).when(memberMapper).join(any(Member.class));
 
-        memberService.join(form);
+        assertThat(memberService.join(form, verification)).isTrue();
 
         ArgumentCaptor<Member> captor = ArgumentCaptor.forClass(Member.class);
         verify(memberMapper).join(captor.capture());
         assertThat(captor.getValue().getBirthDate()).isEqualTo(form.getBirthDate());
+        verify(emailVerificationService).consumeSignupVerification(7L, form.getEmail());
         verify(couponMemberCommandService).issueNewMemberCoupons(1L);
     }
 

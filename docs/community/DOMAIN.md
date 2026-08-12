@@ -49,15 +49,23 @@
 | **B5** | 인기글 영역 | 누구나 | (B1과 메인 `GET /`에 포함) | **완료** | 7c · 13 | `community-popular.md` |
 | **B6** | 검색 | 누구나 | (B1의 파라미터) | **없음** | 2차 | `community-read.md` |
 | **B7** | 무한 스크롤 | 누구나 | (B1의 페이징 대체) | **없음** | 2차 | `community-read.md` |
+| **B8** | 공지 상단 영역 | 누구나 | (B1과 메인 `GET /`에 포함) | **완료** | 14b · 14c | `community-notice.md` |
+| **B9** | 공지 전체보기 | 누구나 | `GET /community/notices` | **완료** | 14b | `community-notice.md` |
+| **B10** | 공지 상세 | 누구나 | `GET /community/notices/{id}` | **완료** | 14b | `community-notice.md` |
 | **C1** | 관리자 목록 | 관리자 | `GET /admin/community` | **완료** | 5 | `community-admin.md` |
 | **C2** | 관리자 상세 | 관리자 | `GET /admin/community/{id}` | **완료** | 5 | `community-admin.md` |
 | **C3** | 차단·해제 | 관리자 | `POST /admin/community/{id}/block` · `/unblock` | **완료** | 5 | `community-admin.md` |
 | **C4** | 신고 기각 | 관리자 | `POST /admin/community/{id}/reports/reject` | **완료** | 5 | `community-admin.md` |
+| **C5** | 관리자 공지 목록 | 관리자 | `GET /admin/community/notices` | **완료** | 14a | `community-notice.md` |
+| **C6** | 공지 작성·수정 | 관리자 | `GET·POST /admin/community/notices/new` · `/{id}/edit` | **완료** | 14a | `community-notice.md` |
+| **C7** | 공지 삭제 | 관리자 | `POST /admin/community/notices/{id}/delete` | **완료** | 14a | `community-notice.md` |
 | **D1** | 작성자 표시명 | — | (Service 계약) | **완료** | 10 | 이 문서 8절 |
 | **D2** | 메인 인기글 계약 | — | (Service 계약) | **완료** | 13 | `community-popular.md` |
+| **D3** | 메인 공지 계약 | — | (D2와 같은 계약에 추가) | **완료** | 14c | `community-notice.md` |
 | **E1** | 상태 enum + `CHECK` | — | — | **완료** | 0 | 이 문서 4절 |
 | **E2** | 카테고리 주입 | — | — | **완료** | 0 | 이 문서 10절 |
 | **E3** | 인기글 집계 배치 | — | (스케줄러) | **완료** | 7b | `community-popular.md` |
+| **E4** | 공지 표 + 상태·기간 `CHECK` | — | — | **완료** | 14a | `community-notice.md` |
 
 ## 1. 한 문장 정의
 
@@ -65,7 +73,7 @@ Cakeshop 커뮤니티는 고객이 케이크 관련 질문과 후기를 공유�
 
 ## 2. MVP 범위
 
-**포함**: 게시글 목록·상세, 게시글 CRUD, 댓글(1단계) 작성·삭제, 좋아요, 신고, 관리자 차단, 페이지 번호 페이징, **조회수 정렬 옵션·인기글**
+**포함**: 게시글 목록·상세, 게시글 CRUD, 댓글(1단계) 작성·삭제, 좋아요, 신고, 관리자 차단, 페이지 번호 페이징, **조회수 정렬 옵션·인기글**, **관리자 공지사항**
 
 ### 2차로 미룬 것
 
@@ -118,6 +126,8 @@ Cakeshop 커뮤니티는 고객이 케이크 관련 질문과 후기를 공유�
 - 이유: 조건이 두 개면 새 쿼리를 추가할 때 하나를 빠뜨려 차단된 글이 노출된다. `WHERE status = 'PUBLISHED'` 하나로 끝내면 빠뜨릴 것이 없다.
 - `PostStatus { PUBLISHED, DELETED, BLOCKED }` enum으로 정의하고, `MemberStatus.canTransitionTo` 선례를 따라 전이 규칙을 enum에 둔다.
 - 새 migration으로 `CHECK (status IN ('PUBLISHED','DELETED','BLOCKED'))`를 추가한다 (선례: `V20260729_123306__add_member_status_constraint.sql`).
+
+> **이 절은 `posts`에만 적용된다.** 공지는 별도 표이고 노출 기간을 갖기 때문에 조건이 셋이다. 그 예외와 예외를 감당하는 방법은 `specs/community-notice.md` E4가 정본이다.
 
 ### 4.2 게시글 전이 규칙
 
@@ -218,6 +228,9 @@ Cakeshop 커뮤니티는 고객이 케이크 관련 질문과 후기를 공유�
 | 댓글 내용 | 필수, 1~500자 | `TEXT` |
 | 신고 사유 | 필수, 1~500자 | `VARCHAR(500)` |
 | 차단 사유 | 필수, 1~500자 | `VARCHAR(500)` (`posts.blocked_reason`) |
+| 공지 제목 | 필수, 1~100자 | `VARCHAR(200)` (`community_notices.title`) |
+| 공지 본문 | 필수, 1~5000자 | `TEXT` (`community_notices.content`) |
+| 공지 노출 기간 | 선택. 둘 다 있으면 시작 < 종료 | `DATETIME(6)` NULL 둘 (`starts_at`·`ends_at`). 표에도 `CHECK`가 있다 |
 
 - 화면 허용 길이를 DB 컬럼 크기보다 작게 잡는다. 컬럼 크기를 그대로 쓰면 정책을 정한 게 아니라 안 정한 것이다.
 - **trim 후 검증**한다. 공백만 입력은 거부. 저장 시 제목은 trim, 본문은 앞뒤만 trim(중간 줄바꿈 보존).
