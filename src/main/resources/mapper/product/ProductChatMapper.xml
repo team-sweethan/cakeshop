@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--/**
+ * ******************************
+ * 작성자 : 김민정
+ * 담당자 : 시은
+ * 작성일 : 2026-08-11
+ * 기능 : 채팅 문의용 상품 조회 SQL 계약
+ * 설명 : 채팅 메시지 송신 시 문의 대상 상품의 존재 여부 및 판매 공개 상태(ACTIVE)를 검증한다.
+ * ******************************
+ */-->
+<mapper namespace="com.cakeshop.domain.product.mapper.ProductChatMapper">
+
+    <!-- 채팅 문의 대상 상품 존재 및 판매 공개(ACTIVE) 상태 검증 -->
+    <select id="countActiveProductById" resultType="int">
+        SELECT COUNT(*)
+        FROM products
+        WHERE id = #{productId}
+          AND status = 'ACTIVE'
+    </select>
+
+    <!-- 문의 대상 상품명 단건 조회 -->
+    <select id="findProductNameById" resultType="string">
+        SELECT name
+        FROM products
+        WHERE id = #{productId}
+    </select>
+
+    <!-- 문의 대상 상품명 배치 (IN) 조회 -->
+    <select id="findProductNamesByIds" resultType="map">
+        SELECT id, name
+        FROM products
+        WHERE id IN
+        <foreach item="id" collection="productIds" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+</mapper>

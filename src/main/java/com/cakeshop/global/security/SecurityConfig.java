@@ -43,9 +43,10 @@ public class SecurityConfig {
         RequestMatcher passwordRecoveryRequest =
                 SecurityConfig::isPasswordRecoveryRequest;
         HttpSessionRequestCache requestCache = new HttpSessionRequestCache();
-        requestCache.setRequestMatcher(request ->
-                !"/cart/count".equals(request.getRequestURI()
-                        .substring(request.getContextPath().length())));
+        requestCache.setRequestMatcher(request -> {
+            String path = request.getRequestURI().substring(request.getContextPath().length());
+            return !"/cart/count".equals(path) && !path.startsWith("/api/");
+        });
         LoginUrlAuthenticationEntryPoint customerLoginEntryPoint =
                 new LoginUrlAuthenticationEntryPoint("/login");
         LoginUrlAuthenticationEntryPoint adminLoginEntryPoint =
@@ -53,6 +54,12 @@ public class SecurityConfig {
         AuthenticationEntryPoint portalLoginEntryPoint = (request, response, exception) -> {
             String path = request.getRequestURI()
                     .substring(request.getContextPath().length());
+            if (path.startsWith("/api/chat/") || path.startsWith("/api/admin/chat/")) {
+                response.setStatus(jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json;charset=UTF-8");
+                response.getWriter().write("{\"code\":\"UNAUTHORIZED\",\"message\":\"인증이 필요합니다.\"}");
+                return;
+            }
             if ("/admin".equals(path) || path.startsWith("/admin/")) {
                 adminLoginEntryPoint.commence(request, response, exception);
                 return;
@@ -120,10 +127,10 @@ public class SecurityConfig {
                             .permitAll();
                 }
 
-                // ② 관리자. 모든 관리자 화면은 관리자 로그인을 요구한다.
-                auth.requestMatchers("/admin", "/admin/**").hasRole("ADMIN");
-                // 고객과 관리자가 각자 받은 알림을 같은 API에서 조회하고 읽음 처리한다.
-                auth.requestMatchers("/api/notifications", "/api/notifications/**")
+                // ② 관리자. 모든 관리자 화면 및 관리자 API는 관리자 로그인을 요구한다.
+                auth.requestMatchers("/admin", "/admin/**", "/api/admin/**").hasRole("ADMIN");
+                // 고객과 관리자가 각자 받은 채팅/알림을 같은 API에서 조회하고 읽음 처리한다.
+                auth.requestMatchers("/api/chat", "/api/chat/**", "/api/notifications", "/api/notifications/**")
                         .hasAnyRole("USER", "ADMIN");
                 // ③ 나머지 회원 전용 기능은 일반 회원만 사용한다.
                 auth.anyRequest().hasRole("USER");
