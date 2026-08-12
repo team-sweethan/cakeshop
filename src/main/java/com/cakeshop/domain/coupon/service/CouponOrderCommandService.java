@@ -10,7 +10,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 주문·결제 담당자가 호출하는 공개 계약이다. 주문 예약·사용 확정·취소 복구의 쿠폰 상태 전이를 소유한다.
+ * ******************************
+ * 작성자 : 주환(이정후)
+ * 담당자 : 이정후
+ * 작성일 : 2026-08-10
+ * 기능 : 주문·결제 쿠폰 상태 변경 계약
+ * 설명 : order·payment 도메인이 주문 생성·결제 완료·만료·취소 시 호출하며,
+ *       쿠폰의 예약·사용 완료·복구 상태 전이를 쿠폰 도메인에서 소유한다.
+ * ******************************
  */
 @Service
 @RequiredArgsConstructor

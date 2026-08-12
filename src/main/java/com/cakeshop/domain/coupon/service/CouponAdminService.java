@@ -1,5 +1,6 @@
 package com.cakeshop.domain.coupon.service;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -22,6 +23,7 @@ import com.cakeshop.domain.coupon.dto.view.CouponUpdateView;
 import com.cakeshop.domain.coupon.entity.Coupon;
 import com.cakeshop.domain.coupon.entity.CouponTargetType;
 import com.cakeshop.domain.coupon.entity.CouponStatus;
+import com.cakeshop.domain.coupon.entity.DiscountType;
 import com.cakeshop.domain.coupon.error.CouponErrorCode;
 import com.cakeshop.domain.coupon.mapper.CouponMapper;
 import com.cakeshop.global.common.paging.PageRequest;
@@ -312,7 +314,9 @@ public class CouponAdminService {
                 || !sameAmount(coupon.getDiscountValue(), form.getDiscountValue())
                 || !sameAmount(coupon.getMinimumOrderAmount(), form.getMinimumOrderAmount())
                 || !sameAmount(coupon.getMaximumDiscountAmount(), form.getMaximumDiscountAmount())
-                || !coupon.getStartsAt().equals(form.getStartsAt())) {
+                // datetime-local Form은 분 단위까지만 전송하므로 양쪽의 초·나노초를 비교에서 제외한다.
+                || !coupon.getStartsAt().truncatedTo(ChronoUnit.MINUTES)
+                .equals(form.getStartsAt().truncatedTo(ChronoUnit.MINUTES))) {
             throw new BusinessException(CouponErrorCode.CANNOT_MODIFY_FIELDS);
         }
 
@@ -345,9 +349,9 @@ public class CouponAdminService {
         coupon.setDiscountValue(form.getDiscountValue());
         coupon.setMinimumOrderAmount(form.getMinimumOrderAmount());
 
-        // 정액 할인에서는 null을 허용하고, 비율 할인 필수 여부는 Form 교차 검증이 담당한다.
+        // 최대 할인 금액은 비율 할인 상한에만 사용한다. 금액 할인 요청값은 저장하지 않는다.
         coupon.setMaximumDiscountAmount(
-                form.getMaximumDiscountAmount()
+                maximumDiscountAmountOf(form.getDiscountType(), form.getMaximumDiscountAmount())
         );
 
         coupon.setTotalQuantity(form.getTargetType() == CouponTargetType.SPECIFIC_MEMBERS
@@ -366,12 +370,21 @@ public class CouponAdminService {
         coupon.setDiscountType(form.getDiscountType());
         coupon.setDiscountValue(form.getDiscountValue());
         coupon.setMinimumOrderAmount(form.getMinimumOrderAmount());
-        coupon.setMaximumDiscountAmount(form.getMaximumDiscountAmount());
+        coupon.setMaximumDiscountAmount(
+                maximumDiscountAmountOf(form.getDiscountType(), form.getMaximumDiscountAmount())
+        );
         coupon.setTotalQuantity(coupon.getTargetType() == CouponTargetType.SPECIFIC_MEMBERS
                 ? Math.toIntExact(form.getTotalQuantity())
                 : null);
         coupon.setStartsAt(form.getStartsAt().truncatedTo(ChronoUnit.MINUTES));
         coupon.setExpiresAt(form.getExpiresAt().truncatedTo(ChronoUnit.MINUTES));
+    }
+
+    /** 최대 할인 금액은 비율 할인에만 의미가 있으므로 정액 할인에서는 저장값을 비운다. */
+    private BigDecimal maximumDiscountAmountOf(
+            DiscountType discountType,
+            BigDecimal maximumDiscountAmount) {
+        return discountType == DiscountType.PERCENTAGE ? maximumDiscountAmount : null;
     }
 
     /** 관리자 화면용 JSON 응답에는 회원 원본 연락처를 포함하지 않는다. */

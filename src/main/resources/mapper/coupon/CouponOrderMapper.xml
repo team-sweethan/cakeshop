@@ -2,6 +2,15 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.cakeshop.domain.coupon.mapper.CouponOrderMapper">
 
+    <!--
+        작성자 : 주환(이정후)
+        담당자 : 이정후
+        기능 : order·payment 도메인 연동 쿠폰 상태 전이
+        설명 : 주문·결제 도메인은 이 Mapper가 아닌 CouponOrderQuery/CommandService만 호출한다.
+               회원 쿠폰의 유효성·잠금·상태 전이는 쿠폰 소유 SQL에서 최종 검증한다.
+    -->
+
+    <!-- 주문서 미리보기에 사용할 수 있도록 최소 주문 금액과 사용 기간을 충족한 쿠폰만 조회한다. -->
     <select id="findAvailableCouponsForMember"
             resultType="com.cakeshop.domain.coupon.dto.view.CouponOrderAvailableView">
         SELECT mc.id AS memberCouponId,
@@ -16,6 +25,7 @@
         ORDER BY c.expires_at, mc.id
     </select>
 
+    <!-- 주문 생성 시 선택한 회원 쿠폰 행을 잠가 같은 쿠폰의 중복 예약을 막는다. -->
     <select id="findAvailableCouponForOrderForUpdate"
             resultType="com.cakeshop.domain.coupon.dto.view.CouponOrderDiscount">
         SELECT mc.id AS memberCouponId, c.discount_type AS discountType, c.discount_value AS discountValue,
@@ -26,6 +36,7 @@
         FOR UPDATE
     </select>
 
+    <!-- 주문서 미리보기는 잠금 없이 현재 시점의 쿠폰 조건만 다시 확인한다. -->
     <select id="findAvailableCouponForOrder"
             resultType="com.cakeshop.domain.coupon.dto.view.CouponOrderDiscount">
         SELECT mc.id AS memberCouponId, c.discount_type AS discountType, c.discount_value AS discountValue,
@@ -35,16 +46,19 @@
           AND c.status = 'ACTIVE' AND c.starts_at &lt;= NOW(6) AND c.expires_at &gt; NOW(6)
     </select>
 
+    <!-- AVAILABLE 쿠폰만 RESERVED로 전이해 예약 요청의 최종 방어선으로 사용한다. -->
     <update id="reserveCouponForOrder">
         UPDATE member_coupons SET status = 'RESERVED', applied_order_id = #{orderId}
         WHERE id = #{memberCouponId} AND status = 'AVAILABLE' AND applied_order_id IS NULL
     </update>
 
+    <!-- 결제가 성공한 주문에 연결된 RESERVED 쿠폰만 USED로 확정한다. -->
     <update id="useReservedCouponForOrder">
         UPDATE member_coupons SET status = 'USED', used_at = NOW(6)
         WHERE applied_order_id = #{orderId} AND status = 'RESERVED'
     </update>
 
+    <!-- 결제 기한 만료 시 사용 기간이 남았으면 AVAILABLE, 지났으면 ENDED로 복구한다. -->
     <update id="releaseReservedCouponForExpiredOrder">
         UPDATE member_coupons mc INNER JOIN coupons c ON c.id = mc.coupon_id
         SET mc.status = CASE WHEN c.expires_at &gt; NOW(6) THEN 'AVAILABLE' ELSE 'ENDED' END,
