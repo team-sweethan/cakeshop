@@ -1,6 +1,14 @@
 <!doctype html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{fragments/common/head :: head('쿠폰 관리 | 관리자')}"></head>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>쿠폰 관리 | 관리자</title>
+    <link rel="icon" th:href="@{/favicon.ico}" sizes="any">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+    <link rel="stylesheet" th:href="@{/css/coupon-admin.css}">
+    <script defer th:src="@{/js/app.js}"></script>
+</head>
 <body>
 <div class="admin-layout">
     <aside th:replace="~{fragments/admin/sidebar :: sidebar('coupons')}"></aside>
@@ -79,15 +87,16 @@
                     <div class="form-group">
                         <label>사용 기간</label>
 
-                        <div class="cluster">
+                        <div class="coupon-period-range">
                             <input id="periodStart"
                                    class="form-control"
                                    type="datetime-local"
+                                   aria-label="사용 기간 시작"
                                    th:field="*{periodStart}">
-                            <span aria-hidden="true">~</span>
                             <input id="periodEnd"
                                    class="form-control"
                                    type="datetime-local"
+                                   aria-label="사용 기간 종료"
                                    th:field="*{periodEnd}">
                         </div>
                         <p class="form-help">선택한 기간과 사용 기간이 겹치는 쿠폰을 조회합니다.</p>

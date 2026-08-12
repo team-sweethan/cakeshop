@@ -15,7 +15,15 @@ import com.cakeshop.domain.coupon.mapper.CouponMemberMapper;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 
-/** 회원 도메인이 마이페이지 쿠폰함을 구성할 수 있도록 보유 쿠폰 조회 계약을 제공한다. */
+/**
+ * ******************************
+ * 작성자 : 수민(이정후)
+ * 담당자 : 이정후
+ * 작성일 : 2026-08-10
+ * 기능 : 회원 마이페이지 보유 쿠폰 조회 계약
+ * 설명 : member 도메인의 MyPageController가 인증 회원의 사용 가능 쿠폰만 조회할 수 있도록 제공한다.
+ * ******************************
+ */
 @Service
 public class CouponMemberQueryService {
 

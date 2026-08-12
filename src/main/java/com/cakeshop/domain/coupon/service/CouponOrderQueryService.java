@@ -10,7 +10,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 주문 담당자가 일반·수제 주문서에 표시할 사용 가능 쿠폰을 조회할 때 사용한다.
+ * ******************************
+ * 작성자 : 주환(이정후)
+ * 담당자 : 이정후
+ * 작성일 : 2026-08-10
+ * 기능 : 주문서 사용 가능 쿠폰 조회 계약
+ * 설명 : 일반 주문에는 사용 가능 쿠폰을, 0원 결제를 지원하지 않는 수제 주문에는
+ *       적용 후 최종금액이 양수인 쿠폰만 제공한다.
+ * ******************************
  */
 @Service
 @RequiredArgsConstructor
@@ -21,8 +28,7 @@ public class CouponOrderQueryService {
     /** 현재 주문 금액을 만족하는 사용 가능 쿠폰만 주문서 선택 목록으로 제공한다. */
     @Transactional(readOnly = true)
     public List<CouponOrderAvailableView> getAvailableCouponsForMember(
-            long memberId, BigDecimal orde
-            rAmount
+            long memberId, BigDecimal orderAmount
     ) {
         if (orderAmount == null || orderAmount.signum() <= 0) {
             return List.of();

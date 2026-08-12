@@ -51,7 +51,7 @@
 
 | 컬럼 | 타입 | 키 | Null | 기본값 | 의미 |
 |---|---|---|---|---|---|
-| `id` | BIGINT | PK | X | AUTO_INCREMENT | 상태 이력 식별자 |
+| `id` | BIGINT | PK, INDEX | X | AUTO_INCREMENT | 상태 이력 식별자 |
 | `member_id` | BIGINT | FK, INDEX | X | 없음 | 대상 회원 식별자 |
 | `action` | VARCHAR(20) |  | X | 없음 | 처리 동작 |
 | `before_status` | VARCHAR(20) |  | X | 없음 | 처리 전 상태 |
@@ -72,20 +72,20 @@
 
 | 컬럼 | 타입 | 키 | Null | 기본값 | 설명 |
 |---|---|---|---|---|---|
-| `id` | BIGINT | PK | X | AUTO_INCREMENT | 인증 요청 식별자 |
+| `id` | BIGINT | PK, INDEX | X | AUTO_INCREMENT | 인증 요청 식별자 |
 | `email` | VARCHAR(255) | INDEX | X | 없음 | 인증 대상 이메일 |
 | `purpose` | VARCHAR(30) | INDEX | X | 없음 | 인증 목적 |
 | `code_hash` | VARCHAR(100) |  | X | 없음 | 인증번호 BCrypt 해시 |
 | `expires_at` | DATETIME(6) | INDEX | X | 없음 | 인증번호 만료 시각 |
-| `attempt_count` | TINYINT UNSIGNED |  | X | `0` | 실패한 확인 횟수 |
+| `attempt_count` | INT UNSIGNED |  | X | `0` | 실패한 확인 횟수 |
 | `verified_at` | DATETIME(6) |  | O | NULL | 인증 완료 시각 |
 | `consumed_at` | DATETIME(6) |  | O | NULL | 회원가입 등에 사용된 시각 |
-| `created_at` | DATETIME(6) |  | X | `CURRENT_TIMESTAMP(6)` | 생성 시각 |
+| `created_at` | DATETIME(6) | INDEX | X | `CURRENT_TIMESTAMP(6)` | 생성 시각 |
 | `updated_at` | DATETIME(6) |  | X | `CURRENT_TIMESTAMP(6)` | 수정 시각, 수정 시 자동 갱신 |
 
 - CHECK: `purpose IN ('SIGNUP', 'PASSWORD_RESET')`
 - CHECK: `attempt_count <= 5`
-- INDEX: `idx_email_verifications_lookup` (`email`, `purpose`, `created_at DESC`, `id DESC`)
+- INDEX: `idx_email_verifications_email_purpose_created` (`email`, `purpose`, `created_at DESC`, `id DESC`)
 - INDEX: `idx_email_verifications_expires_at` (`expires_at`)
 - 회원가입 전 요청도 저장하므로 `members` 외래 키를 두지 않는다.
 

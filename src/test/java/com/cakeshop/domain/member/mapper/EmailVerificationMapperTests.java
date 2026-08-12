@@ -110,6 +110,26 @@ class EmailVerificationMapperTests {
     }
 
     @Test
+    void passwordResetConsumption_oldVerifiedRequestIsRejectedAfterResend() {
+        String email = "password-reset-resend@example.com";
+        EmailVerification oldRequest = insert(
+                email, NOW.plusMinutes(5), EmailVerificationPurpose.PASSWORD_RESET);
+        assertThat(emailVerificationMapper.markVerified(
+                oldRequest.getId(),
+                email,
+                EmailVerificationPurpose.PASSWORD_RESET,
+                NOW)).isOne();
+
+        insert(email, NOW.plusMinutes(6), EmailVerificationPurpose.PASSWORD_RESET);
+
+        assertThat(emailVerificationMapper.findLatestVerifiedByIdForUpdate(
+                oldRequest.getId(),
+                email,
+                EmailVerificationPurpose.PASSWORD_RESET,
+                NOW.minusMinutes(10))).isEmpty();
+    }
+
+    @Test
     void countAndCleanup_requests_usesPurposeAndRetentionCutoff() {
         EmailVerification oldRequest = insert("cleanup@example.com", NOW.minusDays(8));
         jdbcTemplate.update(
@@ -129,9 +149,16 @@ class EmailVerificationMapperTests {
     }
 
     private EmailVerification insert(String email, LocalDateTime expiresAt) {
+        return insert(email, expiresAt, EmailVerificationPurpose.SIGNUP);
+    }
+
+    private EmailVerification insert(
+            String email,
+            LocalDateTime expiresAt,
+            EmailVerificationPurpose purpose) {
         EmailVerification verification = new EmailVerification();
         verification.setEmail(email);
-        verification.setPurpose(EmailVerificationPurpose.SIGNUP);
+        verification.setPurpose(purpose);
         verification.setCodeHash("encoded-code");
         verification.setExpiresAt(expiresAt);
 

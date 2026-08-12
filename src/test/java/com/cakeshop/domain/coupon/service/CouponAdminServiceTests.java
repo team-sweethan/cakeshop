@@ -67,6 +67,7 @@ class CouponAdminServiceTests {
     void insertCopiesFormValuesAndCreatorId() {
         CouponCreateForm form = createForm();
         form.setName(" 여름 할인 ");
+        form.setMaximumDiscountAmount(BigDecimal.valueOf(5_000));
         when(couponMapper.insertCoupon(any())).thenReturn(1);
 
         couponAdminService.insertCoupon(form, 7L);
@@ -79,6 +80,7 @@ class CouponAdminServiceTests {
         assertThat(saved.getDiscountType()).isEqualTo(DiscountType.FIXED_AMOUNT);
         assertThat(saved.getDiscountValue()).isEqualByComparingTo("3000");
         assertThat(saved.getMinimumOrderAmount()).isEqualByComparingTo("10000");
+        assertThat(saved.getMaximumDiscountAmount()).isNull();
         assertThat(saved.getTotalQuantity()).isEqualTo(100);
         assertThat(saved.getCreatedBy()).isEqualTo(7L);
     }
@@ -95,6 +97,22 @@ class CouponAdminServiceTests {
         ArgumentCaptor<Coupon> couponCaptor = ArgumentCaptor.forClass(Coupon.class);
         verify(couponMapper).insertCoupon(couponCaptor.capture());
         assertThat(couponCaptor.getValue().getTotalQuantity()).isNull();
+    }
+
+    @Test
+    void insertPercentageDiscountStoresMaximumDiscountAmount() {
+        CouponCreateForm form = createForm();
+        form.setDiscountType(DiscountType.PERCENTAGE);
+        form.setDiscountValue(BigDecimal.valueOf(10));
+        form.setMaximumDiscountAmount(BigDecimal.valueOf(5_000));
+        when(couponMapper.insertCoupon(any())).thenReturn(1);
+
+        couponAdminService.insertCoupon(form, 7L);
+
+        ArgumentCaptor<Coupon> couponCaptor = ArgumentCaptor.forClass(Coupon.class);
+        verify(couponMapper).insertCoupon(couponCaptor.capture());
+        assertThat(couponCaptor.getValue().getMaximumDiscountAmount())
+                .isEqualByComparingTo("5000");
     }
 
     @Test
@@ -413,6 +431,29 @@ class CouponAdminServiceTests {
         form.setMinimumOrderAmount(coupon.getMinimumOrderAmount());
         // 화면은 분 단위까지만 표시하므로 기존 종료 일시의 초·나노초는 전송하지 않는다.
         form.setExpiresAt(storedExpiresAt.withSecond(0).withNano(0));
+
+        couponAdminService.updateCoupon(1L, form);
+
+        verify(couponMapper).updateCouponAfterStart(any());
+    }
+
+    @Test
+    void updateAllowsSameStartsAtMinuteWhenStoredValueHasSecondsAndNanoseconds() {
+        LocalDateTime storedStartsAt = LocalDateTime.now()
+                .minusDays(1)
+                .withSecond(32)
+                .withNano(123_000_000);
+        Coupon coupon = coupon(CouponStatus.ACTIVE, 10, 1, LocalDateTime.now().plusDays(2));
+        coupon.setStartsAt(storedStartsAt);
+        when(couponMapper.findCouponById(1L)).thenReturn(Optional.of(coupon));
+        when(couponMapper.updateCouponAfterStart(any())).thenReturn(1);
+
+        CouponUpdateForm form = updateForm();
+        form.setStartsAt(storedStartsAt.withSecond(0).withNano(0));
+        form.setDiscountType(coupon.getDiscountType());
+        form.setDiscountValue(coupon.getDiscountValue());
+        form.setMinimumOrderAmount(coupon.getMinimumOrderAmount());
+        form.setExpiresAt(coupon.getExpiresAt().withSecond(0).withNano(0));
 
         couponAdminService.updateCoupon(1L, form);
 
