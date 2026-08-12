@@ -424,7 +424,7 @@
       </div>
 
       <!-- 주문 및 장바구니 버튼 -->
-      <div class="stack product-detail__actions">
+      <div class="product-detail__actions">
 
         <!-- 재고가 있는 경우 -->
         <div
@@ -508,6 +508,25 @@
                   data-login-required
           >
             제작 옵션 선택
+          </a>
+        </div>
+
+        <div class="cluster" sec:authorize="!hasRole('ADMIN')">
+          <a
+                  sec:authorize="hasRole('USER')"
+                  class="btn"
+                  th:href="@{/chat(productId=${product.id})}"
+          >
+            1:1 문의하기
+          </a>
+
+          <a
+                  sec:authorize="isAnonymous()"
+                  class="btn"
+                  th:href="@{/chat(productId=${product.id})}"
+                  data-login-required
+          >
+            1:1 문의하기
           </a>
         </div>
       </div>
