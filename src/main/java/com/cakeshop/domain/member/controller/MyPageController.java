@@ -126,20 +126,29 @@ public class MyPageController {
             return "redirect:/login";
         }
 
-        if (bindingResult.hasErrors()) {
+        String email = memberDetails.getUsername();
+        boolean hasPasswordLogin = memberService.hasPasswordLogin(email);
+        boolean missingCurrentPassword = hasPasswordLogin
+                && (form.getCurrentPassword() == null || form.getCurrentPassword().isBlank());
+        if (missingCurrentPassword) {
+            bindingResult.rejectValue(
+                    "currentPassword",
+                    "NotBlank",
+                    "현재 비밀번호를 입력해 주세요.");
+        }
+
+        if (bindingResult.hasErrors() || missingCurrentPassword) {
             model.addAttribute(
                     "profileForm",
                     ProfileUpdateForm.from(
-                            memberService.getMemberProfile(memberDetails.getUsername())));
-            model.addAttribute(
-                    "hasPasswordLogin",
-                    memberService.hasPasswordLogin(memberDetails.getUsername()));
+                            memberService.getMemberProfile(email)));
+            model.addAttribute("hasPasswordLogin", hasPasswordLogin);
             return "customer/member/profile-edit";
         }
 
         try {
             memberService.withdraw(
-                    memberDetails.getUsername(),
+                    email,
                     form.getCurrentPassword());
         } catch (BusinessException exception) {
             if (exception.getErrorCode() != MemberErrorCode.INVALID_CURRENT_PASSWORD) {
@@ -152,10 +161,8 @@ public class MyPageController {
             model.addAttribute(
                     "profileForm",
                     ProfileUpdateForm.from(
-                            memberService.getMemberProfile(memberDetails.getUsername())));
-            model.addAttribute(
-                    "hasPasswordLogin",
-                    memberService.hasPasswordLogin(memberDetails.getUsername()));
+                            memberService.getMemberProfile(email)));
+            model.addAttribute("hasPasswordLogin", hasPasswordLogin);
             return "customer/member/profile-edit";
         }
 

@@ -21,11 +21,11 @@ class WithdrawFormTests {
     }
 
     @Test
-    void validate_missingPasswordAndConfirmation_rejectsForm() {
+    void validate_missingConfirmation_rejectsForm() {
         WithdrawForm form = new WithdrawForm();
 
         assertThat(validator.validate(form))
                 .extracting(violation -> violation.getPropertyPath().toString())
-                .contains("currentPassword", "withdrawalConfirmed");
+                .contains("withdrawalConfirmed");
     }
 }

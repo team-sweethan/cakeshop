@@ -4,10 +4,12 @@ import com.cakeshop.domain.member.dto.form.OAuthSignupForm;
 import com.cakeshop.domain.member.dto.view.OAuthSignupSession;
 import com.cakeshop.domain.member.service.SocialLoginService;
 import com.cakeshop.global.security.MemberAuthenticationSession;
+import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
+import java.io.IOException;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
@@ -17,6 +19,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.servlet.support.RequestContextUtils;
+import org.springframework.web.servlet.support.SessionFlashMapManager;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
+import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
 
 @Controller
 @RequiredArgsConstructor
@@ -24,6 +31,7 @@ public class OAuthSignupController {
 
     private final SocialLoginService socialLoginService;
     private final MemberAuthenticationSession memberAuthenticationSession;
+    private final AuthenticationSuccessHandler customerSuccessHandler = successHandler();
 
     // 소셜 회원가입 추가 정보 입력 화면
     @GetMapping("/oauth/signup")
@@ -53,7 +61,7 @@ public class OAuthSignupController {
             HttpServletResponse response,
             Model model,
             RedirectAttributes redirectAttributes
-    ) {
+    ) throws IOException, ServletException {
         OAuthSignupSession oauthSession = getValidSession(session);
         if (oauthSession == null) {
             redirectAttributes.addFlashAttribute(
@@ -72,8 +80,12 @@ public class OAuthSignupController {
                 response,
                 socialLoginService.signup(oauthSession.identity(), form));
         session.removeAttribute(OAuthSignupSession.SESSION_KEY);
-        redirectAttributes.addFlashAttribute("successMessage", "소셜 회원가입이 완료되었습니다.");
-        return "redirect:/";
+        addSuccessMessage(request, response);
+        customerSuccessHandler.onAuthenticationSuccess(
+                request,
+                response,
+                SecurityContextHolder.getContext().getAuthentication());
+        return null;
     }
 
     private OAuthSignupSession getValidSession(HttpSession session) {
@@ -84,5 +96,19 @@ public class OAuthSignupController {
             return null;
         }
         return oauthSession;
+    }
+
+    private AuthenticationSuccessHandler successHandler() {
+        SavedRequestAwareAuthenticationSuccessHandler handler =
+                new SavedRequestAwareAuthenticationSuccessHandler();
+        handler.setDefaultTargetUrl("/");
+        return handler;
+    }
+
+    private void addSuccessMessage(HttpServletRequest request, HttpServletResponse response) {
+        RequestContextUtils.getOutputFlashMap(request)
+                .put("successMessage", "소셜 회원가입이 완료되었습니다.");
+        new SessionFlashMapManager().saveOutputFlashMap(
+                RequestContextUtils.getOutputFlashMap(request), request, response);
     }
 }

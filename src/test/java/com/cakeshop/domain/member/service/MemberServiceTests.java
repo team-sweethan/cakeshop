@@ -420,6 +420,29 @@ class MemberServiceTests {
                 org.mockito.ArgumentMatchers.any(MemberStatus.class));
     }
 
+    @Test
+    void withdraw_passwordLoginMember_missingCurrentPassword_throwsMemberBusinessException() {
+        Member member = Member.builder()
+                .id(7L)
+                .email("member@cakeshop.local")
+                .password("encoded-password")
+                .status(MemberStatus.ACTIVE)
+                .build();
+        when(memberMapper.findByEmail(member.getEmail())).thenReturn(Optional.of(member));
+
+        assertThatThrownBy(() -> memberService.withdraw(member.getEmail(), null))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(MemberErrorCode.INVALID_CURRENT_PASSWORD);
+
+        verify(passwordEncoder, never()).matches(
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString());
+        verify(memberMapper, never()).withdrawById(
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.any(MemberStatus.class));
+    }
+
     private ProfileUpdateForm passwordChangeForm() {
         ProfileUpdateForm form = new ProfileUpdateForm();
         form.setName("홍길동");

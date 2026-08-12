@@ -24,6 +24,8 @@ import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -104,6 +106,30 @@ class OAuthSignupControllerTests {
         verify(socialLoginService).signup(any(), any(OAuthSignupForm.class));
         assertThat(session.getAttribute(OAuthSignupSession.SESSION_KEY)).isNull();
         assertThat(result.getRequest().getSession().getId()).isNotEqualTo(previousSessionId);
+    }
+
+    @Test
+    void signup_validInput_returnsToSavedRequest() throws Exception {
+        MockHttpSession session = signupSession();
+        MemberAuthenticationView member = new MemberAuthenticationView(
+                7L, "member@example.com", null, "USER", true, "케이크회원");
+        when(socialLoginService.signup(any(), any(OAuthSignupForm.class))).thenReturn(member);
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("member@example.com", null));
+        org.springframework.mock.web.MockHttpServletRequest savedRequest =
+                new org.springframework.mock.web.MockHttpServletRequest("GET", "/orders/checkout");
+        savedRequest.setSession(session);
+        new org.springframework.security.web.savedrequest.HttpSessionRequestCache()
+                .saveRequest(savedRequest, new org.springframework.mock.web.MockHttpServletResponse());
+
+        mockMvc.perform(post("/oauth/signup")
+                        .session(session)
+                        .param("name", "홍길동")
+                        .param("nickname", "케이크회원")
+                        .param("phone", "010-1234-5678")
+                        .param("birthDate", "2000-01-15"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("http://localhost/orders/checkout?continue"));
     }
 
     private MockHttpSession signupSession() {

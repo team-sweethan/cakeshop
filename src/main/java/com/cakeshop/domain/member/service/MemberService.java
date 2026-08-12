@@ -173,7 +173,8 @@ public class MemberService {
         Member member = memberMapper.findByEmail(email)
                 .orElseThrow(() -> new BusinessException(MemberErrorCode.NOT_FOUND));
         if (member.getPassword() != null
-                && !passwordEncoder.matches(currentPassword, member.getPassword())) {
+                && (currentPassword == null || currentPassword.isBlank()
+                || !passwordEncoder.matches(currentPassword, member.getPassword()))) {
             throw new BusinessException(MemberErrorCode.INVALID_CURRENT_PASSWORD);
         }
         if (member.getStatus() == null

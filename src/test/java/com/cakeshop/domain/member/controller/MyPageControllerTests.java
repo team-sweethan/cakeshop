@@ -241,6 +241,30 @@ class MyPageControllerTests {
                 org.mockito.ArgumentMatchers.any(ProfileUpdateForm.class));
     }
 
+    @Test
+    void withdraw_passwordLoginMember_missingCurrentPassword_rendersFieldError() {
+        MemberDetails memberDetails = memberDetails();
+        WithdrawForm form = new WithdrawForm();
+        form.setWithdrawalConfirmed(true);
+        when(memberService.hasPasswordLogin(memberDetails.getUsername())).thenReturn(true);
+        when(memberService.getMemberProfile(memberDetails.getUsername())).thenReturn(memberProfile());
+
+        String viewName = myPageController.withdraw(
+                memberDetails,
+                form,
+                bindingResult,
+                model,
+                request,
+                redirectAttributes);
+
+        assertThat(viewName).isEqualTo("customer/member/profile-edit");
+        verify(bindingResult).rejectValue(
+                "currentPassword",
+                "NotBlank",
+                "현재 비밀번호를 입력해 주세요.");
+        verifyNoInteractions(sessionRegistry, request, redirectAttributes);
+    }
+
     private WithdrawForm confirmedWithdrawForm() {
         WithdrawForm form = new WithdrawForm();
         form.setCurrentPassword("CurrentPassword1!");
