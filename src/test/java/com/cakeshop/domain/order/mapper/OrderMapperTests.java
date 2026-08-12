@@ -408,6 +408,38 @@ class OrderMapperTests {
     }
 
     @Test
+    void cancelAfterPaymentCompensation_customUnderReviewOrder_marksOrderCanceled() {
+        Order order = newOrder();
+        orderMapper.insertOrder(order);
+        LocalDateTime underReviewAt = LocalDateTime.of(2026, 8, 1, 12, 1);
+        LocalDateTime canceledAt = underReviewAt.plusMinutes(5);
+        long paymentId = insertPayment(order.getId(), "DONE", "CUSTOM-COMPENSATION");
+        assertThat(orderMapper.markUnderReviewAfterPaymentIfPending(order.getId(), underReviewAt))
+                .isEqualTo(1);
+        jdbcTemplate.update(
+                """
+                UPDATE payments
+                SET status = 'CANCELED',
+                    provider_status = 'CANCELED',
+                    failure_code = 'INTERNAL_COMPLETION_FAILED',
+                    canceled_at = ?
+                WHERE id = ?
+                """,
+                canceledAt,
+                paymentId
+        );
+
+        assertThat(orderMapper.cancelAfterPaymentCompensation(
+                order.getId(), canceledAt, "내부 결제 완료 처리 실패"
+        )).isEqualTo(1);
+
+        Order canceled = orderMapper.findOrderById(order.getId()).orElseThrow();
+        assertThat(canceled.getStatus()).isEqualTo(OrderStatus.CANCELED);
+        assertThat(canceled.getCanceledBy()).isEqualTo("SYSTEM");
+        assertThat(canceled.getCanceledAt()).isEqualTo(canceledAt);
+    }
+
+    @Test
     void expireIfPendingPayment_recordsStatusAndTimeConditionally() {
         Order order = newOrder();
         orderMapper.insertOrder(order);

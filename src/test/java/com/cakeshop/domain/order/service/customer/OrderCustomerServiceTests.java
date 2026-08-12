@@ -144,7 +144,7 @@ class OrderCustomerServiceTests {
     }
 
     @Test
-    void getMemberOrder_customPendingPayment_doesNotExposeGeneralPaymentButton() {
+    void getMemberOrder_customPendingPayment_exposesPaymentButton() {
         Order order = order(10L, 3L);
         order.setOrderType(OrderType.CUSTOM);
         order.setStatus(OrderStatus.PENDING_PAYMENT);
@@ -157,7 +157,6 @@ class OrderCustomerServiceTests {
         OrderDetailView result = orderQueryService.getMemberOrder(3L, 10L);
 
         assertThat(result.paymentPending()).isTrue();
-        assertThat(result.generalPaymentPending()).isFalse();
     }
 
     @Test
@@ -172,7 +171,7 @@ class OrderCustomerServiceTests {
 
         OrderDetailView result = orderQueryService.getMemberOrder(3L, 10L);
 
-        assertThat(result.generalPaymentPending()).isTrue();
+        assertThat(result.paymentPending()).isTrue();
     }
 
     @Test

@@ -5,6 +5,7 @@ import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.member.service.MemberCouponQueryService;
 import com.cakeshop.domain.order.entity.OrderStatus;
+import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.order.mapper.OrderMapper;
 import com.cakeshop.domain.order.service.OrderOptionValidator;
 import com.cakeshop.domain.order.service.OrderPaymentCommandService;
@@ -36,6 +37,7 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -47,6 +49,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doThrow;
 
 @MybatisTest
 @Import({
@@ -175,6 +178,108 @@ class PaymentCompletionIntegrationTests {
                 orderItemId
         );
         assertThat(stockDeductedAt).isEqualTo(APPROVED_AT);
+    }
+
+    @Test
+    void completePayment_customReadyPayment_updatesStockPaymentAndUnderReview() {
+        jdbcTemplate.update(
+                "UPDATE products SET product_type = 'CUSTOM', preparation_days = 1 WHERE id = ?",
+                productId
+        );
+        jdbcTemplate.update("UPDATE orders SET order_type = 'CUSTOM' WHERE id = ?", orderId);
+        jdbcTemplate.update(
+                "UPDATE order_items SET product_type = 'CUSTOM', preparation_days = 1 WHERE id = ?",
+                orderItemId
+        );
+
+        Payment readyPayment = paymentService.getReadyPayment(orderId);
+        PaymentExecutionOrder order = new PaymentExecutionOrder(
+                orderId,
+                OrderType.CUSTOM,
+                BigDecimal.valueOf(40_000),
+                APPROVED_AT.plusMinutes(10),
+                List.of(new PaymentProduct(orderItemId, productId, 2))
+        );
+        ApprovalResult approval = new ApprovalResult(
+                "CUSTOM-PAYMENT-KEY-" + suffix,
+                readyPayment.getTossOrderId(),
+                "CARD",
+                "DONE",
+                40_000,
+                APPROVED_AT
+        );
+
+        paymentService.completePayment(order, readyPayment, approval);
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT stock_quantity FROM products WHERE id = ?",
+                Integer.class,
+                productId
+        )).isEqualTo(3);
+        assertThat(paymentMapper.findDonePaymentByOrderId(orderId))
+                .hasValueSatisfying(payment -> assertThat(payment.getStatus())
+                        .isEqualTo(PaymentStatus.DONE));
+        Order completedOrder = orderMapper.findOrderById(orderId).orElseThrow();
+        assertThat(completedOrder.getStatus()).isEqualTo(OrderStatus.UNDER_REVIEW);
+        assertThat(completedOrder.getUnderReviewAt()).isEqualTo(APPROVED_AT);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT stock_deducted_at FROM order_items WHERE id = ?",
+                LocalDateTime.class,
+                orderItemId
+        )).isEqualTo(APPROVED_AT);
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void completePayment_customCouponFailure_rollsBackStockPaymentAndOrder() {
+        jdbcTemplate.update(
+                "UPDATE products SET product_type = 'CUSTOM', preparation_days = 1 WHERE id = ?",
+                productId
+        );
+        jdbcTemplate.update("UPDATE orders SET order_type = 'CUSTOM' WHERE id = ?", orderId);
+        jdbcTemplate.update(
+                "UPDATE order_items SET product_type = 'CUSTOM', preparation_days = 1 WHERE id = ?",
+                orderItemId
+        );
+        Payment readyPayment = paymentService.getReadyPayment(orderId);
+        PaymentExecutionOrder order = new PaymentExecutionOrder(
+                orderId,
+                OrderType.CUSTOM,
+                BigDecimal.valueOf(40_000),
+                APPROVED_AT.plusMinutes(10),
+                List.of(new PaymentProduct(orderItemId, productId, 2))
+        );
+        ApprovalResult approval = new ApprovalResult(
+                "CUSTOM-ROLLBACK-KEY-" + suffix,
+                readyPayment.getTossOrderId(),
+                "CARD",
+                "DONE",
+                40_000,
+                APPROVED_AT
+        );
+        doThrow(new BusinessException(PaymentErrorCode.PAYMENT_COMPLETE_FAILED))
+                .when(couponOrderCommandService)
+                .useReservedCouponForOrder(orderId);
+
+        assertThatThrownBy(() -> paymentService.completePayment(order, readyPayment, approval))
+                .isInstanceOf(BusinessException.class);
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT stock_quantity FROM products WHERE id = ?",
+                Integer.class,
+                productId
+        )).isEqualTo(5);
+        assertThat(paymentMapper.findPaymentById(readyPayment.getId()))
+                .hasValueSatisfying(payment -> assertThat(payment.getStatus())
+                        .isEqualTo(PaymentStatus.READY));
+        assertThat(orderMapper.findOrderById(orderId))
+                .hasValueSatisfying(savedOrder -> assertThat(savedOrder.getStatus())
+                        .isEqualTo(OrderStatus.PENDING_PAYMENT));
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT stock_deducted_at FROM order_items WHERE id = ?",
+                LocalDateTime.class,
+                orderItemId
+        )).isNull();
     }
 
     @Test

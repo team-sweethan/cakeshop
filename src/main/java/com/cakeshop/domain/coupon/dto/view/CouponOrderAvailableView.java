@@ -9,6 +9,7 @@ public record CouponOrderAvailableView(
         String name,
         DiscountType discountType,
         BigDecimal discountValue,
+        BigDecimal minimumOrderAmount,
         BigDecimal maximumDiscountAmount
 ) {
 }

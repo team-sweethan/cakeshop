@@ -4,6 +4,7 @@ import com.cakeshop.domain.order.service.OrderPaymentQueryService;
 import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentOrder;
 import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentExecutionOrder;
 import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentProduct;
+import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.payment.dto.form.PaymentConfirmForm;
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.entity.PaymentStatus;
@@ -113,6 +114,34 @@ class PaymentFacadeTests {
                 payment,
                 approval
         );
+    }
+
+    @Test
+    void confirmPayment_customOrder_approvesAndCompletesThroughCustomPath() {
+        PaymentExecutionOrder order = new PaymentExecutionOrder(
+                1L,
+                OrderType.CUSTOM,
+                BigDecimal.valueOf(30_000),
+                NOW.plusMinutes(5),
+                List.of(new PaymentProduct(20L, 30L, 1))
+        );
+        Payment payment = payment();
+        PaymentConfirmForm form = form(BigDecimal.valueOf(30_000));
+        ApprovalResult approval = approval();
+
+        when(orderPaymentQueryService.getMemberPaymentExecutionOrder(10L, 1L))
+                .thenReturn(order);
+        when(paymentService.getReadyPayment(1L)).thenReturn(payment);
+        when(tossPaymentClient.approve(
+                "payment-key",
+                "ORD-100",
+                30_000L,
+                "PAY-1"
+        )).thenReturn(approval);
+
+        paymentFacade.confirmPayment(10L, 1L, form);
+
+        verify(paymentService).completePayment(order, payment, approval);
     }
 
     @Test
