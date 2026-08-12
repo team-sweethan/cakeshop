@@ -67,7 +67,7 @@ public class HomeService {
     }
 
     /*
-     * 홈 화면 최상단에 노출할 공지를 조회한다.
+     * 홈 화면의 서비스 안내와 카테고리 사이에 노출할 공지를 조회한다.
      *
      * <p>인기글과 같은 계약을 쓴다. 건수도 커뮤니티가 정한다
      * (specs/community-notice.md B8·D3).
