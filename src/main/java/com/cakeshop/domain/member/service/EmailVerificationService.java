@@ -154,26 +154,22 @@ public class EmailVerificationService {
         EmailVerification verification = emailVerificationMapper.findLatest(email, purpose)
                 .orElse(null);
         if (verification == null) {
-            passwordEncoder.matches(code == null ? "" : code, DUMMY_CODE_HASH);
-            throw new BusinessException(MemberErrorCode.EMAIL_VERIFICATION_INVALID);
+            rejectInvalidCode(code, purpose);
         }
 
         if (verification.getVerifiedAt() != null) {
-            if (verification.getAttemptCount() < 5
+            boolean canVerify = verification.getAttemptCount() < 5
                     && verification.getConsumedAt() == null
                     && verification.getVerifiedAt().plus(VERIFIED_TTL).isAfter(now)
                     && code != null
-                    && code.matches("\\d{6}")
-                    && passwordEncoder.matches(code, verification.getCodeHash())) {
+                    && code.matches("\\d{6}");
+            if (!canVerify) {
+                rejectInvalidCode(code, purpose);
+            }
+            if (passwordEncoder.matches(code, verification.getCodeHash())) {
                 return verification;
             }
-            if (verification.getAttemptCount() < 5
-                    && verification.getConsumedAt() == null
-                    && verification.getVerifiedAt().plus(VERIFIED_TTL).isAfter(now)
-                    && code != null
-                    && code.matches("\\d{6}")) {
-                emailVerificationAttemptService.recordFailure(verification.getId(), now);
-            }
+            emailVerificationAttemptService.recordFailure(verification.getId(), now);
             throw new BusinessException(MemberErrorCode.EMAIL_VERIFICATION_INVALID);
         }
         if (verification.getConsumedAt() != null
@@ -181,7 +177,7 @@ public class EmailVerificationService {
                 || verification.getAttemptCount() >= 5
                 || code == null
                 || !code.matches("\\d{6}")) {
-            throw new BusinessException(MemberErrorCode.EMAIL_VERIFICATION_INVALID);
+            rejectInvalidCode(code, purpose);
         }
         if (!passwordEncoder.matches(code, verification.getCodeHash())) {
             emailVerificationAttemptService.recordFailure(verification.getId(), now);
@@ -196,6 +192,13 @@ public class EmailVerificationService {
         }
         verification.setVerifiedAt(now);
         return verification;
+    }
+
+    private void rejectInvalidCode(String code, EmailVerificationPurpose purpose) {
+        if (purpose == EmailVerificationPurpose.PASSWORD_RESET) {
+            passwordEncoder.matches(code == null ? "" : code, DUMMY_CODE_HASH);
+        }
+        throw new BusinessException(MemberErrorCode.EMAIL_VERIFICATION_INVALID);
     }
 
     private Instant verificationExpiresAt(EmailVerification verification) {
@@ -228,7 +231,7 @@ public class EmailVerificationService {
         }
         String email = normalizeAndValidateEmail(rawEmail);
         LocalDateTime now = LocalDateTime.now(clock);
-        return emailVerificationMapper.findVerifiedByIdForUpdate(
+        return findConsumableVerification(
                         verificationId,
                         email,
                         purpose,
@@ -236,6 +239,19 @@ public class EmailVerificationService {
                 .map(verification ->
                         emailVerificationMapper.markConsumed(verification.getId(), now) == 1)
                 .orElse(false);
+    }
+
+    private Optional<EmailVerification> findConsumableVerification(
+            Long verificationId,
+            String email,
+            EmailVerificationPurpose purpose,
+            LocalDateTime verifiedSince) {
+        if (purpose == EmailVerificationPurpose.PASSWORD_RESET) {
+            return emailVerificationMapper.findLatestVerifiedByIdForUpdate(
+                    verificationId, email, purpose, verifiedSince);
+        }
+        return emailVerificationMapper.findVerifiedByIdForUpdate(
+                verificationId, email, purpose, verifiedSince);
     }
 
     private Optional<Member> findPasswordResetMember(String email) {

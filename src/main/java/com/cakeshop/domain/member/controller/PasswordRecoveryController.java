@@ -4,12 +4,14 @@ import com.cakeshop.domain.member.dto.form.PasswordForm;
 import com.cakeshop.domain.member.dto.view.PasswordResetResult;
 import com.cakeshop.domain.member.service.MemberService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import java.time.Instant;
 import org.springframework.security.core.session.SessionInformation;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -43,14 +45,13 @@ public class PasswordRecoveryController {
     @GetMapping("/reset-password")
     public String resetPassword(
             Model model,
-            HttpSession session,
+            HttpServletRequest request,
             RedirectAttributes redirectAttributes) {
+        HttpSession session = request.getSession(false);
         PasswordRecoverySession recoverySession = getValidRecoverySession(session);
         if (recoverySession == null) {
             removeRecoverySession(session);
-            redirectAttributes.addFlashAttribute(
-                    "errorMessage",
-                    "회원정보를 다시 확인해 주세요.");
+            addInvalidRecoveryMessage(session, redirectAttributes);
             return "redirect:/find-password";
         }
 
@@ -63,14 +64,14 @@ public class PasswordRecoveryController {
     public String resetPassword(
             @Valid @ModelAttribute("passwordForm") PasswordForm form,
             BindingResult bindingResult,
-            HttpSession session,
+            HttpServletRequest request,
+            HttpServletResponse response,
             RedirectAttributes redirectAttributes) {
+        HttpSession session = request.getSession(false);
         PasswordRecoverySession recoverySession = getValidRecoverySession(session);
         if (recoverySession == null) {
             removeRecoverySession(session);
-            redirectAttributes.addFlashAttribute(
-                    "errorMessage",
-                    "회원정보를 다시 확인해 주세요.");
+            addInvalidRecoveryMessage(session, redirectAttributes);
             return "redirect:/find-password";
         }
         if (bindingResult.hasErrors()) {
@@ -100,6 +101,7 @@ public class PasswordRecoveryController {
         }
 
         expireExistingSessions(recoverySession.email());
+        new HttpSessionRequestCache().removeRequest(request, response);
         redirectAttributes.addFlashAttribute(
                 "successMessage",
                 "비밀번호가 재설정되었습니다. 새 비밀번호로 로그인해 주세요.");
@@ -107,6 +109,9 @@ public class PasswordRecoveryController {
     }
 
     private PasswordRecoverySession getValidRecoverySession(HttpSession session) {
+        if (session == null) {
+            return null;
+        }
         Object attribute = session.getAttribute(PASSWORD_RECOVERY_SESSION_KEY);
         if (!(attribute instanceof PasswordRecoverySession recoverySession)
                 || !recoverySession.isValid(Instant.now())) {
@@ -118,6 +123,16 @@ public class PasswordRecoveryController {
     private void removeRecoverySession(HttpSession session) {
         if (session != null) {
             session.removeAttribute(PASSWORD_RECOVERY_SESSION_KEY);
+        }
+    }
+
+    private void addInvalidRecoveryMessage(
+            HttpSession session,
+            RedirectAttributes redirectAttributes) {
+        if (session != null) {
+            redirectAttributes.addFlashAttribute(
+                    "errorMessage",
+                    "회원정보를 다시 확인해 주세요.");
         }
     }
 

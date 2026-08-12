@@ -117,6 +117,28 @@
            FOR UPDATE
     </select>
 
+    <select id="findLatestVerifiedByIdForUpdate" resultMap="emailVerificationResultMap">
+        SELECT <include refid="emailVerificationColumns"/>
+          FROM email_verifications
+         WHERE id = #{id}
+           AND email = #{email}
+           AND purpose = #{purpose}
+           AND verified_at &gt;= #{verifiedSince}
+           AND consumed_at IS NULL
+           AND id = (
+               SELECT latest_verification.id
+                 FROM (
+                     SELECT id
+                       FROM email_verifications
+                      WHERE email = #{email}
+                        AND purpose = #{purpose}
+                      ORDER BY created_at DESC, id DESC
+                      LIMIT 1
+                 ) latest_verification
+           )
+         FOR UPDATE
+    </select>
+
     <update id="markConsumed">
         UPDATE email_verifications
            SET consumed_at = #{consumedAt}

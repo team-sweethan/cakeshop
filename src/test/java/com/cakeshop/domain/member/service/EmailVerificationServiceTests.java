@@ -294,6 +294,25 @@ class EmailVerificationServiceTests {
     }
 
     @Test
+    void verifyPasswordResetCode_attemptLimitReached_runsDummyHashComparison() {
+        EmailVerification latest = verification("user@example.com", "unused-hash");
+        latest.setPurpose(EmailVerificationPurpose.PASSWORD_RESET);
+        latest.setAttemptCount(5);
+        when(emailVerificationMapper.findLatest(
+                "user@example.com", EmailVerificationPurpose.PASSWORD_RESET))
+                .thenReturn(Optional.of(latest));
+
+        assertMemberError(
+                () -> emailVerificationService.verifyPasswordResetCode(
+                        "user@example.com", "123456"),
+                MemberErrorCode.EMAIL_VERIFICATION_INVALID);
+
+        verify(passwordEncoder).matches(
+                org.mockito.ArgumentMatchers.eq("123456"),
+                org.mockito.ArgumentMatchers.startsWith("$2a$10$"));
+    }
+
+    @Test
     void verifyPasswordResetCode_alreadyVerified_usesOriginalVerificationExpiry() {
         EmailVerification latest = verification(
                 "user@example.com", passwordEncoder.encode("123456"));
@@ -348,7 +367,7 @@ class EmailVerificationServiceTests {
         EmailVerification verified = verification("user@example.com", "hash");
         verified.setPurpose(EmailVerificationPurpose.PASSWORD_RESET);
         verified.setVerifiedAt(NOW.minusMinutes(1));
-        when(emailVerificationMapper.findVerifiedByIdForUpdate(
+        when(emailVerificationMapper.findLatestVerifiedByIdForUpdate(
                 verified.getId(),
                 "user@example.com",
                 EmailVerificationPurpose.PASSWORD_RESET,

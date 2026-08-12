@@ -25,6 +25,7 @@ import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.core.session.SessionInformation;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.web.savedrequest.DefaultSavedRequest;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -68,6 +69,17 @@ class PasswordRecoveryControllerTests {
     }
 
     @Test
+    void resetPassword_withoutSession_doesNotCreateSession() throws Exception {
+        org.springframework.test.web.servlet.MvcResult result =
+                mockMvc.perform(get("/reset-password"))
+                        .andExpect(status().is3xxRedirection())
+                        .andExpect(redirectedUrl("/find-password"))
+                        .andReturn();
+
+        assertThat(result.getRequest().getSession(false)).isNull();
+    }
+
+    @Test
     void resetPassword_invalidNewPassword_keepsRecoverySession() throws Exception {
         MockHttpSession session = validRecoverySession();
 
@@ -98,6 +110,9 @@ class PasswordRecoveryControllerTests {
         when(memberService.resetPassword(
                 11L, 7L, "member@example.com", "NewPassword1!"))
                 .thenReturn(PasswordResetResult.SUCCESS);
+        session.setAttribute(
+                "SPRING_SECURITY_SAVED_REQUEST",
+                mock(DefaultSavedRequest.class));
 
         mockMvc.perform(post("/reset-password")
                         .session(session)
@@ -109,6 +124,7 @@ class PasswordRecoveryControllerTests {
         verify(sessionInformation).expireNow();
         assertThat(session.getAttribute(
                 PasswordRecoveryController.PASSWORD_RECOVERY_SESSION_KEY)).isNull();
+        assertThat(session.getAttribute("SPRING_SECURITY_SAVED_REQUEST")).isNull();
     }
 
     @Test
