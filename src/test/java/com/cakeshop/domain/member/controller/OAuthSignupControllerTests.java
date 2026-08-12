@@ -25,6 +25,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 class OAuthSignupControllerTests {
@@ -83,11 +84,12 @@ class OAuthSignupControllerTests {
     @Test
     void signup_validInput_authenticatesAndRedirectsHome() throws Exception {
         MockHttpSession session = signupSession();
+        String previousSessionId = session.getId();
         MemberAuthenticationView member = new MemberAuthenticationView(
                 7L, "member@example.com", null, "USER", true, "케이크러버");
         when(socialLoginService.signup(any(), any(OAuthSignupForm.class))).thenReturn(member);
 
-        mockMvc.perform(post("/oauth/signup")
+        MvcResult result = mockMvc.perform(post("/oauth/signup")
                         .session(session)
                         .param("name", "홍길동")
                         .param("nickname", "케이크러버")
@@ -95,11 +97,13 @@ class OAuthSignupControllerTests {
                         .param("birthDate", "2000-01-15"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/"))
-                .andExpect(flash().attribute("successMessage", "소셜 회원가입이 완료되었습니다."));
+                .andExpect(flash().attribute("successMessage", "소셜 회원가입이 완료되었습니다."))
+                .andReturn();
 
         verify(memberAuthenticationSession).login(any(), any(), eq(member));
         verify(socialLoginService).signup(any(), any(OAuthSignupForm.class));
         assertThat(session.getAttribute(OAuthSignupSession.SESSION_KEY)).isNull();
+        assertThat(result.getRequest().getSession().getId()).isNotEqualTo(previousSessionId);
     }
 
     private MockHttpSession signupSession() {

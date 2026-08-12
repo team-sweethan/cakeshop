@@ -66,6 +66,7 @@ public class OAuthSignupController {
             return "auth/oauth-signup";
         }
 
+        request.changeSessionId();
         memberAuthenticationSession.login(
                 request,
                 response,

@@ -69,6 +69,7 @@ public class SocialLoginService {
                 .memberId(member.getId())
                 .provider(identity.provider())
                 .providerId(identity.providerId())
+                .socialEmail(email)
                 .build();
         if (socialAccountMapper.insert(socialAccount) != 1) {
             throw new BusinessException(MemberErrorCode.UPDATE_FAILED);

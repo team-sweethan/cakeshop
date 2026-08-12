@@ -17,5 +17,6 @@ public class SocialAccount {
     private Long memberId;
     private String provider;
     private String providerId;
+    private String socialEmail;
     private LocalDateTime createdAt;
 }

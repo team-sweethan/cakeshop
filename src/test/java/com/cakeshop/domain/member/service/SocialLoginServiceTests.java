@@ -102,6 +102,7 @@ class SocialLoginServiceTests {
         assertThat(accountCaptor.getValue().getMemberId()).isEqualTo(7L);
         assertThat(accountCaptor.getValue().getProvider()).isEqualTo("GOOGLE");
         assertThat(accountCaptor.getValue().getProviderId()).isEqualTo("google-subject");
+        assertThat(accountCaptor.getValue().getSocialEmail()).isEqualTo("member@example.com");
         assertThat(result).isEqualTo(authenticatedMember);
     }
 }

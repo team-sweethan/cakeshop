@@ -13,7 +13,7 @@
             parameterType="com.cakeshop.domain.member.entity.SocialAccount"
             useGeneratedKeys="true"
             keyProperty="id">
-        INSERT INTO social_accounts (member_id, provider, provider_id)
-        VALUES (#{memberId}, #{provider}, #{providerId})
+        INSERT INTO social_accounts (member_id, provider, provider_id, social_email)
+        VALUES (#{memberId}, #{provider}, #{providerId}, #{socialEmail})
     </insert>
 </mapper>

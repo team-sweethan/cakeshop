@@ -29,12 +29,17 @@ class SocialAccountMapperTests {
                 .memberId(memberId)
                 .provider("GOOGLE")
                 .providerId("google-" + System.nanoTime())
+                .socialEmail(email)
                 .build();
 
         assertThat(socialAccountMapper.insert(account)).isOne();
         assertThat(account.getId()).isNotNull();
         assertThat(socialAccountMapper.findMemberEmail(
                 account.getProvider(), account.getProviderId())).contains(email);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT social_email FROM social_accounts WHERE id = ?",
+                String.class,
+                account.getId())).isEqualTo(email);
     }
 
     @Test
