@@ -138,6 +138,10 @@ class HomeScreenRenderingTests {
         int noticeIndex = html.indexOf(NOTICE_SECTION);
         int categoryIndex = html.indexOf("id=\"category-title\"");
 
+        // indexOf는 없는 영역에 -1을 주므로, 순서를 보기 전에 세 영역이 실제로 있는지 먼저 못박는다.
+        assertThat(serviceIndex).isNotNegative();
+        assertThat(noticeIndex).isNotNegative();
+        assertThat(categoryIndex).isNotNegative();
         assertThat(serviceIndex).isLessThan(noticeIndex);
         assertThat(noticeIndex).isLessThan(categoryIndex);
     }
