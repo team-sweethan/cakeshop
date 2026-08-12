@@ -236,10 +236,18 @@ public class ChatService {
         if (key.startsWith("chat/") || key.startsWith("uploads/")) {
             return;
         }
-        // 3. 외부 URL인 경우 자사 S3 / CloudFront / 로컬 도메인만 통과 허용!
+        // 3. 외부 URL인 경우 URI 파싱을 거쳐 자사 신뢰 도메인 호스트만 통과 허용!
         if (key.startsWith("http://") || key.startsWith("https://")) {
-            if (key.contains("amazonaws.com") || key.contains("cloudfront.net") || key.contains("localhost") || key.contains("127.0.0.1")) {
-                return;
+            try {
+                java.net.URI uri = java.net.URI.create(key);
+                String host = uri.getHost();
+                if (host != null) {
+                    host = host.toLowerCase();
+                    if (host.endsWith("amazonaws.com") || host.endsWith("cloudfront.net") || host.equals("localhost") || host.equals("127.0.0.1")) {
+                        return;
+                    }
+                }
+            } catch (Exception ignored) {
             }
             // 해커/외부 서버 추적 URL(https://attacker.example/pixel.png) 차단
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);

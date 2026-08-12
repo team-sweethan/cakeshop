@@ -78,7 +78,7 @@ document.addEventListener("DOMContentLoaded", () => {
     chatMessagesContainer.innerHTML = "";
 
     if (!messages || messages.length === 0) {
-      chatMessagesContainer.innerHTML = `<div class="text-muted" style="text-align:center; padding:30px;">아직 주고받은 메시지가 없습니다. 문의사항을 남겨보세요!</div>`;
+      chatMessagesContainer.innerHTML = `<div class="text-muted empty-chat-notice" style="text-align:center; padding:30px;">아직 주고받은 메시지가 없습니다. 문의사항을 남겨보세요!</div>`;
       return;
     }
 
@@ -234,9 +234,13 @@ document.addEventListener("DOMContentLoaded", () => {
         if (imageFileName) imageFileName.textContent = "선택된 파일 없음";
         if (chatImageInput) chatImageInput.value = "";
 
-        // DOM 추가
-        const msgEl = createMessageDOM(sentMsg);
+        // 첫 메시지 전송 시 기존 안내 문구 지우기
         if (chatMessagesContainer) {
+          const noticeEl = chatMessagesContainer.querySelector(".empty-chat-notice");
+          if (noticeEl) {
+            chatMessagesContainer.innerHTML = "";
+          }
+          const msgEl = createMessageDOM(sentMsg);
           chatMessagesContainer.appendChild(msgEl);
           scrollToBottom();
         }
@@ -270,7 +274,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (!response.ok) {
           alert("이미지 업로드에 실패했습니다. (5MB 이하 이미지 파일만 가능합니다)");
-          if (imageFileName) imageFileName.textContent = "업로드 실패";
+          pendingAttachment = null;
+          if (imageFileName) imageFileName.textContent = "선택된 파일 없음";
+          if (chatImageInput) chatImageInput.value = "";
           return;
         }
 
@@ -287,6 +293,9 @@ document.addEventListener("DOMContentLoaded", () => {
       } catch (err) {
         console.error("이미지 업로드 오류:", err);
         alert("이미지 업로드 처리 중 에러가 발생했습니다.");
+        pendingAttachment = null;
+        if (imageFileName) imageFileName.textContent = "선택된 파일 없음";
+        if (chatImageInput) chatImageInput.value = "";
       }
     });
   }
