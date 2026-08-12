@@ -438,6 +438,29 @@ class CouponAdminServiceTests {
     }
 
     @Test
+    void updateAllowsSameStartsAtMinuteWhenStoredValueHasSecondsAndNanoseconds() {
+        LocalDateTime storedStartsAt = LocalDateTime.now()
+                .minusDays(1)
+                .withSecond(32)
+                .withNano(123_000_000);
+        Coupon coupon = coupon(CouponStatus.ACTIVE, 10, 1, LocalDateTime.now().plusDays(2));
+        coupon.setStartsAt(storedStartsAt);
+        when(couponMapper.findCouponById(1L)).thenReturn(Optional.of(coupon));
+        when(couponMapper.updateCouponAfterStart(any())).thenReturn(1);
+
+        CouponUpdateForm form = updateForm();
+        form.setStartsAt(storedStartsAt.withSecond(0).withNano(0));
+        form.setDiscountType(coupon.getDiscountType());
+        form.setDiscountValue(coupon.getDiscountValue());
+        form.setMinimumOrderAmount(coupon.getMinimumOrderAmount());
+        form.setExpiresAt(coupon.getExpiresAt().withSecond(0).withNano(0));
+
+        couponAdminService.updateCoupon(1L, form);
+
+        verify(couponMapper).updateCouponAfterStart(any());
+    }
+
+    @Test
     void updateAllowsAllFieldsWhenFullEditDueToFutureStartsAt() {
         // startsAt이 미래인 상태
         Coupon coupon = coupon(CouponStatus.ACTIVE, 10, 0, LocalDateTime.now().plusDays(5));

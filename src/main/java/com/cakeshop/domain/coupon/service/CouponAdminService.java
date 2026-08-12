@@ -314,7 +314,9 @@ public class CouponAdminService {
                 || !sameAmount(coupon.getDiscountValue(), form.getDiscountValue())
                 || !sameAmount(coupon.getMinimumOrderAmount(), form.getMinimumOrderAmount())
                 || !sameAmount(coupon.getMaximumDiscountAmount(), form.getMaximumDiscountAmount())
-                || !coupon.getStartsAt().equals(form.getStartsAt())) {
+                // datetime-local Form은 분 단위까지만 전송하므로 양쪽의 초·나노초를 비교에서 제외한다.
+                || !coupon.getStartsAt().truncatedTo(ChronoUnit.MINUTES)
+                .equals(form.getStartsAt().truncatedTo(ChronoUnit.MINUTES))) {
             throw new BusinessException(CouponErrorCode.CANNOT_MODIFY_FIELDS);
         }
 
