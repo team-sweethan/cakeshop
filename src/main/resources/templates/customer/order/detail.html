@@ -67,7 +67,7 @@
             <span th:text="${'-' + #numbers.formatInteger(order.discountAmount, 1, 'COMMA') + '원'}">-0원</span></div>
           <div class="data-row"><span class="data-row__label">최종 결제</span>
             <strong th:text="${#numbers.formatInteger(order.finalAmount, 1, 'COMMA') + '원'}">0원</strong></div>
-          <div class="cluster" th:if="${order.paymentPending}">
+          <div class="cluster" th:if="${order.generalPaymentPending}">
             <a class="btn btn--primary" th:href="@{/orders/{id}/payment(id=${order.orderId})}">결제하기</a>
           </div>
           <form class="stack" th:if="${order.cancelRequestAvailable}" method="post"

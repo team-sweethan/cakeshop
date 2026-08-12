@@ -226,6 +226,15 @@ class CustomerPageControllerTests {
     }
 
     @Test
+    void orderDetailOnlyShowsPaymentButtonForGeneralPaymentFlow() throws IOException {
+        String orderDetailTemplate =
+                new ClassPathResource("templates/customer/order/detail.html")
+                        .getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(orderDetailTemplate).contains("order.generalPaymentPending");
+    }
+
+    @Test
     void pickupViewUsesDedicatedInitializationMarker() throws IOException {
         String pickupTemplate =
                 new ClassPathResource("templates/customer/order/pickup-setting.html")

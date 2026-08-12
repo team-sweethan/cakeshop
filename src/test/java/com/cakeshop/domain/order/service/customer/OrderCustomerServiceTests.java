@@ -144,6 +144,38 @@ class OrderCustomerServiceTests {
     }
 
     @Test
+    void getMemberOrder_customPendingPayment_doesNotExposeGeneralPaymentButton() {
+        Order order = order(10L, 3L);
+        order.setOrderType(OrderType.CUSTOM);
+        order.setStatus(OrderStatus.PENDING_PAYMENT);
+        order.setPaymentExpiresAt(LocalDateTime.of(2026, 8, 3, 10, 10));
+        when(orderMapper.findOrderById(10L)).thenReturn(Optional.of(order));
+        when(orderMapper.findOrderItemsByOrderId(10L)).thenReturn(List.of());
+        when(orderMapper.findOrderItemOptionsByOrderId(10L)).thenReturn(List.of());
+        when(orderMapper.findOrderItemImagesByOrderId(10L)).thenReturn(List.of());
+
+        OrderDetailView result = orderQueryService.getMemberOrder(3L, 10L);
+
+        assertThat(result.paymentPending()).isTrue();
+        assertThat(result.generalPaymentPending()).isFalse();
+    }
+
+    @Test
+    void getMemberOrder_generalPendingPayment_exposesPaymentButton() {
+        Order order = order(10L, 3L);
+        order.setStatus(OrderStatus.PENDING_PAYMENT);
+        order.setPaymentExpiresAt(LocalDateTime.of(2026, 8, 3, 10, 10));
+        when(orderMapper.findOrderById(10L)).thenReturn(Optional.of(order));
+        when(orderMapper.findOrderItemsByOrderId(10L)).thenReturn(List.of());
+        when(orderMapper.findOrderItemOptionsByOrderId(10L)).thenReturn(List.of());
+        when(orderMapper.findOrderItemImagesByOrderId(10L)).thenReturn(List.of());
+
+        OrderDetailView result = orderQueryService.getMemberOrder(3L, 10L);
+
+        assertThat(result.generalPaymentPending()).isTrue();
+    }
+
+    @Test
     void getMemberOrder_requestedCancellationAfterPickup_exposesRetryAction() {
         Order order = order(10L, 3L);
         order.setPickupAt(LocalDateTime.of(2026, 8, 3, 9, 0));
