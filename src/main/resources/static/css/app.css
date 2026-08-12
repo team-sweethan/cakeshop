@@ -903,6 +903,11 @@ h2.section-title {
 }
 
 .product-detail__actions {
+    align-items: flex-start;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    justify-content: space-between;
     margin-top: var(--space-3)
 }
 
