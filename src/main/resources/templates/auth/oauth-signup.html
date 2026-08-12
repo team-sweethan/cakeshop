@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>소셜 회원가입 | 케이크 쇼핑몰</title>
+  <link rel="stylesheet" th:href="@{/css/app.css}">
+  <link rel="stylesheet" th:href="@{/css/customer-mockup.css}">
+  <script defer th:src="@{/js/app.js}"></script>
+  <script defer th:src="@{/js/member-birth-date.js}"></script>
+</head>
+<body>
+<header th:replace="~{fragments/common/header :: header}"></header>
+<main class="page-container page-container--form">
+  <section class="panel section">
+    <h1>추가 정보 입력</h1>
+    <p class="form-help">Google 계정으로 로그인하기 위한 정보를 입력해 주세요.</p>
+    <form class="form-stack" th:action="@{/oauth/signup}" th:object="${oauthSignupForm}" method="post">
+      <div class="form-group">
+        <label for="oauth-email">이메일</label>
+        <input id="oauth-email" class="form-control" type="email" th:value="${oauthEmail}" readonly>
+      </div>
+      <div class="form-group">
+        <label for="oauth-name">이름 <span class="required">*</span></label>
+        <input id="oauth-name" class="form-control" th:field="*{name}" maxlength="50" required>
+        <p class="form-error" th:if="${#fields.hasErrors('name')}" th:errors="*{name}"></p>
+      </div>
+      <div class="form-group">
+        <label for="oauth-nickname">닉네임 <span class="required">*</span></label>
+        <input id="oauth-nickname" class="form-control" th:field="*{nickname}" maxlength="50" required>
+        <p class="form-error" th:if="${#fields.hasErrors('nickname')}" th:errors="*{nickname}"></p>
+      </div>
+      <div class="form-group">
+        <label for="oauth-phone">전화번호 <span class="required">*</span></label>
+        <input id="oauth-phone" class="form-control" type="tel" th:field="*{phone}"
+               placeholder="010-0000-0000" maxlength="13" required>
+        <p class="form-error" th:if="${#fields.hasErrors('phone')}" th:errors="*{phone}"></p>
+      </div>
+      <div class="form-group">
+        <label for="oauth-birth-date">생년월일 <span class="required">*</span></label>
+        <div data-birth-date-picker>
+          <input id="oauth-birth-date" class="form-control" type="date" th:field="*{birthDate}"
+                 data-birth-date-value required>
+          <div class="birth-date-selects">
+            <select class="form-control" aria-label="태어난 연도" data-birth-year required>
+              <option value="">연도</option>
+            </select>
+            <select class="form-control" aria-label="태어난 달" data-birth-month required>
+              <option value="">월</option>
+            </select>
+            <select class="form-control" aria-label="태어난 일" data-birth-day required>
+              <option value="">일</option>
+            </select>
+          </div>
+        </div>
+        <p class="form-error" th:if="${#fields.hasErrors('birthDate')}" th:errors="*{birthDate}"></p>
+      </div>
+      <button class="btn btn--primary btn--block" type="submit">가입 완료</button>
+    </form>
+  </section>
+</main>
+<footer th:replace="~{fragments/common/footer :: footer(${store})}"></footer>
+<script>
+  function formatPhoneNumber(value) {
+    const digits = value.replace(/\D/g, '').slice(0, 11);
+
+    if (digits.length <= 3) {
+      return digits;
+    }
+    if (digits.length <= 7) {
+      return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+    }
+    if (digits.startsWith('010') || digits.length === 11) {
+      return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+    }
+    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+
+  const phoneInput = document.getElementById('oauth-phone');
+  phoneInput.addEventListener('input', (event) => {
+    event.target.value = formatPhoneNumber(event.target.value);
+  });
+</script>
+</body>
+</html>

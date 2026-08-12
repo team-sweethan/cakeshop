@@ -22,6 +22,8 @@ import org.springframework.security.web.authentication.LoginUrlAuthenticationEnt
 import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.security.web.session.HttpSessionEventPublisher;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler;
 
 @Configuration
 @EnableWebSecurity
@@ -36,7 +38,8 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(
             HttpSecurity http,
-            SessionRegistry sessionRegistry) throws Exception {
+            SessionRegistry sessionRegistry,
+            ObjectProvider<OAuth2LoginSuccessHandler> oauth2LoginSuccessHandler) throws Exception {
         RequestMatcher passwordRecoveryRequest =
                 SecurityConfig::isPasswordRecoveryRequest;
         HttpSessionRequestCache requestCache = new HttpSessionRequestCache();
@@ -88,6 +91,7 @@ public class SecurityConfig {
                         "/", "/login", "/signup", "/join", "/emailCheck", "/find-email",
                         "/find-email/login", "/email-verifications/signup/**",
                         "/email-verifications/password-reset/**",
+                        "/oauth/signup", "/oauth2/**", "/login/oauth2/**",
                         "/api/notifications/unread-count", "/api/notifications/test-sms",
                         "/products/**", "/screens", "/favicon.ico",
                         "/css/**", "/js/**", "/webjars/**", "/images/**", "/uploads/**", "/error")
@@ -155,6 +159,13 @@ public class SecurityConfig {
                 .deleteCookies("JSESSIONID")
                 .permitAll()
             );
+        OAuth2LoginSuccessHandler oauthSuccessHandler = oauth2LoginSuccessHandler.getIfAvailable();
+        if (oauthSuccessHandler != null) {
+            http.oauth2Login(oauth2 -> oauth2
+                    .loginPage("/login")
+                    .successHandler(oauthSuccessHandler)
+                    .failureHandler(new SimpleUrlAuthenticationFailureHandler("/login?oauthError")));
+        }
         return http.build();
     }
 
