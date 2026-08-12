@@ -20,7 +20,6 @@ import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.global.error.BusinessException;
 import java.math.BigDecimal;
 import java.time.Clock;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -71,24 +70,19 @@ class FulfillmentServiceTests {
     }
 
     @Test
-    void getFulfillments_missingCondition_usesTodayAndMapsOrderSnapshots() {
+    void getFulfillments_missingCondition_loadsAllStagesAndMapsOrderSnapshots() {
         Order order = order(OrderStatus.READY_FOR_PICKUP);
         OrderItem item = item();
         OrderItemOption option = option();
         order.setOrderType(OrderType.CUSTOM);
         order.setRequestMessage("초는 하늘색으로");
         item.setRequirements("생일 축하해");
-        when(orderMapper.findFulfillmentOrders(
-                LocalDate.of(2026, 8, 2).atStartOfDay(),
-                LocalDate.of(2026, 8, 3).atStartOfDay(),
-                null
-        )).thenReturn(List.of(order));
+        when(orderMapper.findFulfillmentOrders(null)).thenReturn(List.of(order));
         when(orderMapper.findOrderItemsByOrderId(10L)).thenReturn(List.of(item));
         when(orderMapper.findOrderItemOptionsByOrderId(10L)).thenReturn(List.of(option));
 
         FulfillmentListView result = fulfillmentService.getFulfillments(null);
 
-        assertThat(result.pickupDate()).isEqualTo(LocalDate.of(2026, 8, 2));
         assertThat(result.selectedStatus()).isNull();
         assertThat(result.orders()).singleElement().satisfies(view -> {
             assertThat(view.orderNumber()).isEqualTo("ORD-10");
@@ -106,13 +100,8 @@ class FulfillmentServiceTests {
     @Test
     void getFulfillments_unsupportedStatus_ignoresStatusFilter() {
         FulfillmentSearchCondition condition = new FulfillmentSearchCondition();
-        condition.setPickupDate(LocalDate.of(2026, 8, 10));
         condition.setStatus(OrderStatus.CANCELED);
-        when(orderMapper.findFulfillmentOrders(
-                LocalDate.of(2026, 8, 10).atStartOfDay(),
-                LocalDate.of(2026, 8, 11).atStartOfDay(),
-                null
-        )).thenReturn(List.of());
+        when(orderMapper.findFulfillmentOrders(null)).thenReturn(List.of());
 
         FulfillmentListView result = fulfillmentService.getFulfillments(condition);
 
@@ -123,11 +112,7 @@ class FulfillmentServiceTests {
     void getFulfillments_futurePickupOrder_exposesCompletionAction() {
         Order order = order(OrderStatus.READY_FOR_PICKUP);
         order.setPickupAt(NOW.plusHours(1));
-        when(orderMapper.findFulfillmentOrders(
-                LocalDate.of(2026, 8, 2).atStartOfDay(),
-                LocalDate.of(2026, 8, 3).atStartOfDay(),
-                null
-        )).thenReturn(List.of(order));
+        when(orderMapper.findFulfillmentOrders(null)).thenReturn(List.of(order));
         when(orderMapper.findOrderItemsByOrderId(10L)).thenReturn(List.of());
         when(orderMapper.findOrderItemOptionsByOrderId(10L)).thenReturn(List.of());
 
@@ -140,11 +125,7 @@ class FulfillmentServiceTests {
     @Test
     void getFulfillments_requestedCancellation_doesNotExposeCompletionAction() {
         Order order = order(OrderStatus.READY_FOR_PICKUP);
-        when(orderMapper.findFulfillmentOrders(
-                LocalDate.of(2026, 8, 2).atStartOfDay(),
-                LocalDate.of(2026, 8, 3).atStartOfDay(),
-                null
-        )).thenReturn(List.of(order));
+        when(orderMapper.findFulfillmentOrders(null)).thenReturn(List.of(order));
         when(orderMapper.findOrderItemsByOrderId(10L)).thenReturn(List.of());
         when(orderMapper.findOrderItemOptionsByOrderId(10L)).thenReturn(List.of());
         when(orderMapper.hasRequestedRefundCancellation(10L)).thenReturn(true);

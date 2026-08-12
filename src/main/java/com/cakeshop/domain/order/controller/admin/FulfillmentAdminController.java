@@ -49,7 +49,6 @@ public class FulfillmentAdminController {
         // 검증
         recoverInvalidSearchValues(condition, bindingResult);
         FulfillmentListView fulfillment = fulfillmentService.getFulfillments(condition);
-        condition.setPickupDate(fulfillment.pickupDate());
         condition.setStatus(fulfillment.selectedStatus());
         model.addAttribute("fulfillment", fulfillment);
         return "admin/fulfillment/list";
@@ -117,14 +116,11 @@ public class FulfillmentAdminController {
         return "redirect:" + fulfillmentRedirectUrl(condition);
     }
 
-    /** 배송 상태 (픽업 날짜가 없던가, 상태가 없던) 검증 로직.**/
+    /** 지원하지 않는 작업 단계 검색값을 기본값으로 복구한다. */
     private void recoverInvalidSearchValues(
             FulfillmentSearchCondition condition,
             BindingResult bindingResult
     ) {
-        if (bindingResult.hasFieldErrors("pickupDate")) {
-            condition.setPickupDate(null);
-        }
         if (bindingResult.hasFieldErrors("status")) {
             condition.setStatus(null);
         }
@@ -132,9 +128,6 @@ public class FulfillmentAdminController {
 
     private String fulfillmentRedirectUrl(FulfillmentSearchCondition condition) {
         UriComponentsBuilder redirect = UriComponentsBuilder.fromPath("/admin/fulfillment");
-        if (condition != null && condition.getPickupDate() != null) {
-            redirect.queryParam("pickupDate", condition.getPickupDate());
-        }
         if (condition != null
                 && condition.getStatus() != null
                 && FULFILLMENT_STATUSES.contains(condition.getStatus())) {

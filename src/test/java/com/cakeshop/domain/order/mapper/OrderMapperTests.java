@@ -108,7 +108,7 @@ class OrderMapperTests {
     }
 
     @Test
-    void findFulfillmentOrders_filtersPickupDateAndStatusAndSortsByPickupTime() {
+    void findFulfillmentOrders_filtersStatusAndIncludesAllPickupDates() {
         Order laterReady = newOrder();
         laterReady.setOrderNumber("FULFILLMENT-LATER-" + suffix);
         laterReady.setStatus(OrderStatus.READY_FOR_PICKUP);
@@ -139,28 +139,31 @@ class OrderMapperTests {
         futureUnderReview.setPickupAt(LocalDateTime.of(2026, 8, 12, 10, 0));
         orderMapper.insertOrder(futureUnderReview);
 
-        LocalDateTime pickupStart = LocalDateTime.of(2026, 8, 10, 0, 0);
-        LocalDateTime pickupEnd = LocalDateTime.of(2026, 8, 11, 0, 0);
+        Order futureInProduction = newOrder();
+        futureInProduction.setOrderNumber("FULFILLMENT-IN-PRODUCTION-" + suffix);
+        futureInProduction.setOrderType(OrderType.CUSTOM);
+        futureInProduction.setStatus(OrderStatus.IN_PRODUCTION);
+        futureInProduction.setPickupAt(LocalDateTime.of(2026, 8, 12, 11, 0));
+        orderMapper.insertOrder(futureInProduction);
 
-        assertThat(orderMapper.findFulfillmentOrders(pickupStart, pickupEnd, null))
+        assertThat(orderMapper.findFulfillmentOrders(null))
                 .extracting(Order::getId)
                 .containsExactly(
                         futureUnderReview.getId(),
-                        earlierPickedUp.getId(),
-                        laterReady.getId()
+                        futureInProduction.getId(),
+                        laterReady.getId(),
+                        anotherDate.getId(),
+                        earlierPickedUp.getId()
                 );
-        assertThat(orderMapper.findFulfillmentOrders(
-                pickupStart,
-                pickupEnd,
-                OrderStatus.READY_FOR_PICKUP
-        )).extracting(Order::getId)
-                .containsExactly(laterReady.getId());
-        assertThat(orderMapper.findFulfillmentOrders(
-                pickupStart,
-                pickupEnd,
-                OrderStatus.UNDER_REVIEW
-        )).extracting(Order::getId)
+        assertThat(orderMapper.findFulfillmentOrders(OrderStatus.READY_FOR_PICKUP))
+                .extracting(Order::getId)
+                .containsExactly(laterReady.getId(), anotherDate.getId());
+        assertThat(orderMapper.findFulfillmentOrders(OrderStatus.UNDER_REVIEW))
+                .extracting(Order::getId)
                 .containsExactly(futureUnderReview.getId());
+        assertThat(orderMapper.findFulfillmentOrders(OrderStatus.IN_PRODUCTION))
+                .extracting(Order::getId)
+                .containsExactly(futureInProduction.getId());
     }
 
     @Test

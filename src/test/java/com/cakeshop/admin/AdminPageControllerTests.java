@@ -101,7 +101,6 @@ class AdminPageControllerTests {
                 Mockito.mock(FulfillmentService.class);
         when(fulfillmentService.getFulfillments(any()))
                 .thenReturn(new FulfillmentListView(
-                        LocalDate.of(2026, 8, 3),
                         null,
                         List.of()
                 ));

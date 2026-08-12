@@ -20,6 +20,10 @@ public record OrderListView(
         LocalDateTime pickupAt,
         LocalDateTime createdAt
 ) {
+    public String orderTypeLabel() {
+        return orderType == OrderType.CUSTOM ? "주문 제작" : "일반 상품";
+    }
+
     public String statusLabel() {
         return switch (status) {
             case PENDING_PAYMENT -> "결제 대기";

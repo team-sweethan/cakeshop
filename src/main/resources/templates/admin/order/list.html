@@ -3,23 +3,30 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>주문 관리 | 관리자</title>
+  <title>전체 주문 | 관리자</title>
   <link rel="stylesheet" th:href="@{/css/app.css}">
 </head>
 <body>
 <div class="admin-layout">
   <aside th:replace="~{fragments/admin/sidebar :: sidebar('orders')}"></aside>
   <div class="admin-main">
-    <header th:replace="~{fragments/admin/header :: header('주문 관리')}"></header>
+    <header th:replace="~{fragments/admin/header :: header('전체 주문')}"></header>
     <main class="admin-content">
-      <h1 class="admin-page-title">주문 목록</h1>
+      <div class="admin-content__header">
+        <div>
+          <p class="admin-page-eyebrow">ORDER DIRECTORY</p>
+          <h1 class="admin-page-title">전체 주문</h1>
+          <p class="note">모든 주문의 상세와 현재 상태를 확인합니다. 검토·제작·픽업 업무는 주문 처리에서 진행합니다.</p>
+        </div>
+      </div>
       <div class="table-wrap">
         <table class="data-table">
-          <thead><tr><th>주문번호</th><th>주문자</th><th>상품명</th><th>금액</th><th>상태</th><th>픽업 일시</th><th>관리</th></tr></thead>
+          <thead><tr><th>주문번호</th><th>유형</th><th>주문자</th><th>상품명</th><th>금액</th><th>상태</th><th>픽업 일시</th><th>관리</th></tr></thead>
           <tbody>
-          <tr th:if="${#lists.isEmpty(orders)}"><td colspan="7">주문이 없습니다.</td></tr>
+          <tr th:if="${#lists.isEmpty(orders)}"><td colspan="8">주문이 없습니다.</td></tr>
           <tr th:each="order : ${orders}">
             <td th:text="${order.orderNumber}">ORD-001</td>
+            <td th:text="${order.orderTypeLabel}">일반 상품</td>
             <td th:text="${order.ordererName}">주문자</td>
             <td th:text="${order.productName}">상품명</td>
             <td th:text="${#numbers.formatInteger(order.finalAmount, 1, 'COMMA') + '원'}">0원</td>

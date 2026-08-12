@@ -76,12 +76,8 @@ public interface OrderMapper {
             @Param("orderIds") java.util.Collection<Long> orderIds
     );
 
-    /** 지정한 픽업일의 제작·픽업 대상 주문을 픽업 시각 순서로 조회한다. */
-    List<Order> findFulfillmentOrders(
-            @Param("pickupStart") LocalDateTime pickupStart,
-            @Param("pickupEnd") LocalDateTime pickupEnd,
-            @Param("status") OrderStatus status
-    );
+    /** 제작·픽업 대상 주문을 작업 단계와 픽업 시각 순서로 조회한다. */
+    List<Order> findFulfillmentOrders(@Param("status") OrderStatus status);
 
     /** 기준 시각까지 결제되지 않은 PENDING_PAYMENT 주문 식별자를 오래된 순으로 조회한다. */
     List<Long> findOverduePendingOrderIds(

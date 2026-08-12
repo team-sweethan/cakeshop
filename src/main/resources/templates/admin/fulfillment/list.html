@@ -3,43 +3,46 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>제작·픽업 관리 | 관리자</title>
+  <title>주문 처리 | 관리자</title>
   <link rel="stylesheet" th:href="@{/css/app.css}">
 </head>
 <body>
 <div class="admin-layout">
   <aside th:replace="~{fragments/admin/sidebar :: sidebar('fulfillment')}"></aside>
   <div class="admin-main">
-    <header th:replace="~{fragments/admin/header :: header('제작·픽업 관리')}"></header>
+    <header th:replace="~{fragments/admin/header :: header('주문 처리')}"></header>
     <main class="admin-content">
       <div th:replace="~{fragments/common/alert :: alert}"></div>
-      <h1 class="admin-page-title">제작·픽업 관리</h1>
+      <div class="admin-content__header order-workspace__header">
+        <div>
+          <p class="admin-page-eyebrow">ORDER WORKSPACE</p>
+          <h1 class="admin-page-title">주문 처리</h1>
+          <p class="note">결제 완료 주문의 검토, 제작, 픽업 업무를 처리합니다. 결제 대기·취소·만료 기록은 전체 주문 또는 결제 기록에서 확인합니다.</p>
+        </div>
+      </div>
 
-      <form class="admin-toolbar" method="get" th:action="@{/admin/fulfillment}">
-        <input class="form-control" id="pickupDate" name="pickupDate" type="date"
-               aria-label="픽업 날짜"
-               th:value="${fulfillment.pickupDate}">
-        <select class="form-control" id="status" name="status" aria-label="주문 상태">
-          <option value="" th:selected="${fulfillment.selectedStatus == null}">전체 상태</option>
-          <option value="UNDER_REVIEW"
-                  th:selected="${fulfillment.selectedStatus != null
-                      and fulfillment.selectedStatus.name() == 'UNDER_REVIEW'}">승인 대기</option>
-          <option value="IN_PRODUCTION"
-                  th:selected="${fulfillment.selectedStatus != null
-                      and fulfillment.selectedStatus.name() == 'IN_PRODUCTION'}">제작 중</option>
-          <option value="READY_FOR_PICKUP"
-                  th:selected="${fulfillment.selectedStatus != null
-                      and fulfillment.selectedStatus.name() == 'READY_FOR_PICKUP'}">픽업 준비</option>
-          <option value="PICKED_UP"
-                  th:selected="${fulfillment.selectedStatus != null
-                      and fulfillment.selectedStatus.name() == 'PICKED_UP'}">픽업 완료</option>
-        </select>
-        <button class="btn btn--primary" type="submit">조회</button>
-      </form>
+      <nav class="order-workspace__stages" aria-label="주문 처리 단계">
+        <a class="order-workspace__stage"
+           th:classappend="${fulfillment.selectedStatus == null} ? ' is-current'"
+           th:href="@{/admin/fulfillment}">전체 업무</a>
+        <a class="order-workspace__stage"
+           th:classappend="${fulfillment.selectedStatus != null and fulfillment.selectedStatus.name() == 'UNDER_REVIEW'} ? ' is-current'"
+           th:href="@{/admin/fulfillment(status='UNDER_REVIEW')}">검토 대기</a>
+        <a class="order-workspace__stage"
+           th:classappend="${fulfillment.selectedStatus != null and fulfillment.selectedStatus.name() == 'IN_PRODUCTION'} ? ' is-current'"
+           th:href="@{/admin/fulfillment(status='IN_PRODUCTION')}">제작 중</a>
+        <a class="order-workspace__stage"
+           th:classappend="${fulfillment.selectedStatus != null and fulfillment.selectedStatus.name() == 'READY_FOR_PICKUP'} ? ' is-current'"
+           th:href="@{/admin/fulfillment(status='READY_FOR_PICKUP')}">픽업 대기</a>
+        <a class="order-workspace__stage"
+           th:classappend="${fulfillment.selectedStatus != null and fulfillment.selectedStatus.name() == 'PICKED_UP'} ? ' is-current'"
+           th:href="@{/admin/fulfillment(status='PICKED_UP')}">픽업 완료</a>
+      </nav>
+      <p class="note order-workspace__scope-note">모든 단계의 주문을 기간 제한 없이 확인합니다.</p>
 
       <div class="panel empty-state"
            th:if="${#lists.isEmpty(fulfillment.orders)}">
-        선택한 날짜에 제작·픽업 주문이 없습니다.
+        현재 조건에 맞는 처리 대상 주문이 없습니다.
       </div>
 
       <div class="fulfillment-list"
@@ -57,7 +60,7 @@
               </span>
             </span>
             <span class="fulfillment-order__meta">
-              <strong th:text="${#temporals.format(order.pickupAt, 'HH:mm')}">14:00</strong>
+              <strong th:text="${#temporals.format(order.pickupAt, 'MM.dd HH:mm')}">08.12 14:00</strong>
               <span th:text="${order.orderTypeLabel}">일반 상품</span>
               <span class="badge" th:classappend="${order.statusClass}"
                     th:text="${order.statusLabel}">픽업 준비</span>
@@ -102,10 +105,9 @@
 
             <div class="fulfillment-order__actions">
               <a class="btn"
-                 th:href="@{/admin/orders/{id}(id=${order.orderId})}">주문 상세</a>
+                 th:href="@{/admin/orders/{id}(id=${order.orderId})}">전체 주문 보기</a>
               <form th:if="${order.productionStartable}" method="post"
                     th:action="@{/admin/fulfillment/{id}/production/start(id=${order.orderId})}">
-                <input type="hidden" name="pickupDate" th:value="${fulfillment.pickupDate}">
                 <input type="hidden" name="status"
                        th:if="${fulfillment.selectedStatus != null}"
                        th:value="${fulfillment.selectedStatus}">
@@ -116,7 +118,6 @@
               </form>
               <form class="stack" th:if="${order.rejectionAvailable}" method="post"
                     th:action="@{/admin/fulfillment/{id}/reject(id=${order.orderId})}">
-                <input type="hidden" name="pickupDate" th:value="${fulfillment.pickupDate}">
                 <input type="hidden" name="status"
                        th:if="${fulfillment.selectedStatus != null}"
                        th:value="${fulfillment.selectedStatus}">
@@ -129,7 +130,6 @@
               </form>
               <form th:if="${order.productionCompletable}" method="post"
                     th:action="@{/admin/fulfillment/{id}/production/complete(id=${order.orderId})}">
-                <input type="hidden" name="pickupDate" th:value="${fulfillment.pickupDate}">
                 <input type="hidden" name="status"
                        th:if="${fulfillment.selectedStatus != null}"
                        th:value="${fulfillment.selectedStatus}">
@@ -140,7 +140,6 @@
               </form>
               <form th:if="${order.pickupCompletable}" method="post"
                     th:action="@{/admin/fulfillment/{id}/pickup(id=${order.orderId})}">
-                <input type="hidden" name="pickupDate" th:value="${fulfillment.pickupDate}">
                 <input type="hidden" name="status"
                        th:if="${fulfillment.selectedStatus != null}"
                        th:value="${fulfillment.selectedStatus}">

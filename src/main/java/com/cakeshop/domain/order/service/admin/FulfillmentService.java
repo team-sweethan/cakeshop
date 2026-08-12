@@ -14,7 +14,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -36,26 +35,19 @@ public class FulfillmentService {
     private final OrderMapper orderMapper;
     private final Clock clock;
 
-    /** 선택한 픽업일의 실제 제작·픽업 주문과 상품·옵션 스냅샷을 조회한다. */
+    /** 검토·제작·픽업 업무 전체와 상품·옵션 스냅샷을 조회한다. */
     @Transactional(readOnly = true)
     public FulfillmentListView getFulfillments(FulfillmentSearchCondition condition) {
-        LocalDate pickupDate = condition == null || condition.getPickupDate() == null
-                ? LocalDate.now(clock)
-                : condition.getPickupDate();
         OrderStatus selectedStatus = normalizeStatus(
                 condition == null ? null : condition.getStatus()
         );
         List<FulfillmentListView.FulfillmentOrder> orders = orderMapper
-                .findFulfillmentOrders(
-                        pickupDate.atStartOfDay(),
-                        pickupDate.plusDays(1).atStartOfDay(),
-                        selectedStatus
-                )
+                .findFulfillmentOrders(selectedStatus)
                 .stream()
                 .map(this::toFulfillmentOrder)
                 .toList();
 
-        return new FulfillmentListView(pickupDate, selectedStatus, orders);
+        return new FulfillmentListView(selectedStatus, orders);
     }
 
     /** DONE 결제가 유지되는 픽업 준비 주문만 수령 완료로 원자적으로 변경한다. */

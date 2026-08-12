@@ -60,9 +60,7 @@
         <aside><section><h2 class="section-title">주문 처리</h2><div class="panel stack">
           <p>현재 상태: <strong th:text="${order.statusLabel}">결제 대기</strong></p>
           <a class="btn btn--primary" th:if="${order.fulfillmentManageable}"
-             th:href="@{/admin/fulfillment(
-               pickupDate=${#temporals.format(order.pickupAt, 'yyyy-MM-dd')}
-             )}">제작·픽업에서 처리</a>
+             th:href="@{/admin/fulfillment(status=${order.status})}">주문 처리에서 열기</a>
           <form class="stack" th:if="${order.adminCancellationAvailable}" method="post"
                 th:action="@{/admin/orders/{id}/cancel(id=${order.orderId})}">
             <div class="form-group">
