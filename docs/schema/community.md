@@ -165,8 +165,8 @@
 | `title` | VARCHAR(200) |  | X | 없음 | 제목 (화면 허용은 100자) |
 | `content` | TEXT |  | X | 없음 | 본문. 순수 텍스트 |
 | `status` | VARCHAR(20) |  | X | `'PUBLISHED'` | 공지 상태 |
-| `starts_at` | DATETIME(6) |  | O | 없음 | 노출 시작 시각. NULL이면 즉시 노출 |
-| `ends_at` | DATETIME(6) |  | O | 없음 | 노출 종료 시각. NULL이면 무기한 |
+| `starts_at` | DATETIME(6) |  | O | NULL | 노출 시작 시각. NULL이면 즉시 노출 |
+| `ends_at` | DATETIME(6) |  | O | NULL | 노출 종료 시각. NULL이면 무기한 |
 | `created_by` | BIGINT | FK | X | 없음 | 등록한 관리자. 감사용이며 화면에 쓰지 않는다 |
 | `created_at` | DATETIME(6) |  | X | `CURRENT_TIMESTAMP(6)` | 생성 시각 |
 | `updated_at` | DATETIME(6) |  | X | `CURRENT_TIMESTAMP(6)` | 수정 시각 (`ON UPDATE`) |

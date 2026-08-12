@@ -51,11 +51,11 @@
 
 | 컬럼 | 타입 | Null | 기본값 | 키·속성 |
 |---|---|---|---|---|
-| `id` | `BIGINT` | X | 자동 증가 | PK |
-| `batch_type` | `VARCHAR(20)` | X | 없음 | CHECK |
-| `status` | `VARCHAR(20)` | X | 없음 | CHECK |
+| `id` | `BIGINT` | X | 자동 증가 | PK, INDEX |
+| `batch_type` | `VARCHAR(20)` | X | 없음 | CHECK, INDEX |
+| `status` | `VARCHAR(20)` | X | 없음 | CHECK, INDEX |
 | `source_window_started_at` | `DATETIME(6)` | O | `NULL` | CHECK |
-| `source_window_ended_at` | `DATETIME(6)` | O | `NULL` | CHECK |
+| `source_window_ended_at` | `DATETIME(6)` | O | `NULL` | CHECK, INDEX |
 | `target_start_date` | `DATE` | X | 없음 | CHECK |
 | `target_end_date` | `DATE` | X | 없음 | CHECK |
 | `last_completed_date` | `DATE` | O | `NULL` | CHECK |
@@ -92,6 +92,7 @@
 ## 관련 migration
 
 - `V20260810_163646__create_statistics_aggregation_tables.sql`
+- `V20260810_200833__add_statistics_source_indexes.sql`
 - `V20260811_101818__add_statistics_rebuild_batch_type.sql`
 - `V20260811_163316__add_daily_product_statistics.sql`
 

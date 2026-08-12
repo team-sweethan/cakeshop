@@ -27,7 +27,7 @@
 | `payment_expires_at` | DATETIME(6) | INDEX | O | NULL | 결제 만료 시각 |
 | `request_message` | TEXT |  | O | NULL | 주문 요청사항 |
 | `reject_reason` | TEXT |  | O | NULL | 주문 거절 사유 |
-| `approved_at` | DATETIME(6) |  | O | NULL | 승인 시각 |
+| `approved_at` | DATETIME(6) | INDEX | O | NULL | 승인 시각 |
 | `rejected_at` | DATETIME(6) |  | O | NULL | 거절 시각 |
 | `accepted_at` | DATETIME(6) |  | O | NULL | 접수 시각 |
 | `ready_at` | DATETIME(6) |  | O | NULL | 픽업 준비 완료 시각 |
@@ -37,9 +37,9 @@
 | `cancel_reason` | TEXT |  | O | NULL | 취소 사유 |
 | `canceled_by` | VARCHAR(30) |  | O | NULL | 취소 주체 |
 | `pickup_reminder_sent_at` | DATETIME(6) |  | O | NULL | 픽업 알림 발송 시각 |
-| `created_at` | DATETIME(6) |  | X | `CURRENT_TIMESTAMP(6)` | 생성 시각 |
-| `updated_at` | DATETIME(6) |  | X | `CURRENT_TIMESTAMP(6)` | 수정 시각, 수정 시 자동 갱신 |
-| `order_type` | VARCHAR(30) |  | X | 없음 | 주문 유형 |
+| `created_at` | DATETIME(6) | INDEX | X | `CURRENT_TIMESTAMP(6)` | 생성 시각 |
+| `updated_at` | DATETIME(6) | INDEX | X | `CURRENT_TIMESTAMP(6)` | 수정 시각, 수정 시 자동 갱신 |
+| `order_type` | VARCHAR(30) | INDEX | X | 없음 | 주문 유형 |
 | `under_review_at` | DATETIME(6) |  | O | NULL | 주문 제작 검토 시작 시각 |
 | `expired_at` | DATETIME(6) |  | O | NULL | 주문 만료 시각 |
 | `approved_by` | BIGINT | FK | O | NULL | 승인 처리 회원 식별자 |
@@ -55,6 +55,9 @@
 - INDEX: `idx_orders_status` (`status`)
 - INDEX: `idx_orders_pickup_at` (`pickup_at`)
 - INDEX: `idx_orders_payment_expires_at` (`payment_expires_at`)
+- INDEX: `idx_orders_created_at_status` (`created_at`, `status`)
+- INDEX: `idx_orders_updated_at_created_at` (`updated_at`, `created_at`)
+- INDEX: `idx_orders_custom_production_due` (`order_type`, `status`, `approved_at`)
 
 ## `order_items`
 
@@ -120,3 +123,6 @@
 - `V20260729_184356__align_order_payment_schema.sql`
 - `V20260802_185811__track_order_item_stock_restore.sql`
 - `V20260803_183257__add_order_request_key.sql`
+- `V20260810_200833__add_statistics_source_indexes.sql`
+- `V20260811_145723__add_order_in_production_status.sql`
+- `V20260811_165915__add_custom_production_due_index.sql`

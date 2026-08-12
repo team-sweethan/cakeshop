@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.cakeshop.domain.coupon.mapper.CouponMemberMapper">
 
-        <!-- 고객 쿠폰함은 현재 주문에 사용할 수 있는 AVAILABLE 쿠폰만 조회한다. -->
+    <!-- member 도메인이 고객 쿠폰함을 구성할 때 사용하는 조회 전용 SQL이다. -->
     <select id="findMemberCoupons"
             resultType="com.cakeshop.domain.coupon.dto.view.CustomerCouponQueryView">
         SELECT mc.id AS memberCouponId,
@@ -37,4 +37,50 @@
           AND c.starts_at &lt;= NOW(6)
           AND c.expires_at &gt; NOW(6)
     </select>
+
+    <!--
+        작성자 : 수민(이정후)
+        담당자 : 이정후
+        기능 : 회원가입 완료 뒤 NEW_MEMBERS 쿠폰 발급
+        설명 : member 도메인이 CouponMemberCommandService를 통해 호출하는 전용 SQL이다.
+               회원 상태·역할은 MemberCouponQueryService 공개 계약에서 검증하고,
+               이 SQL은 쿠폰 정책·사용 기간·중복 이력만 검증한다.
+    -->
+    <select id="findAvailableNewMemberCouponIds" resultType="long">
+        SELECT id
+        FROM coupons
+        WHERE target_type = 'NEW_MEMBERS'
+          AND status = 'ACTIVE'
+          AND starts_at &lt;= NOW(6)
+          AND expires_at &gt; NOW(6)
+    </select>
+
+    <insert id="insertNewMemberCouponIfAbsent">
+        INSERT INTO member_coupons (coupon_id, member_id)
+        SELECT #{couponId}, #{memberId}
+        FROM coupons c
+        WHERE c.id = #{couponId}
+          AND c.target_type = 'NEW_MEMBERS'
+          AND c.status = 'ACTIVE'
+          AND c.starts_at &lt;= NOW(6)
+          AND c.expires_at &gt; NOW(6)
+          AND NOT EXISTS (
+              SELECT 1
+              FROM member_coupons mc
+              WHERE mc.coupon_id = #{couponId}
+                AND mc.member_id = #{memberId}
+          )
+    </insert>
+
+    <update id="increaseNewMemberCouponIssuedQuantity">
+        UPDATE coupons
+        SET issued_quantity = issued_quantity + 1
+        WHERE id = #{couponId}
+          AND target_type = 'NEW_MEMBERS'
+          AND status = 'ACTIVE'
+          AND starts_at &lt;= NOW(6)
+          AND expires_at &gt; NOW(6)
+          AND total_quantity IS NULL
+    </update>
+
 </mapper>
