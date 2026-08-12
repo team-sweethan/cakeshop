@@ -27,4 +27,14 @@
         WHERE id = #{productId}
     </select>
 
+    <!-- 문의 대상 상품명 배치 (IN) 조회 -->
+    <select id="findProductNamesByIds" resultType="map">
+        SELECT id, name
+        FROM products
+        WHERE id IN
+        <foreach item="id" collection="productIds" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
 </mapper>

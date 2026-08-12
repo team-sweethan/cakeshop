@@ -208,13 +208,28 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  function formatPickupDateTime(rawTime) {
+    if (!rawTime || rawTime === "-") return "-";
+    try {
+      const date = new Date(rawTime);
+      if (isNaN(date.getTime())) return String(rawTime);
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      const hours = String(date.getHours()).padStart(2, "0");
+      const minutes = String(date.getMinutes()).padStart(2, "0");
+      return `${month}월 ${day}일 ${hours}:${minutes}`;
+    } catch (e) {
+      return String(rawTime);
+    }
+  }
+
       itemDiv.innerHTML = `
         <div class="cluster cluster--between" style="margin-bottom:4px;">
           <strong>${escapeHtml(oNum)}</strong>
           <span class="badge badge--warning">${escapeHtml(formatOrderStatus(ord.orderStatus))}</span>
         </div>
         <p class="text-muted" style="margin:0;">${escapeHtml(pName)}</p>
-        <p class="text-muted" style="font-size:11px;">금액: ${amtStr} | 픽업: ${escapeHtml(typeof pTime === "string" ? pTime : formatTime(pTime))}</p>
+        <p class="text-muted" style="font-size:11px;">금액: ${amtStr} | 픽업: ${escapeHtml(formatPickupDateTime(pTime))}</p>
         <a class="btn btn--block" href="/orders/${ord.orderId}" style="margin-top:6px;">주문 상세 보기</a>
       `;
       itemDiv.addEventListener("click", (e) => {

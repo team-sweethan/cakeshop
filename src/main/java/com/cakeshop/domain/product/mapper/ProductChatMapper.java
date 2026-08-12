@@ -12,8 +12,12 @@ import org.apache.ibatis.annotations.Param;
  * 설명 : products 테이블에서 채팅 문의 대상 상품이 존재하고 유효한지 검증한다.
  * ******************************
  */
+import java.util.List;
+import java.util.Map;
+
 @Mapper
 public interface ProductChatMapper {
     int countActiveProductById(@Param("productId") Long productId);
     String findProductNameById(@Param("productId") Long productId);
+    List<Map<String, Object>> findProductNamesByIds(@Param("productIds") List<Long> productIds);
 }

@@ -547,6 +547,15 @@ public class ChatService {
                 ? allAttachments.stream().collect(Collectors.groupingBy(ChatMessageAttachment::getChatMessageId))
                 : Collections.emptyMap();
 
+        // 메시지 내 문의 상품명 일괄 배치 (IN 쿼리) 조회 (N+1 쿼리 완벽 해소!)
+        List<Long> productIds = messages.stream()
+                .map(ChatMessage::getProductId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        Map<Long, String> productNameMap = !productIds.isEmpty()
+                ? productChatQueryService.getProductNamesMap(productIds)
+                : Collections.emptyMap();
+
         return messages.stream().map(msg -> {
             List<ChatMessageAttachment> attachments = attachmentMap.getOrDefault(msg.getId(), Collections.emptyList());
             
@@ -569,10 +578,9 @@ public class ChatService {
             String senderType = isCustomerSender ? "CUSTOMER" : "ADMIN";
             String senderName = isCustomerSender ? "고객" : "관리자";
 
-            String productName = null;
-            if (msg.getProductId() != null) {
-                productName = productChatQueryService.getProductName(msg.getProductId());
-            }
+            String productName = (msg.getProductId() != null)
+                    ? productNameMap.get(msg.getProductId())
+                    : null;
 
             return ChatMessageResponse.builder()
                     .id(msg.getId())

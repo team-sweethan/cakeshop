@@ -47,28 +47,43 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // 1. 관리자 전체 채팅방 목록 서버 필터 조회 (완료 탭: RESOLVED)
-  async function loadAdminRooms() {
+  let currentRoomPage = 1;
+  const ROOM_PAGE_SIZE = 100;
+  let hasMoreRooms = false;
+
+  // 1. 관리자 전체 채팅방 목록 서버 필터 조회 (완료 탭: RESOLVED, size=100 페이징)
+  async function loadAdminRooms(page = 1, append = false) {
     const reqFilter = currentFilter;
+    if (!append) {
+      currentRoomPage = 1;
+    }
     try {
-      let queryUrl = "/api/admin/chat/rooms";
+      let queryUrl = `/api/admin/chat/rooms?page=${page}&size=${ROOM_PAGE_SIZE}`;
       if (reqFilter === "unread") {
-        queryUrl += "?status=WAITING_ADMIN";
+        queryUrl += "&status=WAITING_ADMIN";
       } else if (reqFilter === "done") {
-        queryUrl += "?status=RESOLVED";
+        queryUrl += "&status=RESOLVED";
       }
 
       const response = await fetch(queryUrl);
       if (!response.ok || reqFilter !== currentFilter) {
-        if (!response.ok && adminRoomListContainer) {
+        if (!response.ok && adminRoomListContainer && !append) {
           adminRoomListContainer.innerHTML = `<div class="text-muted" style="font-size:12px; padding:10px;">채팅방 목록을 불러올 수 없습니다.</div>`;
           clearMainAndSidePanel();
         }
         return;
       }
 
-      adminRoomsData = await response.json();
+      const newRooms = await response.json();
       if (reqFilter !== currentFilter) return;
+
+      hasMoreRooms = newRooms && newRooms.length >= ROOM_PAGE_SIZE;
+
+      if (append) {
+        adminRoomsData = adminRoomsData.concat(newRooms);
+      } else {
+        adminRoomsData = newRooms;
+      }
 
       renderRoomList();
 
@@ -94,7 +109,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     } catch (err) {
       console.error("관리자 방 목록 조회 실패:", err);
-      clearMainAndSidePanel();
+      if (!append) {
+        clearMainAndSidePanel();
+      }
     }
   }
 
@@ -189,6 +206,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
       adminRoomListContainer.appendChild(itemDiv);
     });
+
+    // 100개 이상 방이 존재하는 경우 [+ 이전 문의 더보기] 버튼 렌더링
+    if (hasMoreRooms) {
+      const moreBtn = document.createElement("button");
+      moreBtn.className = "btn btn--outline btn--block btn--xs";
+      moreBtn.style.cssText = "margin-top:8px; margin-bottom:12px;";
+      moreBtn.textContent = "+ 이전 문의 더보기";
+      moreBtn.addEventListener("click", () => {
+        currentRoomPage++;
+        loadAdminRooms(currentRoomPage, true);
+      });
+      adminRoomListContainer.appendChild(moreBtn);
+    }
   }
 
   // 방 선택 조작: 대화방 변경 시 기존 작성 중인 텍스트 및 첨부 파일 깨끗이 초기화!
@@ -387,13 +417,28 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  function formatPickupDateTime(rawTime) {
+    if (!rawTime || rawTime === "-") return "-";
+    try {
+      const date = new Date(rawTime);
+      if (isNaN(date.getTime())) return String(rawTime);
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      const hours = String(date.getHours()).padStart(2, "0");
+      const minutes = String(date.getMinutes()).padStart(2, "0");
+      return `${month}월 ${day}일 ${hours}:${minutes}`;
+    } catch (e) {
+      return String(rawTime);
+    }
+  }
+
           cardDiv.innerHTML = `
             <div class="cluster cluster--between" style="margin-bottom:6px;">
               <strong>${escapeHtml(oNum)}</strong>
               <span class="badge badge--warning">${escapeHtml(formatOrderStatus(ord.orderStatus))}</span>
             </div>
             <p style="margin:0; font-weight:600;">${escapeHtml(pName)}</p>
-            <p class="text-muted" style="font-size:12px; margin:2px 0;">픽업: ${escapeHtml(typeof pTime === "string" ? pTime : formatTime(pTime))}</p>
+            <p class="text-muted" style="font-size:12px; margin:2px 0;">픽업: ${escapeHtml(formatPickupDateTime(pTime))}</p>
             <p style="font-size:13px; font-weight:700; margin-top:4px;">금액: ${amtStr}</p>
             <a class="btn btn--outline btn--block btn--xs" href="/admin/orders/${ord.orderId}" style="margin-top:8px;">주문 상세서 보기</a>
           `;

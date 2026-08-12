@@ -37,4 +37,30 @@ public class ProductChatQueryService {
         }
         return productChatMapper.findProductNameById(productId);
     }
+
+    public java.util.Map<Long, String> getProductNamesMap(java.util.List<Long> productIds) {
+        if (productIds == null || productIds.isEmpty()) {
+            return java.util.Collections.emptyMap();
+        }
+        java.util.List<Long> validIds = productIds.stream()
+                .filter(id -> id != null && id > 0)
+                .distinct()
+                .collect(java.util.stream.Collectors.toList());
+        if (validIds.isEmpty()) {
+            return java.util.Collections.emptyMap();
+        }
+        java.util.List<java.util.Map<String, Object>> rows = productChatMapper.findProductNamesByIds(validIds);
+        if (rows == null || rows.isEmpty()) {
+            return java.util.Collections.emptyMap();
+        }
+        java.util.Map<Long, String> result = new java.util.HashMap<>();
+        for (java.util.Map<String, Object> row : rows) {
+            Number idNum = (Number) row.get("id");
+            String name = (String) row.get("name");
+            if (idNum != null && name != null) {
+                result.put(idNum.longValue(), name);
+            }
+        }
+        return result;
+    }
 }
