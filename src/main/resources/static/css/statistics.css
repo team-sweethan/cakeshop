@@ -7,6 +7,12 @@
     position: relative
 }
 
+.statistics-product-ranking-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: var(--space-2)
+}
+
 @media (max-width: 767px) {
     .statistics-chart {
         height: 280px

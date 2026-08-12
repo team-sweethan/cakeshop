@@ -15,10 +15,10 @@ class StatisticsSearchFormTests {
     private final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 
     @Test
-    void create_withoutPeriodType_usesRange() {
+    void create_withoutPeriodType_usesRecentWeek() {
         StatisticsSearchForm form = new StatisticsSearchForm();
 
-        assertThat(form.getPeriodType()).isEqualTo(StatisticsPeriodType.RANGE);
+        assertThat(form.getPeriodType()).isEqualTo(StatisticsPeriodType.RECENT_WEEK);
     }
 
     @Test
@@ -117,6 +117,7 @@ class StatisticsSearchFormTests {
 
     private StatisticsSearchForm form(LocalDate startDate, LocalDate endDate) {
         StatisticsSearchForm form = new StatisticsSearchForm();
+        form.setPeriodType(StatisticsPeriodType.RANGE);
         form.setStartDate(startDate);
         form.setEndDate(endDate);
         return form;

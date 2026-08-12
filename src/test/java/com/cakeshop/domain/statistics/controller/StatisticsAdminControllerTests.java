@@ -102,6 +102,7 @@ class StatisticsAdminControllerTests {
                 .thenReturn(productStatistics);
 
         mockMvc.perform(get("/admin/statistics")
+                        .param("periodType", "RANGE")
                         .param("startDate", startDate.toString())
                         .param("endDate", endDate.toString()))
                 .andExpect(status().isOk())
@@ -119,6 +120,30 @@ class StatisticsAdminControllerTests {
     }
 
     @Test
+    void statistics_dateRangeWithoutPeriodType_usesRangeForExistingUrlCompatibility()
+            throws Exception {
+        LocalDate startDate = LocalDate.of(2026, 8, 1);
+        LocalDate endDate = LocalDate.of(2026, 8, 10);
+        when(periodStatisticsReadModelQueryService.getStatistics(any()))
+                .thenReturn(statistics(startDate, endDate));
+
+        mockMvc.perform(get("/admin/statistics")
+                        .param("startDate", startDate.toString())
+                        .param("endDate", endDate.toString()))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("searchForm", org.hamcrest.Matchers.hasProperty(
+                        "periodType",
+                        org.hamcrest.Matchers.is(StatisticsPeriodType.RANGE)
+                )));
+
+        verify(periodStatisticsReadModelQueryService).getStatistics(argThat(form ->
+                form.getPeriodType() == StatisticsPeriodType.RANGE
+                        && startDate.equals(form.getStartDate())
+                        && endDate.equals(form.getEndDate())
+        ));
+    }
+
+    @Test
     void statistics_productStatisticsNotReady_keepsPeriodStatisticsInModel() throws Exception {
         LocalDate startDate = LocalDate.of(2026, 8, 1);
         LocalDate endDate = LocalDate.of(2026, 8, 10);
@@ -130,6 +155,7 @@ class StatisticsAdminControllerTests {
                 ));
 
         mockMvc.perform(get("/admin/statistics")
+                        .param("periodType", "RANGE")
                         .param("startDate", startDate.toString())
                         .param("endDate", endDate.toString()))
                 .andExpect(status().isOk())
@@ -154,11 +180,35 @@ class StatisticsAdminControllerTests {
                 .andExpect(view().name("admin/statistics"))
                 .andExpect(model().attribute("statistics", statistics))
                 .andExpect(model().attribute("searchForm", org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.hasProperty(
+                                "periodType",
+                                org.hamcrest.Matchers.is(StatisticsPeriodType.RECENT_WEEK)
+                        ),
                         org.hamcrest.Matchers.hasProperty("startDate", org.hamcrest.Matchers.is(startDate)),
                         org.hamcrest.Matchers.hasProperty("endDate", org.hamcrest.Matchers.is(endDate))
                 )));
 
         verify(periodStatisticsReadModelQueryService).getStatistics(any());
+    }
+
+    @Test
+    void statistics_recentWeekRequest_bindsRecentWeek() throws Exception {
+        LocalDate startDate = LocalDate.of(2026, 8, 4);
+        LocalDate endDate = LocalDate.of(2026, 8, 10);
+        when(periodStatisticsReadModelQueryService.getStatistics(any()))
+                .thenReturn(statistics(startDate, endDate));
+
+        mockMvc.perform(get("/admin/statistics")
+                        .param("periodType", "RECENT_WEEK"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("searchForm", org.hamcrest.Matchers.hasProperty(
+                        "periodType",
+                        org.hamcrest.Matchers.is(StatisticsPeriodType.RECENT_WEEK)
+                )));
+
+        verify(periodStatisticsReadModelQueryService).getStatistics(argThat(form ->
+                form.getPeriodType() == StatisticsPeriodType.RECENT_WEEK
+        ));
     }
 
     @Test
@@ -263,6 +313,7 @@ class StatisticsAdminControllerTests {
     @Test
     void statistics_onlyStartDate_doesNotQueryStatistics() throws Exception {
         mockMvc.perform(get("/admin/statistics")
+                        .param("periodType", "RANGE")
                         .param("startDate", "2026-08-01"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("admin/statistics"))
@@ -280,6 +331,7 @@ class StatisticsAdminControllerTests {
                 .thenThrow(new BusinessException(StatisticsErrorCode.INVALID_DATE_RANGE));
 
         mockMvc.perform(get("/admin/statistics")
+                        .param("periodType", "RANGE")
                         .param("startDate", startDate.toString())
                         .param("endDate", endDate.toString()))
                 .andExpect(status().isOk())
@@ -300,6 +352,7 @@ class StatisticsAdminControllerTests {
                 .thenThrow(new BusinessException(StatisticsErrorCode.STATISTICS_NOT_READY));
 
         mockMvc.perform(get("/admin/statistics")
+                        .param("periodType", "RANGE")
                         .param("startDate", startDate.toString())
                         .param("endDate", endDate.toString()))
                 .andExpect(status().isOk())
