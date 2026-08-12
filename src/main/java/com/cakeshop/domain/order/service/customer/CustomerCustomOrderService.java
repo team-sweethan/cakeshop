@@ -69,9 +69,15 @@ public class CustomerCustomOrderService {
         LocalDateTime now = LocalDateTime.now(clock);
         PreparedCustomItem preparedItem = prepareCustomItem(form);
         validateDisplayedOriginalAmount(form, preparedItem.totalAmount());
-        validatePickupAt(form.getPickupAt(), now, preparedItem.product().preparationDays());
+        // 관리자 검토가 지연돼도 결제 완료 주문이 고착되지 않도록, 결제 가능 마지막 시각을 기준으로 확정한다.
+        LocalDateTime paymentExpiresAt = now.plusMinutes(PAYMENT_EXPIRATION_MINUTES);
+        validatePickupAt(
+                form.getPickupAt(),
+                paymentExpiresAt,
+                preparedItem.product().preparationDays()
+        );
 
-        Order order = createOrder(memberId, form, preparedItem.totalAmount(), now);
+        Order order = createOrder(memberId, form, preparedItem.totalAmount(), paymentExpiresAt);
         int insertedRows = orderMapper.insertOrder(order);
         if (order.getId() == null) {
             throw new BusinessException(OrderErrorCode.ORDER_SAVE_FAILED);
@@ -145,12 +151,11 @@ public class CustomerCustomOrderService {
 
     private void validatePickupAt(
             LocalDateTime pickupAt,
-            LocalDateTime now,
+            LocalDateTime paymentExpiresAt,
             int preparationDays
     ) {
         if (pickupAt == null
-                || !pickupAt.isAfter(now.plusMinutes(PAYMENT_EXPIRATION_MINUTES)
-                        .plusDays(preparationDays))
+                || !pickupAt.isAfter(paymentExpiresAt.plusDays(preparationDays))
                 || !pickupAvailabilityPolicy.isAvailable(pickupAt)) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
@@ -193,7 +198,7 @@ public class CustomerCustomOrderService {
             long memberId,
             CustomOrderForm form,
             BigDecimal originalAmount,
-            LocalDateTime now
+            LocalDateTime paymentExpiresAt
     ) {
         Order order = new Order();
         order.setOrderNumber("ORD-" + compactUuid());
@@ -209,7 +214,7 @@ public class CustomerCustomOrderService {
         order.setFinalAmount(originalAmount);
         order.setStatus(OrderStatus.PENDING_PAYMENT);
         order.setPickupAt(form.getPickupAt());
-        order.setPaymentExpiresAt(now.plusMinutes(PAYMENT_EXPIRATION_MINUTES));
+        order.setPaymentExpiresAt(paymentExpiresAt);
         order.setRequestMessage(trimToNull(form.getRequestMessage()));
         return order;
     }
