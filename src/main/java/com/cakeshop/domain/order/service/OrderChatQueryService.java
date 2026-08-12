@@ -26,4 +26,11 @@ public class OrderChatQueryService {
         }
         return orderChatMapper.findOrderById(orderId);
     }
+
+    public java.util.List<OrderChatView> findOrdersByCustomerId(Long customerId) {
+        if (customerId == null || customerId <= 0) {
+            return java.util.Collections.emptyList();
+        }
+        return orderChatMapper.findOrdersByCustomerId(customerId);
+    }
 }

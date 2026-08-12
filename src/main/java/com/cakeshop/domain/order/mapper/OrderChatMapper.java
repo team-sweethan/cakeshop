@@ -13,7 +13,10 @@ import org.apache.ibatis.annotations.Param;
  * 설명 : orders 테이블에서 채팅방 연동용 주문 상세 정보 DTO를 조회한다.
  * ******************************
  */
+import java.util.List;
+
 @Mapper
 public interface OrderChatMapper {
     OrderChatView findOrderById(@Param("orderId") Long orderId);
+    List<OrderChatView> findOrdersByCustomerId(@Param("customerId") Long customerId);
 }

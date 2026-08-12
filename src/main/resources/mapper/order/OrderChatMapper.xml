@@ -37,4 +37,31 @@
         WHERE o.id = #{orderId}
     </select>
 
+    <!-- 고객 ID로 최근 주문 목록 조회 (채팅방 연동 fallback) -->
+    <select id="findOrdersByCustomerId" resultType="com.cakeshop.domain.order.dto.view.OrderChatView">
+        SELECT 
+            o.id AS id,
+            o.order_number AS orderNumber,
+            o.member_id AS memberId,
+            o.order_type AS orderType,
+            o.status AS status,
+            o.final_amount AS finalAmount,
+            o.pickup_at AS pickupAt,
+            o.created_at AS orderCreatedAt,
+            (
+                SELECT 
+                    CASE 
+                        WHEN COUNT(*) = 0 THEN '주문 케이크'
+                        WHEN COUNT(*) = 1 THEN MIN(product_name)
+                        ELSE CONCAT(MIN(product_name), ' 외 ', COUNT(*) - 1, '건')
+                    END
+                FROM order_items oi
+                WHERE oi.order_id = o.id
+            ) AS representativeProductName
+        FROM orders o
+        WHERE o.member_id = #{customerId}
+        ORDER BY o.created_at DESC
+        LIMIT 10
+    </select>
+
 </mapper>

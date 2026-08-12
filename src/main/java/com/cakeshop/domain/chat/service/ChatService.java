@@ -287,25 +287,41 @@ public class ChatService {
         validateRoomAccess(room, currentUserId, isAdmin);
 
         List<ChatRoomOrder> roomOrders = chatMapper.findChatRoomOrderByChatRoomId(chatRoomId);
-        if (roomOrders == null || roomOrders.isEmpty()) {
+        if (roomOrders != null && !roomOrders.isEmpty()) {
+            return roomOrders.stream().map(ro -> {
+                OrderChatView order = orderChatQueryService.findOrder(ro.getOrderId());
+
+                return ChatRoomOrderResponse.builder()
+                        .orderId(ro.getOrderId())
+                        .orderNumber(order != null && order.orderNumber() != null ? order.orderNumber() : "ORD-UNKNOWN")
+                        .productName(order != null && order.representativeProductName() != null ? order.representativeProductName() : "연동 주문 상품")
+                        .productType(order != null && order.orderType() != null ? order.orderType() : "GENERAL")
+                        .totalAmount(order != null && order.finalAmount() != null ? order.finalAmount() : BigDecimal.ZERO)
+                        .orderStatus(order != null && order.status() != null ? order.status() : "UNKNOWN")
+                        .pickupDateTime(order != null ? order.pickupAt() : null)
+                        .conversationAnchorMessageId(ro.getConversationAnchorMessageId())
+                        .createdAt(order != null && order.orderCreatedAt() != null ? order.orderCreatedAt() : ro.getCreatedAt())
+                        .build();
+            }).collect(Collectors.toList());
+        }
+
+        // 매핑 테이블(chat_room_orders)에 연동 주문이 없으면 해당 고객의 전체 주문(orders) 자동 fallback 조회!
+        List<OrderChatView> customerOrders = orderChatQueryService.findOrdersByCustomerId(room.getCustomerId());
+        if (customerOrders == null || customerOrders.isEmpty()) {
             return Collections.emptyList();
         }
 
-        return roomOrders.stream().map(ro -> {
-            OrderChatView order = orderChatQueryService.findOrder(ro.getOrderId());
-
-            return ChatRoomOrderResponse.builder()
-                    .orderId(ro.getOrderId())
-                    .orderNumber(order != null && order.orderNumber() != null ? order.orderNumber() : "ORD-UNKNOWN")
-                    .productName(order != null && order.representativeProductName() != null ? order.representativeProductName() : "연동 주문 상품")
-                    .productType(order != null && order.orderType() != null ? order.orderType() : "GENERAL")
-                    .totalAmount(order != null && order.finalAmount() != null ? order.finalAmount() : BigDecimal.ZERO)
-                    .orderStatus(order != null && order.status() != null ? order.status() : "UNKNOWN")
-                    .pickupDateTime(order != null ? order.pickupAt() : null)
-                    .conversationAnchorMessageId(ro.getConversationAnchorMessageId())
-                    .createdAt(order != null && order.orderCreatedAt() != null ? order.orderCreatedAt() : ro.getCreatedAt())
-                    .build();
-        }).collect(Collectors.toList());
+        return customerOrders.stream().map(order -> ChatRoomOrderResponse.builder()
+                .orderId(order.id())
+                .orderNumber(order.orderNumber() != null ? order.orderNumber() : "ORD-" + order.id())
+                .productName(order.representativeProductName() != null ? order.representativeProductName() : "주문 케이크")
+                .productType(order.orderType() != null ? order.orderType() : "GENERAL")
+                .totalAmount(order.finalAmount() != null ? order.finalAmount() : BigDecimal.ZERO)
+                .orderStatus(order.status() != null ? order.status() : "UNKNOWN")
+                .pickupDateTime(order.pickupAt())
+                .conversationAnchorMessageId(null)
+                .createdAt(order.orderCreatedAt())
+                .build()).collect(Collectors.toList());
     }
 
     // 채팅방에 주문 연동 (검증 포함)

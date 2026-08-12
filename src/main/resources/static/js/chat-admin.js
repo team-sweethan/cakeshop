@@ -49,24 +49,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // 1. 관리자 전체 채팅방 목록 서버 필터 조회 (완료 탭: RESOLVED)
   async function loadAdminRooms() {
+    const reqFilter = currentFilter;
     try {
       let queryUrl = "/api/admin/chat/rooms";
-      if (currentFilter === "unread") {
+      if (reqFilter === "unread") {
         queryUrl += "?status=WAITING_ADMIN";
-      } else if (currentFilter === "done") {
+      } else if (reqFilter === "done") {
         queryUrl += "?status=RESOLVED";
       }
 
       const response = await fetch(queryUrl);
-      if (!response.ok) {
-        if (adminRoomListContainer) {
+      if (!response.ok || reqFilter !== currentFilter) {
+        if (!response.ok && adminRoomListContainer) {
           adminRoomListContainer.innerHTML = `<div class="text-muted" style="font-size:12px; padding:10px;">채팅방 목록을 불러올 수 없습니다.</div>`;
+          clearMainAndSidePanel();
         }
-        clearMainAndSidePanel();
         return;
       }
 
       adminRoomsData = await response.json();
+      if (reqFilter !== currentFilter) return;
+
       renderRoomList();
 
       // 미답변 방 개수 동적 갱신
@@ -218,7 +221,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     await loadAdminMessages(roomId);
     await loadAdminSidePanel(roomId);
-    if (lastFetchedMessageId > 0) {
+    if (lastFetchedMessageId > 0 && selectedChatRoomId === roomId) {
       await markRead(roomId, lastFetchedMessageId);
       // 읽음 완료 시 로컬 메모리 방의 unreadCount 0 갱신 및 배지 리렌더링
       if (targetRoom) {
@@ -234,11 +237,15 @@ document.addEventListener("DOMContentLoaded", () => {
     adminChatMessagesContainer.innerHTML = `<div class="text-muted" style="text-align:center; padding:30px;">대화 내용을 불러오는 중입니다...</div>`;
     try {
       const response = await fetch(`/api/chat/messages?chatRoomId=${roomId}&page=1&size=50`);
-      if (!response.ok) {
-        adminChatMessagesContainer.innerHTML = `<div class="text-muted" style="text-align:center; padding:30px;">대화 내역을 불러오는 데 실패했습니다.</div>`;
+      if (!response.ok || selectedChatRoomId !== roomId) {
+        if (!response.ok) {
+          adminChatMessagesContainer.innerHTML = `<div class="text-muted" style="text-align:center; padding:30px;">대화 내역을 불러오는 데 실패했습니다.</div>`;
+        }
         return;
       }
       const messages = await response.json();
+      if (selectedChatRoomId !== roomId) return;
+
       renderAdminTimeline(messages);
     } catch (err) {
       console.error("관리자 대화 내역 조회 실패:", err);
