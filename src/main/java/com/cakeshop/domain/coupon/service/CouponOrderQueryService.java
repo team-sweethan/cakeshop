@@ -37,8 +37,14 @@ public class CouponOrderQueryService {
     }
 
     /**
-     * 0원 결제를 지원하지 않는 수제 주문서에 표시할 쿠폰만 조회한다.
-     * 일반 주문의 0원 결제 정책에는 사용하지 않는다.
+     * ******************************
+     * 작성자 : 주환
+     * 담당자 : 이정후
+     * 작성일 : 2026-08-12
+     * 기능 : 수제 주문 양수 최종금액 쿠폰 조회
+     * 설명 : 수제 주문은 0원 결제를 제공하지 않아, 공통 후보 중 서버 할인 계산 뒤
+     *       최종 결제 금액이 양수인 쿠폰만 주문서에 제공한다.
+     * ******************************
      */
     @Transactional(readOnly = true)
     public List<CouponOrderAvailableView> getAvailableCouponsWithPositiveFinalAmountForMember(
