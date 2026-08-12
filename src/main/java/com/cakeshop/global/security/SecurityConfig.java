@@ -56,7 +56,13 @@ public class SecurityConfig {
         AuthenticationEntryPoint portalLoginEntryPoint = (request, response, exception) -> {
             String path = request.getRequestURI()
                     .substring(request.getContextPath().length());
-            if ("/admin".equals(path) || path.startsWith("/admin/") || path.startsWith("/api/admin/")) {
+            if (path.startsWith("/api/chat/") || path.startsWith("/api/admin/chat/")) {
+                response.setStatus(jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json;charset=UTF-8");
+                response.getWriter().write("{\"code\":\"UNAUTHORIZED\",\"message\":\"인증이 필요합니다.\"}");
+                return;
+            }
+            if ("/admin".equals(path) || path.startsWith("/admin/")) {
                 adminLoginEntryPoint.commence(request, response, exception);
                 return;
             }

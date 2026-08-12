@@ -209,8 +209,11 @@ public class ChatService {
             return message;
         }
 
-    // S3 저장소에 이미지 파일 직접 업로드 (프론트가 파일 객체 직접 보낼 때)
-    public String uploadChatImageToS3(MultipartFile file) {
+    // S3 저장소에 이미지 파일 직접 업로드 (손님인 경우 DB 기준 활성 회원 검증 추가)
+    public String uploadChatImageToS3(MultipartFile file, Long senderId, boolean isAdmin) {
+        if (!isAdmin && !memberChatQueryService.existsCustomer(senderId)) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
         // 채팅 전용 이미지 파일 검증기 사용 (확장자, MIME 타입, 파일 시그니처, 5MB 크기 검증)
         chatImageValidator.validate(file);
         return fileStorageClient.store(file, "chat");

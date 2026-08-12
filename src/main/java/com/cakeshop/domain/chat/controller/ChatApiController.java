@@ -125,10 +125,18 @@ public class ChatApiController {
                 .build());
     }
 
-    // 4. 사진 파일 업로드 API (독립 파일 업로드)
+    // 4. 사진 파일 업로드 API (독립 파일 업로드, 인증 및 활성 회원 검증 추가)
     @PostMapping("/api/chat/images")
-    public ResponseEntity<String> uploadImage(@RequestParam("file") MultipartFile file) {
-        String fileUrl = chatService.uploadChatImageToS3(file);
+    public ResponseEntity<String> uploadImage(
+            @RequestParam("file") MultipartFile file,
+            @AuthenticationPrincipal MemberDetails memberDetails) {
+
+        if (memberDetails == null) {
+            return ResponseEntity.status(401).build();
+        }
+
+        String fileUrl = chatService.uploadChatImageToS3(
+                file, memberDetails.getMemberId(), memberDetails.isAdmin());
         return ResponseEntity.ok(fileUrl);
     }
 
