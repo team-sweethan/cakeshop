@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.inOrder;
@@ -57,7 +58,7 @@ class EmailVerificationServiceTests {
     @Mock
     private EmailSender emailSender;
 
-    private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    private final PasswordEncoder passwordEncoder = spy(new BCryptPasswordEncoder());
     private EmailVerificationService emailVerificationService;
 
     @BeforeEach
@@ -246,7 +247,11 @@ class EmailVerificationServiceTests {
                         "user@example.com", "123456");
 
         assertThat(result).isEqualTo(
-                new PasswordResetEmailVerification(1L, 7L, "user@example.com"));
+                new PasswordResetEmailVerification(
+                        1L,
+                        7L,
+                        "user@example.com",
+                        NOW.plusMinutes(10).atZone(SEOUL).toInstant()));
     }
 
     @Test
@@ -270,6 +275,42 @@ class EmailVerificationServiceTests {
                         "USER@example.com", "123456");
 
         assertThat(result.email()).isEqualTo("User@Example.com");
+    }
+
+    @Test
+    void verifyPasswordResetCode_missingRequest_runsDummyHashComparison() {
+        when(emailVerificationMapper.findLatest(
+                "missing@example.com", EmailVerificationPurpose.PASSWORD_RESET))
+                .thenReturn(Optional.empty());
+
+        assertMemberError(
+                () -> emailVerificationService.verifyPasswordResetCode(
+                        "missing@example.com", "123456"),
+                MemberErrorCode.EMAIL_VERIFICATION_INVALID);
+
+        verify(passwordEncoder).matches(
+                org.mockito.ArgumentMatchers.eq("123456"),
+                org.mockito.ArgumentMatchers.startsWith("$2a$10$"));
+    }
+
+    @Test
+    void verifyPasswordResetCode_alreadyVerified_usesOriginalVerificationExpiry() {
+        EmailVerification latest = verification(
+                "user@example.com", passwordEncoder.encode("123456"));
+        latest.setPurpose(EmailVerificationPurpose.PASSWORD_RESET);
+        latest.setVerifiedAt(NOW.minusMinutes(9));
+        when(emailVerificationMapper.findLatest(
+                "user@example.com", EmailVerificationPurpose.PASSWORD_RESET))
+                .thenReturn(Optional.of(latest));
+        when(memberMapper.findByEmail("user@example.com"))
+                .thenReturn(Optional.of(passwordMember()));
+
+        PasswordResetEmailVerification result =
+                emailVerificationService.verifyPasswordResetCode(
+                        "user@example.com", "123456");
+
+        assertThat(result.expiresAt())
+                .isEqualTo(NOW.plusMinutes(1).atZone(SEOUL).toInstant());
     }
 
     @Test

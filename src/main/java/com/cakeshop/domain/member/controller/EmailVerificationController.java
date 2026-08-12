@@ -10,8 +10,6 @@ import com.cakeshop.domain.member.service.PasswordResetEmailDispatchService;
 import jakarta.validation.Valid;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
-import java.time.Duration;
-import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -22,8 +20,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class EmailVerificationController {
 
     static final String SIGNUP_VERIFIED_EMAIL_SESSION_KEY = "signupVerifiedEmail";
-    private static final Duration PASSWORD_RESET_SESSION_TTL = Duration.ofMinutes(10);
-
     private final EmailVerificationService emailVerificationService;
     private final PasswordResetEmailDispatchService passwordResetEmailDispatchService;
 
@@ -71,7 +67,7 @@ public class EmailVerificationController {
                         verification.verificationId(),
                         verification.memberId(),
                         verification.email(),
-                        Instant.now().plus(PASSWORD_RESET_SESSION_TTL)));
+                        verification.expiresAt()));
         return EmailVerificationResponse.success("이메일 인증이 완료되었습니다.");
     }
 }

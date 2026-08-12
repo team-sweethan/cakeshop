@@ -15,6 +15,7 @@ import com.cakeshop.global.error.BusinessException;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.Optional;
@@ -36,6 +37,8 @@ public class EmailVerificationService {
     private static final Duration RETENTION = Duration.ofDays(7);
     private static final int MAX_REQUESTS_PER_WINDOW = 5;
     private static final int REQUEST_LOCK_TIMEOUT_SECONDS = 3;
+    private static final String DUMMY_CODE_HASH =
+            "$2a$10$wRIE78x8sm..uLtbp9LHde7l6wUWQD3NjPvThQaXvZ3PpXfW6wwX.";
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final EmailVerificationMapper emailVerificationMapper;
@@ -137,7 +140,10 @@ public class EmailVerificationService {
                 .orElseThrow(() -> new BusinessException(
                         MemberErrorCode.EMAIL_VERIFICATION_INVALID));
         return new PasswordResetEmailVerification(
-                verification.getId(), member.getId(), member.getEmail());
+                verification.getId(),
+                member.getId(),
+                member.getEmail(),
+                verificationExpiresAt(verification));
     }
 
     private EmailVerification verifyCode(
@@ -146,8 +152,11 @@ public class EmailVerificationService {
             EmailVerificationPurpose purpose) {
         LocalDateTime now = LocalDateTime.now(clock);
         EmailVerification verification = emailVerificationMapper.findLatest(email, purpose)
-                .orElseThrow(() -> new BusinessException(
-                        MemberErrorCode.EMAIL_VERIFICATION_INVALID));
+                .orElse(null);
+        if (verification == null) {
+            passwordEncoder.matches(code == null ? "" : code, DUMMY_CODE_HASH);
+            throw new BusinessException(MemberErrorCode.EMAIL_VERIFICATION_INVALID);
+        }
 
         if (verification.getVerifiedAt() != null) {
             if (verification.getAttemptCount() < 5
@@ -187,6 +196,13 @@ public class EmailVerificationService {
         }
         verification.setVerifiedAt(now);
         return verification;
+    }
+
+    private Instant verificationExpiresAt(EmailVerification verification) {
+        return verification.getVerifiedAt()
+                .plus(VERIFIED_TTL)
+                .atZone(clock.getZone())
+                .toInstant();
     }
 
     /** 인증된 이메일을 회원가입에서 한 번만 사용 처리한다. */

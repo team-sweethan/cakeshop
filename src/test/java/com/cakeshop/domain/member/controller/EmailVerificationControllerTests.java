@@ -112,7 +112,10 @@ class EmailVerificationControllerTests {
         when(emailVerificationService.verifyPasswordResetCode(
                 "member@example.com", "123456"))
                 .thenReturn(new PasswordResetEmailVerification(
-                        11L, 7L, "member@example.com"));
+                        11L,
+                        7L,
+                        "member@example.com",
+                        java.time.Instant.now().plusSeconds(60)));
         MockHttpSession session = new MockHttpSession();
 
         mockMvc.perform(post("/email-verifications/password-reset/verify")
