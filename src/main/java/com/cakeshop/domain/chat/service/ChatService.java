@@ -236,9 +236,9 @@ public class ChatService {
         if (key.startsWith("chat/") || key.startsWith("uploads/")) {
             return;
         }
-        // 3. 외부 URL인 경우 자사 S3 / CloudFront 버킷 도메인만 통과 허용!
+        // 3. 외부 URL인 경우 자사 S3 / CloudFront / 로컬 도메인만 통과 허용!
         if (key.startsWith("http://") || key.startsWith("https://")) {
-            if (key.startsWith("https://sweethan-cakeshop-images.s3.ap-northeast-2.amazonaws.com/")) {
+            if (key.contains("amazonaws.com") || key.contains("cloudfront.net") || key.contains("localhost") || key.contains("127.0.0.1")) {
                 return;
             }
             // 해커/외부 서버 추적 URL(https://attacker.example/pixel.png) 차단

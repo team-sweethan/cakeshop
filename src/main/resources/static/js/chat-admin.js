@@ -11,7 +11,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const adminRoomListContainer = document.getElementById("adminChatRoomList");
   const adminChatMessagesContainer = document.getElementById("adminChatMessages");
-  const adminChatForm = document.getElementById("adminChatForm");
+  let adminChatForm = document.getElementById("adminChatForm");
   const adminChatInput = document.getElementById("adminChatInput");
   const adminChatImageInput = document.getElementById("adminChatImageInput");
   const adminImageFileName = document.getElementById("adminImageFileName");
@@ -19,6 +19,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const adminCustomerNote = document.getElementById("adminCustomerNote");
   const saveAdminNoteBtn = document.getElementById("saveAdminNoteBtn");
   const adminSearchInput = document.getElementById("adminChatSearch");
+
+  // 목업 스크립트(admin-mockup.js) 이벤트 간섭 전면 차단을 위한 폼 클로닝
+  if (adminChatForm) {
+    const freshForm = adminChatForm.cloneNode(true);
+    adminChatForm.parentNode.replaceChild(freshForm, adminChatForm);
+    adminChatForm = freshForm;
+  }
 
   // CSRF 메타 태그 획득 헬퍼
   function getCsrfHeaders() {
@@ -31,29 +38,65 @@ document.addEventListener("DOMContentLoaded", () => {
     return headers;
   }
 
-  // 1. 관리자 전체 채팅방 목록 조회
+  // 1. 관리자 전체 채팅방 목록 서버 필터 조회
   async function loadAdminRooms() {
     try {
-      const response = await fetch("/api/admin/chat/rooms");
+      let queryUrl = "/api/admin/chat/rooms";
+      if (currentFilter === "unread") {
+        queryUrl += "?status=WAITING_ADMIN";
+      } else if (currentFilter === "done") {
+        queryUrl += "?status=WAITING_CUSTOMER";
+      }
+
+      const response = await fetch(queryUrl);
       if (!response.ok) {
         if (adminRoomListContainer) {
           adminRoomListContainer.innerHTML = `<div class="text-muted" style="font-size:12px; padding:10px;">채팅방 목록을 불러올 수 없습니다.</div>`;
         }
+        clearMainAndSidePanel();
         return;
       }
 
       adminRoomsData = await response.json();
       renderRoomList();
 
-      // 첫 번째 방 자동 선택 (chatRoomId 필드명 사용)
-      if (adminRoomsData && adminRoomsData.length > 0 && !selectedChatRoomId) {
+      // 방이 존재할 때 첫 번째 방 선택, 없으면 목업 영역 완전 비우기
+      if (adminRoomsData && adminRoomsData.length > 0) {
         const firstRoom = adminRoomsData[0];
         const rId = firstRoom.chatRoomId || firstRoom.id;
         selectChatRoom(rId, firstRoom.customerId);
+      } else {
+        clearMainAndSidePanel();
       }
 
     } catch (err) {
       console.error("관리자 방 목록 조회 실패:", err);
+      clearMainAndSidePanel();
+    }
+  }
+
+  // 메인 및 사이드 패널 초기화 (방이 없을 때 목업 잔재 지우기)
+  function clearMainAndSidePanel() {
+    selectedChatRoomId = null;
+    selectedCustomerId = null;
+
+    if (adminChatMessagesContainer) {
+      adminChatMessagesContainer.innerHTML = `<div class="text-muted" style="text-align:center; padding:40px;">대화방을 선택하거나 활성화된 문의 내역이 없습니다.</div>`;
+    }
+
+    const infoPanel = document.querySelector(".admin-chat-info-panel");
+    if (infoPanel) {
+      const existingCards = infoPanel.querySelectorAll(".admin-order-item");
+      existingCards.forEach((card) => card.remove());
+    }
+
+    if (adminCustomerNote) {
+      adminCustomerNote.value = "";
+    }
+
+    const headerTitle = document.querySelector(".admin-chat-main-room .chat-room__header strong");
+    if (headerTitle) {
+      headerTitle.textContent = "1:1 채팅 상담";
     }
   }
 
@@ -65,21 +108,16 @@ document.addEventListener("DOMContentLoaded", () => {
     const searchKeyword = adminSearchInput ? adminSearchInput.value.trim().toLowerCase() : "";
 
     const filteredRooms = adminRoomsData.filter((room) => {
-      // 탭 필터링
-      if (currentFilter === "unread" && room.responseStatus !== "WAITING_ADMIN") return false;
-      if (currentFilter === "done" && room.responseStatus === "WAITING_ADMIN") return false;
-
-      // 검색어 필터링
       if (searchKeyword) {
         const cName = (room.customerName || "").toLowerCase();
         if (!cName.includes(searchKeyword)) return false;
       }
-
       return true;
     });
 
     if (filteredRooms.length === 0) {
       adminRoomListContainer.innerHTML = `<p class="text-muted" style="font-size:12px; padding:10px;">해당하는 채팅방이 없습니다.</p>`;
+      clearMainAndSidePanel();
       return;
     }
 
@@ -224,8 +262,9 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = await response.json();
 
       // 고객 특이사항 메모 세팅 (note.content 읽기)
-      if (adminCustomerNote) {
-        adminCustomerNote.value = data.note ? (data.note.content || "") : "";
+      const inputMemo = document.getElementById("adminCustomerNote");
+      if (inputMemo) {
+        inputMemo.value = data.note ? (data.note.content || "") : "";
       }
 
       // 연동 주문 목록 렌더링
@@ -257,8 +296,9 @@ document.addEventListener("DOMContentLoaded", () => {
             <a class="btn btn--outline btn--block btn--xs" href="/admin/orders/${ord.orderId}" style="margin-top:8px;">주문 상세서 보기</a>
           `;
 
-          if (adminCustomerNote && adminCustomerNote.parentElement) {
-            infoPanel.insertBefore(cardDiv, adminCustomerNote.parentElement);
+          const targetNote = document.getElementById("adminCustomerNote");
+          if (targetNote && targetNote.parentElement) {
+            infoPanel.insertBefore(cardDiv, targetNote.parentElement);
           }
         });
       }
@@ -277,7 +317,8 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      const contentText = adminChatInput.value.trim();
+      const inputEl = document.getElementById("adminChatInput");
+      const contentText = inputEl ? inputEl.value.trim() : "";
       if (!contentText && !pendingAttachment) {
         alert("메시지 내용 또는 이미지를 첨부해주세요.");
         return;
@@ -308,10 +349,12 @@ document.addEventListener("DOMContentLoaded", () => {
         lastFetchedMessageId = sentMsg.id;
 
         // 폼 초기화
-        adminChatInput.value = "";
+        if (inputEl) inputEl.value = "";
         pendingAttachment = null;
-        if (adminImageFileName) adminImageFileName.textContent = "선택된 파일 없음";
-        if (adminChatImageInput) adminChatImageInput.value = "";
+        const fileLabel = document.getElementById("adminImageFileName");
+        if (fileLabel) fileLabel.textContent = "선택된 파일 없음";
+        const fileInput = document.getElementById("adminChatImageInput");
+        if (fileInput) fileInput.value = "";
 
         // 재조회 및 스크롤
         await loadAdminMessages(selectedChatRoomId);
@@ -333,7 +376,8 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      const noteText = adminCustomerNote ? adminCustomerNote.value.trim() : "";
+      const memoEl = document.getElementById("adminCustomerNote");
+      const noteText = memoEl ? memoEl.value.trim() : "";
 
       try {
         const response = await fetch(`/api/admin/chat/customers/${selectedCustomerId}/note`, {
@@ -360,12 +404,14 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // 6. 이미지 업로드
-  if (adminChatImageInput) {
-    adminChatImageInput.addEventListener("change", async () => {
-      const file = adminChatImageInput.files[0];
+  const fileInputEl = document.getElementById("adminChatImageInput");
+  if (fileInputEl) {
+    fileInputEl.addEventListener("change", async () => {
+      const file = fileInputEl.files[0];
       if (!file) return;
 
-      if (adminImageFileName) adminImageFileName.textContent = file.name;
+      const fileLabel = document.getElementById("adminImageFileName");
+      if (fileLabel) fileLabel.textContent = file.name;
 
       const formData = new FormData();
       formData.append("file", file);
@@ -389,7 +435,7 @@ document.addEventListener("DOMContentLoaded", () => {
           contentType: file.type || "image/jpeg",
           fileSize: file.size
         };
-        if (adminImageFileName) adminImageFileName.textContent = `✔ ${file.name} (첨부 완료)`;
+        if (fileLabel) fileLabel.textContent = `✔ ${file.name} (첨부 완료)`;
 
       } catch (err) {
         console.error("이미지 업로드 에러:", err);
@@ -401,20 +447,21 @@ document.addEventListener("DOMContentLoaded", () => {
   if (quickTemplateSelect) {
     quickTemplateSelect.addEventListener("change", () => {
       const val = quickTemplateSelect.value;
-      if (val && adminChatInput) {
-        adminChatInput.value = val;
+      const inputEl = document.getElementById("adminChatInput");
+      if (val && inputEl) {
+        inputEl.value = val;
       }
     });
   }
 
-  // 8. 탭 필터링 조작
+  // 8. 탭 필터링 조작 (서버 필터 재조회)
   const filterBtns = document.querySelectorAll("[data-admin-filter]");
   filterBtns.forEach((btn) => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", async () => {
       filterBtns.forEach((b) => b.classList.remove("is-active"));
       btn.classList.add("is-active");
       currentFilter = btn.getAttribute("data-admin-filter");
-      renderRoomList();
+      await loadAdminRooms();
     });
   });
 
