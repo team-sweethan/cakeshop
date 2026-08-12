@@ -31,6 +31,7 @@ public class Order {
     private String requestMessage;          // 주문 요청 사항
     private String rejectReason;            // 주문제작 반려 사유
     private LocalDateTime underReviewAt;    // 주문제작 검토 시작 시각
+    private LocalDateTime approvedAt;       // 주문제작 제작 시작 승인 시각
     private LocalDateTime rejectedAt;       // 주문제작 반려 처리 시각
     //member.id
     private Long rejectedBy;                // "반려 처리 관리자 회원" 식별자

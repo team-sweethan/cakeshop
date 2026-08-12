@@ -7,6 +7,7 @@ import com.cakeshop.domain.order.service.OrderOptionValidator.ValidatedOption;
 import com.cakeshop.domain.product.dto.view.ProductSalesInfo;
 import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.service.ProductQueryService;
+import com.cakeshop.domain.product.service.ProductService;
 import com.cakeshop.domain.store.dto.view.StoreView;
 import com.cakeshop.domain.store.entity.StoreHoliday;
 import com.cakeshop.domain.store.service.StoreService;
@@ -44,6 +45,9 @@ class OrderCheckoutServiceTests {
     private ProductQueryService productQueryService;
 
     @Mock
+    private ProductService productService;
+
+    @Mock
     private OrderOptionValidator orderOptionValidator;
 
     @Mock
@@ -55,6 +59,7 @@ class OrderCheckoutServiceTests {
     void setUp() {
         orderCheckoutService = new OrderCheckoutService(
                 productQueryService,
+                productService,
                 orderOptionValidator,
                 storeService,
                 FIXED_CLOCK
@@ -106,6 +111,56 @@ class OrderCheckoutServiceTests {
         assertThat(checkout.pickupDates())
                 .noneMatch(date -> date.date().getDayOfWeek() == DayOfWeek.TUESDAY)
                 .noneMatch(date -> date.date().equals(LocalDate.of(2026, 8, 5)));
+    }
+
+    @Test
+    void getCustomCheckout_onlyOffersPickupSlotsAfterPreparationPeriod() {
+        when(productQueryService.getSalesInfo(6L)).thenReturn(
+                new ProductSalesInfo(
+                        6L,
+                        "레터링 케이크",
+                        ProductType.CUSTOM,
+                        2,
+                        true,
+                        BigDecimal.valueOf(55_000),
+                        null
+                )
+        );
+        when(orderOptionValidator.validate(6L, List.of())).thenReturn(List.of());
+        when(storeService.getStoreView()).thenReturn(storeView());
+
+        var checkout = orderCheckoutService.getCustomCheckout(6L, List.of());
+
+        assertThat(checkout.pickupDates().getFirst().date())
+                .isEqualTo(LocalDate.of(2026, 8, 6));
+        assertThat(checkout.pickupDates().stream()
+                .flatMap(date -> date.times().stream())
+                .map(GeneralOrderCheckoutView.PickupTimeView::value))
+                .allMatch(value -> value.isAfter(LocalDateTime.of(2026, 8, 5, 10, 25)));
+    }
+
+    @Test
+    void getCustomCheckout_longPreparationPeriod_offersPickupSlotsAfterPreparationWindow() {
+        when(productQueryService.getSalesInfo(6L)).thenReturn(
+                new ProductSalesInfo(
+                        6L,
+                        "레터링 케이크",
+                        ProductType.CUSTOM,
+                        14,
+                        true,
+                        BigDecimal.valueOf(55_000),
+                        null
+                )
+        );
+        when(orderOptionValidator.validate(6L, List.of())).thenReturn(List.of());
+        when(storeService.getStoreView()).thenReturn(storeView());
+
+        var checkout = orderCheckoutService.getCustomCheckout(6L, List.of());
+
+        assertThat(checkout.pickupDates().getFirst().date())
+                .isEqualTo(LocalDate.of(2026, 8, 17));
+        assertThat(checkout.pickupDates().getFirst().times().getFirst().value())
+                .isEqualTo(LocalDateTime.of(2026, 8, 17, 10, 30));
     }
 
     private StoreView storeView() {

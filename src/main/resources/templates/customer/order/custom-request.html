@@ -1,22 +1,118 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>제작 승인 대기 | 케이크 쇼핑몰</title>
+  <title>수제 케이크 주문 요청 | 케이크 쇼핑몰</title>
   <link rel="stylesheet" th:href="@{/css/app.css}">
-  <link rel="stylesheet" th:href="@{/css/customer-mockup.css}">
   <script defer th:src="@{/js/app.js}"></script>
-  <script defer th:src="@{/js/customer-mockup.js}"></script>
 </head>
-<body data-page-title="제작 승인 대기">
+<body data-page-title="수제 케이크 주문 요청">
   <header th:replace="~{fragments/common/header :: header}"></header>
   <main class="page-container page-container--narrow">
-    <div th:replace="~{fragments/customer/mock-notice :: notice}"></div>
-    <h1>제작 요청 확인</h1><section class="section"><h2 class="section-title">요청 정보</h2><div class="panel"><div class="data-row"><span class="data-row__label">요청 번호</span><span>REQ-20250115-001</span></div><div class="data-row"><span class="data-row__label">요청 일시</span><span>2025.01.15 14:30</span></div><div class="data-row"><span class="data-row__label">현재 상태</span><span><span class="badge badge--warning">승인 대기</span> <span class="note">승인 / 거절로 변경됨</span></span></div></div></section>
-    <section class="section"><h2 class="section-title">상품 및 제작 옵션</h2><div class="panel"><div class="cluster"><div class="placeholder-image placeholder-image--sm">상품 이미지</div><div><strong>레터링 주문 케이크</strong><p class="text-muted">기본 55,000원</p></div></div><div class="data-row"><span class="data-row__label">크기</span><span>2호 (15cm) +5,000원</span></div><div class="data-row"><span class="data-row__label">맛</span><span>초코 +2,000원</span></div><div class="data-row"><span class="data-row__label">색상</span><span>핑크 +2,000원</span></div><div class="data-row"><span class="data-row__label">레터링</span><span>Happy Birthday 지수야!</span></div><div class="data-row"><span class="data-row__label">요청사항</span><span>장식 최소화 부탁드려요.</span></div><div class="data-row"><span class="data-row__label">픽업 희망</span><span>2025.01.20 (월) 14:00</span></div><div class="data-row"><span class="data-row__label">예상 금액</span><span>64,000원</span></div></div></section>
-    <section class="section"><h2 class="section-title">거절 시 표시 영역</h2><div class="panel panel--danger panel--dashed"><span class="badge badge--danger">거절됨</span><div class="data-row"><span class="data-row__label">거절 사유</span><span>요청 날짜에 제작이 어렵습니다. 픽업일 변경 후 재요청 부탁드립니다.</span></div><a class="btn" href="/orders/custom/options">재요청하기</a></div></section>
-    <section class="section"><h2 class="section-title">승인 시 표시 영역</h2><div class="panel panel--success panel--dashed"><span class="badge badge--success">승인됨</span><p>제작 요청이 승인되었습니다. 결제 후 제작을 시작합니다.</p><button class="btn btn--primary" type="button" disabled>주문제작 결제 준비 중</button></div></section><form data-mock-form data-success-url="/products/1"><button class="btn btn--danger" type="submit" data-confirm="주문 제작 요청을 취소하시겠습니까?">주문 취소</button></form><p class="note">승인 전까지 취소 가능</p>
+    <h1>수제 케이크 주문 요청</h1>
+    <form method="post" th:action="@{/orders/custom}" th:object="${orderForm}">
+      <input type="hidden" th:field="*{productId}">
+      <input type="hidden" th:field="*{requestKey}">
+      <input type="hidden" th:field="*{displayedOriginalAmount}">
+      <input th:each="option : ${checkout.selectedOptions}"
+             type="hidden" name="optionIds" th:value="${option.id}">
+
+      <section class="section">
+        <h2 class="section-title">상품 및 제작 옵션</h2>
+        <div class="panel stack">
+          <strong th:text="${checkout.productName}">상품명</strong>
+          <p class="text-muted" th:text="|제작 준비 기간 ${checkout.preparationDays}일|">준비 기간</p>
+          <div class="data-row" th:each="option : ${checkout.selectedOptions}">
+            <span class="data-row__label" th:text="${option.groupName}">옵션</span>
+            <span th:text="|${option.name} (+${#numbers.formatInteger(option.additionalPrice, 1, 'COMMA')}원)|">
+              옵션명
+            </span>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="lettering">레터링 문구</label>
+            <input class="form-control" id="lettering" th:field="*{lettering}" maxlength="100">
+            <p class="form-error" th:if="${#fields.hasErrors('lettering')}" th:errors="*{lettering}"></p>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="requestMessage">제작 요청사항</label>
+            <textarea class="form-control form-control--textarea" id="requestMessage"
+                      th:field="*{requestMessage}" maxlength="1000"></textarea>
+            <p class="form-error" th:if="${#fields.hasErrors('requestMessage')}" th:errors="*{requestMessage}"></p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-title">픽업 일시</h2>
+        <div class="panel">
+          <label class="form-label" for="pickupAt">픽업 일시 <span class="required">*</span></label>
+          <select class="form-control" id="pickupAt" th:field="*{pickupAt}" required>
+            <option value="">픽업 일시를 선택하세요</option>
+            <optgroup th:each="pickupDate : ${checkout.pickupDates}" th:label="${pickupDate.label}">
+              <option th:each="pickupTime : ${pickupDate.times}"
+                      th:value="${pickupTime.value}"
+                      th:text="${pickupTime.label}">14:00</option>
+            </optgroup>
+          </select>
+          <p class="form-error" th:if="${#fields.hasErrors('pickupAt')}" th:errors="*{pickupAt}"></p>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-title">쿠폰</h2>
+        <div class="panel">
+          <label class="form-label" for="memberCouponId">적용 쿠폰</label>
+          <select class="form-control" id="memberCouponId" th:field="*{memberCouponId}">
+            <option value="">쿠폰을 선택하지 않음</option>
+            <option th:each="coupon : ${availableCoupons}"
+                    th:value="${coupon.memberCouponId}"
+                    th:text="|${coupon.name} (-${#numbers.formatInteger(coupon.discountAmount, 1, 'COMMA')}원, 결제 ${#numbers.formatInteger(coupon.finalAmount, 1, 'COMMA')}원)|">
+              쿠폰
+            </option>
+          </select>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-title">주문자·픽업자 정보</h2>
+        <div class="panel stack">
+          <div class="form-group">
+            <label class="form-label" for="ordererName">주문자 이름 <span class="required">*</span></label>
+            <input class="form-control" id="ordererName" th:field="*{ordererName}" maxlength="50" required>
+            <p class="form-error" th:if="${#fields.hasErrors('ordererName')}" th:errors="*{ordererName}"></p>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="ordererPhone">주문자 연락처 <span class="required">*</span></label>
+            <input class="form-control" id="ordererPhone" type="tel" th:field="*{ordererPhone}" maxlength="30" required>
+            <p class="form-error" th:if="${#fields.hasErrors('ordererPhone')}" th:errors="*{ordererPhone}"></p>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="pickupName">픽업자 이름 <span class="required">*</span></label>
+            <input class="form-control" id="pickupName" th:field="*{pickupName}" maxlength="50" required>
+            <p class="form-error" th:if="${#fields.hasErrors('pickupName')}" th:errors="*{pickupName}"></p>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="pickupPhone">픽업자 연락처 <span class="required">*</span></label>
+            <input class="form-control" id="pickupPhone" type="tel" th:field="*{pickupPhone}" maxlength="30" required>
+            <p class="form-error" th:if="${#fields.hasErrors('pickupPhone')}" th:errors="*{pickupPhone}"></p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-title">주문 금액</h2>
+        <div class="panel">
+          <div class="data-row">
+            <span class="data-row__label">서버 기준 주문 금액</span>
+            <strong th:text="|${#numbers.formatInteger(checkout.originalAmount, 1, 'COMMA')}원|">0원</strong>
+          </div>
+          <p class="note">쿠폰 선택 후 실제 할인과 결제 금액은 서버에서 다시 검증합니다.</p>
+        </div>
+      </section>
+
+      <button class="btn btn--primary btn--block" type="submit">결제 준비하기</button>
+    </form>
   </main>
   <footer th:replace="~{fragments/common/footer :: footer(${store})}"></footer>
 </body>

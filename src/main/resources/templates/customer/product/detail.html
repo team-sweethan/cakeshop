@@ -496,7 +496,7 @@
           <a
                   sec:authorize="hasRole('USER')"
                   class="btn"
-                  th:href="@{/orders/custom/options}"
+                  th:href="@{/orders/custom/options(productId=${product.id})}"
           >
             제작 옵션 선택
           </a>

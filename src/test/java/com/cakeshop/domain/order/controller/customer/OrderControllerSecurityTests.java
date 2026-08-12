@@ -12,10 +12,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
 import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.coupon.service.CouponOrderQueryService;
+import com.cakeshop.domain.coupon.service.CouponOrderQuoteQueryService;
 import com.cakeshop.domain.order.service.OrderService;
+import com.cakeshop.domain.order.service.customer.CustomerCustomOrderService;
 import com.cakeshop.domain.order.service.customer.OrderCustomerService;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
 import com.cakeshop.domain.payment.service.RefundFacade;
+import com.cakeshop.domain.product.service.ProductQueryService;
 import com.cakeshop.global.security.MemberDetails;
 import com.cakeshop.global.security.SecurityConfig;
 import org.junit.jupiter.api.Test;
@@ -53,6 +56,15 @@ class OrderControllerSecurityTests {
 
     @MockitoBean
     private CouponOrderQueryService couponOrderQueryService;
+
+    @MockitoBean
+    private CouponOrderQuoteQueryService couponOrderQuoteQueryService;
+
+    @MockitoBean
+    private CustomerCustomOrderService customerCustomOrderService;
+
+    @MockitoBean
+    private ProductQueryService productQueryService;
 
     @Test
     void checkout_anonymousUser_redirectsToLoginEvenInPublicPreview() throws Exception {

@@ -97,6 +97,7 @@ public record PaymentAdminListRow(
         return switch (cancellationRequestType) {
             case "SYSTEM_COMPENSATION" -> "자동 복구";
             case "ADMIN" -> "관리자 처리";
+            case "ADMIN_REJECTION" -> "관리자 반려";
             default -> "고객 요청";
         };
     }
