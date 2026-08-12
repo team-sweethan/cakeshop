@@ -40,7 +40,7 @@ docs/community/DOMAIN.md 0.1절에서 <이 조각의 기능 ID>가 어느 spec�
 | 7 | 조회수 정렬·인기글 | 완료 (7a·7b·7c) | 목록 `?sort=views`, 인기글 영역, 정렬 인덱스 |
 | 10 | 회원 연동 계약 분리 | 완료 (10a~10d) | `members` JOIN 8곳을 `MemberCommunityQueryService` 경유로 바꿨다 |
 | 13 | 메인 인기글 노출 | 완료 | B5·D2. `CommunityHomeQueryService`로 메인에 5건. 목록 10건과 공유하는 읽기를 `PopularPostReader`로 모았다 |
-| 14 | 공지사항 | **진행 중** — 14a 완료 | B8·B9·B10·C5·C6·C7·D3·E4. 별도 `community_notices` 표. spec은 `specs/community-notice.md`. **14a(표+관리자 CRUD) → 14b(고객 노출) → 14c(메인)** 로 나눠 간다 |
+| 14 | 공지사항 | **진행 중** — 14a·14b 완료 | B8·B9·B10·C5·C6·C7·D3·E4. 별도 `community_notices` 표. spec은 `specs/community-notice.md`. **14a(표+관리자 CRUD) → 14b(고객 노출) → 14c(메인)** 로 나눠 간다 |
 | 8 | (2차) 대댓글 5 depth | **착수 전** | A7. `parent_comment_id` 사용. **`community-comment.md` B4의 자르기 규칙과 부딪히는 자리를 먼저 닫는다** |
 | 9 | (2차) 무한 스크롤 | **착수 전** | B7. B1의 쪽 번호 페이징을 대체. R28의 오프셋 한계가 여기서 정면으로 걸린다 |
 | 11 | (2차) 검색 | **착수 전** | B6. 구현 방식과 인프라 도입 여부를 먼저 합의한다(`DOMAIN.md` 2절) |
@@ -445,18 +445,23 @@ ALTER TABLE comments   ADD INDEX IF NOT EXISTS ix_comments_created   (created_at
 **검증**: H39·H40·H41(근거는 spec `검증` 절). 그 밖에 상태 전이 enum 표, 재삭제 0행, `DELETED`
 공지 수정 거절, 폼 기간 검증, 관리자 목록 렌더링을 각 계층 테스트가 본다.
 
-#### 14b — 고객 노출 (B8 상단 영역 · B9 전체보기 · B10 상세)
+#### 14b — 고객 노출 (B8 상단 영역 · B9 전체보기 · B10 상세) — **완료**
 
-- `<sql id="visibleNotice">` 하나와 그것을 `<include>`하는 조회 3종: 상단 N건, 전체보기(목록+개수), 상세 1건
-- `CommunityNoticeService` — 자리별 건수 상수(목록 상단 10), 페이지 크기 20, `now`를 `Clock`으로 만들어 Mapper에 넘김
+- `<sql id="visibleNotice">` 하나와 그것을 `<include>`하는 조회 3종: 상단·전체보기가 함께 쓰는
+  목록, 개수, 상세 1건. 정렬도 `<sql id="visibleNoticeOrder">` 하나다
+- `CommunityNoticeService` — 자리별 건수 상수(목록 상단 10), 페이지 크기 20, `now`를 `Clock`으로
+  만들어 Mapper에 넘김. **상단 영역의 "1쪽 + 필터 없음"은 Controller가 아니라 여기 있다**
+  (인기글 D7과 같은 자리)
 - `CommunityNoticeController` (`GET /community/notices`, `/community/notices/{id}`)
 - `CommunityController` 목록 모델에 상단 영역 추가
+- **`SecurityConfig`에 고객 경로 둘을 따로 적었다** — 기존 `/community/{id:\d+}`가 숫자만 받아
+  `"notices"`가 걸리지 않는다. 안 적으면 비로그인이 로그인 화면으로 튕긴다
 - 화면: `customer/community/notice/{list,detail}.html` 신설, `list.html` 최상단에 영역(**인기글보다 위**)과 전체보기 링크
 - `detail.html`을 재사용하지 않는다. **폴더를 나누는 것이 그 결정을 드러내는 자리다** — 같은
   폴더에 `detail.html`과 나란히 두면 다음 사람이 재사용을 먼저 떠올린다
 
-**검증**: 삭제·기간 밖 공지가 **네 경로 모두에서** 빠지는지(반대쪽 포함), 기간 경계 양쪽, 상단
-10건, 404 규칙, 페이징.
+**검증**: H42·H43·H44(근거는 spec `검증` 절). 그 밖에 정렬 키와 화면 날짜가 같은 값인지, 404 규칙,
+페이징, 본문 이스케이프를 각 계층 테스트가 본다.
 
 #### 14c — 메인 노출 (D3)
 
@@ -605,6 +610,9 @@ resources/mapper/member/MemberCommunityMapper.xml
 | H39 | 공지 표가 미정의 상태값과 뒤집힌 기간을 거부함 | `specs/community-notice.md` | **적용** (조각 14a) |
 | H40 | 공지 노출 상태 판정이 기간 경계 양쪽에서 옳음 | `specs/community-notice.md` | **적용** (조각 14a) |
 | H41 | 관리자 공지 쓰기가 Security 뒤에 있고 거절 뒤 표가 그대로임 | `specs/community-notice.md` | **적용** (조각 14a) |
+| H42 | 공지 노출 조건이 한 곳에만 있고 고객 조회가 전부 그것을 `<include>`함 | `specs/community-notice.md` | **적용** (조각 14b) |
+| H43 | 삭제·기간 밖 공지가 고객 경로에서 빠짐. 반대쪽과 경계 양쪽을 함께 봄 | `specs/community-notice.md` | **적용** (조각 14b) |
+| H44 | 목록 상단이 1쪽·필터 없을 때만 자기 건수로 읽음 | `specs/community-notice.md` | **적용** (조각 14b) |
 
 이 표는 새 테스트를 빠짐없이 등록하는 목록이 아니다. 조용히 틀어지는 고유 위험과 그 위험을 소유하는
 검증의 선택 근거를 다음 작업자에게 남겨야 할 때만 갱신한다. 실제 테스트의 존재와 이름은 테스트 코드가
@@ -655,6 +663,7 @@ resources/mapper/member/MemberCommunityMapper.xml
 
 | 날짜 | 내용 |
 |---|---|
+| 2026-08-12 | **조각 14b를 끝냈다.** spec이 열어 둔 자리 셋을 닫았다. (1) **정렬 키를 화면 날짜와 같은 값으로 묶었다** — 목록은 `COALESCE(starts_at, created_at)`으로 정렬하는데 화면이 등록일을 보여 주면 **목록이 뒤죽박죽으로 보이고, 그 화면은 정렬이 깨진 것과 구분되지 않는다.** `NoticeView.displayedAt` 하나로 두 값을 같게 했다. (2) **`SecurityConfig`에 고객 경로 둘을 따로 적어야 했다** — 기존 규칙이 `/community/{id:\d+}`라 숫자만 받고 `"notices"`는 안 걸린다. 안 적으면 `anyRequest().hasRole("USER")`로 떨어져 비로그인이 로그인으로 튕기고, **공지를 공개로 두려던 결정이 조용히 뒤집힌다.** (3) **상단 영역의 "1쪽 + 필터 없음"을 `CommunityNoticeService`에 뒀다** — 인기글 D7과 같은 자리이고, 검사도 같은 방식으로 결과가 비었는지가 아니라 **매퍼를 아예 안 부르는지**를 본다. 그 김에 **`<sql id="visibleNotice">`가 실제로 한 번만 쓰였는지를 XML에서 세는 검사(H42)를 세웠다** — 조건을 복사해 넣은 새 조회는 처음에는 맞게 동작해서 행동 검사로는 절대 안 잡히고, 나중에 조건이 바뀔 때 한쪽만 바뀐다. E4 전체가 이 하나에 걸려 있다 |
 | 2026-08-12 | **조각 14a를 끝냈다.** spec을 쓸 때 열려 있던 자리 넷을 구현하면서 닫았다. (1) **기간 순서(`starts_at < ends_at`)를 표의 `CHECK`로도 막는다.** 원래는 Service 검증으로 적었는데, 이 spec의 방식 자체가 "조건문이 아니라 스키마가 정책을 지킨다"였고 뒤집힌 기간은 **등록이 성공으로 끝나면서 공지만 영영 안 보이게** 만든다. 폼 검증은 관리자가 필드 오류로 고칠 수 있게 남기고, 표는 그 경로를 거치지 않는 쓰기까지 막는다. 길이·필수값은 폼에만 두는 것과 다르게 잡은 이유가 이것이다. (2) **Mapper를 고객·관리자로 나누지 않는다.** 게시글은 둘인데 공지는 하나다 — 14b의 `<sql id="visibleNotice">`를 고객 조회 셋이 `<include>`로만 써야 하고, 네임스페이스가 갈리면 건너 참조하거나 복사하게 되어 E4가 막으려던 자리가 그대로 열린다. (3) **템플릿을 `community/notice/` 하위로 판다.** B10이 "`detail.html`을 재사용하지 않는다"고 못 박은 것을 **폴더가 드러내게** 했다 — 같은 폴더에 나란히 두면 다음 사람이 재사용을 먼저 떠올린다. (4) **사이드바를 건드리지 않았다.** `fragments/admin/**`는 공통 협의 파일이라 진입점을 관리자 커뮤니티 목록의 버튼으로 뒀다. 관리자 목록에 상태 필터를 두지 않은 것도 여기서 정했다 — 배지가 네 상태를 한 화면에서 구분해 주고 공지는 수십 건 규모다 |
 | 2026-08-11 | **공지 spec을 썼다**(`specs/community-notice.md`). 확정된 정책 일곱 위에서 **결정이 필요했던 자리가 셋** 나왔고 spec에 근거와 함께 적었다. (1) **"최신순"이 무엇의 최신인지** — 노출 기간을 함께 넣기로 하면서 갈렸다. 고객은 `COALESCE(starts_at, created_at) DESC`, 관리자는 `created_at DESC`다. 고객 쪽을 등록 시각으로 하면 예약 공지가 뜨는 날 목록 한가운데에 나타나 상단에 두는 이유가 무너진다. (2) **노출 조건이 셋이 되어 `DOMAIN.md` 4.1("노출 기준은 status 하나")에서 벗어난다** — 4.1의 목적(빠뜨릴 자리를 없앤다)은 `<sql id="visibleNotice">` 하나를 모든 고객 조회가 `<include>`하는 것으로 지킨다. 복사하면 그 자리가 그대로 열린다. (3) **과거 종료일을 거부하지 않는다** — "지금부터 감추기"가 정당한 사용이라서다. 대신 실수가 조용히 묻히지 않게 관리자 목록에 `예정`/`노출 중`/`종료` 배지를 둔다. 정렬 인덱스는 두지 않는다(수십 건 규모, 정렬 키가 함수식) |
 | 2026-08-11 | **Entity·Form·View 경계를 community에서 먼저 검증한다.** 공통 `conventions.md`는 바꾸지 않고 `community_conventions.md`에 로컬 실험 범위와 종료 기준을 뒀다. Mapper 조회 행·집계·잠금 결과는 `dto/query`, 부분 UPDATE 값은 `dto/command`, 실제 화면 모델만 `dto/view`에 둔다. 2026-08-03의 쓰기용 `Post` 결정은 신규 저장 Entity를 작게 유지한다는 뜻으로 보존하되, 수정 매개변수까지 Entity가 맡게 하지는 않는다. 다른 도메인 적용과 공통 규칙 승격은 community 검증 후 별도로 결정한다. |

@@ -49,9 +49,9 @@
 | **B5** | 인기글 영역 | 누구나 | (B1과 메인 `GET /`에 포함) | **완료** | 7c · 13 | `community-popular.md` |
 | **B6** | 검색 | 누구나 | (B1의 파라미터) | **없음** | 2차 | `community-read.md` |
 | **B7** | 무한 스크롤 | 누구나 | (B1의 페이징 대체) | **없음** | 2차 | `community-read.md` |
-| **B8** | 공지 상단 영역 | 누구나 | (B1과 메인 `GET /`에 포함) | **없음** | 14b · 14c | `community-notice.md` |
-| **B9** | 공지 전체보기 | 누구나 | `GET /community/notices` | **없음** | 14b | `community-notice.md` |
-| **B10** | 공지 상세 | 누구나 | `GET /community/notices/{id}` | **없음** | 14b | `community-notice.md` |
+| **B8** | 공지 상단 영역 | 누구나 | (B1과 메인 `GET /`에 포함) | **목록만** | 14b · 14c | `community-notice.md` |
+| **B9** | 공지 전체보기 | 누구나 | `GET /community/notices` | **완료** | 14b | `community-notice.md` |
+| **B10** | 공지 상세 | 누구나 | `GET /community/notices/{id}` | **완료** | 14b | `community-notice.md` |
 | **C1** | 관리자 목록 | 관리자 | `GET /admin/community` | **완료** | 5 | `community-admin.md` |
 | **C2** | 관리자 상세 | 관리자 | `GET /admin/community/{id}` | **완료** | 5 | `community-admin.md` |
 | **C3** | 차단·해제 | 관리자 | `POST /admin/community/{id}/block` · `/unblock` | **완료** | 5 | `community-admin.md` |

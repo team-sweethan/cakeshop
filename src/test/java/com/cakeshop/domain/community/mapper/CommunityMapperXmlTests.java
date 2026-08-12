@@ -6,6 +6,7 @@ import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -30,6 +31,10 @@ class CommunityMapperXmlTests {
             "mapper/community/CommunityAdminMapper.xml", CommunityAdminMapper.class,
             "mapper/community/CommunityNoticeMapper.xml", CommunityNoticeMapper.class);
 
+    private static final String NOTICE_MAPPER_XML = "mapper/community/CommunityNoticeMapper.xml";
+
+    private static final String[] VISIBLE_NOTICE_STATEMENTS = {
+            "selectVisibleNotices", "countVisibleNotices", "selectVisibleNoticeById"};
 
     private Configuration configuration;
 
@@ -150,6 +155,27 @@ class CommunityMapperXmlTests {
     }
 
     @Test
+    void visibleNoticeQueries_allCarryTheThreeConditions() {
+        for (String statement : VISIBLE_NOTICE_STATEMENTS) {
+            assertThat(normalizedSql(statement))
+                    .as(statement)
+                    .contains("N.STATUS = 'PUBLISHED'")
+                    .contains("N.STARTS_AT IS NULL OR N.STARTS_AT <= ?")
+                    .contains("N.ENDS_AT IS NULL OR ? < N.ENDS_AT");
+        }
+    }
+
+    @Test
+    void visibleNoticeCondition_isWrittenOnlyOnce() throws Exception {
+        String xml = mapperXml(NOTICE_MAPPER_XML).replaceAll("\\s+", " ");
+
+        assertThat(countOccurrences(xml, "n.starts_at IS NULL")).isEqualTo(1);
+        assertThat(countOccurrences(xml, "n.ends_at IS NULL")).isEqualTo(1);
+        assertThat(countOccurrences(xml, "<include refid=\"visibleNotice\"/>"))
+                .isEqualTo(VISIBLE_NOTICE_STATEMENTS.length);
+    }
+
+    @Test
     void adminNoticeQueries_showEveryStatusAndPeriod() {
         for (String statement
                 : new String[]{"selectAdminNotices", "countAdminNotices", "selectAdminNoticeById"}) {
@@ -157,6 +183,12 @@ class CommunityMapperXmlTests {
                     .as(statement)
                     .doesNotContain("N.STARTS_AT IS NULL", "N.STATUS = 'PUBLISHED'");
         }
+    }
+
+    @Test
+    void visibleNotices_ordersByEffectiveDateWithIdTiebreaker() {
+        assertThat(normalizedSql("selectVisibleNotices"))
+                .contains("ORDER BY COALESCE(N.STARTS_AT, N.CREATED_AT) DESC, N.ID DESC");
     }
 
     @Test
@@ -169,6 +201,12 @@ class CommunityMapperXmlTests {
     void noticeWrites_conditionOnCurrentStatus() {
         assertThat(normalizedSql("updateNotice")).contains("N.STATUS = 'PUBLISHED'");
         assertThat(normalizedSql("deleteNotice")).contains("N.STATUS = 'PUBLISHED'");
+    }
+
+    private String mapperXml(String resource) throws Exception {
+        try (InputStream inputStream = Resources.getResourceAsStream(resource)) {
+            return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+        }
     }
 
     private int countOccurrences(String text, String target) {
@@ -197,6 +235,7 @@ class CommunityMapperXmlTests {
         parameters.put("rankingDate", LocalDate.of(2026, 8, 4));
         parameters.put("postCount", 20);
         parameters.put("noticeId", 1L);
+        parameters.put("now", LocalDateTime.of(2026, 8, 4, 10, 0));
         parameters.put("title", "제목");
         parameters.put("content", "본문");
         parameters.put("startsAt", null);

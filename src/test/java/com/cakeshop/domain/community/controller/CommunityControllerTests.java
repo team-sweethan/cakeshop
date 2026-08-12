@@ -26,12 +26,14 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import com.cakeshop.domain.community.dto.view.CommentSectionView;
+import com.cakeshop.domain.community.dto.view.NoticeSectionView;
 import com.cakeshop.domain.community.dto.view.PostCategoryView;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
 import com.cakeshop.domain.community.dto.view.PostSort;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
+import com.cakeshop.domain.community.service.CommunityNoticeService;
 import com.cakeshop.domain.community.service.CommunityService;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
@@ -57,11 +59,16 @@ class CommunityControllerTests {
     private static final LocalDateTime CREATED_AT = LocalDateTime.of(2026, 3, 1, 10, 0);
 
     private CommunityService communityService;
+    private CommunityNoticeService communityNoticeService;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         communityService = mock(CommunityService.class);
+        communityNoticeService = mock(CommunityNoticeService.class);
+
+        when(communityNoticeService.getListSection(any(), any()))
+                .thenReturn(NoticeSectionView.empty());
 
         when(communityService.getPosts(any(), any(), any()))
                 .thenReturn(new PageResult<>(List.of(), new PageRequest(1, 20), 0));
@@ -72,7 +79,8 @@ class CommunityControllerTests {
                         List.of(), 0, 0, CommentSectionView.DEFAULT_LIMIT));
 
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new CommunityController(communityService))
+                .standaloneSetup(
+                        new CommunityController(communityService, communityNoticeService))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .build();
     }
