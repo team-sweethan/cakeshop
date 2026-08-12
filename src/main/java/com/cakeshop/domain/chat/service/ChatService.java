@@ -67,6 +67,9 @@ public class ChatService {
             if (currentUserId == null || !currentUserId.equals(room.getCustomerId())) {
                 throw new AccessDeniedException("해당 채팅방에 대한 접근 권한이 없습니다.");
             }
+            if (!memberChatQueryService.existsCustomer(currentUserId)) {
+                throw new AccessDeniedException("해당 채팅방에 대한 접근 권한이 없습니다.");
+            }
         }
     }
 
