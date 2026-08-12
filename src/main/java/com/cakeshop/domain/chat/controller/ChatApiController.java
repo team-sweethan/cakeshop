@@ -247,7 +247,13 @@ public class ChatApiController {
                 .body(java.util.Map.of("code", e.getErrorCode().code(), "message", e.getErrorCode().message()));
     }
 
-    @ExceptionHandler({org.springframework.web.bind.MethodArgumentNotValidException.class, org.springframework.validation.BindException.class})
+    @ExceptionHandler({
+            org.springframework.web.bind.MethodArgumentNotValidException.class,
+            org.springframework.validation.BindException.class,
+            org.springframework.web.bind.MissingServletRequestParameterException.class,
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class,
+            org.springframework.http.converter.HttpMessageNotReadableException.class
+    })
     public ResponseEntity<java.util.Map<String, String>> handleValidationException() {
         return ResponseEntity.status(400)
                 .body(java.util.Map.of("code", com.cakeshop.global.error.CommonErrorCode.INVALID_INPUT.code(), "message", com.cakeshop.global.error.CommonErrorCode.INVALID_INPUT.message()));
