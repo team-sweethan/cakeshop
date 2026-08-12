@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cakeshop.domain.member.mapper.SocialAccountMapper">
+    <select id="findMemberEmail" resultType="string">
+        SELECT m.email
+          FROM social_accounts sa
+          JOIN members m ON m.id = sa.member_id
+         WHERE sa.provider = #{provider}
+           AND sa.provider_id = #{providerId}
+    </select>
+
+    <insert id="insert"
+            parameterType="com.cakeshop.domain.member.entity.SocialAccount"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO social_accounts (member_id, provider, provider_id)
+        VALUES (#{memberId}, #{provider}, #{providerId})
+    </insert>
+</mapper>
