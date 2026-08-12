@@ -55,6 +55,7 @@ public class ChatService {
     private final FileStorageClient fileStorageClient;
     private final ChatImageValidator chatImageValidator;
     private final ProductChatQueryService productChatQueryService;
+    private final ChatRoomTxHelper chatRoomTxHelper;
 
     // ==========================================
     // 0. 검증 헬퍼 메서드
@@ -102,18 +103,12 @@ public class ChatService {
             chatMapper.insertChatRoom(chatRoom);
             return chatRoom;
         } catch (org.springframework.dao.DataIntegrityViolationException e) {
-            ChatRoom existingRoom = getChatRoomInNewTransaction(customerId);
+            ChatRoom existingRoom = chatRoomTxHelper.findChatRoomInNewTransaction(customerId);
             if (existingRoom != null) {
                 return existingRoom;
             }
             throw e;
         }
-    }
-
-    // 동시 생성 중복 충돌 발생 시 최신 커밋 스냅샷 조회를 위한 독립 트랜잭션 헬퍼
-    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW, readOnly = true)
-    public ChatRoom getChatRoomInNewTransaction(Long customerId) {
-        return chatMapper.findChatRoomByCustomerId(customerId);
     }
 
     // 고객 ID로 기존 채팅방 단순 조회 (생성 부작용 없음)
