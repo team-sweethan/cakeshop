@@ -241,7 +241,7 @@ public class ChatService {
         if (key.startsWith("chat/") || key.startsWith("uploads/")) {
             return;
         }
-        // 3. 외부 URL인 경우 설정된 자사 S3 / CloudFront Base URL 또는 신뢰 호스트만 통과 허용!
+        // 3. 외부 URL인 경우 설정된 자사 S3 / CloudFront Base URL만 통과 허용!
         if (key.startsWith("http://") || key.startsWith("https://")) {
             if (StringUtils.hasText(s3BaseUrl)) {
                 String normalizedBaseUrl = s3BaseUrl.endsWith("/") ? s3BaseUrl : s3BaseUrl + "/";
@@ -249,18 +249,7 @@ public class ChatService {
                     return;
                 }
             }
-            try {
-                java.net.URI uri = java.net.URI.create(key);
-                String host = uri.getHost();
-                if (host != null) {
-                    host = host.toLowerCase();
-                    if (host.equals("localhost") || host.equals("127.0.0.1")) {
-                        return;
-                    }
-                }
-            } catch (Exception ignored) {
-            }
-            // 해커/외부 서버 추적 URL(https://attacker.example/pixel.png) 차단
+            // 해커/외부 서버 추적 URL(https://attacker.example/pixel.png) 및 localhost 차단
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
         // 그 외 미허용 형식 차단
