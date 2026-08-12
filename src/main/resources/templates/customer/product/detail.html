@@ -18,6 +18,7 @@
   <!-- 공통 및 고객 화면 스크립트 -->
   <script defer th:src="@{/js/app.js}"></script>
   <script defer th:src="@{/js/customer-mockup.js}"></script>
+  <script defer th:src="@{/js/product-detail-auth.js}"></script>
   <script defer
           th:src="@{/js/product-gallery.js(v='product-gallery-navigation')}">
   </script>
@@ -434,10 +435,20 @@
         >
           <!-- 일반 상품은 픽업 선택을 포함한 통합 주문서로 바로 이동한다. -->
           <a
+                  sec:authorize="hasRole('USER')"
                   class="btn btn--primary"
-                  th:if="${product.productType.name() == 'GENERAL'}"
                   th:href="@{/orders/checkout}"
                   data-order-checkout
+          >
+            주문서 작성하기
+          </a>
+
+          <a
+                  sec:authorize="isAnonymous()"
+                  class="btn btn--primary"
+                  th:href="@{/orders/checkout}"
+                  data-order-checkout
+                  data-login-required
           >
             주문서 작성하기
           </a>
@@ -483,8 +494,18 @@
                         and product.productType.name() == 'CUSTOM'}"
         >
           <a
+                  sec:authorize="hasRole('USER')"
                   class="btn"
                   th:href="@{/orders/custom/options}"
+          >
+            제작 옵션 선택
+          </a>
+
+          <a
+                  sec:authorize="isAnonymous()"
+                  class="btn"
+                  th:href="@{/orders/custom/options}"
+                  data-login-required
           >
             제작 옵션 선택
           </a>

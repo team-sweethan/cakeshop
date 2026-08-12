@@ -146,7 +146,25 @@ class ScreenRenderingTests {
         mockMvc.perform(get("/products/1"))
             .andExpect(status().isOk())
             .andExpect(content().string(containsString("로그인 후 장바구니 담기")))
+            .andExpect(content().string(containsString("data-login-required")))
+            .andExpect(content().string(containsString("/js/product-detail-auth.js")))
             .andExpect(content().string(not(containsString("data-server-cart-form"))));
+    }
+
+    @Test
+    void customProductDetail_unauthenticatedMember_showsLoginRequiredAction() throws Exception {
+        mockMvc.perform(get("/products/6"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("제작 옵션 선택")))
+            .andExpect(content().string(containsString("/orders/custom/options")))
+            .andExpect(content().string(containsString("data-login-required")));
+    }
+
+    @Test
+    void productDetailAuthScript_isServed() throws Exception {
+        mockMvc.perform(get("/js/product-detail-auth.js"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("[data-login-required]")));
     }
 
     @Test
@@ -209,6 +227,7 @@ class ScreenRenderingTests {
         mockMvc.perform(get("/products/1"))
             .andExpect(status().isOk())
             .andExpect(content().string(containsString("data-server-cart-form")))
+            .andExpect(content().string(not(containsString("data-login-required"))))
             .andExpect(content().string(not(containsString("로그인 후 장바구니 담기"))));
     }
 
@@ -277,6 +296,7 @@ class ScreenRenderingTests {
         mockMvc.perform(get("/products/6"))
             .andExpect(status().isOk())
             .andExpect(content().string(containsString("/orders/custom/options")))
+            .andExpect(content().string(not(containsString("data-login-required"))))
             .andExpect(content().string(not(containsString("data-server-cart-form"))));
     }
 

@@ -4,6 +4,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -25,7 +26,10 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-@WebMvcTest(OrderController.class)
+@WebMvcTest(
+        controllers = OrderController.class,
+        properties = "app.mockup.public-preview=true"
+)
 @Import(SecurityConfig.class)
 class OrderControllerSecurityTests {
 
@@ -49,6 +53,20 @@ class OrderControllerSecurityTests {
 
     @MockitoBean
     private CouponOrderQueryService couponOrderQueryService;
+
+    @Test
+    void checkout_anonymousUser_redirectsToLoginEvenInPublicPreview() throws Exception {
+        mockMvc.perform(get("/orders/checkout"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login"));
+    }
+
+    @Test
+    void customOptions_anonymousUser_redirectsToLoginEvenInPublicPreview() throws Exception {
+        mockMvc.perform(get("/orders/custom/options"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login"));
+    }
 
     @Test
     void cancel_missingCsrf_isForbidden() throws Exception {

@@ -95,6 +95,12 @@ public class SecurityConfig {
                 auth.requestMatchers("/actuator/health", "/actuator/health/**").permitAll();
                 auth.requestMatchers(HttpMethod.GET, "/community", "/community/{id:\\d+}").permitAll();
                 auth.requestMatchers(HttpMethod.POST, "/webhooks/toss").permitAll();
+                // 상품 상세에서 시작하는 주문 흐름은 local 공개 미리보기에서도 회원 로그인이 필요하다.
+                auth.requestMatchers(
+                        HttpMethod.GET,
+                        "/orders/checkout",
+                        "/orders/custom/options"
+                ).hasRole("USER");
 
                 if (publicPreview) {
                     // local 프로필에서만 고객 목업 흐름을 로그인 없이 확인한다.
