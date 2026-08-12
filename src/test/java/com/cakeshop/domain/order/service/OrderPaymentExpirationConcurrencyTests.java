@@ -148,7 +148,7 @@ class OrderPaymentExpirationConcurrencyTests {
         Future<?> completion = executor.submit(() -> {
             await(start);
             try {
-                paymentService.completeGeneralPayment(
+                paymentService.completePayment(
                         new PaymentExecutionOrder(
                                 orderId,
                                 OrderType.CUSTOM,
