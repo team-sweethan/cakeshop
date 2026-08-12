@@ -183,7 +183,8 @@ SPECIFIC_MEMBERS
 `CouponMemberCommandService.issueNewMemberCoupons(memberId)`에 전달해 연결한다. 쿠폰 발급에 실패하면
 회원가입도 함께 롤백한다. 이 공개 명령은 member 도메인 사용을 위한 계약이므로,
 `CouponMemberMapper`와 `CouponMemberMapper.xml`에서 신규 회원 쿠폰 조회·발급 이력 생성·발급 수량 증가 SQL을
-분리해 관리한다.
+분리해 관리한다. 회원 상태·역할 검증은 `MemberCouponQueryService` 공개 조회 계약이 소유하며,
+쿠폰 SQL은 쿠폰 정책·사용 기간·중복 발급 여부만 검증한다.
 
 첫 주문 대상은 회원 행 잠금 뒤 `OrderCouponQueryService`로 주문 이력을 다시 확인한다.
 일반 주문 생성도 동일한 회원 행 잠금을 먼저 획득하므로, 쿠폰 발급 후보 조회와 주문 생성이 경합해도

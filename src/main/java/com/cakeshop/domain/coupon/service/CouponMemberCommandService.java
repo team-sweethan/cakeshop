@@ -2,6 +2,7 @@ package com.cakeshop.domain.coupon.service;
 
 import com.cakeshop.domain.coupon.error.CouponErrorCode;
 import com.cakeshop.domain.coupon.mapper.CouponMemberMapper;
+import com.cakeshop.domain.member.service.MemberCouponQueryService;
 import com.cakeshop.global.error.BusinessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,14 +20,22 @@ import org.springframework.transaction.annotation.Transactional;
 public class CouponMemberCommandService {
 
     private final CouponMemberMapper couponMemberMapper;
+    private final MemberCouponQueryService memberCouponQueryService;
 
-    public CouponMemberCommandService(CouponMemberMapper couponMemberMapper) {
+    public CouponMemberCommandService(CouponMemberMapper couponMemberMapper,
+                                      MemberCouponQueryService memberCouponQueryService) {
         this.couponMemberMapper = couponMemberMapper;
+        this.memberCouponQueryService = memberCouponQueryService;
     }
 
     /** 회원가입 트랜잭션에 참여해 NEW_MEMBERS 대상 쿠폰을 발급한다. */
     @Transactional
     public void issueNewMemberCoupons(long memberId) {
+        // 회원 상태·역할은 소유 도메인의 공개 조회 계약으로 확인한다.
+        if (!memberCouponQueryService.isActiveCouponIssuableMember(memberId)) {
+            return;
+        }
+
         for (Long couponId : couponMemberMapper.findAvailableNewMemberCouponIds()) {
             if (couponMemberMapper.insertNewMemberCouponIfAbsent(couponId, memberId) == 1
                     && couponMemberMapper.increaseNewMemberCouponIssuedQuantity(couponId) != 1) {

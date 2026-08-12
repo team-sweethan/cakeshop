@@ -33,7 +33,7 @@ public interface CouponMemberMapper {
     /** 회원가입 시점에 발급 가능한 NEW_MEMBERS 쿠폰 ID를 조회한다. */
     List<Long> findAvailableNewMemberCouponIds();
 
-    /** 활성 일반 회원에게 중복되지 않는 신규 회원 쿠폰 발급 이력을 생성한다. */
+    /** 회원 도메인에서 검증한 대상에게 중복되지 않는 신규 회원 쿠폰 발급 이력을 생성한다. */
     int insertNewMemberCouponIfAbsent(@Param("couponId") long couponId,
                                       @Param("memberId") long memberId);
 

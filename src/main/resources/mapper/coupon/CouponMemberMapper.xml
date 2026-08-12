@@ -43,9 +43,9 @@
         담당자 : 이정후
         기능 : 회원가입 완료 뒤 NEW_MEMBERS 쿠폰 발급
         설명 : member 도메인이 CouponMemberCommandService를 통해 호출하는 전용 SQL이다.
-               발급 대상·회원 활성 상태·사용 기간·중복 이력을 SQL에서도 다시 검증한다.
+               회원 상태·역할은 MemberCouponQueryService 공개 계약에서 검증하고,
+               이 SQL은 쿠폰 정책·사용 기간·중복 이력만 검증한다.
     -->
-
     <select id="findAvailableNewMemberCouponIds" resultType="long">
         SELECT id
         FROM coupons
@@ -59,14 +59,11 @@
         INSERT INTO member_coupons (coupon_id, member_id)
         SELECT #{couponId}, #{memberId}
         FROM coupons c
-        INNER JOIN members m ON m.id = #{memberId}
         WHERE c.id = #{couponId}
           AND c.target_type = 'NEW_MEMBERS'
           AND c.status = 'ACTIVE'
           AND c.starts_at &lt;= NOW(6)
           AND c.expires_at &gt; NOW(6)
-          AND m.status = 'ACTIVE'
-          AND m.role = 'USER'
           AND NOT EXISTS (
               SELECT 1
               FROM member_coupons mc
