@@ -12,6 +12,9 @@ import static org.mockito.Mockito.inOrder;
 
 import com.cakeshop.domain.member.entity.EmailVerification;
 import com.cakeshop.domain.member.entity.EmailVerificationPurpose;
+import com.cakeshop.domain.member.entity.Member;
+import com.cakeshop.domain.member.entity.MemberStatus;
+import com.cakeshop.domain.member.dto.view.PasswordResetEmailVerification;
 import com.cakeshop.domain.member.dto.view.SignupEmailVerification;
 import com.cakeshop.domain.member.error.MemberErrorCode;
 import com.cakeshop.domain.member.mapper.EmailVerificationMapper;
@@ -129,6 +132,39 @@ class EmailVerificationServiceTests {
     }
 
     @Test
+    void sendPasswordResetCode_activePasswordMember_sendsWithResetPurpose() {
+        when(memberMapper.findByEmail("user@example.com"))
+                .thenReturn(Optional.of(passwordMember()));
+        when(emailVerificationMapper.findLatest(
+                "user@example.com", EmailVerificationPurpose.PASSWORD_RESET))
+                .thenReturn(Optional.empty());
+        when(emailVerificationMapper.countRequestsSince(any(), any(), any())).thenReturn(0);
+        when(emailVerificationMapper.insert(any())).thenReturn(1);
+
+        emailVerificationService.sendPasswordResetCode(" User@Example.com ");
+
+        ArgumentCaptor<EmailVerification> verificationCaptor =
+                ArgumentCaptor.forClass(EmailVerification.class);
+        verify(emailVerificationMapper).insert(verificationCaptor.capture());
+        assertThat(verificationCaptor.getValue().getPurpose())
+                .isEqualTo(EmailVerificationPurpose.PASSWORD_RESET);
+        verify(emailSender).sendVerificationCode(
+                org.mockito.ArgumentMatchers.eq("user@example.com"),
+                org.mockito.ArgumentMatchers.matches("\\d{6}"),
+                org.mockito.ArgumentMatchers.eq(Duration.ofMinutes(5)));
+    }
+
+    @Test
+    void sendPasswordResetCode_unknownEmail_returnsWithoutRevealingMember() {
+        when(memberMapper.findByEmail("missing@example.com")).thenReturn(Optional.empty());
+
+        emailVerificationService.sendPasswordResetCode("missing@example.com");
+
+        verify(emailVerificationMapper, never()).insert(any());
+        verify(emailSender, never()).sendVerificationCode(any(), any(), any());
+    }
+
+    @Test
     void verifySignupCode_matchingCode_marksLatestVerified() {
         EmailVerification latest = verification(
                 "user@example.com",
@@ -188,6 +224,28 @@ class EmailVerificationServiceTests {
     }
 
     @Test
+    void verifyPasswordResetCode_matchingCode_bindsMemberAndVerification() {
+        EmailVerification latest = verification(
+                "user@example.com", passwordEncoder.encode("123456"));
+        latest.setPurpose(EmailVerificationPurpose.PASSWORD_RESET);
+        when(emailVerificationMapper.findLatest(
+                "user@example.com", EmailVerificationPurpose.PASSWORD_RESET))
+                .thenReturn(Optional.of(latest));
+        when(emailVerificationMapper.markVerified(
+                latest.getId(), latest.getEmail(), EmailVerificationPurpose.PASSWORD_RESET, NOW))
+                .thenReturn(1);
+        when(memberMapper.findByEmail("user@example.com"))
+                .thenReturn(Optional.of(passwordMember()));
+
+        PasswordResetEmailVerification result =
+                emailVerificationService.verifyPasswordResetCode(
+                        "user@example.com", "123456");
+
+        assertThat(result).isEqualTo(
+                new PasswordResetEmailVerification(1L, 7L, "user@example.com"));
+    }
+
+    @Test
     void consumeSignupVerification_verifiedRequest_consumesOnce() {
         EmailVerification verified = verification("user@example.com", "hash");
         verified.setVerifiedAt(NOW.minusMinutes(1));
@@ -218,6 +276,22 @@ class EmailVerificationServiceTests {
     }
 
     @Test
+    void consumePasswordResetVerification_usesPasswordResetPurpose() {
+        EmailVerification verified = verification("user@example.com", "hash");
+        verified.setPurpose(EmailVerificationPurpose.PASSWORD_RESET);
+        verified.setVerifiedAt(NOW.minusMinutes(1));
+        when(emailVerificationMapper.findVerifiedByIdForUpdate(
+                verified.getId(),
+                "user@example.com",
+                EmailVerificationPurpose.PASSWORD_RESET,
+                NOW.minusMinutes(10))).thenReturn(Optional.of(verified));
+        when(emailVerificationMapper.markConsumed(verified.getId(), NOW)).thenReturn(1);
+
+        assertThat(emailVerificationService.consumePasswordResetVerification(
+                verified.getId(), "user@example.com")).isTrue();
+    }
+
+    @Test
     void deleteExpiredVerifications_usesSevenDayRetention() {
         when(emailVerificationMapper.deleteExpiredBefore(NOW.minusDays(7))).thenReturn(3);
 
@@ -235,6 +309,16 @@ class EmailVerificationServiceTests {
         verification.setExpiresAt(NOW.plusMinutes(5));
         verification.setCreatedAt(NOW.minusMinutes(1));
         return verification;
+    }
+
+    private Member passwordMember() {
+        return Member.builder()
+                .id(7L)
+                .email("user@example.com")
+                .password("encoded-password")
+                .role("USER")
+                .status(MemberStatus.ACTIVE)
+                .build();
     }
 
     private void assertMemberError(Runnable action, MemberErrorCode errorCode) {

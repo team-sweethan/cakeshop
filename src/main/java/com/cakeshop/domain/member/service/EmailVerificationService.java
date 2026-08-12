@@ -1,9 +1,12 @@
 package com.cakeshop.domain.member.service;
 
 import com.cakeshop.domain.member.dto.form.SignupForm;
+import com.cakeshop.domain.member.dto.view.PasswordResetEmailVerification;
 import com.cakeshop.domain.member.dto.view.SignupEmailVerification;
 import com.cakeshop.domain.member.entity.EmailVerification;
 import com.cakeshop.domain.member.entity.EmailVerificationPurpose;
+import com.cakeshop.domain.member.entity.Member;
+import com.cakeshop.domain.member.entity.MemberStatus;
 import com.cakeshop.domain.member.error.MemberErrorCode;
 import com.cakeshop.domain.member.error.EmailVerificationSendException;
 import com.cakeshop.domain.member.mapper.EmailVerificationMapper;
@@ -14,6 +17,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Locale;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -44,7 +48,19 @@ public class EmailVerificationService {
     @Transactional(noRollbackFor = EmailVerificationSendException.class)
     public void sendSignupCode(String rawEmail) {
         String email = normalizeAndValidateEmail(rawEmail);
-        EmailVerificationPurpose purpose = EmailVerificationPurpose.SIGNUP;
+        sendCodeWithLock(email, EmailVerificationPurpose.SIGNUP);
+    }
+
+    /** 비밀번호 재설정 이메일로 새 인증번호를 발송한다. */
+    @Transactional(noRollbackFor = EmailVerificationSendException.class)
+    public void sendPasswordResetCode(String rawEmail) {
+        String email = normalizeAndValidateEmail(rawEmail);
+        sendCodeWithLock(email, EmailVerificationPurpose.PASSWORD_RESET);
+    }
+
+    private void sendCodeWithLock(
+            String email,
+            EmailVerificationPurpose purpose) {
         if (emailVerificationMapper.acquireRequestLock(
                 email, purpose, REQUEST_LOCK_TIMEOUT_SECONDS) != 1) {
             throw new BusinessException(MemberErrorCode.EMAIL_VERIFICATION_RATE_LIMITED);
@@ -54,6 +70,13 @@ public class EmailVerificationService {
             releaseRequestLockAfterTransaction(email, purpose);
         }
         try {
+            if (purpose == EmailVerificationPurpose.SIGNUP) {
+                if (memberMapper.findByEmail(email).isPresent()) {
+                    throw new BusinessException(MemberErrorCode.DUPLICATE_EMAIL);
+                }
+            } else if (findPasswordResetMember(email).isEmpty()) {
+                return;
+            }
             sendCodeWithinLock(email, purpose);
         } finally {
             if (releaseImmediately) {
@@ -63,10 +86,6 @@ public class EmailVerificationService {
     }
 
     private void sendCodeWithinLock(String email, EmailVerificationPurpose purpose) {
-        if (memberMapper.findByEmail(email).isPresent()) {
-            throw new BusinessException(MemberErrorCode.DUPLICATE_EMAIL);
-        }
-
         LocalDateTime now = LocalDateTime.now(clock);
         emailVerificationMapper.findLatest(email, purpose)
                 .filter(latest -> latest.getCreatedAt()
@@ -100,10 +119,32 @@ public class EmailVerificationService {
     @Transactional
     public SignupEmailVerification verifySignupCode(String rawEmail, String code) {
         String email = normalizeAndValidateEmail(rawEmail);
+        EmailVerification verification = verifyCode(
+                email, code, EmailVerificationPurpose.SIGNUP);
+        return new SignupEmailVerification(verification.getId(), email);
+    }
+
+    /** 비밀번호 재설정 이메일의 가장 최근 인증번호를 확인한다. */
+    @Transactional
+    public PasswordResetEmailVerification verifyPasswordResetCode(
+            String rawEmail,
+            String code) {
+        String email = normalizeAndValidateEmail(rawEmail);
+        EmailVerification verification = verifyCode(
+                email, code, EmailVerificationPurpose.PASSWORD_RESET);
+        Member member = findPasswordResetMember(email)
+                .orElseThrow(() -> new BusinessException(
+                        MemberErrorCode.EMAIL_VERIFICATION_INVALID));
+        return new PasswordResetEmailVerification(
+                verification.getId(), member.getId(), email);
+    }
+
+    private EmailVerification verifyCode(
+            String email,
+            String code,
+            EmailVerificationPurpose purpose) {
         LocalDateTime now = LocalDateTime.now(clock);
-        EmailVerification verification = emailVerificationMapper.findLatest(
-                        email,
-                        EmailVerificationPurpose.SIGNUP)
+        EmailVerification verification = emailVerificationMapper.findLatest(email, purpose)
                 .orElseThrow(() -> new BusinessException(
                         MemberErrorCode.EMAIL_VERIFICATION_INVALID));
 
@@ -114,7 +155,7 @@ public class EmailVerificationService {
                     && code != null
                     && code.matches("\\d{6}")
                     && passwordEncoder.matches(code, verification.getCodeHash())) {
-                return new SignupEmailVerification(verification.getId(), email);
+                return verification;
             }
             if (verification.getAttemptCount() < 5
                     && verification.getConsumedAt() == null
@@ -139,16 +180,32 @@ public class EmailVerificationService {
         if (emailVerificationMapper.markVerified(
                 verification.getId(),
                 email,
-                EmailVerificationPurpose.SIGNUP,
+                purpose,
                 now) != 1) {
             throw new BusinessException(MemberErrorCode.EMAIL_VERIFICATION_INVALID);
         }
-        return new SignupEmailVerification(verification.getId(), email);
+        verification.setVerifiedAt(now);
+        return verification;
     }
 
     /** 인증된 이메일을 회원가입에서 한 번만 사용 처리한다. */
     @Transactional
     public boolean consumeSignupVerification(Long verificationId, String rawEmail) {
+        return consumeVerification(
+                verificationId, rawEmail, EmailVerificationPurpose.SIGNUP);
+    }
+
+    /** 인증된 이메일을 비밀번호 재설정에서 한 번만 사용 처리한다. */
+    @Transactional
+    public boolean consumePasswordResetVerification(Long verificationId, String rawEmail) {
+        return consumeVerification(
+                verificationId, rawEmail, EmailVerificationPurpose.PASSWORD_RESET);
+    }
+
+    private boolean consumeVerification(
+            Long verificationId,
+            String rawEmail,
+            EmailVerificationPurpose purpose) {
         if (verificationId == null) {
             return false;
         }
@@ -157,11 +214,18 @@ public class EmailVerificationService {
         return emailVerificationMapper.findVerifiedByIdForUpdate(
                         verificationId,
                         email,
-                        EmailVerificationPurpose.SIGNUP,
+                        purpose,
                         now.minus(VERIFIED_TTL))
                 .map(verification ->
                         emailVerificationMapper.markConsumed(verification.getId(), now) == 1)
                 .orElse(false);
+    }
+
+    private Optional<Member> findPasswordResetMember(String email) {
+        return memberMapper.findByEmail(email)
+                .filter(member -> MemberStatus.ACTIVE == member.getStatus())
+                .filter(member -> "USER".equals(member.getRole()))
+                .filter(member -> member.getPassword() != null);
     }
 
     /** 보관 기간이 지난 이메일 인증 요청을 삭제한다. */

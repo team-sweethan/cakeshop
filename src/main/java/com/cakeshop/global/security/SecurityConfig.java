@@ -1,8 +1,6 @@
 package com.cakeshop.global.security;
 
 import jakarta.servlet.http.HttpServletRequest;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,7 +20,6 @@ import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.access.AccessDeniedHandlerImpl;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
-import org.springframework.security.web.util.matcher.AndRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.security.web.session.HttpSessionEventPublisher;
 
@@ -42,9 +39,6 @@ public class SecurityConfig {
             SessionRegistry sessionRegistry) throws Exception {
         RequestMatcher passwordRecoveryRequest =
                 SecurityConfig::isPasswordRecoveryRequest;
-        RequestMatcher localPasswordRecoveryRequest = new AndRequestMatcher(
-                passwordRecoveryRequest,
-                SecurityConfig::isLoopbackRequest);
         HttpSessionRequestCache requestCache = new HttpSessionRequestCache();
         requestCache.setRequestMatcher(request ->
                 !"/cart/count".equals(request.getRequestURI()
@@ -82,11 +76,11 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> {
                 // ① 공개 GET을 먼저 선언 (matcher 순서 = 우선순위)
                 // 이메일/SMS 인증 전 간편 재설정은 local 프로필에서도 이 PC의 요청만 허용한다.
-                auth.requestMatchers(localPasswordRecoveryRequest).permitAll();
-                auth.requestMatchers(passwordRecoveryRequest).denyAll();
+                auth.requestMatchers(passwordRecoveryRequest).permitAll();
                 auth.requestMatchers(
                         "/", "/login", "/signup", "/join", "/emailCheck", "/find-email",
                         "/find-email/login", "/email-verifications/signup/**",
+                        "/email-verifications/password-reset/**",
                         "/api/notifications/unread-count", "/api/notifications/test-sms",
                         "/products/**", "/screens", "/favicon.ico",
                         "/css/**", "/js/**", "/webjars/**", "/images/**", "/uploads/**", "/error")
@@ -169,15 +163,6 @@ public class SecurityConfig {
     private static boolean isPasswordRecoveryRequest(HttpServletRequest request) {
         String path = request.getRequestURI().substring(request.getContextPath().length());
         return "/find-password".equals(path)
-                || "/find-password/verify".equals(path)
                 || "/reset-password".equals(path);
-    }
-
-    private static boolean isLoopbackRequest(HttpServletRequest request) {
-        try {
-            return InetAddress.getByName(request.getRemoteAddr()).isLoopbackAddress();
-        } catch (UnknownHostException exception) {
-            return false;
-        }
     }
 }

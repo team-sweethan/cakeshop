@@ -51,12 +51,6 @@ public interface MemberMapper {
             @Param("birthDate") LocalDate birthDate,
             @Param("phone") String phone);
 
-    Optional<Member> findPasswordRecoveryMember(
-            @Param("email") String email,
-            @Param("name") String name,
-            @Param("birthDate") LocalDate birthDate,
-            @Param("phone") String phone);
-
     int join(Member member);
 
     int update(Member member);

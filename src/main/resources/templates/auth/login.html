@@ -41,9 +41,7 @@
       <a class="btn" th:href="@{/signup}">회원가입</a>
       <div class="cluster">
         <a class="btn" th:href="@{/find-email}">이메일 찾기</a>
-        <a class="btn" th:if="${@environment.getProperty(
-                'app.member.simple-password-reset-enabled', 'false') == 'true'}"
-           th:href="@{/find-password}">비밀번호 찾기</a>
+        <a class="btn" th:href="@{/find-password}">비밀번호 찾기</a>
       </div>
     </div>
   </section>

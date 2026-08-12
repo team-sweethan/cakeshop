@@ -66,14 +66,14 @@ class MemberLogoutSecurityTests {
     }
 
     @Test
-    void passwordRecovery_remoteRequest_isForbidden() throws Exception {
+    void passwordRecovery_remoteRequest_passesPublicSecurityRules() throws Exception {
         mockMvc.perform(get("/find-password")
                         .with(user("member@cakeshop.local"))
                         .with(request -> {
                             request.setRemoteAddr("203.0.113.10");
                             return request;
                         }))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isNotFound());
     }
 
     @Test

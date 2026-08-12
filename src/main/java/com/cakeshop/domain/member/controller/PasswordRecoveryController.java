@@ -1,17 +1,12 @@
 package com.cakeshop.domain.member.controller;
 
 import com.cakeshop.domain.member.dto.form.PasswordForm;
-import com.cakeshop.domain.member.dto.form.PasswordRecoveryForm;
-import com.cakeshop.domain.member.dto.view.PasswordRecoveryTarget;
 import com.cakeshop.domain.member.dto.view.PasswordResetResult;
 import com.cakeshop.domain.member.service.MemberService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
-import java.time.Duration;
 import java.time.Instant;
-import java.util.Optional;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.core.session.SessionInformation;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -24,14 +19,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
-@ConditionalOnProperty(
-        name = "app.member.simple-password-reset-enabled",
-        havingValue = "true")
 public class PasswordRecoveryController {
 
     static final String PASSWORD_RECOVERY_SESSION_KEY = "passwordRecovery";
-    private static final Duration PASSWORD_RECOVERY_TTL = Duration.ofMinutes(5);
-
     private final MemberService memberService;
     private final SessionRegistry sessionRegistry;
 
@@ -46,42 +36,7 @@ public class PasswordRecoveryController {
     @GetMapping("/find-password")
     public String findPassword(Model model, HttpServletRequest request) {
         removeRecoverySession(request.getSession(false));
-        model.addAttribute("passwordRecoveryForm", new PasswordRecoveryForm());
         return "customer/member/find-password";
-    }
-
-    // 비밀번호 재설정 회원 확인
-    @PostMapping("/find-password/verify")
-    public String verifyMember(
-            @Valid @ModelAttribute("passwordRecoveryForm") PasswordRecoveryForm form,
-            BindingResult bindingResult,
-            HttpServletRequest request) {
-        removeRecoverySession(request.getSession(false));
-        if (bindingResult.hasErrors()) {
-            return "customer/member/find-password";
-        }
-
-        Optional<PasswordRecoveryTarget> target = memberService.findPasswordRecoveryMember(
-                form.getEmail(),
-                form.getName(),
-                form.getBirthDate(),
-                form.getPhone());
-        if (target.isEmpty()) {
-            bindingResult.reject(
-                    "passwordRecoveryNotFound",
-                    "입력한 정보와 일치하는 회원을 찾을 수 없습니다.");
-            return "customer/member/find-password";
-        }
-
-        HttpSession session = request.getSession();
-        request.changeSessionId();
-        session.setAttribute(
-                PASSWORD_RECOVERY_SESSION_KEY,
-                new PasswordRecoverySession(
-                        target.get().memberId(),
-                        target.get().email(),
-                        Instant.now().plus(PASSWORD_RECOVERY_TTL)));
-        return "redirect:/reset-password";
     }
 
     // 비밀번호 재설정 화면
@@ -123,7 +78,11 @@ public class PasswordRecoveryController {
         }
 
         PasswordResetResult resetResult =
-                memberService.resetPassword(recoverySession.memberId(), form.getNewPassword());
+                memberService.resetPassword(
+                        recoverySession.verificationId(),
+                        recoverySession.memberId(),
+                        recoverySession.email(),
+                        form.getNewPassword());
         if (resetResult == PasswordResetResult.SAME_AS_CURRENT) {
             bindingResult.rejectValue(
                     "newPassword",
