@@ -96,6 +96,7 @@ class StatisticsAdminScreenRenderingTests {
                 ));
 
         mockMvc.perform(get("/admin/statistics")
+                        .param("periodType", "RANGE")
                         .param("startDate", startDate.toString())
                         .param("endDate", endDate.toString()))
                 .andExpect(status().isOk())
@@ -160,6 +161,7 @@ class StatisticsAdminScreenRenderingTests {
                 ));
 
         mockMvc.perform(get("/admin/statistics")
+                        .param("periodType", "RANGE")
                         .param("startDate", startDate.toString())
                         .param("endDate", endDate.toString()))
                 .andExpect(status().isOk())
@@ -195,6 +197,7 @@ class StatisticsAdminScreenRenderingTests {
                 ));
 
         mockMvc.perform(get("/admin/statistics")
+                        .param("periodType", "RANGE")
                         .param("startDate", startDate.toString())
                         .param("endDate", endDate.toString()))
                 .andExpect(status().isOk())
@@ -301,6 +304,7 @@ class StatisticsAdminScreenRenderingTests {
     @WithMockUser(roles = "ADMIN")
     void statistics_onlyStartDate_rendersValidationMessageWithoutStatistics() throws Exception {
         mockMvc.perform(get("/admin/statistics")
+                        .param("periodType", "RANGE")
                         .param("startDate", "2026-08-09"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("시작일과 종료일을 모두 입력해 주세요.")))

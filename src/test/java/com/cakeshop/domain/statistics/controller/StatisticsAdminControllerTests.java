@@ -102,6 +102,7 @@ class StatisticsAdminControllerTests {
                 .thenReturn(productStatistics);
 
         mockMvc.perform(get("/admin/statistics")
+                        .param("periodType", "RANGE")
                         .param("startDate", startDate.toString())
                         .param("endDate", endDate.toString()))
                 .andExpect(status().isOk())
@@ -130,6 +131,7 @@ class StatisticsAdminControllerTests {
                 ));
 
         mockMvc.perform(get("/admin/statistics")
+                        .param("periodType", "RANGE")
                         .param("startDate", startDate.toString())
                         .param("endDate", endDate.toString()))
                 .andExpect(status().isOk())
@@ -263,6 +265,7 @@ class StatisticsAdminControllerTests {
     @Test
     void statistics_onlyStartDate_doesNotQueryStatistics() throws Exception {
         mockMvc.perform(get("/admin/statistics")
+                        .param("periodType", "RANGE")
                         .param("startDate", "2026-08-01"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("admin/statistics"))
@@ -280,6 +283,7 @@ class StatisticsAdminControllerTests {
                 .thenThrow(new BusinessException(StatisticsErrorCode.INVALID_DATE_RANGE));
 
         mockMvc.perform(get("/admin/statistics")
+                        .param("periodType", "RANGE")
                         .param("startDate", startDate.toString())
                         .param("endDate", endDate.toString()))
                 .andExpect(status().isOk())
@@ -300,6 +304,7 @@ class StatisticsAdminControllerTests {
                 .thenThrow(new BusinessException(StatisticsErrorCode.STATISTICS_NOT_READY));
 
         mockMvc.perform(get("/admin/statistics")
+                        .param("periodType", "RANGE")
                         .param("startDate", startDate.toString())
                         .param("endDate", endDate.toString()))
                 .andExpect(status().isOk())

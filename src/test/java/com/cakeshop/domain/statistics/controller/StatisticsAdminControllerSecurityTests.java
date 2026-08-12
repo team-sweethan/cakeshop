@@ -93,6 +93,7 @@ class StatisticsAdminControllerSecurityTests {
                 ));
 
         mockMvc.perform(get("/admin/statistics")
+                        .param("periodType", "RANGE")
                         .param("startDate", startDate.toString())
                         .param("endDate", endDate.toString()))
                 .andExpect(status().isOk())

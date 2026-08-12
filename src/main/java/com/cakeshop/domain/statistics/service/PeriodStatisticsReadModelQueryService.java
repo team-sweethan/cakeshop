@@ -31,8 +31,8 @@ public class PeriodStatisticsReadModelQueryService {
     @Transactional(readOnly = true)
     public PeriodStatisticsView getStatistics(StatisticsSearchForm form) {
         LocalDate latestSelectableDate = getLatestSelectableDate();
-        boolean defaultRangeSearch = isDefaultRangeSearch(form);
-        StatisticsDateRange range = defaultRangeSearch
+        boolean recentWeekSearch = isRecentWeekSearch(form);
+        StatisticsDateRange range = recentWeekSearch
                 ? null
                 : periodResolver.resolve(form, latestSelectableDate);
 
@@ -42,14 +42,14 @@ public class PeriodStatisticsReadModelQueryService {
             throw new BusinessException(StatisticsErrorCode.STATISTICS_NOT_READY);
         }
 
-        if (defaultRangeSearch) {
+        if (recentWeekSearch) {
             range = periodResolver.resolve(form, latestContinuousDate);
         }
         List<DailyStatisticsRow> rows = mapper.findDailyStatistics(
                 range.startDate(),
                 range.endDate()
         );
-        if (defaultRangeSearch && !rows.isEmpty()) {
+        if (recentWeekSearch && !rows.isEmpty()) {
             range = new StatisticsDateRange(rows.getFirst().date(), range.endDate());
         }
         validateCompletedRange(rows, range);
@@ -67,11 +67,9 @@ public class PeriodStatisticsReadModelQueryService {
         return LocalDate.now(clock).minusDays(1);
     }
 
-    private boolean isDefaultRangeSearch(StatisticsSearchForm form) {
+    private boolean isRecentWeekSearch(StatisticsSearchForm form) {
         return form != null
-                && form.getPeriodType() == StatisticsPeriodType.RANGE
-                && form.getStartDate() == null
-                && form.getEndDate() == null;
+                && form.getPeriodType() == StatisticsPeriodType.RECENT_WEEK;
     }
 
     private void validateCompletedRange(
