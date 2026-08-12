@@ -248,7 +248,7 @@ class OrderControllerTests {
     @Test
     void customRequest_validSelection_rendersActualOrderForm() throws Exception {
         CustomOrderCheckoutView checkout = mock(CustomOrderCheckoutView.class);
-        when(checkout.originalAmount()).thenReturn(BigDecimal.valueOf(60_000));
+        when(checkout.totalAmount()).thenReturn(BigDecimal.valueOf(60_000));
         when(memberService.getMemberProfile("member@example.com"))
                 .thenReturn(new MemberProfileView(
                         "member@example.com", "홍길동", "케이크러버", "010-1111-2222",
@@ -265,7 +265,7 @@ class OrderControllerTests {
     }
 
     @Test
-    void createCustomOrder_validRequest_redirectsWithCreatedOrderId() throws Exception {
+    void createCustomOrder_validRequest_redirectsToPaymentWithCreatedOrderId() throws Exception {
         String requestKey = UUID.randomUUID().toString();
         when(customerCustomOrderService.createCustomOrder(eq(10L), any())).thenReturn(43L);
 
@@ -281,7 +281,7 @@ class OrderControllerTests {
                         .param("pickupAt", "2099-08-05T14:00")
                         .param("lettering", "생일 축하해"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/orders/43"));
+                .andExpect(redirectedUrl("/orders/43/payment"));
 
         verify(customerCustomOrderService).createCustomOrder(eq(10L), argThat(form ->
                 form.getProductId().equals(6L)
@@ -294,7 +294,7 @@ class OrderControllerTests {
     @Test
     void createCustomOrder_changedDisplayedAmount_rendersUpdatedOrderForm() throws Exception {
         CustomOrderCheckoutView checkout = mock(CustomOrderCheckoutView.class);
-        when(checkout.originalAmount()).thenReturn(BigDecimal.valueOf(60_000));
+        when(checkout.totalAmount()).thenReturn(BigDecimal.valueOf(60_000));
         when(orderCheckoutService.getCustomCheckout(6L, List.of(101L))).thenReturn(checkout);
         when(customerCustomOrderService.createCustomOrder(eq(10L), any()))
                 .thenThrow(new com.cakeshop.global.error.BusinessException(

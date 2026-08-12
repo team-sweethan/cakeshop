@@ -11,7 +11,7 @@ public record CustomOrderCheckoutView(
         String productName,
         int preparationDays,
         List<SelectedOptionView> selectedOptions,
-        BigDecimal originalAmount,
+        BigDecimal totalAmount,
         List<PickupDateView> pickupDates
 ) {
 }

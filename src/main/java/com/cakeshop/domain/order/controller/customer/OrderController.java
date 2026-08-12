@@ -28,6 +28,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.UUID;
 
@@ -54,7 +55,7 @@ public class OrderController {
 
     @GetMapping("/custom/options")
     public String customOptions(
-            @org.springframework.web.bind.annotation.RequestParam("productId") Long productId,
+            @RequestParam("productId") Long productId,
             Model model
     ) {
         model.addAttribute("customProduct", productQueryService.getSalesInfo(productId));
@@ -86,7 +87,7 @@ public class OrderController {
         }
         try {
             long orderId = customerCustomOrderService.createCustomOrder(memberId, form);
-            return "redirect:/orders/" + orderId;
+            return "redirect:/orders/" + orderId + "/payment";
         } catch (BusinessException exception) {
             if (exception.getErrorCode() != OrderErrorCode.ORDER_AMOUNT_CHANGED) {
                 throw exception;
@@ -201,13 +202,13 @@ public class OrderController {
                 form.getProductId(),
                 form.getOptionIds()
         );
-        form.setDisplayedOriginalAmount(checkout.originalAmount());
+        form.setDisplayedOriginalAmount(checkout.totalAmount());
         model.addAttribute("checkout", checkout);
         model.addAttribute(
                 "availableCoupons",
                 couponOrderQuoteQueryService.getPositiveFinalAmountQuotes(
                         memberId,
-                        checkout.originalAmount()
+                        checkout.totalAmount()
                 )
         );
         return "customer/order/custom-request";

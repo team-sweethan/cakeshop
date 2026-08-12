@@ -236,12 +236,12 @@ class CustomerPageControllerTests {
     }
 
     @Test
-    void orderDetailOnlyShowsPaymentButtonForGeneralPaymentFlow() throws IOException {
+    void orderDetailShowsPaymentButtonForEveryPendingPaymentFlow() throws IOException {
         String orderDetailTemplate =
                 new ClassPathResource("templates/customer/order/detail.html")
                         .getContentAsString(StandardCharsets.UTF_8);
 
-        assertThat(orderDetailTemplate).contains("order.generalPaymentPending");
+        assertThat(orderDetailTemplate).contains("order.paymentPending");
     }
 
     @Test
