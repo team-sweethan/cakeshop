@@ -273,6 +273,7 @@ class OrderControllerTests {
                         .param("requestKey", requestKey)
                         .param("productId", "6")
                         .param("optionIds", "101")
+                        .param("displayedOriginalAmount", "55000")
                         .param("ordererName", "홍길동")
                         .param("ordererPhone", "010-1111-2222")
                         .param("pickupName", "홍길동")
@@ -285,7 +286,34 @@ class OrderControllerTests {
         verify(customerCustomOrderService).createCustomOrder(eq(10L), argThat(form ->
                 form.getProductId().equals(6L)
                         && form.getOptionIds().equals(List.of(101L))
+                        && BigDecimal.valueOf(55_000).compareTo(form.getDisplayedOriginalAmount()) == 0
                         && "생일 축하해".equals(form.getLettering())
         ));
+    }
+
+    @Test
+    void createCustomOrder_changedDisplayedAmount_rendersUpdatedOrderForm() throws Exception {
+        CustomOrderCheckoutView checkout = mock(CustomOrderCheckoutView.class);
+        when(checkout.originalAmount()).thenReturn(BigDecimal.valueOf(60_000));
+        when(orderCheckoutService.getCustomCheckout(6L, List.of(101L))).thenReturn(checkout);
+        when(customerCustomOrderService.createCustomOrder(eq(10L), any()))
+                .thenThrow(new com.cakeshop.global.error.BusinessException(
+                        com.cakeshop.domain.order.error.OrderErrorCode.ORDER_AMOUNT_CHANGED
+                ));
+
+        mockMvc.perform(post("/orders/custom")
+                        .param("requestKey", UUID.randomUUID().toString())
+                        .param("productId", "6")
+                        .param("optionIds", "101")
+                        .param("displayedOriginalAmount", "55000")
+                        .param("ordererName", "홍길동")
+                        .param("ordererPhone", "010-1111-2222")
+                        .param("pickupName", "홍길동")
+                        .param("pickupPhone", "010-1111-2222")
+                        .param("pickupAt", "2099-08-05T14:00"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("customer/order/custom-request"))
+                .andExpect(model().attribute("checkout", checkout))
+                .andExpect(model().attributeHasErrors("orderForm"));
     }
 }

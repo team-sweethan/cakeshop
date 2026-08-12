@@ -226,6 +226,16 @@ class CustomerPageControllerTests {
     }
 
     @Test
+    void customRequestViewSubmitsDisplayedOriginalAmount() throws IOException {
+        String customRequestTemplate =
+                new ClassPathResource("templates/customer/order/custom-request.html")
+                        .getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(customRequestTemplate)
+                .contains("th:field=\"*{displayedOriginalAmount}\"");
+    }
+
+    @Test
     void orderDetailOnlyShowsPaymentButtonForGeneralPaymentFlow() throws IOException {
         String orderDetailTemplate =
                 new ClassPathResource("templates/customer/order/detail.html")

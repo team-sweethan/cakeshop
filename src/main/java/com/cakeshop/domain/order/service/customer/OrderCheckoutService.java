@@ -187,7 +187,7 @@ public class OrderCheckoutService {
         List<PickupDateView> pickupDates = new ArrayList<>();
 
         for (int dayOffset = 0; dayOffset < PICKUP_WINDOW_DAYS; dayOffset++) {
-            LocalDate date = now.toLocalDate().plusDays(dayOffset);
+            LocalDate date = availableFrom.toLocalDate().plusDays(dayOffset);
             List<PickupTimeView> times = createPickupTimes(date, availableFrom, store);
             if (!times.isEmpty()) {
                 pickupDates.add(new PickupDateView(

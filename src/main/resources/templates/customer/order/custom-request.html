@@ -14,6 +14,7 @@
     <form method="post" th:action="@{/orders/custom}" th:object="${orderForm}">
       <input type="hidden" th:field="*{productId}">
       <input type="hidden" th:field="*{requestKey}">
+      <input type="hidden" th:field="*{displayedOriginalAmount}">
       <input th:each="option : ${checkout.selectedOptions}"
              type="hidden" name="optionIds" th:value="${option.id}">
 

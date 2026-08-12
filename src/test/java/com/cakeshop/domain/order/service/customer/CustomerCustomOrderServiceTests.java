@@ -122,6 +122,28 @@ class CustomerCustomOrderServiceTests {
     }
 
     @Test
+    void createCustomOrder_changedDisplayedAmount_rejectsBeforeSavingOrder() {
+        when(memberCouponQueryService.lockActiveCouponIssuableMember(10L)).thenReturn(true);
+        when(memberService.isActiveMember(10L)).thenReturn(true);
+        when(orderMapper.findOrderByMemberIdAndRequestKey(eq(10L), any())).thenReturn(Optional.empty());
+        when(productQueryService.getSalesInfo(6L)).thenReturn(new ProductSalesInfo(
+                6L, "레터링 케이크", ProductType.CUSTOM, 2, true,
+                BigDecimal.valueOf(55_000), null
+        ));
+        when(orderOptionValidator.validate(6L, List.of())).thenReturn(List.of());
+        CustomOrderForm form = form();
+        form.setDisplayedOriginalAmount(BigDecimal.valueOf(60_000));
+
+        assertThatThrownBy(() -> service.createCustomOrder(10L, form))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(OrderErrorCode.ORDER_AMOUNT_CHANGED);
+
+        verify(orderMapper, never()).insertOrder(any());
+        verify(paymentPreparationCommandService, never()).prepareReadyPayment(anyLong(), any(), any());
+    }
+
+    @Test
     void createCustomOrder_sameRequestKey_returnsExistingOrderWithoutDuplicateSideEffects() {
         when(memberCouponQueryService.lockActiveCouponIssuableMember(10L)).thenReturn(true);
         when(memberService.isActiveMember(10L)).thenReturn(true);
@@ -168,6 +190,7 @@ class CustomerCustomOrderServiceTests {
         form.setPickupName("픽업자");
         form.setPickupPhone("010-3333-4444");
         form.setPickupAt(LocalDateTime.of(2026, 8, 13, 10, 30));
+        form.setDisplayedOriginalAmount(BigDecimal.valueOf(55_000));
         return form;
     }
 }

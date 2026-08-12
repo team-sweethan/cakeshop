@@ -68,6 +68,7 @@ public class CustomerCustomOrderService {
 
         LocalDateTime now = LocalDateTime.now(clock);
         PreparedCustomItem preparedItem = prepareCustomItem(form);
+        validateDisplayedOriginalAmount(form, preparedItem.totalAmount());
         validatePickupAt(form.getPickupAt(), now, preparedItem.product().preparationDays());
 
         Order order = createOrder(memberId, form, preparedItem.totalAmount(), now);
@@ -129,8 +130,16 @@ public class CustomerCustomOrderService {
                 || isBlank(form.getPickupName())
                 || isBlank(form.getPickupPhone())
                 || !isUuid(form.getRequestKey())
-                || form.getProductId() == null) {
+                || form.getProductId() == null
+                || form.getDisplayedOriginalAmount() == null
+                || form.getDisplayedOriginalAmount().signum() <= 0) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+    }
+
+    private void validateDisplayedOriginalAmount(CustomOrderForm form, BigDecimal latestOriginalAmount) {
+        if (form.getDisplayedOriginalAmount().compareTo(latestOriginalAmount) != 0) {
+            throw new BusinessException(OrderErrorCode.ORDER_AMOUNT_CHANGED);
         }
     }
 

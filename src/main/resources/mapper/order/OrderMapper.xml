@@ -361,13 +361,16 @@
             created_at,
             updated_at
         FROM orders
-        WHERE pickup_at &gt;= #{pickupStart}
-          AND pickup_at &lt; #{pickupEnd}
-          AND status IN ('UNDER_REVIEW', 'IN_PRODUCTION', 'READY_FOR_PICKUP', 'PICKED_UP')
+        WHERE status IN ('UNDER_REVIEW', 'IN_PRODUCTION', 'READY_FOR_PICKUP', 'PICKED_UP')
+          AND (
+                (order_type = 'CUSTOM' AND status = 'UNDER_REVIEW')
+                OR (pickup_at &gt;= #{pickupStart} AND pickup_at &lt; #{pickupEnd})
+          )
         <if test="status != null">
           AND status = #{status}
         </if>
-        ORDER BY pickup_at, created_at, id
+        ORDER BY CASE WHEN status = 'UNDER_REVIEW' THEN 0 ELSE 1 END,
+                 pickup_at, created_at, id
     </select>
 
     <select id="findOverduePendingOrderIds" resultType="long">

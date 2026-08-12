@@ -132,18 +132,35 @@ class OrderMapperTests {
         anotherDate.setPickupAt(LocalDateTime.of(2026, 8, 11, 9, 0));
         orderMapper.insertOrder(anotherDate);
 
+        Order futureUnderReview = newOrder();
+        futureUnderReview.setOrderNumber("FULFILLMENT-UNDER-REVIEW-" + suffix);
+        futureUnderReview.setOrderType(OrderType.CUSTOM);
+        futureUnderReview.setStatus(OrderStatus.UNDER_REVIEW);
+        futureUnderReview.setPickupAt(LocalDateTime.of(2026, 8, 12, 10, 0));
+        orderMapper.insertOrder(futureUnderReview);
+
         LocalDateTime pickupStart = LocalDateTime.of(2026, 8, 10, 0, 0);
         LocalDateTime pickupEnd = LocalDateTime.of(2026, 8, 11, 0, 0);
 
         assertThat(orderMapper.findFulfillmentOrders(pickupStart, pickupEnd, null))
                 .extracting(Order::getId)
-                .containsExactly(earlierPickedUp.getId(), laterReady.getId());
+                .containsExactly(
+                        futureUnderReview.getId(),
+                        earlierPickedUp.getId(),
+                        laterReady.getId()
+                );
         assertThat(orderMapper.findFulfillmentOrders(
                 pickupStart,
                 pickupEnd,
                 OrderStatus.READY_FOR_PICKUP
         )).extracting(Order::getId)
                 .containsExactly(laterReady.getId());
+        assertThat(orderMapper.findFulfillmentOrders(
+                pickupStart,
+                pickupEnd,
+                OrderStatus.UNDER_REVIEW
+        )).extracting(Order::getId)
+                .containsExactly(futureUnderReview.getId());
     }
 
     @Test

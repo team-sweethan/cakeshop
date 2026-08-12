@@ -84,8 +84,16 @@ public class OrderController {
         if (bindingResult.hasErrors()) {
             return renderCustomOrderForm(form, model, memberId);
         }
-        long orderId = customerCustomOrderService.createCustomOrder(memberId, form);
-        return "redirect:/orders/" + orderId;
+        try {
+            long orderId = customerCustomOrderService.createCustomOrder(memberId, form);
+            return "redirect:/orders/" + orderId;
+        } catch (BusinessException exception) {
+            if (exception.getErrorCode() != OrderErrorCode.ORDER_AMOUNT_CHANGED) {
+                throw exception;
+            }
+            bindingResult.reject("orderAmountChanged", exception.getErrorCode().message());
+            return renderCustomOrderForm(form, model, memberId);
+        }
     }
 
     // 일반 상품 주문서 화면
@@ -193,6 +201,7 @@ public class OrderController {
                 form.getProductId(),
                 form.getOptionIds()
         );
+        form.setDisplayedOriginalAmount(checkout.originalAmount());
         model.addAttribute("checkout", checkout);
         model.addAttribute(
                 "availableCoupons",
