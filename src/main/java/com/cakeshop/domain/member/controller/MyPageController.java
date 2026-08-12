@@ -68,6 +68,7 @@ public class MyPageController {
 
         model.addAttribute("profileForm", ProfileUpdateForm.from(member));
         model.addAttribute("withdrawForm", new WithdrawForm());
+        model.addAttribute("hasPasswordLogin", memberService.hasPasswordLogin(email));
 
         return "customer/member/profile-edit";
     }
@@ -90,6 +91,7 @@ public class MyPageController {
             // 읽기 전용 이메일은 요청값을 신뢰하지 않고 인증된 회원 정보로 되돌린다.
             form.setEmail(memberService.getMemberProfile(email).email());
             model.addAttribute("withdrawForm", new WithdrawForm());
+            model.addAttribute("hasPasswordLogin", memberService.hasPasswordLogin(email));
             return "customer/member/profile-edit";
         }
 
@@ -106,6 +108,7 @@ public class MyPageController {
                     MemberErrorCode.INVALID_CURRENT_PASSWORD.message());
             form.setEmail(memberService.getMemberProfile(email).email());
             model.addAttribute("withdrawForm", new WithdrawForm());
+            model.addAttribute("hasPasswordLogin", memberService.hasPasswordLogin(email));
             return "customer/member/profile-edit";
         }
         return "redirect:/mypage?success=update";
@@ -123,17 +126,29 @@ public class MyPageController {
             return "redirect:/login";
         }
 
-        if (bindingResult.hasErrors()) {
+        String email = memberDetails.getUsername();
+        boolean hasPasswordLogin = memberService.hasPasswordLogin(email);
+        boolean missingCurrentPassword = hasPasswordLogin
+                && (form.getCurrentPassword() == null || form.getCurrentPassword().isBlank());
+        if (missingCurrentPassword) {
+            bindingResult.rejectValue(
+                    "currentPassword",
+                    "NotBlank",
+                    "현재 비밀번호를 입력해 주세요.");
+        }
+
+        if (bindingResult.hasErrors() || missingCurrentPassword) {
             model.addAttribute(
                     "profileForm",
                     ProfileUpdateForm.from(
-                            memberService.getMemberProfile(memberDetails.getUsername())));
+                            memberService.getMemberProfile(email)));
+            model.addAttribute("hasPasswordLogin", hasPasswordLogin);
             return "customer/member/profile-edit";
         }
 
         try {
             memberService.withdraw(
-                    memberDetails.getUsername(),
+                    email,
                     form.getCurrentPassword());
         } catch (BusinessException exception) {
             if (exception.getErrorCode() != MemberErrorCode.INVALID_CURRENT_PASSWORD) {
@@ -146,7 +161,8 @@ public class MyPageController {
             model.addAttribute(
                     "profileForm",
                     ProfileUpdateForm.from(
-                            memberService.getMemberProfile(memberDetails.getUsername())));
+                            memberService.getMemberProfile(email)));
+            model.addAttribute("hasPasswordLogin", hasPasswordLogin);
             return "customer/member/profile-edit";
         }
 

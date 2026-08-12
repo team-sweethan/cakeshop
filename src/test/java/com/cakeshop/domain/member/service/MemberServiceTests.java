@@ -360,6 +360,25 @@ class MemberServiceTests {
     }
 
     @Test
+    void withdraw_passwordlessSocialMember_withdrawsWithoutCurrentPassword() {
+        Member member = Member.builder()
+                .id(7L)
+                .email("social@cakeshop.local")
+                .password(null)
+                .status(MemberStatus.ACTIVE)
+                .build();
+        when(memberMapper.findByEmail(member.getEmail())).thenReturn(Optional.of(member));
+        when(memberMapper.withdrawById(member.getId(), MemberStatus.WITHDRAWN)).thenReturn(1);
+
+        memberService.withdraw(member.getEmail(), null);
+
+        verify(memberMapper).withdrawById(member.getId(), MemberStatus.WITHDRAWN);
+        verify(passwordEncoder, never()).matches(
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
     void withdraw_withdrawnMember_throwsInvalidStatusTransition() {
         Member member = Member.builder()
                 .id(7L)
@@ -396,6 +415,29 @@ class MemberServiceTests {
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(MemberErrorCode.INVALID_CURRENT_PASSWORD);
 
+        verify(memberMapper, never()).withdrawById(
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.any(MemberStatus.class));
+    }
+
+    @Test
+    void withdraw_passwordLoginMember_missingCurrentPassword_throwsMemberBusinessException() {
+        Member member = Member.builder()
+                .id(7L)
+                .email("member@cakeshop.local")
+                .password("encoded-password")
+                .status(MemberStatus.ACTIVE)
+                .build();
+        when(memberMapper.findByEmail(member.getEmail())).thenReturn(Optional.of(member));
+
+        assertThatThrownBy(() -> memberService.withdraw(member.getEmail(), null))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(MemberErrorCode.INVALID_CURRENT_PASSWORD);
+
+        verify(passwordEncoder, never()).matches(
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString());
         verify(memberMapper, never()).withdrawById(
                 org.mockito.ArgumentMatchers.anyLong(),
                 org.mockito.ArgumentMatchers.any(MemberStatus.class));
