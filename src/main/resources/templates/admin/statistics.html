@@ -37,6 +37,11 @@
 
           <a class="btn"
              data-statistics-period-link
+             th:classappend="${searchForm.periodType?.name() == 'RECENT_WEEK'} ? ' is-active'"
+             th:attr="aria-current=${searchForm.periodType?.name() == 'RECENT_WEEK'} ? 'page' : null"
+             th:href="@{/admin/statistics(periodType='RECENT_WEEK')}">최근 일주일</a>
+          <a class="btn"
+             data-statistics-period-link
              th:classappend="${searchForm.periodType?.name() == 'WEEKLY'} ? ' is-active'"
              th:attr="aria-current=${searchForm.periodType?.name() == 'WEEKLY'} ? 'page' : null"
              th:href="@{/admin/statistics(periodType='WEEKLY')}">주간</a>

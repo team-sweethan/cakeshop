@@ -156,11 +156,35 @@ class StatisticsAdminControllerTests {
                 .andExpect(view().name("admin/statistics"))
                 .andExpect(model().attribute("statistics", statistics))
                 .andExpect(model().attribute("searchForm", org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.hasProperty(
+                                "periodType",
+                                org.hamcrest.Matchers.is(StatisticsPeriodType.RECENT_WEEK)
+                        ),
                         org.hamcrest.Matchers.hasProperty("startDate", org.hamcrest.Matchers.is(startDate)),
                         org.hamcrest.Matchers.hasProperty("endDate", org.hamcrest.Matchers.is(endDate))
                 )));
 
         verify(periodStatisticsReadModelQueryService).getStatistics(any());
+    }
+
+    @Test
+    void statistics_recentWeekRequest_bindsRecentWeek() throws Exception {
+        LocalDate startDate = LocalDate.of(2026, 8, 4);
+        LocalDate endDate = LocalDate.of(2026, 8, 10);
+        when(periodStatisticsReadModelQueryService.getStatistics(any()))
+                .thenReturn(statistics(startDate, endDate));
+
+        mockMvc.perform(get("/admin/statistics")
+                        .param("periodType", "RECENT_WEEK"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("searchForm", org.hamcrest.Matchers.hasProperty(
+                        "periodType",
+                        org.hamcrest.Matchers.is(StatisticsPeriodType.RECENT_WEEK)
+                )));
+
+        verify(periodStatisticsReadModelQueryService).getStatistics(argThat(form ->
+                form.getPeriodType() == StatisticsPeriodType.RECENT_WEEK
+        ));
     }
 
     @Test

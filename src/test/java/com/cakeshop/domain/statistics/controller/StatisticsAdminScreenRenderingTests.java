@@ -127,6 +127,34 @@ class StatisticsAdminScreenRenderingTests {
 
     @Test
     @WithMockUser(roles = "ADMIN")
+    void statistics_noCondition_rendersActiveRecentWeekBeforeWeeklyAndMonthly() throws Exception {
+        LocalDate startDate = LocalDate.of(2026, 8, 4);
+        LocalDate endDate = LocalDate.of(2026, 8, 10);
+        when(periodStatisticsReadModelQueryService.getStatistics(any()))
+                .thenReturn(new PeriodStatisticsView(
+                        startDate,
+                        endDate,
+                        0L,
+                        0L,
+                        0L,
+                        BigDecimal.ZERO,
+                        List.of()
+                ));
+
+        mockMvc.perform(get("/admin/statistics"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(
+                        "href=\"/admin/statistics?periodType=RECENT_WEEK\""
+                )))
+                .andExpect(content().string(containsString("최근 일주일")))
+                .andExpect(content().string(containsString("aria-current=\"page\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.matchesPattern(
+                        "(?s).*최근 일주일</a>.*주간</a>.*월간</a>.*"
+                )));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
     void statistics_productStatisticsReturned_rendersProductRankingTable() throws Exception {
         LocalDate startDate = LocalDate.of(2026, 8, 8);
         LocalDate endDate = LocalDate.of(2026, 8, 9);
