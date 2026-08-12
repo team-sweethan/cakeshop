@@ -1,5 +1,6 @@
 package com.cakeshop.domain.cart.service;
 
+import com.cakeshop.domain.cart.dto.view.CartPaymentItemTarget;
 import com.cakeshop.domain.cart.mapper.CartPaymentMapper;
 import com.cakeshop.domain.order.service.OrderCartQueryService;
 import java.util.List;
@@ -21,7 +22,12 @@ public class CartPaymentCommandService {
     @Transactional
     public void removeItemsAfterPayment(long orderId) {
         orderCartQueryService.findCartDeletionTarget(orderId).ifPresent(target -> {
-            List<Long> itemIds = target.cartItemIds();
+            List<Long> itemIds = cartPaymentMapper.findItemIdsMatchingSnapshotQuantity(
+                    target.memberId(),
+                    target.items().stream()
+                            .map(item -> new CartPaymentItemTarget(item.cartItemId(), item.quantity()))
+                            .toList()
+            );
             if (itemIds.isEmpty()) {
                 return;
             }

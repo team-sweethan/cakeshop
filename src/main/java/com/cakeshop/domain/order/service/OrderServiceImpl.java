@@ -15,6 +15,7 @@ import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.order.mapper.OrderMapper;
 import com.cakeshop.domain.order.mapper.OrderCartMapper;
+import com.cakeshop.domain.order.dto.view.OrderCartItemLink;
 import com.cakeshop.domain.order.service.OrderOptionValidator.ValidatedOption;
 import com.cakeshop.domain.payment.service.PaymentOrderPreparationCommandService;
 import com.cakeshop.domain.product.dto.view.ProductSalesInfo;
@@ -180,7 +181,9 @@ public class OrderServiceImpl implements OrderService {
 
         if (orderCartMapper.insertOrderCartItems(
                 order.getId(),
-                cartItems.stream().map(CartOrderItemView::cartItemId).toList()
+                cartItems.stream()
+                        .map(item -> new OrderCartItemLink(item.cartItemId(), item.quantity()))
+                        .toList()
         ) != cartItems.size()) {
             throw new BusinessException(OrderErrorCode.ORDER_SAVE_FAILED);
         }

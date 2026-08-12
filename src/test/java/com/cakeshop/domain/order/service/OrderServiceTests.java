@@ -14,6 +14,7 @@ import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.order.mapper.OrderCartMapper;
+import com.cakeshop.domain.order.dto.view.OrderCartItemLink;
 import com.cakeshop.domain.order.mapper.OrderMapper;
 import com.cakeshop.domain.order.service.OrderOptionValidator.ValidatedOption;
 import com.cakeshop.domain.payment.service.PaymentOrderPreparationCommandService;
@@ -230,7 +231,9 @@ class OrderServiceTests {
             invocation.<OrderItem>getArgument(0).setId(200L);
             return 1;
         });
-        when(orderCartMapper.insertOrderCartItems(100L, List.of(11L, 12L))).thenReturn(2);
+        when(orderCartMapper.insertOrderCartItems(
+                org.mockito.ArgumentMatchers.eq(100L), org.mockito.ArgumentMatchers.anyList()
+        )).thenReturn(2);
 
         CartOrderForm form = new CartOrderForm();
         form.setRequestKey(UUID.randomUUID().toString());
@@ -246,7 +249,10 @@ class OrderServiceTests {
 
         assertThat(orderId).isEqualTo(100L);
         verify(cartOrderQueryService).getSelectedOrderItems(10L, List.of(11L, 12L));
-        verify(orderCartMapper).insertOrderCartItems(100L, List.of(11L, 12L));
+        verify(orderCartMapper).insertOrderCartItems(100L, List.of(
+                new OrderCartItemLink(11L, 1),
+                new OrderCartItemLink(12L, 2)
+        ));
         ArgumentCaptor<OrderItem> items = ArgumentCaptor.forClass(OrderItem.class);
         verify(orderMapper, org.mockito.Mockito.times(2)).insertOrderItem(items.capture());
         assertThat(items.getAllValues()).extracting(OrderItem::getTotalAmount)

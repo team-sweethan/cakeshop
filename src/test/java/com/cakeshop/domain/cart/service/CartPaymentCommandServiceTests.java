@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 
 import com.cakeshop.domain.cart.mapper.CartPaymentMapper;
 import com.cakeshop.domain.order.dto.view.OrderCartDeletionTarget;
+import com.cakeshop.domain.order.dto.view.OrderCartItemLink;
 import com.cakeshop.domain.order.service.OrderCartQueryService;
 import java.util.List;
 import java.util.Optional;
@@ -39,14 +40,36 @@ class CartPaymentCommandServiceTests {
     void removeItemsAfterPayment_deletesOnlyLinkedItemsOfOrderMember() {
         List<Long> cartItemIds = List.of(11L, 12L);
         when(orderCartQueryService.findCartDeletionTarget(100L)).thenReturn(
-                Optional.of(new OrderCartDeletionTarget(10L, cartItemIds))
+                Optional.of(new OrderCartDeletionTarget(10L, List.of(
+                        new OrderCartItemLink(11L, 1),
+                        new OrderCartItemLink(12L, 2)
+                )))
         );
+        when(cartPaymentMapper.findItemIdsMatchingSnapshotQuantity(
+                org.mockito.ArgumentMatchers.eq(10L), org.mockito.ArgumentMatchers.anyList()
+        )).thenReturn(cartItemIds);
 
         cartPaymentCommandService.removeItemsAfterPayment(100L);
 
         verify(cartPaymentMapper).deleteOptionsByMemberIdAndItemIds(10L, cartItemIds);
         verify(cartPaymentMapper).deleteImagesByMemberIdAndItemIds(10L, cartItemIds);
         verify(cartPaymentMapper).deleteItemsByMemberIdAndItemIds(10L, cartItemIds);
+    }
+
+    @Test
+    void removeItemsAfterPayment_keepsItemWhoseQuantityChangedAfterOrderCreation() {
+        when(orderCartQueryService.findCartDeletionTarget(100L)).thenReturn(
+                Optional.of(new OrderCartDeletionTarget(10L, List.of(new OrderCartItemLink(11L, 1))))
+        );
+        when(cartPaymentMapper.findItemIdsMatchingSnapshotQuantity(
+                org.mockito.ArgumentMatchers.eq(10L), org.mockito.ArgumentMatchers.anyList()
+        )).thenReturn(List.of());
+
+        cartPaymentCommandService.removeItemsAfterPayment(100L);
+
+        verify(cartPaymentMapper, never()).deleteItemsByMemberIdAndItemIds(
+                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyList()
+        );
     }
 
     @Test

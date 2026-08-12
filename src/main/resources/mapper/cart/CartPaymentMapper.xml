@@ -1,6 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.cakeshop.domain.cart.mapper.CartPaymentMapper">
+    <select id="findItemIdsMatchingSnapshotQuantity" resultType="long">
+        SELECT ci.id
+        FROM cart_items ci
+        INNER JOIN carts c ON c.id = ci.cart_id
+        WHERE c.member_id = #{memberId}
+          AND (
+        <foreach collection="targets" item="target" separator=" OR ">
+            (ci.id = #{target.cartItemId} AND ci.quantity = #{target.quantity})
+        </foreach>
+        )
+    </select>
     <delete id="deleteOptionsByMemberIdAndItemIds">
         DELETE cio FROM cart_item_options cio
         INNER JOIN cart_items ci ON ci.id = cio.cart_item_id

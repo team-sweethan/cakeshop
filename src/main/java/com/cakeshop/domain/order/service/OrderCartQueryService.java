@@ -1,6 +1,7 @@
 package com.cakeshop.domain.order.service;
 
 import com.cakeshop.domain.order.dto.view.OrderCartDeletionTarget;
+import com.cakeshop.domain.order.dto.view.OrderCartItemLink;
 import com.cakeshop.domain.order.mapper.OrderCartMapper;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -19,12 +20,15 @@ public class OrderCartQueryService {
 
     @Transactional(readOnly = true)
     public Optional<OrderCartDeletionTarget> findCartDeletionTarget(long orderId) {
-        return orderCartMapper.findCartDeletionTarget(orderId)
-                .map(row -> new OrderCartDeletionTarget(
-                        row.memberId(),
-                        java.util.Arrays.stream(row.cartItemIds().split(","))
-                                .map(Long::parseLong)
-                                .toList()
-                ));
+        var rows = orderCartMapper.findCartDeletionTargets(orderId);
+        if (rows.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(new OrderCartDeletionTarget(
+                rows.getFirst().memberId(),
+                rows.stream()
+                        .map(row -> new OrderCartItemLink(row.cartItemId(), row.snapshotQuantity()))
+                        .toList()
+        ));
     }
 }

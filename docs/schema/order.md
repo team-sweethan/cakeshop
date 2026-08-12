@@ -144,3 +144,9 @@ cart 도메인의 공개 Command로 항목을 멱등 삭제한다.
 - `V20260811_145723__add_order_in_production_status.sql`
 - `V20260811_165915__add_custom_production_due_index.sql`
 - `V20260812_115115__add_order_cart_item_links.sql`
+
+> `order_cart_items.snapshot_quantity`는 주문 생성 당시 장바구니 수량이다. 결제 후 정리 시 현재 수량과 비교하여, 수량이 변경된 장바구니 항목은 삭제하지 않는다.
+
+## 장바구니 선택 정책
+
+주문 생성 요청의 `cartItemIds`에는 항목 종류 개수 상한이 없다. 다만 각 항목의 수량은 상품별 판매 수량·재고 정책을 따른다.
