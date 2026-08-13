@@ -11,8 +11,8 @@
 </head>
 <body data-page-title="마이페이지">
 <header th:replace="~{fragments/common/header :: header}"></header>
+<th:block th:replace="~{fragments/common/alert :: popup}"></th:block>
 <main class="page-container ">
-  <div th:replace="~{fragments/customer/mock-notice :: notice}"></div>
   <h1>마이페이지</h1>
   <div class="layout-sidebar">
     <aside class="panel">

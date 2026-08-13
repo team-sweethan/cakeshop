@@ -23,10 +23,16 @@
     <div class="cart-layout" th:unless="${cart.empty}">
       <div>
         <section class="panel cart-toolbar">
-          <form id="selected-delete-form"
+          <form id="cart-selection-form"
                 th:action="@{/cart/items/delete-selected}"
                 method="post">
-            <button class="btn" type="submit">선택 삭제</button>
+            <div class="cluster">
+              <label class="cluster" for="cart-select-all">
+                <input id="cart-select-all" type="checkbox" data-cart-select-all checked>
+                <span>전체 선택</span>
+              </label>
+              <button class="btn" type="submit">선택 삭제</button>
+            </div>
           </form>
           <form th:action="@{/cart/items/delete-all}" method="post">
             <button class="btn btn--danger" type="submit"
@@ -46,7 +52,10 @@
             <label class="cart-item__check">
               <input type="checkbox" name="itemIds"
                      th:value="${item.id}"
-                     form="selected-delete-form">
+                     form="cart-selection-form"
+                     data-cart-item-select
+                     th:checked="${item.available}"
+                     th:disabled="${!item.available}">
               <span class="visually-hidden" th:text="|${item.productName} 선택|">상품 선택</span>
             </label>
             <a class="placeholder-image placeholder-image--sm cart-item__image"
@@ -111,12 +120,18 @@
 
       <aside class="order-summary cart-summary">
         <h2 class="section-title">주문 요약</h2>
-        <div class="data-row"><span class="data-row__label">총 수량</span><span data-cart-total-quantity th:text="|${cart.totalQuantity}개|">0개</span></div>
+        <div class="data-row"><span class="data-row__label">상품 종류</span><span data-cart-item-count th:text="|${cart.itemCount}종|">0종</span></div>
         <div class="data-row"><span class="data-row__label">총 상품 금액</span><span data-cart-base-total th:text="|${#numbers.formatInteger(cart.baseTotal, 1, 'COMMA')}원|">0원</span></div>
         <div class="data-row"><span class="data-row__label">총 옵션 금액</span><span data-cart-option-total th:text="|${#numbers.formatInteger(cart.optionTotal, 1, 'COMMA')}원|">0원</span></div>
         <div class="data-row cart-summary__total"><span class="data-row__label">예상 결제 금액</span><strong data-cart-grand-total th:text="|${#numbers.formatInteger(cart.grandTotal, 1, 'COMMA')}원|">0원</strong></div>
         <p class="note">쿠폰 할인은 주문서에서 적용됩니다.</p>
-        <button class="btn btn--primary btn--block" type="button" disabled>주문 연동 준비 중</button>
+        <button class="btn btn--primary btn--block"
+                type="submit"
+                form="cart-selection-form"
+                formmethod="get"
+                th:formaction="@{/orders/checkout/cart}">
+          주문서 작성
+        </button>
       </aside>
     </div>
   </main>

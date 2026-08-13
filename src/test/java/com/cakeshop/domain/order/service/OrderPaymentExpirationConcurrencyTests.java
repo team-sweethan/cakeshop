@@ -1,6 +1,7 @@
 package com.cakeshop.domain.order.service;
 
 import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
+import com.cakeshop.domain.cart.service.CartOrderQueryService;
 import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.member.service.MemberCouponQueryService;
 import com.cakeshop.domain.order.entity.OrderStatus;
@@ -59,6 +60,9 @@ class OrderPaymentExpirationConcurrencyTests {
 
     @MockitoBean
     private CouponOrderCommandService couponOrderCommandService;
+
+    @MockitoBean
+    private CartOrderQueryService cartOrderQueryService;
 
     private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 8, 3, 10, 0);

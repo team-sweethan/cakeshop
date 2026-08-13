@@ -94,7 +94,7 @@
 | 업무 정의 | 확정 | 관리자가 상태를 확인해야 하는 결제 건수 |
 | 데이터 소유 도메인 | 확정 | `payment` |
 | 기준 지표 | 확정 | `/admin/payments`의 `attentionCount`와 동일한 정의 사용 |
-| 결제 상태 | 확정 | `PaymentStatus.ABORTED`, `PaymentStatus.EXPIRED` 포함 |
+| 결제 상태 | 확정 | `PaymentStatus.ABORTED`와 미확인 `PaymentStatus.EXPIRED` 포함 |
 | 취소·보상 상태 | 확정 | `PaymentCancellationStatus.REQUESTED`, `PaymentCancellationStatus.FAILED` 포함 |
 | 예외 조건 | 확정 | 완료된 결제를 나타내는 시스템 보상 실패 기록은 제외 |
 | 날짜 범위 | 확정 | 제한 없이 현재 확인이 필요한 전체 결제 대상 |
@@ -107,12 +107,14 @@
 확인 필요 결제는 다음 조건 중 하나를 충족하는 결제 건수로 정의한다.
 
 ```text
-payment.status IN (ABORTED, EXPIRED)
+payment.status = ABORTED
+OR (payment.status = EXPIRED AND payment.expiration_checked_at IS NULL)
 OR payment_cancellations.status IN (REQUESTED, FAILED)
 ```
 
 단, `SYSTEM_COMPENSATION` 요청이 `PAYMENT_COMPLETED` 사유로 실패한 기록은 확인 대상에서
-제외한다. 대시보드와 `/admin/payments`는 같은 기준과 결과를 사용해야 한다.
+제외한다. 만료 확인을 해제하면 `expiration_checked_at`이 다시 `NULL`이 되어 집계에 재포함된다.
+대시보드와 `/admin/payments`는 같은 기준과 결과를 사용해야 한다.
 
 ### 3-5. 제작 중
 

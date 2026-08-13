@@ -27,6 +27,8 @@
 
 - UK: `uk_members_email` (`email`)
 - CHECK: `chk_members_status` — `status IN ('ACTIVE', 'SUSPENDED', 'WITHDRAWN')`
+- INDEX: `idx_members_role_created_at` (`role`, `created_at`)
+- INDEX: `idx_members_role_status_withdrawn_at` (`role`, `status`, `withdrawn_at`)
 
 ## `social_accounts`
 
@@ -98,3 +100,4 @@
 - `V20260803_091727__add_member_status_histories.sql`
 - `V20260803_112954__backfill_withdrawn_member_status_histories.sql`
 - `V20260811_174339__add_email_verifications.sql`
+- `V20260813_094912__add_statistics_additional_metrics.sql`

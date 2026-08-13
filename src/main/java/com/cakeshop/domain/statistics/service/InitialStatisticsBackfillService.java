@@ -77,6 +77,7 @@ public class InitialStatisticsBackfillService {
         return Stream.of(
                         sourceReadModelMapper.findEarliestOrderDate(),
                         sourceReadModelMapper.findEarliestApprovedPaymentDate(),
+                        sourceReadModelMapper.findEarliestAdditionalMetricsDate(),
                         targetEndDate.minusDays(6)
                 )
                 .filter(date -> date != null)

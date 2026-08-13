@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.cakeshop.domain.cart.controller.CartController;
 import com.cakeshop.domain.cart.dto.view.CartView;
 import com.cakeshop.domain.cart.service.CartService;
+import com.cakeshop.domain.cart.service.CartOrderQueryService;
 import com.cakeshop.domain.coupon.service.CouponMemberQueryService;
 import com.cakeshop.domain.coupon.dto.view.CustomerCouponView;
 import com.cakeshop.global.common.paging.PageRequest;
@@ -126,7 +127,8 @@ class CustomerPageControllerTests {
                                 mock(RefundFacade.class),
                                 couponOrderQueryService,
                                 mock(CustomerCustomOrderService.class),
-                                mock(ProductQueryService.class)
+                                mock(ProductQueryService.class),
+                                mock(CartOrderQueryService.class)
                         ),
                         new PaymentController(
                                 mock(PaymentFacade.class),

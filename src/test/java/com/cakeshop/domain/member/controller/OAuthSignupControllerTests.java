@@ -52,7 +52,22 @@ class OAuthSignupControllerTests {
                 .andExpect(status().isOk())
                 .andExpect(view().name("auth/oauth-signup"))
                 .andExpect(model().attribute("oauthEmail", "member@example.com"))
+                .andExpect(model().attribute("oauthProviderName", "Google"))
                 .andExpect(model().attributeExists("oauthSignupForm"));
+    }
+
+    @Test
+    void signupPage_validKakaoSession_showsKakaoProviderAndEmail() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute(OAuthSignupSession.SESSION_KEY, new OAuthSignupSession(
+                new OAuthIdentity("KAKAO", "kakao-subject", "kakao@example.com", "카카오회원"),
+                Instant.now().plusSeconds(300)));
+
+        mockMvc.perform(get("/oauth/signup").session(session))
+                .andExpect(status().isOk())
+                .andExpect(view().name("auth/oauth-signup"))
+                .andExpect(model().attribute("oauthEmail", "kakao@example.com"))
+                .andExpect(model().attribute("oauthProviderName", "카카오"));
     }
 
     @Test

@@ -78,6 +78,7 @@ class InitialStatisticsBackfillServiceTests {
         assertThat(countDailyStatistics()).isEqualTo(7);
         assertThat(countDailyStatisticsBetween(yesterday.minusDays(6), yesterday)).isEqualTo(7);
         assertThat(countCompletedProductStatistics()).isEqualTo(7);
+        assertThat(countCompletedAdditionalMetrics()).isEqualTo(7);
         BatchRunRow run = findLatestBackfillRun();
         assertThat(run.status()).isEqualTo("SUCCEEDED");
         assertThat(run.targetStartDate()).isEqualTo(yesterday.minusDays(6));
@@ -101,6 +102,26 @@ class InitialStatisticsBackfillServiceTests {
         assertThat(run.targetStartDate()).isEqualTo(earliestOrderDate);
         assertThat(run.targetEndDate()).isEqualTo(yesterday);
         assertThat(countDailyStatistics()).isEqualTo(10);
+    }
+
+    @Test
+    void backfillInitialStatistics_additionalMetricsOlderThanOrders_startsAtAdditionalMetricsDate() {
+        LocalDate yesterday = findYesterday();
+        LocalDate earliestAdditionalMetricsDate = yesterday.minusDays(12);
+        doReturn(yesterday.minusDays(9)).when(sourceReadModelMapper).findEarliestOrderDate();
+        doReturn(yesterday.minusDays(8))
+                .when(sourceReadModelMapper)
+                .findEarliestApprovedPaymentDate();
+        doReturn(earliestAdditionalMetricsDate)
+                .when(sourceReadModelMapper)
+                .findEarliestAdditionalMetricsDate();
+
+        StatisticsBackfillResult result = service.backfillInitialStatistics();
+
+        assertThat(result).isEqualTo(StatisticsBackfillResult.SUCCEEDED);
+        assertThat(findLatestBackfillRun().targetStartDate())
+                .isEqualTo(earliestAdditionalMetricsDate);
+        assertThat(countDailyStatistics()).isEqualTo(13);
     }
 
     @Test
@@ -268,6 +289,17 @@ class InitialStatisticsBackfillServiceTests {
     private int countCompletedProductStatistics() {
         return jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM daily_statistics WHERE product_aggregated_at IS NOT NULL",
+                Integer.class
+        );
+    }
+
+    private int countCompletedAdditionalMetrics() {
+        return jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM daily_statistics
+                WHERE additional_metrics_aggregated_at IS NOT NULL
+                """,
                 Integer.class
         );
     }

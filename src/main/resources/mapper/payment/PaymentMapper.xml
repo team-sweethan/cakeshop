@@ -16,7 +16,8 @@
             cancellation.request_type AS cancellation_request_type,
             payment.requested_at,
             payment.approved_at,
-            payment.canceled_at
+            payment.canceled_at,
+            payment.expiration_checked_at
         FROM payments AS payment
         LEFT JOIN payment_cancellations AS cancellation
             ON cancellation.id = (
@@ -42,7 +43,11 @@
             COALESCE(SUM(status = 'DONE'), 0) AS done_count,
             COALESCE(SUM(status IN ('CANCELED', 'PARTIAL_CANCELED')), 0) AS canceled_count,
             COALESCE(SUM(
-                payment.status IN ('ABORTED', 'EXPIRED')
+                payment.status = 'ABORTED'
+                OR (
+                    payment.status = 'EXPIRED'
+                    AND payment.expiration_checked_at IS NULL
+                )
                 OR EXISTS (
                     SELECT 1
                     FROM payment_cancellations AS cancellation
@@ -234,6 +239,22 @@
             failure_message = #{failureMessage}
         WHERE id = #{paymentId}
           AND status = 'READY'
+    </update>
+
+    <update id="markExpirationCheckedIfExpired">
+        UPDATE payments
+        SET expiration_checked_at = CURRENT_TIMESTAMP(6)
+        WHERE id = #{paymentId}
+          AND status = 'EXPIRED'
+          AND expiration_checked_at IS NULL
+    </update>
+
+    <update id="clearExpirationCheckedIfExpired">
+        UPDATE payments
+        SET expiration_checked_at = NULL
+        WHERE id = #{paymentId}
+          AND status = 'EXPIRED'
+          AND expiration_checked_at IS NOT NULL
     </update>
 
     <update id="cancelIfDone">

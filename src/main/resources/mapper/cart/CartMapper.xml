@@ -40,8 +40,8 @@
         ORDER BY ci.created_at DESC, ci.id DESC
     </select>
 
-    <select id="sumQuantityByMemberId" resultType="int">
-        SELECT COALESCE(SUM(ci.quantity), 0)
+    <select id="countItemsByMemberId" resultType="int">
+        SELECT COUNT(*)
         FROM cart_items ci
         INNER JOIN carts c ON c.id = ci.cart_id
         WHERE c.member_id = #{memberId}

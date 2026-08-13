@@ -13,11 +13,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.cakeshop.domain.statistics.dto.form.StatisticsPeriodType;
 import com.cakeshop.domain.statistics.dto.form.StatisticsSearchForm;
+import com.cakeshop.domain.statistics.dto.view.AdditionalMetricsView;
 import com.cakeshop.domain.statistics.dto.view.PeriodStatisticsView;
 import com.cakeshop.domain.statistics.dto.view.ProductStatisticsView;
 import com.cakeshop.domain.statistics.dto.view.StatisticsTrendView;
 import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
 import com.cakeshop.domain.statistics.error.StatisticsErrorCode;
+import com.cakeshop.domain.statistics.service.AdditionalMetricsReadModelQueryService;
 import com.cakeshop.domain.statistics.service.DashboardReadModelQueryService;
 import com.cakeshop.domain.statistics.service.PeriodStatisticsReadModelQueryService;
 import com.cakeshop.domain.statistics.service.ProductPeriodStatisticsReadModelQueryService;
@@ -46,6 +48,9 @@ class StatisticsAdminControllerTests {
     @Mock
     private ProductPeriodStatisticsReadModelQueryService productStatisticsQueryService;
 
+    @Mock
+    private AdditionalMetricsReadModelQueryService additionalMetricsQueryService;
+
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -54,7 +59,8 @@ class StatisticsAdminControllerTests {
                 .standaloneSetup(new StatisticsAdminController(
                         dashboardReadModelQueryService,
                         periodStatisticsReadModelQueryService,
-                        productStatisticsQueryService
+                        productStatisticsQueryService,
+                        additionalMetricsQueryService
                 ))
                 .build();
     }
@@ -97,9 +103,12 @@ class StatisticsAdminControllerTests {
                         new BigDecimal("50000")
                 )
         );
+        AdditionalMetricsView additionalMetrics = additionalMetrics();
         when(periodStatisticsReadModelQueryService.getStatistics(any())).thenReturn(statistics);
         when(productStatisticsQueryService.getProductStatistics(startDate, endDate))
                 .thenReturn(productStatistics);
+        when(additionalMetricsQueryService.getAdditionalMetrics(startDate, endDate))
+                .thenReturn(additionalMetrics);
 
         mockMvc.perform(get("/admin/statistics")
                         .param("periodType", "RANGE")
@@ -109,6 +118,7 @@ class StatisticsAdminControllerTests {
                 .andExpect(view().name("admin/statistics"))
                 .andExpect(model().attribute("statistics", statistics))
                 .andExpect(model().attribute("productStatistics", productStatistics))
+                .andExpect(model().attribute("additionalMetrics", additionalMetrics))
                 .andExpect(model().attribute("searchForm", org.hamcrest.Matchers.allOf(
                         org.hamcrest.Matchers.hasProperty("startDate", org.hamcrest.Matchers.is(startDate)),
                         org.hamcrest.Matchers.hasProperty("endDate", org.hamcrest.Matchers.is(endDate))
@@ -116,6 +126,7 @@ class StatisticsAdminControllerTests {
 
         verify(periodStatisticsReadModelQueryService).getStatistics(any());
         verify(productStatisticsQueryService).getProductStatistics(startDate, endDate);
+        verify(additionalMetricsQueryService).getAdditionalMetrics(startDate, endDate);
         verifyNoMoreInteractions(dashboardReadModelQueryService);
     }
 
@@ -166,6 +177,31 @@ class StatisticsAdminControllerTests {
                         StatisticsErrorCode.PRODUCT_STATISTICS_NOT_READY.message()
                 ))
                 .andExpect(model().attributeDoesNotExist("productStatistics"));
+    }
+
+    @Test
+    void statistics_additionalMetricsNotReady_keepsOtherStatisticsInModel() throws Exception {
+        LocalDate startDate = LocalDate.of(2026, 8, 1);
+        LocalDate endDate = LocalDate.of(2026, 8, 10);
+        PeriodStatisticsView statistics = statistics(startDate, endDate);
+        when(periodStatisticsReadModelQueryService.getStatistics(any())).thenReturn(statistics);
+        when(additionalMetricsQueryService.getAdditionalMetrics(startDate, endDate))
+                .thenThrow(new BusinessException(
+                        StatisticsErrorCode.ADDITIONAL_METRICS_NOT_READY
+                ));
+
+        mockMvc.perform(get("/admin/statistics")
+                        .param("periodType", "RANGE")
+                        .param("startDate", startDate.toString())
+                        .param("endDate", endDate.toString()))
+                .andExpect(status().isOk())
+                .andExpect(view().name("admin/statistics"))
+                .andExpect(model().attribute("statistics", statistics))
+                .andExpect(model().attribute(
+                        "additionalMetricsError",
+                        StatisticsErrorCode.ADDITIONAL_METRICS_NOT_READY.message()
+                ))
+                .andExpect(model().attributeDoesNotExist("additionalMetrics"));
     }
 
     @Test
@@ -370,6 +406,17 @@ class StatisticsAdminControllerTests {
                 0,
                 BigDecimal.ZERO,
                 List.<StatisticsTrendView>of()
+        );
+    }
+
+    private AdditionalMetricsView additionalMetrics() {
+        return new AdditionalMetricsView(
+                5,
+                1,
+                8,
+                3,
+                new BigDecimal("12000"),
+                new BigDecimal("25000")
         );
     }
 }

@@ -19,7 +19,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
@@ -75,5 +77,16 @@ class PaymentAdminControllerTests {
                 ArgumentCaptor.forClass(PaymentAdminSearchCondition.class);
         verify(paymentAdminQueryService).getPayments(condition.capture());
         assertThat(condition.getValue().getStatus()).isNull();
+    }
+
+    @Test
+    void updateExpirationCheck_preservesStatusFilter() throws Exception {
+        mockMvc.perform(post("/admin/payments/7/expiration-check")
+                        .param("checked", "true")
+                        .param("status", "EXPIRED"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/admin/payments?status=EXPIRED"));
+
+        verify(paymentAdminQueryService).updateExpirationCheck(7L, true);
     }
 }

@@ -9,6 +9,7 @@ import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.error.PaymentErrorCode;
 import com.cakeshop.domain.payment.infra.TossPaymentClient.ApprovalResult;
 import com.cakeshop.domain.payment.mapper.PaymentMapper;
+import com.cakeshop.domain.payment.event.GeneralPaymentCompletedEvent;
 import com.cakeshop.domain.product.service.ProductStockService;
 import com.cakeshop.global.error.BusinessException;
 import org.junit.jupiter.api.Test;
@@ -18,6 +19,7 @@ import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -53,6 +55,9 @@ class PaymentServiceTests {
     @Mock
     private CouponOrderCommandService couponOrderCommandService;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private PaymentService paymentService;
 
     @BeforeEach
@@ -66,7 +71,8 @@ class PaymentServiceTests {
                         NOW.atZone(ZoneId.of("Asia/Seoul")).toInstant(),
                         ZoneId.of("Asia/Seoul")
                 ),
-                couponOrderCommandService
+                couponOrderCommandService,
+                eventPublisher
         );
     }
 
@@ -112,6 +118,7 @@ class PaymentServiceTests {
         );
         inOrder.verify(couponOrderCommandService).useReservedCouponForOrder(1L);
         inOrder.verify(paymentRecoveryService).discardApprovalRecovery(payment);
+        verify(eventPublisher).publishEvent(new GeneralPaymentCompletedEvent(1L));
     }
 
     @Test
@@ -166,6 +173,7 @@ class PaymentServiceTests {
                 1L,
                 approval.approvedAt()
         );
+        verifyNoInteractions(eventPublisher);
     }
 
     @Test
@@ -261,6 +269,7 @@ class PaymentServiceTests {
         verify(paymentMapper).completeZeroAmountIfReady(20L, completedAt);
         verify(orderPaymentCommandService).completeGeneralOrderAfterPayment(1L, completedAt);
         verify(couponOrderCommandService).useReservedCouponForOrder(1L);
+        verify(eventPublisher).publishEvent(new GeneralPaymentCompletedEvent(1L));
         verifyNoInteractions(paymentRecoveryService);
     }
 

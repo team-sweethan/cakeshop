@@ -38,16 +38,16 @@
 
 ## 2. 주문·결제와 쿠폰
 
-쿠폰 발급 대상과 발급 방식은 [`coupon/DOMAIN.md`](coupon/DOMAIN.md)에 확정되어 있다. 남은 질문은
+쿠폰 발급 대상과 발급 방식은 [`coupon/coupon_conventions.md`](coupon/coupon_conventions.md)에 확정되어 있다. 남은 질문은
 checkout에서 쿠폰을 선택한 뒤 결제 성공·실패·취소와 연결하는 쓰기 흐름이다.
 
 | 결정할 질문 | 관련 담당 | 결정 후 옮길 곳 |
 |---|---|---|
-| checkout에 제공할 사용 가능 쿠폰 조회 DTO와 할인 계산의 최종 소유자는 누구인지 | 정후·주환 | `coupon/DOMAIN.md` |
-| 쿠폰을 주문 생성, PG 승인 요청, 결제 완료 중 언제 사용 처리할지 | 정후·주환 | `coupon/DOMAIN.md` |
-| 결제 실패·만료·전체 취소·부분 취소에서 쿠폰을 언제 어떤 상태로 복구할지 | 정후·주환 | `coupon/DOMAIN.md` |
-| 쿠폰 사용과 결제 콜백의 중복 실행을 막을 멱등키와 잠금 순서를 어떻게 정할지 | 정후·주환 | `coupon/DOMAIN.md` |
-| 첫 주문 판별과 주문 생성이 동시에 일어날 때 회원 단위 잠금 경계를 누가 소유할지 | 정후·주환 | `coupon/DOMAIN.md` |
+| checkout에 제공할 사용 가능 쿠폰 조회 DTO와 할인 계산의 최종 소유자는 누구인지 | 정후·주환 | `coupon/coupon_conventions.md` |
+| 쿠폰을 주문 생성, PG 승인 요청, 결제 완료 중 언제 사용 처리할지 | 정후·주환 | `coupon/coupon_conventions.md` |
+| 결제 실패·만료·전체 취소·부분 취소에서 쿠폰을 언제 어떤 상태로 복구할지 | 정후·주환 | `coupon/coupon_conventions.md` |
+| 쿠폰 사용과 결제 콜백의 중복 실행을 막을 멱등키와 잠금 순서를 어떻게 정할지 | 정후·주환 | `coupon/coupon_conventions.md` |
+| 첫 주문 판별과 주문 생성이 동시에 일어날 때 회원 단위 잠금 경계를 누가 소유할지 | 정후·주환 | `coupon/coupon_conventions.md` |
 
 ## 3. 알림 발생과 발송 범위
 

@@ -120,7 +120,7 @@ class CartControllerTests {
                 BigDecimal.valueOf(35000), BigDecimal.ZERO, BigDecimal.valueOf(105000),
                 null, List.of());
         CartView cart = new CartView(
-                List.of(item), 3, BigDecimal.valueOf(105000),
+                List.of(item), 1, BigDecimal.valueOf(105000),
                 BigDecimal.ZERO, BigDecimal.valueOf(105000));
         when(cartService.getCart(1L)).thenReturn(cart);
 
@@ -128,7 +128,7 @@ class CartControllerTests {
 
         verify(cartService).updateQuantity(1L, 30L, 3);
         assertThat(result.itemTotal()).isEqualByComparingTo("105000");
-        assertThat(result.totalQuantity()).isEqualTo(3);
+        assertThat(result.itemCount()).isEqualTo(1);
         assertThat(result.available()).isTrue();
         assertThat(result.itemAvailability()).hasSize(1);
         assertThat(result.itemAvailability().getFirst().itemId()).isEqualTo(30L);
@@ -166,13 +166,13 @@ class CartControllerTests {
     }
 
     @Test
-    void count_authenticatedMember_returnsDatabaseQuantity() {
+    void count_authenticatedMember_returnsCartItemCount() {
         MemberDetails member = memberDetails();
-        when(cartService.getTotalQuantity(1L)).thenReturn(3);
+        when(cartService.getItemCount(1L)).thenReturn(3);
 
         CartCountView result = cartController.count(member);
 
-        assertThat(result.totalQuantity()).isEqualTo(3);
+        assertThat(result.itemCount()).isEqualTo(3);
     }
 
     private MemberDetails memberDetails() {

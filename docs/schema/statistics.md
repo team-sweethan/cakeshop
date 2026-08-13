@@ -16,13 +16,22 @@
 | `completed_order_count` | `BIGINT` | X | `0` | CHECK |
 | `canceled_order_count` | `BIGINT` | X | `0` | CHECK |
 | `total_sales_amount` | `DECIMAL(18, 0)` | X | `0` | CHECK |
+| `new_member_count` | `BIGINT` | X | `0` | CHECK |
+| `withdrawn_member_count` | `BIGINT` | X | `0` | CHECK |
+| `new_post_count` | `BIGINT` | X | `0` | CHECK |
+| `coupon_usage_count` | `BIGINT` | X | `0` | CHECK |
+| `refund_amount` | `DECIMAL(18, 0)` | X | `0` | CHECK |
+| `valid_payment_order_count` | `BIGINT` | X | `0` | CHECK |
 | `aggregated_at` | `DATETIME(6)` | X | 없음 |  |
 | `product_aggregated_at` | `DATETIME(6)` | O | `NULL` | 상품별 집계 완료 시각 |
+| `additional_metrics_aggregated_at` | `DATETIME(6)` | O | `NULL` | 기타 지표 집계 완료 시각 |
 
 ### 제약조건
 
 - `chk_daily_statistics_counts`: 주문 건수 지표는 모두 `0` 이상이다.
 - `chk_daily_statistics_sales_amount`: 총매출은 `0` 이상이다.
+- `chk_daily_statistics_additional_counts`: 기타 건수 지표와 유효 결제 주문 수는 모두 `0` 이상이다.
+- `chk_daily_statistics_refund_amount`: 환불 금액은 `0` 이상이다.
 
 ## `daily_product_statistics`
 
@@ -95,6 +104,7 @@
 - `V20260810_200833__add_statistics_source_indexes.sql`
 - `V20260811_101818__add_statistics_rebuild_batch_type.sql`
 - `V20260811_163316__add_daily_product_statistics.sql`
+- `V20260813_094912__add_statistics_additional_metrics.sql`
 
 ## 관련 문서
 

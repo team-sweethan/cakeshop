@@ -119,6 +119,12 @@ class DashboardReadModelMapperTests {
     void countPaymentsRequiringAttention_statusOrCancellation_countsDistinctPayments() {
         insertPayment("ATTENTION-ABORTED", "ABORTED", null);
         insertPayment("ATTENTION-EXPIRED", "EXPIRED", null);
+        long checkedExpiredPaymentId =
+                insertPayment("CHECKED-EXPIRED", "EXPIRED", null);
+        jdbcTemplate.update(
+                "UPDATE payments SET expiration_checked_at = CURRENT_TIMESTAMP(6) WHERE id = ?",
+                checkedExpiredPaymentId
+        );
 
         long requestedPaymentId =
                 insertPayment("ATTENTION-REQUESTED", "DONE", START.plusHours(1));
