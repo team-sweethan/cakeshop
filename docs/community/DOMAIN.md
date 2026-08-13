@@ -280,7 +280,7 @@ Cakeshop 커뮤니티는 고객이 케이크 관련 질문과 후기를 공유�
 
 **H3 — Controller가 Mapper를 직접 호출하지 않음.** ArchUnit. **아직 적용하지 않았다** — 위반이 발생하면 그때 세운다.
 
-**H4 — 본문·제목의 HTML이 이스케이프됨.** `th:utext`를 쓰지 않은 것의 실제 결과다. `CommunityScreenRenderingTests`가 본문에 `<script>`를 넣고 렌더링 결과를 확인한다.
+**H4 — 본문·제목·댓글의 HTML이 이스케이프됨.** `th:utext`를 쓰지 않은 것의 실제 결과다. `CommunityScreenRenderingTests`가 한 화면에 세 자리를 함께 심고 렌더링 결과를 확인한다. **필드마다 테스트를 늘리지 않는다** — 같은 템플릿 안에서는 `th:text` 하나를 반복 검증하는 셈이다. 다만 공지처럼 템플릿이 다르면 그 템플릿의 검사가 따로 필요하다.
 
 **H5 — 커뮤니티 화면이 실제로 렌더링됨.** 작성자에게만 열리는 차단 안내 화면 포함. `CommunityScreenRenderingTests`가 Thymeleaf를 실제로 돌린다. **Controller 단위 테스트는 뷰 이름만 보므로 템플릿이 깨져도 통과한다.**
 
