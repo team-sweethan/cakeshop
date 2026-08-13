@@ -31,6 +31,57 @@
           AND statistics_order.created_at &lt; #{end}
     </select>
 
+    <select id="findDailyAdditionalMetrics"
+            resultType="com.cakeshop.domain.statistics.dto.view.DailyAdditionalMetricsSourceView">
+        SELECT
+            (
+                SELECT COUNT(*)
+                FROM members AS statistics_member
+                WHERE statistics_member.role = 'USER'
+                  AND statistics_member.created_at &gt;= #{start}
+                  AND statistics_member.created_at &lt; #{end}
+            ) AS new_member_count,
+            (
+                SELECT COUNT(*)
+                FROM members AS statistics_member
+                WHERE statistics_member.role = 'USER'
+                  AND statistics_member.status = 'WITHDRAWN'
+                  AND statistics_member.withdrawn_at &gt;= #{start}
+                  AND statistics_member.withdrawn_at &lt; #{end}
+            ) AS withdrawn_member_count,
+            (
+                SELECT COUNT(*)
+                FROM posts AS statistics_post
+                WHERE statistics_post.created_at &gt;= #{start}
+                  AND statistics_post.created_at &lt; #{end}
+            ) AS new_post_count,
+            (
+                SELECT COUNT(DISTINCT statistics_member_coupon.id)
+                FROM member_coupons AS statistics_member_coupon
+                INNER JOIN payments AS statistics_coupon_payment
+                    ON statistics_coupon_payment.order_id
+                        = statistics_member_coupon.applied_order_id
+                WHERE statistics_member_coupon.status = 'USED'
+                  AND statistics_coupon_payment.status = 'DONE'
+                  AND statistics_coupon_payment.approved_at &gt;= #{start}
+                  AND statistics_coupon_payment.approved_at &lt; #{end}
+            ) AS coupon_usage_count,
+            (
+                SELECT COALESCE(SUM(statistics_cancellation.cancel_amount), 0)
+                FROM payment_cancellations AS statistics_cancellation
+                WHERE statistics_cancellation.status = 'DONE'
+                  AND statistics_cancellation.canceled_at &gt;= #{start}
+                  AND statistics_cancellation.canceled_at &lt; #{end}
+            ) AS refund_amount,
+            (
+                SELECT COUNT(DISTINCT statistics_payment.order_id)
+                FROM payments AS statistics_payment
+                WHERE statistics_payment.status = 'DONE'
+                  AND statistics_payment.approved_at &gt;= #{start}
+                  AND statistics_payment.approved_at &lt; #{end}
+            ) AS valid_payment_order_count
+    </select>
+
     <select id="findDailyProductStatistics"
             resultType="com.cakeshop.domain.statistics.dto.view.DailyProductStatisticsSourceView">
         <!-- 실제 결제액을 주문 항목 금액 비율로 나누고 원 단위 나머지는 소수 부분 순서로 배분한다. -->

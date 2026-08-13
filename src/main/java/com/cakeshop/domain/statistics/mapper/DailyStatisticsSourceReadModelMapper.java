@@ -1,5 +1,6 @@
 package com.cakeshop.domain.statistics.mapper;
 
+import com.cakeshop.domain.statistics.dto.view.DailyAdditionalMetricsSourceView;
 import com.cakeshop.domain.statistics.dto.view.DailyProductStatisticsSourceView;
 import com.cakeshop.domain.statistics.dto.view.DailyStatisticsSourceView;
 import java.time.LocalDate;
@@ -13,6 +14,12 @@ public interface DailyStatisticsSourceReadModelMapper {
 
     /** 원본 주문·결제에서 해당 날짜의 통계 집계값을 조회한다. */
     DailyStatisticsSourceView findDailyStatistics(
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end
+    );
+
+    /** 다른 도메인의 원본 데이터에서 해당 날짜의 활동·금액 지표 집계값을 조회한다. */
+    DailyAdditionalMetricsSourceView findDailyAdditionalMetrics(
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end
     );
