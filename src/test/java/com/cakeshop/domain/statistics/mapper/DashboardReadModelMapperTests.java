@@ -30,6 +30,7 @@ class DashboardReadModelMapperTests {
 
     private String suffix;
     private long categoryId;
+    private long postCategoryId;
     private long memberId;
     private long productId;
 
@@ -47,6 +48,7 @@ class DashboardReadModelMapperTests {
         suffix = Long.toString(System.nanoTime());
         memberId = insertMember();
         productId = insertProduct();
+        postCategoryId = insertPostCategory();
     }
 
     @Test
@@ -113,6 +115,23 @@ class DashboardReadModelMapperTests {
         var sales = dashboardReadModelMapper.sumTodaySales(START, END);
 
         assertThat(sales).isZero();
+    }
+
+    @Test
+    void countApprovalPendingCustomOrders_typeAndStatus_countsOnlyCustomUnderReview() {
+        insertOrder("APPROVAL-FIRST", "CUSTOM", "UNDER_REVIEW", END.plusDays(1));
+        insertOrder("APPROVAL-SECOND", "CUSTOM", "UNDER_REVIEW", END.plusDays(2));
+        insertOrder("GENERAL-REVIEW", "GENERAL", "UNDER_REVIEW", END.plusDays(3));
+        insertOrder("CUSTOM-PRODUCTION", "CUSTOM", "IN_PRODUCTION", END.plusDays(4));
+
+        long count = dashboardReadModelMapper.countApprovalPendingCustomOrders();
+
+        assertThat(count).isEqualTo(2);
+    }
+
+    @Test
+    void countApprovalPendingCustomOrders_noMatchingOrders_returnsZero() {
+        assertThat(dashboardReadModelMapper.countApprovalPendingCustomOrders()).isZero();
     }
 
     @Test
@@ -211,6 +230,23 @@ class DashboardReadModelMapperTests {
         long count = dashboardReadModelMapper.countPaymentsRequiringAttention();
 
         assertThat(count).isZero();
+    }
+
+    @Test
+    void countCustomOrdersInProduction_typeAndStatus_countsOnlyCustomInProduction() {
+        insertOrder("PRODUCTION-FIRST", "CUSTOM", "IN_PRODUCTION", END.plusDays(1));
+        insertOrder("PRODUCTION-SECOND", "CUSTOM", "IN_PRODUCTION", END.plusDays(2));
+        insertOrder("GENERAL-PRODUCTION", "GENERAL", "IN_PRODUCTION", END.plusDays(3));
+        insertOrder("CUSTOM-READY", "CUSTOM", "READY_FOR_PICKUP", END.plusDays(4));
+
+        long count = dashboardReadModelMapper.countCustomOrdersInProduction();
+
+        assertThat(count).isEqualTo(2);
+    }
+
+    @Test
+    void countCustomOrdersInProduction_noMatchingOrders_returnsZero() {
+        assertThat(dashboardReadModelMapper.countCustomOrdersInProduction()).isZero();
     }
 
     @Test
@@ -452,6 +488,31 @@ class DashboardReadModelMapperTests {
         assertThat(products).isEmpty();
     }
 
+    @Test
+    void countPendingReportedPosts_multipleReports_countsDistinctPendingPosts() {
+        long firstPostId = insertPost("FIRST");
+        long secondPostId = insertPost("SECOND");
+        long resolvedPostId = insertPost("RESOLVED");
+        long secondReporterId = insertReporter("SECOND");
+
+        insertPostReport(firstPostId, memberId, "FIRST-A", "PENDING");
+        insertPostReport(firstPostId, secondReporterId, "FIRST-B", "PENDING");
+        insertPostReport(secondPostId, memberId, "SECOND", "PENDING");
+        insertPostReport(resolvedPostId, memberId, "RESOLVED", "RESOLVED");
+
+        long count = dashboardReadModelMapper.countPendingReportedPosts();
+
+        assertThat(count).isEqualTo(2);
+    }
+
+    @Test
+    void countPendingReportedPosts_noPendingReports_returnsZero() {
+        long postId = insertPost("REJECTED");
+        insertPostReport(postId, memberId, "REJECTED", "REJECTED");
+
+        assertThat(dashboardReadModelMapper.countPendingReportedPosts()).isZero();
+    }
+
     private long insertMember() {
         String email = "dashboard-read-model-" + suffix + "@example.com";
         jdbcTemplate.update(
@@ -511,6 +572,63 @@ class DashboardReadModelMapperTests {
                 "SELECT id FROM products WHERE name = ?",
                 Long.class,
                 productName
+        );
+    }
+
+    private long insertPostCategory() {
+        String code = "DASHBOARD_POST_" + suffix;
+        jdbcTemplate.update(
+                "INSERT INTO post_categories (code, name) VALUES (?, '대시보드 게시글')",
+                code
+        );
+        return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+    }
+
+    private long insertReporter(String label) {
+        String email = "dashboard-reporter-" + label + "-" + suffix + "@example.com";
+        jdbcTemplate.update(
+                """
+                INSERT INTO members (
+                    email, password, name, nickname, phone, role, status
+                )
+                VALUES (?, NULL, '대시보드 신고자', ?, '010-9999-9999', 'USER', 'ACTIVE')
+                """,
+                email,
+                "신고자-" + label + "-" + suffix
+        );
+        return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+    }
+
+    private long insertPost(String label) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO posts (
+                    member_id, category_id, title, content, status
+                )
+                VALUES (?, ?, ?, '대시보드 신고 집계 테스트', 'PUBLISHED')
+                """,
+                memberId,
+                postCategoryId,
+                "대시보드 게시글 " + label + " " + suffix
+        );
+        return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+    }
+
+    private void insertPostReport(
+            long postId,
+            long reporterId,
+            String label,
+            String status
+    ) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO post_reports (post_id, reporter_id, reason, status)
+                VALUES (?, ?, ?, ?)
+                """,
+                postId,
+                reporterId,
+                "대시보드 신고 " + label,
+                status
         );
     }
 
