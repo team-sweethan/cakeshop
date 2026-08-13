@@ -172,6 +172,9 @@
     <select id="countPendingReportedPosts" resultType="long">
         SELECT COUNT(DISTINCT post_report.post_id)
         FROM post_reports AS post_report
+        JOIN posts AS post
+          ON post.id = post_report.post_id
         WHERE post_report.status = 'PENDING'
+          AND post.status &lt;&gt; 'DELETED'
     </select>
 </mapper>

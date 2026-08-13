@@ -489,16 +489,18 @@ class DashboardReadModelMapperTests {
     }
 
     @Test
-    void countPendingReportedPosts_multipleReports_countsDistinctPendingPosts() {
+    void countPendingReportedPosts_actionablePendingReports_countsDistinctNonDeletedPosts() {
         long firstPostId = insertPost("FIRST");
         long secondPostId = insertPost("SECOND");
         long resolvedPostId = insertPost("RESOLVED");
+        long deletedPostId = insertPost("DELETED", "DELETED");
         long secondReporterId = insertReporter("SECOND");
 
         insertPostReport(firstPostId, memberId, "FIRST-A", "PENDING");
         insertPostReport(firstPostId, secondReporterId, "FIRST-B", "PENDING");
         insertPostReport(secondPostId, memberId, "SECOND", "PENDING");
         insertPostReport(resolvedPostId, memberId, "RESOLVED", "RESOLVED");
+        insertPostReport(deletedPostId, memberId, "DELETED", "PENDING");
 
         long count = dashboardReadModelMapper.countPendingReportedPosts();
 
@@ -600,16 +602,21 @@ class DashboardReadModelMapperTests {
     }
 
     private long insertPost(String label) {
+        return insertPost(label, "PUBLISHED");
+    }
+
+    private long insertPost(String label, String status) {
         jdbcTemplate.update(
                 """
                 INSERT INTO posts (
                     member_id, category_id, title, content, status
                 )
-                VALUES (?, ?, ?, '대시보드 신고 집계 테스트', 'PUBLISHED')
+                VALUES (?, ?, ?, '대시보드 신고 집계 테스트', ?)
                 """,
                 memberId,
                 postCategoryId,
-                "대시보드 게시글 " + label + " " + suffix
+                "대시보드 게시글 " + label + " " + suffix,
+                status
         );
         return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
     }
