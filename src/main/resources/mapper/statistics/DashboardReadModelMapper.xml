@@ -19,6 +19,25 @@
           AND payment.approved_at &lt; #{end}
     </select>
 
+    <sql id="withoutRequestedCancellation">
+        AND NOT EXISTS (
+            SELECT 1
+            FROM payments AS cancel_payment
+            INNER JOIN payment_cancellations AS cancellation
+              ON cancellation.payment_id = cancel_payment.id
+            WHERE cancel_payment.order_id = custom_order.id
+              AND cancellation.status = 'REQUESTED'
+        )
+    </sql>
+
+    <select id="countApprovalPendingCustomOrders" resultType="long">
+        SELECT COUNT(*)
+        FROM orders AS custom_order
+        WHERE custom_order.order_type = 'CUSTOM'
+          AND custom_order.status = 'UNDER_REVIEW'
+        <include refid="withoutRequestedCancellation"/>
+    </select>
+
     <select id="countPaymentsRequiringAttention" resultType="long">
         SELECT COUNT(*)
         FROM payments AS payment
@@ -38,6 +57,14 @@
                       AND cancellation.failure_code = 'PAYMENT_COMPLETED'
                   )
             )
+    </select>
+
+    <select id="countCustomOrdersInProduction" resultType="long">
+        SELECT COUNT(*)
+        FROM orders AS custom_order
+        WHERE custom_order.order_type = 'CUSTOM'
+          AND custom_order.status = 'IN_PRODUCTION'
+        <include refid="withoutRequestedCancellation"/>
     </select>
 
     <select id="countTodayPickups" resultType="long">
@@ -153,5 +180,14 @@
           AND low_stock_product.stock_quantity BETWEEN 0 AND 2
         ORDER BY low_stock_product.stock_quantity, low_stock_product.id
         LIMIT #{limit}
+    </select>
+
+    <select id="countPendingReportedPosts" resultType="long">
+        SELECT COUNT(DISTINCT post_report.post_id)
+        FROM post_reports AS post_report
+        JOIN posts AS post
+          ON post.id = post_report.post_id
+        WHERE post_report.status = 'PENDING'
+          AND post.status &lt;&gt; 'DELETED'
     </select>
 </mapper>

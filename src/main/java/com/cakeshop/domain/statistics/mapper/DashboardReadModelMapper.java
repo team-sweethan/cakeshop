@@ -24,8 +24,14 @@ public interface DashboardReadModelMapper {
             @Param("end") LocalDateTime end
     );
 
+    /** 현재 승인 대기 상태인 전체 주문제작 건수를 조회한다. */
+    long countApprovalPendingCustomOrders();
+
     /** 현재 관리자의 확인이 필요한 전체 결제 건수를 조회한다. */
     long countPaymentsRequiringAttention();
+
+    /** 현재 제작 중 상태인 전체 주문제작 건수를 조회한다. */
+    long countCustomOrdersInProduction();
 
     /** 지정한 날짜 범위에 픽업 대기 중인 전체 주문 건수를 조회한다. */
     long countTodayPickups(
@@ -48,4 +54,7 @@ public interface DashboardReadModelMapper {
 
     /** 판매 중인 일반 상품 가운데 재고가 2개 이하인 상품을 재고 순서로 조회한다. */
     List<LowStockProductView> findLowStockProducts(@Param("limit") int limit);
+
+    /** 미처리 신고가 하나 이상 있는 고유 게시글 수를 조회한다. */
+    long countPendingReportedPosts();
 }

@@ -171,6 +171,7 @@ class CommunitySchemaTests {
         assertIndexPrefix("post_views", true, "created_at,post_id");
         assertIndexPrefix("post_likes", true, "created_at,post_id");
         assertIndexPrefix("post_views", true, "post_id,viewer_key,created_at");
+        assertIndexPrefix("post_reports", true, "status,post_id");
 
         List<String> indexes = jdbcTemplate.queryForList(
                 """

@@ -40,7 +40,9 @@ class DashboardReadModelQueryServiceTests {
         when(dashboardReadModelMapper.countTodayOrders(start, end)).thenReturn(3L);
         when(dashboardReadModelMapper.sumTodaySales(start, end))
                 .thenReturn(new BigDecimal("120000"));
+        when(dashboardReadModelMapper.countApprovalPendingCustomOrders()).thenReturn(5L);
         when(dashboardReadModelMapper.countPaymentsRequiringAttention()).thenReturn(2L);
+        when(dashboardReadModelMapper.countCustomOrdersInProduction()).thenReturn(7L);
         TodayPickupScheduleView pickup = new TodayPickupScheduleView(
                 10L,
                 start.plusHours(11),
@@ -68,6 +70,7 @@ class DashboardReadModelQueryServiceTests {
         when(dashboardReadModelMapper.countLowStockProducts()).thenReturn(6L);
         when(dashboardReadModelMapper.findLowStockProducts(5))
                 .thenReturn(List.of(lowStockProduct));
+        when(dashboardReadModelMapper.countPendingReportedPosts()).thenReturn(8L);
         DashboardReadModelQueryService service =
                 new DashboardReadModelQueryService(dashboardReadModelMapper, CLOCK);
 
@@ -75,19 +78,25 @@ class DashboardReadModelQueryServiceTests {
 
         assertThat(dashboard.todayOrderCount()).isEqualTo(3L);
         assertThat(dashboard.todaySalesAmount()).isEqualByComparingTo("120000");
+        assertThat(dashboard.approvalPendingCount()).isEqualTo(5L);
         assertThat(dashboard.paymentAttentionCount()).isEqualTo(2L);
+        assertThat(dashboard.inProductionCount()).isEqualTo(7L);
         assertThat(dashboard.todayPickupCount()).isEqualTo(4L);
         assertThat(dashboard.lowStockProductCount()).isEqualTo(6L);
+        assertThat(dashboard.pendingReportedPostCount()).isEqualTo(8L);
         assertThat(dashboard.todayPickups()).containsExactly(pickup);
         assertThat(dashboard.recentOrders()).containsExactly(recentOrder);
         assertThat(dashboard.lowStockProducts()).containsExactly(lowStockProduct);
         verify(dashboardReadModelMapper).countTodayOrders(start, end);
         verify(dashboardReadModelMapper).sumTodaySales(start, end);
+        verify(dashboardReadModelMapper).countApprovalPendingCustomOrders();
         verify(dashboardReadModelMapper).countPaymentsRequiringAttention();
+        verify(dashboardReadModelMapper).countCustomOrdersInProduction();
         verify(dashboardReadModelMapper).countTodayPickups(start, end);
         verify(dashboardReadModelMapper).findTodayPickupSchedules(start, end, 5);
         verify(dashboardReadModelMapper).findRecentOrders(5);
         verify(dashboardReadModelMapper).countLowStockProducts();
         verify(dashboardReadModelMapper).findLowStockProducts(5);
+        verify(dashboardReadModelMapper).countPendingReportedPosts();
     }
 }

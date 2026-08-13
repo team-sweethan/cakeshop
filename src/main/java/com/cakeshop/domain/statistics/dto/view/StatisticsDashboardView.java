@@ -7,9 +7,12 @@ import java.util.List;
 public record StatisticsDashboardView(
         long todayOrderCount,
         BigDecimal todaySalesAmount,
+        long approvalPendingCount,
         long paymentAttentionCount,
+        long inProductionCount,
         long todayPickupCount,
         long lowStockProductCount,
+        long pendingReportedPostCount,
         List<TodayPickupScheduleView> todayPickups,
         List<RecentOrderView> recentOrders,
         List<LowStockProductView> lowStockProducts
