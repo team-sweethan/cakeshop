@@ -82,16 +82,17 @@
 | 표시 이름 | 확정 | `승인 대기`로 통일 |
 | 대상 주문 유형 | 확정 | `OrderType.CUSTOM`만 포함 |
 | 대상 상태 | 확정 | `OrderStatus.UNDER_REVIEW`만 포함 |
+| 환불 처리 중 주문 | 확정 | `PaymentCancellationStatus.REQUESTED` 취소가 있는 주문 제외 |
 | 날짜 범위 | 확정 | 제한 없이 현재 승인 대기 상태인 전체 주문제작 대상 |
 | 집계 단위 | 확정 | 주문 ID 기준 건수 |
 | 빈 결과 | 확정 | `0` 반환 |
 | 이동 화면 | 확정 | `/admin/fulfillment?status=UNDER_REVIEW` |
-| 조회 구현 | 확정 | `DashboardReadModelMapper`에서 주문 테이블을 읽기 전용으로 조회 |
+| 조회 구현 | 확정 | `DashboardReadModelMapper`에서 주문·결제·결제 취소 테이블을 읽기 전용으로 조회 |
 | 조건 검토 | 합의 필요 | 주문제작 상태 조건을 `order` 도메인 담당자가 검토 |
 
 승인 대기는 결제가 완료되어 `UNDER_REVIEW`로 전이된 `CUSTOM` 주문 중 관리자가 제작을 시작하거나
-반려하기 전인 주문 수로 정의한다. 결제 완료 여부는 해당 상태의 전이 규칙으로 보장하므로 대시보드
-조회에서 결제 테이블을 별도로 조회하지 않는다.
+반려하기 전인 주문 수로 정의한다. 단, `REQUESTED` 결제 취소가 있으면 제작 시작과 반려를 처리할 수
+없으므로 집계에서 제외한다. 결제 완료 여부는 해당 상태의 전이 규칙으로 보장한다.
 
 ### 3-4. 확인 필요 결제
 
@@ -130,17 +131,19 @@ OR payment_cancellations.status IN (REQUESTED, FAILED)
 | 데이터 소유 도메인 | 확정 | `order` |
 | 대상 주문 유형 | 확정 | `OrderType.CUSTOM`만 포함 |
 | 대상 상태 | 확정 | `OrderStatus.IN_PRODUCTION`만 포함 |
+| 환불 처리 중 주문 | 확정 | `PaymentCancellationStatus.REQUESTED` 취소가 있는 주문 제외 |
 | 제작 완료 구분 | 확정 | 제작 완료 후 `READY_FOR_PICKUP`으로 전이되므로 제작 중에서 제외 |
 | 날짜 범위 | 확정 | 제한 없이 현재 제작 중 상태인 전체 주문제작 대상 |
 | 집계 단위 | 확정 | 주문 ID 기준 건수 |
 | 빈 결과 | 확정 | `0` 반환 |
 | 이동 화면 | 확정 | `/admin/fulfillment?status=IN_PRODUCTION` |
-| 조회 구현 | 확정 | `DashboardReadModelMapper`에서 주문 테이블을 읽기 전용으로 조회 |
+| 조회 구현 | 확정 | `DashboardReadModelMapper`에서 주문·결제·결제 취소 테이블을 읽기 전용으로 조회 |
 | 조건 검토 | 합의 필요 | 주문제작 상태 조건을 `order` 도메인 담당자가 검토 |
 
 제작 중은 관리자가 제작을 시작하여 `IN_PRODUCTION`으로 전이된 `CUSTOM` 주문 중 제작 완료 전인
-주문 수로 정의한다. 제작 완료 후 `READY_FOR_PICKUP`으로 전이된 주문은 오늘 픽업 예정 지표의
-조건에 따라 별도로 집계한다.
+주문 수로 정의한다. 단, `REQUESTED` 결제 취소가 있으면 제작 완료 처리를 할 수 없으므로 집계에서
+제외한다. 제작 완료 후 `READY_FOR_PICKUP`으로 전이된 주문은 오늘 픽업 예정 지표의 조건에 따라
+별도로 집계한다.
 
 ### 3-6. 오늘 픽업 예정
 

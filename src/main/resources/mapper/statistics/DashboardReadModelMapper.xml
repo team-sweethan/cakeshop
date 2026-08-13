@@ -19,11 +19,23 @@
           AND payment.approved_at &lt; #{end}
     </select>
 
+    <sql id="withoutRequestedCancellation">
+        AND NOT EXISTS (
+            SELECT 1
+            FROM payments AS cancel_payment
+            INNER JOIN payment_cancellations AS cancellation
+              ON cancellation.payment_id = cancel_payment.id
+            WHERE cancel_payment.order_id = custom_order.id
+              AND cancellation.status = 'REQUESTED'
+        )
+    </sql>
+
     <select id="countApprovalPendingCustomOrders" resultType="long">
         SELECT COUNT(*)
         FROM orders AS custom_order
         WHERE custom_order.order_type = 'CUSTOM'
           AND custom_order.status = 'UNDER_REVIEW'
+        <include refid="withoutRequestedCancellation"/>
     </select>
 
     <select id="countPaymentsRequiringAttention" resultType="long">
@@ -52,6 +64,7 @@
         FROM orders AS custom_order
         WHERE custom_order.order_type = 'CUSTOM'
           AND custom_order.status = 'IN_PRODUCTION'
+        <include refid="withoutRequestedCancellation"/>
     </select>
 
     <select id="countTodayPickups" resultType="long">

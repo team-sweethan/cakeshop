@@ -135,6 +135,28 @@ class DashboardReadModelMapperTests {
     }
 
     @Test
+    void countApprovalPendingCustomOrders_requestedCancellation_excludesOrder() {
+        insertOrder("APPROVAL-ACTIONABLE", "CUSTOM", "UNDER_REVIEW", END.plusDays(1));
+        long requestedOrderId =
+                insertOrder("APPROVAL-REFUND", "CUSTOM", "UNDER_REVIEW", END.plusDays(2));
+        long requestedPaymentId = insertPaymentForOrder(
+                requestedOrderId,
+                "APPROVAL-REFUND",
+                "DONE",
+                START.plusHours(1)
+        );
+        insertCancellation(
+                requestedPaymentId,
+                "APPROVAL-REFUND",
+                "CUSTOMER",
+                "REQUESTED",
+                null
+        );
+
+        assertThat(dashboardReadModelMapper.countApprovalPendingCustomOrders()).isEqualTo(1L);
+    }
+
+    @Test
     void countPaymentsRequiringAttention_statusOrCancellation_countsDistinctPayments() {
         insertPayment("ATTENTION-ABORTED", "ABORTED", null);
         insertPayment("ATTENTION-EXPIRED", "EXPIRED", null);
@@ -247,6 +269,28 @@ class DashboardReadModelMapperTests {
     @Test
     void countCustomOrdersInProduction_noMatchingOrders_returnsZero() {
         assertThat(dashboardReadModelMapper.countCustomOrdersInProduction()).isZero();
+    }
+
+    @Test
+    void countCustomOrdersInProduction_requestedCancellation_excludesOrder() {
+        insertOrder("PRODUCTION-ACTIONABLE", "CUSTOM", "IN_PRODUCTION", END.plusDays(1));
+        long requestedOrderId =
+                insertOrder("PRODUCTION-REFUND", "CUSTOM", "IN_PRODUCTION", END.plusDays(2));
+        long requestedPaymentId = insertPaymentForOrder(
+                requestedOrderId,
+                "PRODUCTION-REFUND",
+                "DONE",
+                START.plusHours(1)
+        );
+        insertCancellation(
+                requestedPaymentId,
+                "PRODUCTION-REFUND",
+                "ADMIN",
+                "REQUESTED",
+                null
+        );
+
+        assertThat(dashboardReadModelMapper.countCustomOrdersInProduction()).isEqualTo(1L);
     }
 
     @Test
@@ -811,6 +855,15 @@ class DashboardReadModelMapperTests {
             LocalDateTime approvedAt
     ) {
         long orderId = insertOrder(label);
+        return insertPaymentForOrder(orderId, label, status, approvedAt);
+    }
+
+    private long insertPaymentForOrder(
+            long orderId,
+            String label,
+            String status,
+            LocalDateTime approvedAt
+    ) {
         String tossOrderId = "TOSS-" + label + "-" + suffix;
         jdbcTemplate.update(
                 """
