@@ -121,8 +121,7 @@ public class ChatService {
     }
 
     // 메시지 만들고 저장, 방 상태 갱신
-    @Transactional
-    public ChatMessage createMessage(Long roomId, Long senderId, boolean isAdmin, Long productId, 
+    private ChatMessage createMessage(Long roomId, Long senderId, boolean isAdmin, Long productId, 
         String content, List<ChatMessageAttachmentRequest> attachments) {
 
             // 1. 텅 빈 메시지 저장 차단, 2,000자 상한선 및 첨부파일 최대 5개 상한선 제한
@@ -212,6 +211,40 @@ public class ChatService {
 
             return message;
         }
+    
+    // 외부(REST / STOMP 컨트롤러)에서 호출하는 메서드
+    @Transactional
+    public ChatMessageResponse sendMessage(Long roomId, Long senderId, boolean isAdmin, Long productId, 
+        String content, List<ChatMessageAttachmentRequest> attachments) {
+        // DB 메시지 저장 (아래 private createMessage 호출)
+        ChatMessage message = createMessage(roomId, senderId, isAdmin, productId, content, attachments);
+        // ChatMessageResponse DTO 조립
+        List<String> imageUrls = (attachments != null && !attachments.isEmpty())
+                ? attachments.stream()
+                        .map(ChatMessageAttachmentRequest::getObjectKey)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toList())
+                : Collections.emptyList();
+        String productName = null;
+        if (message.getProductId() != null) {
+            productName = productChatQueryService.getProductName(message.getProductId());
+        }
+        String senderType = isAdmin ? "ADMIN" : "CUSTOMER";
+        String senderName = isAdmin ? "관리자" : "고객";
+        return ChatMessageResponse.builder()
+                .id(message.getId())
+                .chatRoomId(message.getChatRoomId())
+                .senderId(message.getSenderId())
+                .senderName(senderName)
+                .senderType(senderType)
+                .productId(message.getProductId())
+                .productName(productName)
+                .content(message.getContent())
+                .imageUrls(imageUrls)
+                .isRead(false)
+                .createdAt(message.getCreatedAt())
+                .build();
+    }
 
     // S3 저장소에 이미지 파일 직접 업로드 (손님인 경우 DB 기준 활성 회원 검증 추가)
     public String uploadChatImageToS3(MultipartFile file, Long senderId, boolean isAdmin) {
