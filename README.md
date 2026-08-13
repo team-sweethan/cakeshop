@@ -105,6 +105,8 @@ AWS_S3_BASE_URL=https://sweethan-cakeshop-images.s3.ap-northeast-2.amazonaws.com
 AWS_S3_KEY_PREFIX=local-your-name
 GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
+KAKAO_CLIENT_ID=your-kakao-rest-api-key
+KAKAO_CLIENT_SECRET=your-kakao-client-secret
 ```
 
 `.env_sample`의 기본 포트는 `3307`입니다. 로컬 MariaDB가 기본 포트 `3306`을 사용한다면 반드시 수정합니다.
@@ -171,12 +173,13 @@ CREATE DATABASE `cakeshop`
 `s3`가 포함된 조합은 `AWS_S3_BUCKET`, `AWS_S3_BASE_URL`, `AWS_S3_KEY_PREFIX`와 AWS 자격 증명이 필요합니다.
 `rds`가 포함된 조합은 `RDS_ENDPOINT`, `RDS_DATABASE`, `RDS_USERNAME`, `RDS_PASSWORD`가 필요합니다.
 
-Google 소셜 로그인까지 확인하려면 `.env`에 `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`을 입력한 뒤
-`oauth` 프로필을 추가합니다. Google Cloud Console의 승인된 리디렉션 URI에는
-`http://localhost:8080/login/oauth2/code/google`을 등록합니다.
+Google·카카오 소셜 로그인은 `.env`에 각 서비스의 Client ID와 Client Secret을 입력하고 `oauth` 프로필을
+추가합니다. Google Cloud Console의 승인된 리디렉션 URI에는
+`http://localhost:8080/login/oauth2/code/google`을, 카카오 개발자 콘솔의 Redirect URI에는
+`http://localhost:8080/login/oauth2/code/kakao`를 등록합니다.
 
 ```powershell
-# Windows: 로컬 MariaDB + 공용 S3 + Google OAuth
+# Windows: 로컬 MariaDB + 공용 S3 + Google/Kakao OAuth
 .\gradlew.bat bootRun --args="--spring.profiles.active=local,s3,oauth"
 ```
 
@@ -217,7 +220,7 @@ SOURCE src/main/resources/db/seed/seed-community.sql;
 | `local` | 개인 PC의 MariaDB와 로컬 디스크를 사용하는 대체 개발 환경 | 활성화 |
 | `rds` | 팀 공용 AWS RDS 연결 | 비활성화 |
 | `rds,s3` | 팀 공용 AWS RDS와 공용 S3 연결 | 비활성화 |
-| `oauth` | Google OAuth 클라이언트 설정 활성화. 단독 사용하지 않고 `local,s3,oauth`처럼 조합 | 조합 대상 프로필을 따름 |
+| `oauth` | Google·카카오 OAuth 클라이언트와 공통 OAuth 로그인 처리 활성화. 단독 사용하지 않고 `local,s3,oauth`처럼 조합 | 조합 대상 프로필을 따름 |
 
 공용 RDS 스키마는 애플리케이션 시작으로 변경하지 않습니다. `rds` 프로필은 접속 정보와 별도의 스키마 반영 절차가 준비된 경우에만 사용합니다.
 

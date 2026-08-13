@@ -24,6 +24,7 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.security.web.session.HttpSessionEventPublisher;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 
 @Configuration
 @EnableWebSecurity
@@ -39,7 +40,8 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(
             HttpSecurity http,
             SessionRegistry sessionRegistry,
-            ObjectProvider<OAuth2LoginSuccessHandler> oauth2LoginSuccessHandler) throws Exception {
+            ObjectProvider<OAuth2LoginSuccessHandler> oauth2LoginSuccessHandler,
+            ObjectProvider<ClientRegistrationRepository> clientRegistrationRepository) throws Exception {
         RequestMatcher passwordRecoveryRequest =
                 SecurityConfig::isPasswordRecoveryRequest;
         HttpSessionRequestCache requestCache = new HttpSessionRequestCache();
@@ -162,8 +164,15 @@ public class SecurityConfig {
             );
         OAuth2LoginSuccessHandler oauthSuccessHandler = oauth2LoginSuccessHandler.getIfAvailable();
         if (oauthSuccessHandler != null) {
+            ClientRegistrationRepository registrations = clientRegistrationRepository.getIfAvailable();
             http.oauth2Login(oauth2 -> oauth2
                     .loginPage("/login")
+                    .authorizationEndpoint(endpoint -> {
+                        if (registrations != null) {
+                            endpoint.authorizationRequestResolver(
+                                    new KakaoPromptAuthorizationRequestResolver(registrations));
+                        }
+                    })
                     .successHandler(oauthSuccessHandler)
                     .failureHandler(new SimpleUrlAuthenticationFailureHandler("/login?oauthError")));
         }
