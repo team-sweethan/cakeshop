@@ -221,7 +221,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // 방 선택 조작: 대화방 변경 시 기존 작성 중인 텍스트 및 첨부 파일 깨끗이 초기화!
+  // 방 선택 조작: 대화방 변경 시 기존 작성 중인 텍스트 및 첨부 파일 초기화
   async function selectChatRoom(roomId, customerId) {
     if (!roomId) return;
 
@@ -406,35 +406,35 @@ document.addEventListener("DOMContentLoaded", () => {
             ? ord.totalAmount.toLocaleString() + "원"
             : "-";
 
-  function formatOrderStatus(status) {
-    if (!status) return "접수";
-    switch (String(status).toUpperCase()) {
-      case "READY_FOR_PICKUP": return "픽업 대기";
-      case "IN_PRODUCTION": return "제작 중";
-      case "UNDER_REVIEW": return "주문 확인 중";
-      case "PENDING_PAYMENT": return "결제 대기";
-      case "PICKED_UP": return "픽업 완료";
-      case "CANCELED": return "주문 취소";
-      case "REJECTED": return "주문 거절";
-      case "EXPIRED": return "만료";
-      default: return status;
-    }
-  }
+          function formatOrderStatus(status) {
+            if (!status) return "접수";
+            switch (String(status).toUpperCase()) {
+              case "READY_FOR_PICKUP": return "픽업 대기";
+              case "IN_PRODUCTION": return "제작 중";
+              case "UNDER_REVIEW": return "주문 확인 중";
+              case "PENDING_PAYMENT": return "결제 대기";
+              case "PICKED_UP": return "픽업 완료";
+              case "CANCELED": return "주문 취소";
+              case "REJECTED": return "주문 거절";
+              case "EXPIRED": return "만료";
+              default: return status;
+            }
+          }
 
-  function formatPickupDateTime(rawTime) {
-    if (!rawTime || rawTime === "-") return "-";
-    try {
-      const date = new Date(rawTime);
-      if (isNaN(date.getTime())) return String(rawTime);
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      const hours = String(date.getHours()).padStart(2, "0");
-      const minutes = String(date.getMinutes()).padStart(2, "0");
-      return `${month}월 ${day}일 ${hours}:${minutes}`;
-    } catch (e) {
-      return String(rawTime);
-    }
-  }
+          function formatPickupDateTime(rawTime) {
+            if (!rawTime || rawTime === "-") return "-";
+            try {
+              const date = new Date(rawTime);
+              if (isNaN(date.getTime())) return String(rawTime);
+              const month = String(date.getMonth() + 1).padStart(2, "0");
+              const day = String(date.getDate()).padStart(2, "0");
+              const hours = String(date.getHours()).padStart(2, "0");
+              const minutes = String(date.getMinutes()).padStart(2, "0");
+              return `${month}월 ${day}일 ${hours}:${minutes}`;
+            } catch (e) {
+              return String(rawTime);
+            }
+          }
 
           cardDiv.innerHTML = `
             <div class="cluster cluster--between" style="margin-bottom:6px;">

@@ -62,9 +62,7 @@ public class ChatService {
     @Value("${aws.s3.base-url:}")
     private String s3BaseUrl;
 
-    // ==========================================
     // 0. 검증 헬퍼 메서드
-    // ==========================================
     private void validateRoomAccess(ChatRoom room, Long currentUserId, boolean isAdmin) {
         if (room == null) {
             throw new BusinessException(ChatErrorCode.ROOM_NOT_FOUND);
@@ -79,10 +77,7 @@ public class ChatService {
         }
     }
 
-    // ==========================================
     // 1. 공통 & 고객용 기능 (Customer)
-    // ==========================================
-    
     // 없으면 방 만들고, 있으면 만들어져있는거 반환 (동시성 충돌 발생 시 기존 방 흡수)
     @Transactional
     public ChatRoom getOrMakeChatRoom(Long customerId) {
@@ -196,12 +191,12 @@ public class ChatService {
                         .originalFilename(att.getOriginalFilename())
                         .contentType(att.getContentType())
                         .fileSize(att.getFileSize())
-                        .displayOrder(displayOrder++)   // 0, 1, 2... 정렬 순서 자동 증가
+                        .displayOrder(displayOrder++)   // 정렬 순서 자동 증가
                         .createdAt(LocalDateTime.now())
                         .build();
                         
                     try {
-                        chatMapper.insertChatMessageAttachment(attachment); // 첨부파일 매퍼 호출!
+                        chatMapper.insertChatMessageAttachment(attachment); // 첨부파일 매퍼 호출
                     } catch (org.springframework.dao.DataIntegrityViolationException e) {
                         throw new BusinessException(CommonErrorCode.INVALID_INPUT);
                     }
@@ -241,7 +236,7 @@ public class ChatService {
         if (key.startsWith("chat/") || key.startsWith("uploads/")) {
             return;
         }
-        // 3. 외부 URL인 경우 설정된 자사 S3 / CloudFront Base URL만 통과 허용!
+        // 3. 외부 URL인 경우 설정된 자사 S3 / CloudFront Base URL만 통과 허용
         if (key.startsWith("http://") || key.startsWith("https://")) {
             if (StringUtils.hasText(s3BaseUrl)) {
                 String normalizedBaseUrl = s3BaseUrl.endsWith("/") ? s3BaseUrl : s3BaseUrl + "/";
@@ -293,7 +288,7 @@ public class ChatService {
             }).collect(Collectors.toList());
         }
 
-        // 매핑 테이블(chat_room_orders)에 연동 주문이 없으면 해당 고객의 전체 주문(orders) 자동 fallback 조회!
+        // 매핑 테이블(chat_room_orders)에 연동 주문이 없으면 해당 고객의 전체 주문(orders) 자동 fallback 조회
         List<OrderChatView> customerOrders = orderChatQueryService.findOrdersByCustomerId(room.getCustomerId());
         if (customerOrders == null || customerOrders.isEmpty()) {
             return Collections.emptyList();
@@ -318,7 +313,7 @@ public class ChatService {
         ChatRoom chatRoom = chatMapper.findChatRoomById(chatRoomId);
         validateRoomAccess(chatRoom, currentUserId, isAdmin);
 
-        // anchorMessageId가 전달된 경우, 비양수 거절 및 해당 메시지가 이 채팅방의 메시지인지 검증!
+        // anchorMessageId가 전달된 경우, 비양수 거절 및 해당 메시지가 이 채팅방의 메시지인지 검증
         if (anchorMessageId != null) {
             if (anchorMessageId <= 0) {
                 throw new BusinessException(CommonErrorCode.INVALID_INPUT);
@@ -361,13 +356,13 @@ public class ChatService {
         ChatRoom room = chatMapper.findChatRoomById(chatRoomId);
         validateRoomAccess(room, currentUserId, isAdmin);
 
-        // 검증: lastReadMessageId가 진짜 해당 채팅방의 메시지인지 확인!
+        // 검증: lastReadMessageId가 진짜 해당 채팅방의 메시지인지 확인 
         ChatMessage lastMessage = chatMapper.findChatMessageById(lastReadMessageId);
         if (lastMessage == null || !chatRoomId.equals(lastMessage.getChatRoomId())) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
 
-        // derivedSide: 파라미터 readerSide 대신 실제 로그인 사용자의 권한(isAdmin)으로 결정!
+        // derivedSide: 파라미터 readerSide 대신 실제 로그인 사용자의 권한(isAdmin)으로 결정 
         ChatReaderSide derivedSide = isAdmin ? ChatReaderSide.ADMIN : ChatReaderSide.CUSTOMER;
 
         ChatRoomReadCursor cursor = ChatRoomReadCursor.builder()
@@ -387,10 +382,8 @@ public class ChatService {
         return chatMapper.findReadCursor(chatRoomId, readerSide);
     }
 
-    // ==========================================
+
     // 2. 관리자용 기능 (Admin)
-    // ==========================================
-    
     // 채팅 목록 조회
     // 관리자 좌측 배너 채팅방 목록 조회 (탭 필터링 + PageRequest 정규화 페이징 + 미읽음 배치 집계)
     @Transactional(readOnly = true)
@@ -405,11 +398,11 @@ public class ChatService {
             return Collections.emptyList();
         }
 
-        // 2. 고객 이름 배치 조회 (IN 쿼리로 단 1번만의 SELECT로 N+1 문제 완전 해소!)
+        // 2. 고객 이름 배치 조회 (IN 쿼리로 단 1번만의 SELECT로 N+1 문제 완전 해소)
         Set<Long> uniqueCustomerIds = rooms.stream().map(ChatRoom::getCustomerId).collect(Collectors.toSet());
         Map<Long, String> customerNameMap = memberChatQueryService.getCustomerNamesMap(new java.util.ArrayList<>(uniqueCustomerIds));
 
-        // 3. 마지막 메시지 일괄 배치 조회 (방 20개당 20번 단건 쿼리 나가던 N+1 문제 완전 해소!)
+        // 3. 마지막 메시지 일괄 배치 조회 (방 20개당 20번 단건 쿼리 나가던 N+1 문제 완전 해소)
         List<Long> lastMessageIds = rooms.stream()
                 .map(ChatRoom::getLastMessageId)
                 .filter(Objects::nonNull)
@@ -422,7 +415,7 @@ public class ChatService {
         Map<Long, ChatMessage> lastMessageMap = lastMessages.stream()
                 .collect(Collectors.toMap(ChatMessage::getId, m -> m, (a, b) -> a));
 
-        // 4. 안 읽은 메시지 수 일괄 GROUP BY 배치 조회 (방 100개당 100번 N+1 쿼리 나가던 문제 완벽 제거!)
+        // 4. 안 읽은 메시지 수 일괄 GROUP BY 배치 조회 (방 100개당 100번 N+1 쿼리 나가던 문제 제거)
         List<Long> roomIds = rooms.stream().map(ChatRoom::getId).collect(Collectors.toList());
         List<ChatUnreadCountDto> unreadDtos = chatMapper.countUnreadMessagesByRoomIds(roomIds);
         Map<Long, Integer> unreadCountMap = (unreadDtos != null && !unreadDtos.isEmpty())
@@ -529,14 +522,14 @@ public class ChatService {
             return Collections.emptyList();
         }
 
-        // 메시지 ID 목록으로 첨부파일 일괄 배치 조회 (N+1 쿼리 완벽 해소)
+        // 메시지 ID 목록으로 첨부파일 일괄 배치 조회 (N+1 쿼리 해소)
         List<Long> messageIds = messages.stream().map(ChatMessage::getId).collect(Collectors.toList());
         List<ChatMessageAttachment> allAttachments = chatMapper.findAttachmentsByMessageIds(messageIds);
         Map<Long, List<ChatMessageAttachment>> attachmentMap = (allAttachments != null && !allAttachments.isEmpty())
                 ? allAttachments.stream().collect(Collectors.groupingBy(ChatMessageAttachment::getChatMessageId))
                 : Collections.emptyMap();
 
-        // 메시지 내 문의 상품명 일괄 배치 (IN 쿼리) 조회 (N+1 쿼리 완벽 해소!)
+        // 메시지 내 문의 상품명 일괄 배치 (IN 쿼리) 조회 (N+1 쿼리 해소)
         List<Long> productIds = messages.stream()
                 .map(ChatMessage::getProductId)
                 .filter(Objects::nonNull)

@@ -29,5 +29,5 @@ public class ChatMessageResponse {
     private Long productId;                            // 문의 상품 ID (선택)
     private String productName;                        // 문의 상품명 (선택)
     private String productImageUrl;                    // 문의 상품 대표 이미지 (선택)
-    private List<String> imageUrls; // S3 Presigned 이미지 전체 URL 목록 (순서 보장됨!)
+    private List<String> imageUrls; // S3 Presigned 이미지 전체 URL 목록 (순서 보장됨)
 }

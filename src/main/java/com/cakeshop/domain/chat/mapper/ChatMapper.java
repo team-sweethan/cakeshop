@@ -19,9 +19,7 @@ import com.cakeshop.domain.chat.dto.view.ChatUnreadCountDto;
 @Mapper
 public interface ChatMapper {
 
-    // ==========================================
     // 1. 채팅방 (chat_rooms)
-    // ==========================================
     void insertChatRoom(ChatRoom chatRoom); // 새 1:1 채팅방 생성
 
     ChatRoom findChatRoomById(Long id); // 채팅방 단건 조회 (이미 채팅방에 입장해서 채팅방 번호를 알고 있을 때)
@@ -53,10 +51,7 @@ public interface ChatMapper {
     // 관리자 좌측 배너 총 개수
     int countChatRoomsForAdmin(@Param("responseStatus") ChatResponseStatus responseStatus);
 
-
-    // ==========================================
     // 2. 메시지 (chat_messages)
-    // ==========================================
     void insertChatMessage(ChatMessage chatMessage); // 메시지 저장
 
     // 메시지 단건 조회
@@ -82,11 +77,7 @@ public interface ChatMapper {
     // 채팅방 ID 목록별 안 읽은 메시지 수 일괄 배치 조회 (N+1 방지)
     List<ChatUnreadCountDto> countUnreadMessagesByRoomIds(@Param("roomIds") List<Long> roomIds);
 
-
-    // ==========================================
-    // 3. xmr
-    // ==========================================
-
+    // 3. 첨부파일 (chat_message_attachments)
     // 첨부파일 저장
     void insertChatMessageAttachment(ChatMessageAttachment chatMessageAttachment);
 
@@ -96,11 +87,7 @@ public interface ChatMapper {
     // 메시지 목록 ID들에 대한 첨부파일 일괄 조회 (N+1 방지 배치)
     List<ChatMessageAttachment> findAttachmentsByMessageIds(@Param("messageIds") List<Long> messageIds);
 
-
-    // ==========================================
     // 4. 읽음 커서 (chat_room_read_cursors)
-    // ==========================================
-
     // 고객·관리자별 읽음 커서 저장/수정
     void upsertReadCursor(ChatRoomReadCursor cursor);
 
@@ -111,21 +98,14 @@ public interface ChatMapper {
     );
 
 
-    // ==========================================
     // 5. 고객 메모 (customer_admin_notes)
-    // ==========================================
-
     // 관리자가 특정 고객의 메모를 저장하거나 수정 ( upsert )
     void upsertCustomerAdminNote(CustomerAdminNote note);
 
     // 관리자가 특정 고객의 메모 조회
     CustomerAdminNote findCustomerAdminNoteByCustomerId(Long customerId);
 
-
-    // ==========================================
     // 6. 연동 주문 (chat_room_orders)
-    // ==========================================
-
     // 채팅방과 주문을 연결하거나 변경 ( upsert )
     void upsertChatRoomOrder(ChatRoomOrder chatRoomOrder);
 

@@ -275,9 +275,7 @@ public class ChatApiController {
         return ResponseEntity.ok().build();
     }
 
-    // ==========================================
     // 채팅 API 전용 예외 핸들러 (REST JSON 응답 보장)
-    // ==========================================
     @ExceptionHandler(com.cakeshop.global.error.BusinessException.class)
     public ResponseEntity<java.util.Map<String, String>> handleBusinessException(com.cakeshop.global.error.BusinessException e) {
         return ResponseEntity.status(e.getErrorCode().status())
