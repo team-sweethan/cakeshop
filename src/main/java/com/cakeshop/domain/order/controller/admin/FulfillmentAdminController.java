@@ -31,8 +31,6 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class FulfillmentAdminController {
 
-    private static final int FULFILLMENT_PAGE_SIZE = 20;
-
     private static final Set<OrderStatus> FULFILLMENT_STATUSES = Set.of(
             OrderStatus.UNDER_REVIEW,
             OrderStatus.IN_PRODUCTION,
@@ -55,7 +53,7 @@ public class FulfillmentAdminController {
         recoverInvalidSearchValues(condition, bindingResult);
         FulfillmentListView fulfillment = fulfillmentService.getFulfillments(
                 condition,
-                new PageRequest(parsePositiveInteger(page), FULFILLMENT_PAGE_SIZE)
+                new PageRequest(parsePositiveInteger(page), FulfillmentService.PAGE_SIZE)
         );
         condition.setStatus(fulfillment.selectedStatus());
         model.addAttribute("fulfillment", fulfillment);
@@ -67,7 +65,6 @@ public class FulfillmentAdminController {
     public String markPickedUp(
             @PathVariable("orderId") long orderId,
             @ModelAttribute FulfillmentSearchCondition condition,
-            @RequestParam(required = false) String page,
             @AuthenticationPrincipal MemberDetails admin,
             RedirectAttributes redirectAttributes
     ) {
@@ -78,7 +75,7 @@ public class FulfillmentAdminController {
         fulfillmentService.markPickedUp(orderId, admin.getMemberId());
 
         redirectAttributes.addFlashAttribute("successMessage", "픽업 완료로 변경했습니다.");
-        return "redirect:" + fulfillmentRedirectUrl(condition, page);
+        return "redirect:" + fulfillmentRedirectUrl(condition);
     }
 
     /** 승인 대기 수제 주문의 제작을 시작한다. */
@@ -86,13 +83,12 @@ public class FulfillmentAdminController {
     public String startProduction(
             @PathVariable("orderId") long orderId,
             @ModelAttribute FulfillmentSearchCondition condition,
-            @RequestParam(required = false) String page,
             @AuthenticationPrincipal MemberDetails admin,
             RedirectAttributes redirectAttributes
     ) {
         adminCustomOrderService.startProduction(orderId, requireAdminMemberId(admin));
         redirectAttributes.addFlashAttribute("successMessage", "제작을 시작했습니다.");
-        return "redirect:" + fulfillmentRedirectUrl(condition, page);
+        return "redirect:" + fulfillmentRedirectUrl(condition);
     }
 
     /** 제작 중 수제 주문을 제작 완료 후 픽업 대기로 변경한다. */
@@ -100,13 +96,12 @@ public class FulfillmentAdminController {
     public String completeProduction(
             @PathVariable("orderId") long orderId,
             @ModelAttribute FulfillmentSearchCondition condition,
-            @RequestParam(required = false) String page,
             @AuthenticationPrincipal MemberDetails admin,
             RedirectAttributes redirectAttributes
     ) {
         adminCustomOrderService.completeProduction(orderId, requireAdminMemberId(admin));
         redirectAttributes.addFlashAttribute("successMessage", "제작 완료 후 픽업 대기로 변경했습니다.");
-        return "redirect:" + fulfillmentRedirectUrl(condition, page);
+        return "redirect:" + fulfillmentRedirectUrl(condition);
     }
 
     /** 승인 전 수제 주문을 반려하고 전액 환불한다. */
@@ -114,7 +109,6 @@ public class FulfillmentAdminController {
     public String reject(
             @PathVariable("orderId") long orderId,
             @ModelAttribute FulfillmentSearchCondition condition,
-            @RequestParam(required = false) String page,
             @AuthenticationPrincipal MemberDetails admin,
             @Valid @ModelAttribute CancelForm form,
             BindingResult bindingResult,
@@ -125,7 +119,7 @@ public class FulfillmentAdminController {
         }
         refundFacade.rejectCustomOrder(requireAdminMemberId(admin), orderId, form.getReason());
         redirectAttributes.addFlashAttribute("successMessage", "주문을 반려하고 결제를 환불했습니다.");
-        return "redirect:" + fulfillmentRedirectUrl(condition, page);
+        return "redirect:" + fulfillmentRedirectUrl(condition);
     }
 
     /** 지원하지 않는 작업 단계 검색값을 기본값으로 복구한다. */
@@ -138,16 +132,12 @@ public class FulfillmentAdminController {
         }
     }
 
-    private String fulfillmentRedirectUrl(FulfillmentSearchCondition condition, String page) {
+    private String fulfillmentRedirectUrl(FulfillmentSearchCondition condition) {
         UriComponentsBuilder redirect = UriComponentsBuilder.fromPath("/admin/fulfillment");
         if (condition != null
                 && condition.getStatus() != null
                 && FULFILLMENT_STATUSES.contains(condition.getStatus())) {
             redirect.queryParam("status", condition.getStatus());
-        }
-        Integer requestedPage = parsePositiveInteger(page);
-        if (requestedPage != null && requestedPage > 1) {
-            redirect.queryParam("page", requestedPage);
         }
         return redirect.toUriString();
     }

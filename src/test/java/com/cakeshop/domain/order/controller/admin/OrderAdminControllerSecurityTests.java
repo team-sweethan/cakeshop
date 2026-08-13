@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
 import com.cakeshop.domain.order.controller.admin.OrderAdminController;
 import com.cakeshop.domain.order.service.admin.AdminOrderService;
+import com.cakeshop.domain.order.service.admin.FulfillmentService;
 import com.cakeshop.domain.payment.service.RefundFacade;
 import com.cakeshop.global.security.MemberDetails;
 import com.cakeshop.global.security.SecurityConfig;
@@ -36,6 +37,9 @@ class OrderAdminControllerSecurityTests {
 
     @MockitoBean
     private AdminOrderService orderAdminService;
+
+    @MockitoBean
+    private FulfillmentService fulfillmentService;
 
     @MockitoBean
     private RefundFacade refundFacade;

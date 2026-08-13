@@ -27,6 +27,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class FulfillmentService {
 
+    public static final int PAGE_SIZE = 20;
+
     private static final Set<OrderStatus> FULFILLMENT_STATUSES = Set.of(
             OrderStatus.UNDER_REVIEW,
             OrderStatus.IN_PRODUCTION,
@@ -65,6 +67,16 @@ public class FulfillmentService {
                 selectedStatus,
                 new PageResult<>(orders, normalizedPageRequest, totalOrders)
         );
+    }
+
+    /** 주문 상세에서 해당 주문이 보이는 작업 단계 페이지를 계산한다. */
+    @Transactional(readOnly = true)
+    public int getFulfillmentPage(long orderId, OrderStatus status) {
+        if (orderId <= 0 || normalizeStatus(status) == null) {
+            return 1;
+        }
+        Integer page = orderMapper.findFulfillmentPage(orderId, status, PAGE_SIZE);
+        return page == null ? 1 : page;
     }
 
     /** DONE 결제가 유지되는 픽업 준비 주문만 수령 완료로 원자적으로 변경한다. */

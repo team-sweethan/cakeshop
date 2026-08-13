@@ -22,7 +22,11 @@
     <select id="countPaymentsRequiringAttention" resultType="long">
         SELECT COUNT(*)
         FROM payments AS payment
-        WHERE payment.status IN ('ABORTED', 'EXPIRED')
+        WHERE payment.status = 'ABORTED'
+           OR (
+                payment.status = 'EXPIRED'
+                AND payment.expiration_checked_at IS NULL
+           )
            OR EXISTS (
                 SELECT 1
                 FROM payment_cancellations AS cancellation

@@ -25,6 +25,7 @@
 | `requested_at` | DATETIME(6) |  | X | `CURRENT_TIMESTAMP(6)` | 요청 시각 |
 | `approved_at` | DATETIME(6) | INDEX | O | NULL | 승인 시각 |
 | `canceled_at` | DATETIME(6) |  | O | NULL | 취소 시각 |
+| `expiration_checked_at` | DATETIME(6) |  | O | NULL | 관리자 결제 만료 확인 시각 |
 | `created_at` | DATETIME(6) |  | X | `CURRENT_TIMESTAMP(6)` | 생성 시각 |
 | `updated_at` | DATETIME(6) | INDEX | X | `CURRENT_TIMESTAMP(6)` | 수정 시각, 수정 시 자동 갱신 |
 

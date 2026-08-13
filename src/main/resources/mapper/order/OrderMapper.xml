@@ -387,6 +387,18 @@
         OFFSET #{offset}
     </select>
 
+    <select id="findFulfillmentPage" resultType="int">
+        SELECT ranked_orders.page
+        FROM (
+            SELECT
+                id,
+                FLOOR((ROW_NUMBER() OVER (ORDER BY pickup_at, created_at, id) - 1) / #{size}) + 1 AS page
+            FROM orders
+            WHERE status = #{status}
+        ) AS ranked_orders
+        WHERE ranked_orders.id = #{orderId}
+    </select>
+
     <select id="findOverduePendingOrderIds" resultType="long">
         SELECT id
           FROM orders

@@ -86,6 +86,13 @@ public interface OrderMapper {
             @Param("offset") int offset
     );
 
+    /** 작업 단계 목록에서 대상 주문이 위치한 페이지를 조회한다. */
+    Integer findFulfillmentPage(
+            @Param("orderId") long orderId,
+            @Param("status") OrderStatus status,
+            @Param("size") int size
+    );
+
     /** 기준 시각까지 결제되지 않은 PENDING_PAYMENT 주문 식별자를 오래된 순으로 조회한다. */
     List<Long> findOverduePendingOrderIds(
             @Param("now") LocalDateTime now,

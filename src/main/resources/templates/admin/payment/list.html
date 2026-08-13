@@ -12,6 +12,7 @@
   <div class="admin-main">
     <header th:replace="~{fragments/admin/header :: header('결제 기록')}"></header>
     <main class="admin-content">
+      <div th:replace="~{fragments/common/alert :: alert}"></div>
       <div class="admin-content__header payment-admin-header">
         <div>
           <p class="payment-admin-eyebrow">PAYMENT RECORDS</p>
@@ -37,8 +38,7 @@
         </article>
         <article class="metric-card payment-metric--attention">
           <p>확인 필요</p>
-          <strong data-payment-attention-count
-                  th:text="|${paymentList.summary.attentionCount}건|">0건</strong>
+          <strong th:text="|${paymentList.summary.attentionCount}건|">0건</strong>
         </article>
       </section>
 
@@ -130,11 +130,19 @@
               </td>
               <td>
                 <div class="payment-row-actions">
-                  <label class="payment-expiration-check"
-                         th:if="${payment.status.name() == 'EXPIRED'}">
-                    <input type="checkbox" data-payment-expiration-check>
-                    <span>만료 확인</span>
-                  </label>
+                  <form th:if="${payment.status.name() == 'EXPIRED'}"
+                        method="post"
+                        th:action="@{/admin/payments/{id}/expiration-check(id=${payment.paymentId})}">
+                    <input type="hidden" name="status"
+                           th:if="${paymentList.selectedStatus != null}"
+                           th:value="${paymentList.selectedStatus}">
+                    <label class="payment-expiration-check">
+                      <input type="checkbox" name="checked" value="true"
+                             th:checked="${payment.expirationChecked}"
+                             data-payment-expiration-check>
+                      <span>만료 확인</span>
+                    </label>
+                  </form>
                   <a class="btn" th:href="@{/admin/orders/{id}(id=${payment.orderId})}">
                     전체 주문 보기
                   </a>

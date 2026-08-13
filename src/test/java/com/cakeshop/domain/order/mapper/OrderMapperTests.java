@@ -162,6 +162,11 @@ class OrderMapperTests {
         assertThat(orderMapper.findFulfillmentOrders(OrderStatus.READY_FOR_PICKUP, 20, 0))
                 .extracting(Order::getId)
                 .containsExactly(laterReady.getId(), anotherDate.getId());
+        assertThat(orderMapper.findFulfillmentPage(
+                anotherDate.getId(),
+                OrderStatus.READY_FOR_PICKUP,
+                1
+        )).isEqualTo(2);
         assertThat(orderMapper.findFulfillmentOrders(OrderStatus.UNDER_REVIEW, 20, 0))
                 .extracting(Order::getId)
                 .containsExactly(futureUnderReview.getId());

@@ -7,6 +7,7 @@ import com.cakeshop.domain.payment.dto.view.PaymentAdminListRow;
 import com.cakeshop.domain.payment.dto.view.PaymentAdminListView;
 import com.cakeshop.domain.payment.dto.view.PaymentAdminPaymentRow;
 import com.cakeshop.domain.payment.dto.view.PaymentAdminSummaryView;
+import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.entity.PaymentStatus;
 import com.cakeshop.domain.payment.mapper.PaymentMapper;
 import com.cakeshop.global.error.BusinessException;
@@ -43,6 +44,21 @@ public class PaymentAdminService {
         );
     }
 
+    /** 결제 만료 건의 관리자 확인 여부를 변경한다. */
+    @Transactional
+    public void updateExpirationCheck(long paymentId, boolean checked) {
+        Payment payment = paymentMapper.findPaymentById(paymentId)
+                .orElseThrow(() -> new BusinessException(CommonErrorCode.NOT_FOUND));
+        if (payment.getStatus() != PaymentStatus.EXPIRED) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+        if (checked) {
+            paymentMapper.markExpirationCheckedIfExpired(paymentId);
+            return;
+        }
+        paymentMapper.clearExpirationCheckedIfExpired(paymentId);
+    }
+
     private PaymentAdminListRow toListRow(
             PaymentAdminPaymentRow payment,
             Map<Long, OrderPaymentAdminView> ordersById
@@ -65,7 +81,8 @@ public class PaymentAdminService {
                 payment.cancellationRequestType(),
                 payment.requestedAt(),
                 payment.approvedAt(),
-                payment.canceledAt()
+                payment.canceledAt(),
+                payment.expirationCheckedAt()
         );
     }
 }

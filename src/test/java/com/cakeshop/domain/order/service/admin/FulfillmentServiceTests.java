@@ -140,6 +140,16 @@ class FulfillmentServiceTests {
                 .satisfies(view -> assertThat(view.pickupCompletable()).isFalse());
     }
 
+    @Test
+    void getFulfillmentPage_orderOnSecondPage_returnsPageNumber() {
+        when(orderMapper.findFulfillmentPage(10L, OrderStatus.READY_FOR_PICKUP, 20))
+                .thenReturn(2);
+
+        int page = fulfillmentService.getFulfillmentPage(10L, OrderStatus.READY_FOR_PICKUP);
+
+        assertThat(page).isEqualTo(2);
+    }
+
     private Order order(OrderStatus status) {
         Order order = new Order();
         order.setId(10L);

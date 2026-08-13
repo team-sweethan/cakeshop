@@ -126,7 +126,8 @@ class FulfillmentAdminControllerTests {
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
                 mockMvc.perform(post("/admin/fulfillment/10/pickup")
-                        .param("status", "READY_FOR_PICKUP"))
+                        .param("status", "READY_FOR_PICKUP")
+                        .param("page", "2"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/admin/fulfillment?status=READY_FOR_PICKUP"))
                 .andExpect(flash().attribute("successMessage", "픽업 완료로 변경했습니다."));

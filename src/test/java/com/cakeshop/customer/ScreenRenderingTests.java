@@ -620,6 +620,34 @@ class ScreenRenderingTests {
         value = "admin@cakeshop.local",
         userDetailsServiceBeanName = "memberDetailsService"
     )
+    void paymentAdminScreen_expiredPayment_rendersPersistentCheckForm()
+            throws Exception {
+        long orderId = createGeneralOrder();
+        long paymentId = jdbcTemplate.queryForObject(
+                "SELECT id FROM payments WHERE order_id = ?",
+                Long.class,
+                orderId
+        );
+        jdbcTemplate.update(
+                "UPDATE payments SET status = 'EXPIRED', provider_status = 'EXPIRED' WHERE id = ?",
+                paymentId
+        );
+
+        mockMvc.perform(get("/admin/payments").param("status", "EXPIRED"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(
+                        "/admin/payments/" + paymentId + "/expiration-check"
+                )))
+                .andExpect(content().string(containsString("name=\"checked\"")))
+                .andExpect(content().string(containsString("만료 확인")));
+    }
+
+    @Test
+    @Transactional
+    @WithUserDetails(
+        value = "admin@cakeshop.local",
+        userDetailsServiceBeanName = "memberDetailsService"
+    )
     void adminOrderList_rendersOrderTypeAndWorkspaceGuidance() throws Exception {
         createGeneralOrder();
 
@@ -671,7 +699,7 @@ class ScreenRenderingTests {
             .andExpect(content().string(containsString("주문·결제 취소")))
             .andExpect(content().string(containsString("주문 처리에서 열기")))
             .andExpect(content().string(containsString(
-                "/admin/fulfillment?status=READY_FOR_PICKUP"
+                "/admin/fulfillment?status=READY_FOR_PICKUP&amp;page=1"
             )))
             .andExpect(content().string(not(containsString(
                 "/admin/orders/" + orderId + "/pickup"
