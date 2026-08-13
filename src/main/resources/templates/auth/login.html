@@ -15,7 +15,10 @@
 <main class="page-container page-container--narrow">
   <section class="panel auth-card section">
     <h1>로그인</h1>
-    <p class="alert alert--error" th:if="${param.error}">이메일 또는 비밀번호가 올바르지 않습니다.</p>
+    <p class="alert alert--error" th:if="${param.error}"
+       role="alert" tabindex="-1" data-login-error>
+      이메일 또는 비밀번호가 올바르지 않습니다.
+    </p>
 
     <!-- 인증 과정: POST /login은 컨트롤러가 아니라 Spring Security Filter가 처리한다. -->
     <form class="form-stack" th:action="@{/login}" method="post">
@@ -23,7 +26,7 @@
       <div class="form-group">
         <label for="email">이메일</label>
         <input id="email" class="form-control" type="email" name="email"
-               th:value="${recoveredEmail}" autocomplete="username" required autofocus>
+               th:value="${recoveredEmail}" autocomplete="username" required>
       </div>
       <div class="form-group">
         <label for="password">비밀번호</label>
@@ -36,8 +39,14 @@
       </label>
       <button class="btn btn--primary btn--block" type="submit">로그인</button>
     </form>
-    <p class="alert alert--error" th:if="${param.oauthError}">소셜 로그인을 진행할 수 없습니다. 다시 시도해 주세요.</p>
-    <p class="alert alert--error" th:if="${param.oauthAccountExists}">이미 가입된 이메일입니다. 일반 로그인을 이용해 주세요.</p>
+    <p class="alert alert--error" th:if="${param.oauthError}"
+       role="alert" tabindex="-1" data-login-error>
+      소셜 로그인을 진행할 수 없습니다. 다시 시도해 주세요.
+    </p>
+    <p class="alert alert--error" th:if="${param.oauthAccountExists}"
+       role="alert" tabindex="-1" data-login-error>
+      이미 가입된 이메일입니다. 일반 로그인을 이용해 주세요.
+    </p>
     <a class="btn btn--block" th:if="${@environment.getProperty('app.member.oauth.google-enabled', false)}"
        th:href="@{/oauth2/authorization/google}">Google로 로그인</a>
     <a class="btn btn--block" th:if="${@environment.getProperty('app.member.oauth.kakao-enabled', false)}"
@@ -58,6 +67,7 @@
   const loginForm = document.querySelector('form[action$="/login"]');
   const emailInput = document.getElementById('email');
   const rememberEmailCheckbox = document.getElementById('remember-email');
+  const loginError = document.querySelector('[data-login-error]');
 
   try {
     const rememberedEmail = window.localStorage.getItem(rememberedEmailKey);
@@ -69,6 +79,12 @@
     }
   } catch (error) {
     // 브라우저가 로컬 저장소를 차단해도 로그인 자체는 정상적으로 진행한다.
+  }
+
+  if (loginError) {
+    loginError.focus();
+  } else {
+    emailInput.focus();
   }
 
   loginForm.addEventListener('submit', () => {
