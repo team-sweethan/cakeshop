@@ -28,6 +28,18 @@
             aggregated_at = VALUES(aggregated_at)
     </insert>
 
+    <update id="updateDailyAdditionalMetrics">
+        UPDATE daily_statistics
+        SET new_member_count = #{source.newMemberCount},
+            withdrawn_member_count = #{source.withdrawnMemberCount},
+            new_post_count = #{source.newPostCount},
+            coupon_usage_count = #{source.couponUsageCount},
+            refund_amount = #{source.refundAmount},
+            valid_payment_order_count = #{source.validPaymentOrderCount},
+            additional_metrics_aggregated_at = CURRENT_TIMESTAMP(6)
+        WHERE statistics_date = #{statisticsDate}
+    </update>
+
     <delete id="deleteDailyProductStatistics">
         DELETE FROM daily_product_statistics
         WHERE statistics_date = #{statisticsDate}

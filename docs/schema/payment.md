@@ -70,6 +70,8 @@
 - CHECK: `cancel_amount > 0`
 - INDEX: `idx_payment_cancellations_status` (`status`)
 - INDEX: `idx_payment_cancellations_requested_by` (`requested_by`)
+- INDEX: `idx_payment_cancellations_status_canceled_at` (`status`, `canceled_at`)
+- INDEX: `idx_payment_cancellations_updated_at_canceled_at` (`updated_at`, `canceled_at`)
 
 ## 관련 migration
 
@@ -78,4 +80,5 @@
 - `V20260730_170822__add_payment_request_guards.sql`
 - `V20260731_091629__unify_active_payment_guard.sql`
 - `V20260810_200833__add_statistics_source_indexes.sql`
+- `V20260813_094912__add_statistics_additional_metrics.sql`
 - `V20260813_104053__add_payment_expiration_check.sql`

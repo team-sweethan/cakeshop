@@ -76,6 +76,8 @@ class StatisticsRebuildServiceTests {
         assertThat(countDailyStatisticsBetween(yesterday.minusDays(2), yesterday)).isEqualTo(3);
         assertThat(countCompletedProductStatisticsBetween(yesterday.minusDays(2), yesterday))
                 .isEqualTo(3);
+        assertThat(countCompletedAdditionalMetricsBetween(yesterday.minusDays(2), yesterday))
+                .isEqualTo(3);
         BatchRunRow run = findLatestRebuildRun();
         assertThat(run.status()).isEqualTo("SUCCEEDED");
         assertThat(run.targetStartDate()).isEqualTo(yesterday.minusDays(2));
@@ -251,6 +253,20 @@ class StatisticsRebuildServiceTests {
                 FROM daily_statistics
                 WHERE statistics_date BETWEEN ? AND ?
                   AND product_aggregated_at IS NOT NULL
+                """,
+                Integer.class,
+                startDate,
+                endDate
+        );
+    }
+
+    private int countCompletedAdditionalMetricsBetween(LocalDate startDate, LocalDate endDate) {
+        return jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM daily_statistics
+                WHERE statistics_date BETWEEN ? AND ?
+                  AND additional_metrics_aggregated_at IS NOT NULL
                 """,
                 Integer.class,
                 startDate,

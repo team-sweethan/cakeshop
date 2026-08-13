@@ -68,6 +68,7 @@ import com.cakeshop.domain.statistics.controller.StatisticsAdminController;
 import com.cakeshop.domain.statistics.dto.view.PeriodStatisticsView;
 import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
 import com.cakeshop.domain.statistics.service.DashboardReadModelQueryService;
+import com.cakeshop.domain.statistics.service.AdditionalMetricsReadModelQueryService;
 import com.cakeshop.domain.statistics.service.PeriodStatisticsReadModelQueryService;
 import com.cakeshop.domain.statistics.service.ProductPeriodStatisticsReadModelQueryService;
 
@@ -137,6 +138,8 @@ class AdminPageControllerTests {
                 Mockito.mock(PeriodStatisticsReadModelQueryService.class);
         ProductPeriodStatisticsReadModelQueryService productStatisticsQueryService =
                 Mockito.mock(ProductPeriodStatisticsReadModelQueryService.class);
+        AdditionalMetricsReadModelQueryService additionalMetricsQueryService =
+                Mockito.mock(AdditionalMetricsReadModelQueryService.class);
 
         ReviewAdminService reviewAdminService = Mockito.mock(ReviewAdminService.class);
         when(reviewAdminService.getReviews(any(), any(), any(), any(), any(PageRequest.class)))
@@ -184,7 +187,8 @@ class AdminPageControllerTests {
                 new StatisticsAdminController(
                         dashboardReadModelQueryService,
                         periodStatisticsReadModelQueryService,
-                        productStatisticsQueryService
+                        productStatisticsQueryService,
+                        additionalMetricsQueryService
                 ),
                 new ProductAdminController(
                         Mockito.mock(ProductAdminService.class)),

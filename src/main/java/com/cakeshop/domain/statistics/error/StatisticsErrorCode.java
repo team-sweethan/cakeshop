@@ -10,6 +10,11 @@ public enum StatisticsErrorCode implements ErrorCode {
             "STATISTICS_003",
             "선택한 기간의 상품별 통계 집계가 완료되지 않았습니다.",
             409
+    ),
+    ADDITIONAL_METRICS_NOT_READY(
+            "STATISTICS_004",
+            "선택한 기간의 기타 지표 집계가 완료되지 않았습니다.",
+            409
     );
 
     private final String code;
