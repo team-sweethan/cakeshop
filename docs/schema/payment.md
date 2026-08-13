@@ -37,6 +37,8 @@
 - INDEX: `idx_payments_status` (`status`)
 - INDEX: `idx_payments_status_approved_at` (`status`, `approved_at`)
 - INDEX: `idx_payments_updated_at_approved_at` (`updated_at`, `approved_at`)
+- `expiration_checked_at`이 `NULL`이면 미확인 만료 결제이며, 시각이 있으면 관리자가 확인한 만료 결제다.
+  이 값은 결제 기록과 관리자 대시보드의 `확인 필요` 집계에서 `EXPIRED` 결제를 제외하는 기준으로 쓴다.
 
 ## `payment_cancellations`
 
@@ -76,3 +78,4 @@
 - `V20260730_170822__add_payment_request_guards.sql`
 - `V20260731_091629__unify_active_payment_guard.sql`
 - `V20260810_200833__add_statistics_source_indexes.sql`
+- `V20260813_104053__add_payment_expiration_check.sql`
