@@ -184,38 +184,20 @@ class CommunityScreenRenderingTests {
                 .andExpect(content().string(not(containsString("로그인하면 댓글을 쓸 수 있습니다."))));
     }
 
-    /** 게시글 HTML을 이스케이프한다. */
     @Test
-    void communityDetail_htmlInContent_isEscaped() throws Exception {
-        String attack = "<script>alert('xss')</script>";
-        long postId = insertPost(memberId, "제목", attack, PostStatus.PUBLISHED);
-
-        mockMvc.perform(get("/community/" + postId))
-                .andExpect(status().isOk())
-                .andExpect(content().string(not(containsString(attack))))
-                .andExpect(content().string(containsString("&lt;script&gt;")));
-    }
-
-    @Test
-    void communityDetail_titleWithHtml_isEscaped() throws Exception {
+    void communityDetail_htmlInTitleContentAndComment_isEscaped() throws Exception {
+        String contentAttack = "<script>alert('xss')</script>";
+        String commentAttack = "<script>alert('comment')</script>";
         long postId = insertPost(
-                memberId, "<img src=x onerror=alert(1)>", "본문", PostStatus.PUBLISHED);
+                memberId, "<img src=x onerror=alert(1)>", contentAttack, PostStatus.PUBLISHED);
+        insertComment(postId, memberId, commentAttack, CommentStatus.PUBLISHED, BASE_TIME);
 
         mockMvc.perform(get("/community/" + postId))
                 .andExpect(status().isOk())
-                .andExpect(content().string(not(containsString("<img src=x"))));
-    }
-
-    /** 댓글 HTML을 이스케이프한다. */
-    @Test
-    void communityDetail_htmlInComment_isEscaped() throws Exception {
-        String attack = "<script>alert('comment')</script>";
-        long postId = insertPost(memberId, "글", "본문", PostStatus.PUBLISHED);
-        insertComment(postId, memberId, attack, CommentStatus.PUBLISHED, BASE_TIME);
-
-        mockMvc.perform(get("/community/" + postId))
-                .andExpect(status().isOk())
-                .andExpect(content().string(not(containsString(attack))))
+                .andExpect(content().string(not(containsString("<img src=x"))))
+                .andExpect(content().string(not(containsString(contentAttack))))
+                .andExpect(content().string(not(containsString(commentAttack))))
+                .andExpect(content().string(containsString("&lt;img src=x")))
                 .andExpect(content().string(containsString("&lt;script&gt;")));
     }
 
