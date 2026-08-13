@@ -79,19 +79,19 @@ public class CartService {
                 .filter(CartItemView::available)
                 .map(item -> item.optionPrice().multiply(BigDecimal.valueOf(item.quantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        int totalQuantity = itemViews.stream().mapToInt(CartItemView::quantity).sum();
+        int itemCount = itemViews.size();
 
         return new CartView(
                 itemViews,
-                totalQuantity,
+                itemCount,
                 baseTotal,
                 optionTotal,
                 baseTotal.add(optionTotal));
     }
 
     @Transactional(readOnly = true)
-    public int getTotalQuantity(long memberId) {
-        return cartMapper.sumQuantityByMemberId(memberId);
+    public int getItemCount(long memberId) {
+        return cartMapper.countItemsByMemberId(memberId);
     }
 
     @Transactional

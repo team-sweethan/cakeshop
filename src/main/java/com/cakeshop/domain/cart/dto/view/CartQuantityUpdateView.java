@@ -8,7 +8,7 @@ public record CartQuantityUpdateView(
         int quantity,
         boolean available,
         BigDecimal itemTotal,
-        int totalQuantity,
+        int itemCount,
         BigDecimal baseTotal,
         BigDecimal optionTotal,
         BigDecimal grandTotal,
@@ -22,7 +22,7 @@ public record CartQuantityUpdateView(
                 .orElseThrow();
 
         return new CartQuantityUpdateView(
-                item.id(), item.quantity(), item.available(), item.totalPrice(), cart.totalQuantity(),
+                item.id(), item.quantity(), item.available(), item.totalPrice(), cart.itemCount(),
                 cart.baseTotal(), cart.optionTotal(), cart.grandTotal(),
                 cart.items().stream()
                         .map(candidate -> new CartItemAvailabilityView(

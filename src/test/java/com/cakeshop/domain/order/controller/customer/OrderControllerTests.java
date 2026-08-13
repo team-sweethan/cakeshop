@@ -5,6 +5,7 @@ import com.cakeshop.domain.member.dto.view.MemberProfileView;
 import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.coupon.service.CouponOrderQueryService;
 import com.cakeshop.domain.order.dto.view.customer.CustomOrderCheckoutView;
+import com.cakeshop.domain.order.dto.view.customer.CartOrderCheckoutView;
 import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
 import com.cakeshop.domain.order.service.customer.CustomerCustomOrderService;
@@ -13,6 +14,7 @@ import com.cakeshop.domain.order.service.customer.OrderCustomerService;
 import com.cakeshop.domain.order.service.OrderService;
 import com.cakeshop.domain.payment.service.RefundFacade;
 import com.cakeshop.domain.product.service.ProductQueryService;
+import com.cakeshop.domain.cart.service.CartOrderQueryService;
 import com.cakeshop.global.security.MemberDetails;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,6 +45,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
@@ -74,6 +77,9 @@ class OrderControllerTests {
     @Mock
     private ProductQueryService productQueryService;
 
+    @Mock
+    private CartOrderQueryService cartOrderQueryService;
+
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -87,7 +93,8 @@ class OrderControllerTests {
                                 refundFacade,
                                 couponOrderQueryService,
                                 customerCustomOrderService,
-                                productQueryService
+                                productQueryService,
+                                cartOrderQueryService
                         )
                 )
                 .setCustomArgumentResolvers(
@@ -160,6 +167,37 @@ class OrderControllerTests {
                 2,
                 List.of(101L, 102L)
         );
+    }
+
+    @Test
+    void cartCheckout_withoutSelectedItems_redirectsToCartWithMessage() throws Exception {
+        mockMvc.perform(get("/orders/checkout/cart"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/cart"))
+                .andExpect(flash().attribute("errorMessage", "주문할 상품을 선택해 주세요."));
+    }
+
+    @Test
+    void createCartOrder_validationFailure_keepsUncheckedSameAsOrderer() throws Exception {
+        CartOrderCheckoutView checkout = new CartOrderCheckoutView(
+                List.of(), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, List.of()
+        );
+        when(cartOrderQueryService.getSelectedOrderItems(10L, List.of(1L))).thenReturn(List.of());
+        when(orderCheckoutService.getCartCheckout(List.of())).thenReturn(checkout);
+
+        mockMvc.perform(post("/orders/general/cart")
+                        .param("requestKey", UUID.randomUUID().toString())
+                        .param("cartItemIds", "1")
+                        .param("displayedOriginalAmount", "10000")
+                        .param("ordererName", "홍길동")
+                        .param("ordererPhone", "010-1111-2222")
+                        .param("pickupName", "김픽업")
+                        .param("pickupPhone", "010-3333-4444")
+                        .param("_sameAsOrderer", "on"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("customer/order/cart-form"))
+                .andExpect(model().attribute("orderForm", hasProperty("sameAsOrderer", equalTo(false))))
+                .andExpect(model().attributeHasErrors("orderForm"));
     }
 
     @Test

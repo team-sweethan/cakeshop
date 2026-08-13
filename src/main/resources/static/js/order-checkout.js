@@ -72,7 +72,9 @@
   }
 
   function initializeSingleSubmit() {
-    const form = document.querySelector("form[action$='/orders/general']");
+    const form = document.querySelector(
+      "form[action$='/orders/general'], form[action$='/orders/general/cart']"
+    );
     if (!form) return;
 
     form.addEventListener("submit", function () {

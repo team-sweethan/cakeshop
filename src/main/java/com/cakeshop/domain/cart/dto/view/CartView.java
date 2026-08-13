@@ -5,7 +5,7 @@ import java.util.List;
 
 public record CartView(
         List<CartItemView> items,
-        int totalQuantity,
+        int itemCount,
         BigDecimal baseTotal,
         BigDecimal optionTotal,
         BigDecimal grandTotal

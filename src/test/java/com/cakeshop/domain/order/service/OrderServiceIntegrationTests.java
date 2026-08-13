@@ -1,6 +1,7 @@
 package com.cakeshop.domain.order.service;
 
 import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
+import com.cakeshop.domain.cart.service.CartOrderQueryService;
 import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.member.service.MemberCouponQueryService;
 import com.cakeshop.domain.order.dto.form.customer.GeneralOrderForm;
@@ -61,6 +62,9 @@ class OrderServiceIntegrationTests {
 
     @MockitoBean
     private CouponOrderCommandService couponOrderCommandService;
+
+    @MockitoBean
+    private CartOrderQueryService cartOrderQueryService;
 
     private static final ZoneId TEST_ZONE = ZoneId.of("Asia/Seoul");
     private static final LocalDateTime FIXED_NOW =

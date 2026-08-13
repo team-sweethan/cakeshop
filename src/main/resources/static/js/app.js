@@ -15,7 +15,7 @@ async function loadCartCount() {
     });
     if (!response.ok) return;
     const cart = await response.json();
-    updateCartCount(cart.totalQuantity);
+    updateCartCount(cart.itemCount);
   } catch (error) {
     // 헤더 보조 정보 조회 실패는 현재 화면 사용을 막지 않는다.
   }

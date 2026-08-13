@@ -1,6 +1,7 @@
 package com.cakeshop.domain.payment.service;
 
 import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
+import com.cakeshop.domain.cart.service.CartOrderQueryService;
 import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.member.service.MemberCouponQueryService;
@@ -69,6 +70,9 @@ class PaymentCompletionIntegrationTests {
 
     @MockitoBean
     private CouponOrderCommandService couponOrderCommandService;
+
+    @MockitoBean
+    private CartOrderQueryService cartOrderQueryService;
 
     private static final LocalDateTime APPROVED_AT =
             LocalDateTime.of(2026, 8, 1, 12, 0);
