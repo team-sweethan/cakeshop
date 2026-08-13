@@ -75,6 +75,9 @@ class FulfillmentServiceTests {
         Order order = order(OrderStatus.READY_FOR_PICKUP);
         OrderItem item = item();
         OrderItemOption option = option();
+        order.setOrderType(OrderType.CUSTOM);
+        order.setRequestMessage("초는 하늘색으로");
+        item.setRequirements("생일 축하해");
         when(orderMapper.findFulfillmentOrders(
                 LocalDate.of(2026, 8, 2).atStartOfDay(),
                 LocalDate.of(2026, 8, 3).atStartOfDay(),
@@ -91,8 +94,10 @@ class FulfillmentServiceTests {
             assertThat(view.orderNumber()).isEqualTo("ORD-10");
             assertThat(view.statusLabel()).isEqualTo("픽업 준비");
             assertThat(view.pickupCompletable()).isTrue();
+            assertThat(view.requestMessage()).isEqualTo("초는 하늘색으로");
             assertThat(view.items()).singleElement().satisfies(itemView -> {
                 assertThat(itemView.productName()).isEqualTo("딸기 케이크");
+                assertThat(itemView.requirements()).isEqualTo("생일 축하해");
                 assertThat(itemView.optionSummary()).isEqualTo("크기: 2호");
             });
         });

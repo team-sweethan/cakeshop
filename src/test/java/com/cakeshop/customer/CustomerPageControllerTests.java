@@ -274,7 +274,8 @@ class CustomerPageControllerTests {
                         "data-product-option-groups",
                         "th:if=\"${product.productType.name() == 'GENERAL'}\""
                 )
-                .contains("th:href=\"@{/orders/custom/options(productId=${product.id})}\"");
+                .contains("th:href=\"@{/orders/custom/options(productId=${product.id})}\"")
+                .doesNotContain("th:href=\"@{/orders/custom/options}\"");
     }
 
     @Test

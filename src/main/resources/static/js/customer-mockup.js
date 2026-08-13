@@ -672,8 +672,17 @@
     }
     const customEdit = event.target.closest("[data-cart-custom-edit]");
     if (customEdit && row) {
+      const item = currentItems().find(function (current) { return current.id === row.dataset.cartId; });
+      const productId = Number(item && item.productId);
+      if (!Number.isSafeInteger(productId) || productId <= 0) {
+        showError("수제 케이크 옵션은 상품 상세에서 다시 선택해 주세요.");
+        return;
+      }
       try { sessionStorage.setItem("cakeShopCartPickupTarget", row.dataset.cartId); } catch (error) { /* 세션 저장소 미지원 */ }
-      location.href = "/orders/custom/options?intent=cart-edit";
+      const url = new URL("/orders/custom/options", location.origin);
+      url.searchParams.set("productId", String(productId));
+      url.searchParams.set("intent", "cart-edit");
+      location.href = url.toString();
     }
     if (event.target.closest("[data-cart-delete-selected]")) {
       if (!selected.size) { showError("삭제할 상품을 선택해 주세요."); return; }
