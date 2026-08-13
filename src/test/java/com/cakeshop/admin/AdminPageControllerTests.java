@@ -99,10 +99,10 @@ class AdminPageControllerTests {
 
         FulfillmentService fulfillmentService =
                 Mockito.mock(FulfillmentService.class);
-        when(fulfillmentService.getFulfillments(any()))
+        when(fulfillmentService.getFulfillments(any(), any()))
                 .thenReturn(new FulfillmentListView(
                         null,
-                        List.of()
+                        new PageResult<>(List.of(), new PageRequest(null, null), 0)
                 ));
 
         PaymentAdminService paymentAdminQueryService =

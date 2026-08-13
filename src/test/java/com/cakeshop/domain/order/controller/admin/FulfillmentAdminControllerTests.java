@@ -19,6 +19,8 @@ import com.cakeshop.domain.order.controller.admin.FulfillmentAdminController;
 import com.cakeshop.domain.order.service.admin.FulfillmentService;
 import com.cakeshop.domain.order.service.admin.AdminCustomOrderService;
 import com.cakeshop.domain.payment.service.RefundFacade;
+import com.cakeshop.global.common.paging.PageRequest;
+import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.security.MemberDetails;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -65,31 +67,34 @@ class FulfillmentAdminControllerTests {
     void fulfillment_validCondition_addsActualFulfillmentView() throws Exception {
         FulfillmentListView fulfillment = new FulfillmentListView(
                 OrderStatus.READY_FOR_PICKUP,
-                List.of()
+                new PageResult<>(List.of(), new PageRequest(2, 20), 30)
         );
-        when(fulfillmentService.getFulfillments(any())).thenReturn(fulfillment);
+        when(fulfillmentService.getFulfillments(any(), any())).thenReturn(fulfillment);
 
         mockMvc.perform(get("/admin/fulfillment")
-                        .param("status", "READY_FOR_PICKUP"))
+                        .param("status", "READY_FOR_PICKUP")
+                        .param("page", "2"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("admin/fulfillment/list"))
                 .andExpect(model().attribute("fulfillment", fulfillment));
 
         ArgumentCaptor<FulfillmentSearchCondition> condition =
                 ArgumentCaptor.forClass(FulfillmentSearchCondition.class);
-        verify(fulfillmentService).getFulfillments(condition.capture());
+        ArgumentCaptor<PageRequest> pageRequest = ArgumentCaptor.forClass(PageRequest.class);
+        verify(fulfillmentService).getFulfillments(condition.capture(), pageRequest.capture());
         org.assertj.core.api.Assertions.assertThat(condition.getValue().getStatus())
                 .isEqualTo(OrderStatus.READY_FOR_PICKUP);
+        org.assertj.core.api.Assertions.assertThat(pageRequest.getValue().getPage()).isEqualTo(2);
     }
 
     @Test
     void fulfillment_invalidCondition_recoversToDefaultSearch() throws Exception {
         FulfillmentListView fulfillment = new FulfillmentListView(
                 null,
-                List.of()
+                new PageResult<>(List.of(), new PageRequest(null, null), 0)
         );
         AtomicReference<OrderStatus> capturedStatus = new AtomicReference<>();
-        when(fulfillmentService.getFulfillments(any())).thenAnswer(invocation -> {
+        when(fulfillmentService.getFulfillments(any(), any())).thenAnswer(invocation -> {
             FulfillmentSearchCondition condition = invocation.getArgument(0);
             capturedStatus.set(condition.getStatus());
             return fulfillment;

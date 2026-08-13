@@ -41,14 +41,14 @@
       <p class="note order-workspace__scope-note">모든 단계의 주문을 기간 제한 없이 확인합니다.</p>
 
       <div class="panel empty-state"
-           th:if="${#lists.isEmpty(fulfillment.orders)}">
+           th:if="${#lists.isEmpty(fulfillment.orders.content)}">
         현재 조건에 맞는 처리 대상 주문이 없습니다.
       </div>
 
       <div class="fulfillment-list"
-           th:unless="${#lists.isEmpty(fulfillment.orders)}">
+           th:unless="${#lists.isEmpty(fulfillment.orders.content)}">
         <details class="fulfillment-order"
-                 th:each="order : ${fulfillment.orders}"
+                 th:each="order : ${fulfillment.orders.content}"
                  th:id="|fulfillment-order-${order.orderId}|"
                  th:attr="data-order-id=${order.orderId}">
           <summary class="fulfillment-order__summary">
@@ -111,6 +111,7 @@
                 <input type="hidden" name="status"
                        th:if="${fulfillment.selectedStatus != null}"
                        th:value="${fulfillment.selectedStatus}">
+                <input type="hidden" name="page" th:value="${fulfillment.orders.page}">
                 <button class="btn btn--primary" type="submit"
                         data-confirm="제작을 시작하면 고객 취소가 불가능합니다. 계속하시겠습니까?">
                   제작 승인·시작
@@ -121,6 +122,7 @@
                 <input type="hidden" name="status"
                        th:if="${fulfillment.selectedStatus != null}"
                        th:value="${fulfillment.selectedStatus}">
+                <input type="hidden" name="page" th:value="${fulfillment.orders.page}">
                 <textarea class="form-control form-control--textarea" name="reason"
                           maxlength="200" required placeholder="반려 사유"></textarea>
                 <button class="btn btn--danger" type="submit"
@@ -133,6 +135,7 @@
                 <input type="hidden" name="status"
                        th:if="${fulfillment.selectedStatus != null}"
                        th:value="${fulfillment.selectedStatus}">
+                <input type="hidden" name="page" th:value="${fulfillment.orders.page}">
                 <button class="btn btn--primary" type="submit"
                         data-confirm="제작을 완료하고 픽업 대기로 변경하시겠습니까?">
                   제작 완료
@@ -143,6 +146,7 @@
                 <input type="hidden" name="status"
                        th:if="${fulfillment.selectedStatus != null}"
                        th:value="${fulfillment.selectedStatus}">
+                <input type="hidden" name="page" th:value="${fulfillment.orders.page}">
                 <button class="btn btn--primary" type="submit"
                         data-confirm="픽업 완료 처리 후에는 되돌릴 수 없습니다. 처리하시겠습니까?">
                   픽업 완료 처리
@@ -152,6 +156,21 @@
           </div>
         </details>
       </div>
+
+      <nav class="cluster fulfillment-pagination"
+           th:if="${fulfillment.orders.totalPages > 1}"
+           aria-label="주문 처리 페이지">
+        <a class="btn"
+           th:if="${fulfillment.orders.page > 1}"
+           th:href="@{/admin/fulfillment(status=${fulfillment.selectedStatus}, page=${fulfillment.orders.page - 1})}">이전</a>
+        <span class="btn btn--disabled" th:unless="${fulfillment.orders.page > 1}">이전</span>
+        <span th:text="|${fulfillment.orders.page} / ${fulfillment.orders.totalPages}|">1 / 1</span>
+        <a class="btn"
+           th:if="${fulfillment.orders.page < fulfillment.orders.totalPages}"
+           th:href="@{/admin/fulfillment(status=${fulfillment.selectedStatus}, page=${fulfillment.orders.page + 1})}">다음</a>
+        <span class="btn btn--disabled"
+              th:unless="${fulfillment.orders.page < fulfillment.orders.totalPages}">다음</span>
+      </nav>
     </main>
   </div>
 </div>

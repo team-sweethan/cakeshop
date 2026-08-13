@@ -146,22 +146,26 @@ class OrderMapperTests {
         futureInProduction.setPickupAt(LocalDateTime.of(2026, 8, 12, 11, 0));
         orderMapper.insertOrder(futureInProduction);
 
-        assertThat(orderMapper.findFulfillmentOrders(null))
+        assertThat(orderMapper.countFulfillmentOrders(null)).isEqualTo(5L);
+        assertThat(orderMapper.findFulfillmentOrders(null, 2, 0))
                 .extracting(Order::getId)
                 .containsExactly(
                         futureUnderReview.getId(),
-                        futureInProduction.getId(),
-                        laterReady.getId(),
-                        anotherDate.getId(),
-                        earlierPickedUp.getId()
+                        futureInProduction.getId()
                 );
-        assertThat(orderMapper.findFulfillmentOrders(OrderStatus.READY_FOR_PICKUP))
+        assertThat(orderMapper.findFulfillmentOrders(null, 2, 2))
+                .extracting(Order::getId)
+                .containsExactly(
+                        laterReady.getId(),
+                        anotherDate.getId()
+                );
+        assertThat(orderMapper.findFulfillmentOrders(OrderStatus.READY_FOR_PICKUP, 20, 0))
                 .extracting(Order::getId)
                 .containsExactly(laterReady.getId(), anotherDate.getId());
-        assertThat(orderMapper.findFulfillmentOrders(OrderStatus.UNDER_REVIEW))
+        assertThat(orderMapper.findFulfillmentOrders(OrderStatus.UNDER_REVIEW, 20, 0))
                 .extracting(Order::getId)
                 .containsExactly(futureUnderReview.getId());
-        assertThat(orderMapper.findFulfillmentOrders(OrderStatus.IN_PRODUCTION))
+        assertThat(orderMapper.findFulfillmentOrders(OrderStatus.IN_PRODUCTION, 20, 0))
                 .extracting(Order::getId)
                 .containsExactly(futureInProduction.getId());
     }

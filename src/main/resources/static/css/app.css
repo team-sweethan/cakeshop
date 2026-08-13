@@ -2246,6 +2246,11 @@ body > main {
     margin: calc(var(--space-4) * -1) 0 var(--space-4)
 }
 
+.fulfillment-pagination {
+    justify-content: center;
+    margin-top: var(--space-4)
+}
+
 .fulfillment-order {
     background: var(--color-background);
     border: 1px solid var(--color-border-light);

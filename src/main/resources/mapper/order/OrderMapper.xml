@@ -325,6 +325,19 @@
         </foreach>
     </select>
 
+    <sql id="fulfillmentOrderConditions">
+        WHERE status IN ('UNDER_REVIEW', 'IN_PRODUCTION', 'READY_FOR_PICKUP', 'PICKED_UP')
+        <if test="status != null">
+          AND status = #{status}
+        </if>
+    </sql>
+
+    <select id="countFulfillmentOrders" resultType="long">
+        SELECT COUNT(*)
+        FROM orders
+        <include refid="fulfillmentOrderConditions"/>
+    </select>
+
     <select id="findFulfillmentOrders" resultType="com.cakeshop.domain.order.entity.Order">
         SELECT
             id,
@@ -361,10 +374,7 @@
             created_at,
             updated_at
         FROM orders
-        WHERE status IN ('UNDER_REVIEW', 'IN_PRODUCTION', 'READY_FOR_PICKUP', 'PICKED_UP')
-        <if test="status != null">
-          AND status = #{status}
-        </if>
+        <include refid="fulfillmentOrderConditions"/>
         ORDER BY CASE status
                      WHEN 'UNDER_REVIEW' THEN 0
                      WHEN 'IN_PRODUCTION' THEN 1
@@ -373,6 +383,8 @@
                      ELSE 4
                  END,
                  pickup_at, created_at, id
+        LIMIT #{size}
+        OFFSET #{offset}
     </select>
 
     <select id="findOverduePendingOrderIds" resultType="long">

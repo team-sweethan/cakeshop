@@ -8,6 +8,8 @@ import com.cakeshop.domain.order.entity.OrderItemOption;
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.order.mapper.OrderMapper;
+import com.cakeshop.global.common.paging.PageRequest;
+import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -35,19 +37,34 @@ public class FulfillmentService {
     private final OrderMapper orderMapper;
     private final Clock clock;
 
-    /** 검토·제작·픽업 업무 전체와 상품·옵션 스냅샷을 조회한다. */
+    /** 검토·제작·픽업 업무 전체를 페이지 단위로 조회하고 상품·옵션 스냅샷을 조합한다. */
     @Transactional(readOnly = true)
-    public FulfillmentListView getFulfillments(FulfillmentSearchCondition condition) {
+    public FulfillmentListView getFulfillments(
+            FulfillmentSearchCondition condition,
+            PageRequest pageRequest
+    ) {
         OrderStatus selectedStatus = normalizeStatus(
                 condition == null ? null : condition.getStatus()
         );
-        List<FulfillmentListView.FulfillmentOrder> orders = orderMapper
-                .findFulfillmentOrders(selectedStatus)
-                .stream()
-                .map(this::toFulfillmentOrder)
-                .toList();
+        PageRequest normalizedPageRequest = pageRequest == null
+                ? new PageRequest(null, null)
+                : pageRequest;
+        long totalOrders = orderMapper.countFulfillmentOrders(selectedStatus);
+        List<FulfillmentListView.FulfillmentOrder> orders = totalOrders <= normalizedPageRequest.getOffset()
+                ? List.of()
+                : orderMapper.findFulfillmentOrders(
+                                selectedStatus,
+                                normalizedPageRequest.getSize(),
+                                normalizedPageRequest.getOffset()
+                        )
+                        .stream()
+                        .map(this::toFulfillmentOrder)
+                        .toList();
 
-        return new FulfillmentListView(selectedStatus, orders);
+        return new FulfillmentListView(
+                selectedStatus,
+                new PageResult<>(orders, normalizedPageRequest, totalOrders)
+        );
     }
 
     /** DONE 결제가 유지되는 픽업 준비 주문만 수령 완료로 원자적으로 변경한다. */
