@@ -8,9 +8,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import com.cakeshop.domain.statistics.dto.view.PeriodStatisticsView;
-import com.cakeshop.domain.statistics.service.AdditionalMetricsReadModelQueryService;
-import com.cakeshop.domain.statistics.service.PeriodStatisticsReadModelQueryService;
-import com.cakeshop.domain.statistics.service.ProductPeriodStatisticsReadModelQueryService;
+import com.cakeshop.domain.statistics.service.query.AdditionalMetricsReadModelQueryService;
+import com.cakeshop.domain.statistics.service.query.PeriodStatisticsReadModelQueryService;
+import com.cakeshop.domain.statistics.service.query.ProductPeriodStatisticsReadModelQueryService;
 import com.cakeshop.global.security.SecurityConfig;
 import java.math.BigDecimal;
 import java.time.LocalDate;

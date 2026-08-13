@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.cakeshop.domain.statistics.dto.view.DailyProductStatisticsSourceView;
-import com.cakeshop.domain.statistics.service.DailyProductStatisticsSourceReadModelQueryService;
+import com.cakeshop.domain.statistics.service.aggregation.DailyProductStatisticsSourceReadModelQueryService;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 import java.math.BigDecimal;
 import java.time.LocalDate;
