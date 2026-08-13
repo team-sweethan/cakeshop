@@ -127,6 +127,7 @@ cart 도메인의 공개 Command로 항목을 멱등 삭제한다.
 |---|---|---|---|---|---|
 | `order_id` | BIGINT | PK, FK | X | 없음 | 주문 식별자 |
 | `cart_item_id` | BIGINT | PK | X | 없음 | 결제 완료 후 정리할 장바구니 항목 식별자 |
+| `snapshot_quantity` | INT UNSIGNED | - | X | 1 | 주문 생성 시점 장바구니 항목 수량 |
 
 - PK: (`order_id`, `cart_item_id`)
 - FK: `fk_order_cart_items_order` (`order_id`) → `orders.id`
@@ -144,6 +145,7 @@ cart 도메인의 공개 Command로 항목을 멱등 삭제한다.
 - `V20260811_145723__add_order_in_production_status.sql`
 - `V20260811_165915__add_custom_production_due_index.sql`
 - `V20260812_115115__add_order_cart_item_links.sql`
+- `V20260812_155402__add_order_cart_item_snapshot_quantity.sql`
 
 > `order_cart_items.snapshot_quantity`는 주문 생성 당시 장바구니 수량이다. 결제 후 정리 시 현재 수량과 비교하여, 수량이 변경된 장바구니 항목은 삭제하지 않는다.
 

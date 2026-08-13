@@ -5,6 +5,7 @@ import com.cakeshop.domain.member.dto.view.MemberProfileView;
 import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.coupon.service.CouponOrderQueryService;
 import com.cakeshop.domain.order.dto.view.customer.CustomOrderCheckoutView;
+import com.cakeshop.domain.order.dto.view.customer.CartOrderCheckoutView;
 import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
 import com.cakeshop.domain.order.service.customer.CustomerCustomOrderService;
@@ -174,6 +175,29 @@ class OrderControllerTests {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/cart"))
                 .andExpect(flash().attribute("errorMessage", "주문할 상품을 선택해 주세요."));
+    }
+
+    @Test
+    void createCartOrder_validationFailure_keepsUncheckedSameAsOrderer() throws Exception {
+        CartOrderCheckoutView checkout = new CartOrderCheckoutView(
+                List.of(), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, List.of()
+        );
+        when(cartOrderQueryService.getSelectedOrderItems(10L, List.of(1L))).thenReturn(List.of());
+        when(orderCheckoutService.getCartCheckout(List.of())).thenReturn(checkout);
+
+        mockMvc.perform(post("/orders/general/cart")
+                        .param("requestKey", UUID.randomUUID().toString())
+                        .param("cartItemIds", "1")
+                        .param("displayedOriginalAmount", "10000")
+                        .param("ordererName", "홍길동")
+                        .param("ordererPhone", "010-1111-2222")
+                        .param("pickupName", "김픽업")
+                        .param("pickupPhone", "010-3333-4444")
+                        .param("_sameAsOrderer", "on"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("customer/order/cart-form"))
+                .andExpect(model().attribute("orderForm", hasProperty("sameAsOrderer", equalTo(false))))
+                .andExpect(model().attributeHasErrors("orderForm"));
     }
 
     @Test

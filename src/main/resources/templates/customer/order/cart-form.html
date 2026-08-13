@@ -80,7 +80,7 @@
           <div class="panel">
             <div class="form-group"><label class="form-label" for="ordererName">주문자 이름 <span class="required">*</span></label><input class="form-control" id="ordererName" th:field="*{ordererName}" maxlength="50" required></div>
             <div class="form-group"><label class="form-label" for="ordererPhone">주문자 휴대폰 번호 <span class="required">*</span></label><input class="form-control" id="ordererPhone" type="tel" th:field="*{ordererPhone}" maxlength="30" required></div>
-            <div class="form-group"><label class="cluster" for="sameAsOrderer"><input id="sameAsOrderer" type="checkbox" data-same-as-orderer checked><span>픽업자가 주문자와 같습니다.</span></label></div>
+            <div class="form-group"><label class="cluster" for="sameAsOrderer"><input id="sameAsOrderer" type="checkbox" th:field="*{sameAsOrderer}" data-same-as-orderer><span>픽업자가 주문자와 같습니다.</span></label></div>
             <div class="form-group"><label class="form-label" for="pickupName">픽업자 이름 <span class="required">*</span></label><input class="form-control" id="pickupName" th:field="*{pickupName}" maxlength="50" required></div>
             <div class="form-group"><label class="form-label" for="pickupPhone">픽업자 휴대폰 번호 <span class="required">*</span></label><input class="form-control" id="pickupPhone" type="tel" th:field="*{pickupPhone}" maxlength="30" required></div>
           </div>

@@ -14,6 +14,9 @@ import lombok.Setter;
 @Setter
 public class CartOrderForm extends CreateOrderForm {
 
+    /** 최초 주문서에서는 주문자 연락처를 픽업자 정보에 그대로 사용한다. */
+    private boolean sameAsOrderer = true;
+
     @NotBlank
     private String requestKey;
 
