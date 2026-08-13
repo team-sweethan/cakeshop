@@ -3,10 +3,8 @@ package com.cakeshop.domain.statistics.controller;
 import com.cakeshop.domain.statistics.dto.form.StatisticsPeriodType;
 import com.cakeshop.domain.statistics.dto.form.StatisticsSearchForm;
 import com.cakeshop.domain.statistics.dto.view.PeriodStatisticsView;
-import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
 import com.cakeshop.domain.statistics.error.StatisticsErrorCode;
 import com.cakeshop.domain.statistics.service.AdditionalMetricsReadModelQueryService;
-import com.cakeshop.domain.statistics.service.DashboardReadModelQueryService;
 import com.cakeshop.domain.statistics.service.PeriodStatisticsReadModelQueryService;
 import com.cakeshop.domain.statistics.service.ProductPeriodStatisticsReadModelQueryService;
 import com.cakeshop.global.error.BusinessException;
@@ -33,7 +31,6 @@ public class StatisticsAdminController {
             .appendValue(IsoFields.WEEK_OF_WEEK_BASED_YEAR, 2)
             .toFormatter();
 
-    private final DashboardReadModelQueryService dashboardReadModelQueryService;
     private final PeriodStatisticsReadModelQueryService periodStatisticsReadModelQueryService;
     private final ProductPeriodStatisticsReadModelQueryService productStatisticsQueryService;
     private final AdditionalMetricsReadModelQueryService additionalMetricsQueryService;
@@ -49,15 +46,6 @@ public class StatisticsAdminController {
             searchForm.setPeriodType(StatisticsPeriodType.RANGE);
         }
         return searchForm;
-    }
-
-    /** 관리자 대시보드의 오늘 통계를 조회한다. */
-    @GetMapping("/admin")
-    public String dashboard(Model model) {
-        StatisticsDashboardView dashboard = dashboardReadModelQueryService.getDashboard();
-        model.addAttribute("dashboard", dashboard);
-
-        return "admin/dashboard";
     }
 
     /** 조회 기간의 관리자 통계를 조회한다. */

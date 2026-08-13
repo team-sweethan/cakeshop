@@ -4,7 +4,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
@@ -17,10 +16,8 @@ import com.cakeshop.domain.statistics.dto.view.AdditionalMetricsView;
 import com.cakeshop.domain.statistics.dto.view.PeriodStatisticsView;
 import com.cakeshop.domain.statistics.dto.view.ProductStatisticsView;
 import com.cakeshop.domain.statistics.dto.view.StatisticsTrendView;
-import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
 import com.cakeshop.domain.statistics.error.StatisticsErrorCode;
 import com.cakeshop.domain.statistics.service.AdditionalMetricsReadModelQueryService;
-import com.cakeshop.domain.statistics.service.DashboardReadModelQueryService;
 import com.cakeshop.domain.statistics.service.PeriodStatisticsReadModelQueryService;
 import com.cakeshop.domain.statistics.service.ProductPeriodStatisticsReadModelQueryService;
 import com.cakeshop.global.error.BusinessException;
@@ -40,9 +37,6 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 class StatisticsAdminControllerTests {
 
     @Mock
-    private DashboardReadModelQueryService dashboardReadModelQueryService;
-
-    @Mock
     private PeriodStatisticsReadModelQueryService periodStatisticsReadModelQueryService;
 
     @Mock
@@ -57,38 +51,11 @@ class StatisticsAdminControllerTests {
     void setUp() {
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new StatisticsAdminController(
-                        dashboardReadModelQueryService,
                         periodStatisticsReadModelQueryService,
                         productStatisticsQueryService,
                         additionalMetricsQueryService
                 ))
                 .build();
-    }
-
-    @Test
-    void dashboard_serviceReturnsView_addsDashboardToModel() throws Exception {
-        StatisticsDashboardView dashboard =
-                new StatisticsDashboardView(
-                        3L,
-                        new BigDecimal("120000"),
-                        2L,
-                        0L,
-                        0L,
-                        0L,
-                        0L,
-                        0L,
-                        List.of(),
-                        List.of(),
-                        List.of()
-                );
-        when(dashboardReadModelQueryService.getDashboard()).thenReturn(dashboard);
-
-        mockMvc.perform(get("/admin"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("admin/dashboard"))
-                .andExpect(model().attribute("dashboard", dashboard));
-
-        verify(dashboardReadModelQueryService).getDashboard();
     }
 
     @Test
@@ -130,7 +97,6 @@ class StatisticsAdminControllerTests {
         verify(periodStatisticsReadModelQueryService).getStatistics(any());
         verify(productStatisticsQueryService).getProductStatistics(startDate, endDate);
         verify(additionalMetricsQueryService).getAdditionalMetrics(startDate, endDate);
-        verifyNoMoreInteractions(dashboardReadModelQueryService);
     }
 
     @Test

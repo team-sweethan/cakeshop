@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.cakeshop.domain.statistics.mapper.DashboardReadModelMapper">
+<mapper namespace="com.cakeshop.domain.dashboard.mapper.DashboardReadModelMapper">
     <!-- 사용자 입력은 #{}만 사용하고 ${}는 사용하지 않는다. -->
 
     <select id="countTodayOrders" resultType="long">
@@ -76,7 +76,7 @@
     </select>
 
     <select id="findTodayPickupSchedules"
-            resultType="com.cakeshop.domain.statistics.dto.view.TodayPickupScheduleView">
+            resultType="com.cakeshop.domain.dashboard.dto.view.TodayPickupScheduleView">
         SELECT
             pickup_order.id AS order_id,
             pickup_order.pickup_at,
@@ -120,7 +120,7 @@
     </select>
 
     <select id="findRecentOrders"
-            resultType="com.cakeshop.domain.statistics.dto.view.RecentOrderView">
+            resultType="com.cakeshop.domain.dashboard.dto.view.RecentOrderView">
         SELECT
             recent_order.id AS order_id,
             recent_order.order_number,
@@ -169,7 +169,7 @@
     </select>
 
     <select id="findLowStockProducts"
-            resultType="com.cakeshop.domain.statistics.dto.view.LowStockProductView">
+            resultType="com.cakeshop.domain.dashboard.dto.view.LowStockProductView">
         SELECT
             low_stock_product.id AS product_id,
             low_stock_product.name AS product_name,

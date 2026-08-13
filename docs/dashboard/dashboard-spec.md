@@ -2,6 +2,7 @@
 
 > 관리자 대시보드에 표시할 지표의 업무적 정의, 데이터 소유권,
 > 도메인 간 조회 기준 및 결정 현황을 관리한다.
+> 이 문서를 `dashboard` 도메인의 구현 정본으로 사용한다.
 > `확정` 항목만 구현 계약으로 사용하며,
 > `합의 필요` 항목은 담당자 승인 전에 구현하지 않는다.
 
@@ -17,9 +18,19 @@
 - 대상 화면: `/admin`
 - 화면 역할: 당일 운영 현황과 관리자 처리 항목 제공
 - 담당자: 시은
+- 구현 위치: `domain/dashboard`
 - 조회 방식: 집계 테이블 없이 `DashboardReadModelMapper`의 읽기 전용 SQL로 실시간 조회
-- 제외 범위: `/admin/statistics` 기간별 분석 화면
-- 후속 범위: 일별·월별 통계와 자체 집계 테이블
+- 소유 범위: `/admin` 요청, 대시보드 View DTO 조합, 대시보드 전용 ReadModel 조회
+- 제외 범위: `/admin/statistics` 기간별 통계 조회, 일별 집계, 백필, REBUILD와 정기 배치
+
+### 1-3. 도메인 경계
+
+- `dashboard`는 여러 도메인의 현재 운영 상태를 읽어 `/admin` 화면에 제공한다.
+- `statistics`는 확정된 과거 데이터를 집계하고 `/admin/statistics` 기간별 통계를 제공한다.
+- `dashboard`는 `statistics`의 DTO, Service, Mapper와 집계 테이블을 사용하지 않는다.
+- `statistics`는 `/admin` 요청과 대시보드 화면 모델을 제공하지 않는다.
+- 두 도메인은 원본 업무 데이터를 소유하거나 변경하지 않으며, 각 목적에 맞는 ReadModel을 독립적으로
+  관리한다.
 
 ## 2. 결정 상태
 
@@ -287,31 +298,30 @@ ReadModel 조회와 이동 링크도 제공하지 않는다.
 ### 5-1. 호출 구조
 
 ```text
-StatisticsAdminController
+DashboardAdminController
 → DashboardReadModelQueryService
 → DashboardReadModelMapper
 → 여러 도메인의 원본 테이블 읽기 전용 조회
-→ StatisticsDashboardView
+→ DashboardView
 → admin/dashboard.html
 ```
 
-향후 기간별 분석은 다음 구조로 분리한다.
+기간별 통계는 다음과 같이 별도의 `statistics` 도메인에서 처리한다.
 
 ```text
 StatisticsAdminController
-→ StatisticsReportReadModelQueryService
-→ StatisticsReportReadModelMapper
-→ 원본 또는 집계 테이블 읽기 전용 조회
-→ StatisticsReportView
+→ 기간별 통계 조회 Service
+→ 기간별 통계 Mapper
+→ 통계 집계 테이블 읽기 전용 조회
+→ 기간별 통계 View DTO
 → admin/statistics.html
 ```
 
-- `StatisticsAdminController`는 요청 화면에 해당하는 Service만 호출한다.
-- `DashboardReadModelQueryService`는 `/admin` 조회와 `StatisticsDashboardView` 조합만 담당한다.
+- `DashboardAdminController`는 `/admin` 요청만 처리한다.
+- `DashboardReadModelQueryService`는 `/admin` 조회와 `DashboardView` 조합만 담당한다.
 - `DashboardReadModelMapper`는 `/admin` 대시보드에 필요한 읽기 전용 SQL만 실행한다.
-- `StatisticsReportReadModelQueryService`는 `/admin/statistics` 조회와 `StatisticsReportView` 조합만 담당한다.
-- `StatisticsReportReadModelMapper`는 기간별 분석에 필요한 읽기 전용 SQL만 실행한다.
-- Dashboard와 Report Service의 조회 메서드에는 각각 읽기 전용 트랜잭션을 적용한다.
+- `StatisticsAdminController`와 통계 조회·집계 구성요소는 `statistics` 도메인에 유지한다.
+- 대시보드와 통계 조회 Service의 조회 메서드에는 각각 읽기 전용 트랜잭션을 적용한다.
 
 ### 5-2. 실시간 조회 기준
 
@@ -324,15 +334,14 @@ StatisticsAdminController
 
 ### 5-3. 읽기 전용 JOIN 허용 범위
 
-대시보드와 기간별 통계는 여러 도메인의 데이터를 함께 집계해야 하므로 예외적으로 도메인 간
-JOIN을 허용한다.
+대시보드는 여러 도메인의 현재 데이터를 함께 조회해야 하므로 예외적으로 도메인 간 JOIN을 허용한다.
 
-- JOIN은 `statistics` 도메인의 화면 목적별 Mapper와 MyBatis XML에서만 작성한다.
-- `/admin` 대시보드와 `/admin/statistics` 통계 조회 목적에만 사용한다.
+- 대시보드 JOIN은 `dashboard` 도메인의 `DashboardReadModelMapper`와 MyBatis XML에서만 작성한다.
+- `/admin` 대시보드 조회 목적으로만 사용한다.
 - `SELECT` 읽기 작업만 허용한다.
-- JOIN 예외는 원본 데이터와 업무 규칙의 소유권이 `statistics`로 이전된다는 의미가 아니다.
+- JOIN 예외는 원본 데이터와 업무 규칙의 소유권이 `dashboard`로 이전된다는 의미가 아니다.
 - 다른 도메인의 Mapper나 Entity를 직접 참조하지 않는다.
-- 화면에 필요한 최소 컬럼만 조회하고 화면 전용 통계 DTO로 반환한다.
+- 화면에 필요한 최소 컬럼만 조회하고 대시보드 전용 DTO로 반환한다.
 - 사용자 제어 값은 `#{}`로 바인딩하고 `${}`를 사용하지 않는다.
 - 상태값, 날짜 컬럼과 집계 조건은 데이터 소유 도메인 담당자의 검토를 받는다.
 - 개인정보는 지표에 꼭 필요한 경우가 아니면 조회하거나 반환하지 않는다.
@@ -342,7 +351,7 @@ JOIN을 허용한다.
 - 다른 도메인 테이블에 대한 `INSERT`, `UPDATE`, `DELETE`
 - 주문·결제·재고·신고의 상태 전이
 - 데이터 소유 도메인의 업무 규칙 변경
-- 통계 조회를 이유로 한 다른 도메인의 쓰기 Service 우회
+- 대시보드 조회를 이유로 한 다른 도메인의 쓰기 Service 우회
 
 ### 5-4. 상태 변경과 Command 검증
 
@@ -368,13 +377,14 @@ JOIN을 허용한다.
 - 별도 집계 테이블을 사용하면 원본과 집계 결과 사이에 지연이 발생할 수 있으므로 허용 가능한
   지연 범위를 명시한다.
 - 집계 테이블을 도입할 때 갱신 실패, 중복 처리, 재집계와 원본 대조 방법을 함께 정의한다.
-- 기간별 집계와 자체 집계 테이블의 상세 설계는 `/admin/statistics` 후속 범위에서 다룬다.
+- 대시보드 집계 테이블을 도입하더라도 `statistics`의 기간별 집계 테이블을 공유하지 않고 별도 계약으로
+  설계한다.
 
 ### 5-7. 성능, 변경 및 검증 기준
 
 - 구현 전에 필요한 인덱스, 조회 범위, 목록 제한, 캐시 적용 여부와 목표 응답 시간을 합의한다.
-- JOIN 대상 테이블이나 상태값이 변경되면 데이터 소유 도메인 담당자가 통계 담당자에게 공유한다.
-- 통계 SQL을 변경하는 PR은 JOIN 대상 데이터의 소유 도메인 담당자를 우선 리뷰어로 지정한다.
+- JOIN 대상 테이블이나 상태값이 변경되면 데이터 소유 도메인 담당자가 대시보드 담당자에게 공유한다.
+- 대시보드 SQL을 변경하는 PR은 JOIN 대상 데이터의 소유 도메인 담당자를 우선 리뷰어로 지정한다.
 - 인덱스가 필요하면 기존 Flyway migration을 수정하지 않고 새 migration을 추가한다.
 - MariaDB Testcontainers에서 JOIN, 상태 조건, 날짜 경계와 DTO 매핑을 검증한다.
 - `/admin/payments`와 대시보드의 확인 필요 결제 건수가 동일한지 통합 테스트로 검증한다.

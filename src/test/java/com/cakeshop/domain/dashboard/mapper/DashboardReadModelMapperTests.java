@@ -1,11 +1,11 @@
-package com.cakeshop.domain.statistics.mapper;
+package com.cakeshop.domain.dashboard.mapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.cakeshop.domain.order.entity.OrderStatus;
-import com.cakeshop.domain.statistics.dto.view.LowStockProductView;
-import com.cakeshop.domain.statistics.dto.view.RecentOrderView;
-import com.cakeshop.domain.statistics.dto.view.TodayPickupScheduleView;
+import com.cakeshop.domain.dashboard.dto.view.LowStockProductView;
+import com.cakeshop.domain.dashboard.dto.view.RecentOrderView;
+import com.cakeshop.domain.dashboard.dto.view.TodayPickupScheduleView;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 import java.time.LocalDateTime;
 import java.util.List;

@@ -319,8 +319,8 @@ ReadModel은 관리자 대시보드(`/admin`), 관리자 통계(`/admin/statisti
 - 원본으로부터 재생성 가능한 통계 도메인의 파생 집계 데이터를 생성·교체하는 조회 근거로 사용할 수 있다.
 - 파생 집계 데이터 쓰기는 별도의 통계 도메인 Mapper에서 수행하며, ReadModel Mapper에는 쓰기 SQL을
   두지 않는다.
-- `statistics` 도메인에 두고 `<Purpose>ReadModelQueryService`,
-  `<Purpose>ReadModelMapper`로 이름을 짓는다.
+- 관리자 대시보드 조회는 `dashboard` 도메인에, 기간별 통계 조회와 집계 배치는 `statistics` 도메인에
+  두고 `<Purpose>ReadModelQueryService`, `<Purpose>ReadModelMapper`로 이름을 짓는다.
 - 최초 작성과 주요 변경 때 JOIN 대상 데이터의 소유 담당자를 리뷰어로 지정한다.
 - 조회 대상 테이블의 구조와 제외 조건을 실제 MariaDB 통합 테스트로 검증한다.
 

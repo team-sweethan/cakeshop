@@ -65,9 +65,10 @@ import com.cakeshop.domain.review.dto.view.AdminReviewListView;
 import com.cakeshop.domain.review.entity.ReviewStatus;
 import com.cakeshop.domain.review.service.ReviewAdminService;
 import com.cakeshop.domain.statistics.controller.StatisticsAdminController;
+import com.cakeshop.domain.dashboard.controller.DashboardAdminController;
 import com.cakeshop.domain.statistics.dto.view.PeriodStatisticsView;
-import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
-import com.cakeshop.domain.statistics.service.DashboardReadModelQueryService;
+import com.cakeshop.domain.dashboard.dto.view.DashboardView;
+import com.cakeshop.domain.dashboard.service.DashboardReadModelQueryService;
 import com.cakeshop.domain.statistics.service.AdditionalMetricsReadModelQueryService;
 import com.cakeshop.domain.statistics.service.PeriodStatisticsReadModelQueryService;
 import com.cakeshop.domain.statistics.service.ProductPeriodStatisticsReadModelQueryService;
@@ -162,7 +163,7 @@ class AdminPageControllerTests {
         when(communityService.getComments(anyLong(), any()))
                 .thenReturn(new CommentSectionView(List.of(), 0, 0, 20));
         when(dashboardReadModelQueryService.getDashboard())
-                .thenReturn(new StatisticsDashboardView(
+                .thenReturn(new DashboardView(
                         0L,
                         BigDecimal.ZERO,
                         0L,
@@ -187,8 +188,8 @@ class AdminPageControllerTests {
                 ));
 
         mockMvc = MockMvcBuilders.standaloneSetup(
+                new DashboardAdminController(dashboardReadModelQueryService),
                 new StatisticsAdminController(
-                        dashboardReadModelQueryService,
                         periodStatisticsReadModelQueryService,
                         productStatisticsQueryService,
                         additionalMetricsQueryService
