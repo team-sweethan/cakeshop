@@ -299,6 +299,19 @@ class ScreenRenderingTests {
         value = "user@cakeshop.local",
         userDetailsServiceBeanName = "memberDetailsService"
     )
+    void memberScreens_doNotRenderMockNotice() throws Exception {
+        for (String path : new String[] {"/signup", "/mypage", "/mypage/profile"}) {
+            mockMvc.perform(get(path))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("class=\"mock-notice\""))));
+        }
+    }
+
+    @Test
+    @WithUserDetails(
+        value = "user@cakeshop.local",
+        userDetailsServiceBeanName = "memberDetailsService"
+    )
     void customProductDetail_showsCustomOptionFlowWithoutServerCartForm() throws Exception {
         mockMvc.perform(get("/products/6"))
             .andExpect(status().isOk())
