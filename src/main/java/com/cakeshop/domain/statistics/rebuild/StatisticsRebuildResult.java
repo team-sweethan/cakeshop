@@ -1,4 +1,4 @@
-package com.cakeshop.domain.statistics.service;
+package com.cakeshop.domain.statistics.rebuild;
 
 /** 운영자 수동 재집계 명령의 실행 결과다. */
 public enum StatisticsRebuildResult {

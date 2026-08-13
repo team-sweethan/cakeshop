@@ -1,4 +1,4 @@
-package com.cakeshop.domain.statistics.service;
+package com.cakeshop.domain.statistics.rebuild;
 
 import com.cakeshop.domain.statistics.dto.StatisticsRebuildRequest;
 import java.time.LocalDate;
