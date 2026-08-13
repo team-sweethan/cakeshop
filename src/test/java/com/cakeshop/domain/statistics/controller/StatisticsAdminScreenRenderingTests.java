@@ -13,6 +13,7 @@ import com.cakeshop.domain.statistics.dto.view.PeriodStatisticsView;
 import com.cakeshop.domain.statistics.dto.view.AdditionalMetricsView;
 import com.cakeshop.domain.statistics.dto.view.ProductStatisticsView;
 import com.cakeshop.domain.statistics.dto.view.StatisticsTrendView;
+import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
 import com.cakeshop.domain.statistics.error.StatisticsErrorCode;
 import com.cakeshop.domain.statistics.service.DashboardReadModelQueryService;
 import com.cakeshop.domain.statistics.service.AdditionalMetricsReadModelQueryService;
@@ -49,6 +50,27 @@ class StatisticsAdminScreenRenderingTests {
 
     @MockitoBean
     private AdditionalMetricsReadModelQueryService additionalMetricsQueryService;
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void dashboard_pendingReportTask_rendersPostInsteadOfReview() throws Exception {
+        when(dashboardReadModelQueryService.getDashboard())
+                .thenReturn(new StatisticsDashboardView(
+                        0,
+                        BigDecimal.ZERO,
+                        0,
+                        0,
+                        0,
+                        List.of(),
+                        List.of(),
+                        List.of()
+                ));
+
+        mockMvc.perform(get("/admin"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("신고 처리 대기 게시글")))
+                .andExpect(content().string(not(containsString("신고 처리 대기 후기"))));
+    }
 
     @Test
     @WithMockUser(roles = "ADMIN")
