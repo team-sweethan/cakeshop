@@ -533,9 +533,15 @@ class ScreenRenderingTests {
             orderId
         );
 
-        mockMvc.perform(get("/admin/fulfillment")
-                .param("pickupDate", pickupAt.toLocalDate().toString()))
+        mockMvc.perform(get("/admin/fulfillment"))
             .andExpect(status().isOk())
+            .andExpect(content().string(containsString("주문 처리")))
+            .andExpect(content().string(containsString("검토 대기")))
+            .andExpect(content().string(containsString("모든 단계의 주문을 기간 제한 없이 확인합니다.")))
+            .andExpect(content().string(not(containsString("name=\"pickupDate\""))))
+            .andExpect(content().string(containsString(
+                pickupAt.format(java.time.format.DateTimeFormatter.ofPattern("MM.dd HH:mm"))
+            )))
             .andExpect(content().string(containsString("딸기 생크림 케이크")))
             .andExpect(content().string(containsString("케이크 크기: 1호")))
             .andExpect(content().string(containsString("<details")))
@@ -551,12 +557,9 @@ class ScreenRenderingTests {
             .andExpect(content().string(containsString("name=\"_csrf\"")));
 
         mockMvc.perform(post("/admin/fulfillment/{orderId}/pickup", orderId)
-                .with(csrf())
-                .param("pickupDate", pickupAt.toLocalDate().toString()))
+                .with(csrf()))
             .andExpect(status().is3xxRedirection())
-            .andExpect(redirectedUrl(
-                "/admin/fulfillment?pickupDate=" + pickupAt.toLocalDate()
-            ));
+            .andExpect(redirectedUrl("/admin/fulfillment"));
 
         assertThat(jdbcTemplate.queryForObject(
             "SELECT status FROM orders WHERE id = ?",
@@ -634,7 +637,7 @@ class ScreenRenderingTests {
 
         mockMvc.perform(get("/admin/payments").param("status", "DONE"))
             .andExpect(status().isOk())
-            .andExpect(content().string(containsString("결제 내역")))
+            .andExpect(content().string(containsString("결제 기록")))
             .andExpect(content().string(containsString(orderNumber)))
             .andExpect(content().string(containsString("35,000원")))
             .andExpect(content().string(containsString("결제 완료")))
@@ -642,8 +645,56 @@ class ScreenRenderingTests {
             .andExpect(content().string(containsString(
                 "/admin/orders/" + orderId
             )))
+            .andExpect(content().string(containsString("전체 주문 보기")))
             .andExpect(content().string(not(containsString("PAY-001"))))
             .andExpect(content().string(not(containsString("환불 처리하시겠습니까"))));
+    }
+
+    @Test
+    @Transactional
+    @WithUserDetails(
+        value = "admin@cakeshop.local",
+        userDetailsServiceBeanName = "memberDetailsService"
+    )
+    void paymentAdminScreen_expiredPayment_rendersPersistentCheckForm()
+            throws Exception {
+        long orderId = createGeneralOrder();
+        long paymentId = jdbcTemplate.queryForObject(
+                "SELECT id FROM payments WHERE order_id = ?",
+                Long.class,
+                orderId
+        );
+        jdbcTemplate.update(
+                "UPDATE payments SET status = 'EXPIRED', provider_status = 'EXPIRED' WHERE id = ?",
+                paymentId
+        );
+
+        mockMvc.perform(get("/admin/payments").param("status", "EXPIRED"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(
+                        "/admin/payments/" + paymentId + "/expiration-check"
+                )))
+                .andExpect(content().string(containsString("name=\"checked\"")))
+                .andExpect(content().string(containsString("만료 확인")));
+    }
+
+    @Test
+    @Transactional
+    @WithUserDetails(
+        value = "admin@cakeshop.local",
+        userDetailsServiceBeanName = "memberDetailsService"
+    )
+    void adminOrderList_rendersOrderTypeAndWorkspaceGuidance() throws Exception {
+        createGeneralOrder();
+
+        mockMvc.perform(get("/admin/orders"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("전체 주문")))
+            .andExpect(content().string(containsString("유형")))
+            .andExpect(content().string(containsString("일반 상품")))
+            .andExpect(content().string(containsString(
+                "검토·제작·픽업 업무는 주문 처리에서 진행합니다."
+            )));
     }
 
     @Test
@@ -672,6 +723,8 @@ class ScreenRenderingTests {
             """
             UPDATE orders
             SET status = 'READY_FOR_PICKUP',
+                discount_amount = 5000,
+                final_amount = original_amount - 5000,
                 ready_at = CURRENT_TIMESTAMP(6)
             WHERE id = ?
             """,
@@ -682,9 +735,9 @@ class ScreenRenderingTests {
             .andExpect(status().isOk())
             .andExpect(content().string(containsString("관리자 취소 사유")))
             .andExpect(content().string(containsString("주문·결제 취소")))
-            .andExpect(content().string(containsString("제작·픽업에서 처리")))
+            .andExpect(content().string(containsString("주문 처리에서 열기")))
             .andExpect(content().string(containsString(
-                "/admin/fulfillment?pickupDate="
+                "/admin/fulfillment?status=READY_FOR_PICKUP&amp;page=1"
             )))
             .andExpect(content().string(not(containsString(
                 "/admin/orders/" + orderId + "/pickup"
@@ -692,6 +745,10 @@ class ScreenRenderingTests {
             .andExpect(content().string(containsString(
                 "/admin/orders/" + orderId + "/cancel"
             )))
+            .andExpect(content().string(containsString("쿠폰 적용")))
+            .andExpect(content().string(containsString("적용")))
+            .andExpect(content().string(containsString("쿠폰 할인 금액")))
+            .andExpect(content().string(containsString("-5,000원")))
             .andExpect(content().string(containsString("name=\"_csrf\"")));
     }
 

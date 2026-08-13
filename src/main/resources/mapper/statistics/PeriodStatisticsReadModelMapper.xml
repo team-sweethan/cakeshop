@@ -73,6 +73,40 @@
         ORDER BY ranking
     </select>
 
+    <select id="countIncompleteAdditionalMetricsDates" resultType="int">
+        SELECT
+            DATEDIFF(#{endDate}, #{startDate}) + 1
+                - COUNT(CASE
+                    WHEN daily_statistics.additional_metrics_aggregated_at IS NOT NULL THEN 1
+                    ELSE NULL
+                END)
+        FROM daily_statistics
+        WHERE daily_statistics.statistics_date &gt;= #{startDate}
+          AND daily_statistics.statistics_date &lt;= #{endDate}
+    </select>
+
+    <select id="findAdditionalMetrics"
+            resultType="com.cakeshop.domain.statistics.dto.view.AdditionalMetricsView">
+        SELECT
+            COALESCE(SUM(daily_statistics.new_member_count), 0) AS new_member_count,
+            COALESCE(SUM(daily_statistics.withdrawn_member_count), 0)
+                AS withdrawn_member_count,
+            COALESCE(SUM(daily_statistics.new_post_count), 0) AS new_post_count,
+            COALESCE(SUM(daily_statistics.coupon_usage_count), 0) AS coupon_usage_count,
+            COALESCE(SUM(daily_statistics.refund_amount), 0) AS refund_amount,
+            CASE
+                WHEN COALESCE(SUM(daily_statistics.valid_payment_order_count), 0) = 0 THEN 0
+                ELSE ROUND(
+                    SUM(daily_statistics.total_sales_amount)
+                        / SUM(daily_statistics.valid_payment_order_count),
+                    0
+                )
+            END AS average_order_amount
+        FROM daily_statistics
+        WHERE daily_statistics.statistics_date &gt;= #{startDate}
+          AND daily_statistics.statistics_date &lt;= #{endDate}
+    </select>
+
     <select id="findLatestContinuousStatisticsDate" resultType="java.time.LocalDate">
         WITH backfill_start AS (
             SELECT MIN(statistics_batch_run.target_start_date) AS start_date

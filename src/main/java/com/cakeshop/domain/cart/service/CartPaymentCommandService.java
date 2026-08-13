@@ -9,7 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 작성자: 정후 / cart 담당자: 수민, order 담당자: 주환
+ * 작성자: 이정후 / cart 담당자: 수민, order 담당자: 주환
  * 결제 완료 주문에 연결된 선택 장바구니 항목을 별도 트랜잭션에서 멱등적으로 삭제하는 공개 Command 계약이다.
  */
 @Service

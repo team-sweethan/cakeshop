@@ -19,8 +19,9 @@ import com.cakeshop.domain.order.controller.admin.FulfillmentAdminController;
 import com.cakeshop.domain.order.service.admin.FulfillmentService;
 import com.cakeshop.domain.order.service.admin.AdminCustomOrderService;
 import com.cakeshop.domain.payment.service.RefundFacade;
+import com.cakeshop.global.common.paging.PageRequest;
+import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.security.MemberDetails;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
@@ -65,51 +66,45 @@ class FulfillmentAdminControllerTests {
     @Test
     void fulfillment_validCondition_addsActualFulfillmentView() throws Exception {
         FulfillmentListView fulfillment = new FulfillmentListView(
-                LocalDate.of(2026, 8, 10),
                 OrderStatus.READY_FOR_PICKUP,
-                List.of()
+                new PageResult<>(List.of(), new PageRequest(2, 20), 30)
         );
-        when(fulfillmentService.getFulfillments(any())).thenReturn(fulfillment);
+        when(fulfillmentService.getFulfillments(any(), any())).thenReturn(fulfillment);
 
         mockMvc.perform(get("/admin/fulfillment")
-                        .param("pickupDate", "2026-08-10")
-                        .param("status", "READY_FOR_PICKUP"))
+                        .param("status", "READY_FOR_PICKUP")
+                        .param("page", "2"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("admin/fulfillment/list"))
                 .andExpect(model().attribute("fulfillment", fulfillment));
 
         ArgumentCaptor<FulfillmentSearchCondition> condition =
                 ArgumentCaptor.forClass(FulfillmentSearchCondition.class);
-        verify(fulfillmentService).getFulfillments(condition.capture());
-        org.assertj.core.api.Assertions.assertThat(condition.getValue().getPickupDate())
-                .isEqualTo(LocalDate.of(2026, 8, 10));
+        ArgumentCaptor<PageRequest> pageRequest = ArgumentCaptor.forClass(PageRequest.class);
+        verify(fulfillmentService).getFulfillments(condition.capture(), pageRequest.capture());
         org.assertj.core.api.Assertions.assertThat(condition.getValue().getStatus())
                 .isEqualTo(OrderStatus.READY_FOR_PICKUP);
+        org.assertj.core.api.Assertions.assertThat(pageRequest.getValue().getPage()).isEqualTo(2);
     }
 
     @Test
     void fulfillment_invalidCondition_recoversToDefaultSearch() throws Exception {
         FulfillmentListView fulfillment = new FulfillmentListView(
-                LocalDate.of(2026, 8, 2),
                 null,
-                List.of()
+                new PageResult<>(List.of(), new PageRequest(null, null), 0)
         );
-        AtomicReference<LocalDate> capturedDate = new AtomicReference<>();
         AtomicReference<OrderStatus> capturedStatus = new AtomicReference<>();
-        when(fulfillmentService.getFulfillments(any())).thenAnswer(invocation -> {
+        when(fulfillmentService.getFulfillments(any(), any())).thenAnswer(invocation -> {
             FulfillmentSearchCondition condition = invocation.getArgument(0);
-            capturedDate.set(condition.getPickupDate());
             capturedStatus.set(condition.getStatus());
             return fulfillment;
         });
 
         mockMvc.perform(get("/admin/fulfillment")
-                        .param("pickupDate", "not-a-date")
                         .param("status", "UNKNOWN"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("admin/fulfillment/list"));
 
-        org.assertj.core.api.Assertions.assertThat(capturedDate.get()).isNull();
         org.assertj.core.api.Assertions.assertThat(capturedStatus.get()).isNull();
     }
 
@@ -131,10 +126,10 @@ class FulfillmentAdminControllerTests {
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
                 mockMvc.perform(post("/admin/fulfillment/10/pickup")
-                        .param("pickupDate", "2026-08-10")
-                        .param("status", "READY_FOR_PICKUP"))
+                        .param("status", "READY_FOR_PICKUP")
+                        .param("page", "2"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/admin/fulfillment?pickupDate=2026-08-10&status=READY_FOR_PICKUP"))
+                .andExpect(redirectedUrl("/admin/fulfillment?status=READY_FOR_PICKUP"))
                 .andExpect(flash().attribute("successMessage", "픽업 완료로 변경했습니다."));
 
         verify(fulfillmentService).markPickedUp(10L, 7L);
@@ -145,10 +140,9 @@ class FulfillmentAdminControllerTests {
         authenticateAdmin();
 
         mockMvc.perform(post("/admin/fulfillment/10/production/start")
-                        .param("pickupDate", "2026-08-10")
                         .param("status", "UNDER_REVIEW"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/admin/fulfillment?pickupDate=2026-08-10&status=UNDER_REVIEW"))
+                .andExpect(redirectedUrl("/admin/fulfillment?status=UNDER_REVIEW"))
                 .andExpect(flash().attribute("successMessage", "제작을 시작했습니다."));
 
         verify(adminCustomOrderService).startProduction(10L, 7L);
@@ -160,7 +154,6 @@ class FulfillmentAdminControllerTests {
 
         mockMvc.perform(post("/admin/fulfillment/10/reject")
                         .param("reason", "제작 일정이 부족합니다.")
-                        .param("pickupDate", "2026-08-10")
                         .param("status", "UNDER_REVIEW"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(flash().attribute("successMessage", "주문을 반려하고 결제를 환불했습니다."));

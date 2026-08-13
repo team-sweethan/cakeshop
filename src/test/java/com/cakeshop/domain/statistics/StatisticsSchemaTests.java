@@ -82,6 +82,69 @@ class StatisticsSchemaTests {
     }
 
     @Test
+    void dailyStatistics_additionalMetricsNotCompleted_defaultsMetricsAndAllowsNullCompletedAt() {
+        insertDailyStatistics(10, new BigDecimal("100000"));
+
+        AdditionalMetricsRow row = jdbcTemplate.queryForObject(
+                """
+                SELECT
+                    new_member_count,
+                    withdrawn_member_count,
+                    new_post_count,
+                    coupon_usage_count,
+                    refund_amount,
+                    valid_payment_order_count,
+                    additional_metrics_aggregated_at
+                FROM daily_statistics
+                WHERE statistics_date = ?
+                """,
+                (resultSet, rowNum) -> new AdditionalMetricsRow(
+                        resultSet.getLong("new_member_count"),
+                        resultSet.getLong("withdrawn_member_count"),
+                        resultSet.getLong("new_post_count"),
+                        resultSet.getLong("coupon_usage_count"),
+                        resultSet.getBigDecimal("refund_amount"),
+                        resultSet.getLong("valid_payment_order_count"),
+                        resultSet.getObject(
+                                "additional_metrics_aggregated_at",
+                                LocalDateTime.class
+                        )
+                ),
+                TARGET_DATE
+        );
+
+        assertThat(row).isEqualTo(new AdditionalMetricsRow(
+                0,
+                0,
+                0,
+                0,
+                BigDecimal.ZERO,
+                0,
+                null
+        ));
+    }
+
+    @Test
+    void dailyStatistics_negativeAdditionalMetric_rejectsRow() {
+        insertDailyStatistics(10, new BigDecimal("100000"));
+
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                "UPDATE daily_statistics SET new_member_count = -1 WHERE statistics_date = ?",
+                TARGET_DATE
+        )).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void dailyStatistics_negativeRefundAmount_rejectsRow() {
+        insertDailyStatistics(10, new BigDecimal("100000"));
+
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                "UPDATE daily_statistics SET refund_amount = -1 WHERE statistics_date = ?",
+                TARGET_DATE
+        )).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
     void dailyProductStatistics_sameDateAndProduct_rejectsDuplicateRow() {
         insertDailyProductStatistics(1L, 2L, 3L, new BigDecimal("50000"));
 
@@ -227,6 +290,31 @@ class StatisticsSchemaTests {
                 "idx_payments_updated_at_approved_at",
                 "updated_at,approved_at"
         );
+        assertIndexColumns(
+                "members",
+                "idx_members_role_created_at",
+                "role,created_at"
+        );
+        assertIndexColumns(
+                "members",
+                "idx_members_role_status_withdrawn_at",
+                "role,status,withdrawn_at"
+        );
+        assertIndexColumns(
+                "posts",
+                "idx_posts_created_at",
+                "created_at"
+        );
+        assertIndexColumns(
+                "payment_cancellations",
+                "idx_payment_cancellations_status_canceled_at",
+                "status,canceled_at"
+        );
+        assertIndexColumns(
+                "payment_cancellations",
+                "idx_payment_cancellations_updated_at_canceled_at",
+                "updated_at,canceled_at"
+        );
     }
 
     private void assertIndexColumns(
@@ -318,5 +406,16 @@ class StatisticsSchemaTests {
     }
 
     private record DailyStatisticsRow(long totalOrderCount, BigDecimal totalSalesAmount) {
+    }
+
+    private record AdditionalMetricsRow(
+            long newMemberCount,
+            long withdrawnMemberCount,
+            long newPostCount,
+            long couponUsageCount,
+            BigDecimal refundAmount,
+            long validPaymentOrderCount,
+            LocalDateTime additionalMetricsAggregatedAt
+    ) {
     }
 }

@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.cakeshop.domain.statistics.dto.view.PeriodStatisticsView;
 import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
 import com.cakeshop.domain.statistics.service.DashboardReadModelQueryService;
+import com.cakeshop.domain.statistics.service.AdditionalMetricsReadModelQueryService;
 import com.cakeshop.domain.statistics.service.PeriodStatisticsReadModelQueryService;
 import com.cakeshop.domain.statistics.service.ProductPeriodStatisticsReadModelQueryService;
 import com.cakeshop.global.security.SecurityConfig;
@@ -40,6 +41,9 @@ class StatisticsAdminControllerSecurityTests {
 
     @MockitoBean
     private ProductPeriodStatisticsReadModelQueryService productStatisticsQueryService;
+
+    @MockitoBean
+    private AdditionalMetricsReadModelQueryService additionalMetricsQueryService;
 
     @Test
     @WithAnonymousUser

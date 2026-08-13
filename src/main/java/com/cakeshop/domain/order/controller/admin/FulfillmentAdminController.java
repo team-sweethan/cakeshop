@@ -7,6 +7,7 @@ import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.service.admin.AdminCustomOrderService;
 import com.cakeshop.domain.order.service.admin.FulfillmentService;
 import com.cakeshop.domain.payment.service.RefundFacade;
+import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.error.CommonErrorCode;
 import com.cakeshop.global.security.MemberDetails;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import jakarta.validation.Valid;
@@ -44,12 +46,15 @@ public class FulfillmentAdminController {
     public String fulfillment(
             @ModelAttribute("condition") FulfillmentSearchCondition condition,
             BindingResult bindingResult,
+            @RequestParam(required = false) String page,
             Model model
     ) {
         // 검증
         recoverInvalidSearchValues(condition, bindingResult);
-        FulfillmentListView fulfillment = fulfillmentService.getFulfillments(condition);
-        condition.setPickupDate(fulfillment.pickupDate());
+        FulfillmentListView fulfillment = fulfillmentService.getFulfillments(
+                condition,
+                new PageRequest(parsePositiveInteger(page), FulfillmentService.PAGE_SIZE)
+        );
         condition.setStatus(fulfillment.selectedStatus());
         model.addAttribute("fulfillment", fulfillment);
         return "admin/fulfillment/list";
@@ -117,14 +122,11 @@ public class FulfillmentAdminController {
         return "redirect:" + fulfillmentRedirectUrl(condition);
     }
 
-    /** 배송 상태 (픽업 날짜가 없던가, 상태가 없던) 검증 로직.**/
+    /** 지원하지 않는 작업 단계 검색값을 기본값으로 복구한다. */
     private void recoverInvalidSearchValues(
             FulfillmentSearchCondition condition,
             BindingResult bindingResult
     ) {
-        if (bindingResult.hasFieldErrors("pickupDate")) {
-            condition.setPickupDate(null);
-        }
         if (bindingResult.hasFieldErrors("status")) {
             condition.setStatus(null);
         }
@@ -132,15 +134,24 @@ public class FulfillmentAdminController {
 
     private String fulfillmentRedirectUrl(FulfillmentSearchCondition condition) {
         UriComponentsBuilder redirect = UriComponentsBuilder.fromPath("/admin/fulfillment");
-        if (condition != null && condition.getPickupDate() != null) {
-            redirect.queryParam("pickupDate", condition.getPickupDate());
-        }
         if (condition != null
                 && condition.getStatus() != null
                 && FULFILLMENT_STATUSES.contains(condition.getStatus())) {
             redirect.queryParam("status", condition.getStatus());
         }
         return redirect.toUriString();
+    }
+
+    private Integer parsePositiveInteger(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            int parsed = Integer.parseInt(value);
+            return parsed > 0 ? parsed : null;
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     private long requireAdminMemberId(MemberDetails admin) {

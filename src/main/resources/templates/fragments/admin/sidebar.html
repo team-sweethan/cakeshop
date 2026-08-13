@@ -10,12 +10,14 @@
       th:href="@{/admin/store}">매장</a>
     <a class="admin-sidebar__link" th:classappend="${activeMenu == 'products'} ? ' is-current'"
       th:href="@{/admin/products}">상품</a>
+
+    <p class="admin-sidebar__section">주문 운영</p>
     <a class="admin-sidebar__link" th:classappend="${activeMenu == 'orders'} ? ' is-current'"
-      th:href="@{/admin/orders}">주문</a>
+      th:href="@{/admin/orders}">전체 주문</a>
     <a class="admin-sidebar__link" th:classappend="${activeMenu == 'fulfillment'} ? ' is-current'"
-      th:href="@{/admin/fulfillment}">제작·픽업</a>
+      th:href="@{/admin/fulfillment}">주문 처리</a>
     <a class="admin-sidebar__link" th:classappend="${activeMenu == 'payments'} ? ' is-current'"
-      th:href="@{/admin/payments}">결제 내역</a>
+      th:href="@{/admin/payments}">결제 기록</a>
     <a class="admin-sidebar__link" th:classappend="${activeMenu == 'coupons'} ? ' is-current'"
       th:href="@{/admin/coupons}">쿠폰</a>
     <a class="admin-sidebar__link" th:classappend="${activeMenu == 'members'} ? ' is-current'"

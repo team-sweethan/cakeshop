@@ -1,5 +1,6 @@
 package com.cakeshop.domain.statistics.mapper;
 
+import com.cakeshop.domain.statistics.dto.view.DailyAdditionalMetricsSourceView;
 import com.cakeshop.domain.statistics.dto.view.DailyProductStatisticsSourceView;
 import com.cakeshop.domain.statistics.dto.view.DailyStatisticsSourceView;
 import java.time.LocalDate;
@@ -14,6 +15,12 @@ public interface DailyStatisticsAggregationMapper {
     int upsertDailyStatistics(
             @Param("statisticsDate") LocalDate statisticsDate,
             @Param("source") DailyStatisticsSourceView source
+    );
+
+    /** 전달받은 집계값으로 해당 날짜의 활동·금액 지표와 완료 시각을 교체한다. */
+    int updateDailyAdditionalMetrics(
+            @Param("statisticsDate") LocalDate statisticsDate,
+            @Param("source") DailyAdditionalMetricsSourceView source
     );
 
     /** 해당 날짜의 기존 상품별 통계를 삭제한다. */

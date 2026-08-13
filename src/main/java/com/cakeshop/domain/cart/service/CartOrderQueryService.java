@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 작성자: 주환 / cart 담당자: 수민
+ * 작성자: 이정후 / cart 담당자: 수민, order 담당자: 주환
  * 주문 도메인이 로그인 회원 소유의 선택 장바구니 항목을 조회하도록 제공하는 공개 Query 계약이다.
  */
 @Service

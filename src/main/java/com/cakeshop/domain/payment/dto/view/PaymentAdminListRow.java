@@ -21,7 +21,8 @@ public record PaymentAdminListRow(
         String cancellationRequestType,
         LocalDateTime requestedAt,
         LocalDateTime approvedAt,
-        LocalDateTime canceledAt
+        LocalDateTime canceledAt,
+        LocalDateTime expirationCheckedAt
 ) {
 
     public String paymentNumber() {
@@ -110,5 +111,9 @@ public record PaymentAdminListRow(
             return approvedAt;
         }
         return requestedAt;
+    }
+
+    public boolean expirationChecked() {
+        return expirationCheckedAt != null;
     }
 }

@@ -2,16 +2,15 @@ package com.cakeshop.domain.order.dto.view.admin;
 
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.entity.OrderType;
+import com.cakeshop.global.common.paging.PageResult;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
 /** 관리자 제작·픽업 목록과 적용된 검색 조건이다. */
 public record FulfillmentListView(
-        LocalDate pickupDate,
         OrderStatus selectedStatus,
-        List<FulfillmentOrder> orders
+        PageResult<FulfillmentOrder> orders
 ) {
 
     public record FulfillmentOrder(

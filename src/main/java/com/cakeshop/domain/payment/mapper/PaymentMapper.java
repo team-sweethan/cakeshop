@@ -65,6 +65,12 @@ public interface PaymentMapper {
             @Param("failureMessage") String failureMessage
     );
 
+    /** 관리자가 결제 만료를 확인한 시각을 기록한다. */
+    int markExpirationCheckedIfExpired(@Param("paymentId") long paymentId);
+
+    /** 결제 만료 확인을 취소한다. */
+    int clearExpirationCheckedIfExpired(@Param("paymentId") long paymentId);
+
     // DONE 결제의 전체 취소 결과와 취소 시각을 함께 기록한다.
     int cancelIfDone(
             @Param("paymentId") long paymentId,

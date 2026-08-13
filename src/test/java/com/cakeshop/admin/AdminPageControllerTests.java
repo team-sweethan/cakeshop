@@ -46,7 +46,10 @@ import com.cakeshop.domain.member.service.MemberSessionService;
 import com.cakeshop.domain.notification.controller.NotificationAdminController;
 import com.cakeshop.domain.order.controller.admin.FulfillmentAdminController;
 import com.cakeshop.domain.order.controller.admin.OrderAdminController;
+import com.cakeshop.domain.order.dto.view.OrderDetailView;
 import com.cakeshop.domain.order.dto.view.admin.FulfillmentListView;
+import com.cakeshop.domain.order.entity.OrderStatus;
+import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.order.service.admin.AdminOrderService;
 import com.cakeshop.domain.order.service.admin.AdminCustomOrderService;
 import com.cakeshop.domain.order.service.admin.FulfillmentService;
@@ -65,6 +68,7 @@ import com.cakeshop.domain.statistics.controller.StatisticsAdminController;
 import com.cakeshop.domain.statistics.dto.view.PeriodStatisticsView;
 import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
 import com.cakeshop.domain.statistics.service.DashboardReadModelQueryService;
+import com.cakeshop.domain.statistics.service.AdditionalMetricsReadModelQueryService;
 import com.cakeshop.domain.statistics.service.PeriodStatisticsReadModelQueryService;
 import com.cakeshop.domain.statistics.service.ProductPeriodStatisticsReadModelQueryService;
 
@@ -99,12 +103,20 @@ class AdminPageControllerTests {
 
         FulfillmentService fulfillmentService =
                 Mockito.mock(FulfillmentService.class);
-        when(fulfillmentService.getFulfillments(any()))
+        when(fulfillmentService.getFulfillments(any(), any()))
                 .thenReturn(new FulfillmentListView(
-                        LocalDate.of(2026, 8, 3),
                         null,
-                        List.of()
+                        new PageResult<>(List.of(), new PageRequest(null, null), 0)
                 ));
+
+        AdminOrderService adminOrderService = Mockito.mock(AdminOrderService.class);
+        when(adminOrderService.getOrder(1L)).thenReturn(new OrderDetailView(
+                1L, "ORD-1", 1L, OrderType.GENERAL, OrderStatus.PENDING_PAYMENT,
+                "주문자", "010-1111-1111", "수령자", "010-2222-2222",
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                LocalDateTime.of(2026, 8, 1, 10, 0), null, false,
+                null, null, null, null, LocalDateTime.of(2026, 8, 1, 9, 0), false, List.of()
+        ));
 
         PaymentAdminService paymentAdminQueryService =
                 Mockito.mock(PaymentAdminService.class);
@@ -126,6 +138,8 @@ class AdminPageControllerTests {
                 Mockito.mock(PeriodStatisticsReadModelQueryService.class);
         ProductPeriodStatisticsReadModelQueryService productStatisticsQueryService =
                 Mockito.mock(ProductPeriodStatisticsReadModelQueryService.class);
+        AdditionalMetricsReadModelQueryService additionalMetricsQueryService =
+                Mockito.mock(AdditionalMetricsReadModelQueryService.class);
 
         ReviewAdminService reviewAdminService = Mockito.mock(ReviewAdminService.class);
         when(reviewAdminService.getReviews(any(), any(), any(), any(), any(PageRequest.class)))
@@ -173,12 +187,14 @@ class AdminPageControllerTests {
                 new StatisticsAdminController(
                         dashboardReadModelQueryService,
                         periodStatisticsReadModelQueryService,
-                        productStatisticsQueryService
+                        productStatisticsQueryService,
+                        additionalMetricsQueryService
                 ),
                 new ProductAdminController(
                         Mockito.mock(ProductAdminService.class)),
                 new OrderAdminController(
-                        Mockito.mock(AdminOrderService.class),
+                        adminOrderService,
+                        Mockito.mock(FulfillmentService.class),
                         Mockito.mock(RefundFacade.class)),
                 new FulfillmentAdminController(
                         fulfillmentService,
