@@ -5,11 +5,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.cakeshop.domain.order.entity.OrderStatus;
-import com.cakeshop.domain.statistics.dto.view.LowStockProductView;
-import com.cakeshop.domain.statistics.dto.view.RecentOrderView;
-import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
-import com.cakeshop.domain.statistics.dto.view.TodayPickupScheduleView;
-import com.cakeshop.domain.statistics.mapper.DashboardReadModelMapper;
+import com.cakeshop.domain.dashboard.dto.view.DashboardView;
+import com.cakeshop.domain.dashboard.dto.view.LowStockProductView;
+import com.cakeshop.domain.dashboard.dto.view.RecentOrderView;
+import com.cakeshop.domain.dashboard.dto.view.TodayPickupScheduleView;
+import com.cakeshop.domain.dashboard.mapper.DashboardReadModelMapper;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
@@ -74,7 +74,7 @@ class DashboardReadModelQueryServiceTests {
         DashboardReadModelQueryService service =
                 new DashboardReadModelQueryService(dashboardReadModelMapper, CLOCK);
 
-        StatisticsDashboardView dashboard = service.getDashboard();
+        DashboardView dashboard = service.getDashboard();
 
         assertThat(dashboard.todayOrderCount()).isEqualTo(3L);
         assertThat(dashboard.todaySalesAmount()).isEqualByComparingTo("120000");

@@ -13,7 +13,7 @@ import com.cakeshop.domain.statistics.dto.view.PeriodStatisticsView;
 import com.cakeshop.domain.statistics.dto.view.AdditionalMetricsView;
 import com.cakeshop.domain.statistics.dto.view.ProductStatisticsView;
 import com.cakeshop.domain.statistics.dto.view.StatisticsTrendView;
-import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
+import com.cakeshop.domain.dashboard.dto.view.DashboardView;
 import com.cakeshop.domain.statistics.error.StatisticsErrorCode;
 import com.cakeshop.domain.statistics.service.DashboardReadModelQueryService;
 import com.cakeshop.domain.statistics.service.AdditionalMetricsReadModelQueryService;
@@ -55,7 +55,7 @@ class StatisticsAdminScreenRenderingTests {
     @WithMockUser(roles = "ADMIN")
     void dashboard_followupMetrics_rendersCountsAndManagementLinks() throws Exception {
         when(dashboardReadModelQueryService.getDashboard())
-                .thenReturn(new StatisticsDashboardView(
+                .thenReturn(new DashboardView(
                         0,
                         BigDecimal.ZERO,
                         3,

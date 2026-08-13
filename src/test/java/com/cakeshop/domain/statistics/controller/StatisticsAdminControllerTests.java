@@ -17,7 +17,7 @@ import com.cakeshop.domain.statistics.dto.view.AdditionalMetricsView;
 import com.cakeshop.domain.statistics.dto.view.PeriodStatisticsView;
 import com.cakeshop.domain.statistics.dto.view.ProductStatisticsView;
 import com.cakeshop.domain.statistics.dto.view.StatisticsTrendView;
-import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
+import com.cakeshop.domain.dashboard.dto.view.DashboardView;
 import com.cakeshop.domain.statistics.error.StatisticsErrorCode;
 import com.cakeshop.domain.statistics.service.AdditionalMetricsReadModelQueryService;
 import com.cakeshop.domain.statistics.service.DashboardReadModelQueryService;
@@ -67,8 +67,8 @@ class StatisticsAdminControllerTests {
 
     @Test
     void dashboard_serviceReturnsView_addsDashboardToModel() throws Exception {
-        StatisticsDashboardView dashboard =
-                new StatisticsDashboardView(
+        DashboardView dashboard =
+                new DashboardView(
                         3L,
                         new BigDecimal("120000"),
                         2L,

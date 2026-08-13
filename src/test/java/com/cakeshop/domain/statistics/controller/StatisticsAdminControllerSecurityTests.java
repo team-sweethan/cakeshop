@@ -8,7 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import com.cakeshop.domain.statistics.dto.view.PeriodStatisticsView;
-import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
+import com.cakeshop.domain.dashboard.dto.view.DashboardView;
 import com.cakeshop.domain.statistics.service.DashboardReadModelQueryService;
 import com.cakeshop.domain.statistics.service.AdditionalMetricsReadModelQueryService;
 import com.cakeshop.domain.statistics.service.PeriodStatisticsReadModelQueryService;
@@ -64,7 +64,7 @@ class StatisticsAdminControllerSecurityTests {
     @WithMockUser(roles = "ADMIN")
     void dashboard_adminRole_isAccessible() throws Exception {
         when(dashboardReadModelQueryService.getDashboard())
-                .thenReturn(new StatisticsDashboardView(
+                .thenReturn(new DashboardView(
                         0L,
                         BigDecimal.ZERO,
                         0L,

@@ -3,7 +3,7 @@ package com.cakeshop.domain.statistics.controller;
 import com.cakeshop.domain.statistics.dto.form.StatisticsPeriodType;
 import com.cakeshop.domain.statistics.dto.form.StatisticsSearchForm;
 import com.cakeshop.domain.statistics.dto.view.PeriodStatisticsView;
-import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
+import com.cakeshop.domain.dashboard.dto.view.DashboardView;
 import com.cakeshop.domain.statistics.error.StatisticsErrorCode;
 import com.cakeshop.domain.statistics.service.AdditionalMetricsReadModelQueryService;
 import com.cakeshop.domain.statistics.service.DashboardReadModelQueryService;
@@ -54,7 +54,7 @@ public class StatisticsAdminController {
     /** 관리자 대시보드의 오늘 통계를 조회한다. */
     @GetMapping("/admin")
     public String dashboard(Model model) {
-        StatisticsDashboardView dashboard = dashboardReadModelQueryService.getDashboard();
+        DashboardView dashboard = dashboardReadModelQueryService.getDashboard();
         model.addAttribute("dashboard", dashboard);
 
         return "admin/dashboard";

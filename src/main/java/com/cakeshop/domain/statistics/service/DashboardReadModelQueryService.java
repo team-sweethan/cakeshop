@@ -1,10 +1,10 @@
 package com.cakeshop.domain.statistics.service;
 
-import com.cakeshop.domain.statistics.dto.view.LowStockProductView;
-import com.cakeshop.domain.statistics.dto.view.RecentOrderView;
-import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
-import com.cakeshop.domain.statistics.dto.view.TodayPickupScheduleView;
-import com.cakeshop.domain.statistics.mapper.DashboardReadModelMapper;
+import com.cakeshop.domain.dashboard.dto.view.DashboardView;
+import com.cakeshop.domain.dashboard.dto.view.LowStockProductView;
+import com.cakeshop.domain.dashboard.dto.view.RecentOrderView;
+import com.cakeshop.domain.dashboard.dto.view.TodayPickupScheduleView;
+import com.cakeshop.domain.dashboard.mapper.DashboardReadModelMapper;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
@@ -26,7 +26,7 @@ public class DashboardReadModelQueryService {
 
     /** 관리자 대시보드에 표시할 지표를 조회한다. */
     @Transactional(readOnly = true)
-    public StatisticsDashboardView getDashboard() {
+    public DashboardView getDashboard() {
         LocalDate today = LocalDate.now(clock);
         LocalDateTime start = today.atStartOfDay();
         LocalDateTime end = today.plusDays(1).atStartOfDay();
@@ -62,7 +62,7 @@ public class DashboardReadModelQueryService {
         // 신고 처리 대기 게시글
         long pendingReportedPostCount = dashboardReadModelMapper.countPendingReportedPosts();
 
-        return new StatisticsDashboardView(
+        return new DashboardView(
                 todayOrderCount,
                 todaySalesAmount,
                 approvalPendingCount,
