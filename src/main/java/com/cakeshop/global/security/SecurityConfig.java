@@ -82,8 +82,8 @@ public class SecurityConfig {
         };
 
         http
-            // 웹훅 경로만 CSRF 제외 — 전체 비활성화 금지
-                .csrf(csrf -> csrf.ignoringRequestMatchers("/webhooks/toss"))
+            // 웹훅 경로 및 웹소켓 SockJS 폴백 경로만 CSRF 제외 — 전체 비활성화 금지
+                .csrf(csrf -> csrf.ignoringRequestMatchers("/webhooks/toss", "/ws/**"))
             .requestCache(cache -> cache.requestCache(requestCache))
             .authorizeHttpRequests(auth -> {
                 // ① 공개 GET을 먼저 선언 (matcher 순서 = 우선순위)

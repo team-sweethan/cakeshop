@@ -148,9 +148,12 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       });
 
-      // 연결 완료 후 현재 활성화된 방이 있다면 소켓 구독을 재등록!
+      // 연결 완료 후 현재 활성화된 방이 있다면 소켓 구독 및 읽음 커서 재전파!
       if (selectedChatRoomId) {
         subscribeActiveRoomWebSocket(selectedChatRoomId);
+        if (lastFetchedMessageId > 0) {
+          markRead(selectedChatRoomId, lastFetchedMessageId);
+        }
       }
     }, (err) => {
       console.error("관리자 웹소켓 연결 오류:", err);
@@ -162,14 +165,27 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!msg || !msg.chatRoomId) return;
 
     const rId = msg.chatRoomId;
-    let existingRoom = adminRoomsData.find((r) => (r.chatRoomId || r.id) === rId);
+    const newStatus = msg.senderType === "ADMIN" ? "WAITING_CUSTOMER" : "WAITING_ADMIN";
 
+    // 현재 탭 필터 조건 검증 (미답변 탭일 때 답변완료 방이면 제거, 완료 탭일 때 미답변 방이면 제거)
+    if (currentFilter === "unread" && newStatus !== "WAITING_ADMIN") {
+      adminRoomsData = adminRoomsData.filter((r) => (r.chatRoomId || r.id) !== rId);
+      renderRoomList();
+      return;
+    }
+    if (currentFilter === "done" && newStatus !== "RESOLVED") {
+      adminRoomsData = adminRoomsData.filter((r) => (r.chatRoomId || r.id) !== rId);
+      renderRoomList();
+      return;
+    }
+
+    let existingRoom = adminRoomsData.find((r) => (r.chatRoomId || r.id) === rId);
     const isCurrentActive = selectedChatRoomId === rId;
 
     if (existingRoom) {
       existingRoom.lastMessageContent = msg.content || (msg.imageUrls && msg.imageUrls.length > 0 ? "(사진)" : "");
       existingRoom.lastMessageCreatedAt = msg.createdAt;
-      existingRoom.responseStatus = msg.senderType === "ADMIN" ? "WAITING_CUSTOMER" : "WAITING_ADMIN";
+      existingRoom.responseStatus = newStatus;
       if (!isCurrentActive && msg.senderType !== "ADMIN") {
         existingRoom.unreadCount = (existingRoom.unreadCount || 0) + 1;
       }
@@ -180,7 +196,7 @@ document.addEventListener("DOMContentLoaded", () => {
         chatRoomId: rId,
         customerId: msg.senderId,
         customerName: msg.senderName || `고객 #${msg.senderId}`,
-        responseStatus: msg.senderType === "ADMIN" ? "WAITING_CUSTOMER" : "WAITING_ADMIN",
+        responseStatus: newStatus,
         lastMessageContent: msg.content || (msg.imageUrls && msg.imageUrls.length > 0 ? "(사진)" : ""),
         lastMessageCreatedAt: msg.createdAt,
         unreadCount: isCurrentActive ? 0 : 1
@@ -660,15 +676,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // 웹소켓 연결 시 STOMP 발신
       if (stompClient && stompClient.connected) {
-        stompClient.send("/app/chat/message", {}, JSON.stringify(payload));
+        try {
+          stompClient.send("/app/chat/message", {}, JSON.stringify(payload));
+          if (inputEl) inputEl.value = "";
+          pendingAttachment = null;
+          if (adminImageFileName) adminImageFileName.textContent = "선택된 파일 없음";
+          if (adminChatImageInput) adminChatImageInput.value = "";
 
-        if (inputEl) inputEl.value = "";
-        pendingAttachment = null;
-        if (adminImageFileName) adminImageFileName.textContent = "선택된 파일 없음";
-        if (adminChatImageInput) adminChatImageInput.value = "";
-
-        // 답변 작성 후 관리자 탭 목록 재조회 (미답변 탭 필터 동기화)
-        setTimeout(() => loadAdminRooms(currentRoomPage), 300);
+          // 답변 작성 후 관리자 목록 1페이지 재조회 (미답변 탭 필터 동기화)
+          setTimeout(() => loadAdminRooms(1), 300);
+        } catch (stompErr) {
+          console.error("관리자 STOMP 메시지 발신 실패:", stompErr);
+          alert("답변 전송 중 오류가 발생했습니다.");
+        }
         return;
       }
 
@@ -697,7 +717,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (adminChatImageInput) adminChatImageInput.value = "";
 
         await loadAdminMessages(selectedChatRoomId);
-        await loadAdminRooms(currentRoomPage);
+        await loadAdminRooms(1);
         await markRead(selectedChatRoomId, sentMsg.id);
 
       } catch (err) {
