@@ -64,7 +64,7 @@
 | 정후 | `coupon` |
 | 민정 | `chat`, `notification` |
 | 현규 | `community`, `review` |
-| 시은 | `product`, `statistics` |
+| 시은 | `product`, `dashboard`, `statistics` |
 | 공통 협의 | `store`, `global`, `home` |
 
 ## 작업과 검증 루프
