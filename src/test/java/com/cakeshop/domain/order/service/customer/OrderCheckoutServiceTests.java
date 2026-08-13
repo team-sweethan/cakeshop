@@ -1,6 +1,7 @@
 package com.cakeshop.domain.order.service.customer;
 
 import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView;
+import com.cakeshop.domain.order.dto.view.customer.common.PickupTimeView;
 import com.cakeshop.domain.order.service.OrderOptionValidator;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
 import com.cakeshop.domain.order.service.OrderOptionValidator.ValidatedOption;
@@ -135,7 +136,7 @@ class OrderCheckoutServiceTests {
                 .isEqualTo(LocalDate.of(2026, 8, 6));
         assertThat(checkout.pickupDates().stream()
                 .flatMap(date -> date.times().stream())
-                .map(GeneralOrderCheckoutView.PickupTimeView::value))
+                .map(PickupTimeView::value))
                 .allMatch(value -> value.isAfter(LocalDateTime.of(2026, 8, 5, 10, 25)));
     }
 

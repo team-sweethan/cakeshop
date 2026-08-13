@@ -1,7 +1,7 @@
 package com.cakeshop.domain.order.dto.view.customer;
 
-import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView.PickupDateView;
-import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView.SelectedOptionView;
+import com.cakeshop.domain.order.dto.view.customer.common.CheckoutOptionView;
+import com.cakeshop.domain.order.dto.view.customer.common.PickupDateView;
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -10,7 +10,7 @@ public record CustomOrderCheckoutView(
         long productId,
         String productName,
         int preparationDays,
-        List<SelectedOptionView> selectedOptions,
+        List<CheckoutOptionView> selectedOptions,
         BigDecimal totalAmount,
         List<PickupDateView> pickupDates
 ) {

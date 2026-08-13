@@ -2,6 +2,7 @@ package com.cakeshop.domain.payment.dto.view;
 
 import com.cakeshop.domain.payment.entity.PaymentCancellationStatus;
 import com.cakeshop.domain.payment.entity.PaymentStatus;
+import com.cakeshop.domain.order.entity.OrderType;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -30,7 +31,7 @@ public record PaymentAdminListRow(
     }
 
     public String orderTypeLabel() {
-        return "CUSTOM".equals(orderType) ? "주문 제작" : "일반 상품";
+        return OrderType.valueOf(orderType).orderTypeLabel();
     }
 
     public String methodLabel() {
