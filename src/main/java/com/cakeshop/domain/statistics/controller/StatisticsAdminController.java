@@ -5,6 +5,7 @@ import com.cakeshop.domain.statistics.dto.form.StatisticsSearchForm;
 import com.cakeshop.domain.statistics.dto.view.PeriodStatisticsView;
 import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
 import com.cakeshop.domain.statistics.error.StatisticsErrorCode;
+import com.cakeshop.domain.statistics.service.AdditionalMetricsReadModelQueryService;
 import com.cakeshop.domain.statistics.service.DashboardReadModelQueryService;
 import com.cakeshop.domain.statistics.service.PeriodStatisticsReadModelQueryService;
 import com.cakeshop.domain.statistics.service.ProductPeriodStatisticsReadModelQueryService;
@@ -35,6 +36,7 @@ public class StatisticsAdminController {
     private final DashboardReadModelQueryService dashboardReadModelQueryService;
     private final PeriodStatisticsReadModelQueryService periodStatisticsReadModelQueryService;
     private final ProductPeriodStatisticsReadModelQueryService productStatisticsQueryService;
+    private final AdditionalMetricsReadModelQueryService additionalMetricsQueryService;
 
     /** 조회 유형이 생략된 기존 날짜 URL은 직접 기간 조회로 호환한다. */
     @ModelAttribute("searchForm")
@@ -89,6 +91,7 @@ public class StatisticsAdminController {
             }
             model.addAttribute("statistics", statistics);
             addProductStatistics(model, statistics);
+            addAdditionalMetrics(model, statistics);
         } catch (BusinessException e) {
             if (e.getErrorCode() != StatisticsErrorCode.INVALID_DATE_RANGE
                     && e.getErrorCode() != StatisticsErrorCode.STATISTICS_NOT_READY) {
@@ -114,6 +117,23 @@ public class StatisticsAdminController {
                 throw e;
             }
             model.addAttribute("productStatisticsError", e.getMessage());
+        }
+    }
+
+    private void addAdditionalMetrics(Model model, PeriodStatisticsView statistics) {
+        try {
+            model.addAttribute(
+                    "additionalMetrics",
+                    additionalMetricsQueryService.getAdditionalMetrics(
+                            statistics.startDate(),
+                            statistics.endDate()
+                    )
+            );
+        } catch (BusinessException e) {
+            if (e.getErrorCode() != StatisticsErrorCode.ADDITIONAL_METRICS_NOT_READY) {
+                throw e;
+            }
+            model.addAttribute("additionalMetricsError", e.getMessage());
         }
     }
 }
