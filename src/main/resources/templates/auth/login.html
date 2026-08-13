@@ -40,6 +40,8 @@
     <p class="alert alert--error" th:if="${param.oauthAccountExists}">이미 가입된 이메일입니다. 일반 로그인을 이용해 주세요.</p>
     <a class="btn btn--block" th:if="${@environment.getProperty('app.member.oauth.google-enabled', false)}"
        th:href="@{/oauth2/authorization/google}">Google로 로그인</a>
+    <a class="btn btn--block" th:if="${@environment.getProperty('app.member.oauth.kakao-enabled', false)}"
+       th:href="@{/oauth2/authorization/kakao(prompt=select_account)}">카카오로 로그인</a>
     <hr class="divider">
     <div class="cluster cluster--between">
       <a class="btn" th:href="@{/signup}">회원가입</a>

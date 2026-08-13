@@ -6,11 +6,10 @@
   }
 
   function updateSummary(cart) {
-    document.querySelector("[data-cart-total-quantity]").textContent = cart.totalQuantity + "개";
+    document.querySelector("[data-cart-item-count]").textContent = cart.itemCount + "종";
     document.querySelector("[data-cart-base-total]").textContent = money(cart.baseTotal);
     document.querySelector("[data-cart-option-total]").textContent = money(cart.optionTotal);
     document.querySelector("[data-cart-grand-total]").textContent = money(cart.grandTotal);
-    document.dispatchEvent(new CustomEvent("cart:updated", { detail: cart.totalQuantity }));
   }
 
   function updateButtons(form) {
@@ -29,18 +28,19 @@
   }
 
   function optimisticSummary() {
-    let totalQuantity = 0;
+    let itemCount = 0;
     let baseTotal = 0;
     let optionTotal = 0;
     document.querySelectorAll("[data-cart-item]").forEach(function (item) {
-      if (item.dataset.available !== "true") return;
+      const selector = item.querySelector("[data-cart-item-select]");
+      if (item.dataset.available !== "true" || !selector || !selector.checked) return;
+      itemCount += 1;
       const quantity = Number(item.querySelector("[name='quantity']").value);
-      totalQuantity += quantity;
       baseTotal += Number(item.dataset.basePrice) * quantity;
       optionTotal += Number(item.dataset.optionPrice) * quantity;
     });
     updateSummary({
-      totalQuantity: totalQuantity,
+      itemCount: itemCount,
       baseTotal: baseTotal,
       optionTotal: optionTotal,
       grandTotal: baseTotal + optionTotal
@@ -54,6 +54,43 @@
     status.classList.toggle("badge--success", available);
     status.classList.toggle("badge--danger", !available);
     status.textContent = available ? "주문 가능" : "재고 부족 또는 판매 중지";
+    const selector = item.querySelector("[data-cart-item-select]");
+    if (selector) {
+      selector.disabled = !available;
+      selector.checked = available;
+    }
+    updateSelectAllState();
+  }
+
+  function updateSelectAllState() {
+    const selectAll = document.querySelector("[data-cart-select-all]");
+    if (!selectAll) return;
+    const itemSelectors = Array.from(
+      document.querySelectorAll("[data-cart-item-select]:not(:disabled)")
+    );
+    const selectedCount = itemSelectors.filter(input => input.checked).length;
+    selectAll.checked = itemSelectors.length > 0 && selectedCount === itemSelectors.length;
+    selectAll.indeterminate = selectedCount > 0 && selectedCount < itemSelectors.length;
+    selectAll.disabled = itemSelectors.length === 0;
+  }
+
+  function initializeItemSelection() {
+    const selectAll = document.querySelector("[data-cart-select-all]");
+    if (!selectAll) return;
+    selectAll.addEventListener("change", function () {
+      document.querySelectorAll("[data-cart-item-select]:not(:disabled)")
+        .forEach(input => { input.checked = selectAll.checked; });
+      updateSelectAllState();
+      optimisticSummary();
+    });
+    document.addEventListener("change", function (event) {
+      if (event.target.matches("[data-cart-item-select]")) {
+        updateSelectAllState();
+        optimisticSummary();
+      }
+    });
+    updateSelectAllState();
+    optimisticSummary();
   }
 
   async function saveQuantity(form) {
@@ -83,7 +120,8 @@
         });
         item.querySelector("[data-cart-item-total]").textContent = money(cart.itemTotal);
         updateButtons(form);
-        updateSummary(cart);
+        // 수량 갱신 후에도 주문 요약은 현재 체크된 주문 대상만 다시 계산한다.
+        optimisticSummary();
       }
     } catch (error) {
       window.location.reload();
@@ -126,4 +164,6 @@
     event.preventDefault();
     saveQuantity(form);
   });
+
+  document.addEventListener("DOMContentLoaded", initializeItemSelection);
 })();

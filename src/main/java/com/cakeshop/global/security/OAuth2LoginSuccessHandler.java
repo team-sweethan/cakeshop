@@ -23,7 +23,7 @@ import org.springframework.security.web.authentication.SavedRequestAwareAuthenti
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
-/** Google OAuth 인증 결과를 기존 회원 로그인 또는 추가 정보 입력으로 분기한다. */
+/** OAuth 인증 결과를 기존 회원 로그인 또는 추가 정보 입력으로 분기한다. */
 @Component
 @Profile("oauth")
 @RequiredArgsConstructor
@@ -42,7 +42,7 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
             HttpServletResponse response,
             Authentication authentication
     ) throws IOException, ServletException {
-        OAuthIdentity identity = extractGoogleIdentity(authentication);
+        OAuthIdentity identity = extractIdentity(authentication);
         if (identity == null) {
             memberAuthenticationSession.clear(request, response);
             redirectStrategy.sendRedirect(request, response, "/login?oauthError");
@@ -80,13 +80,20 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
         }
     }
 
-    private OAuthIdentity extractGoogleIdentity(Authentication authentication) {
-        if (!(authentication instanceof OAuth2AuthenticationToken oauthToken)
-                || !"google".equalsIgnoreCase(oauthToken.getAuthorizedClientRegistrationId())) {
+    private OAuthIdentity extractIdentity(Authentication authentication) {
+        if (!(authentication instanceof OAuth2AuthenticationToken oauthToken)) {
             return null;
         }
 
         OAuth2User user = oauthToken.getPrincipal();
+        return switch (oauthToken.getAuthorizedClientRegistrationId().toLowerCase(Locale.ROOT)) {
+            case "google" -> googleIdentity(user);
+            case "kakao" -> kakaoIdentity(user);
+            default -> null;
+        };
+    }
+
+    private OAuthIdentity googleIdentity(OAuth2User user) {
         String providerId = user.getAttribute("sub");
         String email = user.getAttribute("email");
         Boolean emailVerified = user.getAttribute("email_verified");
@@ -94,9 +101,32 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
                 || !SignupForm.isEmailFormatValid(email)) {
             return null;
         }
-        String name = user.getAttribute("name");
+        return identity("GOOGLE", providerId, email, user.getAttribute("name"));
+    }
+
+    private OAuthIdentity kakaoIdentity(OAuth2User user) {
+        Object id = user.getAttribute("id");
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> account = user.getAttribute("kakao_account");
+        if (!(id instanceof Number) || account == null) {
+            return null;
+        }
+        String email = (String) account.get("email");
+        Boolean emailValid = (Boolean) account.get("is_email_valid");
+        Boolean emailVerified = (Boolean) account.get("is_email_verified");
+        if (!Boolean.TRUE.equals(emailValid) || !Boolean.TRUE.equals(emailVerified)
+                || !SignupForm.isEmailFormatValid(email)) {
+            return null;
+        }
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> profile = (java.util.Map<String, Object>) account.get("profile");
+        String nickname = profile == null ? "" : (String) profile.get("nickname");
+        return identity("KAKAO", String.valueOf(id), email, nickname);
+    }
+
+    private OAuthIdentity identity(String provider, String providerId, String email, String name) {
         return new OAuthIdentity(
-                "GOOGLE",
+                provider,
                 providerId.trim(),
                 email.trim().toLowerCase(Locale.ROOT),
                 name == null ? "" : name.trim());

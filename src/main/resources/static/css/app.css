@@ -1394,6 +1394,15 @@ body > main {
     padding: 6px
 }
 
+.admin-sidebar__section {
+    color: var(--color-muted);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    margin: 14px 8px 4px;
+    text-transform: uppercase
+}
+
 .admin-sidebar__link {
     display: block;
     font-size: var(--font-xs);
@@ -1850,6 +1859,7 @@ body > main {
     align-items: flex-end
 }
 
+.admin-page-eyebrow,
 .payment-admin-eyebrow {
     color: var(--color-muted);
     font-size: 11px;
@@ -1905,6 +1915,21 @@ body > main {
 
 .payment-history-table td {
     vertical-align: middle
+}
+
+.payment-row-actions {
+    display: grid;
+    gap: var(--space-2)
+}
+
+.payment-expiration-check {
+    align-items: center;
+    cursor: pointer;
+    display: inline-flex;
+    font-size: var(--font-xs);
+    font-weight: 700;
+    gap: 6px;
+    white-space: nowrap
 }
 
 .payment-reference {
@@ -2188,6 +2213,42 @@ body > main {
 .fulfillment-list {
     display: grid;
     gap: var(--space-3)
+}
+
+.order-workspace__header {
+    margin-bottom: var(--space-3)
+}
+
+.order-workspace__stages {
+    border-bottom: 1px solid var(--color-border-light);
+    display: flex;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+    overflow-x: auto
+}
+
+.order-workspace__stage {
+    color: var(--color-muted);
+    font-size: var(--font-sm);
+    font-weight: 700;
+    padding: 0 var(--space-2) var(--space-3);
+    text-decoration: none;
+    white-space: nowrap
+}
+
+.order-workspace__stage:hover,
+.order-workspace__stage.is-current {
+    box-shadow: inset 0 -2px 0 var(--color-dark);
+    color: var(--color-dark)
+}
+
+.order-workspace__scope-note {
+    margin: calc(var(--space-4) * -1) 0 var(--space-4)
+}
+
+.fulfillment-pagination {
+    justify-content: center;
+    margin-top: var(--space-4)
 }
 
 .fulfillment-order {

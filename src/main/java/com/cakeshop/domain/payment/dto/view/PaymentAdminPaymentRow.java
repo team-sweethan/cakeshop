@@ -17,6 +17,7 @@ public record PaymentAdminPaymentRow(
         String cancellationRequestType,
         LocalDateTime requestedAt,
         LocalDateTime approvedAt,
-        LocalDateTime canceledAt
+        LocalDateTime canceledAt,
+        LocalDateTime expirationCheckedAt
 ) {
 }

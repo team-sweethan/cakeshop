@@ -14,7 +14,9 @@
 <main class="page-container page-container--form">
   <section class="panel section">
     <h1>추가 정보 입력</h1>
-    <p class="form-help">Google 계정으로 로그인하기 위한 정보를 입력해 주세요.</p>
+    <p class="form-help">
+      <span th:text="${oauthProviderName}">소셜</span> 계정으로 로그인하기 위한 정보를 입력해 주세요.
+    </p>
     <form class="form-stack" th:action="@{/oauth/signup}" th:object="${oauthSignupForm}" method="post">
       <div class="form-group">
         <label for="oauth-email">이메일</label>

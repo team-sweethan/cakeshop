@@ -9,10 +9,12 @@ import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.error.PaymentErrorCode;
 import com.cakeshop.domain.payment.infra.TossPaymentClient.ApprovalResult;
 import com.cakeshop.domain.payment.mapper.PaymentMapper;
+import com.cakeshop.domain.payment.event.GeneralPaymentCompletedEvent;
 import com.cakeshop.domain.product.service.ProductStockService;
 import com.cakeshop.global.error.BusinessException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
@@ -32,6 +34,7 @@ public class PaymentService {
     private final Clock clock;
     // 쿠폰 담당자의 공개 계약으로 결제 성공 시 RESERVED 쿠폰을 USED로 확정한다.
     private final CouponOrderCommandService couponOrderCommandService;
+    private final ApplicationEventPublisher eventPublisher;
 
     /** 주문의 현재 READY 결제를 조회한다. */
     @Transactional(readOnly = true)
@@ -110,6 +113,8 @@ public class PaymentService {
         );
         couponOrderCommandService.useReservedCouponForOrder(order.orderId());
         paymentRecoveryService.discardApprovalRecovery(payment);
+        // 장바구니에서 생성한 일반 주문만 결제 커밋 후 연결된 장바구니 항목을 정리한다.
+        eventPublisher.publishEvent(new GeneralPaymentCompletedEvent(order.orderId()));
     }
 
     private void completeCustomPayment(
@@ -174,6 +179,7 @@ public class PaymentService {
         requireOneRow(paymentMapper.completeZeroAmountIfReady(payment.getId(), completedAt));
         orderPaymentCommandService.completeGeneralOrderAfterPayment(order.orderId(), completedAt);
         couponOrderCommandService.useReservedCouponForOrder(order.orderId());
+        eventPublisher.publishEvent(new GeneralPaymentCompletedEvent(order.orderId()));
     }
 
     private void requireOneRow(int affectedRows) {

@@ -113,7 +113,7 @@ public class CartController {
     @GetMapping("/count")
     @ResponseBody
     public CartCountView count(@AuthenticationPrincipal MemberDetails member) {
-        return new CartCountView(cartService.getTotalQuantity(member.getMemberId()));
+        return new CartCountView(cartService.getItemCount(member.getMemberId()));
     }
 
     @PostMapping("/items/{itemId}/delete")

@@ -357,6 +357,27 @@ class PaymentMapperTests {
     }
 
     @Test
+    void expirationCheck_expiredPayment_updatesListAndAttentionSummary() {
+        Payment payment = insertPayment("EXPIRED-CHECK");
+        assertThat(paymentMapper.expireIfReady(
+                payment.getId(),
+                "EXPIRED",
+                "PAYMENT_TIMEOUT",
+                "결제 유효 시간이 지났습니다."
+        )).isEqualTo(1);
+
+        assertThat(paymentMapper.summarizePaymentsForAdmin().attentionCount()).isEqualTo(1);
+        assertThat(paymentMapper.markExpirationCheckedIfExpired(payment.getId())).isEqualTo(1);
+        assertThat(paymentMapper.findPaymentsForAdmin(PaymentStatus.EXPIRED))
+                .singleElement()
+                .satisfies(row -> assertThat(row.expirationCheckedAt()).isNotNull());
+        assertThat(paymentMapper.summarizePaymentsForAdmin().attentionCount()).isZero();
+
+        assertThat(paymentMapper.clearExpirationCheckedIfExpired(payment.getId())).isEqualTo(1);
+        assertThat(paymentMapper.summarizePaymentsForAdmin().attentionCount()).isEqualTo(1);
+    }
+
+    @Test
     void readyPaymentCannotBeCreatedWhenDonePaymentExists() {
         Payment firstPayment = insertPayment("FIRST-DONE");
 

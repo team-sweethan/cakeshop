@@ -8,13 +8,14 @@ import com.cakeshop.domain.order.entity.OrderItemOption;
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.order.mapper.OrderMapper;
+import com.cakeshop.global.common.paging.PageRequest;
+import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +27,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class FulfillmentService {
 
+    public static final int PAGE_SIZE = 20;
+
     private static final Set<OrderStatus> FULFILLMENT_STATUSES = Set.of(
             OrderStatus.UNDER_REVIEW,
             OrderStatus.IN_PRODUCTION,
@@ -36,26 +39,44 @@ public class FulfillmentService {
     private final OrderMapper orderMapper;
     private final Clock clock;
 
-    /** 선택한 픽업일의 실제 제작·픽업 주문과 상품·옵션 스냅샷을 조회한다. */
+    /** 검토·제작·픽업 업무 전체를 페이지 단위로 조회하고 상품·옵션 스냅샷을 조합한다. */
     @Transactional(readOnly = true)
-    public FulfillmentListView getFulfillments(FulfillmentSearchCondition condition) {
-        LocalDate pickupDate = condition == null || condition.getPickupDate() == null
-                ? LocalDate.now(clock)
-                : condition.getPickupDate();
+    public FulfillmentListView getFulfillments(
+            FulfillmentSearchCondition condition,
+            PageRequest pageRequest
+    ) {
         OrderStatus selectedStatus = normalizeStatus(
                 condition == null ? null : condition.getStatus()
         );
-        List<FulfillmentListView.FulfillmentOrder> orders = orderMapper
-                .findFulfillmentOrders(
-                        pickupDate.atStartOfDay(),
-                        pickupDate.plusDays(1).atStartOfDay(),
-                        selectedStatus
-                )
-                .stream()
-                .map(this::toFulfillmentOrder)
-                .toList();
+        PageRequest normalizedPageRequest = pageRequest == null
+                ? new PageRequest(null, null)
+                : pageRequest;
+        long totalOrders = orderMapper.countFulfillmentOrders(selectedStatus);
+        List<FulfillmentListView.FulfillmentOrder> orders = totalOrders <= normalizedPageRequest.getOffset()
+                ? List.of()
+                : orderMapper.findFulfillmentOrders(
+                                selectedStatus,
+                                normalizedPageRequest.getSize(),
+                                normalizedPageRequest.getOffset()
+                        )
+                        .stream()
+                        .map(this::toFulfillmentOrder)
+                        .toList();
 
-        return new FulfillmentListView(pickupDate, selectedStatus, orders);
+        return new FulfillmentListView(
+                selectedStatus,
+                new PageResult<>(orders, normalizedPageRequest, totalOrders)
+        );
+    }
+
+    /** 주문 상세에서 해당 주문이 보이는 작업 단계 페이지를 계산한다. */
+    @Transactional(readOnly = true)
+    public int getFulfillmentPage(long orderId, OrderStatus status) {
+        if (orderId <= 0 || normalizeStatus(status) == null) {
+            return 1;
+        }
+        Integer page = orderMapper.findFulfillmentPage(orderId, status, PAGE_SIZE);
+        return page == null ? 1 : page;
     }
 
     /** DONE 결제가 유지되는 픽업 준비 주문만 수령 완료로 원자적으로 변경한다. */
