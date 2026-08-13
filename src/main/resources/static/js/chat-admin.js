@@ -111,7 +111,7 @@ document.addEventListener("DOMContentLoaded", () => {
         clearMainAndSidePanel();
       }
 
-      // 🌟 웹소켓 연결 및 관리자 대시보드 토픽 구독
+      // 웹소켓 연결 및 관리자 대시보드 토픽 구독
       initAdminWebSocket();
 
     } catch (err) {
@@ -122,7 +122,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // 🌟 관리자 웹소켓 STOMP 초기화 및 연결
+  // 관리자 웹소켓 STOMP 초기화 및 연결
   function initAdminWebSocket() {
     if (stompClient && stompClient.connected) return;
     if (typeof SockJS === "undefined" || typeof Stomp === "undefined") {
@@ -313,7 +313,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     renderRoomList();
 
-    // 🌟 방 교체 시 이전 방 구독 해제 후 새 방 웹소켓 토픽 구독
+    // 방 교체 시 이전 방 구독 해제 후 새 방 웹소켓 토픽 구독
     subscribeActiveRoomWebSocket(roomId);
 
     await loadAdminMessages(roomId);
@@ -641,7 +641,7 @@ document.addEventListener("DOMContentLoaded", () => {
         attachments: pendingAttachment ? [pendingAttachment] : []
       };
 
-      // 🌟 웹소켓 연결 시 STOMP 발신
+      // 웹소켓 연결 시 STOMP 발신
       if (stompClient && stompClient.connected) {
         stompClient.send("/app/chat/message", {}, JSON.stringify(payload));
 

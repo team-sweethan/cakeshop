@@ -53,7 +53,7 @@ document.addEventListener("DOMContentLoaded", () => {
         await updateReadCursor(currentChatRoomId, lastFetchedMessageId);
       }
 
-      // 🌟 웹소켓 실시간 연결 및 구독 시작
+      // 웹소켓 실시간 연결 및 구독 시작
       connectWebSocket(currentChatRoomId);
 
     } catch (err) {
@@ -64,7 +64,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // 🌟 웹소켓 STOMP 연결 및 실시간 구독
+  // 웹소켓 STOMP 연결 및 실시간 구독
   function connectWebSocket(roomId) {
     if (stompClient && stompClient.connected) return;
     if (typeof SockJS === "undefined" || typeof Stomp === "undefined") {
@@ -376,7 +376,7 @@ document.addEventListener("DOMContentLoaded", () => {
         attachments: pendingAttachment ? [pendingAttachment] : []
       };
 
-      // 🌟 웹소켓 연결되어 있으면 STOMP로 실시간 발신
+      // 웹소켓 연결되어 있으면 STOMP로 실시간 발신
       if (stompClient && stompClient.connected) {
         stompClient.send("/app/chat/message", {}, JSON.stringify(payload));
         chatInput.value = "";
