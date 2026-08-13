@@ -88,6 +88,16 @@ class ScreenRenderingTests {
     }
 
     @Test
+    void login_authenticationError_rendersFocusableInlineAlert() throws Exception {
+        mockMvc.perform(get("/login").param("error", ""))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("이메일 또는 비밀번호가 올바르지 않습니다.")))
+            .andExpect(content().string(containsString("role=\"alert\"")))
+            .andExpect(content().string(containsString("tabindex=\"-1\"")))
+            .andExpect(content().string(containsString("data-login-error")));
+    }
+
+    @Test
     void productScreens_errorMessage_renderCommonAlertFragment() throws Exception {
         for (String path : new String[] {"/products", "/products/1"}) {
             mockMvc.perform(get(path)
