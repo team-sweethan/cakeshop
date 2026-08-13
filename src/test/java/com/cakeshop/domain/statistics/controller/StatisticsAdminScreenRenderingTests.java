@@ -53,17 +53,17 @@ class StatisticsAdminScreenRenderingTests {
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void dashboard_pendingReportTask_rendersPostInsteadOfReview() throws Exception {
+    void dashboard_followupMetrics_rendersCountsAndManagementLinks() throws Exception {
         when(dashboardReadModelQueryService.getDashboard())
                 .thenReturn(new StatisticsDashboardView(
                         0,
                         BigDecimal.ZERO,
+                        3,
+                        0,
+                        4,
                         0,
                         0,
-                        0,
-                        0,
-                        0,
-                        0,
+                        5,
                         List.of(),
                         List.of(),
                         List.of()
@@ -71,8 +71,21 @@ class StatisticsAdminScreenRenderingTests {
 
         mockMvc.perform(get("/admin"))
                 .andExpect(status().isOk())
+                .andExpect(content().string(containsString("<strong>3건</strong>")))
+                .andExpect(content().string(containsString("<strong>4건</strong>")))
+                .andExpect(content().string(containsString("<strong>5건</strong>")))
+                .andExpect(content().string(containsString(
+                        "href=\"/admin/fulfillment?status=UNDER_REVIEW\""
+                )))
+                .andExpect(content().string(not(containsString(
+                        "href=\"/admin/fulfillment?status=IN_PRODUCTION\""
+                ))))
+                .andExpect(content().string(containsString(
+                        "href=\"/admin/community?sort=REPORTS\""
+                )))
                 .andExpect(content().string(containsString("신고 처리 대기 게시글")))
-                .andExpect(content().string(not(containsString("신고 처리 대기 후기"))));
+                .andExpect(content().string(not(containsString("신고 처리 대기 후기"))))
+                .andExpect(content().string(not(containsString("구현 예정"))));
     }
 
     @Test
