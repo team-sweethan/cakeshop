@@ -1,4 +1,4 @@
-package com.cakeshop.domain.statistics.service;
+package com.cakeshop.domain.statistics.query;
 
 import static java.time.DayOfWeek.SUNDAY;
 import static java.time.temporal.TemporalAdjusters.previousOrSame;

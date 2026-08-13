@@ -69,9 +69,9 @@ import com.cakeshop.domain.dashboard.controller.DashboardAdminController;
 import com.cakeshop.domain.statistics.dto.view.PeriodStatisticsView;
 import com.cakeshop.domain.dashboard.dto.view.DashboardView;
 import com.cakeshop.domain.dashboard.service.DashboardReadModelQueryService;
-import com.cakeshop.domain.statistics.service.AdditionalMetricsReadModelQueryService;
-import com.cakeshop.domain.statistics.service.PeriodStatisticsReadModelQueryService;
-import com.cakeshop.domain.statistics.service.ProductPeriodStatisticsReadModelQueryService;
+import com.cakeshop.domain.statistics.query.AdditionalMetricsReadModelQueryService;
+import com.cakeshop.domain.statistics.query.PeriodStatisticsReadModelQueryService;
+import com.cakeshop.domain.statistics.query.ProductPeriodStatisticsReadModelQueryService;
 
 class AdminPageControllerTests {
 

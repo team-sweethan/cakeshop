@@ -1,4 +1,4 @@
-package com.cakeshop.domain.statistics.service;
+package com.cakeshop.domain.statistics.query;
 
 import java.time.LocalDate;
 

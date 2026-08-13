@@ -1,4 +1,4 @@
-package com.cakeshop.domain.statistics.service;
+package com.cakeshop.domain.statistics.query;
 
 import com.cakeshop.domain.statistics.dto.view.ProductStatisticsView;
 import com.cakeshop.domain.statistics.error.StatisticsErrorCode;
