@@ -1,4 +1,4 @@
-package com.cakeshop.domain.statistics.service;
+package com.cakeshop.domain.statistics.backfill;
 
 import com.cakeshop.domain.statistics.aggregation.StatisticsAggregationTransactionService;
 import com.cakeshop.domain.statistics.entity.StatisticsBatchRun;

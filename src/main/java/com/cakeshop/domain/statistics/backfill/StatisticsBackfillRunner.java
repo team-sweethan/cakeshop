@@ -1,4 +1,4 @@
-package com.cakeshop.domain.statistics.service;
+package com.cakeshop.domain.statistics.backfill;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
