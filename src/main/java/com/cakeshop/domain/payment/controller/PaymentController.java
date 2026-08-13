@@ -80,7 +80,7 @@ public class PaymentController {
         return "customer/payment/fail";
     }
 
-    /** Toss 결제 인증 성공 값을 검증하고 일반 주문의 결제를 완료한다. */
+    /** Toss 결제 인증 성공 값을 검증하고 주문 유형에 맞게 결제를 완료한다. */
     @PostMapping("/orders/{orderId:\\d+}/payment/confirm")
     public String confirm(
             @PathVariable("orderId") long orderId,
@@ -91,7 +91,7 @@ public class PaymentController {
         if (bindingResult.hasErrors()) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
-        paymentFacade.confirmGeneralPayment(
+        paymentFacade.confirmPayment(
                 requireMemberId(memberDetails),
                 orderId,
                 form

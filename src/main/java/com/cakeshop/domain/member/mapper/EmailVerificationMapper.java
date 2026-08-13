@@ -54,6 +54,13 @@ public interface EmailVerificationMapper {
             @Param("purpose") EmailVerificationPurpose purpose,
             @Param("verifiedSince") LocalDateTime verifiedSince);
 
+    /** 최신 비밀번호 재설정 인증 완료 요청만 잠그고 조회한다. */
+    Optional<EmailVerification> findLatestVerifiedByIdForUpdate(
+            @Param("id") Long id,
+            @Param("email") String email,
+            @Param("purpose") EmailVerificationPurpose purpose,
+            @Param("verifiedSince") LocalDateTime verifiedSince);
+
     /** 인증 완료 요청을 한 번만 사용 처리한다. */
     int markConsumed(
             @Param("id") Long id,

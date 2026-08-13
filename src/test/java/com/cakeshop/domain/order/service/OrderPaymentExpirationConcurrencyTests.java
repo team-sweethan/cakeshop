@@ -5,6 +5,7 @@ import com.cakeshop.domain.cart.service.CartOrderQueryService;
 import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.member.service.MemberCouponQueryService;
 import com.cakeshop.domain.order.entity.OrderStatus;
+import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.order.mapper.OrderMapper;
 import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentExecutionOrder;
 import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentProduct;
@@ -136,15 +137,25 @@ class OrderPaymentExpirationConcurrencyTests {
     }
 
     @Test
-    void paymentCompletionAndExpiration_concurrentExecution_keepsOneConsistentResult()
+    void customPaymentCompletionAndExpiration_concurrentExecution_keepsOneConsistentResult()
             throws Exception {
+        jdbcTemplate.update(
+                "UPDATE products SET product_type = 'CUSTOM', preparation_days = 1 WHERE id = ?",
+                productId
+        );
+        jdbcTemplate.update("UPDATE orders SET order_type = 'CUSTOM' WHERE id = ?", orderId);
+        jdbcTemplate.update(
+                "UPDATE order_items SET product_type = 'CUSTOM', preparation_days = 1 WHERE id = ?",
+                orderItemId
+        );
         CountDownLatch start = new CountDownLatch(1);
         Future<?> completion = executor.submit(() -> {
             await(start);
             try {
-                paymentService.completeGeneralPayment(
+                paymentService.completePayment(
                         new PaymentExecutionOrder(
                                 orderId,
+                                OrderType.CUSTOM,
                                 BigDecimal.valueOf(40_000),
                                 NOW,
                                 List.of(new PaymentProduct(orderItemId, productId, 2))
@@ -184,7 +195,7 @@ class OrderPaymentExpirationConcurrencyTests {
                 productId
         );
 
-        if (orderStatus == OrderStatus.READY_FOR_PICKUP) {
+        if (orderStatus == OrderStatus.UNDER_REVIEW) {
             assertThat(paymentStatus).isEqualTo(PaymentStatus.DONE);
             assertThat(stock).isEqualTo(3);
         } else {

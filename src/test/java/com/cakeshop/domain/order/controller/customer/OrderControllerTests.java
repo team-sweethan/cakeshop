@@ -4,7 +4,6 @@ import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
 import com.cakeshop.domain.member.dto.view.MemberProfileView;
 import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.coupon.service.CouponOrderQueryService;
-import com.cakeshop.domain.coupon.service.CouponOrderQuoteQueryService;
 import com.cakeshop.domain.order.dto.view.customer.CustomOrderCheckoutView;
 import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
@@ -72,9 +71,6 @@ class OrderControllerTests {
     private CouponOrderQueryService couponOrderQueryService;
 
     @Mock
-    private CouponOrderQuoteQueryService couponOrderQuoteQueryService;
-
-    @Mock
     private CustomerCustomOrderService customerCustomOrderService;
 
     @Mock
@@ -95,7 +91,6 @@ class OrderControllerTests {
                                 memberService,
                                 refundFacade,
                                 couponOrderQueryService,
-                                couponOrderQuoteQueryService,
                                 customerCustomOrderService,
                                 productQueryService,
                                 cartOrderQueryService
@@ -262,7 +257,7 @@ class OrderControllerTests {
     @Test
     void customRequest_validSelection_rendersActualOrderForm() throws Exception {
         CustomOrderCheckoutView checkout = mock(CustomOrderCheckoutView.class);
-        when(checkout.originalAmount()).thenReturn(BigDecimal.valueOf(60_000));
+        when(checkout.totalAmount()).thenReturn(BigDecimal.valueOf(60_000));
         when(memberService.getMemberProfile("member@example.com"))
                 .thenReturn(new MemberProfileView(
                         "member@example.com", "홍길동", "케이크러버", "010-1111-2222",
@@ -276,10 +271,15 @@ class OrderControllerTests {
                 .andExpect(status().isOk())
                 .andExpect(view().name("customer/order/custom-request"))
                 .andExpect(model().attribute("checkout", checkout));
+
+        verify(couponOrderQueryService).getAvailableCouponsWithPositiveFinalAmountForMember(
+                10L,
+                BigDecimal.valueOf(60_000)
+        );
     }
 
     @Test
-    void createCustomOrder_validRequest_redirectsWithCreatedOrderId() throws Exception {
+    void createCustomOrder_validRequest_redirectsToPaymentWithCreatedOrderId() throws Exception {
         String requestKey = UUID.randomUUID().toString();
         when(customerCustomOrderService.createCustomOrder(eq(10L), any())).thenReturn(43L);
 
@@ -295,7 +295,7 @@ class OrderControllerTests {
                         .param("pickupAt", "2099-08-05T14:00")
                         .param("lettering", "생일 축하해"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/orders/43"));
+                .andExpect(redirectedUrl("/orders/43/payment"));
 
         verify(customerCustomOrderService).createCustomOrder(eq(10L), argThat(form ->
                 form.getProductId().equals(6L)
@@ -308,7 +308,7 @@ class OrderControllerTests {
     @Test
     void createCustomOrder_changedDisplayedAmount_rendersUpdatedOrderForm() throws Exception {
         CustomOrderCheckoutView checkout = mock(CustomOrderCheckoutView.class);
-        when(checkout.originalAmount()).thenReturn(BigDecimal.valueOf(60_000));
+        when(checkout.totalAmount()).thenReturn(BigDecimal.valueOf(60_000));
         when(orderCheckoutService.getCustomCheckout(6L, List.of(101L))).thenReturn(checkout);
         when(customerCustomOrderService.createCustomOrder(eq(10L), any()))
                 .thenThrow(new com.cakeshop.global.error.BusinessException(

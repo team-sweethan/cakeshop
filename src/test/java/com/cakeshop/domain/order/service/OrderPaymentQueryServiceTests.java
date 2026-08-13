@@ -116,4 +116,37 @@ class OrderPaymentQueryServiceTests {
                 new OrderPaymentQueryService.PaymentProduct(20L, 30L, 2)
         );
     }
+
+    @Test
+    void getMemberPaymentExecutionOrder_customOrder_returnsCustomStockSnapshot() {
+        LocalDateTime expiresAt = LocalDateTime.of(2026, 8, 3, 10, 10);
+        when(memberService.isActiveMember(10L)).thenReturn(true);
+        Order paymentOrder = new Order();
+        paymentOrder.setId(1L);
+        paymentOrder.setMemberId(10L);
+        paymentOrder.setOrderType(OrderType.CUSTOM);
+        paymentOrder.setStatus(OrderStatus.PENDING_PAYMENT);
+        paymentOrder.setFinalAmount(BigDecimal.valueOf(30_000));
+        paymentOrder.setPaymentExpiresAt(expiresAt);
+        OrderItem paymentItem = new OrderItem();
+        paymentItem.setId(20L);
+        paymentItem.setProductId(30L);
+        paymentItem.setProductType(com.cakeshop.domain.product.entity.ProductType.CUSTOM);
+        paymentItem.setQuantity(1);
+        when(orderMapper.findOrderById(1L)).thenReturn(Optional.of(paymentOrder));
+        when(orderMapper.findOrderItemsByOrderId(1L)).thenReturn(List.of(paymentItem));
+
+        OrderPaymentQueryService service = new OrderPaymentQueryService(
+                orderCustomerService,
+                memberService,
+                orderMapper
+        );
+
+        var result = service.getMemberPaymentExecutionOrder(10L, 1L);
+
+        assertThat(result.orderType()).isEqualTo(OrderType.CUSTOM);
+        assertThat(result.products()).containsExactly(
+                new OrderPaymentQueryService.PaymentProduct(20L, 30L, 1)
+        );
+    }
 }

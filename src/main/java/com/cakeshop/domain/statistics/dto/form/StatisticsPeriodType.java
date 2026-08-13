@@ -6,6 +6,9 @@ import lombok.Getter;
 @Getter
 public enum StatisticsPeriodType {
 
+    /** 어제를 포함한 최근 7일 조회. */
+    RECENT_WEEK("최근 일주일"),
+
     /** 시작일과 종료일을 직접 선택하는 기간 조회. */
     RANGE("기간"),
 

@@ -25,7 +25,9 @@ public enum MemberErrorCode implements ErrorCode {
     EMAIL_VERIFICATION_REQUIRED(
             "MEMBER_015", "이메일 인증을 완료해 주세요.", 400),
     EMAIL_VERIFICATION_SAVE_FAILED(
-            "MEMBER_016", "이메일 인증 처리에 실패했습니다.", 500);
+            "MEMBER_016", "이메일 인증 처리에 실패했습니다.", 500),
+    OAUTH_SIGNUP_UNAVAILABLE(
+            "MEMBER_017", "소셜 회원가입을 진행할 수 없습니다. 다시 로그인해 주세요.", 400);
 
     private final String code;
     private final String message;

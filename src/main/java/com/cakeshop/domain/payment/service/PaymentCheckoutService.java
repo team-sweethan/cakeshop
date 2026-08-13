@@ -36,7 +36,7 @@ public class PaymentCheckoutService {
     private final Clock clock;
     private final TossPaymentAvailability tossPaymentAvailability;
 
-    /** 결제 기한과 결제 정보를 검증해 일반 주문용 Toss 결제 화면 데이터를 구성한다. */
+    /** 결제 기한과 결제 정보를 검증해 결제 대상 주문용 Toss 결제 화면 데이터를 구성한다. */
     @Transactional(readOnly = true)
     public PaymentCheckoutView getCheckout(long memberId, String memberEmail, long orderId) {
         if (!memberService.isActiveMember(memberId)) {
@@ -44,7 +44,7 @@ public class PaymentCheckoutService {
         }
 
         PaymentOrder order = orderPaymentQueryService.getMemberPaymentOrder(memberId, orderId);
-        validatePendingGeneralOrder(order);
+        validatePendingPaymentOrder(order);
         validatePaymentExpiration(order.paymentExpiresAt());
 
         Payment payment = paymentService.getReadyPayment(orderId);
@@ -91,7 +91,7 @@ public class PaymentCheckoutService {
     public void validateSuccessCallback(long memberId, long orderId, TossPaymentSuccessForm form) {
 
         PaymentOrder order = orderPaymentQueryService.getMemberPaymentOrder(memberId, orderId);
-        validateGeneralOrder(order);
+        validatePaymentOrder(order);
         validateSuccessRedirectOrder(order, form);
 
         Payment completedPayment = paymentService.findDonePayment(orderId)
@@ -101,7 +101,7 @@ public class PaymentCheckoutService {
             return;
         }
 
-        validatePendingGeneralOrder(order);
+        validatePendingPaymentOrder(order);
         validatePaymentExpiration(order.paymentExpiresAt());
         validateReadyPayment(order, paymentService.getReadyPayment(orderId));
     }
@@ -111,7 +111,7 @@ public class PaymentCheckoutService {
     public PaymentFailureView getFailure(long memberId, long orderId, String failureCode) {
 
         PaymentOrder order = orderPaymentQueryService.getMemberPaymentOrder(memberId, orderId);
-        validateGeneralOrder(order);
+        validatePaymentOrder(order);
 
         boolean retryAvailable = order.pendingPayment()
                 && order.paymentExpiresAt() != null
@@ -127,7 +127,7 @@ public class PaymentCheckoutService {
     @Transactional(readOnly = true)
     public PaymentCompletionView getCompletion(long memberId, long orderId) {
         PaymentOrder order = orderPaymentQueryService.getMemberPaymentOrder(memberId, orderId);
-        validateGeneralOrder(order);
+        validatePaymentOrder(order);
         Payment payment = paymentService.getDonePayment(orderId);
 
         if (!sameAmount(order.finalAmount(), payment.getAmount())) {
@@ -150,14 +150,14 @@ public class PaymentCheckoutService {
         );
     }
 
-    private void validateGeneralOrder(PaymentOrder order) {
-        if (!order.generalOrder()) {
+    private void validatePaymentOrder(PaymentOrder order) {
+        if (order.orderType() == null) {
             throw new BusinessException(PaymentErrorCode.READY_PAYMENT_NOT_FOUND);
         }
     }
 
-    private void validatePendingGeneralOrder(PaymentOrder order) {
-        validateGeneralOrder(order);
+    private void validatePendingPaymentOrder(PaymentOrder order) {
+        validatePaymentOrder(order);
         if (!order.pendingPayment()) {
             throw new BusinessException(PaymentErrorCode.READY_PAYMENT_NOT_FOUND);
         }

@@ -80,6 +80,26 @@
               <span th:if="${#lists.isEmpty(order.items)}">주문 상품 없음</span>
             </div>
 
+            <div class="fulfillment-order__section" th:if="${order.orderType.name() == 'CUSTOM'}">
+              <h2 class="section-title">제작 요청사항</h2>
+              <p th:if="${order.requestMessage != null and !order.requestMessage.isBlank()}"
+                 style="white-space:pre-wrap" th:text="${order.requestMessage}">제작 요청사항</p>
+              <p class="text-muted" th:unless="${order.requestMessage != null and !order.requestMessage.isBlank()}">
+                입력된 제작 요청사항이 없습니다.
+              </p>
+            </div>
+
+            <div class="fulfillment-order__section" th:if="${order.orderType.name() == 'CUSTOM'}">
+              <h2 class="section-title">레터링 문구</h2>
+              <div class="fulfillment-order__item" th:each="item : ${order.items}">
+                <p th:if="${item.requirements != null and !item.requirements.isBlank()}"
+                   style="white-space:pre-wrap" th:text="${item.requirements}">레터링 문구</p>
+                <p class="text-muted" th:unless="${item.requirements != null and !item.requirements.isBlank()}">
+                  입력된 레터링 문구가 없습니다.
+                </p>
+              </div>
+            </div>
+
             <div class="fulfillment-order__actions">
               <a class="btn"
                  th:href="@{/admin/orders/{id}(id=${order.orderId})}">주문 상세</a>

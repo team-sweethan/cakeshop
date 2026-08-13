@@ -4,6 +4,7 @@ import com.cakeshop.domain.order.service.OrderPaymentCommandService;
 import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
 import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentExecutionOrder;
 import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentProduct;
+import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.error.PaymentErrorCode;
 import com.cakeshop.domain.payment.infra.TossPaymentClient.ApprovalResult;
@@ -100,7 +101,7 @@ class PaymentServiceTests {
         );
         inOrder.verify(orderPaymentCommandService).lockGeneralOrderForPayment(1L);
         inOrder.verify(productStockService).decreaseStock(100L, 2);
-        inOrder.verify(orderPaymentCommandService).recordGeneralStockDeduction(
+        inOrder.verify(orderPaymentCommandService).recordStockDeduction(
                 200L,
                 approval.approvedAt()
         );
@@ -118,6 +119,60 @@ class PaymentServiceTests {
         inOrder.verify(couponOrderCommandService).useReservedCouponForOrder(1L);
         inOrder.verify(paymentRecoveryService).discardApprovalRecovery(payment);
         verify(eventPublisher).publishEvent(new GeneralPaymentCompletedEvent(1L));
+    }
+
+    @Test
+    void completePayment_customOrder_updatesStockPaymentAndUnderReviewInOrder() {
+        PaymentExecutionOrder order = new PaymentExecutionOrder(
+                1L,
+                OrderType.CUSTOM,
+                BigDecimal.valueOf(30_000),
+                NOW.plusMinutes(10),
+                List.of(new PaymentProduct(200L, 100L, 1))
+        );
+        Payment payment = payment();
+        ApprovalResult approval = approval();
+        when(productStockService.decreaseStock(100L, 1)).thenReturn(true);
+        when(paymentMapper.completeIfReady(
+                20L,
+                "payment-key",
+                "카드",
+                "DONE",
+                approval.approvedAt()
+        )).thenReturn(1);
+
+        paymentService.completePayment(order, payment, approval);
+
+        InOrder inOrder = inOrder(
+                productStockService,
+                paymentMapper,
+                orderPaymentCommandService,
+                couponOrderCommandService,
+                paymentRecoveryService
+        );
+        inOrder.verify(orderPaymentCommandService).lockOrderForPayment(1L);
+        inOrder.verify(productStockService).decreaseStock(100L, 1);
+        inOrder.verify(orderPaymentCommandService).recordStockDeduction(
+                200L,
+                approval.approvedAt()
+        );
+        inOrder.verify(paymentMapper).completeIfReady(
+                20L,
+                "payment-key",
+                "카드",
+                "DONE",
+                approval.approvedAt()
+        );
+        inOrder.verify(orderPaymentCommandService).completeCustomOrderAfterPayment(
+                1L,
+                approval.approvedAt()
+        );
+        inOrder.verify(couponOrderCommandService).useReservedCouponForOrder(1L);
+        inOrder.verify(paymentRecoveryService).discardApprovalRecovery(payment);
+        verify(orderPaymentCommandService, never()).completeGeneralOrderAfterPayment(
+                1L,
+                approval.approvedAt()
+        );
     }
 
     @Test
@@ -146,7 +201,7 @@ class PaymentServiceTests {
 
         verify(productStockService).decreaseStock(100L, 2);
         verify(orderPaymentCommandService).lockGeneralOrderForPayment(1L);
-        verify(orderPaymentCommandService).recordGeneralStockDeduction(200L, approval.approvedAt());
+        verify(orderPaymentCommandService).recordStockDeduction(200L, approval.approvedAt());
         verify(orderPaymentCommandService, never()).completeGeneralOrderAfterPayment(
                 1L,
                 approval.approvedAt()

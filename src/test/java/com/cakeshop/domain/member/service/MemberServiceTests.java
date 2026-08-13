@@ -12,7 +12,6 @@ import com.cakeshop.domain.member.dto.form.SignupForm;
 import com.cakeshop.domain.coupon.service.CouponMemberCommandService;
 import com.cakeshop.domain.member.dto.view.EmailRecoveryResult;
 import com.cakeshop.domain.member.dto.view.MemberProfileView;
-import com.cakeshop.domain.member.dto.view.PasswordRecoveryTarget;
 import com.cakeshop.domain.member.dto.view.PasswordResetResult;
 import com.cakeshop.domain.member.dto.view.RecoveredEmailView;
 import com.cakeshop.domain.member.dto.view.SignupEmailVerification;
@@ -298,39 +297,19 @@ class MemberServiceTests {
     }
 
     @Test
-    void findPasswordRecoveryMember_validInfo_normalizesAndReturnsCanonicalTarget() {
-        LocalDate birthDate = LocalDate.of(2000, 1, 15);
-        Member member = Member.builder()
-                .id(7L)
-                .email("Member@example.com")
-                .build();
-        when(memberMapper.findPasswordRecoveryMember(
-                "member@example.com",
-                "홍길동",
-                birthDate,
-                "01012345678"))
-                .thenReturn(Optional.of(member));
-
-        Optional<PasswordRecoveryTarget> target = memberService.findPasswordRecoveryMember(
-                " member@example.com ",
-                " 홍길동 ",
-                birthDate,
-                "010-1234-5678");
-
-        assertThat(target).contains(new PasswordRecoveryTarget(7L, "Member@example.com"));
-    }
-
-    @Test
     void resetPassword_activeMember_encodesAndUpdatesPassword() {
         when(memberMapper.findActivePasswordForUpdate(7L))
                 .thenReturn(Optional.of("encoded-current-password"));
         when(passwordEncoder.matches("NewPassword1!", "encoded-current-password"))
                 .thenReturn(false);
+        when(emailVerificationService.consumePasswordResetVerification(
+                11L, "member@example.com")).thenReturn(true);
         when(passwordEncoder.encode("NewPassword1!")).thenReturn("encoded-new-password");
         when(memberMapper.updatePasswordForActiveMember(7L, "encoded-new-password"))
                 .thenReturn(1);
 
-        assertThat(memberService.resetPassword(7L, "NewPassword1!"))
+        assertThat(memberService.resetPassword(
+                11L, 7L, "member@example.com", "NewPassword1!"))
                 .isEqualTo(PasswordResetResult.SUCCESS);
 
         verify(memberMapper).updatePasswordForActiveMember(7L, "encoded-new-password");
@@ -340,7 +319,8 @@ class MemberServiceTests {
     void resetPassword_memberNoLongerActive_returnsFalse() {
         when(memberMapper.findActivePasswordForUpdate(7L)).thenReturn(Optional.empty());
 
-        assertThat(memberService.resetPassword(7L, "NewPassword1!"))
+        assertThat(memberService.resetPassword(
+                11L, 7L, "member@example.com", "NewPassword1!"))
                 .isEqualTo(PasswordResetResult.UNAVAILABLE);
         verify(passwordEncoder, never()).encode("NewPassword1!");
     }
@@ -352,7 +332,8 @@ class MemberServiceTests {
         when(passwordEncoder.matches("CurrentPassword1!", "encoded-current-password"))
                 .thenReturn(true);
 
-        assertThat(memberService.resetPassword(7L, "CurrentPassword1!"))
+        assertThat(memberService.resetPassword(
+                11L, 7L, "member@example.com", "CurrentPassword1!"))
                 .isEqualTo(PasswordResetResult.SAME_AS_CURRENT);
 
         verify(passwordEncoder, never()).encode("CurrentPassword1!");
@@ -376,6 +357,25 @@ class MemberServiceTests {
         memberService.withdraw(member.getEmail(), "CurrentPassword1!");
 
         verify(memberMapper).withdrawById(member.getId(), MemberStatus.WITHDRAWN);
+    }
+
+    @Test
+    void withdraw_passwordlessSocialMember_withdrawsWithoutCurrentPassword() {
+        Member member = Member.builder()
+                .id(7L)
+                .email("social@cakeshop.local")
+                .password(null)
+                .status(MemberStatus.ACTIVE)
+                .build();
+        when(memberMapper.findByEmail(member.getEmail())).thenReturn(Optional.of(member));
+        when(memberMapper.withdrawById(member.getId(), MemberStatus.WITHDRAWN)).thenReturn(1);
+
+        memberService.withdraw(member.getEmail(), null);
+
+        verify(memberMapper).withdrawById(member.getId(), MemberStatus.WITHDRAWN);
+        verify(passwordEncoder, never()).matches(
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString());
     }
 
     @Test
@@ -415,6 +415,29 @@ class MemberServiceTests {
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(MemberErrorCode.INVALID_CURRENT_PASSWORD);
 
+        verify(memberMapper, never()).withdrawById(
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.any(MemberStatus.class));
+    }
+
+    @Test
+    void withdraw_passwordLoginMember_missingCurrentPassword_throwsMemberBusinessException() {
+        Member member = Member.builder()
+                .id(7L)
+                .email("member@cakeshop.local")
+                .password("encoded-password")
+                .status(MemberStatus.ACTIVE)
+                .build();
+        when(memberMapper.findByEmail(member.getEmail())).thenReturn(Optional.of(member));
+
+        assertThatThrownBy(() -> memberService.withdraw(member.getEmail(), null))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(MemberErrorCode.INVALID_CURRENT_PASSWORD);
+
+        verify(passwordEncoder, never()).matches(
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString());
         verify(memberMapper, never()).withdrawById(
                 org.mockito.ArgumentMatchers.anyLong(),
                 org.mockito.ArgumentMatchers.any(MemberStatus.class));

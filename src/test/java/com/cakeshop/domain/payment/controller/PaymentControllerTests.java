@@ -92,7 +92,7 @@ class PaymentControllerTests {
                         "/orders/complete?orderId=1"
                 ));
 
-        verify(paymentFacade).confirmGeneralPayment(
+        verify(paymentFacade).confirmPayment(
                 eq(10L),
                 eq(1L),
                 argThat(form ->
