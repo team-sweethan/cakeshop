@@ -687,6 +687,8 @@ class ScreenRenderingTests {
             """
             UPDATE orders
             SET status = 'READY_FOR_PICKUP',
+                discount_amount = 5000,
+                final_amount = original_amount - 5000,
                 ready_at = CURRENT_TIMESTAMP(6)
             WHERE id = ?
             """,
@@ -707,6 +709,10 @@ class ScreenRenderingTests {
             .andExpect(content().string(containsString(
                 "/admin/orders/" + orderId + "/cancel"
             )))
+            .andExpect(content().string(containsString("쿠폰 적용")))
+            .andExpect(content().string(containsString("적용")))
+            .andExpect(content().string(containsString("쿠폰 할인 금액")))
+            .andExpect(content().string(containsString("-5,000원")))
             .andExpect(content().string(containsString("name=\"_csrf\"")));
     }
 
