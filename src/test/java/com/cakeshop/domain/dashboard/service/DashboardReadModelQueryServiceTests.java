@@ -1,4 +1,4 @@
-package com.cakeshop.domain.statistics.service;
+package com.cakeshop.domain.dashboard.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;

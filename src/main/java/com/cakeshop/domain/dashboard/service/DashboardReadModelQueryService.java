@@ -1,4 +1,4 @@
-package com.cakeshop.domain.statistics.service;
+package com.cakeshop.domain.dashboard.service;
 
 import com.cakeshop.domain.dashboard.dto.view.DashboardView;
 import com.cakeshop.domain.dashboard.dto.view.LowStockProductView;

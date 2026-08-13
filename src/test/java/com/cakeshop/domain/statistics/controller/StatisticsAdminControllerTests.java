@@ -20,7 +20,7 @@ import com.cakeshop.domain.statistics.dto.view.StatisticsTrendView;
 import com.cakeshop.domain.dashboard.dto.view.DashboardView;
 import com.cakeshop.domain.statistics.error.StatisticsErrorCode;
 import com.cakeshop.domain.statistics.service.AdditionalMetricsReadModelQueryService;
-import com.cakeshop.domain.statistics.service.DashboardReadModelQueryService;
+import com.cakeshop.domain.dashboard.service.DashboardReadModelQueryService;
 import com.cakeshop.domain.statistics.service.PeriodStatisticsReadModelQueryService;
 import com.cakeshop.domain.statistics.service.ProductPeriodStatisticsReadModelQueryService;
 import com.cakeshop.global.error.BusinessException;
