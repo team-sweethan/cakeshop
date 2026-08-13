@@ -80,7 +80,8 @@ public class MyPageController {
             @AuthenticationPrincipal MemberDetails memberDetails,
             @Valid @ModelAttribute("profileForm") ProfileUpdateForm form,
             BindingResult bindingResult,
-            Model model) {
+            Model model,
+            RedirectAttributes redirectAttributes) {
 
         if (memberDetails == null) {
             return "redirect:/login";
@@ -111,7 +112,10 @@ public class MyPageController {
             model.addAttribute("hasPasswordLogin", memberService.hasPasswordLogin(email));
             return "customer/member/profile-edit";
         }
-        return "redirect:/mypage?success=update";
+        redirectAttributes.addFlashAttribute(
+                "successMessage",
+                "회원정보가 수정되었습니다.");
+        return "redirect:/mypage";
     }
 
     @PostMapping("/mypage/withdraw")

@@ -124,6 +124,19 @@ class ScreenRenderingTests {
     }
 
     @Test
+    @WithUserDetails(
+        value = "user@cakeshop.local",
+        userDetailsServiceBeanName = "memberDetailsService"
+    )
+    void myPage_successMessage_rendersCommonPopupFragment() throws Exception {
+        mockMvc.perform(get("/mypage")
+                .flashAttr("successMessage", "회원정보가 수정되었습니다."))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("data-common-alert-popup")))
+            .andExpect(content().string(containsString("window.alert(")));
+    }
+
+    @Test
     void cart_unauthenticatedMember_redirectsToLoginEvenInPublicPreview() throws Exception {
         mockMvc.perform(get("/cart"))
             .andExpect(status().is3xxRedirection())
