@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.cakeshop.domain.statistics.dto.view.PeriodStatisticsView;
+import com.cakeshop.domain.statistics.dto.view.AdditionalMetricsView;
 import com.cakeshop.domain.statistics.dto.view.ProductStatisticsView;
 import com.cakeshop.domain.statistics.dto.view.StatisticsTrendView;
 import com.cakeshop.domain.statistics.error.StatisticsErrorCode;
@@ -301,6 +302,86 @@ class StatisticsAdminScreenRenderingTests {
                 )))
                 .andExpect(content().string(not(containsString("<table"))))
                 .andExpect(content().string(not(containsString("data-product-ranking-toggle"))));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void statistics_additionalMetricsReturned_rendersActivityAndAmountPanels() throws Exception {
+        LocalDate startDate = LocalDate.of(2026, 8, 8);
+        LocalDate endDate = LocalDate.of(2026, 8, 9);
+        when(periodStatisticsReadModelQueryService.getStatistics(any()))
+                .thenReturn(new PeriodStatisticsView(
+                        startDate,
+                        endDate,
+                        12L,
+                        8L,
+                        2L,
+                        new BigDecimal("123456"),
+                        List.of()
+                ));
+        when(additionalMetricsQueryService.getAdditionalMetrics(startDate, endDate))
+                .thenReturn(new AdditionalMetricsView(
+                        12L,
+                        3L,
+                        25L,
+                        7L,
+                        new BigDecimal("320000"),
+                        new BigDecimal("37656")
+                ));
+
+        mockMvc.perform(get("/admin/statistics")
+                        .param("periodType", "RANGE")
+                        .param("startDate", startDate.toString())
+                        .param("endDate", endDate.toString()))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("기타 지표")))
+                .andExpect(content().string(containsString("활동 지표")))
+                .andExpect(content().string(containsString("금액 지표")))
+                .andExpect(content().string(containsString("신규 회원 수")))
+                .andExpect(content().string(containsString("12건")))
+                .andExpect(content().string(containsString("탈퇴 회원 수")))
+                .andExpect(content().string(containsString("새 게시글 수")))
+                .andExpect(content().string(containsString("25건")))
+                .andExpect(content().string(containsString("쿠폰 사용 건수")))
+                .andExpect(content().string(containsString("환불 금액")))
+                .andExpect(content().string(containsString("320,000원")))
+                .andExpect(content().string(containsString("평균 주문 금액")))
+                .andExpect(content().string(containsString("37,656원")))
+                .andExpect(content().string(containsString("statistics-additional-metrics")));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void statistics_additionalMetricsNotReady_rendersNoticeWithoutPanels() throws Exception {
+        LocalDate startDate = LocalDate.of(2026, 8, 8);
+        LocalDate endDate = LocalDate.of(2026, 8, 9);
+        when(periodStatisticsReadModelQueryService.getStatistics(any()))
+                .thenReturn(new PeriodStatisticsView(
+                        startDate,
+                        endDate,
+                        12L,
+                        8L,
+                        2L,
+                        new BigDecimal("123456"),
+                        List.of()
+                ));
+        when(additionalMetricsQueryService.getAdditionalMetrics(startDate, endDate))
+                .thenThrow(new BusinessException(
+                        StatisticsErrorCode.ADDITIONAL_METRICS_NOT_READY
+                ));
+
+        mockMvc.perform(get("/admin/statistics")
+                        .param("periodType", "RANGE")
+                        .param("startDate", startDate.toString())
+                        .param("endDate", endDate.toString()))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("12건")))
+                .andExpect(content().string(containsString("기타 지표")))
+                .andExpect(content().string(containsString(
+                        StatisticsErrorCode.ADDITIONAL_METRICS_NOT_READY.message()
+                )))
+                .andExpect(content().string(not(containsString("활동 지표"))))
+                .andExpect(content().string(not(containsString("금액 지표"))));
     }
 
     @Test

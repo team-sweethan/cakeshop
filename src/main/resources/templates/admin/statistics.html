@@ -210,6 +210,55 @@
             </button>
           </div>
         </section>
+
+        <section class="section" aria-labelledby="additional-metrics-title">
+          <h2 id="additional-metrics-title" class="section-title">기타 지표</h2>
+
+          <div class="alert alert--info"
+               th:if="${additionalMetricsError != null}"
+               th:text="${additionalMetricsError}">
+            선택한 기간의 기타 지표 집계가 완료되지 않았습니다.
+          </div>
+
+          <div class="grid grid--2 statistics-additional-metrics"
+               th:if="${additionalMetrics != null}">
+            <section class="panel" aria-labelledby="activity-metrics-title">
+              <h3 id="activity-metrics-title" class="statistics-metric-panel-title">활동 지표</h3>
+              <dl class="statistics-metric-list">
+                <div class="statistics-metric-row">
+                  <dt>신규 회원 수</dt>
+                  <dd th:text="|${#numbers.formatInteger(additionalMetrics.newMemberCount, 0, 'COMMA')}건|"></dd>
+                </div>
+                <div class="statistics-metric-row">
+                  <dt>탈퇴 회원 수</dt>
+                  <dd th:text="|${#numbers.formatInteger(additionalMetrics.withdrawnMemberCount, 0, 'COMMA')}건|"></dd>
+                </div>
+                <div class="statistics-metric-row">
+                  <dt>새 게시글 수</dt>
+                  <dd th:text="|${#numbers.formatInteger(additionalMetrics.newPostCount, 0, 'COMMA')}건|"></dd>
+                </div>
+                <div class="statistics-metric-row">
+                  <dt>쿠폰 사용 건수</dt>
+                  <dd th:text="|${#numbers.formatInteger(additionalMetrics.couponUsageCount, 0, 'COMMA')}건|"></dd>
+                </div>
+              </dl>
+            </section>
+
+            <section class="panel" aria-labelledby="amount-metrics-title">
+              <h3 id="amount-metrics-title" class="statistics-metric-panel-title">금액 지표</h3>
+              <dl class="statistics-metric-list">
+                <div class="statistics-metric-row">
+                  <dt>환불 금액</dt>
+                  <dd th:text="|${#numbers.formatInteger(additionalMetrics.refundAmount, 0, 'COMMA')}원|"></dd>
+                </div>
+                <div class="statistics-metric-row">
+                  <dt>평균 주문 금액</dt>
+                  <dd th:text="|${#numbers.formatInteger(additionalMetrics.averageOrderAmount, 0, 'COMMA')}원|"></dd>
+                </div>
+              </dl>
+            </section>
+          </div>
+        </section>
       </th:block>
     </main>
   </div>
