@@ -109,6 +109,11 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       });
 
+      // D. 웹소켓 연결 완료 시 초기 읽음 커서도 소켓으로 실시간 전파!
+      if (lastFetchedMessageId > 0) {
+        sendReadCursor(roomId, lastFetchedMessageId);
+      }
+
     }, (err) => {
       console.error("웹소켓 연결 실시간 에러:", err);
     });
@@ -378,11 +383,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // 웹소켓 연결되어 있으면 STOMP로 실시간 발신
       if (stompClient && stompClient.connected) {
-        stompClient.send("/app/chat/message", {}, JSON.stringify(payload));
-        chatInput.value = "";
-        pendingAttachment = null;
-        if (imageFileName) imageFileName.textContent = "선택된 파일 없음";
-        if (chatImageInput) chatImageInput.value = "";
+        try {
+          stompClient.send("/app/chat/message", {}, JSON.stringify(payload));
+          chatInput.value = "";
+          pendingAttachment = null;
+          if (imageFileName) imageFileName.textContent = "선택된 파일 없음";
+          if (chatImageInput) chatImageInput.value = "";
+        } catch (stompErr) {
+          console.error("STOMP 메시지 발신 실패:", stompErr);
+          alert("실시간 메시지 발신 중 에러가 발생했습니다.");
+        }
         return;
       }
 
@@ -467,9 +477,8 @@ document.addEventListener("DOMContentLoaded", () => {
           if (chatImageInput) chatImageInput.value = "";
         }
       } finally {
-        if (chatImageInput.files[0] === currentUploadFile) {
-          isUploadingAttachment = false;
-        }
+        // 성공하든 실패하든 업로드 락 플래그를 무조건 해제!
+        isUploadingAttachment = false;
       }
     });
   }

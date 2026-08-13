@@ -15,6 +15,7 @@ import com.cakeshop.global.security.MemberDetails;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -29,6 +30,7 @@ public class ChatApiController {
 
     private final ChatService chatService;
     private final ProductChatQueryService productChatQueryService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     // 1-1. 내 1:1 채팅방 단순 조회 (고객용, 방이 없으면 404, 생성 부작용 없음)
     @GetMapping("/api/chat/room")
@@ -121,6 +123,14 @@ public class ChatApiController {
                 request.getContent(),
                 request.getAttachments()
         );
+
+        // REST Fallback 메시지 전송 시에도 웹소켓 구독자 및 관리자 대시보드로 실시간 방송!
+        try {
+            messagingTemplate.convertAndSend("/topic/chat/" + response.getChatRoomId(), response);
+            messagingTemplate.convertAndSend("/topic/admin/rooms", response);
+        } catch (Exception e) {
+            // 소켓 방송 중 예외가 발생하더라도 REST 응답은 성공 유지
+        }
 
         return ResponseEntity.ok(response);
     }

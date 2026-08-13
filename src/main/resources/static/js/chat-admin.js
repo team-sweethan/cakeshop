@@ -625,6 +625,17 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  // 관리자 Enter 키 단축키 연동 (Shift+Enter는 줄바꿈)
+  const adminChatInput = document.getElementById("adminChatInput");
+  if (adminChatInput && adminChatForm) {
+    adminChatInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+        e.preventDefault();
+        adminChatForm.requestSubmit();
+      }
+    });
+  }
+
   // 4. 관리자 메시지 전송 (웹소켓 STOMP + REST Fallback)
   if (adminChatForm) {
     adminChatForm.addEventListener("submit", async (e) => {
@@ -655,6 +666,9 @@ document.addEventListener("DOMContentLoaded", () => {
         pendingAttachment = null;
         if (adminImageFileName) adminImageFileName.textContent = "선택된 파일 없음";
         if (adminChatImageInput) adminChatImageInput.value = "";
+
+        // 답변 작성 후 관리자 탭 목록 재조회 (미답변 탭 필터 동기화)
+        setTimeout(() => loadAdminRooms(currentRoomPage), 300);
         return;
       }
 
@@ -683,7 +697,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (adminChatImageInput) adminChatImageInput.value = "";
 
         await loadAdminMessages(selectedChatRoomId);
-        await loadAdminRooms();
+        await loadAdminRooms(currentRoomPage);
         await markRead(selectedChatRoomId, sentMsg.id);
 
       } catch (err) {
@@ -745,9 +759,7 @@ document.addEventListener("DOMContentLoaded", () => {
           if (adminChatImageInput) adminChatImageInput.value = "";
         }
       } finally {
-        if (adminChatImageInput.files[0] === currentUploadFile) {
-          isAdminUploadingAttachment = false;
-        }
+        isAdminUploadingAttachment = false;
       }
     });
   }
