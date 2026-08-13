@@ -20,6 +20,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const saveAdminNoteBtn = document.getElementById("saveAdminNoteBtn");
   const adminSearchInput = document.getElementById("adminChatSearch");
 
+  const adminChatImageInput = document.getElementById("adminChatImageInput");
+  const adminImageFileName = document.getElementById("adminImageFileName");
+
   // 목업 스크립트(admin-mockup.js) 이벤트 간섭 전면 차단을 위한 폼 클로닝
   if (adminChatForm) {
     const freshForm = adminChatForm.cloneNode(true);
@@ -144,6 +147,11 @@ document.addEventListener("DOMContentLoaded", () => {
           console.error("관리자 웹소켓 수신 오류:", e);
         }
       });
+
+      // 연결 완료 후 현재 활성화된 방이 있다면 소켓 구독을 재등록!
+      if (selectedChatRoomId) {
+        subscribeActiveRoomWebSocket(selectedChatRoomId);
+      }
     }, (err) => {
       console.error("관리자 웹소켓 연결 오류:", err);
     });
@@ -295,10 +303,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const inputEl = document.getElementById("adminChatInput");
       if (inputEl) inputEl.value = "";
       pendingAttachment = null;
-      const fileLabel = document.getElementById("adminImageFileName");
-      if (fileLabel) fileLabel.textContent = "선택된 파일 없음";
-      const fileInput = document.getElementById("adminChatImageInput");
-      if (fileInput) fileInput.value = "";
+      if (adminImageFileName) adminImageFileName.textContent = "선택된 파일 없음";
+      if (adminChatImageInput) adminChatImageInput.value = "";
     }
 
     selectedChatRoomId = roomId;
@@ -647,10 +653,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (inputEl) inputEl.value = "";
         pendingAttachment = null;
-        const fileLabel = document.getElementById("adminImageFileName");
-        if (fileLabel) fileLabel.textContent = "선택된 파일 없음";
-        const fileInput = document.getElementById("adminChatImageInput");
-        if (fileInput) fileInput.value = "";
+        if (adminImageFileName) adminImageFileName.textContent = "선택된 파일 없음";
+        if (adminChatImageInput) adminChatImageInput.value = "";
         return;
       }
 
@@ -675,10 +679,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (inputEl) inputEl.value = "";
         pendingAttachment = null;
-        const fileLabel = document.getElementById("adminImageFileName");
-        if (fileLabel) fileLabel.textContent = "선택된 파일 없음";
-        const fileInput = document.getElementById("adminChatImageInput");
-        if (fileInput) fileInput.value = "";
+        if (adminImageFileName) adminImageFileName.textContent = "선택된 파일 없음";
+        if (adminChatImageInput) adminChatImageInput.value = "";
 
         await loadAdminMessages(selectedChatRoomId);
         await loadAdminRooms();
@@ -687,6 +689,65 @@ document.addEventListener("DOMContentLoaded", () => {
       } catch (err) {
         console.error("관리자 답장 전송 오류:", err);
         alert("답변 전송 처리 중 오류가 발생했습니다.");
+      }
+    });
+  }
+
+  // 4-2. 관리자 이미지 선택 시 즉시 독립 업로드 실행
+  let isAdminUploadingAttachment = false;
+  if (adminChatImageInput) {
+    adminChatImageInput.addEventListener("change", async () => {
+      const file = adminChatImageInput.files[0];
+      if (!file) return;
+
+      const currentUploadFile = file;
+      isAdminUploadingAttachment = true;
+      if (adminImageFileName) adminImageFileName.textContent = `⏳ ${file.name} 업로드 중...`;
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      try {
+        const response = await fetch("/api/chat/images", {
+          method: "POST",
+          headers: getCsrfHeaders(),
+          body: formData
+        });
+
+        if (!response.ok || adminChatImageInput.files[0] !== currentUploadFile) {
+          if (adminChatImageInput.files[0] === currentUploadFile) {
+            alert("이미지 업로드에 실패했습니다. (5MB 이하 이미지 파일만 가능합니다)");
+            pendingAttachment = null;
+            if (adminImageFileName) adminImageFileName.textContent = "선택된 파일 없음";
+            if (adminChatImageInput) adminChatImageInput.value = "";
+          }
+          return;
+        }
+
+        const objectKey = await response.text();
+        if (adminChatImageInput.files[0] !== currentUploadFile) return;
+
+        pendingAttachment = {
+          objectKey: objectKey,
+          originalFilename: file.name,
+          contentType: file.type || "image/jpeg",
+          fileSize: file.size
+        };
+
+        if (adminImageFileName) adminImageFileName.textContent = `✔ ${file.name} (첨부 준비 완료)`;
+
+      } catch (err) {
+        console.error("관리자 이미지 업로드 오류:", err);
+        if (adminChatImageInput.files[0] === currentUploadFile) {
+          alert("이미지 업로드 처리 중 에러가 발생했습니다.");
+          pendingAttachment = null;
+          if (adminImageFileName) adminImageFileName.textContent = "선택된 파일 없음";
+          if (adminChatImageInput) adminChatImageInput.value = "";
+        }
+      } finally {
+        if (adminChatImageInput.files[0] === currentUploadFile) {
+          isAdminUploadingAttachment = false;
+        }
       }
     });
   }
@@ -784,14 +845,14 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // 탭 필터 클릭 이벤트 연동
-  const filterTabs = document.querySelectorAll(".admin-chat-tabs button");
+  // 탭 필터 클릭 이벤트 연동 (HTML 마크업 .admin-chat-filter-tabs [data-admin-filter] 일치)
+  const filterTabs = document.querySelectorAll(".admin-chat-filter-tabs [data-admin-filter]");
   filterTabs.forEach((tab) => {
     tab.addEventListener("click", () => {
       filterTabs.forEach((t) => t.classList.remove("is-active"));
       tab.classList.add("is-active");
 
-      const filterVal = tab.getAttribute("data-filter");
+      const filterVal = tab.getAttribute("data-admin-filter");
       currentFilter = filterVal || "all";
       loadAdminRooms();
     });

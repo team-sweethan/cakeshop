@@ -15,9 +15,8 @@ public class WebSocketConfig
     public void registerStompEndpoints(
             StompEndpointRegistry registry
     ) {
-        registry.addEndpoint("/ws"); // 웹소켓 연결
-                //.setAllowedOriginPatterns("*")
-                //.withSockJS();
+        registry.addEndpoint("/ws")
+                .withSockJS();
     }
 
     @Override
