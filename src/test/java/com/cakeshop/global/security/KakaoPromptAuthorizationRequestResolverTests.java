@@ -16,21 +16,33 @@ class KakaoPromptAuthorizationRequestResolverTests {
                     new InMemoryClientRegistrationRepository(kakaoRegistration()));
 
     @Test
-    void kakaoPromptLogin_addsPromptToAuthorizationRequest() {
+    void kakaoPromptSelectAccount_addsPromptToAuthorizationRequest() {
         MockHttpServletRequest request = new MockHttpServletRequest(
                 "GET", "/oauth2/authorization/kakao");
-        request.setParameter("prompt", "login");
+        request.setParameter("prompt", "select_account");
 
         OAuth2AuthorizationRequest authorizationRequest = resolver.resolve(request);
 
         assertThat(authorizationRequest.getAdditionalParameters())
-                .containsEntry("prompt", "login");
+                .containsEntry("prompt", "select_account");
     }
 
     @Test
     void regularKakaoLogin_doesNotForcePrompt() {
         MockHttpServletRequest request = new MockHttpServletRequest(
                 "GET", "/oauth2/authorization/kakao");
+
+        OAuth2AuthorizationRequest authorizationRequest = resolver.resolve(request);
+
+        assertThat(authorizationRequest.getAdditionalParameters())
+                .doesNotContainKey("prompt");
+    }
+
+    @Test
+    void kakaoUnsupportedPrompt_doesNotAddPromptToAuthorizationRequest() {
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "GET", "/oauth2/authorization/kakao");
+        request.setParameter("prompt", "login");
 
         OAuth2AuthorizationRequest authorizationRequest = resolver.resolve(request);
 

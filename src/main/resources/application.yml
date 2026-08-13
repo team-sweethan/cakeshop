@@ -2,7 +2,7 @@ spring:
   config:
     import: optional:file:.env[.properties]
   profiles:
-    default: local,s3,oauth
+    default: local,s3,oauth,kakao-oauth
   application:
     name: cakeshop
   thymeleaf:
@@ -102,6 +102,22 @@ spring:
             client-id: ${GOOGLE_CLIENT_ID}
             client-secret: ${GOOGLE_CLIENT_SECRET}
             scope: openid, profile, email
+
+app:
+  member:
+    oauth:
+      google-enabled: true
+
+---
+# Kakao OAuth login. Activate with the oauth profile only when Kakao credentials are available.
+spring:
+  config:
+    activate:
+      on-profile: kakao-oauth
+  security:
+    oauth2:
+      client:
+        registration:
           kakao:
             client-id: ${KAKAO_CLIENT_ID}
             client-secret: ${KAKAO_CLIENT_SECRET}
@@ -119,7 +135,6 @@ spring:
 app:
   member:
     oauth:
-      google-enabled: true
       kakao-enabled: true
 
 ---
