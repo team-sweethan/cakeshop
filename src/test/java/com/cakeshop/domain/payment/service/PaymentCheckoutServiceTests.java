@@ -105,6 +105,22 @@ class PaymentCheckoutServiceTests {
     }
 
     @Test
+    void getCheckout_customPendingOrder_returnsPaymentView() {
+        when(orderPaymentQueryService.getMemberPaymentOrder(10L, 1L))
+                .thenReturn(order(false, true));
+        when(paymentService.getReadyPayment(1L)).thenReturn(payment(PaymentStatus.READY, null));
+
+        PaymentCheckoutView checkout = paymentCheckoutService.getCheckout(
+                10L,
+                "member@example.com",
+                1L
+        );
+
+        assertThat(checkout.orderNumber()).isEqualTo("ORD-100");
+        assertThat(checkout.amount()).isEqualByComparingTo("30000");
+    }
+
+    @Test
     void getCheckout_productNameOver100Characters_truncatesOrderName() {
         String longProductName = "가".repeat(101);
         when(orderPaymentQueryService.getMemberPaymentOrder(10L, 1L))

@@ -2,6 +2,7 @@ package com.cakeshop.domain.payment.service;
 
 import com.cakeshop.domain.order.service.OrderPaymentCommandService;
 import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
+import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentExecutionOrder;
 import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentProduct;
 import com.cakeshop.domain.payment.entity.Payment;
@@ -54,25 +55,41 @@ public class PaymentService {
                 ));
     }
 
-    /** 재고 차감, 결제 완료, 주문 상태 변경을 하나의 트랜잭션으로 확정한다. */
+    /** 재고 차감, 결제 완료, 주문 유형별 상태 변경을 하나의 트랜잭션으로 확정한다. */
+    @Transactional
+    public void completePayment(
+            PaymentExecutionOrder order,
+            Payment payment,
+            ApprovalResult approval
+    ) {
+        if (order.orderType() == OrderType.GENERAL) {
+            completeGeneralPayment(order, payment, approval);
+            return;
+        }
+        if (order.orderType() == OrderType.CUSTOM) {
+            completeCustomPayment(order, payment, approval);
+            return;
+        }
+        throw new BusinessException(PaymentErrorCode.PAYMENT_COMPLETE_FAILED);
+    }
+
+    /** 기존 일반 주문 결제 완료 흐름을 유지한다. */
     @Transactional
     public void completeGeneralPayment(
             PaymentExecutionOrder order,
             Payment payment,
             ApprovalResult approval
     ) {
-        // 주문 행을 먼저 잠가 스케줄러의 EXPIRED 전이와 동일한 잠금 순서를 사용한다.
         orderPaymentCommandService.lockGeneralOrderForPayment(order.orderId());
         validatePaymentExpiration(order.paymentExpiresAt());
 
-        // products는 주문 생성 시점에 GENERAL로 저장된 주문 항목 스냅샷이다.
         for (PaymentProduct product : order.products()) {
             boolean stockDeducted = productStockService.decreaseStock(
                     product.productId(),
                     product.quantity()
             );
             if (stockDeducted) {
-                orderPaymentCommandService.recordGeneralStockDeduction(
+                orderPaymentCommandService.recordStockDeduction(
                         product.orderItemId(),
                         approval.approvedAt()
                 );
@@ -87,8 +104,46 @@ public class PaymentService {
                 approval.approvedAt()
         ));
 
-        // 주문 상태 변경 쿼리는 같은 트랜잭션에서 DONE 결제를 확인한다.
         orderPaymentCommandService.completeGeneralOrderAfterPayment(
+                order.orderId(),
+                approval.approvedAt()
+        );
+        couponOrderCommandService.useReservedCouponForOrder(order.orderId());
+        paymentRecoveryService.discardApprovalRecovery(payment);
+    }
+
+    private void completeCustomPayment(
+            PaymentExecutionOrder order,
+            Payment payment,
+            ApprovalResult approval
+    ) {
+        // 주문 행을 먼저 잠가 스케줄러의 EXPIRED 전이와 동일한 잠금 순서를 사용한다.
+        orderPaymentCommandService.lockOrderForPayment(order.orderId());
+        validatePaymentExpiration(order.paymentExpiresAt());
+
+        // products는 주문 생성 시점의 상품 유형을 유지하는 주문 항목 스냅샷이다.
+        for (PaymentProduct product : order.products()) {
+            boolean stockDeducted = productStockService.decreaseStock(
+                    product.productId(),
+                    product.quantity()
+            );
+            if (stockDeducted) {
+                orderPaymentCommandService.recordStockDeduction(
+                        product.orderItemId(),
+                        approval.approvedAt()
+                );
+            }
+        }
+
+        requireOneRow(paymentMapper.completeIfReady(
+                payment.getId(),
+                approval.paymentKey(),
+                approval.method(),
+                approval.status(),
+                approval.approvedAt()
+        ));
+
+        orderPaymentCommandService.completeCustomOrderAfterPayment(
                 order.orderId(),
                 approval.approvedAt()
         );
@@ -113,7 +168,7 @@ public class PaymentService {
         orderPaymentCommandService.lockGeneralOrderForPayment(order.orderId());
         for (PaymentProduct product : order.products()) {
             if (productStockService.decreaseStock(product.productId(), product.quantity())) {
-                orderPaymentCommandService.recordGeneralStockDeduction(product.orderItemId(), completedAt);
+                orderPaymentCommandService.recordStockDeduction(product.orderItemId(), completedAt);
             }
         }
         requireOneRow(paymentMapper.completeZeroAmountIfReady(payment.getId(), completedAt));

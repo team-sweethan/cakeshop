@@ -7,10 +7,8 @@ import static org.mockito.Mockito.when;
 
 import com.cakeshop.domain.member.service.MemberOrderQueryService;
 import com.cakeshop.domain.order.entity.Order;
-import com.cakeshop.domain.order.entity.OrderItem;
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.entity.OrderType;
-import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.order.mapper.OrderMapper;
 import com.cakeshop.global.error.BusinessException;
 import java.time.Clock;
@@ -18,7 +16,6 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Optional;
-import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,7 +47,6 @@ class AdminCustomOrderServiceTests {
     @Test
     void startProduction_underReviewCustomOrder_recordsApproval() {
         when(orderMapper.findOrderByIdForUpdate(10L)).thenReturn(Optional.of(custom(OrderStatus.UNDER_REVIEW)));
-        when(orderMapper.findOrderItemsByOrderId(10L)).thenReturn(List.of(customItem(2)));
         when(orderMapper.startProductionIfUnderReview(10L, 7L, NOW)).thenReturn(1);
 
         service.startProduction(10L, 7L);
@@ -59,18 +55,15 @@ class AdminCustomOrderServiceTests {
     }
 
     @Test
-    void startProduction_pickupBeforePreparationCompletion_rejectsWithoutStartingProduction() {
+    void startProduction_underReviewOrder_startsDespiteDelayedApproval() {
         Order order = custom(OrderStatus.UNDER_REVIEW);
         order.setPickupAt(NOW.plusDays(2).minusSeconds(1));
         when(orderMapper.findOrderByIdForUpdate(10L)).thenReturn(Optional.of(order));
-        when(orderMapper.findOrderItemsByOrderId(10L)).thenReturn(List.of(customItem(2)));
+        when(orderMapper.startProductionIfUnderReview(10L, 7L, NOW)).thenReturn(1);
 
-        assertThatThrownBy(() -> service.startProduction(10L, 7L))
-                .isInstanceOf(BusinessException.class)
-                .extracting(exception -> ((BusinessException) exception).getErrorCode())
-                .isEqualTo(OrderErrorCode.PICKUP_TIME_UNAVAILABLE);
+        service.startProduction(10L, 7L);
 
-        verify(orderMapper, never()).startProductionIfUnderReview(10L, 7L, NOW);
+        verify(orderMapper).startProductionIfUnderReview(10L, 7L, NOW);
     }
 
     @Test
@@ -98,11 +91,5 @@ class AdminCustomOrderServiceTests {
         order.setStatus(status);
         order.setPickupAt(NOW.plusDays(2));
         return order;
-    }
-
-    private OrderItem customItem(int preparationDays) {
-        OrderItem item = new OrderItem();
-        item.setPreparationDays(preparationDays);
-        return item;
     }
 }

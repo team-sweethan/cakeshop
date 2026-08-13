@@ -51,11 +51,6 @@ public record OrderDetailView(
         return status == OrderStatus.READY_FOR_PICKUP;
     }
 
-    /** 수제 주문 결제 흐름이 구현되기 전에는 일반 주문에만 결제 화면을 노출한다. */
-    public boolean generalPaymentPending() {
-        return orderType == OrderType.GENERAL && paymentPending;
-    }
-
     public boolean fulfillmentManageable() {
         return status == OrderStatus.READY_FOR_PICKUP
                 || (orderType == OrderType.CUSTOM
