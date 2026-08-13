@@ -1917,6 +1917,21 @@ body > main {
     vertical-align: middle
 }
 
+.payment-row-actions {
+    display: grid;
+    gap: var(--space-2)
+}
+
+.payment-expiration-check {
+    align-items: center;
+    cursor: pointer;
+    display: inline-flex;
+    font-size: var(--font-xs);
+    font-weight: 700;
+    gap: 6px;
+    white-space: nowrap
+}
+
 .payment-reference {
     color: var(--color-muted);
     display: block;
