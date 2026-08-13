@@ -173,6 +173,7 @@ class PaymentServiceTests {
                 1L,
                 approval.approvedAt()
         );
+        verifyNoInteractions(eventPublisher);
     }
 
     @Test
