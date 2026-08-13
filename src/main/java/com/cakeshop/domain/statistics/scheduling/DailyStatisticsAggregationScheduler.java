@@ -1,4 +1,4 @@
-package com.cakeshop.domain.statistics.service;
+package com.cakeshop.domain.statistics.scheduling;
 
 import com.cakeshop.domain.statistics.aggregation.DailyStatisticsAggregationService;
 import org.springframework.scheduling.annotation.Scheduled;
