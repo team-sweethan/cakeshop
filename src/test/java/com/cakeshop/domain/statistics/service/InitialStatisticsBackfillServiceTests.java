@@ -78,6 +78,7 @@ class InitialStatisticsBackfillServiceTests {
         assertThat(countDailyStatistics()).isEqualTo(7);
         assertThat(countDailyStatisticsBetween(yesterday.minusDays(6), yesterday)).isEqualTo(7);
         assertThat(countCompletedProductStatistics()).isEqualTo(7);
+        assertThat(countCompletedAdditionalMetrics()).isEqualTo(7);
         BatchRunRow run = findLatestBackfillRun();
         assertThat(run.status()).isEqualTo("SUCCEEDED");
         assertThat(run.targetStartDate()).isEqualTo(yesterday.minusDays(6));
@@ -268,6 +269,17 @@ class InitialStatisticsBackfillServiceTests {
     private int countCompletedProductStatistics() {
         return jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM daily_statistics WHERE product_aggregated_at IS NOT NULL",
+                Integer.class
+        );
+    }
+
+    private int countCompletedAdditionalMetrics() {
+        return jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM daily_statistics
+                WHERE additional_metrics_aggregated_at IS NOT NULL
+                """,
                 Integer.class
         );
     }

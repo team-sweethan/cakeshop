@@ -1,5 +1,6 @@
 package com.cakeshop.domain.statistics.service;
 
+import com.cakeshop.domain.statistics.dto.view.DailyAdditionalMetricsSourceView;
 import com.cakeshop.domain.statistics.dto.view.DailyProductStatisticsSourceView;
 import com.cakeshop.domain.statistics.entity.StatisticsBatchRun;
 import com.cakeshop.domain.statistics.mapper.DailyStatisticsAggregationMapper;
@@ -127,11 +128,19 @@ public class StatisticsAggregationTransactionService {
         LocalDateTime end = statisticsDate.plusDays(1).atStartOfDay();
         List<DailyProductStatisticsSourceView> productSources =
                 productSourceQueryService.getDailyProductStatistics(start, end);
+        DailyAdditionalMetricsSourceView additionalMetricsSource =
+                sourceReadModelMapper.findDailyAdditionalMetrics(start, end);
 
         aggregationMapper.upsertDailyStatistics(
                 statisticsDate,
                 sourceReadModelMapper.findDailyStatistics(start, end)
         );
+        if (aggregationMapper.updateDailyAdditionalMetrics(
+                statisticsDate,
+                additionalMetricsSource
+        ) != 1) {
+            throw new IllegalStateException("활동·금액 지표 집계 결과를 저장하지 못했습니다.");
+        }
         aggregationMapper.deleteDailyProductStatistics(statisticsDate);
         if (!productSources.isEmpty()) {
             int insertedRows = aggregationMapper.insertDailyProductStatistics(

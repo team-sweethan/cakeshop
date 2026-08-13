@@ -95,6 +95,7 @@ class DailyStatisticsAggregationServiceTests {
                 new DailyStatisticsRow(0, 0, 0, BigDecimal.ZERO)
         );
         assertThat(findProductAggregatedAt(yesterday)).isNotNull();
+        assertThat(findAdditionalMetricsAggregatedAt(yesterday)).isNotNull();
         BatchRunRow dailyRun = findLatestDailyRun();
         assertThat(dailyRun.status()).isEqualTo("SUCCEEDED");
         assertThat(dailyRun.sourceWindowStartedAt()).isEqualTo(backfillStartedAt);
@@ -267,6 +268,40 @@ class DailyStatisticsAggregationServiceTests {
         assertThat(findLatestDailyRun().status()).isEqualTo("FAILED");
     }
 
+    @Test
+    void aggregateDailyStatistics_additionalMetricsUpdateFails_preservesExistingResult() {
+        LocalDate yesterday = findYesterday();
+        insertSuccessfulBackfill(yesterday);
+        insertDailyStatistics(yesterday);
+        LocalDateTime previousAggregatedAt = LocalDateTime.of(2026, 8, 1, 0, 10);
+        jdbcTemplate.update(
+                """
+                UPDATE daily_statistics
+                SET new_member_count = 9,
+                    refund_amount = 45000,
+                    additional_metrics_aggregated_at = ?
+                WHERE statistics_date = ?
+                """,
+                previousAggregatedAt,
+                yesterday
+        );
+        doThrow(new IllegalStateException("기타 지표 집계 실패 테스트"))
+                .when(aggregationMapper)
+                .updateDailyAdditionalMetrics(eq(yesterday), any());
+
+        assertThatThrownBy(service::aggregateDailyStatistics)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("기타 지표 집계 실패 테스트");
+
+        assertThat(findDailyStatistics(yesterday)).isEqualTo(
+                new DailyStatisticsRow(99, 88, 7, new BigDecimal("123456"))
+        );
+        assertThat(findAdditionalMetrics(yesterday)).isEqualTo(
+                new AdditionalMetricsRow(9, new BigDecimal("45000"), previousAggregatedAt)
+        );
+        assertThat(findLatestDailyRun().status()).isEqualTo("FAILED");
+    }
+
     private LocalDate findYesterday() {
         return batchRunMapper.findCurrentDateTime().toLocalDate().minusDays(1);
     }
@@ -316,6 +351,40 @@ class DailyStatisticsAggregationServiceTests {
                         resultSet.getLong("completed_order_count"),
                         resultSet.getLong("canceled_order_count"),
                         resultSet.getBigDecimal("total_sales_amount")
+                ),
+                statisticsDate
+        );
+    }
+
+    private LocalDateTime findAdditionalMetricsAggregatedAt(LocalDate statisticsDate) {
+        return jdbcTemplate.queryForObject(
+                """
+                SELECT additional_metrics_aggregated_at
+                FROM daily_statistics
+                WHERE statistics_date = ?
+                """,
+                LocalDateTime.class,
+                statisticsDate
+        );
+    }
+
+    private AdditionalMetricsRow findAdditionalMetrics(LocalDate statisticsDate) {
+        return jdbcTemplate.queryForObject(
+                """
+                SELECT
+                    new_member_count,
+                    refund_amount,
+                    additional_metrics_aggregated_at
+                FROM daily_statistics
+                WHERE statistics_date = ?
+                """,
+                (resultSet, rowNum) -> new AdditionalMetricsRow(
+                        resultSet.getLong("new_member_count"),
+                        resultSet.getBigDecimal("refund_amount"),
+                        resultSet.getObject(
+                                "additional_metrics_aggregated_at",
+                                LocalDateTime.class
+                        )
                 ),
                 statisticsDate
         );
@@ -426,6 +495,13 @@ class DailyStatisticsAggregationServiceTests {
     }
 
     private record ProductStatisticsRow(long productId, String productName, long orderCount) {
+    }
+
+    private record AdditionalMetricsRow(
+            long newMemberCount,
+            BigDecimal refundAmount,
+            LocalDateTime aggregatedAt
+    ) {
     }
 
     private record BatchRunRow(
