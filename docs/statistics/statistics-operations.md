@@ -60,12 +60,12 @@ WHERE product_aggregated_at IS NULL;
 2. 기타 지표 집계 기능이 포함된 애플리케이션 버전을 배포한다.
 3. 아래 SQL로 재집계할 최초일과 최종일을 확인한다.
 4. 해당 전체 기간을 366일 이하의 겹치지 않는 연속 구간으로 나누어 이 문서의 REBUILD 명령을 실행한다.
-5. 모든 구간이 성공한 뒤 아래 완료 확인 SQL에서 두 미집계 날짜 수가 모두 `0`인지 확인한다.
+5. 모든 구간이 성공한 뒤 아래 완료 확인 SQL에서 누락 및 두 미집계 날짜 수가 모두 `0`인지 확인한다.
 
 ```sql
 SELECT
     MIN(statistics_source.source_date) AS rebuild_start_date,
-    CURRENT_DATE - INTERVAL 1 DAY AS rebuild_end_date
+    DATE(UTC_TIMESTAMP(6) + INTERVAL 9 HOUR) - INTERVAL 1 DAY AS rebuild_end_date
 FROM (
     SELECT statistics_date AS source_date
     FROM daily_statistics
@@ -106,17 +106,76 @@ FROM (
 ```
 
 ```sql
+WITH rebuild_bounds AS (
+    SELECT
+        MIN(statistics_source.source_date) AS start_date,
+        DATE(UTC_TIMESTAMP(6) + INTERVAL 9 HOUR) - INTERVAL 1 DAY AS end_date
+    FROM (
+        SELECT statistics_date AS source_date
+        FROM daily_statistics
+
+        UNION ALL
+
+        SELECT DATE(created_at)
+        FROM orders
+
+        UNION ALL
+
+        SELECT DATE(approved_at)
+        FROM payments
+        WHERE approved_at IS NOT NULL
+
+        UNION ALL
+
+        SELECT DATE(created_at)
+        FROM members
+
+        UNION ALL
+
+        SELECT DATE(withdrawn_at)
+        FROM members
+        WHERE withdrawn_at IS NOT NULL
+
+        UNION ALL
+
+        SELECT DATE(created_at)
+        FROM posts
+
+        UNION ALL
+
+        SELECT DATE(canceled_at)
+        FROM payment_cancellations
+        WHERE canceled_at IS NOT NULL
+    ) AS statistics_source
+)
 SELECT
-    COALESCE(SUM(product_aggregated_at IS NULL), 0) AS incomplete_product_date_count,
-    COALESCE(SUM(additional_metrics_aggregated_at IS NULL), 0) AS incomplete_additional_metrics_date_count
-FROM daily_statistics;
+    CASE
+        WHEN bounds.start_date IS NULL OR bounds.end_date < bounds.start_date THEN 0
+        ELSE GREATEST(
+            DATEDIFF(bounds.end_date, bounds.start_date) + 1
+                - COUNT(statistics.statistics_date),
+            0
+        )
+    END AS missing_date_count,
+    COALESCE(SUM(
+        statistics.statistics_date IS NOT NULL
+        AND statistics.product_aggregated_at IS NULL
+    ), 0) AS incomplete_product_date_count,
+    COALESCE(SUM(
+        statistics.statistics_date IS NOT NULL
+        AND statistics.additional_metrics_aggregated_at IS NULL
+    ), 0) AS incomplete_additional_metrics_date_count
+FROM rebuild_bounds AS bounds
+LEFT JOIN daily_statistics AS statistics
+    ON statistics.statistics_date BETWEEN bounds.start_date AND bounds.end_date
+GROUP BY bounds.start_date, bounds.end_date;
 ```
 
 재집계가 완료되기 전에도 기존 주문·매출 통계는 조회할 수 있지만,
 `additional_metrics_aggregated_at IS NULL`인 날짜가 조회 기간에 포함되면 활동·금액 지표 영역은
-미집계 상태로 표시된다. 상품별 통계와 활동·금액 지표를 함께 도입하면 두 미집계 날짜 수가 모두
-`0`인 것을 확인한 뒤 사용한다. 시작일이 기존 `daily_statistics`의 최초일보다 이르면 REBUILD가
-앞쪽 날짜의 `daily_statistics` 행도 새로 생성한다.
+미집계 상태로 표시된다. 상품별 통계와 활동·금액 지표를 함께 도입하면 누락 날짜 수와 두 미집계 날짜
+수가 모두 `0`인 것을 확인한 뒤 사용한다. 시작일이 기존 `daily_statistics`의 최초일보다 이르면
+REBUILD가 앞쪽 날짜의 `daily_statistics` 행도 새로 생성한다.
 
 ## 애플리케이션 시작 시 자동 따라잡기
 
