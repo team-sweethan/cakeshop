@@ -105,6 +105,26 @@ class InitialStatisticsBackfillServiceTests {
     }
 
     @Test
+    void backfillInitialStatistics_additionalMetricsOlderThanOrders_startsAtAdditionalMetricsDate() {
+        LocalDate yesterday = findYesterday();
+        LocalDate earliestAdditionalMetricsDate = yesterday.minusDays(12);
+        doReturn(yesterday.minusDays(9)).when(sourceReadModelMapper).findEarliestOrderDate();
+        doReturn(yesterday.minusDays(8))
+                .when(sourceReadModelMapper)
+                .findEarliestApprovedPaymentDate();
+        doReturn(earliestAdditionalMetricsDate)
+                .when(sourceReadModelMapper)
+                .findEarliestAdditionalMetricsDate();
+
+        StatisticsBackfillResult result = service.backfillInitialStatistics();
+
+        assertThat(result).isEqualTo(StatisticsBackfillResult.SUCCEEDED);
+        assertThat(findLatestBackfillRun().targetStartDate())
+                .isEqualTo(earliestAdditionalMetricsDate);
+        assertThat(countDailyStatistics()).isEqualTo(13);
+    }
+
+    @Test
     void backfillInitialStatistics_successfulRunExists_skipsSecondRun() {
         LocalDate yesterday = findYesterday();
         insertCompletedBackfill(yesterday, "SUCCEEDED");

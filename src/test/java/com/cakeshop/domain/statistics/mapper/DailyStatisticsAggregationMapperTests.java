@@ -134,6 +134,32 @@ class DailyStatisticsAggregationMapperTests {
                 sourceEnd
         );
         insertOrder("AFTER-END", "PICKED_UP", START.plusDays(3), sourceEnd.plusNanos(1_000));
+        long cancellationAtStartPaymentId = insertPayment(
+                "C-START",
+                "CANCELED",
+                new BigDecimal("10000"),
+                START.minusDays(1),
+                sourceStart.minusHours(1)
+        );
+        insertCancellation(
+                cancellationAtStartPaymentId,
+                "AT-START",
+                START.plusDays(4),
+                sourceStart
+        );
+        long changedCancellationPaymentId = insertPayment(
+                "C-AFTER",
+                "CANCELED",
+                new BigDecimal("10000"),
+                START.minusDays(1),
+                sourceStart.minusHours(1)
+        );
+        insertCancellation(
+                changedCancellationPaymentId,
+                "AFTER-START",
+                START.plusDays(5),
+                sourceStart.plusNanos(1_000)
+        );
         insertOrder(
                 "TODAY",
                 "PICKED_UP",
@@ -147,7 +173,11 @@ class DailyStatisticsAggregationMapperTests {
                 latestStatisticsDate
         );
 
-        assertThat(dates).containsExactly(STATISTICS_DATE.plusDays(1), STATISTICS_DATE.plusDays(2));
+        assertThat(dates).containsExactly(
+                STATISTICS_DATE.plusDays(1),
+                STATISTICS_DATE.plusDays(2),
+                STATISTICS_DATE.plusDays(5)
+        );
     }
 
     @Test
@@ -297,6 +327,34 @@ class DailyStatisticsAggregationMapperTests {
                 updatedAt
         );
         return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+    }
+
+    private void insertCancellation(
+            long paymentId,
+            String label,
+            LocalDateTime canceledAt,
+            LocalDateTime updatedAt
+    ) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO payment_cancellations (
+                    payment_id,
+                    idempotency_key,
+                    cancel_amount,
+                    cancel_reason,
+                    status,
+                    canceled_at,
+                    created_at,
+                    updated_at
+                )
+                VALUES (?, ?, 10000, '변경 날짜 탐색 테스트', 'DONE', ?, ?, ?)
+                """,
+                paymentId,
+                "DAILY-CANCELLATION-" + label + "-" + suffix,
+                canceledAt,
+                updatedAt,
+                updatedAt
+        );
     }
 
     private record DailyStatisticsRow(

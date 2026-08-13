@@ -106,6 +106,54 @@ class DailyAdditionalMetricsSourceReadModelMapperTests {
         ));
     }
 
+    @Test
+    void findEarliestAdditionalMetricsDate_memberExists_returnsMemberCreatedDate() {
+        assertThat(mapper.findEarliestAdditionalMetricsDate())
+                .isEqualTo(START.minusDays(10).toLocalDate());
+    }
+
+    @Test
+    void findEarliestAdditionalMetricsDate_withdrawnMemberExists_returnsWithdrawnDate() {
+        LocalDateTime withdrawnAt = START.minusDays(20);
+        insertMember(
+                "EARLIEST-WITHDRAWN",
+                "USER",
+                "WITHDRAWN",
+                START.minusDays(5),
+                withdrawnAt
+        );
+
+        assertThat(mapper.findEarliestAdditionalMetricsDate())
+                .isEqualTo(START.minusDays(20).toLocalDate());
+    }
+
+    @Test
+    void findEarliestAdditionalMetricsDate_postExists_returnsPostCreatedDate() {
+        insertPost(START.minusDays(30), "DELETED");
+
+        assertThat(mapper.findEarliestAdditionalMetricsDate())
+                .isEqualTo(START.minusDays(30).toLocalDate());
+    }
+
+    @Test
+    void findEarliestAdditionalMetricsDate_completedCancellationExists_returnsCanceledDate() {
+        long paymentId = insertPayment(
+                insertOrder("EARLIEST-CANCELLATION"),
+                "EARLIEST-CANCELLATION",
+                "CANCELED",
+                START.minusDays(1)
+        );
+        insertCancellation(
+                paymentId,
+                "DONE",
+                new BigDecimal("10000"),
+                START.minusDays(40)
+        );
+
+        assertThat(mapper.findEarliestAdditionalMetricsDate())
+                .isEqualTo(START.minusDays(40).toLocalDate());
+    }
+
     private long insertMember(
             String label,
             String role,

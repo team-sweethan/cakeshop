@@ -48,4 +48,7 @@ public interface DailyStatisticsSourceReadModelMapper {
 
     /** 초기 백필의 승인 결제 기준 시작일을 조회한다. */
     LocalDate findEarliestApprovedPaymentDate();
+
+    /** 초기 백필의 회원·게시글·완료 환불 기준 시작일을 조회한다. */
+    LocalDate findEarliestAdditionalMetricsDate();
 }
