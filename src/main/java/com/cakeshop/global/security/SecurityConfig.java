@@ -133,7 +133,7 @@ public class SecurityConfig {
                 // ② 관리자. 모든 관리자 화면 및 관리자 API는 관리자 로그인을 요구한다.
                 auth.requestMatchers("/admin", "/admin/**", "/api/admin/**").hasRole("ADMIN");
                 // 고객과 관리자가 각자 받은 채팅/알림을 같은 API에서 조회하고 읽음 처리한다.
-                auth.requestMatchers("/api/chat", "/api/chat/**", "/api/notifications", "/api/notifications/**")
+                auth.requestMatchers("/ws", "/ws/**", "/api/chat", "/api/chat/**", "/api/notifications", "/api/notifications/**")
                         .hasAnyRole("USER", "ADMIN");
                 // ③ 나머지 회원 전용 기능은 일반 회원만 사용한다.
                 auth.anyRequest().hasRole("USER");
