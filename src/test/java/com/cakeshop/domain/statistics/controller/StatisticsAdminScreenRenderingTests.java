@@ -61,6 +61,9 @@ class StatisticsAdminScreenRenderingTests {
                         0,
                         0,
                         0,
+                        0,
+                        0,
+                        0,
                         List.of(),
                         List.of(),
                         List.of()

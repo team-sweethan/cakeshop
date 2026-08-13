@@ -35,9 +35,14 @@ public class DashboardReadModelQueryService {
         long todayOrderCount = dashboardReadModelMapper.countTodayOrders(start, end);
         // 오늘 매출
         BigDecimal todaySalesAmount = dashboardReadModelMapper.sumTodaySales(start, end);
+        // 승인 대기 주문제작 주문
+        long approvalPendingCount =
+                dashboardReadModelMapper.countApprovalPendingCustomOrders();
         // 확인 필요 결제
         long paymentAttentionCount =
                 dashboardReadModelMapper.countPaymentsRequiringAttention();
+        // 제작 중 주문제작 주문
+        long inProductionCount = dashboardReadModelMapper.countCustomOrdersInProduction();
         // 오늘 픽업 예정
         long todayPickupCount = dashboardReadModelMapper.countTodayPickups(start, end);
         // 오늘 픽업 일정
@@ -54,13 +59,18 @@ public class DashboardReadModelQueryService {
         long lowStockProductCount = dashboardReadModelMapper.countLowStockProducts();
         List<LowStockProductView> lowStockProducts =
                 dashboardReadModelMapper.findLowStockProducts(DASHBOARD_LIST_LIMIT);
+        // 신고 처리 대기 게시글
+        long pendingReportedPostCount = dashboardReadModelMapper.countPendingReportedPosts();
 
         return new StatisticsDashboardView(
                 todayOrderCount,
                 todaySalesAmount,
+                approvalPendingCount,
                 paymentAttentionCount,
+                inProductionCount,
                 todayPickupCount,
                 lowStockProductCount,
+                pendingReportedPostCount,
                 todayPickups,
                 recentOrders,
                 lowStockProducts

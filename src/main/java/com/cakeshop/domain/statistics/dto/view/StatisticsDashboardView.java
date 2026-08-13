@@ -17,29 +17,4 @@ public record StatisticsDashboardView(
         List<RecentOrderView> recentOrders,
         List<LowStockProductView> lowStockProducts
 ) {
-
-    public StatisticsDashboardView(
-            long todayOrderCount,
-            BigDecimal todaySalesAmount,
-            long paymentAttentionCount,
-            long todayPickupCount,
-            long lowStockProductCount,
-            List<TodayPickupScheduleView> todayPickups,
-            List<RecentOrderView> recentOrders,
-            List<LowStockProductView> lowStockProducts
-    ) {
-        this(
-                todayOrderCount,
-                todaySalesAmount,
-                0,
-                paymentAttentionCount,
-                0,
-                todayPickupCount,
-                lowStockProductCount,
-                0,
-                todayPickups,
-                recentOrders,
-                lowStockProducts
-        );
-    }
 }
