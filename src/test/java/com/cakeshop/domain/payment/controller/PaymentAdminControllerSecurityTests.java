@@ -15,8 +15,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(PaymentAdminController.class)
@@ -48,5 +51,23 @@ class PaymentAdminControllerSecurityTests {
 
         mockMvc.perform(get("/admin/payments"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void updateExpirationCheck_customer_isForbidden() throws Exception {
+        mockMvc.perform(post("/admin/payments/7/expiration-check").with(csrf()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void updateExpirationCheck_adminWithCsrf_updatesState() throws Exception {
+        mockMvc.perform(post("/admin/payments/7/expiration-check")
+                        .with(csrf())
+                        .param("checked", "true"))
+                .andExpect(status().is3xxRedirection());
+
+        verify(paymentAdminQueryService).updateExpirationCheck(7L, true);
     }
 }

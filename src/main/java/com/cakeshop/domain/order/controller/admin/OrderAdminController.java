@@ -2,6 +2,7 @@ package com.cakeshop.domain.order.controller.admin;
 
 import com.cakeshop.domain.order.dto.form.CancelForm;
 import com.cakeshop.domain.order.service.admin.AdminOrderService;
+import com.cakeshop.domain.order.service.admin.FulfillmentService;
 import com.cakeshop.domain.payment.service.RefundFacade;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.error.CommonErrorCode;
@@ -23,6 +24,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class OrderAdminController {
 
     private final AdminOrderService orderAdminService;
+    private final FulfillmentService fulfillmentService;
     private final RefundFacade refundFacade;
 
     /** 주문 목록 리스트 가져오기**/
@@ -35,7 +37,14 @@ public class OrderAdminController {
     /** 주문 목록 중 한건 한건에 대한 정보 가져오기.**/
     @GetMapping("/admin/orders/{orderId}")
     public String detail(@PathVariable("orderId") long orderId, Model model) {
-        model.addAttribute("order", orderAdminService.getOrder(orderId));
+        var order = orderAdminService.getOrder(orderId);
+        model.addAttribute("order", order);
+        if (order.fulfillmentManageable()) {
+            model.addAttribute(
+                    "fulfillmentPage",
+                    fulfillmentService.getFulfillmentPage(order.orderId(), order.status())
+            );
+        }
         return "admin/order/detail";
     }
 
