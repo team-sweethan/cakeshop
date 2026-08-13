@@ -1,7 +1,7 @@
 # 주문 스키마
 
 - 담당: 주환
-- 테이블: `orders`, `order_items`, `order_item_options`, `order_item_images`
+- 테이블: `orders`, `order_items`, `order_item_options`, `order_item_images`, `order_cart_items`
 - 정본: Flyway migration 적용 결과
 
 ## `orders`
@@ -117,6 +117,24 @@
 - FK: `fk_order_item_images_item` — `order_item_id` → `order_items.id`
 - CHECK: `sort_order >= 0`
 
+## `order_cart_items`
+
+장바구니에서 생성한 주문이 결제 완료된 뒤, 해당 주문에 포함됐던 장바구니 항목만 정리하기 위한 연결 테이블이다.
+결제 대기·실패·만료 주문에서는 장바구니를 유지하며, 결제 커밋 후 발생하는 이벤트가 이 연결 정보를 조회해
+cart 도메인의 공개 Command로 항목을 멱등 삭제한다.
+
+| 컬럼 | 타입 | 키 | Null | 기본값 | 의미 |
+|---|---|---|---|---|---|
+| `order_id` | BIGINT | PK, FK | X | 없음 | 주문 식별자 |
+| `cart_item_id` | BIGINT | PK | X | 없음 | 결제 완료 후 정리할 장바구니 항목 식별자 |
+| `snapshot_quantity` | INT UNSIGNED | - | X | 1 | 주문 생성 시점 장바구니 항목 수량 |
+
+- PK: (`order_id`, `cart_item_id`)
+- FK: `fk_order_cart_items_order` (`order_id`) → `orders.id`
+- INDEX: `idx_order_cart_items_order_id` (`order_id`)
+- `cart_item_id`에는 FK를 두지 않는다. 결제 전 사용자가 장바구니 항목을 직접 삭제해도 주문 생성 이력과
+  결제 처리가 막히지 않도록 하며, 결제 후 정리는 삭제 행 수와 관계없이 멱등 처리한다.
+
 ## 관련 migration
 
 - `V0__initial_schema.sql`
@@ -126,3 +144,11 @@
 - `V20260810_200833__add_statistics_source_indexes.sql`
 - `V20260811_145723__add_order_in_production_status.sql`
 - `V20260811_165915__add_custom_production_due_index.sql`
+- `V20260812_115115__add_order_cart_item_links.sql`
+- `V20260812_155402__add_order_cart_item_snapshot_quantity.sql`
+
+> `order_cart_items.snapshot_quantity`는 주문 생성 당시 장바구니 수량이다. 결제 후 정리 시 현재 수량과 비교하여, 수량이 변경된 장바구니 항목은 삭제하지 않는다.
+
+## 장바구니 선택 정책
+
+주문 생성 요청의 `cartItemIds`에는 항목 종류 개수 상한이 없다. 다만 각 항목의 수량은 상품별 판매 수량·재고 정책을 따른다.

@@ -1,5 +1,7 @@
 package com.cakeshop.domain.order.service.customer;
 
+import com.cakeshop.domain.cart.dto.view.CartOrderItemView;
+import com.cakeshop.domain.order.dto.view.customer.CartOrderCheckoutView;
 import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView;
 import com.cakeshop.domain.order.dto.view.customer.CustomOrderCheckoutView;
 import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView.PickupDateView;
@@ -97,6 +99,39 @@ public class OrderCheckoutService {
                 amounts.productAmount(),
                 amounts.optionAmount(),
                 amounts.totalAmount(),
+                createPickupDates(storeService.getStoreView(), 0)
+        );
+    }
+
+    /**
+     * 장바구니에서 소유권 검증을 마친 여러 항목을 주문서 표시용으로 재검증·계산한다.
+     * 최종 주문 저장 단계에서도 동일 항목을 다시 조회해 검증하므로 이 결과는 화면 표시 전용이다.
+     */
+    @Transactional(readOnly = true)
+    public CartOrderCheckoutView getCartCheckout(List<CartOrderItemView> cartItems) {
+        if (cartItems == null || cartItems.isEmpty()) {
+            throw new BusinessException(OrderErrorCode.EMPTY_ORDER_ITEMS);
+        }
+        List<GeneralOrderCheckoutView> itemCheckouts = cartItems.stream()
+                .map(item -> getGeneralCheckout(item.productId(), item.quantity(), item.optionIds()))
+                .toList();
+
+        List<CartOrderCheckoutView.CartOrderItemView> items = itemCheckouts.stream()
+                .map(item -> new CartOrderCheckoutView.CartOrderItemView(
+                        item.productName(), item.quantity(), item.selectedOptions(), item.totalAmount()
+                ))
+                .toList();
+        java.math.BigDecimal productAmount = itemCheckouts.stream()
+                .map(GeneralOrderCheckoutView::productAmount)
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+        java.math.BigDecimal optionAmount = itemCheckouts.stream()
+                .map(GeneralOrderCheckoutView::optionAmount)
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+        return new CartOrderCheckoutView(
+                items,
+                productAmount,
+                optionAmount,
+                productAmount.add(optionAmount),
                 createPickupDates(storeService.getStoreView(), 0)
         );
     }

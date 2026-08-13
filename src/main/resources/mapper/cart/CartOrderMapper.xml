@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cakeshop.domain.cart.mapper.CartOrderMapper">
+    <!-- order 도메인 연동용: 요청 회원이 소유한 선택 장바구니 항목만 반환한다. -->
+    <select id="findSelectedOrderItems"
+            resultType="com.cakeshop.domain.cart.dto.view.CartOrderItemRow">
+        SELECT ci.id AS cart_item_id,
+               ci.product_id,
+               ci.quantity,
+               ci.requirements
+        FROM cart_items ci
+        INNER JOIN carts c ON c.id = ci.cart_id
+        WHERE c.member_id = #{memberId}
+          AND ci.id IN
+        <foreach collection="itemIds" item="itemId" open="(" separator="," close=")">
+            #{itemId}
+        </foreach>
+        ORDER BY ci.created_at DESC, ci.id DESC
+    </select>
+
+    <select id="findOptionsByCartItemIds"
+            resultType="com.cakeshop.domain.cart.entity.CartItemOption">
+        SELECT cart_item_id, product_option_id
+        FROM cart_item_options
+        WHERE cart_item_id IN
+        <foreach collection="itemIds" item="itemId" open="(" separator="," close=")">
+            #{itemId}
+        </foreach>
+        ORDER BY id
+    </select>
+</mapper>

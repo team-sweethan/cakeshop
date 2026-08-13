@@ -1,6 +1,9 @@
 package com.cakeshop.domain.order.service;
 
 import com.cakeshop.domain.order.dto.form.customer.GeneralOrderForm;
+import com.cakeshop.domain.order.dto.form.customer.CartOrderForm;
+import com.cakeshop.domain.cart.dto.view.CartOrderItemView;
+import com.cakeshop.domain.cart.service.CartOrderQueryService;
 import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
 import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.member.service.MemberCouponQueryService;
@@ -11,6 +14,8 @@ import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.order.mapper.OrderMapper;
+import com.cakeshop.domain.order.mapper.OrderCartMapper;
+import com.cakeshop.domain.order.dto.view.OrderCartItemLink;
 import com.cakeshop.domain.order.service.OrderOptionValidator.ValidatedOption;
 import com.cakeshop.domain.payment.service.PaymentOrderPreparationCommandService;
 import com.cakeshop.domain.product.dto.view.ProductSalesInfo;
@@ -47,6 +52,8 @@ public class OrderServiceImpl implements OrderService {
     private final MemberCouponQueryService memberCouponQueryService;
     // 쿠폰 담당자가 제공하는 공개 명령 계약이다. 주문 도메인은 쿠폰 Mapper를 직접 사용하지 않는다.
     private final CouponOrderCommandService couponOrderCommandService;
+    private final CartOrderQueryService cartOrderQueryService;
+    private final OrderCartMapper orderCartMapper;
     private final Clock clock;
 
     /** 일반 상품 주문, 주문 항목 스냅샷, READY 결제를 하나의 트랜잭션으로 생성한다. */
@@ -120,6 +127,86 @@ public class OrderServiceImpl implements OrderService {
         return order.getId();
     }
 
+    /**
+     * 장바구니 선택 항목은 화면에서 전달된 상품 정보가 아닌 cart 공개 조회 계약으로 다시 읽는다.
+     * 상품·옵션·재고와 총 주문 금액은 주문 생성 직전에 현재 DB 기준으로 재검증한다.
+     */
+    @Override
+    @Transactional
+    public long createCartOrder(long memberId, CartOrderForm form) {
+        if (!memberCouponQueryService.lockActiveCouponIssuableMember(memberId)) {
+            throw new BusinessException(CommonErrorCode.FORBIDDEN);
+        }
+        validateActiveMember(memberId);
+        validateCartForm(form);
+
+        Order existingOrder = orderMapper.findOrderByMemberIdAndRequestKey(memberId, form.getRequestKey())
+                .orElse(null);
+        if (existingOrder != null) {
+            return existingOrder.getId();
+        }
+
+        LocalDateTime now = LocalDateTime.now(clock);
+        validatePickupAt(form.getPickupAt(), now);
+
+        List<CartOrderItemView> cartItems = cartOrderQueryService.getSelectedOrderItems(
+                memberId, form.getCartItemIds()
+        );
+        List<PreparedOrderItem> preparedItems = cartItems.stream()
+                .map(this::prepareCartItem)
+                .toList();
+        BigDecimal originalAmount = preparedItems.stream()
+                .map(PreparedOrderItem::totalAmount)
+                .reduce(ZERO, BigDecimal::add);
+        if (originalAmount.signum() <= 0) {
+            throw new BusinessException(OrderErrorCode.INVALID_ORDER_AMOUNT);
+        }
+        validateDisplayedOriginalAmount(form.getDisplayedOriginalAmount(), originalAmount);
+
+        Order order = createOrder(memberId, form, form.getRequestKey(), originalAmount, now);
+        int insertedRows = orderMapper.insertOrder(order);
+        if (order.getId() == null) {
+            throw new BusinessException(OrderErrorCode.ORDER_SAVE_FAILED);
+        }
+        if (orderMapper.existsOrderItemByOrderId(order.getId())) {
+            Order persistedOrder = orderMapper.findOrderById(order.getId())
+                    .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_SAVE_FAILED));
+            if (Long.valueOf(memberId).equals(persistedOrder.getMemberId())
+                    && form.getRequestKey().equals(persistedOrder.getRequestKey())) {
+                return order.getId();
+            }
+            throw new BusinessException(OrderErrorCode.ORDER_SAVE_FAILED);
+        }
+        requireOneRow(insertedRows, OrderErrorCode.ORDER_SAVE_FAILED);
+
+        if (orderCartMapper.insertOrderCartItems(
+                order.getId(),
+                cartItems.stream()
+                        .map(item -> new OrderCartItemLink(item.cartItemId(), item.quantity()))
+                        .toList()
+        ) != cartItems.size()) {
+            throw new BusinessException(OrderErrorCode.ORDER_SAVE_FAILED);
+        }
+
+        if (form.getMemberCouponId() != null) {
+            BigDecimal discountAmount = couponOrderCommandService.reserveCouponForOrder(
+                    memberId, form.getMemberCouponId(), order.getId(), originalAmount
+            );
+            BigDecimal finalAmount = originalAmount.subtract(discountAmount);
+            requireOneRow(orderMapper.updateAmountsIfPendingPayment(
+                    order.getId(), discountAmount, finalAmount
+            ), OrderErrorCode.ORDER_SAVE_FAILED);
+            order.setDiscountAmount(discountAmount);
+            order.setFinalAmount(finalAmount);
+        }
+
+        preparedItems.forEach(item -> saveOrderItem(order.getId(), item));
+        paymentOrderPreparationCommandService.prepareReadyPayment(
+                order.getId(), order.getOrderNumber(), order.getFinalAmount()
+        );
+        return order.getId();
+    }
+
     /** 세션 값만 신뢰하지 않고 현재 ACTIVE 회원인지 DB 기준으로 검증한다. */
     private void validateActiveMember(long memberId) {
         if (!memberService.isActiveMember(memberId)) {
@@ -152,6 +239,19 @@ public class OrderServiceImpl implements OrderService {
         }
         if (form.getProductId() == null) {
             throw new BusinessException(OrderErrorCode.EMPTY_ORDER_ITEMS);
+        }
+    }
+
+    private void validateCartForm(CartOrderForm form) {
+        if (form == null
+                || isBlank(form.getOrdererName())
+                || isBlank(form.getOrdererPhone())
+                || isBlank(form.getPickupName())
+                || isBlank(form.getPickupPhone())
+                || form.getCartItemIds() == null
+                || form.getCartItemIds().isEmpty()
+                || !isUuid(form.getRequestKey())) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
     }
 
@@ -204,7 +304,24 @@ public class OrderServiceImpl implements OrderService {
                 form.getQuantity(),
                 selectedOptions,
                 amounts.unitOptionAmount(),
-                amounts.totalAmount()
+                amounts.totalAmount(),
+                null
+        );
+    }
+
+    private PreparedOrderItem prepareCartItem(CartOrderItemView item) {
+        GeneralOrderForm form = new GeneralOrderForm();
+        form.setProductId(item.productId());
+        form.setQuantity(item.quantity());
+        form.setOptionIds(item.optionIds());
+        PreparedOrderItem preparedItem = prepareItem(form);
+        return new PreparedOrderItem(
+                preparedItem.product(),
+                preparedItem.quantity(),
+                preparedItem.selectedOptions(),
+                preparedItem.optionAmount(),
+                preparedItem.totalAmount(),
+                item.requirements()
         );
     }
 
@@ -228,10 +345,20 @@ public class OrderServiceImpl implements OrderService {
             BigDecimal originalAmount,
             LocalDateTime now
     ) {
+        return createOrder(memberId, form, form.getRequestKey(), originalAmount, now);
+    }
+
+    private Order createOrder(
+            long memberId,
+            com.cakeshop.domain.order.dto.form.customer.CreateOrderForm form,
+            String requestKey,
+            BigDecimal originalAmount,
+            LocalDateTime now
+    ) {
         Order order = new Order();
         order.setOrderNumber("ORD-" + compactUuid());
         order.setMemberId(memberId);
-        order.setRequestKey(form.getRequestKey());
+        order.setRequestKey(requestKey);
         order.setOrderType(OrderType.GENERAL);
         order.setOrdererName(form.getOrdererName().trim());
         order.setOrdererPhone(form.getOrdererPhone().trim());
@@ -259,6 +386,7 @@ public class OrderServiceImpl implements OrderService {
         orderItem.setBasePrice(product.basePrice());
         orderItem.setOptionAmount(preparedItem.optionAmount());
         orderItem.setTotalAmount(preparedItem.totalAmount());
+        orderItem.setRequirements(preparedItem.requirements());
         orderItem.setPreparationDays(product.preparationDays());
         orderItem.setCancellationLimitDays(0);
         requireOneRow(
@@ -316,7 +444,8 @@ public class OrderServiceImpl implements OrderService {
             int quantity,
             List<ValidatedOption> selectedOptions,
             BigDecimal optionAmount,
-            BigDecimal totalAmount
+            BigDecimal totalAmount,
+            String requirements
     ) {
     }
 }

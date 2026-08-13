@@ -110,6 +110,7 @@ public class SecurityConfig {
                 auth.requestMatchers(
                         HttpMethod.GET,
                         "/orders/checkout",
+                        "/orders/checkout/**",
                         "/orders/custom/options",
                         "/chat"
                 ).hasRole("USER");

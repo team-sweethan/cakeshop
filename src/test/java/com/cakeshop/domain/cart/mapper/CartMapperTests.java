@@ -48,9 +48,9 @@ class CartMapperTests {
         assertThat(cartMapper.findItemsByMemberId(memberId))
                 .extracting(CartItem::getId)
                 .containsExactly(item.getId());
-        assertThat(cartMapper.sumQuantityByMemberId(memberId)).isEqualTo(2);
+        assertThat(cartMapper.countItemsByMemberId(memberId)).isEqualTo(1);
         assertThat(cartMapper.findItemsByMemberId(memberId + 999)).isEmpty();
-        assertThat(cartMapper.sumQuantityByMemberId(memberId + 999)).isZero();
+        assertThat(cartMapper.countItemsByMemberId(memberId + 999)).isZero();
     }
 
     @Test
