@@ -1,5 +1,6 @@
 package com.cakeshop.domain.statistics.service;
 
+import com.cakeshop.domain.statistics.aggregation.StatisticsAggregationTransactionService;
 import com.cakeshop.domain.statistics.entity.StatisticsBatchRun;
 import com.cakeshop.domain.statistics.mapper.DailyStatisticsSourceReadModelMapper;
 import com.cakeshop.domain.statistics.mapper.StatisticsBatchRunMapper;

@@ -6,6 +6,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 
+import com.cakeshop.domain.statistics.aggregation.DailyProductStatisticsSourceReadModelQueryService;
+import com.cakeshop.domain.statistics.aggregation.StatisticsAggregationTransactionService;
 import com.cakeshop.domain.statistics.dto.StatisticsRebuildRequest;
 import com.cakeshop.domain.statistics.entity.StatisticsBatchRun;
 import com.cakeshop.domain.statistics.mapper.DailyStatisticsAggregationMapper;

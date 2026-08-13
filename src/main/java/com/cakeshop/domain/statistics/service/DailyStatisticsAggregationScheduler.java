@@ -1,5 +1,6 @@
 package com.cakeshop.domain.statistics.service;
 
+import com.cakeshop.domain.statistics.aggregation.DailyStatisticsAggregationService;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 

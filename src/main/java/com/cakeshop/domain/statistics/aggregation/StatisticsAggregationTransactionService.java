@@ -1,4 +1,4 @@
-package com.cakeshop.domain.statistics.service;
+package com.cakeshop.domain.statistics.aggregation;
 
 import com.cakeshop.domain.statistics.dto.view.DailyAdditionalMetricsSourceView;
 import com.cakeshop.domain.statistics.dto.view.DailyProductStatisticsSourceView;

@@ -1,5 +1,6 @@
 package com.cakeshop.domain.statistics.service;
 
+import com.cakeshop.domain.statistics.aggregation.DailyStatisticsAggregationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;

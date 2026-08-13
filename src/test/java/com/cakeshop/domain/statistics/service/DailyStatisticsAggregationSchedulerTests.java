@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+import com.cakeshop.domain.statistics.aggregation.DailyStatisticsAggregationService;
 import java.lang.reflect.Method;
 import org.junit.jupiter.api.Test;
 import org.springframework.scheduling.annotation.Scheduled;
