@@ -8,7 +8,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
-import com.cakeshop.domain.statistics.dto.view.DailyProductStatisticsSourceView;
+import com.cakeshop.domain.statistics.dto.source.DailyProductStatisticsSourceView;
 import com.cakeshop.domain.statistics.entity.StatisticsBatchRun;
 import com.cakeshop.domain.statistics.mapper.DailyStatisticsAggregationMapper;
 import com.cakeshop.domain.statistics.mapper.DailyStatisticsSourceReadModelMapper;

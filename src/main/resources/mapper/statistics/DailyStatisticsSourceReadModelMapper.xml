@@ -4,7 +4,7 @@
     <!-- 사용자 입력은 #{}만 사용하고 ${}는 사용하지 않는다. -->
 
     <select id="findDailyStatistics"
-            resultType="com.cakeshop.domain.statistics.dto.view.DailyStatisticsSourceView">
+            resultType="com.cakeshop.domain.statistics.dto.source.DailyStatisticsSourceView">
         SELECT
             COUNT(statistics_order.id) AS total_order_count,
             COALESCE(SUM(
@@ -32,7 +32,7 @@
     </select>
 
     <select id="findDailyAdditionalMetrics"
-            resultType="com.cakeshop.domain.statistics.dto.view.DailyAdditionalMetricsSourceView">
+            resultType="com.cakeshop.domain.statistics.dto.source.DailyAdditionalMetricsSourceView">
         SELECT
             (
                 SELECT COUNT(*)
@@ -83,7 +83,7 @@
     </select>
 
     <select id="findDailyProductStatistics"
-            resultType="com.cakeshop.domain.statistics.dto.view.DailyProductStatisticsSourceView">
+            resultType="com.cakeshop.domain.statistics.dto.source.DailyProductStatisticsSourceView">
         <!-- 실제 결제액을 주문 항목 금액 비율로 나누고 원 단위 나머지는 소수 부분 순서로 배분한다. -->
         WITH payment_item_share AS (
             SELECT

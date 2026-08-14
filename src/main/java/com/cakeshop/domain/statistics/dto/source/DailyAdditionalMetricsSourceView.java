@@ -1,4 +1,4 @@
-package com.cakeshop.domain.statistics.dto.view;
+package com.cakeshop.domain.statistics.dto.source;
 
 import java.math.BigDecimal;
 

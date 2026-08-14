@@ -1,6 +1,6 @@
 package com.cakeshop.domain.statistics.service.aggregation;
 
-import com.cakeshop.domain.statistics.dto.view.DailyProductStatisticsSourceView;
+import com.cakeshop.domain.statistics.dto.source.DailyProductStatisticsSourceView;
 import com.cakeshop.domain.statistics.mapper.DailyStatisticsSourceReadModelMapper;
 import java.time.LocalDateTime;
 import java.util.List;

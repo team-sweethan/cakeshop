@@ -2,7 +2,7 @@ package com.cakeshop.domain.statistics.mapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.cakeshop.domain.statistics.dto.view.DailyAdditionalMetricsSourceView;
+import com.cakeshop.domain.statistics.dto.source.DailyAdditionalMetricsSourceView;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 import java.math.BigDecimal;
 import java.time.LocalDate;

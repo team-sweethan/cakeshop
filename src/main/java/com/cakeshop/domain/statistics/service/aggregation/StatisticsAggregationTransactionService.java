@@ -1,7 +1,7 @@
 package com.cakeshop.domain.statistics.service.aggregation;
 
-import com.cakeshop.domain.statistics.dto.view.DailyAdditionalMetricsSourceView;
-import com.cakeshop.domain.statistics.dto.view.DailyProductStatisticsSourceView;
+import com.cakeshop.domain.statistics.dto.source.DailyAdditionalMetricsSourceView;
+import com.cakeshop.domain.statistics.dto.source.DailyProductStatisticsSourceView;
 import com.cakeshop.domain.statistics.entity.StatisticsBatchRun;
 import com.cakeshop.domain.statistics.mapper.DailyStatisticsAggregationMapper;
 import com.cakeshop.domain.statistics.mapper.DailyStatisticsSourceReadModelMapper;
