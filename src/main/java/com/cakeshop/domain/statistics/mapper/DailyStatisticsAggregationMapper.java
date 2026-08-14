@@ -1,8 +1,8 @@
 package com.cakeshop.domain.statistics.mapper;
 
-import com.cakeshop.domain.statistics.dto.view.DailyAdditionalMetricsSourceView;
-import com.cakeshop.domain.statistics.dto.view.DailyProductStatisticsSourceView;
-import com.cakeshop.domain.statistics.dto.view.DailyStatisticsSourceView;
+import com.cakeshop.domain.statistics.dto.source.DailyAdditionalMetricsSourceView;
+import com.cakeshop.domain.statistics.dto.source.DailyProductStatisticsSourceView;
+import com.cakeshop.domain.statistics.dto.source.DailyStatisticsSourceView;
 import java.time.LocalDate;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
