@@ -133,7 +133,40 @@ class ScreenRenderingTests {
                 .flashAttr("successMessage", "회원정보가 수정되었습니다."))
             .andExpect(status().isOk())
             .andExpect(content().string(containsString("data-common-alert-popup")))
-            .andExpect(content().string(containsString("window.alert(")));
+            .andExpect(content().string(containsString("window.alert(")))
+            .andExpect(content().string(containsString("진행 중인 주문")))
+            .andExpect(content().string(containsString("완료된 주문")))
+            .andExpect(content().string(containsString("href=\"/orders\"")));
+    }
+
+    @Test
+    @Transactional
+    @WithUserDetails(
+        value = "user@cakeshop.local",
+        userDetailsServiceBeanName = "memberDetailsService"
+    )
+    void myPage_generalAndCustomOrders_renderOrderTypeBadges() throws Exception {
+        long memberId = jdbcTemplate.queryForObject(
+                "SELECT id FROM members WHERE email = 'user@cakeshop.local'",
+                Long.class);
+        long generalProductId = jdbcTemplate.queryForObject(
+                "SELECT id FROM products WHERE product_type = 'GENERAL' ORDER BY id LIMIT 1",
+                Long.class);
+        long customProductId = jdbcTemplate.queryForObject(
+                "SELECT id FROM products WHERE product_type = 'CUSTOM' ORDER BY id LIMIT 1",
+                Long.class);
+        insertMyPageOrder(
+                memberId, generalProductId, "MYPAGE-GENERAL", "GENERAL",
+                "READY_FOR_PICKUP", "일반 배지 케이크");
+        insertMyPageOrder(
+                memberId, customProductId, "MYPAGE-CUSTOM", "CUSTOM",
+                "PICKED_UP", "주문 제작 배지 케이크");
+
+        mockMvc.perform(get("/mypage"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("mypage-order-card__badges")))
+            .andExpect(content().string(containsString(">일반 상품</span>")))
+            .andExpect(content().string(containsString(">주문 제작</span>")));
     }
 
     @Test
@@ -949,6 +982,54 @@ class ScreenRenderingTests {
                 "(?s).*<input(?=[^>]*id=\"imageFile\")"
                     + "(?=[^>]*disabled)[^>]*>.*"
             ))));
+    }
+
+    private void insertMyPageOrder(
+            long memberId,
+            long productId,
+            String orderNumber,
+            String orderType,
+            String status,
+            String productName
+    ) {
+        LocalDateTime createdAt = LocalDateTime.of(2026, 8, 15, 10, 0);
+        jdbcTemplate.update(
+                """
+                INSERT INTO orders (
+                    order_number, member_id, orderer_name, orderer_phone,
+                    pickup_name, pickup_phone, original_amount, discount_amount,
+                    final_amount, status, pickup_at, created_at, updated_at, order_type
+                )
+                VALUES (?, ?, '테스트회원', '010-0000-0002', '테스트회원', '010-0000-0002',
+                        35000, 0, 35000, ?, ?, ?, ?, ?)
+                """,
+                orderNumber,
+                memberId,
+                status,
+                createdAt.plusDays(1),
+                createdAt,
+                createdAt,
+                orderType
+        );
+        long orderId = jdbcTemplate.queryForObject(
+                "SELECT id FROM orders WHERE order_number = ?",
+                Long.class,
+                orderNumber
+        );
+        jdbcTemplate.update(
+                """
+                INSERT INTO order_items (
+                    order_id, product_id, product_name, product_type, quantity,
+                    base_price, option_amount, total_amount, preparation_days,
+                    cancellation_limit_days
+                )
+                VALUES (?, ?, ?, ?, 1, 35000, 0, 35000, 0, 0)
+                """,
+                orderId,
+                productId,
+                productName,
+                orderType
+        );
     }
 
     private void assertScreensRender(String[] paths) throws Exception {

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cakeshop.domain.order.mapper.OrderMemberMapper">
+    <sql id="memberOrderSummaryColumns">
+        o.id AS order_id,
+        o.order_number,
+        o.order_type,
+        COALESCE((
+            SELECT oi.product_name
+            FROM order_items oi
+            WHERE oi.order_id = o.id
+            ORDER BY oi.id
+            LIMIT 1
+        ), '주문 상품 없음') AS product_name,
+        (
+            SELECT COUNT(*)
+            FROM order_items oi
+            WHERE oi.order_id = o.id
+        ) AS item_count,
+        o.status,
+        o.final_amount,
+        o.pickup_at,
+        o.created_at
+    </sql>
+
+    <select id="findInProgressOrders"
+            resultType="com.cakeshop.domain.order.dto.view.OrderMemberOrderRow">
+        SELECT
+        <include refid="memberOrderSummaryColumns"/>
+        FROM orders o
+        WHERE o.member_id = #{memberId}
+          AND o.status IN (
+              'PENDING_PAYMENT',
+              'UNDER_REVIEW',
+              'IN_PRODUCTION',
+              'READY_FOR_PICKUP'
+          )
+        ORDER BY o.created_at DESC, o.id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="findCompletedOrders"
+            resultType="com.cakeshop.domain.order.dto.view.OrderMemberOrderRow">
+        SELECT
+        <include refid="memberOrderSummaryColumns"/>
+        FROM orders o
+        WHERE o.member_id = #{memberId}
+          AND o.status = 'PICKED_UP'
+        ORDER BY o.created_at DESC, o.id DESC
+        LIMIT #{limit}
+    </select>
+</mapper>

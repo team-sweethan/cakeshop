@@ -16,6 +16,8 @@ import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.coupon.service.CouponMemberQueryService;
 import com.cakeshop.domain.coupon.dto.view.CustomerCouponView;
 import com.cakeshop.domain.coupon.entity.CustomerCouponStatus;
+import com.cakeshop.domain.order.dto.view.OrderMemberSummaryView;
+import com.cakeshop.domain.order.service.OrderMemberQueryService;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
@@ -47,6 +49,9 @@ class MyPageControllerTests {
     private CouponMemberQueryService couponMemberQueryService;
 
     @Mock
+    private OrderMemberQueryService orderMemberQueryService;
+
+    @Mock
     private HttpServletRequest request;
 
     @Mock
@@ -76,6 +81,25 @@ class MyPageControllerTests {
     @AfterEach
     void clearSecurityContext() {
         SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    void myPage_authenticatedMember_addsProfileAndOrderSummaryToModel() {
+        MemberDetails memberDetails = memberDetails();
+        MemberProfileView profile = memberProfile();
+        OrderMemberSummaryView orderSummary = new OrderMemberSummaryView(
+                java.util.List.of(),
+                java.util.List.of());
+        when(memberService.getMemberProfile(memberDetails.getUsername()))
+                .thenReturn(profile);
+        when(orderMemberQueryService.getMyPageOrders(memberDetails.getMemberId()))
+                .thenReturn(orderSummary);
+
+        String viewName = myPageController.myPage(memberDetails, model);
+
+        assertThat(viewName).isEqualTo("customer/member/mypage");
+        verify(model).addAttribute("member", profile);
+        verify(model).addAttribute("orderSummary", orderSummary);
     }
 
     @Test
