@@ -120,7 +120,8 @@ class MyPageControllerTests {
                 null,
                 new ProfileUpdateForm(),
                 bindingResult,
-                model);
+                model,
+                redirectAttributes);
 
         assertThat(viewName).isEqualTo("redirect:/login");
         verifyNoInteractions(memberService);
@@ -170,7 +171,8 @@ class MyPageControllerTests {
                 memberDetails,
                 form,
                 bindingResult,
-                model);
+                model,
+                redirectAttributes);
 
         assertThat(viewName).isEqualTo("customer/member/profile-edit");
         assertThat(form.getEmail()).isEqualTo(memberDetails.getUsername());
@@ -195,8 +197,28 @@ class MyPageControllerTests {
                 memberDetails,
                 form,
                 bindingResult,
-                model))
+                model,
+                redirectAttributes))
                 .isSameAs(exception);
+    }
+
+    @Test
+    void updateProfile_authenticatedMember_redirectsWithSuccessMessage() {
+        MemberDetails memberDetails = memberDetails();
+        ProfileUpdateForm form = new ProfileUpdateForm();
+
+        String viewName = myPageController.updateProfile(
+                memberDetails,
+                form,
+                bindingResult,
+                model,
+                redirectAttributes);
+
+        assertThat(viewName).isEqualTo("redirect:/mypage");
+        verify(memberService).updateMemberInfo(memberDetails.getUsername(), form);
+        verify(redirectAttributes).addFlashAttribute(
+                "successMessage",
+                "회원정보가 수정되었습니다.");
     }
 
     @Test

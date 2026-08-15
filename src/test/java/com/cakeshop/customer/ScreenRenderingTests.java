@@ -88,6 +88,16 @@ class ScreenRenderingTests {
     }
 
     @Test
+    void login_authenticationError_rendersFocusableInlineAlert() throws Exception {
+        mockMvc.perform(get("/login").param("error", ""))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("이메일 또는 비밀번호가 올바르지 않습니다.")))
+            .andExpect(content().string(containsString("role=\"alert\"")))
+            .andExpect(content().string(containsString("tabindex=\"-1\"")))
+            .andExpect(content().string(containsString("data-login-error")));
+    }
+
+    @Test
     void productScreens_errorMessage_renderCommonAlertFragment() throws Exception {
         for (String path : new String[] {"/products", "/products/1"}) {
             mockMvc.perform(get(path)
@@ -111,6 +121,19 @@ class ScreenRenderingTests {
         mockMvc.perform(get("/mypage"))
             .andExpect(status().is3xxRedirection())
             .andExpect(redirectedUrl("/login"));
+    }
+
+    @Test
+    @WithUserDetails(
+        value = "user@cakeshop.local",
+        userDetailsServiceBeanName = "memberDetailsService"
+    )
+    void myPage_successMessage_rendersCommonPopupFragment() throws Exception {
+        mockMvc.perform(get("/mypage")
+                .flashAttr("successMessage", "회원정보가 수정되었습니다."))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("data-common-alert-popup")))
+            .andExpect(content().string(containsString("window.alert(")));
     }
 
     @Test
@@ -292,6 +315,19 @@ class ScreenRenderingTests {
             .andExpect(content().string(not(containsString("/orders/1"))))
             .andExpect(content().string(not(containsString("ORD-001"))))
             .andExpect(content().string(not(containsString("ORD-004"))));
+    }
+
+    @Test
+    @WithUserDetails(
+        value = "user@cakeshop.local",
+        userDetailsServiceBeanName = "memberDetailsService"
+    )
+    void memberScreens_doNotRenderMockNotice() throws Exception {
+        for (String path : new String[] {"/signup", "/mypage", "/mypage/profile"}) {
+            mockMvc.perform(get(path))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("class=\"mock-notice\""))));
+        }
     }
 
     @Test
@@ -687,6 +723,8 @@ class ScreenRenderingTests {
             """
             UPDATE orders
             SET status = 'READY_FOR_PICKUP',
+                discount_amount = 5000,
+                final_amount = original_amount - 5000,
                 ready_at = CURRENT_TIMESTAMP(6)
             WHERE id = ?
             """,
@@ -707,6 +745,10 @@ class ScreenRenderingTests {
             .andExpect(content().string(containsString(
                 "/admin/orders/" + orderId + "/cancel"
             )))
+            .andExpect(content().string(containsString("쿠폰 적용")))
+            .andExpect(content().string(containsString("적용")))
+            .andExpect(content().string(containsString("쿠폰 할인 금액")))
+            .andExpect(content().string(containsString("-5,000원")))
             .andExpect(content().string(containsString("name=\"_csrf\"")));
     }
 

@@ -2,8 +2,8 @@ package com.cakeshop.domain.statistics.mapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.cakeshop.domain.statistics.dto.view.DailyProductStatisticsSourceView;
-import com.cakeshop.domain.statistics.dto.view.DailyStatisticsSourceView;
+import com.cakeshop.domain.statistics.dto.source.DailyProductStatisticsSourceView;
+import com.cakeshop.domain.statistics.dto.source.DailyStatisticsSourceView;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 import java.math.BigDecimal;
 import java.time.LocalDate;

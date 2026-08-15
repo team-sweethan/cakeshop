@@ -3,11 +3,10 @@ package com.cakeshop.domain.statistics.controller;
 import com.cakeshop.domain.statistics.dto.form.StatisticsPeriodType;
 import com.cakeshop.domain.statistics.dto.form.StatisticsSearchForm;
 import com.cakeshop.domain.statistics.dto.view.PeriodStatisticsView;
-import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
 import com.cakeshop.domain.statistics.error.StatisticsErrorCode;
-import com.cakeshop.domain.statistics.service.DashboardReadModelQueryService;
-import com.cakeshop.domain.statistics.service.PeriodStatisticsReadModelQueryService;
-import com.cakeshop.domain.statistics.service.ProductPeriodStatisticsReadModelQueryService;
+import com.cakeshop.domain.statistics.service.query.AdditionalMetricsReadModelQueryService;
+import com.cakeshop.domain.statistics.service.query.PeriodStatisticsReadModelQueryService;
+import com.cakeshop.domain.statistics.service.query.ProductPeriodStatisticsReadModelQueryService;
 import com.cakeshop.global.error.BusinessException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -32,9 +31,9 @@ public class StatisticsAdminController {
             .appendValue(IsoFields.WEEK_OF_WEEK_BASED_YEAR, 2)
             .toFormatter();
 
-    private final DashboardReadModelQueryService dashboardReadModelQueryService;
     private final PeriodStatisticsReadModelQueryService periodStatisticsReadModelQueryService;
     private final ProductPeriodStatisticsReadModelQueryService productStatisticsQueryService;
+    private final AdditionalMetricsReadModelQueryService additionalMetricsQueryService;
 
     /** 조회 유형이 생략된 기존 날짜 URL은 직접 기간 조회로 호환한다. */
     @ModelAttribute("searchForm")
@@ -47,15 +46,6 @@ public class StatisticsAdminController {
             searchForm.setPeriodType(StatisticsPeriodType.RANGE);
         }
         return searchForm;
-    }
-
-    /** 관리자 대시보드의 오늘 통계를 조회한다. */
-    @GetMapping("/admin")
-    public String dashboard(Model model) {
-        StatisticsDashboardView dashboard = dashboardReadModelQueryService.getDashboard();
-        model.addAttribute("dashboard", dashboard);
-
-        return "admin/dashboard";
     }
 
     /** 조회 기간의 관리자 통계를 조회한다. */
@@ -89,6 +79,7 @@ public class StatisticsAdminController {
             }
             model.addAttribute("statistics", statistics);
             addProductStatistics(model, statistics);
+            addAdditionalMetrics(model, statistics);
         } catch (BusinessException e) {
             if (e.getErrorCode() != StatisticsErrorCode.INVALID_DATE_RANGE
                     && e.getErrorCode() != StatisticsErrorCode.STATISTICS_NOT_READY) {
@@ -114,6 +105,23 @@ public class StatisticsAdminController {
                 throw e;
             }
             model.addAttribute("productStatisticsError", e.getMessage());
+        }
+    }
+
+    private void addAdditionalMetrics(Model model, PeriodStatisticsView statistics) {
+        try {
+            model.addAttribute(
+                    "additionalMetrics",
+                    additionalMetricsQueryService.getAdditionalMetrics(
+                            statistics.startDate(),
+                            statistics.endDate()
+                    )
+            );
+        } catch (BusinessException e) {
+            if (e.getErrorCode() != StatisticsErrorCode.ADDITIONAL_METRICS_NOT_READY) {
+                throw e;
+            }
+            model.addAttribute("additionalMetricsError", e.getMessage());
         }
     }
 }

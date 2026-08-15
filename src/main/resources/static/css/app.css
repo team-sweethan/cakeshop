@@ -1802,10 +1802,6 @@ body > main {
     margin-top: 2px
 }
 
-.dashboard-metric-pending {
-    color: var(--color-danger)
-}
-
 /* 관리자 콘텐츠 헤더(제목+액션) / 목록 필터 폼 (프론트 .admin-toolbar 와 동일 룩) */
 .admin-content__header {
     align-items: center;
