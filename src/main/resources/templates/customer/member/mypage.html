@@ -6,6 +6,7 @@
   <title>마이페이지 | 케이크 쇼핑몰</title>
   <link rel="stylesheet" th:href="@{/css/app.css}">
   <link rel="stylesheet" th:href="@{/css/customer-mockup.css}">
+  <link rel="stylesheet" th:href="@{/css/member-mypage.css}">
   <script defer th:src="@{/js/app.js}"></script>
   <script defer th:src="@{/js/customer-mockup.js}"></script>
 </head>
@@ -53,6 +54,90 @@
                     ? #temporals.format(member.birthDate, 'yyyy-MM-dd')
                     : '미등록'}"></span>
           </div>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="mypage-orders-title">
+        <div class="mypage-order-heading">
+          <div>
+            <h2 class="section-title" id="mypage-orders-title">주문 현황</h2>
+            <p class="text-muted">최근 주문의 진행 상태를 확인할 수 있습니다.</p>
+          </div>
+          <a class="btn" th:href="@{/orders}">전체 주문 내역</a>
+        </div>
+
+        <div class="mypage-order-grid">
+          <section class="panel mypage-order-section" aria-labelledby="in-progress-orders-title">
+            <div class="mypage-order-section__header">
+              <h3 id="in-progress-orders-title">진행 중인 주문</h3>
+              <span class="mypage-order-count"
+                    th:text="|${orderSummary.inProgressOrders.size()}건|">0건</span>
+            </div>
+
+            <p class="mypage-order-empty"
+               th:if="${#lists.isEmpty(orderSummary.inProgressOrders)}">
+              진행 중인 주문이 없습니다.
+            </p>
+
+            <div class="mypage-order-list"
+                 th:unless="${#lists.isEmpty(orderSummary.inProgressOrders)}">
+              <a class="mypage-order-card"
+                 th:each="order : ${orderSummary.inProgressOrders}"
+                th:href="@{/orders/{orderId}(orderId=${order.orderId})}">
+                <span class="mypage-order-card__header">
+                  <span class="mypage-order-card__number" th:text="${order.orderNumber}">ORD-001</span>
+                  <span class="mypage-order-card__badges">
+                    <span class="badge" th:text="${order.orderTypeLabel}">일반 상품</span>
+                    <span class="badge badge--info" th:text="${order.statusLabel}">제작 중</span>
+                  </span>
+                </span>
+                <strong class="mypage-order-card__product" th:text="${order.productName}">딸기 생크림 케이크</strong>
+                <span class="text-muted"
+                      th:if="${order.itemCount > 1}"
+                      th:text="| 외 ${order.itemCount - 1}건|">외 1건</span>
+                <span class="mypage-order-card__meta">
+                  <span th:text="|픽업 ${#temporals.format(order.pickupAt, 'MM.dd HH:mm')}|">픽업 08.17 14:00</span>
+                  <strong th:text="|${#numbers.formatInteger(order.finalAmount, 1, 'COMMA')}원|">35,000원</strong>
+                </span>
+              </a>
+            </div>
+          </section>
+
+          <section class="panel mypage-order-section" aria-labelledby="completed-orders-title">
+            <div class="mypage-order-section__header">
+              <h3 id="completed-orders-title">완료된 주문</h3>
+              <span class="mypage-order-count"
+                    th:text="|${orderSummary.completedOrders.size()}건|">0건</span>
+            </div>
+
+            <p class="mypage-order-empty"
+               th:if="${#lists.isEmpty(orderSummary.completedOrders)}">
+              완료된 주문 내역이 없습니다.
+            </p>
+
+            <div class="mypage-order-list"
+                 th:unless="${#lists.isEmpty(orderSummary.completedOrders)}">
+              <a class="mypage-order-card"
+                 th:each="order : ${orderSummary.completedOrders}"
+                th:href="@{/orders/{orderId}(orderId=${order.orderId})}">
+                <span class="mypage-order-card__header">
+                  <span class="mypage-order-card__number" th:text="${order.orderNumber}">ORD-002</span>
+                  <span class="mypage-order-card__badges">
+                    <span class="badge" th:text="${order.orderTypeLabel}">주문 제작</span>
+                    <span class="badge badge--success" th:text="${order.statusLabel}">픽업 완료</span>
+                  </span>
+                </span>
+                <strong class="mypage-order-card__product" th:text="${order.productName}">초코 케이크</strong>
+                <span class="text-muted"
+                      th:if="${order.itemCount > 1}"
+                      th:text="| 외 ${order.itemCount - 1}건|">외 1건</span>
+                <span class="mypage-order-card__meta">
+                  <span th:text="|주문 ${#temporals.format(order.createdAt, 'yyyy.MM.dd')}|">주문 2026.08.10</span>
+                  <strong th:text="|${#numbers.formatInteger(order.finalAmount, 1, 'COMMA')}원|">35,000원</strong>
+                </span>
+              </a>
+            </div>
+          </section>
         </div>
       </section>
     </div>

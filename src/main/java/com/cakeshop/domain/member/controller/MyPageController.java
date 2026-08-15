@@ -6,6 +6,7 @@ import com.cakeshop.domain.member.dto.view.MemberProfileView;
 import com.cakeshop.domain.member.error.MemberErrorCode;
 import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.coupon.service.CouponMemberQueryService;
+import com.cakeshop.domain.order.service.OrderMemberQueryService;
 import com.cakeshop.global.common.paging.PageNavigation;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.error.BusinessException;
@@ -32,6 +33,7 @@ public class MyPageController {
 
     private final MemberService memberService;
     private final CouponMemberQueryService couponMemberQueryService;
+    private final OrderMemberQueryService orderMemberQueryService;
     private final SessionRegistry sessionRegistry;
 
     // 마이페이지 조회
@@ -41,6 +43,9 @@ public class MyPageController {
             Model model) {
         String email = memberDetails.getUsername();
         model.addAttribute("member", memberService.getMemberProfile(email));
+        model.addAttribute(
+                "orderSummary",
+                orderMemberQueryService.getMyPageOrders(memberDetails.getMemberId()));
 
         return "customer/member/mypage";
     }
