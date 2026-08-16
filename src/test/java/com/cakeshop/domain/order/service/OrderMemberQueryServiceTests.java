@@ -10,6 +10,7 @@ import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.order.mapper.OrderMemberMapper;
+import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.error.BusinessException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -62,6 +63,39 @@ class OrderMemberQueryServiceTests {
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(OrderErrorCode.MEMBER_NOT_AVAILABLE));
+    }
+
+    @Test
+    void getAdminMemberOrders_outOfRangePage_returnsLastPageWithLabels() {
+        PageRequest pageRequest = new PageRequest(99, 10);
+        when(orderMemberMapper.countOrdersByMemberId(1L)).thenReturn(12L);
+        when(orderMemberMapper.findOrdersByMemberId(1L, 10, 10))
+                .thenReturn(List.of(row(30L, OrderStatus.CANCELED)));
+
+        var result = orderMemberQueryService.getAdminMemberOrders(1L, pageRequest);
+
+        assertThat(result.getPage()).isEqualTo(2);
+        assertThat(result.getTotalElements()).isEqualTo(12);
+        assertThat(result.getTotalPages()).isEqualTo(2);
+        assertThat(result.getContent())
+                .singleElement()
+                .satisfies(order -> {
+                    assertThat(order.orderId()).isEqualTo(30L);
+                    assertThat(order.orderTypeLabel()).isEqualTo("일반 상품");
+                    assertThat(order.statusLabel()).isEqualTo("취소 완료");
+                });
+    }
+
+    @Test
+    void getAdminMemberOrders_noOrders_returnsEmptyPage() {
+        PageRequest pageRequest = new PageRequest(99, 10);
+        when(orderMemberMapper.countOrdersByMemberId(1L)).thenReturn(0L);
+
+        var result = orderMemberQueryService.getAdminMemberOrders(1L, pageRequest);
+
+        assertThat(result.getContent()).isEmpty();
+        assertThat(result.getPage()).isEqualTo(1);
+        assertThat(result.getTotalElements()).isZero();
     }
 
     private OrderMemberOrderRow row(long orderId, OrderStatus status) {

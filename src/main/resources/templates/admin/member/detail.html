@@ -197,6 +197,100 @@
             </section>
 
             <section class="panel member-admin-detail-section">
+                <div class="member-admin-order-heading">
+                    <h2 class="member-admin-detail-title">주문 내역</h2>
+                    <span class="member-admin-order-count"
+                          th:text="|총 ${orderPageResult.totalElements}건|">총 0건</span>
+                </div>
+
+                <div class="table-wrap" th:if="${!orderPageResult.content.isEmpty()}">
+                    <table class="data-table member-admin-order-table">
+                        <thead>
+                        <tr>
+                            <th>주문번호</th>
+                            <th>유형</th>
+                            <th>상품</th>
+                            <th>상태</th>
+                            <th>주문일</th>
+                            <th>픽업 예정</th>
+                            <th>결제금액</th>
+                            <th>상세</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="order : ${orderPageResult.content}">
+                            <td>
+                                <span class="member-admin-order-number"
+                                      th:title="${order.orderNumber}"
+                                      th:text="${order.orderNumber}">ORD-20260816-0001</span>
+                            </td>
+                            <td>
+                                <span class="badge"
+                                      th:text="${order.orderTypeLabel}">일반 상품</span>
+                            </td>
+                            <td>
+                                <span class="member-admin-order-product"
+                                      th:title="${order.productName}"
+                                      th:text="${order.productName}">생크림 케이크</span>
+                                <span class="member-admin-order-additional"
+                                      th:if="${order.itemCount > 1}"
+                                      th:text="| 외 ${order.itemCount - 1}건|">외 1건</span>
+                            </td>
+                            <td>
+                                <span class="badge badge--info"
+                                      th:text="${order.statusLabel}">결제 대기</span>
+                            </td>
+                            <td th:text="${#temporals.format(order.createdAt, 'yyyy.MM.dd HH:mm')}">
+                                2026.08.16 10:00
+                            </td>
+                            <td th:text="${order.pickupAt == null
+                                ? '-'
+                                : #temporals.format(order.pickupAt, 'yyyy.MM.dd HH:mm')}">
+                                2026.08.23 14:00
+                            </td>
+                            <td th:text="|${#numbers.formatInteger(order.finalAmount, 1, 'COMMA')}원|">
+                                35,000원
+                            </td>
+                            <td>
+                                <a class="btn btn--outline btn--sm"
+                                   th:href="@{/admin/orders/{orderId}(orderId=${order.orderId})}">
+                                    상세
+                                </a>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <p class="member-admin-order-empty"
+                   th:if="${orderPageResult.content.isEmpty()}">
+                    주문 내역이 없습니다.
+                </p>
+
+                <nav class="cluster member-admin-order-pagination"
+                     th:if="${orderPageResult.totalPages > 1}"
+                     aria-label="회원 주문 내역 페이지">
+                    <a class="btn btn--outline"
+                       th:if="${orderPageResult.page > 1}"
+                       th:href="@{/admin/members/{memberId}(
+                           memberId=${member.id},
+                           orderPage=${orderPageResult.page - 1}
+                       )}">
+                        이전
+                    </a>
+                    <span th:text="|${orderPageResult.page} / ${orderPageResult.totalPages}|">1 / 1</span>
+                    <a class="btn btn--outline"
+                       th:if="${orderPageResult.page < orderPageResult.totalPages}"
+                       th:href="@{/admin/members/{memberId}(
+                           memberId=${member.id},
+                           orderPage=${orderPageResult.page + 1}
+                       )}">
+                        다음
+                    </a>
+                </nav>
+            </section>
+
+            <section class="panel member-admin-detail-section">
                 <div class="member-admin-history-heading">
                     <h2 class="member-admin-detail-title">이용정지 이력</h2>
                     <span class="member-admin-history-count"

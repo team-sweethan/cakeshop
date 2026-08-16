@@ -43,6 +43,7 @@ import com.cakeshop.domain.coupon.service.CouponAdminService;
 import com.cakeshop.domain.member.controller.MemberAdminController;
 import com.cakeshop.domain.member.service.MemberAdminService;
 import com.cakeshop.domain.member.service.MemberSessionService;
+import com.cakeshop.domain.order.service.OrderMemberQueryService;
 import com.cakeshop.domain.notification.controller.NotificationAdminController;
 import com.cakeshop.domain.order.controller.admin.FulfillmentAdminController;
 import com.cakeshop.domain.order.controller.admin.OrderAdminController;
@@ -207,7 +208,8 @@ class AdminPageControllerTests {
                 new PaymentAdminController(paymentAdminQueryService),
                 new MemberAdminController(
                         Mockito.mock(MemberAdminService.class),
-                        Mockito.mock(MemberSessionService.class)),
+                        Mockito.mock(MemberSessionService.class),
+                        Mockito.mock(OrderMemberQueryService.class)),
                 new ReviewAdminController(reviewAdminService),
                 new NotificationAdminController(),
                 new CommunityAdminController(communityAdminService, communityService),
