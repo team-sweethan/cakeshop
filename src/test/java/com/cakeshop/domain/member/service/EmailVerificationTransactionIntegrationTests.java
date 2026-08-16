@@ -70,6 +70,26 @@ class EmailVerificationTransactionIntegrationTests {
     }
 
     @Test
+    void consumeSignupVerification_transactionCompletion_releasesRequestLock() {
+        String email = "consume-" + UUID.randomUUID() + "@example.com";
+        emailVerificationService.sendSignupCode(email);
+        ArgumentCaptor<String> codeCaptor = ArgumentCaptor.forClass(String.class);
+        verify(emailSender).sendVerificationCode(
+                org.mockito.ArgumentMatchers.eq(email),
+                codeCaptor.capture(),
+                org.mockito.ArgumentMatchers.any());
+        var verification = emailVerificationService.verifySignupCode(
+                email, codeCaptor.getValue());
+
+        assertThat(emailVerificationService.consumeSignupVerification(
+                verification.verificationId(), email)).isTrue();
+        assertThat(emailVerificationMapper.acquireRequestLock(
+                email, EmailVerificationPurpose.SIGNUP, 0)).isOne();
+        assertThat(emailVerificationMapper.releaseRequestLock(
+                email, EmailVerificationPurpose.SIGNUP)).isOne();
+    }
+
+    @Test
     void sendSignupCode_smtpFailure_commitsAttemptAndReleasesRequestLock() {
         doThrow(new EmailVerificationSendException())
                 .when(emailSender)

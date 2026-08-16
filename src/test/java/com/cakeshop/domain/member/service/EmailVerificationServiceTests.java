@@ -353,6 +353,8 @@ class EmailVerificationServiceTests {
     void consumeSignupVerification_verifiedRequest_consumesOnce() {
         EmailVerification verified = verification("user@example.com", "hash");
         verified.setVerifiedAt(NOW.minusMinutes(1));
+        when(emailVerificationMapper.acquireRequestLock(
+                "user@example.com", EmailVerificationPurpose.SIGNUP, 3)).thenReturn(1);
         when(emailVerificationMapper.findLatestVerifiedByIdForUpdate(
                 verified.getId(),
                 "user@example.com",
@@ -364,11 +366,23 @@ class EmailVerificationServiceTests {
                 verified.getId(), "user@example.com"))
                 .isTrue();
 
-        verify(emailVerificationMapper).markConsumed(verified.getId(), NOW);
+        InOrder consumeOrder = inOrder(emailVerificationMapper);
+        consumeOrder.verify(emailVerificationMapper).acquireRequestLock(
+                "user@example.com", EmailVerificationPurpose.SIGNUP, 3);
+        consumeOrder.verify(emailVerificationMapper).findLatestVerifiedByIdForUpdate(
+                verified.getId(),
+                "user@example.com",
+                EmailVerificationPurpose.SIGNUP,
+                NOW.minusMinutes(10));
+        consumeOrder.verify(emailVerificationMapper).markConsumed(verified.getId(), NOW);
+        consumeOrder.verify(emailVerificationMapper).releaseRequestLock(
+                "user@example.com", EmailVerificationPurpose.SIGNUP);
     }
 
     @Test
     void consumeSignupVerification_notLatestRequest_returnsFalse() {
+        when(emailVerificationMapper.acquireRequestLock(
+                "user@example.com", EmailVerificationPurpose.SIGNUP, 3)).thenReturn(1);
         when(emailVerificationMapper.findLatestVerifiedByIdForUpdate(
                 7L,
                 "user@example.com",
@@ -384,6 +398,8 @@ class EmailVerificationServiceTests {
         EmailVerification verified = verification("user@example.com", "hash");
         verified.setPurpose(EmailVerificationPurpose.PASSWORD_RESET);
         verified.setVerifiedAt(NOW.minusMinutes(1));
+        when(emailVerificationMapper.acquireRequestLock(
+                "user@example.com", EmailVerificationPurpose.PASSWORD_RESET, 3)).thenReturn(1);
         when(emailVerificationMapper.findLatestVerifiedByIdForUpdate(
                 verified.getId(),
                 "user@example.com",
