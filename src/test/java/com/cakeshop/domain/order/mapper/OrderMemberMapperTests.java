@@ -142,6 +142,45 @@ class OrderMemberMapperTests {
                         orderNumber("GENERAL-PICKED-UP"));
     }
 
+    @Test
+    void findOrdersByMemberId_allStatuses_returnsRequestedNewestPage() {
+        LocalDateTime base = LocalDateTime.of(2026, 8, 1, 10, 0);
+        OrderStatus[] statuses = OrderStatus.values();
+        for (int index = 0; index < 12; index++) {
+            insertOrderWithItem(
+                    "ADMIN-" + index,
+                    index % 2 == 0 ? OrderType.GENERAL : OrderType.CUSTOM,
+                    statuses[index % statuses.length],
+                    index >= 10 ? base.plusHours(10) : base.plusHours(index));
+        }
+        long otherOrderId = insertOrder(
+                otherMemberId,
+                "ADMIN-OTHER",
+                OrderType.GENERAL,
+                OrderStatus.PICKED_UP,
+                base.plusDays(2));
+        insertOrderItem(otherOrderId, "다른 회원 상품");
+
+        long totalElements = orderMemberMapper.countOrdersByMemberId(memberId);
+        var firstPage = orderMemberMapper.findOrdersByMemberId(memberId, 0, 10);
+        var secondPage = orderMemberMapper.findOrdersByMemberId(memberId, 10, 10);
+
+        assertThat(totalElements).isEqualTo(12);
+        assertThat(firstPage)
+                .extracting(order -> order.orderNumber())
+                .startsWith(
+                        orderNumber("ADMIN-11"),
+                        orderNumber("ADMIN-10"));
+        assertThat(secondPage)
+                .extracting(order -> order.orderNumber())
+                .containsExactly(
+                        orderNumber("ADMIN-1"),
+                        orderNumber("ADMIN-0"));
+        assertThat(secondPage)
+                .extracting(order -> order.status())
+                .containsExactly(statuses[1], statuses[0]);
+    }
+
     private long insertMember(String key) {
         String email = "order-member-" + key + "-" + suffix + "@example.com";
         jdbcTemplate.update(

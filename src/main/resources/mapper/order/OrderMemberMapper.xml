@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.cakeshop.domain.order.mapper.OrderMemberMapper">
-    <sql id="memberOrderSummaryColumns">
+    <sql id="memberOrderColumns">
         o.id AS order_id,
         o.order_number,
         o.order_type,
@@ -26,7 +26,7 @@
     <select id="findInProgressOrders"
             resultType="com.cakeshop.domain.order.dto.view.OrderMemberOrderRow">
         SELECT
-        <include refid="memberOrderSummaryColumns"/>
+        <include refid="memberOrderColumns"/>
         FROM orders o
         WHERE o.member_id = #{memberId}
           AND o.status IN (
@@ -42,11 +42,27 @@
     <select id="findCompletedOrders"
             resultType="com.cakeshop.domain.order.dto.view.OrderMemberOrderRow">
         SELECT
-        <include refid="memberOrderSummaryColumns"/>
+        <include refid="memberOrderColumns"/>
         FROM orders o
         WHERE o.member_id = #{memberId}
           AND o.status = 'PICKED_UP'
         ORDER BY o.created_at DESC, o.id DESC
         LIMIT #{limit}
+    </select>
+
+    <select id="countOrdersByMemberId" resultType="long">
+        SELECT COUNT(*)
+        FROM orders
+        WHERE member_id = #{memberId}
+    </select>
+
+    <select id="findOrdersByMemberId"
+            resultType="com.cakeshop.domain.order.dto.view.OrderMemberOrderRow">
+        SELECT
+        <include refid="memberOrderColumns"/>
+        FROM orders o
+        WHERE o.member_id = #{memberId}
+        ORDER BY o.created_at DESC, o.id DESC
+        LIMIT #{size} OFFSET #{offset}
     </select>
 </mapper>
