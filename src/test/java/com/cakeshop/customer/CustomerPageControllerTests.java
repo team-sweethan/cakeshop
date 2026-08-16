@@ -200,6 +200,22 @@ class CustomerPageControllerTests {
     }
 
     @Test
+    void socialLoginLinks_requestAccountSelection() throws IOException {
+        String loginTemplate = new ClassPathResource("templates/auth/login.html")
+                .getContentAsString(StandardCharsets.UTF_8);
+        String passwordRecoveryTemplate = new ClassPathResource(
+                "templates/customer/member/find-password.html")
+                .getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(loginTemplate)
+                .contains("@{/oauth2/authorization/google(prompt=select_account)}")
+                .contains("@{/oauth2/authorization/kakao(prompt=select_account)}");
+        assertThat(passwordRecoveryTemplate)
+                .contains("@{/oauth2/authorization/google(prompt=select_account)}")
+                .contains("@{/oauth2/authorization/kakao(prompt=select_account)}");
+    }
+
+    @Test
     void cartViewUsesServerBackedSpringRoutes()
             throws IOException {
         String cartTemplate =
