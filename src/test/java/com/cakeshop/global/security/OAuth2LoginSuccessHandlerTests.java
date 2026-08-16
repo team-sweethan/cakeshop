@@ -54,6 +54,9 @@ class OAuth2LoginSuccessHandlerTests {
 
         assertThat(response.getRedirectedUrl())
                 .startsWith("http://localhost/orders/checkout");
+        verify(socialLoginService).resolveLogin(
+                new com.cakeshop.domain.member.dto.view.OAuthIdentity(
+                        "GOOGLE", "google-subject", "social@cakeshop.local", "소셜회원"));
         verify(memberAuthenticationSession).login(callbackRequest, response, member);
     }
 
@@ -99,7 +102,7 @@ class OAuth2LoginSuccessHandlerTests {
     private OAuth2AuthenticationToken googleAuthentication() {
         OAuth2User user = Mockito.mock(OAuth2User.class);
         when(user.getAttribute("sub")).thenReturn("google-subject");
-        when(user.getAttribute("email")).thenReturn("social@cakeshop.local");
+        when(user.getAttribute("email")).thenReturn("  SOCIAL@cakeshop.local  ");
         when(user.getAttribute("email_verified")).thenReturn(true);
         when(user.getAttribute("name")).thenReturn("소셜회원");
         return new OAuth2AuthenticationToken(user, List.of(), "google");

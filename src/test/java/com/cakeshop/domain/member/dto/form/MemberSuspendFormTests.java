@@ -15,9 +15,10 @@ class MemberSuspendFormTests {
     void validate_reasonWith500Characters_acceptsForm() {
         MemberSuspendForm form = new MemberSuspendForm();
 
-        form.setReason("가".repeat(500));
+        form.setReason("  " + "가".repeat(500) + "  ");
 
         assertThat(validator.validate(form)).isEmpty();
+        assertThat(form.getReason()).hasSize(500);
     }
 
     @Test

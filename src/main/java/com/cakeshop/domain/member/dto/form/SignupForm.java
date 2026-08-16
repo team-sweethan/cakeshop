@@ -8,6 +8,7 @@ import jakarta.validation.constraints.Past;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
+import java.util.Locale;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -23,6 +24,10 @@ public class SignupForm {
     @Pattern(regexp = EMAIL_REGEX, message = "이메일 형식을 확인해 주세요.")
     @Size(max = 255, message = "이메일은 255자 이하여야 합니다.")
     private String email;
+
+    public void setEmail(String email) {
+        this.email = normalizeEmail(email);
+    }
 
     @NotBlank(message = "비밀번호를 입력해 주세요.")
     @Size(min = 8, max = 100, message = "비밀번호는 8자 이상 100자 이하여야 합니다.")
@@ -61,5 +66,11 @@ public class SignupForm {
         return email != null
                 && email.length() <= 255
                 && email.matches(EMAIL_REGEX);
+    }
+
+    public static String normalizeEmail(String email) {
+        return email == null
+                ? null
+                : email.strip().toLowerCase(Locale.ROOT);
     }
 }

@@ -17,7 +17,6 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.util.Locale;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -65,14 +64,7 @@ public class EmailVerificationService {
     private void sendCodeWithLock(
             String email,
             EmailVerificationPurpose purpose) {
-        if (emailVerificationMapper.acquireRequestLock(
-                email, purpose, REQUEST_LOCK_TIMEOUT_SECONDS) != 1) {
-            throw new BusinessException(MemberErrorCode.EMAIL_VERIFICATION_RATE_LIMITED);
-        }
-        boolean releaseImmediately = !TransactionSynchronizationManager.isSynchronizationActive();
-        if (!releaseImmediately) {
-            releaseRequestLockAfterTransaction(email, purpose);
-        }
+        boolean releaseImmediately = acquireRequestLock(email, purpose);
         try {
             if (purpose == EmailVerificationPurpose.SIGNUP) {
                 if (memberMapper.findByEmail(email).isPresent()) {
@@ -160,6 +152,7 @@ public class EmailVerificationService {
         if (verification.getVerifiedAt() != null) {
             boolean canVerify = verification.getAttemptCount() < 5
                     && verification.getConsumedAt() == null
+                    && verification.getExpiresAt().isAfter(now)
                     && verification.getVerifiedAt().plus(VERIFIED_TTL).isAfter(now)
                     && code != null
                     && code.matches("\\d{6}");
@@ -230,15 +223,22 @@ public class EmailVerificationService {
             return false;
         }
         String email = normalizeAndValidateEmail(rawEmail);
-        LocalDateTime now = LocalDateTime.now(clock);
-        return findConsumableVerification(
-                        verificationId,
-                        email,
-                        purpose,
-                        now.minus(VERIFIED_TTL))
-                .map(verification ->
-                        emailVerificationMapper.markConsumed(verification.getId(), now) == 1)
-                .orElse(false);
+        boolean releaseImmediately = acquireRequestLock(email, purpose);
+        try {
+            LocalDateTime now = LocalDateTime.now(clock);
+            return findConsumableVerification(
+                            verificationId,
+                            email,
+                            purpose,
+                            now.minus(VERIFIED_TTL))
+                    .map(verification ->
+                            emailVerificationMapper.markConsumed(verification.getId(), now) == 1)
+                    .orElse(false);
+        } finally {
+            if (releaseImmediately) {
+                emailVerificationMapper.releaseRequestLock(email, purpose);
+            }
+        }
     }
 
     private Optional<EmailVerification> findConsumableVerification(
@@ -246,11 +246,7 @@ public class EmailVerificationService {
             String email,
             EmailVerificationPurpose purpose,
             LocalDateTime verifiedSince) {
-        if (purpose == EmailVerificationPurpose.PASSWORD_RESET) {
-            return emailVerificationMapper.findLatestVerifiedByIdForUpdate(
-                    verificationId, email, purpose, verifiedSince);
-        }
-        return emailVerificationMapper.findVerifiedByIdForUpdate(
+        return emailVerificationMapper.findLatestVerifiedByIdForUpdate(
                 verificationId, email, purpose, verifiedSince);
     }
 
@@ -269,13 +265,25 @@ public class EmailVerificationService {
     }
 
     private String normalizeAndValidateEmail(String rawEmail) {
-        String email = rawEmail == null
-                ? ""
-                : rawEmail.trim().toLowerCase(Locale.ROOT);
+        String email = SignupForm.normalizeEmail(rawEmail);
         if (!SignupForm.isEmailFormatValid(email)) {
             throw new BusinessException(MemberErrorCode.INVALID_EMAIL);
         }
         return email;
+    }
+
+    private boolean acquireRequestLock(
+            String email,
+            EmailVerificationPurpose purpose) {
+        if (emailVerificationMapper.acquireRequestLock(
+                email, purpose, REQUEST_LOCK_TIMEOUT_SECONDS) != 1) {
+            throw new BusinessException(MemberErrorCode.EMAIL_VERIFICATION_RATE_LIMITED);
+        }
+        boolean releaseImmediately = !TransactionSynchronizationManager.isSynchronizationActive();
+        if (!releaseImmediately) {
+            releaseRequestLockAfterTransaction(email, purpose);
+        }
+        return releaseImmediately;
     }
 
     private void releaseRequestLockAfterTransaction(

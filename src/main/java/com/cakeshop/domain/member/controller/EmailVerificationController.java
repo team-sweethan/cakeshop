@@ -5,6 +5,7 @@ import com.cakeshop.domain.member.dto.form.EmailVerificationRequestForm;
 import com.cakeshop.domain.member.dto.view.EmailVerificationResponse;
 import com.cakeshop.domain.member.dto.view.SignupEmailVerification;
 import com.cakeshop.domain.member.dto.view.PasswordResetEmailVerification;
+import com.cakeshop.domain.member.error.EmailVerificationSendException;
 import com.cakeshop.domain.member.service.EmailVerificationService;
 import com.cakeshop.domain.member.service.PasswordResetEmailDispatchService;
 import jakarta.validation.Valid;
@@ -26,8 +27,15 @@ public class EmailVerificationController {
     // 회원가입 이메일 인증번호 발송
     @PostMapping("/email-verifications/signup/send")
     public EmailVerificationResponse sendSignupCode(
-            @Valid @RequestBody EmailVerificationRequestForm form) {
-        emailVerificationService.sendSignupCode(form.getEmail());
+            @Valid @RequestBody EmailVerificationRequestForm form,
+            HttpSession session) {
+        try {
+            emailVerificationService.sendSignupCode(form.getEmail());
+        } catch (EmailVerificationSendException exception) {
+            session.removeAttribute(SIGNUP_VERIFIED_EMAIL_SESSION_KEY);
+            throw exception;
+        }
+        session.removeAttribute(SIGNUP_VERIFIED_EMAIL_SESSION_KEY);
         return EmailVerificationResponse.success("인증번호를 발송했습니다.");
     }
 

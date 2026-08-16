@@ -1,11 +1,13 @@
 package com.cakeshop.domain.cart.service;
 
 import com.cakeshop.domain.cart.dto.view.CartPaymentItemTarget;
+import com.cakeshop.domain.cart.mapper.CartMapper;
 import com.cakeshop.domain.cart.mapper.CartPaymentMapper;
 import com.cakeshop.domain.order.service.OrderCartQueryService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -17,11 +19,15 @@ import org.springframework.transaction.annotation.Transactional;
 public class CartPaymentCommandService {
 
     private final CartPaymentMapper cartPaymentMapper;
+    private final CartMapper cartMapper;
     private final OrderCartQueryService orderCartQueryService;
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void removeItemsAfterPayment(long orderId) {
         orderCartQueryService.findCartDeletionTarget(orderId).ifPresent(target -> {
+            if (cartMapper.findCartIdByMemberIdForUpdate(target.memberId()).isEmpty()) {
+                return;
+            }
             List<Long> itemIds = cartPaymentMapper.findItemIdsMatchingSnapshotQuantity(
                     target.memberId(),
                     target.items().stream()

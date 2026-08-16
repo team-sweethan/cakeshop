@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.cakeshop.domain.member.error.EmailVerificationExceptionHandler;
+import com.cakeshop.domain.member.error.EmailVerificationSendException;
 import com.cakeshop.domain.member.error.MemberErrorCode;
 import com.cakeshop.domain.member.dto.view.SignupEmailVerification;
 import com.cakeshop.domain.member.dto.view.PasswordResetEmailVerification;
@@ -43,14 +44,22 @@ class EmailVerificationControllerTests {
 
     @Test
     void sendSignupCode_validEmail_returnsSuccess() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute(
+                EmailVerificationController.SIGNUP_VERIFIED_EMAIL_SESSION_KEY,
+                new SignupEmailVerification(3L, "member@example.com"));
+
         mockMvc.perform(post("/email-verifications/signup/send")
+                        .session(session)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"member@example.com\"}"))
+                        .content("{\"email\":\"  MEMBER@example.com  \"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("인증번호를 발송했습니다."));
 
         verify(emailVerificationService).sendSignupCode("member@example.com");
+        assertThat(session.getAttribute(
+                EmailVerificationController.SIGNUP_VERIFIED_EMAIL_SESSION_KEY)).isNull();
     }
 
     @Test
@@ -71,7 +80,7 @@ class EmailVerificationControllerTests {
         mockMvc.perform(post("/email-verifications/signup/verify")
                         .session(session)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"member@example.com\",\"code\":\"123456\"}"))
+                        .content("{\"email\":\" MEMBER@example.com \",\"code\":\"123456\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
 
@@ -92,6 +101,27 @@ class EmailVerificationControllerTests {
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.code").value("MEMBER_012"));
+    }
+
+    @Test
+    void sendSignupCode_mailSendFailed_clearsPreviousVerification() throws Exception {
+        doThrow(new EmailVerificationSendException())
+                .when(emailVerificationService)
+                .sendSignupCode("member@example.com");
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute(
+                EmailVerificationController.SIGNUP_VERIFIED_EMAIL_SESSION_KEY,
+                new SignupEmailVerification(3L, "member@example.com"));
+
+        mockMvc.perform(post("/email-verifications/signup/send")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"member@example.com\"}"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("MEMBER_013"));
+
+        assertThat(session.getAttribute(
+                EmailVerificationController.SIGNUP_VERIFIED_EMAIL_SESSION_KEY)).isNull();
     }
 
     @Test
