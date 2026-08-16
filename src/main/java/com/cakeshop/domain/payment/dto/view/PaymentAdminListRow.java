@@ -13,7 +13,7 @@ public record PaymentAdminListRow(
         String orderNumber,
         String tossOrderId,
         String ordererName,
-        String orderType,
+        String orderTypeLabel,
         BigDecimal amount,
         String method,
         PaymentStatus status,
@@ -27,10 +27,6 @@ public record PaymentAdminListRow(
 
     public String paymentNumber() {
         return "PAY-%06d".formatted(paymentId);
-    }
-
-    public String orderTypeLabel() {
-        return "CUSTOM".equals(orderType) ? "주문 제작" : "일반 상품";
     }
 
     public String methodLabel() {

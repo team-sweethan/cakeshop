@@ -42,6 +42,7 @@ class PaymentAdminServiceTests {
         assertThat(result.payments()).singleElement().satisfies(row -> {
             assertThat(row.orderNumber()).isEqualTo("ORD-10");
             assertThat(row.ordererName()).isEqualTo("홍길동");
+            assertThat(row.orderTypeLabel()).isEqualTo("일반 상품");
         });
         verify(orderService).getPaymentAdminOrders(List.of(10L));
     }

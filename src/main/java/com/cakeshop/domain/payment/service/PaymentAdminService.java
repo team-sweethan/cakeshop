@@ -73,7 +73,7 @@ public class PaymentAdminService {
                 order.orderNumber(),
                 payment.tossOrderId(),
                 order.ordererName(),
-                order.orderType(),
+                order.orderTypeLabel(),
                 payment.amount(),
                 payment.method(),
                 payment.status(),

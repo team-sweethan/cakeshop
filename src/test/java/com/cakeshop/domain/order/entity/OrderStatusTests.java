@@ -2,6 +2,7 @@ package com.cakeshop.domain.order.entity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Map;
 import java.util.Set;
 
 import org.junit.jupiter.api.Test;
@@ -21,6 +22,20 @@ class OrderStatusTests {
                 OrderStatus.REJECTED,
                 OrderStatus.EXPIRED
             );
+    }
+
+    @Test
+    void providesStatusLabelsInOnePlace() {
+        assertThat(Map.of(
+                OrderStatus.PENDING_PAYMENT, "결제 대기",
+                OrderStatus.UNDER_REVIEW, "승인 대기",
+                OrderStatus.IN_PRODUCTION, "제작 중",
+                OrderStatus.READY_FOR_PICKUP, "픽업 준비",
+                OrderStatus.PICKED_UP, "픽업 완료",
+                OrderStatus.CANCELED, "취소 완료",
+                OrderStatus.REJECTED, "주문 반려",
+                OrderStatus.EXPIRED, "결제 만료"
+        )).allSatisfy((status, label) -> assertThat(status.statusLabel()).isEqualTo(label));
     }
 
     @Test
