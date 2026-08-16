@@ -17,7 +17,6 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.util.Locale;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -160,6 +159,7 @@ public class EmailVerificationService {
         if (verification.getVerifiedAt() != null) {
             boolean canVerify = verification.getAttemptCount() < 5
                     && verification.getConsumedAt() == null
+                    && verification.getExpiresAt().isAfter(now)
                     && verification.getVerifiedAt().plus(VERIFIED_TTL).isAfter(now)
                     && code != null
                     && code.matches("\\d{6}");
@@ -246,11 +246,7 @@ public class EmailVerificationService {
             String email,
             EmailVerificationPurpose purpose,
             LocalDateTime verifiedSince) {
-        if (purpose == EmailVerificationPurpose.PASSWORD_RESET) {
-            return emailVerificationMapper.findLatestVerifiedByIdForUpdate(
-                    verificationId, email, purpose, verifiedSince);
-        }
-        return emailVerificationMapper.findVerifiedByIdForUpdate(
+        return emailVerificationMapper.findLatestVerifiedByIdForUpdate(
                 verificationId, email, purpose, verifiedSince);
     }
 
@@ -269,9 +265,7 @@ public class EmailVerificationService {
     }
 
     private String normalizeAndValidateEmail(String rawEmail) {
-        String email = rawEmail == null
-                ? ""
-                : rawEmail.trim().toLowerCase(Locale.ROOT);
+        String email = SignupForm.normalizeEmail(rawEmail);
         if (!SignupForm.isEmailFormatValid(email)) {
             throw new BusinessException(MemberErrorCode.INVALID_EMAIL);
         }

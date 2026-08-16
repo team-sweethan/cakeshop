@@ -229,6 +229,23 @@ class EmailVerificationServiceTests {
     }
 
     @Test
+    void verifySignupCode_alreadyVerifiedButCodeExpired_rejectsReuse() {
+        EmailVerification latest = verification(
+                "user@example.com",
+                passwordEncoder.encode("123456"));
+        latest.setVerifiedAt(NOW.minusMinutes(4));
+        latest.setExpiresAt(NOW);
+        when(emailVerificationMapper.findLatest(
+                "user@example.com", EmailVerificationPurpose.SIGNUP))
+                .thenReturn(Optional.of(latest));
+
+        assertMemberError(
+                () -> emailVerificationService.verifySignupCode(
+                        "user@example.com", "123456"),
+                MemberErrorCode.EMAIL_VERIFICATION_INVALID);
+    }
+
+    @Test
     void verifyPasswordResetCode_matchingCode_bindsMemberAndVerification() {
         EmailVerification latest = verification(
                 "user@example.com", passwordEncoder.encode("123456"));
@@ -336,7 +353,7 @@ class EmailVerificationServiceTests {
     void consumeSignupVerification_verifiedRequest_consumesOnce() {
         EmailVerification verified = verification("user@example.com", "hash");
         verified.setVerifiedAt(NOW.minusMinutes(1));
-        when(emailVerificationMapper.findVerifiedByIdForUpdate(
+        when(emailVerificationMapper.findLatestVerifiedByIdForUpdate(
                 verified.getId(),
                 "user@example.com",
                 EmailVerificationPurpose.SIGNUP,
@@ -351,8 +368,8 @@ class EmailVerificationServiceTests {
     }
 
     @Test
-    void consumeSignupVerification_withoutVerification_returnsFalse() {
-        when(emailVerificationMapper.findVerifiedByIdForUpdate(
+    void consumeSignupVerification_notLatestRequest_returnsFalse() {
+        when(emailVerificationMapper.findLatestVerifiedByIdForUpdate(
                 7L,
                 "user@example.com",
                 EmailVerificationPurpose.SIGNUP,

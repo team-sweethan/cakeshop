@@ -186,7 +186,7 @@ public class MemberAdminService {
                     MemberErrorCode.INVALID_STATUS_REASON);
         }
 
-        String normalizedReason = reason.trim();
+        String normalizedReason = reason.strip();
 
         if (normalizedReason.length() > 500) {
             throw new BusinessException(

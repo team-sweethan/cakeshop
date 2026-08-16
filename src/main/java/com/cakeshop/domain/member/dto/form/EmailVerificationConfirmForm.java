@@ -14,6 +14,10 @@ public class EmailVerificationConfirmForm {
     @Email
     private String email;
 
+    public void setEmail(String email) {
+        this.email = SignupForm.normalizeEmail(email);
+    }
+
     @NotBlank
     @Pattern(regexp = "\\d{6}")
     private String code;

@@ -26,8 +26,10 @@ public class EmailVerificationController {
     // 회원가입 이메일 인증번호 발송
     @PostMapping("/email-verifications/signup/send")
     public EmailVerificationResponse sendSignupCode(
-            @Valid @RequestBody EmailVerificationRequestForm form) {
+            @Valid @RequestBody EmailVerificationRequestForm form,
+            HttpSession session) {
         emailVerificationService.sendSignupCode(form.getEmail());
+        session.removeAttribute(SIGNUP_VERIFIED_EMAIL_SESSION_KEY);
         return EmailVerificationResponse.success("인증번호를 발송했습니다.");
     }
 
