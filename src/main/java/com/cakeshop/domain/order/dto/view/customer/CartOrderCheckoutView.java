@@ -1,6 +1,7 @@
 package com.cakeshop.domain.order.dto.view.customer;
 
-import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView.PickupDateView;
+import com.cakeshop.domain.order.dto.view.customer.common.CheckoutOptionView;
+import com.cakeshop.domain.order.dto.view.customer.common.PickupDateView;
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -15,7 +16,7 @@ public record CartOrderCheckoutView(
     public record CartOrderItemView(
             String productName,
             int quantity,
-            List<GeneralOrderCheckoutView.SelectedOptionView> selectedOptions,
+            List<CheckoutOptionView> selectedOptions,
             BigDecimal totalAmount
     ) {
     }

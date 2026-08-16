@@ -13,15 +13,6 @@ public record TodayPickupScheduleView(
 ) {
 
     public String statusLabel() {
-        return switch (status) {
-            case PENDING_PAYMENT -> "결제 대기";
-            case UNDER_REVIEW -> "승인 대기";
-            case IN_PRODUCTION -> "제작 중";
-            case READY_FOR_PICKUP -> "픽업 준비";
-            case PICKED_UP -> "픽업 완료";
-            case CANCELED -> "취소 완료";
-            case REJECTED -> "주문 반려";
-            case EXPIRED -> "결제 만료";
-        };
+        return status.statusLabel();
     }
 }
