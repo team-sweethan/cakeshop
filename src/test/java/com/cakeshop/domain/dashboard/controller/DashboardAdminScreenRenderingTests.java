@@ -11,6 +11,7 @@ import com.cakeshop.domain.dashboard.dto.view.DashboardView;
 import com.cakeshop.domain.dashboard.service.DashboardReadModelQueryService;
 import com.cakeshop.global.security.SecurityConfig;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +36,7 @@ class DashboardAdminScreenRenderingTests {
     void dashboard_metrics_rendersCountsAndManagementLinks() throws Exception {
         when(dashboardReadModelQueryService.getDashboard())
                 .thenReturn(new DashboardView(
+                        LocalDateTime.of(2026, 8, 17, 12, 0),
                         0,
                         BigDecimal.ZERO,
                         3,

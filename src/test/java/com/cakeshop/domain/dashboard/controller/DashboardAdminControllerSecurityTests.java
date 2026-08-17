@@ -10,6 +10,7 @@ import com.cakeshop.domain.dashboard.dto.view.DashboardView;
 import com.cakeshop.domain.dashboard.service.DashboardReadModelQueryService;
 import com.cakeshop.global.security.SecurityConfig;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -57,6 +58,7 @@ class DashboardAdminControllerSecurityTests {
 
     private DashboardView emptyDashboard() {
         return new DashboardView(
+                LocalDateTime.of(2026, 8, 17, 12, 0),
                 0L,
                 BigDecimal.ZERO,
                 0L,

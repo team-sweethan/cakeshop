@@ -165,6 +165,7 @@ class AdminPageControllerTests {
                 .thenReturn(new CommentSectionView(List.of(), 0, 0, 20));
         when(dashboardReadModelQueryService.getDashboard())
                 .thenReturn(new DashboardView(
+                        LocalDateTime.of(2026, 8, 17, 12, 0),
                         0L,
                         BigDecimal.ZERO,
                         0L,
