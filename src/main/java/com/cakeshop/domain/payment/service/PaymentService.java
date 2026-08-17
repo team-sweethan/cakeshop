@@ -133,6 +133,7 @@ public class PaymentService {
         // 주문·결제 완료가 같은 트랜잭션에서 성공한 뒤에만 쿠폰 사용을 확정한다.
         couponOrderCommandService.useReservedCouponForOrder(order.orderId());
         paymentRecoveryService.discardApprovalRecovery(payment);
+        eventPublisher.publishEvent(new GeneralPaymentCompletedEvent(order.orderId()));
     }
 
     /** PG 호출 없이 0원 주문의 재고·결제·주문·쿠폰 상태를 같은 트랜잭션에서 완료한다. */

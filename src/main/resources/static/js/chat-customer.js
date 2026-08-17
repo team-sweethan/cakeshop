@@ -46,8 +46,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const room = await response.json();
       currentChatRoomId = room.id;
 
-      // 웹소켓 실시간 연결 및 구독을 초기 메시지 조회 전 미리 시작
-      connectWebSocket(currentChatRoomId);
+      // 웹소켓 실시간 연결 및 구독을 완료될 때까지 기다린 후 초기 메시지 조회!
+      await connectWebSocket(currentChatRoomId);
 
       // 대화 목록 및 연동 주문 조회
       await loadMessages(currentChatRoomId);
@@ -66,62 +66,66 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // 웹소켓 STOMP 연결 및 실시간 구독
   function connectWebSocket(roomId) {
-    if (stompClient && stompClient.connected) return;
+    if (stompClient && stompClient.connected) return Promise.resolve();
     if (typeof SockJS === "undefined" || typeof Stomp === "undefined") {
       console.warn("SockJS 또는 Stomp 라이브러리가 로드되지 않았습니다.");
-      return;
+      return Promise.resolve();
     }
 
-    const socket = new SockJS("/ws");
-    stompClient = Stomp.over(socket);
-    stompClient.debug = null; // 디버그 콘솔 로그 숨김
+    return new Promise((resolve) => {
+      const socket = new SockJS("/ws");
+      stompClient = Stomp.over(socket);
+      stompClient.debug = null; // 디버그 콘솔 로그 숨김
 
-    stompClient.connect({}, () => {
-      // A. 대화 메시지 실시간 수신 구독 (/topic/chat/{roomId})
-      stompClient.subscribe(`/topic/chat/${roomId}`, (message) => {
-        try {
-          const msg = JSON.parse(message.body);
-          appendIncomingMessage(msg);
-        } catch (e) {
-          console.error("웹소켓 메시지 파싱 오류:", e);
-        }
-      });
-
-      // B. 상대방(관리자) 읽음 처리 실시간 수신 구독 (/topic/chat/{roomId}/read)
-      stompClient.subscribe(`/topic/chat/${roomId}/read`, (event) => {
-        try {
-          const readData = JSON.parse(event.body);
-          if (readData.readerSide === "ADMIN") {
-            markAllMyMessagesRead();
+      stompClient.connect({}, () => {
+        // A. 대화 메시지 실시간 수신 구독 (/topic/chat/{roomId})
+        stompClient.subscribe(`/topic/chat/${roomId}`, (message) => {
+          try {
+            const msg = JSON.parse(message.body);
+            appendIncomingMessage(msg);
+          } catch (e) {
+            console.error("웹소켓 메시지 파싱 오류:", e);
           }
-        } catch (e) {
-          console.error("읽음 이벤트 수신 오류:", e);
+        });
+
+        // B. 상대방(관리자) 읽음 처리 실시간 수신 구독 (/topic/chat/{roomId}/read)
+        stompClient.subscribe(`/topic/chat/${roomId}/read`, (event) => {
+          try {
+            const readData = JSON.parse(event.body);
+            if (readData.readerSide === "ADMIN") {
+              markAllMyMessagesRead();
+            }
+          } catch (e) {
+            console.error("읽음 이벤트 수신 오류:", e);
+          }
+        });
+
+        // C. 실시간 연동 주문 목록 수신 구독 (/topic/chat/{roomId}/orders)
+        stompClient.subscribe(`/topic/chat/${roomId}/orders`, (event) => {
+          try {
+            const orders = JSON.parse(event.body);
+            renderOrderSidebar(orders);
+          } catch (e) {
+            console.error("주문 배너 수신 오류:", e);
+          }
+        });
+
+        // D. 웹소켓 연결 완료 시 초기 읽음 커서도 소켓으로 실시간 전파!
+        if (lastFetchedMessageId > 0) {
+          sendReadCursor(roomId, lastFetchedMessageId);
         }
+
+        resolve();
+      }, (err) => {
+        console.error("웹소켓 연결 실시간 에러:", err);
+        // 지연 재연결 (5초 후 자동 재연결 시도)
+        setTimeout(() => {
+          if (currentChatRoomId) {
+            connectWebSocket(currentChatRoomId);
+          }
+        }, 5000);
+        resolve();
       });
-
-      // C. 실시간 연동 주문 목록 수신 구독 (/topic/chat/{roomId}/orders)
-      stompClient.subscribe(`/topic/chat/${roomId}/orders`, (event) => {
-        try {
-          const orders = JSON.parse(event.body);
-          renderOrderSidebar(orders);
-        } catch (e) {
-          console.error("주문 배너 수신 오류:", e);
-        }
-      });
-
-      // D. 웹소켓 연결 완료 시 초기 읽음 커서도 소켓으로 실시간 전파!
-      if (lastFetchedMessageId > 0) {
-        sendReadCursor(roomId, lastFetchedMessageId);
-      }
-
-    }, (err) => {
-      console.error("웹소켓 연결 실시간 에러:", err);
-      // 지연 재연결 (5초 후 자동 재연결 시도)
-      setTimeout(() => {
-        if (currentChatRoomId) {
-          connectWebSocket(currentChatRoomId);
-        }
-      }, 5000);
     });
   }
 
@@ -424,6 +428,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if (chatImageInput) chatImageInput.value = "";
 
         await loadMessages(currentChatRoomId);
+        if (lastFetchedMessageId > 0) {
+          await updateReadCursor(currentChatRoomId, lastFetchedMessageId);
+        }
 
       } catch (err) {
         console.error("메시지 전송 오류:", err);

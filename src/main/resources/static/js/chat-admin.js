@@ -126,19 +126,25 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  let isConnectingAdminWebSocket = false;
+
   // 관리자 웹소켓 STOMP 초기화 및 연결
   function initAdminWebSocket() {
     if (stompClient && stompClient.connected) return;
+    if (isConnectingAdminWebSocket) return;
     if (typeof SockJS === "undefined" || typeof Stomp === "undefined") {
       console.warn("SockJS 또는 Stomp 라이브러리가 로드되지 않았습니다.");
       return;
     }
 
+    isConnectingAdminWebSocket = true;
     const socket = new SockJS("/ws");
     stompClient = Stomp.over(socket);
     stompClient.debug = null;
 
     stompClient.connect({}, () => {
+      isConnectingAdminWebSocket = false;
+
       // 관리자 대시보드 실시간 토픽 구독 (/topic/admin/rooms)
       stompClient.subscribe("/topic/admin/rooms", (event) => {
         try {
@@ -157,6 +163,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
     }, (err) => {
+      isConnectingAdminWebSocket = false;
       console.error("관리자 웹소켓 연결 오류:", err);
       // 지연 재연결 (5초 후 자동 재연결 시도)
       setTimeout(() => {
