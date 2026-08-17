@@ -27,7 +27,8 @@ public class DashboardReadModelQueryService {
     /** 관리자 대시보드에 표시할 지표를 조회한다. */
     @Transactional(readOnly = true)
     public DashboardView getDashboard() {
-        LocalDate today = LocalDate.now(clock);
+        LocalDateTime queryReferenceAt = LocalDateTime.now(clock);
+        LocalDate today = queryReferenceAt.toLocalDate();
         LocalDateTime start = today.atStartOfDay();
         LocalDateTime end = today.plusDays(1).atStartOfDay();
 
@@ -63,6 +64,7 @@ public class DashboardReadModelQueryService {
         long pendingReportedPostCount = dashboardReadModelMapper.countPendingReportedPosts();
 
         return new DashboardView(
+                queryReferenceAt,
                 todayOrderCount,
                 todaySalesAmount,
                 approvalPendingCount,

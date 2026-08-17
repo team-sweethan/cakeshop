@@ -11,6 +11,7 @@ import com.cakeshop.domain.dashboard.dto.view.DashboardView;
 import com.cakeshop.domain.dashboard.service.DashboardReadModelQueryService;
 import com.cakeshop.global.security.SecurityConfig;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +36,7 @@ class DashboardAdminScreenRenderingTests {
     void dashboard_metrics_rendersCountsAndManagementLinks() throws Exception {
         when(dashboardReadModelQueryService.getDashboard())
                 .thenReturn(new DashboardView(
+                        LocalDateTime.of(2026, 8, 17, 12, 0),
                         0,
                         BigDecimal.ZERO,
                         3,
@@ -50,6 +52,9 @@ class DashboardAdminScreenRenderingTests {
 
         mockMvc.perform(get("/admin"))
                 .andExpect(status().isOk())
+                .andExpect(content().string(containsString("조회 기준")))
+                .andExpect(content().string(containsString("2026.08.17 12:00:00")))
+                .andExpect(content().string(containsString("href=\"/admin\">새로고침</a>")))
                 .andExpect(content().string(containsString("<strong>3건</strong>")))
                 .andExpect(content().string(containsString("<strong>4건</strong>")))
                 .andExpect(content().string(containsString("<strong>5건</strong>")))

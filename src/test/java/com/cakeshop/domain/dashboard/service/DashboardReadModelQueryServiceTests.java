@@ -76,6 +76,8 @@ class DashboardReadModelQueryServiceTests {
 
         DashboardView dashboard = service.getDashboard();
 
+        assertThat(dashboard.queryReferenceAt())
+                .isEqualTo(LocalDateTime.of(2026, 8, 7, 0, 30));
         assertThat(dashboard.todayOrderCount()).isEqualTo(3L);
         assertThat(dashboard.todaySalesAmount()).isEqualByComparingTo("120000");
         assertThat(dashboard.approvalPendingCount()).isEqualTo(5L);

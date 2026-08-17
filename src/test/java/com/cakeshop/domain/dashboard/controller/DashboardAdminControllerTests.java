@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.cakeshop.domain.dashboard.dto.view.DashboardView;
 import com.cakeshop.domain.dashboard.service.DashboardReadModelQueryService;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,6 +38,7 @@ class DashboardAdminControllerTests {
     @Test
     void dashboard_serviceReturnsView_addsDashboardToModel() throws Exception {
         DashboardView dashboard = new DashboardView(
+                LocalDateTime.of(2026, 8, 17, 12, 0),
                 3L,
                 new BigDecimal("120000"),
                 2L,
