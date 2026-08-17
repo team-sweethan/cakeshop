@@ -46,15 +46,15 @@ document.addEventListener("DOMContentLoaded", () => {
       const room = await response.json();
       currentChatRoomId = room.id;
 
+      // 웹소켓 실시간 연결 및 구독을 초기 메시지 조회 전 미리 시작
+      connectWebSocket(currentChatRoomId);
+
       // 대화 목록 및 연동 주문 조회
       await loadMessages(currentChatRoomId);
       await loadOrderBanners(currentChatRoomId);
       if (lastFetchedMessageId > 0) {
         await updateReadCursor(currentChatRoomId, lastFetchedMessageId);
       }
-
-      // 웹소켓 실시간 연결 및 구독 시작
-      connectWebSocket(currentChatRoomId);
 
     } catch (err) {
       console.error(err);
@@ -483,8 +483,9 @@ document.addEventListener("DOMContentLoaded", () => {
           if (chatImageInput) chatImageInput.value = "";
         }
       } finally {
-        // 성공하든 실패하든 업로드 락 플래그를 무조건 해제!
-        isUploadingAttachment = false;
+        if (chatImageInput && chatImageInput.files[0] === currentUploadFile) {
+          isUploadingAttachment = false;
+        }
       }
     });
   }
