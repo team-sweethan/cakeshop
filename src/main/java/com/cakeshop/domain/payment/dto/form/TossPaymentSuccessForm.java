@@ -27,10 +27,6 @@ public class TossPaymentSuccessForm {
     private BigDecimal amount;
 
     public PaymentConfirmForm toConfirmForm() {
-        PaymentConfirmForm form = new PaymentConfirmForm();
-        form.setPaymentKey(paymentKey);
-        form.setTossOrderId(orderId);
-        form.setAmount(amount);
-        return form;
+        return new PaymentConfirmForm(paymentKey, orderId, amount);
     }
 }
