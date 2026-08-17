@@ -141,6 +141,24 @@ public class NotificationService {
                     String receiverPhone = notificationMapper.findReceiverPhone(request.getReceiverId(), request.getOrderId());
                     registerSmsSending(existingId, receiverPhone, title, content);
                 }
+
+                Long bundleId = existing != null ? existing.getId() : notificationMapper.findIdByReceiverIdAndEventKey(request.getReceiverId(), eventKey);
+                NotificationResponse bundleResponse = NotificationResponse.builder()
+                        .id(bundleId)
+                        .type(request.getType())
+                        .title(title)
+                        .content(content)
+                        .isRead(false)
+                        .createdAt(existing != null ? existing.getCreatedAt() : updateNow)
+                        .orderId(request.getOrderId())
+                        .chatRoomId(request.getChatRoomId())
+                        .commentId(request.getCommentId())
+                        .postId(request.getPostId())
+                        .reviewId(request.getReviewId())
+                        .userCouponId(request.getUserCouponId())
+                        .lastEventAt(updateNow)
+                        .build();
+                registerWebSocketSending(request.getReceiverId(), bundleResponse);
             }
             return;
         }
@@ -234,7 +252,7 @@ public class NotificationService {
 
     private void executeWebSocketSending(Long receiverId, NotificationResponse responseDTO) {
         try {
-            if (receiverId != null) {
+            if (receiverId != null && notificationMapper.isReceiverActive(receiverId)) {
                 messagingTemplate.convertAndSend("/topic/notifications/" + receiverId, responseDTO);
             }
         } catch (Exception e) {

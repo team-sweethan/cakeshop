@@ -3,7 +3,7 @@
   <strong class="admin-header__title" th:text="${title}">관리자 화면</strong>
   <div class="cluster">
     <a class="btn" th:href="@{/}">고객 화면</a>
-    <span class="note" sec:authentication="name">관리자</span>
+    <span class="note" data-account-identity th:data-member-id="${#authentication.principal.memberId}" sec:authentication="name">관리자</span>
     <form th:action="@{/logout}" method="post">
       <button class="btn" type="submit">로그아웃</button>
     </form>
