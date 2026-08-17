@@ -110,8 +110,9 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         });
 
-        // D. 웹소켓 연결/재연결 완료 시 단절 구간 오프라인 메시지 재조회 완료 후 최신 읽음 커서 전파!
+        // D. 웹소켓 연결/재연결 완료 시 단절 구간 오프라인 메시지 및 주문 목록 재조회 완료 후 최신 읽음 커서 전파!
         await loadMessages(roomId);
+        loadOrderBanners(roomId);
         if (lastFetchedMessageId > 0) {
           sendReadCursor(roomId, lastFetchedMessageId);
         }
@@ -189,23 +190,41 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // 타임라인 HTML 렌더링
+  // 타임라인 HTML 렌더링 (REST 스냅샷과 실시간 도착 메시지 ID 기준 병합)
   function renderTimeline(messages) {
     if (!chatMessagesContainer) return;
+
+    // REST 조회 중 STOMP로 실시간 먼저 도착했던 신규 메시지 DOM 보존
+    const existingMsgEls = Array.from(chatMessagesContainer.querySelectorAll("[id^='msg-']"));
+
     chatMessagesContainer.innerHTML = "";
 
     if (!messages || messages.length === 0) {
-      chatMessagesContainer.innerHTML = `<div class="text-muted empty-chat-notice" style="text-align:center; padding:30px;">아직 주고받은 메시지가 없습니다. 문의사항을 남겨보세요!</div>`;
-      return;
+      if (existingMsgEls.length === 0) {
+        chatMessagesContainer.innerHTML = `<div class="text-muted empty-chat-notice" style="text-align:center; padding:30px;">아직 주고받은 메시지가 없습니다. 문의사항을 남겨보세요!</div>`;
+        return;
+      }
     }
 
-    lastFetchedMessageId = messages[messages.length - 1].id;
+    const renderedIds = new Set();
+    if (messages && messages.length > 0) {
+      lastFetchedMessageId = Math.max(lastFetchedMessageId, messages[messages.length - 1].id || 0);
 
-    messages.forEach((msg) => {
-      appendProductBannerDOM(msg, chatMessagesContainer);
-      const msgEl = createMessageDOM(msg);
-      if (msg.id) msgEl.id = `msg-${msg.id}`;
-      chatMessagesContainer.appendChild(msgEl);
+      messages.forEach((msg) => {
+        if (msg.id) renderedIds.add(String(msg.id));
+        appendProductBannerDOM(msg, chatMessagesContainer);
+        const msgEl = createMessageDOM(msg);
+        if (msg.id) msgEl.id = `msg-${msg.id}`;
+        chatMessagesContainer.appendChild(msgEl);
+      });
+    }
+
+    // REST 스냅샷에 포함되지 않았던 실시간 메시지 DOM 재첨부 (덮어쓰기 방지)
+    existingMsgEls.forEach((el) => {
+      const idStr = el.id.replace("msg-", "");
+      if (!renderedIds.has(idStr)) {
+        chatMessagesContainer.appendChild(el);
+      }
     });
 
     scrollToBottom();

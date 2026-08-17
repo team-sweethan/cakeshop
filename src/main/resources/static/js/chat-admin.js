@@ -180,7 +180,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!msg || !msg.chatRoomId) return;
 
     const rId = msg.chatRoomId;
-    const newStatus = msg.senderType === "ADMIN" ? "WAITING_CUSTOMER" : "WAITING_ADMIN";
+    const newStatus = msg.responseStatus ? msg.responseStatus : (msg.senderType === "ADMIN" ? "WAITING_CUSTOMER" : "WAITING_ADMIN");
 
     // 현재 탭 필터 조건 검증 (미답변 탭일 때 답변완료 방이면 제거, 완료 탭일 때 미답변 방이면 제거)
     if (currentFilter === "unread" && newStatus !== "WAITING_ADMIN") {
@@ -410,7 +410,7 @@ document.addEventListener("DOMContentLoaded", () => {
     readSub = stompClient.subscribe(`/topic/chat/${roomId}/read`, (event) => {
       try {
         const readData = JSON.parse(event.body);
-        if (readData.readerSide === "CUSTOMER") {
+        if (selectedChatRoomId === roomId && readData.readerSide === "CUSTOMER") {
           markAllAdminMessagesRead(readData.lastReadMessageId || readData.lastMessageId);
         }
       } catch (e) {
