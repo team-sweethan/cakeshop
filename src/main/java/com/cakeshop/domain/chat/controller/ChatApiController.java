@@ -275,7 +275,7 @@ public class ChatApiController {
         return ResponseEntity.ok().build();
     }
 
-    /* 9. 채팅방에 주문 연동 (관리자 전용) (역할이 약간 애매함 필요 없으면 삭제할 것)
+    // 9. 채팅방에 주문 연동 (관리자 전용)
     @PostMapping("/api/admin/chat/orders")
     public ResponseEntity<Void> linkOrderToChatRoom(
             @RequestParam Long chatRoomId,
@@ -291,7 +291,7 @@ public class ChatApiController {
                 chatRoomId, orderId, anchorMessageId, memberDetails.getMemberId(), true);
                 
         return ResponseEntity.ok().build();
-    } */
+    }
 
     // 채팅 API 전용 예외 핸들러 (REST JSON 응답 보장)
     @ExceptionHandler(com.cakeshop.global.error.BusinessException.class)

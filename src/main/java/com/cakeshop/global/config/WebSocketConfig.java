@@ -98,7 +98,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                             try {
                                 Long targetMemberId = Long.parseLong(subPath);
                                 if (principal instanceof Authentication auth && auth.getPrincipal() instanceof MemberDetails memberDetails) {
-                                    if (!memberDetails.getMemberId().equals(targetMemberId) && !memberDetails.isAdmin()) {
+                                    if (!memberDetails.getMemberId().equals(targetMemberId)) {
                                         throw new AccessDeniedException("본인의 알림 토픽만 구독할 수 있습니다.");
                                     }
                                 }

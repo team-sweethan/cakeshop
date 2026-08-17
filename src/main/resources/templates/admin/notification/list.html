@@ -116,13 +116,22 @@
               `;
             });
 
-            const existingRealtimeNodes = Array.from(container.querySelectorAll(".admin-noti-row[data-id]"));
-            const dataIds = new Set(data.map(item => String(item.id)));
-            const realtimeOnlyNodes = existingRealtimeNodes.filter(node => !dataIds.has(node.getAttribute("data-id")));
+            const existingUnreadRealtimeMap = new Map();
+            container.querySelectorAll(".admin-noti-row.is-unread[data-id]").forEach(node => {
+              existingUnreadRealtimeMap.set(node.getAttribute("data-id"), node);
+            });
 
             container.innerHTML = html;
-            realtimeOnlyNodes.reverse().forEach(node => {
-              container.insertBefore(node, container.firstChild);
+
+            existingUnreadRealtimeMap.forEach((realtimeNode, id) => {
+              const restNode = container.querySelector(`.admin-noti-row[data-id="${id}"]`);
+              if (restNode) {
+                container.replaceChild(realtimeNode, restNode);
+              } else if (container.firstChild) {
+                container.insertBefore(realtimeNode, container.firstChild);
+              } else {
+                container.appendChild(realtimeNode);
+              }
             });
             attachRowEvents();
           })

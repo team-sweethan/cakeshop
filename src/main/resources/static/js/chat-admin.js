@@ -257,14 +257,15 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (existingRoom) {
-      const isOlderMessage = msg.id && existingRoom.lastMessageId && msg.id < existingRoom.lastMessageId;
+      const incomingMsgId = msg.lastMessageId || msg.id;
+      const isOlderMessage = incomingMsgId && existingRoom.lastMessageId && incomingMsgId < existingRoom.lastMessageId;
       if (!isOlderMessage) {
         existingRoom.lastMessageContent = msg.lastMessageContent || msg.content || existingRoom.lastMessageContent || (msg.imageUrls && msg.imageUrls.length > 0 ? "(사진)" : "");
         if (msg.lastMessageCreatedAt || msg.createdAt) {
           existingRoom.lastMessageCreatedAt = msg.lastMessageCreatedAt || msg.createdAt;
         }
         existingRoom.responseStatus = newStatus;
-        if (msg.id) existingRoom.lastMessageId = msg.id;
+        if (incomingMsgId) existingRoom.lastMessageId = incomingMsgId;
 
         const isVisibleActive = isCurrentActive && document.visibilityState === "visible";
         if (typeof msg.unreadCount === "number") {
