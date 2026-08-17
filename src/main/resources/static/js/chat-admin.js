@@ -208,10 +208,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const isCurrentActive = selectedChatRoomId === rId;
 
     if (existingRoom) {
-      existingRoom.lastMessageContent = msg.content || (msg.imageUrls && msg.imageUrls.length > 0 ? "(사진)" : "");
-      existingRoom.lastMessageCreatedAt = msg.createdAt;
+      existingRoom.lastMessageContent = msg.lastMessageContent || msg.content || (msg.imageUrls && msg.imageUrls.length > 0 ? "(사진)" : "");
+      existingRoom.lastMessageCreatedAt = msg.lastMessageCreatedAt || msg.createdAt;
       existingRoom.responseStatus = newStatus;
-      if (!isCurrentActive && msg.senderType !== "ADMIN") {
+      if (typeof msg.unreadCount === "number") {
+        existingRoom.unreadCount = isCurrentActive ? 0 : msg.unreadCount;
+      } else if (!isCurrentActive && msg.senderType !== "ADMIN") {
         existingRoom.unreadCount = (existingRoom.unreadCount || 0) + 1;
       } else if (isCurrentActive || msg.senderType === "ADMIN") {
         existingRoom.unreadCount = 0;
@@ -487,9 +489,23 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (!isAdminSender && msg.id) {
-      markRead(selectedChatRoomId, msg.id);
+      if (document.visibilityState === "visible") {
+        markRead(selectedChatRoomId, msg.id);
+      }
     }
   }
+
+  // 탭으로 돌아왔을 때(포커스 복귀 시) 관리자 읽음 커서 일괄 갱신
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && selectedChatRoomId && lastFetchedMessageId > 0) {
+      markRead(selectedChatRoomId, lastFetchedMessageId);
+    }
+  });
+  window.addEventListener("focus", () => {
+    if (selectedChatRoomId && lastFetchedMessageId > 0) {
+      markRead(selectedChatRoomId, lastFetchedMessageId);
+    }
+  });
 
   function markAllAdminMessagesRead(lastReadMessageId) {
     const readMessages = document.querySelectorAll(".admin-chat-main-room .chat-msg--me");
@@ -536,60 +552,77 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function renderAdminTimeline(messages) {
     if (!adminChatMessagesContainer) return;
+
+    // REST 조회 중 STOMP로 먼저 도착했던 신규 메시지 DOM 보존
+    const existingMsgEls = Array.from(adminChatMessagesContainer.querySelectorAll("[id^='admin-msg-']"));
+
     adminChatMessagesContainer.innerHTML = "";
 
     if (!messages || messages.length === 0) {
-      adminChatMessagesContainer.innerHTML = `<div class="text-muted" style="text-align:center; padding:30px;">대화 기록이 없습니다.</div>`;
-      lastFetchedMessageId = 0;
-      return;
+      if (existingMsgEls.length === 0) {
+        adminChatMessagesContainer.innerHTML = `<div class="text-muted" style="text-align:center; padding:30px;">대화 기록이 없습니다.</div>`;
+        lastFetchedMessageId = 0;
+        return;
+      }
     }
 
-    lastFetchedMessageId = messages[messages.length - 1].id;
+    const renderedIds = new Set();
+    if (messages && messages.length > 0) {
+      lastFetchedMessageId = Math.max(lastFetchedMessageId, messages[messages.length - 1].id || 0);
 
-    messages.forEach((msg) => {
-      appendProductBannerDOM(msg, adminChatMessagesContainer);
+      messages.forEach((msg) => {
+        if (msg.id) renderedIds.add(String(msg.id));
+        appendProductBannerDOM(msg, adminChatMessagesContainer);
 
-      const isAdminSender = msg.senderType === "ADMIN";
-      const msgDiv = document.createElement("div");
-      msgDiv.className = `chat-msg ${isAdminSender ? "chat-msg--me" : "chat-msg--other"}`;
-      if (msg.id) msgDiv.id = `admin-msg-${msg.id}`;
+        const isAdminSender = msg.senderType === "ADMIN";
+        const msgDiv = document.createElement("div");
+        msgDiv.className = `chat-msg ${isAdminSender ? "chat-msg--me" : "chat-msg--other"}`;
+        if (msg.id) msgDiv.id = `admin-msg-${msg.id}`;
 
-      const formattedTime = msg.createdAt ? formatTime(msg.createdAt) : "";
+        const formattedTime = msg.createdAt ? formatTime(msg.createdAt) : "";
 
-      let attachmentsHtml = "";
-      if (msg.imageUrls && msg.imageUrls.length > 0) {
-        msg.imageUrls.forEach((url) => {
-          attachmentsHtml += `<div style="margin-bottom:6px;"><img src="${escapeHtml(url)}" style="max-width:200px; border-radius:8px;" alt="첨부 이미지"/></div>`;
-        });
-      }
+        let attachmentsHtml = "";
+        if (msg.imageUrls && msg.imageUrls.length > 0) {
+          msg.imageUrls.forEach((url) => {
+            attachmentsHtml += `<div style="margin-bottom:6px;"><img src="${escapeHtml(url)}" style="max-width:200px; border-radius:8px;" alt="첨부 이미지"/></div>`;
+          });
+        }
 
-      if (isAdminSender) {
-        msgDiv.innerHTML = `
-          <div class="chat-msg__body">
-            ${attachmentsHtml}
-            <div class="chat-msg__content">${escapeHtml(msg.content || "")}</div>
-          </div>
-          <div class="chat-msg__meta">
-            <span class="chat-msg__read">${msg.isRead ? "읽음" : "미읽음"}</span>
-            <span class="chat-msg__time">${formattedTime}</span>
-          </div>
-        `;
-      } else {
-        msgDiv.innerHTML = `
-          <div class="chat-msg__sender">${escapeHtml(msg.senderName || "고객")}</div>
-          <div class="chat-msg--other__content-wrap">
+        if (isAdminSender) {
+          msgDiv.innerHTML = `
             <div class="chat-msg__body">
               ${attachmentsHtml}
               <div class="chat-msg__content">${escapeHtml(msg.content || "")}</div>
+              <div class="chat-msg__meta">
+                <span class="chat-msg__read">${msg.read ? "읽음" : "미읽음"}</span>
+                <span class="chat-msg__time">${formattedTime}</span>
+              </div>
             </div>
-            <div class="chat-msg__meta">
-              <span class="chat-msg__time">${formattedTime}</span>
+          `;
+        } else {
+          msgDiv.innerHTML = `
+            <div class="chat-msg--other__content-wrap">
+              <div class="chat-msg__body">
+                ${attachmentsHtml}
+                <div class="chat-msg__content">${escapeHtml(msg.content || "")}</div>
+              </div>
+              <div class="chat-msg__meta">
+                <span class="chat-msg__time">${formattedTime}</span>
+              </div>
             </div>
-          </div>
-        `;
-      }
+          `;
+        }
 
-      adminChatMessagesContainer.appendChild(msgDiv);
+        adminChatMessagesContainer.appendChild(msgDiv);
+      });
+    }
+
+    // REST 스냅샷에 포함되지 않았던 실시간 메시지 DOM 재첨부 (덮어쓰기 방지)
+    existingMsgEls.forEach((el) => {
+      const idStr = el.id.replace("admin-msg-", "");
+      if (!renderedIds.has(idStr)) {
+        adminChatMessagesContainer.appendChild(el);
+      }
     });
 
     scrollToBottom();
