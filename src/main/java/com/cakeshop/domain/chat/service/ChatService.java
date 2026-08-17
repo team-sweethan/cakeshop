@@ -553,6 +553,7 @@ public class ChatService {
                     .customerId(room.getCustomerId())
                     .customerName(customerName)
                     .responseStatus(room.getResponseStatus())
+                    .lastMessageId(room.getLastMessageId())
                     .lastMessageContent(previewContent)
                     .lastMessageCreatedAt(lastMessage != null ? lastMessage.getCreatedAt() : room.getCreatedAt())
                     .unreadCount(unreadCount)

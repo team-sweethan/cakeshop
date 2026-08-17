@@ -121,7 +121,11 @@ document.addEventListener("DOMContentLoaded", () => {
           newRooms.forEach((r) => {
             const existing = roomMap.get(r.chatRoomId || r.id);
             if (existing) {
-              if (existing.lastMessageCreatedAt && r.lastMessageCreatedAt && new Date(existing.lastMessageCreatedAt) > new Date(r.lastMessageCreatedAt)) {
+              if (existing.lastMessageId && r.lastMessageId && existing.lastMessageId > r.lastMessageId) {
+                r.lastMessageId = existing.lastMessageId;
+                r.lastMessageCreatedAt = existing.lastMessageCreatedAt;
+                r.lastMessageContent = existing.lastMessageContent;
+              } else if (existing.lastMessageCreatedAt && r.lastMessageCreatedAt && new Date(existing.lastMessageCreatedAt) > new Date(r.lastMessageCreatedAt)) {
                 r.lastMessageCreatedAt = existing.lastMessageCreatedAt;
                 r.lastMessageContent = existing.lastMessageContent;
               }
@@ -284,6 +288,7 @@ document.addEventListener("DOMContentLoaded", () => {
         customerId: resolvedCustomerId,
         customerName: resolvedCustomerName,
         responseStatus: newStatus,
+        lastMessageId: msg.lastMessageId || msg.id,
         lastMessageContent: msg.lastMessageContent || msg.content || (msg.imageUrls && msg.imageUrls.length > 0 ? "(사진)" : ""),
         lastMessageCreatedAt: msg.lastMessageCreatedAt || msg.createdAt,
         unreadCount: initialUnreadCount
