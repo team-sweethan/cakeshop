@@ -92,7 +92,6 @@ public class PaymentService {
                 payment.getId(),
                 approval.paymentKey(),
                 approval.method(),
-                approval.status(),
                 approval.approvedAt()
         ));
 
@@ -122,7 +121,6 @@ public class PaymentService {
                 payment.getId(),
                 approval.paymentKey(),
                 approval.method(),
-                approval.status(),
                 approval.approvedAt()
         ));
 

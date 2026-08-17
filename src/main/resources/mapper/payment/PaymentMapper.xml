@@ -75,9 +75,7 @@
             method,
             amount,
             status,
-            provider_status,
-            failure_code,
-            failure_message
+            failure_code
         )
         VALUES (
             #{orderId},
@@ -87,9 +85,7 @@
             #{method},
             #{amount},
             'READY',
-            #{providerStatus},
-            #{failureCode},
-            #{failureMessage}
+            #{failureCode}
         )
     </insert>
 
@@ -104,10 +100,8 @@
             method,
             amount,
             status,
-            provider_status,
             active_payment_order_id,
             failure_code,
-            failure_message,
             requested_at,
             approved_at,
             canceled_at,
@@ -130,10 +124,8 @@
             method,
             amount,
             status,
-            provider_status,
             active_payment_order_id,
             failure_code,
-            failure_message,
             requested_at,
             approved_at,
             canceled_at,
@@ -154,10 +146,8 @@
             method,
             amount,
             status,
-            provider_status,
             active_payment_order_id,
             failure_code,
-            failure_message,
             requested_at,
             approved_at,
             canceled_at,
@@ -174,10 +164,8 @@
         SET status = 'DONE',
             payment_key = #{paymentKey},
             method = #{method},
-            provider_status = #{providerStatus},
             approved_at = #{approvedAt},
-            failure_code = NULL,
-            failure_message = NULL
+            failure_code = NULL
         WHERE id = #{paymentId}
           AND status = 'READY'
     </update>
@@ -187,10 +175,8 @@
         SET status = 'DONE',
             payment_key = CONCAT('ZERO-', id),
             method = 'ZERO_AMOUNT',
-            provider_status = 'ZERO_AMOUNT',
             approved_at = #{approvedAt},
-            failure_code = NULL,
-            failure_message = NULL
+            failure_code = NULL
         WHERE id = #{paymentId}
           AND status = 'READY'
           AND amount = 0
@@ -215,7 +201,6 @@
     <update id="cancelIfDone">
         UPDATE payments
         SET status = 'CANCELED',
-            provider_status = #{providerStatus},
             canceled_at = #{canceledAt}
         WHERE id = #{paymentId}
           AND status = 'DONE'
@@ -262,7 +247,6 @@
             active_requested_payment_id,
             transaction_key,
             failure_code,
-            failure_message,
             requested_at,
             canceled_at,
             created_at,
@@ -286,7 +270,6 @@
             active_requested_payment_id,
             transaction_key,
             failure_code,
-            failure_message,
             requested_at,
             canceled_at,
             created_at,
@@ -309,7 +292,6 @@
             active_requested_payment_id,
             transaction_key,
             failure_code,
-            failure_message,
             requested_at,
             canceled_at,
             created_at,
@@ -323,7 +305,7 @@
         SELECT
             id, payment_id, idempotency_key, cancel_amount, cancel_reason,
             request_type, requested_by, status, active_requested_payment_id,
-            transaction_key, failure_code, failure_message, requested_at,
+            transaction_key, failure_code, requested_at,
             canceled_at, created_at, updated_at
         FROM payment_cancellations
         WHERE status = 'REQUESTED'
@@ -390,7 +372,6 @@
         UPDATE payment_cancellations
         SET status = 'REQUESTED',
             failure_code = NULL,
-            failure_message = NULL,
             transaction_key = NULL,
             canceled_at = NULL,
             requested_at = CURRENT_TIMESTAMP(6)
@@ -415,7 +396,6 @@
             active_requested_payment_id,
             transaction_key,
             failure_code,
-            failure_message,
             requested_at,
             canceled_at,
             created_at,
@@ -436,12 +416,9 @@
             cancellation.transaction_key = #{transactionKey},
             cancellation.canceled_at = #{canceledAt},
             cancellation.failure_code = NULL,
-            cancellation.failure_message = NULL,
             payment.status = 'CANCELED',
-            payment.provider_status = 'CANCELED',
             payment.canceled_at = #{canceledAt},
-            payment.failure_code = NULL,
-            payment.failure_message = NULL
+            payment.failure_code = NULL
         WHERE cancellation.id = #{cancellationId}
           AND cancellation.status = 'REQUESTED'
           AND payment.status = 'DONE'
@@ -450,8 +427,7 @@
     <update id="failCancellationIfRequested">
         UPDATE payment_cancellations
         SET status = 'FAILED',
-            failure_code = #{failureCode},
-            failure_message = #{failureMessage}
+            failure_code = #{failureCode}
         WHERE id = #{cancellationId}
           AND status = 'REQUESTED'
     </update>
@@ -459,8 +435,7 @@
     <update id="failUnapprovedCompensationIfRequested">
         UPDATE payment_cancellations
         SET status = 'FAILED',
-            failure_code = 'PAYMENT_NOT_APPROVED',
-            failure_message = 'PG 승인 전 결제 요청이 종료되었습니다.'
+            failure_code = 'PAYMENT_NOT_APPROVED'
         WHERE id = #{cancellationId}
           AND request_type = 'SYSTEM_COMPENSATION'
           AND status = 'REQUESTED'
@@ -475,13 +450,10 @@
             cancellation.transaction_key = #{transactionKey},
             cancellation.canceled_at = #{canceledAt},
             cancellation.failure_code = NULL,
-            cancellation.failure_message = NULL,
             payment.status = 'CANCELED',
             payment.payment_key = COALESCE(payment.payment_key, #{paymentKey}),
-            payment.provider_status = 'CANCELED',
             payment.canceled_at = #{canceledAt},
-            payment.failure_code = 'INTERNAL_COMPLETION_FAILED',
-            payment.failure_message = '내부 주문 처리 실패로 승인 결제를 자동 취소했습니다.'
+            payment.failure_code = 'INTERNAL_COMPLETION_FAILED'
         WHERE cancellation.id = #{cancellationId}
           AND cancellation.status = 'REQUESTED'
           AND cancellation.request_type = 'SYSTEM_COMPENSATION'

@@ -18,10 +18,8 @@
 | `method` | VARCHAR(30) |  | O | NULL | 결제 수단 |
 | `amount` | DECIMAL(12, 0) |  | X | 없음 | 결제 금액 |
 | `status` | VARCHAR(30) | INDEX | X | `'READY'` | 결제 상태 |
-| `provider_status` | VARCHAR(50) |  | O | NULL | 결제사 상태 |
 | `active_payment_order_id` | BIGINT | GEN, UK | O | 계산값 | `READY` 또는 `DONE`이면 `order_id`, 아니면 NULL |
 | `failure_code` | VARCHAR(100) |  | O | NULL | 실패 코드 |
-| `failure_message` | VARCHAR(500) |  | O | NULL | 실패 메시지 |
 | `requested_at` | DATETIME(6) |  | X | `CURRENT_TIMESTAMP(6)` | 요청 시각 |
 | `approved_at` | DATETIME(6) | INDEX | O | NULL | 승인 시각 |
 | `canceled_at` | DATETIME(6) |  | O | NULL | 취소 시각 |
@@ -56,7 +54,6 @@
 | `status` | VARCHAR(30) | INDEX | X | `'REQUESTED'` | 취소 상태 |
 | `transaction_key` | VARCHAR(200) | UK | O | NULL | 취소 거래 키 |
 | `failure_code` | VARCHAR(100) |  | O | NULL | 실패 코드 |
-| `failure_message` | VARCHAR(500) |  | O | NULL | 실패 메시지 |
 | `requested_at` | DATETIME(6) |  | X | `CURRENT_TIMESTAMP(6)` | 요청 시각 |
 | `canceled_at` | DATETIME(6) |  | O | NULL | 취소 완료 시각 |
 | `created_at` | DATETIME(6) |  | X | `CURRENT_TIMESTAMP(6)` | 생성 시각 |

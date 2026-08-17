@@ -117,8 +117,7 @@ class PaymentMapperTests {
         completePayment(payment, "COMPLETED-GUARD");
         assertThat(paymentMapper.failCancellationIfRequested(
                 guard.getId(),
-                "PAYMENT_COMPLETED",
-                "내부 결제가 정상 완료되어 보상 취소를 종료했습니다."
+                "PAYMENT_COMPLETED"
         )).isEqualTo(1);
 
         assertThat(paymentMapper.findPaymentsForAdmin(PaymentStatus.DONE))
@@ -142,8 +141,7 @@ class PaymentMapperTests {
         completePayment(payment, "REOPEN-COMPLETED-GUARD");
         assertThat(paymentMapper.failCancellationIfRequested(
                 guard.getId(),
-                "PAYMENT_COMPLETED",
-                "정상 완료"
+                "PAYMENT_COMPLETED"
         )).isEqualTo(1);
         LocalDateTime oldRequestedAt = LocalDateTime.of(2026, 8, 1, 12, 0);
         jdbcTemplate.update(
@@ -238,7 +236,6 @@ class PaymentMapperTests {
                 payment.getId(),
                 "PAYMENT-KEY-" + suffix,
                 "CARD",
-                "DONE",
                 approvedAt
         )).isEqualTo(1);
 
@@ -246,22 +243,19 @@ class PaymentMapperTests {
         assertThat(completed.getStatus()).isEqualTo(PaymentStatus.DONE);
         assertThat(completed.getPaymentKey()).isEqualTo("PAYMENT-KEY-" + suffix);
         assertThat(completed.getMethod()).isEqualTo("CARD");
-        assertThat(completed.getProviderStatus()).isEqualTo("DONE");
         assertThat(completed.getApprovedAt()).isEqualTo(approvedAt);
         assertThat(completed.getFailureCode()).isNull();
-        assertThat(completed.getFailureMessage()).isNull();
 
         assertThat(paymentMapper.completeIfReady(
                 payment.getId(),
                 "OTHER-PAYMENT-KEY-" + suffix,
                 "TRANSFER",
-                "DONE",
                 approvedAt.plusMinutes(1)
         )).isZero();
     }
 
     @Test
-    void cancelIfDone_recordsProviderStatusAndTimeConditionally() {
+    void cancelIfDone_recordsCancellationTimeConditionally() {
         Payment payment = insertPayment("DONE-TO-CANCELED");
         LocalDateTime approvedAt =
                 LocalDateTime.of(2026, 8, 1, 12, 1);
@@ -271,22 +265,18 @@ class PaymentMapperTests {
                 payment.getId(),
                 "PAYMENT-KEY-CANCEL-" + suffix,
                 "CARD",
-                "DONE",
                 approvedAt
         );
 
         assertThat(paymentMapper.cancelIfDone(
                 payment.getId(),
-                "CANCELED",
                 canceledAt
         )).isEqualTo(1);
         Payment canceled = findPayment(payment.getId());
         assertThat(canceled.getStatus()).isEqualTo(PaymentStatus.CANCELED);
-        assertThat(canceled.getProviderStatus()).isEqualTo("CANCELED");
         assertThat(canceled.getCanceledAt()).isEqualTo(canceledAt);
         assertThat(paymentMapper.cancelIfDone(
                 payment.getId(),
-                "CANCELED",
                 canceledAt.plusMinutes(1)
         )).isZero();
     }
@@ -297,7 +287,6 @@ class PaymentMapperTests {
 
         assertThat(paymentMapper.cancelIfDone(
                 payment.getId(),
-                "CANCELED",
                 LocalDateTime.of(2026, 8, 1, 12, 5)
         )).isZero();
         assertThat(findPayment(payment.getId()).getStatus())
@@ -466,10 +455,8 @@ class PaymentMapperTests {
                 .isEqualTo("CANCEL-TRANSACTION-" + suffix);
         assertThat(completed.getCanceledAt()).isEqualTo(canceledAt);
         assertThat(completed.getFailureCode()).isNull();
-        assertThat(completed.getFailureMessage()).isNull();
         Payment canceledPayment = findPayment(payment.getId());
         assertThat(canceledPayment.getStatus()).isEqualTo(PaymentStatus.CANCELED);
-        assertThat(canceledPayment.getProviderStatus()).isEqualTo("CANCELED");
         assertThat(canceledPayment.getCanceledAt()).isEqualTo(canceledAt);
         assertThat(paymentMapper.completeCancellationIfRequested(
                 cancellation.getId(),
@@ -493,8 +480,7 @@ class PaymentMapperTests {
 
         assertThat(paymentMapper.failCancellationIfRequested(
                 cancellation.getId(),
-                "ALREADY_CANCELED",
-                "이미 취소된 결제입니다."
+                "ALREADY_CANCELED"
         )).isEqualTo(1);
 
         PaymentCancellation failed = paymentMapper
@@ -503,11 +489,9 @@ class PaymentMapperTests {
         assertThat(failed.getStatus()).isEqualTo(PaymentCancellationStatus.FAILED);
         assertThat(failed.getActiveRequestedPaymentId()).isNull();
         assertThat(failed.getFailureCode()).isEqualTo("ALREADY_CANCELED");
-        assertThat(failed.getFailureMessage()).isEqualTo("이미 취소된 결제입니다.");
         assertThat(paymentMapper.failCancellationIfRequested(
                 cancellation.getId(),
-                "OTHER",
-                "다시 실패 처리"
+                "OTHER"
         )).isZero();
     }
 
@@ -572,7 +556,6 @@ class PaymentMapperTests {
                 payment.getId(),
                 "PAYMENT-KEY-" + label + "-" + suffix,
                 "CARD",
-                "DONE",
                 LocalDateTime.of(2026, 8, 1, 12, 1)
         )).isEqualTo(1);
     }

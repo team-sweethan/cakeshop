@@ -183,7 +183,7 @@ class RefundServiceTests {
         when(orderPaymentCancellationCommandService.isPaymentCancellationAvailable(
                 10L, "CUSTOMER", NOW
         )).thenReturn(true);
-        when(paymentMapper.cancelIfDone(20L, "ZERO_AMOUNT_CANCELED", NOW)).thenReturn(1);
+        when(paymentMapper.cancelIfDone(20L, NOW)).thenReturn(1);
         when(orderPaymentCancellationCommandService.completePaymentCancellation(
                 10L, "CUSTOMER", 3L, "cancel", NOW, NOW
         )).thenReturn(true);

@@ -22,7 +22,6 @@ public class PaymentCancellation {
     private Long activeRequestedPaymentId;
     private String transactionKey;
     private String failureCode;
-    private String failureMessage;
     private LocalDateTime requestedAt;
     private LocalDateTime canceledAt;
     private LocalDateTime createdAt;

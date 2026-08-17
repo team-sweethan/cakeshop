@@ -174,7 +174,7 @@ public class RefundService {
 
         LocalDateTime canceledAt = LocalDateTime.now(clock);
         requirePaymentCancellationAvailable(orderId, requestType, canceledAt);
-        requireOneRow(paymentMapper.cancelIfDone(payment.getId(), "ZERO_AMOUNT_CANCELED", canceledAt));
+        requireOneRow(paymentMapper.cancelIfDone(payment.getId(), canceledAt));
         completeOrderCancellation(orderId, requestType, requestedBy, reason.trim(), canceledAt, canceledAt);
         return true;
     }

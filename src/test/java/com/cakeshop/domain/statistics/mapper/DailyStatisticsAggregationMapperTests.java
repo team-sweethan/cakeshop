@@ -310,18 +310,16 @@ class DailyStatisticsAggregationMapperTests {
                     method,
                     amount,
                     status,
-                    provider_status,
                     approved_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, 'CARD', ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, 'CARD', ?, ?, ?, ?)
                 """,
                 orderId,
                 "DAILY-TOSS-" + label + "-" + suffix,
                 "DAILY-PAYMENT-KEY-" + label + "-" + suffix,
                 "DAILY-IDEMPOTENCY-" + label + "-" + suffix,
                 amount,
-                status,
                 status,
                 approvedAt,
                 updatedAt

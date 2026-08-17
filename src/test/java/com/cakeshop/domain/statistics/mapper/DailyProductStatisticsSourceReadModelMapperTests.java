@@ -462,18 +462,16 @@ class DailyProductStatisticsSourceReadModelMapperTests {
                     method,
                     amount,
                     status,
-                    provider_status,
                     approved_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, 'CARD', ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, 'CARD', ?, ?, ?, ?)
                 """,
                 orderId,
                 "DAILY-PRODUCT-TOSS-" + label + "-" + suffix,
                 "DAILY-PRODUCT-KEY-" + label + "-" + suffix,
                 "DAILY-PRODUCT-IDEMPOTENCY-" + label + "-" + suffix,
                 amount,
-                status,
                 status,
                 approvedAt,
                 approvedAt

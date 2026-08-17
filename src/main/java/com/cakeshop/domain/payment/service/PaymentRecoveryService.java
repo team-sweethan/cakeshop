@@ -196,8 +196,7 @@ public class PaymentRecoveryService {
         if (cancellation.getStatus() != PaymentCancellationStatus.REQUESTED
                 || paymentMapper.failCancellationIfRequested(
                         cancellation.getId(),
-                        "PAYMENT_COMPLETED",
-                        "내부 결제가 정상 완료되어 보상 취소를 종료했습니다."
+                        "PAYMENT_COMPLETED"
                 ) != 1) {
             throw new BusinessException(PaymentErrorCode.PAYMENT_COMPLETE_FAILED);
         }

@@ -86,7 +86,6 @@ class PaymentServiceTests {
                 20L,
                 "payment-key",
                 "카드",
-                "DONE",
                 approval.approvedAt()
         )).thenReturn(1);
 
@@ -109,7 +108,6 @@ class PaymentServiceTests {
                 20L,
                 "payment-key",
                 "카드",
-                "DONE",
                 approval.approvedAt()
         );
         inOrder.verify(orderPaymentCommandService).completeGeneralOrderAfterPayment(
@@ -137,7 +135,6 @@ class PaymentServiceTests {
                 20L,
                 "payment-key",
                 "카드",
-                "DONE",
                 approval.approvedAt()
         )).thenReturn(1);
 
@@ -160,7 +157,6 @@ class PaymentServiceTests {
                 20L,
                 "payment-key",
                 "카드",
-                "DONE",
                 approval.approvedAt()
         );
         inOrder.verify(orderPaymentCommandService).completeCustomOrderAfterPayment(
@@ -186,7 +182,6 @@ class PaymentServiceTests {
                 20L,
                 "payment-key",
                 "카드",
-                "DONE",
                 approval.approvedAt()
         )).thenReturn(0);
 
