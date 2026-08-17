@@ -94,6 +94,15 @@ public class ChatService {
         return room != null ? room.getId() : null;
     }
 
+    // 고객 존재 및 활성 회원 상태 검증 계약 (인터셉터 전용)
+    @Transactional(readOnly = true)
+    public boolean existsCustomer(Long customerId) {
+        if (customerId == null || customerId <= 0) {
+            return false;
+        }
+        return memberChatQueryService.existsCustomer(customerId);
+    }
+
     // 단일 채팅방의 권위 있는 ChatRoomListResponse DTO 조회 (관리자 알림 방송 계약)
     @Transactional(readOnly = true)
     public ChatRoomListResponse getAdminChatRoomResponse(Long roomId) {

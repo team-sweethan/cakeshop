@@ -49,10 +49,15 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                     String destination = accessor.getDestination();
                     Principal principal = accessor.getUser();
 
-                    // A. 클라이언트가 /topic/이나 /queue/로 직접 SEND하는 행위 차단 (컨트롤러 우회 방지)
+                    // A. 클라이언트가 /topic/이나 /queue/로 직접 SEND하는 행위 차단 및 정지 회원 발신 거부
                     if (StompCommand.SEND.equals(command) && destination != null) {
                         if (destination.startsWith("/topic/") || destination.startsWith("/queue/")) {
                             throw new AccessDeniedException("브로커 목적지로 직접 메시지를 발신할 수 없습니다.");
+                        }
+                        if (principal instanceof Authentication auth && auth.getPrincipal() instanceof MemberDetails memberDetails) {
+                            if (!memberDetails.isAdmin() && !chatService.existsCustomer(memberDetails.getMemberId())) {
+                                throw new AccessDeniedException("정지되었거나 유효하지 않은 회원은 메시지를 발신할 수 없습니다.");
+                            }
                         }
                     }
 

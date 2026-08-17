@@ -208,8 +208,8 @@ document.addEventListener("DOMContentLoaded", () => {
   function renderTimeline(messages) {
     if (!chatMessagesContainer) return;
 
-    // REST 조회 중 STOMP로 실시간 먼저 도착했던 신규 메시지 DOM 보존
-    const existingMsgEls = Array.from(chatMessagesContainer.querySelectorAll("[id^='msg-']"));
+    // REST 조회 중 STOMP로 실시간 먼저 도착했던 신규 메시지 및 상품 배너 DOM 보존
+    const existingMsgEls = Array.from(chatMessagesContainer.querySelectorAll("[id^='msg-'], [id^='banner-msg-']"));
 
     chatMessagesContainer.innerHTML = "";
 
@@ -233,9 +233,9 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
-    // REST 스냅샷에 포함되지 않았던 실시간 메시지 DOM 재첨부 (덮어쓰기 방지)
+    // REST 스냅샷에 포함되지 않았던 실시간 메시지 및 배너 DOM 재첨부 (덮어쓰기 방지)
     existingMsgEls.forEach((el) => {
-      const idStr = el.id.replace("msg-", "");
+      const idStr = el.id.replace("banner-msg-", "").replace("msg-", "");
       if (!renderedIds.has(idStr)) {
         chatMessagesContainer.appendChild(el);
       }
@@ -247,8 +247,12 @@ document.addEventListener("DOMContentLoaded", () => {
   // 문의 상품 중앙 시스템 배너 카드 생성 헬퍼
   function appendProductBannerDOM(msg, container) {
     if (!msg || !msg.productId || !container) return;
+    const bannerId = msg.id ? `banner-msg-${msg.id}` : null;
+    if (bannerId && document.getElementById(bannerId)) return;
+
     const pName = msg.productName ? escapeHtml(msg.productName) : `상품 #${msg.productId}`;
     const bannerDiv = document.createElement("div");
+    if (bannerId) bannerDiv.id = bannerId;
     bannerDiv.className = "chat-msg chat-msg--system";
     bannerDiv.style.cssText = "margin: 14px 0 8px 0; text-align: center;";
     bannerDiv.innerHTML = `

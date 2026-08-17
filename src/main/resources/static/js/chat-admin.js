@@ -208,8 +208,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const isCurrentActive = selectedChatRoomId === rId;
 
     if (existingRoom) {
-      existingRoom.lastMessageContent = msg.lastMessageContent || msg.content || (msg.imageUrls && msg.imageUrls.length > 0 ? "(사진)" : "");
-      existingRoom.lastMessageCreatedAt = msg.lastMessageCreatedAt || msg.createdAt;
+      existingRoom.lastMessageContent = msg.lastMessageContent || msg.content || existingRoom.lastMessageContent || (msg.imageUrls && msg.imageUrls.length > 0 ? "(사진)" : "");
+      if (msg.lastMessageCreatedAt || msg.createdAt) {
+        existingRoom.lastMessageCreatedAt = msg.lastMessageCreatedAt || msg.createdAt;
+      }
       existingRoom.responseStatus = newStatus;
       if (typeof msg.unreadCount === "number") {
         existingRoom.unreadCount = isCurrentActive ? 0 : msg.unreadCount;
@@ -218,8 +220,12 @@ document.addEventListener("DOMContentLoaded", () => {
       } else if (isCurrentActive || msg.senderType === "ADMIN") {
         existingRoom.unreadCount = 0;
       }
-      // 배열 맨 앞으로 이동
-      adminRoomsData = [existingRoom, ...adminRoomsData.filter((r) => (r.chatRoomId || r.id) !== rId)];
+
+      const isNewMessageEvent = Boolean(msg.content || (msg.imageUrls && msg.imageUrls.length > 0) || msg.senderType === "CUSTOMER");
+      if (isNewMessageEvent) {
+        adminRoomsData = [existingRoom, ...adminRoomsData.filter((r) => (r.chatRoomId || r.id) !== rId)];
+      }
+    }
     } else {
       const resolvedCustomerId = msg.customerId || (msg.senderType === "CUSTOMER" ? msg.senderId : null);
       const resolvedCustomerName = msg.customerName || (msg.senderType === "CUSTOMER" ? msg.senderName : (resolvedCustomerId ? `고객 #${resolvedCustomerId}` : "고객"));
@@ -361,6 +367,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     selectedChatRoomId = roomId;
     selectedCustomerId = customerId;
+    lastFetchedMessageId = 0;
 
     const headerTitle = document.querySelector(".admin-chat-main-room .chat-room__header strong");
     const targetRoom = adminRoomsData.find((r) => (r.chatRoomId || r.id) === roomId);
@@ -568,7 +575,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const renderedIds = new Set();
     if (messages && messages.length > 0) {
-      lastFetchedMessageId = Math.max(lastFetchedMessageId, messages[messages.length - 1].id || 0);
+      lastFetchedMessageId = messages[messages.length - 1].id || 0;
 
       messages.forEach((msg) => {
         if (msg.id) renderedIds.add(String(msg.id));
@@ -594,7 +601,7 @@ document.addEventListener("DOMContentLoaded", () => {
               ${attachmentsHtml}
               <div class="chat-msg__content">${escapeHtml(msg.content || "")}</div>
               <div class="chat-msg__meta">
-                <span class="chat-msg__read">${msg.read ? "읽음" : "미읽음"}</span>
+                <span class="chat-msg__read">${(msg.isRead || msg.read) ? "읽음" : "미읽음"}</span>
                 <span class="chat-msg__time">${formattedTime}</span>
               </div>
             </div>
