@@ -181,7 +181,6 @@ document.addEventListener("DOMContentLoaded", () => {
   // 관리자 좌측 목록 실시간 상단 정렬 및 갱신
   function handleAdminRoomUpdateRealtime(msg) {
     if (!msg || !msg.chatRoomId) return;
-    adminRoomsFetchGen++;
 
     const rId = msg.chatRoomId;
     const newStatus = msg.responseStatus ? msg.responseStatus : (msg.senderType === "ADMIN" ? "WAITING_CUSTOMER" : "WAITING_ADMIN");
@@ -441,6 +440,30 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // 메시지 ID 숫자 순서대로 타임라인에 안전하게 삽입하는 헬퍼
+  function insertMessageInOrder(container, msgEl, msgId) {
+    if (!container || !msgEl) return;
+    if (!msgId) {
+      container.appendChild(msgEl);
+      return;
+    }
+    const children = Array.from(container.children);
+    for (let i = 0; i < children.length; i++) {
+      const child = children[i];
+      const idAttr = child.id || "";
+      const match = idAttr.match(/(?:admin-)?msg-(\d+)/);
+      if (match) {
+        const childId = parseInt(match[1], 10);
+        if (childId > msgId) {
+          container.insertBefore(msgEl, child);
+          return;
+        }
+      }
+    }
+    container.appendChild(msgEl);
+  }
+
+  // 상대방 메시지 수신 시 타임라인에 추가 헬퍼
   function appendIncomingAdminMessage(msg) {
     if (!adminChatMessagesContainer || !msg) return;
 
@@ -490,7 +513,7 @@ document.addEventListener("DOMContentLoaded", () => {
       `;
     }
 
-    adminChatMessagesContainer.appendChild(msgDiv);
+    insertMessageInOrder(adminChatMessagesContainer, msgDiv, msg.id);
     scrollToBottom();
 
     if (msg.id) {
@@ -564,6 +587,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // REST 조회 중 STOMP로 먼저 도착했던 신규 메시지 및 상품 배너 DOM 보존
     const existingMsgEls = Array.from(adminChatMessagesContainer.querySelectorAll("[id^='admin-msg-'], [id^='admin-banner-msg-']"));
+    const existingReadSet = new Set();
+    existingMsgEls.forEach((el) => {
+      const readBadge = el.querySelector(".chat-msg__read");
+      if (readBadge && readBadge.textContent.trim() === "읽음") {
+        const idStr = el.id.replace("admin-banner-msg-", "").replace("admin-msg-", "");
+        existingReadSet.add(idStr);
+      }
+    });
 
     adminChatMessagesContainer.innerHTML = "";
 
@@ -583,6 +614,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
       messages.forEach((msg) => {
         if (msg.id) renderedIds.add(String(msg.id));
+        if (existingReadSet.has(String(msg.id))) {
+          msg.isRead = true;
+          msg.read = true;
+        }
         appendProductBannerDOM(msg, adminChatMessagesContainer);
 
         const isAdminSender = msg.senderType === "ADMIN";
@@ -662,25 +697,30 @@ document.addEventListener("DOMContentLoaded", () => {
     container.appendChild(bannerDiv);
   }
 
+  let sidePanelFetchGen = 0;
+
   // 3. 우측 사이드 패널 렌더링
   async function loadAdminSidePanel(roomId) {
+    const currentGen = ++sidePanelFetchGen;
+    const inputMemo = document.getElementById("adminCustomerNote");
+    const isMemoFocused = inputMemo && (document.activeElement === inputMemo || (inputMemo.value && inputMemo.value.trim().length > 0));
+
     const infoPanel = document.querySelector(".admin-chat-info-panel");
     if (infoPanel) {
       const existingCards = infoPanel.querySelectorAll(".admin-order-item");
       existingCards.forEach((card) => card.remove());
     }
-    const inputMemo = document.getElementById("adminCustomerNote");
-    if (inputMemo) {
+    if (inputMemo && !isMemoFocused) {
       inputMemo.value = "";
     }
 
     try {
       const response = await fetch(`/api/admin/chat/rooms/${roomId}/side-panel`);
-      if (!response.ok || selectedChatRoomId !== roomId) return;
+      if (!response.ok || selectedChatRoomId !== roomId || currentGen !== sidePanelFetchGen) return;
       const data = await response.json();
-      if (selectedChatRoomId !== roomId) return;
+      if (selectedChatRoomId !== roomId || currentGen !== sidePanelFetchGen) return;
 
-      if (inputMemo) {
+      if (inputMemo && !isMemoFocused) {
         inputMemo.value = data.note ? (data.note.content || "") : "";
       }
 

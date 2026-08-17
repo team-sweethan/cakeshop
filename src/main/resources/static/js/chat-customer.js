@@ -145,6 +145,29 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // 메시지 ID 숫자 순서대로 타임라인에 안전하게 삽입하는 헬퍼
+  function insertMessageInOrder(container, msgEl, msgId) {
+    if (!container || !msgEl) return;
+    if (!msgId) {
+      container.appendChild(msgEl);
+      return;
+    }
+    const children = Array.from(container.children);
+    for (let i = 0; i < children.length; i++) {
+      const child = children[i];
+      const idAttr = child.id || "";
+      const match = idAttr.match(/(?:admin-)?msg-(\d+)/);
+      if (match) {
+        const childId = parseInt(match[1], 10);
+        if (childId > msgId) {
+          container.insertBefore(msgEl, child);
+          return;
+        }
+      }
+    }
+    container.appendChild(msgEl);
+  }
+
   // 실시간 수신 메시지 DOM 추가
   function appendIncomingMessage(msg) {
     if (!chatMessagesContainer || !msg) return;
@@ -160,7 +183,7 @@ document.addEventListener("DOMContentLoaded", () => {
     appendProductBannerDOM(msg, chatMessagesContainer);
     const msgEl = createMessageDOM(msg);
     if (msg.id) msgEl.id = `msg-${msg.id}`;
-    chatMessagesContainer.appendChild(msgEl);
+    insertMessageInOrder(chatMessagesContainer, msgEl, msg.id);
     scrollToBottom();
 
     if (msg.id) {
@@ -224,6 +247,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // REST 조회 중 STOMP로 실시간 먼저 도착했던 신규 메시지 및 상품 배너 DOM 보존
     const existingMsgEls = Array.from(chatMessagesContainer.querySelectorAll("[id^='msg-'], [id^='banner-msg-']"));
+    const existingReadSet = new Set();
+    existingMsgEls.forEach((el) => {
+      const readBadge = el.querySelector(".chat-msg__read");
+      if (readBadge && readBadge.textContent.trim() === "읽음") {
+        const idStr = el.id.replace("banner-msg-", "").replace("msg-", "");
+        existingReadSet.add(idStr);
+      }
+    });
 
     chatMessagesContainer.innerHTML = "";
 
@@ -242,6 +273,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
       messages.forEach((msg) => {
         if (msg.id) renderedIds.add(String(msg.id));
+        if (existingReadSet.has(String(msg.id))) {
+          msg.isRead = true;
+          msg.read = true;
+        }
         appendProductBannerDOM(msg, chatMessagesContainer);
         const msgEl = createMessageDOM(msg);
         if (msg.id) msgEl.id = `msg-${msg.id}`;
