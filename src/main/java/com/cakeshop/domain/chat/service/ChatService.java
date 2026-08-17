@@ -107,25 +107,33 @@ public class ChatService {
     @Transactional(readOnly = true)
     public ChatRoomListResponse getAdminChatRoomResponse(Long roomId) {
         if (roomId == null || roomId <= 0) return null;
-        List<ChatRoomListResponse> responses = getAdminChatRooms(null, 1, 500);
-        if (responses != null) {
-            for (ChatRoomListResponse res : responses) {
-                if (roomId.equals(res.getChatRoomId())) {
-                    return res;
-                }
-            }
-        }
         ChatRoom room = chatMapper.findChatRoomById(roomId);
         if (room == null) return null;
+
         String customerName = memberChatQueryService.getCustomerName(room.getCustomerId());
+
+        ChatMessage lastMessage = room.getLastMessageId() != null
+                ? chatMapper.findChatMessageById(room.getLastMessageId())
+                : null;
+
+        String previewContent = "";
+        if (lastMessage != null) {
+            previewContent = (lastMessage.getContent() != null && !lastMessage.getContent().isBlank())
+                    ? lastMessage.getContent()
+                    : "(사진)";
+        }
+
+        List<ChatUnreadCountDto> unreadDtos = chatMapper.countUnreadMessagesByRoomIds(List.of(room.getId()));
+        int unreadCount = (unreadDtos != null && !unreadDtos.isEmpty()) ? unreadDtos.get(0).getUnreadCount() : 0;
+
         return ChatRoomListResponse.builder()
                 .chatRoomId(room.getId())
                 .customerId(room.getCustomerId())
                 .customerName(customerName != null ? customerName : "고객")
                 .responseStatus(room.getResponseStatus())
-                .lastMessageContent("")
-                .lastMessageCreatedAt(room.getCreatedAt())
-                .unreadCount(0)
+                .lastMessageContent(previewContent)
+                .lastMessageCreatedAt(lastMessage != null ? lastMessage.getCreatedAt() : room.getCreatedAt())
+                .unreadCount(unreadCount)
                 .build();
     }
 

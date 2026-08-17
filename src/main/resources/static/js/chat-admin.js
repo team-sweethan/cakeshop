@@ -225,7 +225,6 @@ document.addEventListener("DOMContentLoaded", () => {
       if (isNewMessageEvent) {
         adminRoomsData = [existingRoom, ...adminRoomsData.filter((r) => (r.chatRoomId || r.id) !== rId)];
       }
-    }
     } else {
       const resolvedCustomerId = msg.customerId || (msg.senderType === "CUSTOMER" ? msg.senderId : null);
       const resolvedCustomerName = msg.customerName || (msg.senderType === "CUSTOMER" ? msg.senderName : (resolvedCustomerId ? `고객 #${resolvedCustomerId}` : "고객"));
@@ -355,9 +354,8 @@ document.addEventListener("DOMContentLoaded", () => {
   async function selectChatRoom(roomId, customerId) {
     if (!roomId) return;
 
-    isAdminUploadingAttachment = false;
-
     if (selectedChatRoomId !== roomId) {
+      isAdminUploadingAttachment = false;
       const inputEl = document.getElementById("adminChatInput");
       if (inputEl) inputEl.value = "";
       pendingAttachment = null;
@@ -782,6 +780,11 @@ document.addEventListener("DOMContentLoaded", () => {
       const contentText = inputEl ? inputEl.value.trim() : "";
       if (!contentText && !pendingAttachment) {
         alert("답변 메시지 내용 또는 이미지를 첨부해주세요.");
+        return;
+      }
+
+      if (contentText.length > 2000) {
+        alert("메시지는 최대 2,000자까지 입력 가능합니다.");
         return;
       }
 

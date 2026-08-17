@@ -433,6 +433,11 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
+      if (contentText.length > 2000) {
+        alert("메시지는 최대 2,000자까지 입력 가능합니다.");
+        return;
+      }
+
       const payload = {
         chatRoomId: currentChatRoomId,
         content: contentText,
