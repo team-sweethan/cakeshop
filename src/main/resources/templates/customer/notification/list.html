@@ -94,7 +94,7 @@
             });
 
             const existingUnreadRealtimeMap = new Map();
-            container.querySelectorAll("article.notification-item.is-unread[data-id]").forEach(node => {
+            container.querySelectorAll("article.notification-item.is-unread[data-realtime='true'][data-id]").forEach(node => {
               existingUnreadRealtimeMap.set(node.getAttribute("data-id"), node);
             });
 

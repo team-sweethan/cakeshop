@@ -117,7 +117,7 @@
             });
 
             const existingUnreadRealtimeMap = new Map();
-            container.querySelectorAll(".admin-noti-row.is-unread[data-id]").forEach(node => {
+            container.querySelectorAll(".admin-noti-row.is-unread[data-realtime='true'][data-id]").forEach(node => {
               existingUnreadRealtimeMap.set(node.getAttribute("data-id"), node);
             });
 

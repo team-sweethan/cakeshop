@@ -200,7 +200,10 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       // 연결/재연결 완료 시 대시보드 대화방 목록 및 활성 대화 스냅샷 다시 동기화 후 최신 읽음 커서 전송!
-      await loadAdminRooms(1, false, true);
+      const pageToReload = Math.max(1, currentAdminPage || 1);
+      for (let p = 1; p <= pageToReload; p++) {
+        await loadAdminRooms(p, p > 1, true);
+      }
       if (selectedChatRoomId) {
         subscribeActiveRoomWebSocket(selectedChatRoomId);
         await loadAdminMessages(selectedChatRoomId, true);

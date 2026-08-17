@@ -1,6 +1,8 @@
 <head th:fragment="head(title)" xmlns:th="http://www.thymeleaf.org">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="_csrf" th:content="${_csrf?.token}"/>
+  <meta name="_csrf_header" th:content="${_csrf?.headerName}"/>
   <title th:text="${title}">케이크 쇼핑몰</title>
   <link rel="icon" th:href="@{/favicon.ico}" sizes="any">
   <link rel="stylesheet" th:href="@{/css/app.css}">

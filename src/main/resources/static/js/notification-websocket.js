@@ -92,6 +92,7 @@
         if (titleSpan) titleSpan.textContent = notification.title || "알림";
         if (contentP) contentP.textContent = notification.content || "";
         if (timeEl) timeEl.textContent = "방금 전";
+        existingArticle.setAttribute("data-realtime", "true");
         attachCustomerItemEvents(existingArticle, notification);
         customerContainer.insertBefore(existingArticle, customerContainer.firstChild);
       } else {
@@ -101,6 +102,7 @@
 
         const article = document.createElement("article");
         article.className = "notification-item is-unread";
+        article.setAttribute("data-realtime", "true");
         if (notification.id) article.setAttribute("data-id", notification.id);
         article.innerHTML = `
           <div class="cluster" style="align-items:flex-start">
@@ -145,6 +147,7 @@
           cells[2].textContent = notification.content || "";
           cells[3].innerHTML = '<span class="badge badge--info">미읽음</span>';
         }
+        existingRow.setAttribute("data-realtime", "true");
         attachAdminRowEvents(existingRow, notification);
         adminContainer.insertBefore(existingRow, adminContainer.firstChild);
       } else {
@@ -154,6 +157,7 @@
 
         const tr = document.createElement("tr");
         tr.className = "admin-noti-row is-unread";
+        tr.setAttribute("data-realtime", "true");
         if (notification.id) tr.setAttribute("data-id", notification.id);
         tr.style.cssText = "font-weight: 600; background-color: rgba(255, 243, 205, 0.2);";
         tr.innerHTML = `

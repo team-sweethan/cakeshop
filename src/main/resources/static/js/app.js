@@ -71,11 +71,7 @@ function showToast(title, content, targetUrl, notificationId) {
 
   toast.addEventListener("click", () => {
     if (notificationId) {
-      const csrfToken = document.querySelector('meta[name="_csrf"]')?.getAttribute('content');
-      const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.getAttribute('content');
-      const headers = {};
-      if (csrfToken && csrfHeader) headers[csrfHeader] = csrfToken;
-
+      const headers = getCsrfHeadersApp();
       fetch(`/api/notifications/${notificationId}/read`, {
         method: "PATCH",
         headers: headers,
@@ -110,4 +106,16 @@ function escapeHtmlApp(text) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+}
+
+function getCsrfHeadersApp() {
+  const token = document.querySelector('meta[name="_csrf"]')?.getAttribute('content')
+    || document.querySelector('input[name="_csrf"]')?.value;
+  const header = document.querySelector('meta[name="_csrf_header"]')?.getAttribute('content')
+    || 'X-CSRF-TOKEN';
+  const headers = {};
+  if (token) {
+    headers[header] = token;
+  }
+  return headers;
 }
