@@ -30,6 +30,7 @@ import com.cakeshop.global.infra.FileStorageClient;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,6 +59,7 @@ public class ChatService {
     private final ChatImageValidator chatImageValidator;
     private final ProductChatQueryService productChatQueryService;
     private final ChatRoomTxHelper chatRoomTxHelper;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Value("${aws.s3.base-url:}")
     private String s3BaseUrl;
@@ -82,6 +84,35 @@ public class ChatService {
     public void validateSubscribeAccess(Long roomId, Long currentUserId, boolean isAdmin) {
         ChatRoom room = chatMapper.findChatRoomById(roomId);
         validateRoomAccess(room, currentUserId, isAdmin);
+    }
+
+    // 결제 완료 도메인 이벤트 수신 시 채팅방 연동 주문 실시간 방송 헬퍼 메서드
+    @Transactional(readOnly = true)
+    public void broadcastOrderUpdateForPayment(Long orderId) {
+        if (orderId == null || orderId <= 0) {
+            return;
+        }
+        OrderChatView orderView = orderChatQueryService.findOrder(orderId);
+        if (orderView == null || orderView.memberId() == null) {
+            return;
+        }
+        ChatRoom room = chatMapper.findChatRoomByCustomerId(orderView.memberId());
+        if (room == null) {
+            return;
+        }
+        List<ChatRoomOrderResponse> orders = getChatRoomOrders(
+                room.getId(),
+                orderView.memberId(),
+                false
+        );
+        try {
+            messagingTemplate.convertAndSend(
+                    "/topic/chat/" + room.getId() + "/orders",
+                    orders
+            );
+        } catch (Exception e) {
+            // 소켓 전파 실패 시에도 백그라운드 트랜잭션 성공 유지
+        }
     }
 
     // 1. 공통 & 고객용 기능 (Customer)
