@@ -77,7 +77,7 @@ class PaymentServiceTests {
     }
 
     @Test
-    void completeGeneralPayment_validApproval_updatesStockPaymentAndOrderInOrder() {
+    void completePayment_generalOrder_updatesStockPaymentAndOrderInOrder() {
         PaymentExecutionOrder order = order();
         Payment payment = payment();
         ApprovalResult approval = approval();
@@ -90,7 +90,7 @@ class PaymentServiceTests {
                 approval.approvedAt()
         )).thenReturn(1);
 
-        paymentService.completeGeneralPayment(order, payment, approval);
+        paymentService.completePayment(order, payment, approval);
 
         InOrder inOrder = inOrder(
                 productStockService,
@@ -177,7 +177,7 @@ class PaymentServiceTests {
     }
 
     @Test
-    void completeGeneralPayment_paymentUpdateFails_doesNotUpdateOrder() {
+    void completePayment_generalOrderPaymentUpdateFails_doesNotUpdateOrder() {
         PaymentExecutionOrder order = order();
         Payment payment = payment();
         ApprovalResult approval = approval();
@@ -190,7 +190,7 @@ class PaymentServiceTests {
                 approval.approvedAt()
         )).thenReturn(0);
 
-        assertThatThrownBy(() -> paymentService.completeGeneralPayment(
+        assertThatThrownBy(() -> paymentService.completePayment(
                 order,
                 payment,
                 approval
@@ -210,7 +210,7 @@ class PaymentServiceTests {
     }
 
     @Test
-    void completeGeneralPayment_expiredAfterOrderLock_doesNotChangeInternalState() {
+    void completePayment_generalOrderExpiredAfterOrderLock_doesNotChangeInternalState() {
         PaymentExecutionOrder order = new PaymentExecutionOrder(
                 1L,
                 BigDecimal.valueOf(30_000),
@@ -218,7 +218,7 @@ class PaymentServiceTests {
                 List.of(new PaymentProduct(200L, 100L, 2))
         );
 
-        assertThatThrownBy(() -> paymentService.completeGeneralPayment(
+        assertThatThrownBy(() -> paymentService.completePayment(
                 order,
                 payment(),
                 approval()
@@ -238,10 +238,10 @@ class PaymentServiceTests {
     }
 
     @Test
-    void completeGeneralPayment_isTransactional() throws NoSuchMethodException {
+    void completePayment_isTransactional() throws NoSuchMethodException {
         Transactional transactional = PaymentService.class
                 .getMethod(
-                        "completeGeneralPayment",
+                        "completePayment",
                         PaymentExecutionOrder.class,
                         Payment.class,
                         ApprovalResult.class
@@ -266,6 +266,8 @@ class PaymentServiceTests {
         paymentService.completeZeroAmountGeneralPayment(order, payment, completedAt);
 
         verify(orderPaymentCommandService).lockGeneralOrderForPayment(1L);
+        verify(productStockService).decreaseStock(100L, 2);
+        verify(orderPaymentCommandService).recordStockDeduction(200L, completedAt);
         verify(paymentMapper).completeZeroAmountIfReady(20L, completedAt);
         verify(orderPaymentCommandService).completeGeneralOrderAfterPayment(1L, completedAt);
         verify(couponOrderCommandService).useReservedCouponForOrder(1L);

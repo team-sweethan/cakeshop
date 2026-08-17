@@ -73,7 +73,7 @@ public class TossPaymentApprovalResolver {
         }
     }
 
-    public void validateApproval(Payment payment, PaymentConfirmForm form, ApprovalResult approval) {
+    private void validateApproval(Payment payment, PaymentConfirmForm form, ApprovalResult approval) {
         if (approval == null
                 || !payment.getTossOrderId().equals(approval.orderId())
                 || !TOSS_DONE.equals(approval.status())

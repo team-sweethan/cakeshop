@@ -93,31 +93,6 @@
         )
     </insert>
 
-    <select id="findPaymentsByOrderId"
-            resultType="com.cakeshop.domain.payment.entity.Payment">
-        SELECT
-            id,
-            order_id,
-            toss_order_id,
-            payment_key,
-            idempotency_key,
-            method,
-            amount,
-            status,
-            provider_status,
-            active_payment_order_id,
-            failure_code,
-            failure_message,
-            requested_at,
-            approved_at,
-            canceled_at,
-            created_at,
-            updated_at
-        FROM payments
-        WHERE order_id = #{orderId}
-        ORDER BY id
-    </select>
-
     <select id="findReadyPaymentByOrderId"
             resultType="com.cakeshop.domain.payment.entity.Payment">
         SELECT
@@ -221,26 +196,6 @@
           AND amount = 0
     </update>
 
-    <update id="abortIfReady">
-        UPDATE payments
-        SET status = 'ABORTED',
-            provider_status = #{providerStatus},
-            failure_code = #{failureCode},
-            failure_message = #{failureMessage}
-        WHERE id = #{paymentId}
-          AND status = 'READY'
-    </update>
-
-    <update id="expireIfReady">
-        UPDATE payments
-        SET status = 'EXPIRED',
-            provider_status = #{providerStatus},
-            failure_code = #{failureCode},
-            failure_message = #{failureMessage}
-        WHERE id = #{paymentId}
-          AND status = 'READY'
-    </update>
-
     <update id="markExpirationCheckedIfExpired">
         UPDATE payments
         SET expiration_checked_at = CURRENT_TIMESTAMP(6)
@@ -292,29 +247,6 @@
           AND payment.status = 'DONE'
           AND #{cancelAmount} = payment.amount
     </insert>
-
-    <select id="findPaymentCancellationById"
-            resultType="com.cakeshop.domain.payment.entity.PaymentCancellation">
-        SELECT
-            id,
-            payment_id,
-            idempotency_key,
-            cancel_amount,
-            cancel_reason,
-            request_type,
-            requested_by,
-            status,
-            active_requested_payment_id,
-            transaction_key,
-            failure_code,
-            failure_message,
-            requested_at,
-            canceled_at,
-            created_at,
-            updated_at
-        FROM payment_cancellations
-        WHERE id = #{cancellationId}
-    </select>
 
     <select id="findPaymentCancellationByIdForUpdate"
             resultType="com.cakeshop.domain.payment.entity.PaymentCancellation">

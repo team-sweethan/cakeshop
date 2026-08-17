@@ -21,6 +21,7 @@ import java.util.Optional;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /** READY 결제 조회와 승인 후 내부 결제 상태 확정을 담당한다. */
 @Service
@@ -76,9 +77,8 @@ public class PaymentService {
         throw new BusinessException(PaymentErrorCode.PAYMENT_COMPLETE_FAILED);
     }
 
-    /** 기존 일반 주문 결제 완료 흐름을 유지한다. */
-    @Transactional
-    public void completeGeneralPayment(
+    /** 일반 주문 결제 완료 흐름은 주문 유형 dispatcher 내부에서만 호출한다. */
+    private void completeGeneralPayment(
             PaymentExecutionOrder order,
             Payment payment,
             ApprovalResult approval
@@ -86,18 +86,7 @@ public class PaymentService {
         orderPaymentCommandService.lockGeneralOrderForPayment(order.orderId());
         validatePaymentExpiration(order.paymentExpiresAt());
 
-        for (PaymentProduct product : order.products()) {
-            boolean stockDeducted = productStockService.decreaseStock(
-                    product.productId(),
-                    product.quantity()
-            );
-            if (stockDeducted) {
-                orderPaymentCommandService.recordStockDeduction(
-                        product.orderItemId(),
-                        approval.approvedAt()
-                );
-            }
-        }
+        deductStockAndRecord(order.products(), approval.approvedAt());
 
         requireOneRow(paymentMapper.completeIfReady(
                 payment.getId(),
@@ -127,18 +116,7 @@ public class PaymentService {
         validatePaymentExpiration(order.paymentExpiresAt());
 
         // products는 주문 생성 시점의 상품 유형을 유지하는 주문 항목 스냅샷이다.
-        for (PaymentProduct product : order.products()) {
-            boolean stockDeducted = productStockService.decreaseStock(
-                    product.productId(),
-                    product.quantity()
-            );
-            if (stockDeducted) {
-                orderPaymentCommandService.recordStockDeduction(
-                        product.orderItemId(),
-                        approval.approvedAt()
-                );
-            }
-        }
+        deductStockAndRecord(order.products(), approval.approvedAt());
 
         requireOneRow(paymentMapper.completeIfReady(
                 payment.getId(),
@@ -171,11 +149,7 @@ public class PaymentService {
         }
 
         orderPaymentCommandService.lockGeneralOrderForPayment(order.orderId());
-        for (PaymentProduct product : order.products()) {
-            if (productStockService.decreaseStock(product.productId(), product.quantity())) {
-                orderPaymentCommandService.recordStockDeduction(product.orderItemId(), completedAt);
-            }
-        }
+        deductStockAndRecord(order.products(), completedAt);
         requireOneRow(paymentMapper.completeZeroAmountIfReady(payment.getId(), completedAt));
         orderPaymentCommandService.completeGeneralOrderAfterPayment(order.orderId(), completedAt);
         couponOrderCommandService.useReservedCouponForOrder(order.orderId());
@@ -187,6 +161,20 @@ public class PaymentService {
             throw new BusinessException(
                     PaymentErrorCode.PAYMENT_COMPLETE_FAILED
             );
+        }
+    }
+
+    private void deductStockAndRecord(
+            List<PaymentProduct> products,
+            LocalDateTime deductedAt
+    ) {
+        for (PaymentProduct product : products) {
+            if (productStockService.decreaseStock(product.productId(), product.quantity())) {
+                orderPaymentCommandService.recordStockDeduction(
+                        product.orderItemId(),
+                        deductedAt
+                );
+            }
         }
     }
 

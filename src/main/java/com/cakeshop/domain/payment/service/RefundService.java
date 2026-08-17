@@ -271,15 +271,6 @@ public class RefundService {
         );
     }
 
-    @Transactional
-    public void failRequestedCancellation(long cancellationId) {
-        paymentMapper.failCancellationIfRequested(
-                cancellationId,
-                "TOSS_CANCEL_FAILED",
-                "결제 취소 요청에 실패했습니다."
-        );
-    }
-
     /** PG 오류로 남은 고객·관리자 취소·반려 요청을 같은 멱등키로 재처리한다. */
     @Transactional(readOnly = true)
     public List<RefundRequest> getRequestedCancellations(int limit) {

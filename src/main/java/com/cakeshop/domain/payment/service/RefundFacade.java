@@ -3,7 +3,6 @@ package com.cakeshop.domain.payment.service;
 import com.cakeshop.domain.payment.error.PaymentErrorCode;
 import com.cakeshop.domain.payment.infra.TossPaymentClient;
 import com.cakeshop.domain.payment.infra.TossPaymentClient.CancellationResult;
-import com.cakeshop.domain.payment.infra.TossPaymentClient.PaymentLookupResult;
 import com.cakeshop.domain.payment.service.RefundService.RefundRequest;
 import com.cakeshop.global.error.BusinessException;
 import lombok.RequiredArgsConstructor;
@@ -91,20 +90,9 @@ public class RefundFacade {
 
     private Optional<CancellationResult> findCanceledResult(String paymentKey) {
         try {
-            return tossPaymentClient.find(paymentKey)
-                    .filter(lookup -> "CANCELED".equals(lookup.status()))
-                    .map(PaymentLookupResult::cancellation)
-                    .filter(this::isCompletedCancellation);
+            return TossCancellationResultResolver.findCompleted(tossPaymentClient, paymentKey);
         } catch (BusinessException lookupFailure) {
             return Optional.empty();
         }
-    }
-
-    private boolean isCompletedCancellation(CancellationResult result) {
-        return result != null
-                && "CANCELED".equals(result.status())
-                && result.transactionKey() != null
-                && !result.transactionKey().isBlank()
-                && result.canceledAt() != null;
     }
 }
