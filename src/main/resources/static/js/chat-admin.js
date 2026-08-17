@@ -200,12 +200,15 @@ document.addEventListener("DOMContentLoaded", () => {
       existingRoom.responseStatus = newStatus;
       if (!isCurrentActive && msg.senderType !== "ADMIN") {
         existingRoom.unreadCount = (existingRoom.unreadCount || 0) + 1;
+      } else if (isCurrentActive || msg.senderType === "ADMIN") {
+        existingRoom.unreadCount = 0;
       }
       // 배열 맨 앞으로 이동
       adminRoomsData = [existingRoom, ...adminRoomsData.filter((r) => (r.chatRoomId || r.id) !== rId)];
     } else {
       const resolvedCustomerId = msg.customerId || (msg.senderType === "CUSTOMER" ? msg.senderId : null);
       const resolvedCustomerName = msg.customerName || (msg.senderType === "CUSTOMER" ? msg.senderName : (resolvedCustomerId ? `고객 #${resolvedCustomerId}` : "고객"));
+      const initialUnreadCount = (isCurrentActive || msg.senderType === "ADMIN") ? 0 : (msg.unreadCount != null ? msg.unreadCount : 1);
       const newRoom = {
         chatRoomId: rId,
         customerId: resolvedCustomerId,
@@ -213,7 +216,7 @@ document.addEventListener("DOMContentLoaded", () => {
         responseStatus: newStatus,
         lastMessageContent: msg.content || (msg.imageUrls && msg.imageUrls.length > 0 ? "(사진)" : ""),
         lastMessageCreatedAt: msg.createdAt,
-        unreadCount: isCurrentActive ? 0 : 1
+        unreadCount: initialUnreadCount
       };
       adminRoomsData = [newRoom, ...adminRoomsData];
     }
@@ -330,6 +333,8 @@ document.addEventListener("DOMContentLoaded", () => {
   // 방 선택 조작
   async function selectChatRoom(roomId, customerId) {
     if (!roomId) return;
+
+    isAdminUploadingAttachment = false;
 
     if (selectedChatRoomId !== roomId) {
       const inputEl = document.getElementById("adminChatInput");
@@ -825,9 +830,7 @@ document.addEventListener("DOMContentLoaded", () => {
           if (adminChatImageInput) adminChatImageInput.value = "";
         }
       } finally {
-        if (adminChatImageInput && adminChatImageInput.files[0] === currentUploadFile) {
-          isAdminUploadingAttachment = false;
-        }
+        isAdminUploadingAttachment = false;
       }
     });
   }
