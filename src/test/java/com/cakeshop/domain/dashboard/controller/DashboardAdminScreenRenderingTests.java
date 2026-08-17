@@ -82,7 +82,7 @@ class DashboardAdminScreenRenderingTests {
                 .andExpect(content().string(containsString("<strong>3건</strong>")))
                 .andExpect(content().string(containsString("<strong>4건</strong>")))
                 .andExpect(content().string(containsString("<strong>5건</strong>")))
-                .andExpect(content().string(containsString("<th>긴급도</th>")))
+                .andExpect(content().string(containsString("<th>픽업 상태</th>")))
                 .andExpect(content().string(containsString(
                         "class=\"badge badge--danger\">지연</span>"
                 )))
@@ -95,6 +95,10 @@ class DashboardAdminScreenRenderingTests {
                 .andExpect(content().string(containsString(
                         "href=\"/admin/fulfillment?status=UNDER_REVIEW\""
                 )))
+                .andExpect(content().string(containsString(
+                        "href=\"/admin/fulfillment?status=READY_FOR_PICKUP\""
+                )))
+                .andExpect(content().string(containsString("픽업 대기 주문 전체 보기")))
                 .andExpect(content().string(not(containsString(
                         "href=\"/admin/fulfillment?status=IN_PRODUCTION\""
                 ))))
