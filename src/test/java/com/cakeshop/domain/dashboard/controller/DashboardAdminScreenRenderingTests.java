@@ -8,6 +8,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.cakeshop.domain.dashboard.dto.view.DashboardView;
+import com.cakeshop.domain.dashboard.dto.view.PickupUrgency;
+import com.cakeshop.domain.dashboard.dto.view.TodayPickupScheduleView;
 import com.cakeshop.domain.dashboard.service.DashboardReadModelQueryService;
 import com.cakeshop.global.security.SecurityConfig;
 import java.math.BigDecimal;
@@ -45,7 +47,29 @@ class DashboardAdminScreenRenderingTests {
                         0,
                         0,
                         5,
-                        List.of(),
+                        List.of(
+                                new TodayPickupScheduleView(
+                                        1L,
+                                        LocalDateTime.of(2026, 8, 17, 11, 0),
+                                        "ORDER-1",
+                                        "지연 상품",
+                                        PickupUrgency.OVERDUE
+                                ),
+                                new TodayPickupScheduleView(
+                                        2L,
+                                        LocalDateTime.of(2026, 8, 17, 12, 30),
+                                        "ORDER-2",
+                                        "임박 상품",
+                                        PickupUrgency.IMMINENT
+                                ),
+                                new TodayPickupScheduleView(
+                                        3L,
+                                        LocalDateTime.of(2026, 8, 17, 14, 0),
+                                        "ORDER-3",
+                                        "예정 상품",
+                                        PickupUrgency.SCHEDULED
+                                )
+                        ),
                         List.of(),
                         List.of()
                 ));
@@ -58,9 +82,23 @@ class DashboardAdminScreenRenderingTests {
                 .andExpect(content().string(containsString("<strong>3건</strong>")))
                 .andExpect(content().string(containsString("<strong>4건</strong>")))
                 .andExpect(content().string(containsString("<strong>5건</strong>")))
+                .andExpect(content().string(containsString("<th>픽업 상태</th>")))
+                .andExpect(content().string(containsString(
+                        "class=\"badge badge--danger\">지연</span>"
+                )))
+                .andExpect(content().string(containsString(
+                        "class=\"badge badge--warning\">임박</span>"
+                )))
+                .andExpect(content().string(containsString(
+                        "class=\"badge badge--success\">예정</span>"
+                )))
                 .andExpect(content().string(containsString(
                         "href=\"/admin/fulfillment?status=UNDER_REVIEW\""
                 )))
+                .andExpect(content().string(containsString(
+                        "href=\"/admin/fulfillment?status=READY_FOR_PICKUP\""
+                )))
+                .andExpect(content().string(containsString("픽업 대기 주문 전체 보기")))
                 .andExpect(content().string(not(containsString(
                         "href=\"/admin/fulfillment?status=IN_PRODUCTION\""
                 ))))

@@ -51,6 +51,7 @@ public class DashboardReadModelQueryService {
                 dashboardReadModelMapper.findTodayPickupSchedules(
                         start,
                         end,
+                        queryReferenceAt,
                         DASHBOARD_LIST_LIMIT
                 );
         // 최근 주문
