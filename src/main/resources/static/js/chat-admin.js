@@ -261,14 +261,14 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         existingRoom.responseStatus = newStatus;
         if (msg.id) existingRoom.lastMessageId = msg.id;
-      }
 
-      if (typeof msg.unreadCount === "number") {
-        existingRoom.unreadCount = isCurrentActive ? 0 : msg.unreadCount;
-      } else if (!isCurrentActive && msg.senderType !== "ADMIN") {
-        existingRoom.unreadCount = (existingRoom.unreadCount || 0) + 1;
-      } else if (isCurrentActive || msg.senderType === "ADMIN") {
-        existingRoom.unreadCount = 0;
+        if (typeof msg.unreadCount === "number") {
+          existingRoom.unreadCount = isCurrentActive ? 0 : msg.unreadCount;
+        } else if (!isCurrentActive && msg.senderType !== "ADMIN") {
+          existingRoom.unreadCount = (existingRoom.unreadCount || 0) + 1;
+        } else if (isCurrentActive || msg.senderType === "ADMIN") {
+          existingRoom.unreadCount = 0;
+        }
       }
 
       const isNewMessageEvent = Boolean(msg.content || (msg.imageUrls && msg.imageUrls.length > 0) || msg.senderType === "CUSTOMER");
@@ -392,9 +392,17 @@ document.addEventListener("DOMContentLoaded", () => {
       moreBtn.className = "btn btn--outline btn--block btn--xs";
       moreBtn.style.cssText = "margin-top:8px; margin-bottom:12px;";
       moreBtn.textContent = "+ 이전 문의 더보기";
-      moreBtn.addEventListener("click", () => {
-        currentRoomPage++;
-        loadAdminRooms(currentRoomPage, true);
+      moreBtn.addEventListener("click", async () => {
+        if (moreBtn.disabled) return;
+        moreBtn.disabled = true;
+        moreBtn.textContent = "불러오는 중...";
+        try {
+          currentRoomPage++;
+          await loadAdminRooms(currentRoomPage, true);
+        } finally {
+          moreBtn.disabled = false;
+          moreBtn.textContent = "+ 이전 문의 더보기";
+        }
       });
       adminRoomListContainer.appendChild(moreBtn);
     }
