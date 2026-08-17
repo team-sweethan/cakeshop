@@ -235,8 +235,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const renderedIds = new Set();
+    let maxId = lastFetchedMessageId;
+
     if (messages && messages.length > 0) {
-      lastFetchedMessageId = Math.max(lastFetchedMessageId, messages[messages.length - 1].id || 0);
+      maxId = Math.max(maxId, messages[messages.length - 1].id || 0);
 
       messages.forEach((msg) => {
         if (msg.id) renderedIds.add(String(msg.id));
@@ -250,10 +252,14 @@ document.addEventListener("DOMContentLoaded", () => {
     // REST 스냅샷에 포함되지 않았던 실시간 메시지 및 배너 DOM 재첨부 (덮어쓰기 방지)
     existingMsgEls.forEach((el) => {
       const idStr = el.id.replace("banner-msg-", "").replace("msg-", "");
+      const parsed = parseInt(idStr, 10);
+      if (!isNaN(parsed)) maxId = Math.max(maxId, parsed);
       if (!renderedIds.has(idStr)) {
         chatMessagesContainer.appendChild(el);
       }
     });
+
+    lastFetchedMessageId = maxId;
 
     scrollToBottom();
   }

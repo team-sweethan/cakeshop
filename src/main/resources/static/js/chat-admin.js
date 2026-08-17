@@ -59,9 +59,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const ROOM_PAGE_SIZE = 100;
   let hasMoreRooms = false;
 
+  let adminRoomsFetchGen = 0;
+
   // 1. 관리자 전체 채팅방 목록 서버 필터 조회
   async function loadAdminRooms(page = 1, append = false) {
     const reqFilter = currentFilter;
+    const currentGen = ++adminRoomsFetchGen;
     if (!append) {
       currentRoomPage = 1;
     }
@@ -74,7 +77,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       const response = await fetch(queryUrl);
-      if (!response.ok || reqFilter !== currentFilter) {
+      if (!response.ok || reqFilter !== currentFilter || currentGen !== adminRoomsFetchGen) {
         if (!response.ok && adminRoomListContainer && !append) {
           adminRoomListContainer.innerHTML = `<div class="text-muted" style="font-size:12px; padding:10px;">채팅방 목록을 불러올 수 없습니다.</div>`;
           clearMainAndSidePanel();
@@ -83,7 +86,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       const newRooms = await response.json();
-      if (reqFilter !== currentFilter) return;
+      if (reqFilter !== currentFilter || currentGen !== adminRoomsFetchGen) return;
 
       hasMoreRooms = newRooms && newRooms.length >= ROOM_PAGE_SIZE;
 
@@ -178,6 +181,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // 관리자 좌측 목록 실시간 상단 정렬 및 갱신
   function handleAdminRoomUpdateRealtime(msg) {
     if (!msg || !msg.chatRoomId) return;
+    adminRoomsFetchGen++;
 
     const rId = msg.chatRoomId;
     const newStatus = msg.responseStatus ? msg.responseStatus : (msg.senderType === "ADMIN" ? "WAITING_CUSTOMER" : "WAITING_ADMIN");
@@ -572,8 +576,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const renderedIds = new Set();
+    let maxId = lastFetchedMessageId;
+
     if (messages && messages.length > 0) {
-      lastFetchedMessageId = messages[messages.length - 1].id || 0;
+      maxId = Math.max(maxId, messages[messages.length - 1].id || 0);
 
       messages.forEach((msg) => {
         if (msg.id) renderedIds.add(String(msg.id));
@@ -625,10 +631,14 @@ document.addEventListener("DOMContentLoaded", () => {
     // REST 스냅샷에 포함되지 않았던 실시간 메시지 및 배너 DOM 재첨부 (덮어쓰기 방지)
     existingMsgEls.forEach((el) => {
       const idStr = el.id.replace("admin-banner-msg-", "").replace("admin-msg-", "");
+      const parsed = parseInt(idStr, 10);
+      if (!isNaN(parsed)) maxId = Math.max(maxId, parsed);
       if (!renderedIds.has(idStr)) {
         adminChatMessagesContainer.appendChild(el);
       }
     });
+
+    lastFetchedMessageId = maxId;
 
     scrollToBottom();
   }
