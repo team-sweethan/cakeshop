@@ -94,6 +94,32 @@ public class ChatService {
         return room != null ? room.getId() : null;
     }
 
+    // 단일 채팅방의 권위 있는 ChatRoomListResponse DTO 조회 (관리자 알림 방송 계약)
+    @Transactional(readOnly = true)
+    public ChatRoomListResponse getAdminChatRoomResponse(Long roomId) {
+        if (roomId == null || roomId <= 0) return null;
+        List<ChatRoomListResponse> responses = getAdminChatRooms(null, 1, 500);
+        if (responses != null) {
+            for (ChatRoomListResponse res : responses) {
+                if (roomId.equals(res.getChatRoomId())) {
+                    return res;
+                }
+            }
+        }
+        ChatRoom room = chatMapper.findChatRoomById(roomId);
+        if (room == null) return null;
+        String customerName = memberChatQueryService.getCustomerName(room.getCustomerId());
+        return ChatRoomListResponse.builder()
+                .chatRoomId(room.getId())
+                .customerId(room.getCustomerId())
+                .customerName(customerName != null ? customerName : "고객")
+                .responseStatus(room.getResponseStatus())
+                .lastMessageContent("")
+                .lastMessageCreatedAt(room.getCreatedAt())
+                .unreadCount(0)
+                .build();
+    }
+
     // 1. 공통 & 고객용 기능 (Customer)
     // 없으면 방 만들고, 있으면 만들어져있는거 반환 (동시성 충돌 발생 시 기존 방 흡수)
     @Transactional

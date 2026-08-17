@@ -153,11 +153,25 @@ document.addEventListener("DOMContentLoaded", () => {
       lastFetchedMessageId = Math.max(lastFetchedMessageId, msg.id);
     }
 
-    // 상대방(관리자) 메시지 수신 시 즉시 읽음 커서 전송
+    // 상대방(관리자) 메시지 수신 시 탭이 활성화된(visible) 상태에서만 즉시 읽음 커서 전송
     if (msg.senderType !== "CUSTOMER" && msg.id) {
-      sendReadCursor(currentChatRoomId, msg.id);
+      if (document.visibilityState === "visible") {
+        sendReadCursor(currentChatRoomId, msg.id);
+      }
     }
   }
+
+  // 탭으로 돌아왔을 때(포커스 복귀 시) 읽지 않은 메시지 커서 일괄 갱신
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && currentChatRoomId && lastFetchedMessageId > 0) {
+      sendReadCursor(currentChatRoomId, lastFetchedMessageId);
+    }
+  });
+  window.addEventListener("focus", () => {
+    if (currentChatRoomId && lastFetchedMessageId > 0) {
+      sendReadCursor(currentChatRoomId, lastFetchedMessageId);
+    }
+  });
 
   // 상대방이 읽었을 때 내 메시지의 "미읽음" 텍스트를 "읽음"으로 실시간 변경 (lastReadMessageId 이하만 반영)
   function markAllMyMessagesRead(lastReadMessageId) {

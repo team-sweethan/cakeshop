@@ -228,12 +228,10 @@ public class ChatApiController {
         chatService.updateResponseStatus(chatRoomId, status, memberDetails.getMemberId(), true);
 
         try {
-            ChatRoomListResponse statusPayload = ChatRoomListResponse.builder()
-                    .chatRoomId(chatRoomId)
-                    .responseStatus(status)
-                    .lastMessageCreatedAt(java.time.LocalDateTime.now())
-                    .build();
-            messagingTemplate.convertAndSend("/topic/admin/rooms", statusPayload);
+            ChatRoomListResponse fullPayload = chatService.getAdminChatRoomResponse(chatRoomId);
+            if (fullPayload != null) {
+                messagingTemplate.convertAndSend("/topic/admin/rooms", fullPayload);
+            }
         } catch (Exception e) {
             // 실시간 방송 실패 시에도 REST 응답 성공 유지
         }
@@ -263,6 +261,13 @@ public class ChatApiController {
                         "lastReadMessageId", actualReadMessageId
                 );
                 messagingTemplate.convertAndSend("/topic/chat/" + chatRoomId + "/read", readPayload);
+
+                if (memberDetails.isAdmin()) {
+                    ChatRoomListResponse fullPayload = chatService.getAdminChatRoomResponse(chatRoomId);
+                    if (fullPayload != null) {
+                        messagingTemplate.convertAndSend("/topic/admin/rooms", fullPayload);
+                    }
+                }
             } catch (Exception e) {
                 // 실시간 방송 실패 시에도 REST 응답 성공 유지
             }

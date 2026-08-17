@@ -3,6 +3,7 @@ package com.cakeshop.domain.chat.controller;
 import com.cakeshop.domain.chat.dto.form.ChatMessageSendRequest;
 import com.cakeshop.domain.chat.dto.form.ChatRoomReadRequest;
 import com.cakeshop.domain.chat.dto.view.ChatMessageResponse;
+import com.cakeshop.domain.chat.dto.view.ChatRoomListResponse;
 import com.cakeshop.domain.chat.service.ChatService;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.error.CommonErrorCode;
@@ -92,5 +93,14 @@ public class ChatStompController {
                 "/topic/chat/" + request.getChatRoomId() + "/read",
                 readPayload
         );
+
+        if (memberDetails.isAdmin()) {
+            try {
+                ChatRoomListResponse fullPayload = chatService.getAdminChatRoomResponse(request.getChatRoomId());
+                if (fullPayload != null) {
+                    messagingTemplate.convertAndSend("/topic/admin/rooms", fullPayload);
+                }
+            } catch (Exception e) {}
+        }
     }
 }
