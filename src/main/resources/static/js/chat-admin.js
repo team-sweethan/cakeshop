@@ -121,13 +121,15 @@ document.addEventListener("DOMContentLoaded", () => {
           newRooms.forEach((r) => {
             const existing = roomMap.get(r.chatRoomId || r.id);
             if (existing) {
-              if (existing.lastMessageId && r.lastMessageId && existing.lastMessageId > r.lastMessageId) {
+              const isExistingNewer = (existing.lastMessageId && r.lastMessageId && existing.lastMessageId > r.lastMessageId) ||
+                (existing.lastMessageCreatedAt && r.lastMessageCreatedAt && new Date(existing.lastMessageCreatedAt) > new Date(r.lastMessageCreatedAt));
+
+              if (isExistingNewer) {
                 r.lastMessageId = existing.lastMessageId;
                 r.lastMessageCreatedAt = existing.lastMessageCreatedAt;
                 r.lastMessageContent = existing.lastMessageContent;
-              } else if (existing.lastMessageCreatedAt && r.lastMessageCreatedAt && new Date(existing.lastMessageCreatedAt) > new Date(r.lastMessageCreatedAt)) {
-                r.lastMessageCreatedAt = existing.lastMessageCreatedAt;
-                r.lastMessageContent = existing.lastMessageContent;
+                if (existing.responseStatus) r.responseStatus = existing.responseStatus;
+                if (typeof existing.unreadCount === "number") r.unreadCount = existing.unreadCount;
               }
             }
           });

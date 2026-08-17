@@ -47,7 +47,7 @@ public class SecurityConfig {
         HttpSessionRequestCache requestCache = new HttpSessionRequestCache();
         requestCache.setRequestMatcher(request -> {
             String path = request.getRequestURI().substring(request.getContextPath().length());
-            return !"/cart/count".equals(path) && !path.startsWith("/api/");
+            return !"/cart/count".equals(path) && !path.startsWith("/api/") && !"/ws".equals(path) && !path.startsWith("/ws/");
         });
         LoginUrlAuthenticationEntryPoint customerLoginEntryPoint =
                 new LoginUrlAuthenticationEntryPoint("/login");

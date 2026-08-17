@@ -29,6 +29,14 @@
           handleNotificationReceived(event);
         });
       }
+
+      // 2. 재연결 또는 최초 연결 성공 시 DB 미읽음 개수 및 화면 목록 상태 재동기화
+      if (typeof window.updateNotificationUnreadCount === "function") {
+        window.updateNotificationUnreadCount();
+      }
+      if (typeof window.loadNotifications === "function") {
+        window.loadNotifications();
+      }
     }, () => {
       // 연결 오류 시 5초 후 자동 재연결
       setTimeout(initNotificationWebSocket, 5000);
