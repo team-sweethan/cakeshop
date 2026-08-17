@@ -209,12 +209,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // 현재 탭 필터 조건 검증 (미답변 탭일 때 답변완료 방이면 제거, 완료 탭일 때 미답변 방이면 제거)
     if (currentFilter === "unread" && newStatus !== "WAITING_ADMIN") {
-      adminRoomsData = adminRoomsData.filter((r) => (r.chatRoomId || r.id) !== rId);
-      renderRoomList();
-      if (selectedChatRoomId === rId) {
-        clearMainAndSidePanel();
+      const existingIdx = adminRoomsData.findIndex((r) => (r.chatRoomId || r.id) === rId);
+      if (existingIdx !== -1) {
+        adminRoomsData.splice(existingIdx, 1);
+        renderRoomList();
+        if (selectedChatRoomId === rId) {
+          clearMainAndSidePanel();
+        }
+        adjustUnreadTabBadge(-1);
       }
-      adjustUnreadTabBadge(-1);
       return;
     }
     if (currentFilter === "done" && newStatus !== "RESOLVED") {
@@ -264,8 +267,8 @@ document.addEventListener("DOMContentLoaded", () => {
         customerId: resolvedCustomerId,
         customerName: resolvedCustomerName,
         responseStatus: newStatus,
-        lastMessageContent: msg.content || (msg.imageUrls && msg.imageUrls.length > 0 ? "(사진)" : ""),
-        lastMessageCreatedAt: msg.createdAt,
+        lastMessageContent: msg.lastMessageContent || msg.content || (msg.imageUrls && msg.imageUrls.length > 0 ? "(사진)" : ""),
+        lastMessageCreatedAt: msg.lastMessageCreatedAt || msg.createdAt,
         unreadCount: initialUnreadCount
       };
       adminRoomsData = [newRoom, ...adminRoomsData];
