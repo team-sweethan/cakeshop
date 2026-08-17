@@ -68,7 +68,11 @@ class PaymentFacadeTests {
         paymentFacade = new PaymentFacade(
                 orderPaymentQueryService,
                 paymentService,
-                new PaymentCompensationProcessor(paymentRecoveryService, tossPaymentClient),
+                new PaymentCompensationProcessor(
+                        paymentRecoveryService,
+                        tossPaymentClient,
+                        new TossPaymentApprovalResolver(tossPaymentClient)
+                ),
                 new TossPaymentApprovalResolver(tossPaymentClient),
                 CLOCK
         );
@@ -553,7 +557,11 @@ class PaymentFacadeTests {
         paymentFacade = new PaymentFacade(
                 orderPaymentQueryService,
                 paymentService,
-                new PaymentCompensationProcessor(paymentRecoveryService, tossPaymentClient),
+                new PaymentCompensationProcessor(
+                        paymentRecoveryService,
+                        tossPaymentClient,
+                        new TossPaymentApprovalResolver(tossPaymentClient)
+                ),
                 new TossPaymentApprovalResolver(tossPaymentClient),
                 clock
         );
@@ -830,105 +838,6 @@ class PaymentFacadeTests {
                 "ORD-100",
                 30_000L,
                 "PAY-1"
-        );
-    }
-
-    @Test
-    void recoverPendingCompensations_persistedRequest_retriesSameCancelKey() {
-        CompensationRequest request = compensationRequest();
-        CancellationResult cancellation = cancellation();
-        when(paymentRecoveryService.getPreparedCompensations(50))
-                .thenReturn(List.of(request));
-        when(tossPaymentClient.find(request.paymentKey())).thenReturn(Optional.of(
-                new PaymentLookupResult(
-                        request.paymentKey(),
-                        "ORD-100",
-                        "카드",
-                        "DONE",
-                        30_000L,
-                        NOW,
-                        null
-                )
-        ));
-        when(tossPaymentClient.cancel(
-                request.paymentKey(),
-                request.reason(),
-                request.idempotencyKey()
-        )).thenReturn(cancellation);
-
-        paymentFacade.recoverPendingCompensations(50);
-
-        verify(paymentRecoveryService).completeCompensation(request, cancellation);
-    }
-
-    @Test
-    void recoverPendingCompensations_unapprovedRequest_releasesCompensation() {
-        CompensationRequest request = compensationRequest();
-        when(paymentRecoveryService.getPreparedCompensations(50))
-                .thenReturn(List.of(request));
-        when(tossPaymentClient.find(request.paymentKey())).thenReturn(Optional.empty());
-
-        paymentFacade.recoverPendingCompensations(50);
-
-        verify(paymentRecoveryService).releaseUnapprovedCompensation(request);
-        verify(tossPaymentClient, never()).cancel(
-                request.paymentKey(),
-                request.reason(),
-                request.idempotencyKey()
-        );
-    }
-
-    @Test
-    void recoverPendingCompensations_expiredRequest_releasesCompensation() {
-        CompensationRequest request = compensationRequest();
-        when(paymentRecoveryService.getPreparedCompensations(50))
-                .thenReturn(List.of(request));
-        when(tossPaymentClient.find(request.paymentKey())).thenReturn(Optional.of(
-                new PaymentLookupResult(
-                        request.paymentKey(),
-                        "ORD-100",
-                        null,
-                        "EXPIRED",
-                        30_000L,
-                        null,
-                        null
-                )
-        ));
-
-        paymentFacade.recoverPendingCompensations(50);
-
-        verify(paymentRecoveryService).releaseUnapprovedCompensation(request);
-        verify(tossPaymentClient, never()).cancel(
-                request.paymentKey(),
-                request.reason(),
-                request.idempotencyKey()
-        );
-    }
-
-    @Test
-    void recoverPendingCompensations_inProgressRequest_keepsCompensation() {
-        CompensationRequest request = compensationRequest();
-        when(paymentRecoveryService.getPreparedCompensations(50))
-                .thenReturn(List.of(request));
-        when(tossPaymentClient.find(request.paymentKey())).thenReturn(Optional.of(
-                new PaymentLookupResult(
-                        request.paymentKey(),
-                        "ORD-100",
-                        "카드",
-                        "IN_PROGRESS",
-                        30_000L,
-                        null,
-                        null
-                )
-        ));
-
-        paymentFacade.recoverPendingCompensations(50);
-
-        verify(paymentRecoveryService, never()).releaseUnapprovedCompensation(request);
-        verify(tossPaymentClient, never()).cancel(
-                request.paymentKey(),
-                request.reason(),
-                request.idempotencyKey()
         );
     }
 

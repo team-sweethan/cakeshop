@@ -8,18 +8,18 @@ import org.mockito.Mockito;
 class PaymentRecoverySchedulerTests {
 
     @Test
-    void recoverPendingCompensations_configuredBatchSize_delegatesToFacades() {
-        PaymentFacade paymentFacade = Mockito.mock(PaymentFacade.class);
+    void recoverPendingCompensations_configuredBatchSize_delegatesToRecoveryProcessors() {
+        PaymentCompensationProcessor compensationProcessor = Mockito.mock(PaymentCompensationProcessor.class);
         RefundFacade refundFacade = Mockito.mock(RefundFacade.class);
         PaymentRecoveryScheduler scheduler = new PaymentRecoveryScheduler(
-                paymentFacade,
+                compensationProcessor,
                 refundFacade,
                 25
         );
 
         scheduler.recoverPendingCompensations();
 
-        verify(paymentFacade).recoverPendingCompensations(25);
+        verify(compensationProcessor).recoverPendingCompensations(25);
         verify(refundFacade).recoverPendingCancellations(25);
     }
 }

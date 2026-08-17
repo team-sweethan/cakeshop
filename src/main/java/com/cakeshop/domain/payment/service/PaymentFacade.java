@@ -6,26 +6,20 @@ import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentExecuti
 import com.cakeshop.domain.payment.dto.form.PaymentConfirmForm;
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.error.PaymentErrorCode;
-import com.cakeshop.domain.payment.service.PaymentRecoveryService.CompensationRequest;
 import com.cakeshop.domain.payment.service.TossPaymentApprovalResolver.ApprovalResolution;
 import com.cakeshop.domain.payment.service.TossPaymentApprovalResolver.ApprovalState;
 import com.cakeshop.global.error.BusinessException;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
-import java.util.Optional;
 
-/** Toss 결제 confirm과 보상 복구의 실행 순서를 조정한다. */
+/** Toss 결제 confirm의 실행 순서를 조정한다. */
 @Service
 @RequiredArgsConstructor
 public class PaymentFacade {
-
-    private static final Logger log = LoggerFactory.getLogger(PaymentFacade.class);
 
     private final OrderPaymentQueryService orderPaymentQueryService;
     private final PaymentService paymentService;
@@ -36,10 +30,7 @@ public class PaymentFacade {
     /** 일반·수제 주문의 Toss 결제를 승인하고 내부 상태를 완료한다. */
     public void confirmPayment(long memberId, long orderId, PaymentConfirmForm form) {
         PaymentOrder ownedOrder = orderPaymentQueryService.getMemberPaymentOrder(memberId, orderId);
-        Payment completedPayment = paymentService.findDonePayment(orderId).orElse(null);
-        if (completedPayment != null) {
-            validateCompletedRequest(ownedOrder, completedPayment, form);
-            validateCompletedProviderState(completedPayment, form);
+        if (isAlreadyCompleted(ownedOrder, orderId, form)) {
             return;
         }
 
@@ -51,12 +42,35 @@ public class PaymentFacade {
         validateRequest(order, payment, form);
         ResolvedApproval resolved = resolvePreparedOrNewApproval(payment, form, orderId);
 
+        completeOrCompensate(ownedOrder, order, resolved, form);
+    }
+
+    private boolean isAlreadyCompleted(
+            PaymentOrder order,
+            long orderId,
+            PaymentConfirmForm form
+    ) {
+        Payment completedPayment = paymentService.findDonePayment(orderId).orElse(null);
+        if (completedPayment == null) {
+            return false;
+        }
+        validateCompletedRequest(order, completedPayment, form);
+        validateCompletedProviderState(completedPayment, form);
+        return true;
+    }
+
+    private void completeOrCompensate(
+            PaymentOrder ownedOrder,
+            PaymentExecutionOrder order,
+            ResolvedApproval resolved,
+            PaymentConfirmForm form
+    ) {
         try {
             // Toss 승인 응답을 받은 뒤에도 내부 완료 직전에 만료 경계를 다시 확인한다.
             validatePaymentExpiration(order.paymentExpiresAt());
             paymentService.completePayment(order, resolved.payment(), resolved.approval().approval());
         } catch (RuntimeException exception) {
-            Payment concurrentlyCompleted = findConcurrentlyCompleted(orderId);
+            Payment concurrentlyCompleted = findConcurrentlyCompleted(order.orderId());
             if (concurrentlyCompleted == null) {
                 throw compensationProcessor.compensateApproved(resolved.payment(), form.getPaymentKey());
             }
@@ -85,68 +99,67 @@ public class PaymentFacade {
         paymentService.completeZeroAmountGeneralPayment(order, payment, LocalDateTime.now(clock));
     }
 
-    /** 영속화된 미완료 보상 취소를 같은 멱등키로 다시 처리한다. */
-    public void recoverPendingCompensations(int batchSize) {
-        for (CompensationRequest request : compensationProcessor.getPreparedCompensations(batchSize)) {
-            try {
-                ApprovalResolution approvalState = approvalResolver.resolveCompensationState(request);
-                if (approvalState.state() == ApprovalState.NOT_APPROVED) {
-                    compensationProcessor.releaseUnapproved(request);
-                    continue;
-                }
-                if (approvalState.state() == ApprovalState.IN_PROGRESS) {
-                    continue;
-                }
-                compensationProcessor.completePrepared(request);
-            } catch (RuntimeException recoveryFailure) {
-                log.warn("Pending payment compensation could not be completed.");
-            }
-        }
-    }
-
     private ResolvedApproval resolvePreparedOrNewApproval(
             Payment payment,
             PaymentConfirmForm form,
             long orderId
     ) {
-        Optional<CompensationRequest> prepared = compensationProcessor.findPrepared(payment);
-        if (prepared.isPresent()) {
-            ApprovalResolution recoveryState = approvalResolver.resolveCompensationState(prepared.get());
-            if (recoveryState.state() == ApprovalState.NOT_APPROVED) {
-                compensationProcessor.releaseUnapproved(prepared.get());
-                payment = paymentService.getReadyPayment(orderId);
-            } else if (recoveryState.state() == ApprovalState.IN_PROGRESS) {
-                throw new BusinessException(PaymentErrorCode.PAYMENT_RECOVERY_PENDING);
-            } else if (recoveryState.state() == ApprovalState.DONE
-                    && prepared.get().paymentKey().equals(form.getPaymentKey())) {
-                return new ResolvedApproval(
-                        payment,
-                        requireApproved(approvalResolver.resolveCurrent(payment, form))
-                );
-            } else if (recoveryState.state() == ApprovalState.CANCELED) {
-                throw compensationProcessor.reconcileCanceled(payment, recoveryState.lookup());
-            } else {
-                throw compensationProcessor.cancelPrepared(prepared.get());
+        return compensationProcessor.findPrepared(payment)
+                .map(prepared -> resolvePreparedApproval(payment, prepared, form, orderId))
+                .orElseGet(() -> resolveCurrentOrApprove(payment, form));
+    }
+
+    private ResolvedApproval resolvePreparedApproval(
+            Payment payment,
+            PaymentRecoveryService.CompensationRequest prepared,
+            PaymentConfirmForm form,
+            long orderId
+    ) {
+        ApprovalResolution recoveryState = approvalResolver.resolveCompensationState(prepared);
+        return switch (recoveryState.state()) {
+            case NOT_APPROVED -> {
+                compensationProcessor.releaseUnapproved(prepared);
+                yield resolveCurrentOrApprove(paymentService.getReadyPayment(orderId), form);
             }
-        }
+            case IN_PROGRESS -> throw new BusinessException(PaymentErrorCode.PAYMENT_RECOVERY_PENDING);
+            case DONE -> resolvePreparedDonePayment(payment, prepared, form);
+            case CANCELED -> throw compensationProcessor.reconcileCanceled(payment, recoveryState.lookup());
+            case FINAL_OR_UNKNOWN -> throw compensationProcessor.cancelPrepared(prepared);
+        };
+    }
 
+    private ResolvedApproval resolvePreparedDonePayment(
+            Payment payment,
+            PaymentRecoveryService.CompensationRequest prepared,
+            PaymentConfirmForm form
+    ) {
+        if (!prepared.paymentKey().equals(form.getPaymentKey())) {
+            throw compensationProcessor.cancelPrepared(prepared);
+        }
+        return new ResolvedApproval(
+                payment,
+                requireApproved(approvalResolver.resolveCurrent(payment, form))
+        );
+    }
+
+    private ResolvedApproval resolveCurrentOrApprove(Payment payment, PaymentConfirmForm form) {
         ApprovalResolution current = approvalResolver.resolveCurrent(payment, form);
-        if (current.state() == ApprovalState.DONE) {
-            return new ResolvedApproval(payment, requireApproved(current));
-        }
-        if (current.state() == ApprovalState.CANCELED) {
-            throw compensationProcessor.reconcileCanceled(payment, current.lookup());
-        }
+        return switch (current.state()) {
+            case DONE -> new ResolvedApproval(payment, requireApproved(current));
+            case CANCELED -> throw compensationProcessor.reconcileCanceled(payment, current.lookup());
+            case NOT_APPROVED, IN_PROGRESS, FINAL_OR_UNKNOWN -> approvePayment(payment, form);
+        };
+    }
 
+    private ResolvedApproval approvePayment(Payment payment, PaymentConfirmForm form) {
         compensationProcessor.prepareBeforeApproval(payment, form.getPaymentKey());
         ApprovalResolution approved = approvalResolver.approve(payment, form);
-        if (approved.state() == ApprovalState.DONE) {
-            return new ResolvedApproval(payment, requireApproved(approved));
-        }
-        if (approved.state() == ApprovalState.CANCELED) {
-            throw compensationProcessor.reconcileCanceled(payment, approved.lookup());
-        }
-        throw new BusinessException(PaymentErrorCode.PAYMENT_RECOVERY_PENDING);
+        return switch (approved.state()) {
+            case DONE -> new ResolvedApproval(payment, requireApproved(approved));
+            case CANCELED -> throw compensationProcessor.reconcileCanceled(payment, approved.lookup());
+            case NOT_APPROVED, IN_PROGRESS, FINAL_OR_UNKNOWN ->
+                    throw new BusinessException(PaymentErrorCode.PAYMENT_RECOVERY_PENDING);
+        };
     }
 
     private ApprovalResolution requireApproved(ApprovalResolution resolution) {
