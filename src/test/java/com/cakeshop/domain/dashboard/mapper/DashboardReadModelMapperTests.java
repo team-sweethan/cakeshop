@@ -398,8 +398,6 @@ class DashboardReadModelMapperTests {
                 .extracting(TodayPickupScheduleView::orderId)
                 .containsExactly(nine, tenFirst, tenSecond, eleven, twelve);
         assertThat(schedules.getFirst().productName()).isEqualTo("딸기 케이크 외 1개");
-        assertThat(schedules.getFirst().status()).isEqualTo(OrderStatus.READY_FOR_PICKUP);
-        assertThat(schedules.getFirst().statusLabel()).isEqualTo("픽업 준비");
         assertThat(schedules)
                 .extracting(TodayPickupScheduleView::urgency)
                 .containsExactly(

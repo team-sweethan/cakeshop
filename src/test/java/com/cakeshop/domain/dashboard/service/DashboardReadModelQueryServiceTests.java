@@ -51,7 +51,6 @@ class DashboardReadModelQueryServiceTests {
                 start.plusHours(11),
                 "ORDER-10",
                 "딸기 케이크",
-                OrderStatus.READY_FOR_PICKUP,
                 PickupUrgency.SCHEDULED
         );
         when(dashboardReadModelMapper.countTodayPickups(start, end)).thenReturn(4L);
