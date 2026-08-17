@@ -116,6 +116,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     }, (err) => {
       console.error("웹소켓 연결 실시간 에러:", err);
+      // 지연 재연결 (5초 후 자동 재연결 시도)
+      setTimeout(() => {
+        if (currentChatRoomId) {
+          connectWebSocket(currentChatRoomId);
+        }
+      }, 5000);
     });
   }
 

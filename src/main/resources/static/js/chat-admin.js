@@ -208,6 +208,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     renderRoomList();
+    const unreadCountTotal = adminRoomsData.filter((r) => r.responseStatus === "WAITING_ADMIN").length;
+    updateUnreadTabBadge(unreadCountTotal);
   }
 
   // 메인 및 사이드 패널 초기화
@@ -648,6 +650,20 @@ document.addEventListener("DOMContentLoaded", () => {
             <a class="btn btn--outline btn--block btn--xs" href="/admin/orders/${ord.orderId}" style="margin-top:8px;">주문 상세서 보기</a>
           `;
 
+          if (ord.conversationAnchorMessageId) {
+            cardDiv.style.cursor = "pointer";
+            cardDiv.addEventListener("click", (e) => {
+              if (e.target.closest("a")) return;
+              const anchorEl = document.getElementById(`admin-msg-${ord.conversationAnchorMessageId}`);
+              if (anchorEl) {
+                anchorEl.scrollIntoView({ behavior: "smooth", block: "center" });
+                anchorEl.style.transition = "background-color 0.5s";
+                anchorEl.style.backgroundColor = "#fff9c4";
+                setTimeout(() => { anchorEl.style.backgroundColor = ""; }, 2000);
+              }
+            });
+          }
+
           infoPanel.appendChild(cardDiv);
         });
       }
@@ -673,6 +689,10 @@ document.addEventListener("DOMContentLoaded", () => {
       e.preventDefault();
       if (!selectedChatRoomId) {
         alert("선택된 대화방이 없습니다.");
+        return;
+      }
+      if (isAdminUploadingAttachment) {
+        alert("이미지 업로드가 진행 중입니다. 업로드 완료 후 다시 시도해 주세요.");
         return;
       }
 

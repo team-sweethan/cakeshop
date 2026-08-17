@@ -583,6 +583,8 @@ public class ChatService {
                 ? productChatQueryService.getProductNamesMap(productIds)
                 : Collections.emptyMap();
 
+        String customerName = memberChatQueryService.getCustomerName(chatRoom.getCustomerId());
+
         return messages.stream().map(msg -> {
             List<ChatMessageAttachment> attachments = attachmentMap.getOrDefault(msg.getId(), Collections.emptyList());
             
@@ -608,8 +610,6 @@ public class ChatService {
             String productName = (msg.getProductId() != null)
                     ? productNameMap.get(msg.getProductId())
                     : null;
-
-            String customerName = memberChatQueryService.getCustomerName(chatRoom.getCustomerId());
 
             return ChatMessageResponse.builder()
                     .id(msg.getId())
