@@ -142,7 +142,7 @@ document.addEventListener("DOMContentLoaded", () => {
     stompClient = Stomp.over(socket);
     stompClient.debug = null;
 
-    stompClient.connect({}, () => {
+    stompClient.connect({}, async () => {
       isConnectingAdminWebSocket = false;
 
       // 관리자 대시보드 실시간 토픽 구독 (/topic/admin/rooms)
@@ -155,12 +155,12 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       });
 
-      // 연결/재연결 완료 시 대시보드 대화방 목록 및 활성 대화 스냅샷 다시 동기화!
-      loadAdminRooms();
+      // 연결/재연결 완료 시 대시보드 대화방 목록 및 활성 대화 스냅샷 다시 동기화 후 최신 읽음 커서 전송!
+      await loadAdminRooms();
       if (selectedChatRoomId) {
         subscribeActiveRoomWebSocket(selectedChatRoomId);
-        loadAdminMessages(selectedChatRoomId);
-        loadAdminSidePanel(selectedChatRoomId);
+        await loadAdminMessages(selectedChatRoomId);
+        await loadAdminSidePanel(selectedChatRoomId);
         if (lastFetchedMessageId > 0) {
           markRead(selectedChatRoomId, lastFetchedMessageId);
         }

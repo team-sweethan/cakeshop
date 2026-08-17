@@ -77,7 +77,7 @@ document.addEventListener("DOMContentLoaded", () => {
       stompClient = Stomp.over(socket);
       stompClient.debug = null; // 디버그 콘솔 로그 숨김
 
-      stompClient.connect({}, () => {
+      stompClient.connect({}, async () => {
         // A. 대화 메시지 실시간 수신 구독 (/topic/chat/{roomId})
         stompClient.subscribe(`/topic/chat/${roomId}`, (message) => {
           try {
@@ -110,9 +110,9 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         });
 
-        // D. 웹소켓 연결/재연결 완료 시 단절 구간 오프라인 메시지 및 커서 재동기화!
+        // D. 웹소켓 연결/재연결 완료 시 단절 구간 오프라인 메시지 재조회 완료 후 최신 읽음 커서 전파!
+        await loadMessages(roomId);
         if (lastFetchedMessageId > 0) {
-          loadMessages(roomId);
           sendReadCursor(roomId, lastFetchedMessageId);
         }
 
@@ -160,7 +160,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // 상대방이 읽었을 때 내 메시지의 "미읽음" 텍스트를 "읽음"으로 실시간 변경 (lastReadMessageId 이하만 반영)
   function markAllMyMessagesRead(lastReadMessageId) {
-    const myMessages = document.querySelectorAll("#chatMessagesContainer .chat-msg--me");
+    if (!chatMessagesContainer) return;
+    const myMessages = chatMessagesContainer.querySelectorAll(".chat-msg--me");
     myMessages.forEach((msgEl) => {
       const msgIdAttr = msgEl.getAttribute("id");
       if (msgIdAttr && msgIdAttr.startsWith("msg-")) {
