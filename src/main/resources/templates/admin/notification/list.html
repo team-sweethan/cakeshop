@@ -116,7 +116,14 @@
               `;
             });
 
+            const existingRealtimeNodes = Array.from(container.querySelectorAll(".admin-noti-row[data-id]"));
+            const dataIds = new Set(data.map(item => String(item.id)));
+            const realtimeOnlyNodes = existingRealtimeNodes.filter(node => !dataIds.has(node.getAttribute("data-id")));
+
             container.innerHTML = html;
+            realtimeOnlyNodes.reverse().forEach(node => {
+              container.insertBefore(node, container.firstChild);
+            });
             attachRowEvents();
           })
           .catch(error => {

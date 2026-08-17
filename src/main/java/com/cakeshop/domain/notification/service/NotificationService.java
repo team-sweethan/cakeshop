@@ -21,6 +21,8 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import com.cakeshop.domain.member.service.MemberNotificationQueryService;
+
 @Service
 @RequiredArgsConstructor
 public class NotificationService {
@@ -29,6 +31,7 @@ public class NotificationService {
     private final SolapiKakaoAlimtalkClient solapiKakaoAlimtalkClient;
     private final NotificationDeliveryService notificationDeliveryService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final MemberNotificationQueryService memberNotificationQueryService;
 
     // 알림 생성
     @Transactional
@@ -252,7 +255,7 @@ public class NotificationService {
 
     private void executeWebSocketSending(Long receiverId, NotificationResponse responseDTO) {
         try {
-            if (receiverId != null && notificationMapper.isReceiverActive(receiverId)) {
+            if (receiverId != null && memberNotificationQueryService.isMemberActive(receiverId)) {
                 messagingTemplate.convertAndSend("/topic/notifications/" + receiverId, responseDTO);
             }
         } catch (Exception e) {

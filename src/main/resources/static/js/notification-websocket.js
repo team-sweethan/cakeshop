@@ -69,13 +69,22 @@
 
       let existingArticle = notification.id ? customerContainer.querySelector(`article[data-id="${notification.id}"]`) : null;
       if (existingArticle) {
-        // 기존 묶음 알림 DOM 요소 내용 갱신 및 최상단 이동
+        // 기존 묶음 알림 DOM 요소 내용 갱신, 미읽음 클래스/dot 복원 및 최상단 이동
+        existingArticle.className = "notification-item is-unread";
+        const clusterEl = existingArticle.querySelector(".cluster");
+        if (clusterEl && !clusterEl.querySelector(".notification-dot")) {
+          const dot = document.createElement("span");
+          dot.className = "notification-dot";
+          dot.setAttribute("aria-hidden", "true");
+          clusterEl.insertBefore(dot, clusterEl.firstChild);
+        }
         const titleSpan = existingArticle.querySelector(".badge");
         const contentP = existingArticle.querySelector("p");
         const timeEl = existingArticle.querySelector("time");
         if (titleSpan) titleSpan.textContent = notification.title || "알림";
         if (contentP) contentP.textContent = notification.content || "";
         if (timeEl) timeEl.textContent = "방금 전";
+        attachCustomerItemEvents(existingArticle, notification);
         customerContainer.insertBefore(existingArticle, customerContainer.firstChild);
       } else {
         const detailBtn = notification.targetUrl
@@ -117,14 +126,18 @@
 
       let existingRow = notification.id ? adminContainer.querySelector(`tr[data-id="${notification.id}"]`) : null;
       if (existingRow) {
-        // 기존 묶음 알림 TR 요소 내용 갱신 및 최상단 이동
+        // 기존 묶음 알림 TR 요소 내용 갱신, 미읽음 클래스/스타일/뱃지 복원 및 최상단 이동
+        existingRow.className = "admin-noti-row is-unread";
+        existingRow.style.cssText = "font-weight: 600; background-color: rgba(255, 243, 205, 0.2);";
         const cells = existingRow.querySelectorAll("td");
-        if (cells.length >= 3) {
+        if (cells.length >= 4) {
           cells[0].textContent = "방금 전";
           const titleBadge = cells[1].querySelector(".badge");
           if (titleBadge) titleBadge.textContent = notification.title || "알림";
           cells[2].textContent = notification.content || "";
+          cells[3].innerHTML = '<span class="badge badge--info">미읽음</span>';
         }
+        attachAdminRowEvents(existingRow, notification);
         adminContainer.insertBefore(existingRow, adminContainer.firstChild);
       } else {
         const detailBtn = notification.targetUrl

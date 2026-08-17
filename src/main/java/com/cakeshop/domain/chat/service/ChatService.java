@@ -133,6 +133,7 @@ public class ChatService {
                 .responseStatus(room.getResponseStatus())
                 .lastMessageContent(previewContent)
                 .lastMessageCreatedAt(lastMessage != null ? lastMessage.getCreatedAt() : room.getCreatedAt())
+                .lastMessageId(lastMessage != null ? lastMessage.getId() : null)
                 .unreadCount(unreadCount)
                 .build();
     }

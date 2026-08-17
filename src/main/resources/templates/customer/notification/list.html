@@ -93,8 +93,14 @@
               `;
             });
 
-            // 조립된 HTML을 컨테이너 상자에 주입
+            const existingRealtimeNodes = Array.from(container.querySelectorAll("article.notification-item[data-id]"));
+            const dataIds = new Set(data.map(item => String(item.id)));
+            const realtimeOnlyNodes = existingRealtimeNodes.filter(node => !dataIds.has(node.getAttribute("data-id")));
+
             container.innerHTML = html;
+            realtimeOnlyNodes.reverse().forEach(node => {
+              container.insertBefore(node, container.firstChild);
+            });
 
             // 개별 알림 항목 클릭 이벤트 추가 (클릭 시 읽음 처리)
             attachItemClickEvents();
