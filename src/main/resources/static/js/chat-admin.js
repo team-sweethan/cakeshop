@@ -69,6 +69,14 @@ document.addEventListener("DOMContentLoaded", () => {
   let hasMoreRooms = false;
 
   let adminRoomsFetchGen = 0;
+  const removedRoomIds = new Set();
+  let isMemoDirty = false;
+
+  document.addEventListener("input", (e) => {
+    if (e.target && e.target.id === "adminCustomerNote") {
+      isMemoDirty = true;
+    }
+  });
 
   // 1. 관리자 전체 채팅방 목록 서버 필터 조회
   async function loadAdminRooms(page = 1, append = false, isReconnect = false) {
@@ -76,6 +84,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const currentGen = ++adminRoomsFetchGen;
     if (!append) {
       currentRoomPage = 1;
+      removedRoomIds.clear();
     }
     try {
       let queryUrl = `/api/admin/chat/rooms?page=${page}&size=${ROOM_PAGE_SIZE}`;
@@ -94,8 +103,12 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      const newRooms = await response.json();
+      let newRooms = await response.json();
       if (reqFilter !== currentFilter || currentGen !== adminRoomsFetchGen) return;
+
+      if (reqFilter !== "all" && removedRoomIds.size > 0) {
+        newRooms = newRooms.filter((r) => !removedRoomIds.has(r.chatRoomId || r.id));
+      }
 
       hasMoreRooms = newRooms && newRooms.length >= ROOM_PAGE_SIZE;
 
@@ -209,6 +222,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // 현재 탭 필터 조건 검증 (미답변 탭일 때 답변완료 방이면 제거, 완료 탭일 때 미답변 방이면 제거)
     if (currentFilter === "unread" && newStatus !== "WAITING_ADMIN") {
+      removedRoomIds.add(rId);
       const existingIdx = adminRoomsData.findIndex((r) => (r.chatRoomId || r.id) === rId);
       if (existingIdx !== -1) {
         adminRoomsData.splice(existingIdx, 1);
@@ -221,12 +235,16 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
     if (currentFilter === "done" && newStatus !== "RESOLVED") {
-      adminRoomsData = adminRoomsData.filter((r) => (r.chatRoomId || r.id) !== rId);
-      renderRoomList();
-      if (selectedChatRoomId === rId) {
-        clearMainAndSidePanel();
+      removedRoomIds.add(rId);
+      const existingIdx = adminRoomsData.findIndex((r) => (r.chatRoomId || r.id) === rId);
+      if (existingIdx !== -1) {
+        adminRoomsData.splice(existingIdx, 1);
+        renderRoomList();
+        if (selectedChatRoomId === rId) {
+          clearMainAndSidePanel();
+        }
       }
-      if (newStatus === "WAITING_ADMIN") {
+      if (newStatus === "WAITING_ADMIN" && (!existingRoom || existingRoom.responseStatus !== "WAITING_ADMIN")) {
         adjustUnreadTabBadge(1);
       }
       return;
@@ -744,16 +762,6 @@ document.addEventListener("DOMContentLoaded", () => {
   async function loadAdminSidePanel(roomId) {
     const currentGen = ++sidePanelFetchGen;
     const inputMemo = document.getElementById("adminCustomerNote");
-    const isMemoFocused = inputMemo && (document.activeElement === inputMemo || (inputMemo.value && inputMemo.value.trim().length > 0));
-
-    const infoPanel = document.querySelector(".admin-chat-info-panel");
-    if (infoPanel) {
-      const existingCards = infoPanel.querySelectorAll(".admin-order-item");
-      existingCards.forEach((card) => card.remove());
-    }
-    if (inputMemo && !isMemoFocused) {
-      inputMemo.value = "";
-    }
 
     try {
       const response = await fetch(`/api/admin/chat/rooms/${roomId}/side-panel`);
@@ -761,7 +769,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = await response.json();
       if (selectedChatRoomId !== roomId || currentGen !== sidePanelFetchGen) return;
 
-      if (inputMemo && !isMemoFocused) {
+      if (inputMemo && !isMemoDirty) {
         inputMemo.value = data.note ? (data.note.content || "") : "";
       }
 
