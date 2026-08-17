@@ -1,10 +1,11 @@
 package com.cakeshop.domain.member.controller;
 
-import com.cakeshop.domain.member.dto.form.EmailVerificationConfirmRequest;
-import com.cakeshop.domain.member.dto.form.EmailVerificationRequest;
+import com.cakeshop.domain.member.dto.form.EmailVerificationConfirmForm;
+import com.cakeshop.domain.member.dto.form.EmailVerificationRequestForm;
 import com.cakeshop.domain.member.dto.view.EmailVerificationResponse;
 import com.cakeshop.domain.member.dto.view.SignupEmailVerification;
 import com.cakeshop.domain.member.dto.view.PasswordResetEmailVerification;
+import com.cakeshop.domain.member.error.EmailVerificationSendException;
 import com.cakeshop.domain.member.service.EmailVerificationService;
 import com.cakeshop.domain.member.service.PasswordResetEmailDispatchService;
 import jakarta.validation.Valid;
@@ -26,18 +27,25 @@ public class EmailVerificationController {
     // 회원가입 이메일 인증번호 발송
     @PostMapping("/email-verifications/signup/send")
     public EmailVerificationResponse sendSignupCode(
-            @Valid @RequestBody EmailVerificationRequest request) {
-        emailVerificationService.sendSignupCode(request.email());
+            @Valid @RequestBody EmailVerificationRequestForm form,
+            HttpSession session) {
+        try {
+            emailVerificationService.sendSignupCode(form.getEmail());
+        } catch (EmailVerificationSendException exception) {
+            session.removeAttribute(SIGNUP_VERIFIED_EMAIL_SESSION_KEY);
+            throw exception;
+        }
+        session.removeAttribute(SIGNUP_VERIFIED_EMAIL_SESSION_KEY);
         return EmailVerificationResponse.success("인증번호를 발송했습니다.");
     }
 
     // 회원가입 이메일 인증번호 확인
     @PostMapping("/email-verifications/signup/verify")
     public EmailVerificationResponse verifySignupCode(
-            @Valid @RequestBody EmailVerificationConfirmRequest request,
+            @Valid @RequestBody EmailVerificationConfirmForm form,
             HttpSession session) {
         SignupEmailVerification verification =
-                emailVerificationService.verifySignupCode(request.email(), request.code());
+                emailVerificationService.verifySignupCode(form.getEmail(), form.getCode());
         session.setAttribute(SIGNUP_VERIFIED_EMAIL_SESSION_KEY, verification);
         return EmailVerificationResponse.success("이메일 인증이 완료되었습니다.");
     }
@@ -45,8 +53,8 @@ public class EmailVerificationController {
     // 비밀번호 재설정 이메일 인증번호 발송
     @PostMapping("/email-verifications/password-reset/send")
     public EmailVerificationResponse sendPasswordResetCode(
-            @Valid @RequestBody EmailVerificationRequest request) {
-        passwordResetEmailDispatchService.dispatch(request.email());
+            @Valid @RequestBody EmailVerificationRequestForm form) {
+        passwordResetEmailDispatchService.dispatch(form.getEmail());
         return EmailVerificationResponse.success(
                 "입력한 이메일로 인증번호 발송을 요청했습니다.");
     }
@@ -54,11 +62,11 @@ public class EmailVerificationController {
     // 비밀번호 재설정 이메일 인증번호 확인
     @PostMapping("/email-verifications/password-reset/verify")
     public EmailVerificationResponse verifyPasswordResetCode(
-            @Valid @RequestBody EmailVerificationConfirmRequest request,
+            @Valid @RequestBody EmailVerificationConfirmForm form,
             HttpServletRequest httpRequest) {
         PasswordResetEmailVerification verification =
                 emailVerificationService.verifyPasswordResetCode(
-                        request.email(), request.code());
+                        form.getEmail(), form.getCode());
         HttpSession session = httpRequest.getSession();
         httpRequest.changeSessionId();
         session.setAttribute(

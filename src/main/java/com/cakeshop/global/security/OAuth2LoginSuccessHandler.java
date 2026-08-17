@@ -95,7 +95,7 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
 
     private OAuthIdentity googleIdentity(OAuth2User user) {
         String providerId = user.getAttribute("sub");
-        String email = user.getAttribute("email");
+        String email = SignupForm.normalizeEmail(user.getAttribute("email"));
         Boolean emailVerified = user.getAttribute("email_verified");
         if (isBlank(providerId) || !Boolean.TRUE.equals(emailVerified)
                 || !SignupForm.isEmailFormatValid(email)) {
@@ -111,7 +111,7 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
         if (!(id instanceof Number) || account == null) {
             return null;
         }
-        String email = (String) account.get("email");
+        String email = SignupForm.normalizeEmail((String) account.get("email"));
         Boolean emailValid = (Boolean) account.get("is_email_valid");
         Boolean emailVerified = (Boolean) account.get("is_email_verified");
         if (!Boolean.TRUE.equals(emailValid) || !Boolean.TRUE.equals(emailVerified)
@@ -128,7 +128,7 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
         return new OAuthIdentity(
                 provider,
                 providerId.trim(),
-                email.trim().toLowerCase(Locale.ROOT),
+                email,
                 name == null ? "" : name.trim());
     }
 

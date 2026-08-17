@@ -426,6 +426,6 @@ public class CartService {
     private String normalizeRequirements(String requirements) {
         return requirements == null || requirements.isBlank()
                 ? null
-                : requirements.trim();
+                : requirements.strip();
     }
 }

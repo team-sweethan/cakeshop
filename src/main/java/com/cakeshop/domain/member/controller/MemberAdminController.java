@@ -9,6 +9,8 @@ import com.cakeshop.domain.member.dto.view.MemberAdminListView;
 import com.cakeshop.domain.member.entity.MemberStatus;
 import com.cakeshop.domain.member.service.MemberAdminService;
 import com.cakeshop.domain.member.service.MemberSessionService;
+import com.cakeshop.domain.order.dto.view.OrderMemberOrderView;
+import com.cakeshop.domain.order.service.OrderMemberQueryService;
 import com.cakeshop.global.security.MemberDetails;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
@@ -28,15 +30,19 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class MemberAdminController {
 
     private static final int DEFAULT_MEMBER_PAGE_SIZE = 10;
+    private static final int DEFAULT_ORDER_PAGE_SIZE = 10;
 
     private final MemberAdminService memberAdminService;
     private final MemberSessionService memberSessionService;
+    private final OrderMemberQueryService orderMemberQueryService;
 
     public MemberAdminController(
             MemberAdminService memberAdminService,
-            MemberSessionService memberSessionService) {
+            MemberSessionService memberSessionService,
+            OrderMemberQueryService orderMemberQueryService) {
         this.memberAdminService = memberAdminService;
         this.memberSessionService = memberSessionService;
+        this.orderMemberQueryService = orderMemberQueryService;
     }
 
     // 관리자 회원 목록
@@ -82,11 +88,19 @@ public class MemberAdminController {
     @GetMapping("/admin/members/{memberId}")
     public String memberDetail(
             @PathVariable Long memberId,
+            @RequestParam(required = false) String orderPage,
             Model model) {
         MemberAdminDetailView member =
                 memberAdminService.getMemberDetail(memberId);
+        PageResult<OrderMemberOrderView> orderPageResult =
+                orderMemberQueryService.getAdminMemberOrders(
+                        memberId,
+                        new PageRequest(
+                                parsePositiveInteger(orderPage),
+                                DEFAULT_ORDER_PAGE_SIZE));
 
         model.addAttribute("member", member);
+        model.addAttribute("orderPageResult", orderPageResult);
         return "admin/member/detail";
     }
 

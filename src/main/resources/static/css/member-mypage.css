@@ -1,0 +1,119 @@
+.mypage-order-heading {
+  align-items: flex-end;
+  display: flex;
+  gap: var(--space-3);
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+
+.mypage-order-heading .section-title {
+  margin-bottom: 4px;
+}
+
+.mypage-order-grid {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.mypage-order-section {
+  min-width: 0;
+}
+
+.mypage-order-section__header {
+  align-items: center;
+  border-bottom: 1px solid var(--color-border-light);
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+  padding-bottom: var(--space-2);
+}
+
+.mypage-order-section__header h3 {
+  font-size: var(--font-sm);
+}
+
+.mypage-order-count {
+  color: var(--color-muted);
+  font-size: var(--font-xs);
+}
+
+.mypage-order-list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.mypage-order-card {
+  border: 1px solid var(--color-border-light);
+  display: block;
+  min-width: 0;
+  padding: var(--space-2);
+}
+
+.mypage-order-card:hover {
+  background: var(--color-background-faint);
+  border-color: var(--color-border);
+}
+
+.mypage-order-card__header,
+.mypage-order-card__meta {
+  align-items: center;
+  display: flex;
+  gap: var(--space-2);
+  justify-content: space-between;
+}
+
+.mypage-order-card__badges {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--space-1);
+}
+
+.mypage-order-card__number {
+  color: var(--color-muted);
+  font-size: var(--font-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mypage-order-card__product {
+  display: inline-block;
+  font-size: var(--font-xs);
+  margin-top: 6px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+  white-space: nowrap;
+}
+
+.mypage-order-card__meta {
+  color: var(--color-muted);
+  font-size: var(--font-xs);
+  margin-top: 6px;
+}
+
+.mypage-order-card__meta strong {
+  color: var(--color-text);
+}
+
+.mypage-order-empty {
+  color: var(--color-muted);
+  font-size: var(--font-xs);
+  padding: var(--space-4) var(--space-2);
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .mypage-order-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .mypage-order-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

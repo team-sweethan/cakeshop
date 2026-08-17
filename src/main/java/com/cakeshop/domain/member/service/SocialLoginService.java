@@ -12,7 +12,6 @@ import com.cakeshop.domain.member.error.MemberErrorCode;
 import com.cakeshop.domain.member.mapper.MemberMapper;
 import com.cakeshop.domain.member.mapper.SocialAccountMapper;
 import com.cakeshop.global.error.BusinessException;
-import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -80,9 +79,10 @@ public class SocialLoginService {
     }
 
     private String normalizeEmail(String email) {
-        if (!SignupForm.isEmailFormatValid(email)) {
+        String normalizedEmail = SignupForm.normalizeEmail(email);
+        if (!SignupForm.isEmailFormatValid(normalizedEmail)) {
             throw new BusinessException(MemberErrorCode.OAUTH_SIGNUP_UNAVAILABLE);
         }
-        return email.trim().toLowerCase(Locale.ROOT);
+        return normalizedEmail;
     }
 }

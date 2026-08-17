@@ -159,14 +159,15 @@ public class AuthController {
     @GetMapping("/emailCheck")
     @ResponseBody
     public EmailAvailabilityView emailCheck(@RequestParam String email) {
-        if (!SignupForm.isEmailFormatValid(email)) {
+        String normalizedEmail = SignupForm.normalizeEmail(email);
+        if (!SignupForm.isEmailFormatValid(normalizedEmail)) {
             return new EmailAvailabilityView(
                     false,
                     false,
                     "이메일 형식을 확인해 주세요.");
         }
 
-        boolean available = !memberService.checkEmailDuplicate(email);
+        boolean available = !memberService.checkEmailDuplicate(normalizedEmail);
         return new EmailAvailabilityView(
                 true,
                 available,

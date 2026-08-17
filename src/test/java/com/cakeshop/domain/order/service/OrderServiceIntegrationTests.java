@@ -161,7 +161,7 @@ class OrderServiceIntegrationTests {
         assertThat(savedOption.getOptionName()).isEqualTo("2호");
         assertThat(savedOption.getAdditionalPrice()).isEqualByComparingTo("5000");
 
-        Payment payment = paymentMapper.findPaymentsByOrderId(orderId).getFirst();
+        Payment payment = paymentMapper.findReadyPaymentByOrderId(orderId).orElseThrow();
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.READY);
         assertThat(payment.getAmount()).isEqualByComparingTo("70000");
         assertThat(payment.getTossOrderId()).isEqualTo(order.getOrderNumber());
@@ -183,7 +183,11 @@ class OrderServiceIntegrationTests {
                 form.getRequestKey()
         )).isEqualTo(1L);
         assertThat(orderMapper.findOrderItemsByOrderId(firstOrderId)).hasSize(1);
-        assertThat(paymentMapper.findPaymentsByOrderId(firstOrderId)).hasSize(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM payments WHERE order_id = ?",
+                Long.class,
+                firstOrderId
+        )).isEqualTo(1L);
     }
 
     private void stubProductLookup() {

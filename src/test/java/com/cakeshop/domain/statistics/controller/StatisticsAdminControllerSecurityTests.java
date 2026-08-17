@@ -8,11 +8,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import com.cakeshop.domain.statistics.dto.view.PeriodStatisticsView;
-import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
-import com.cakeshop.domain.statistics.service.DashboardReadModelQueryService;
-import com.cakeshop.domain.statistics.service.AdditionalMetricsReadModelQueryService;
-import com.cakeshop.domain.statistics.service.PeriodStatisticsReadModelQueryService;
-import com.cakeshop.domain.statistics.service.ProductPeriodStatisticsReadModelQueryService;
+import com.cakeshop.domain.statistics.service.query.AdditionalMetricsReadModelQueryService;
+import com.cakeshop.domain.statistics.service.query.PeriodStatisticsReadModelQueryService;
+import com.cakeshop.domain.statistics.service.query.ProductPeriodStatisticsReadModelQueryService;
 import com.cakeshop.global.security.SecurityConfig;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -32,9 +30,6 @@ class StatisticsAdminControllerSecurityTests {
 
     @Autowired
     private MockMvc mockMvc;
-
-    @MockitoBean
-    private DashboardReadModelQueryService dashboardReadModelQueryService;
 
     @MockitoBean
     private PeriodStatisticsReadModelQueryService periodStatisticsReadModelQueryService;
@@ -58,26 +53,6 @@ class StatisticsAdminControllerSecurityTests {
     void statistics_customerRole_isForbidden() throws Exception {
         mockMvc.perform(get("/admin/statistics"))
                 .andExpect(status().isForbidden());
-    }
-
-    @Test
-    @WithMockUser(roles = "ADMIN")
-    void dashboard_adminRole_isAccessible() throws Exception {
-        when(dashboardReadModelQueryService.getDashboard())
-                .thenReturn(new StatisticsDashboardView(
-                        0L,
-                        BigDecimal.ZERO,
-                        0L,
-                        0L,
-                        0L,
-                        List.of(),
-                        List.of(),
-                        List.of()
-                ));
-
-        mockMvc.perform(get("/admin"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("admin/dashboard"));
     }
 
     @Test

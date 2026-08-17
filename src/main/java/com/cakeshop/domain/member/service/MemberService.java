@@ -36,7 +36,7 @@ public class MemberService {
      */
     @Transactional
     public boolean join(SignupForm form, SignupEmailVerification verification) {
-        String email = form.getEmail().trim().toLowerCase(java.util.Locale.ROOT);
+        String email = SignupForm.normalizeEmail(form.getEmail());
         if (memberMapper.findByEmail(email).isPresent()) {
             throw new BusinessException(MemberErrorCode.DUPLICATE_EMAIL);
         }

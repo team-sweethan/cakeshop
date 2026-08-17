@@ -12,4 +12,8 @@ public class MemberSuspendForm {
     @NotBlank(message = "이용정지 사유를 입력해 주세요.")
     @Size(max = 500, message = "이용정지 사유는 500자 이하여야 합니다.")
     private String reason;
+
+    public void setReason(String reason) {
+        this.reason = reason == null ? null : reason.strip();
+    }
 }

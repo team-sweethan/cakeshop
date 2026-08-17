@@ -11,14 +11,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import java.util.Optional;
 import java.util.List;
+import java.util.Optional;
 
 /** 승인 후 내부 처리 실패를 보상 취소하고, 재시도 가능한 로컬 상태로 반영한다. */
 @Component
 public class PaymentCompensationProcessor {
 
-    private static final String TOSS_CANCELED = "CANCELED";
     private static final Logger log = LoggerFactory.getLogger(PaymentCompensationProcessor.class);
 
     private final PaymentRecoveryService paymentRecoveryService;
@@ -66,8 +65,7 @@ public class PaymentCompensationProcessor {
     }
 
     public BusinessException reconcileCanceled(Payment payment, PaymentLookupResult lookup) {
-        CancellationResult result = Optional.ofNullable(lookup.cancellation())
-                .filter(this::isCompletedCancellation)
+        CancellationResult result = TossCancellationResultResolver.findCompleted(lookup)
                 .orElseThrow(() -> new BusinessException(PaymentErrorCode.PAYMENT_RECOVERY_PENDING));
         CompensationRequest request = paymentRecoveryService.createRequest(payment, lookup.paymentKey());
         try {
@@ -93,7 +91,7 @@ public class PaymentCompensationProcessor {
         try {
             result = tossPaymentClient.cancel(request.paymentKey(), request.reason(), request.idempotencyKey());
         } catch (BusinessException cancelFailure) {
-            result = findCanceledResult(request.paymentKey())
+            result = TossCancellationResultResolver.findCompleted(tossPaymentClient, request.paymentKey())
                     .orElseThrow(() -> new BusinessException(PaymentErrorCode.PAYMENT_RECOVERY_PENDING));
         }
 
@@ -104,18 +102,4 @@ public class PaymentCompensationProcessor {
         }
     }
 
-    private Optional<CancellationResult> findCanceledResult(String paymentKey) {
-        return tossPaymentClient.find(paymentKey)
-                .filter(lookup -> TOSS_CANCELED.equals(lookup.status()))
-                .map(PaymentLookupResult::cancellation)
-                .filter(this::isCompletedCancellation);
-    }
-
-    private boolean isCompletedCancellation(CancellationResult result) {
-        return result != null
-                && TOSS_CANCELED.equals(result.status())
-                && result.transactionKey() != null
-                && !result.transactionKey().isBlank()
-                && result.canceledAt() != null;
-    }
 }

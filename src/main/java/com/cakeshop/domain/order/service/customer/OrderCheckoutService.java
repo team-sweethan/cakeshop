@@ -4,9 +4,9 @@ import com.cakeshop.domain.cart.dto.view.CartOrderItemView;
 import com.cakeshop.domain.order.dto.view.customer.CartOrderCheckoutView;
 import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView;
 import com.cakeshop.domain.order.dto.view.customer.CustomOrderCheckoutView;
-import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView.PickupDateView;
-import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView.PickupTimeView;
-import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView.SelectedOptionView;
+import com.cakeshop.domain.order.dto.view.customer.common.CheckoutOptionView;
+import com.cakeshop.domain.order.dto.view.customer.common.PickupDateView;
+import com.cakeshop.domain.order.dto.view.customer.common.PickupTimeView;
 import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.order.service.OrderAmountCalculator;
 import com.cakeshop.domain.order.service.OrderOptionValidator;
@@ -81,8 +81,8 @@ public class OrderCheckoutService {
                 product.basePrice(), quantity, validatedOptions
         );
 
-        List<SelectedOptionView> selectedOptions = validatedOptions.stream()
-                .map(option -> new SelectedOptionView(
+        List<CheckoutOptionView> selectedOptions = validatedOptions.stream()
+                .map(option -> new CheckoutOptionView(
                         option.optionId(),
                         option.groupName(),
                         option.optionName(),
@@ -173,7 +173,7 @@ public class OrderCheckoutService {
                 product.productName(),
                 product.preparationDays(),
                 selectedOptions.stream()
-                        .map(option -> new SelectedOptionView(
+                        .map(option -> new CheckoutOptionView(
                                 option.optionId(),
                                 option.groupName(),
                                 option.optionName(),

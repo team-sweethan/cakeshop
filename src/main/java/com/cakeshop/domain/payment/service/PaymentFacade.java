@@ -6,7 +6,6 @@ import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentExecuti
 import com.cakeshop.domain.payment.dto.form.PaymentConfirmForm;
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.error.PaymentErrorCode;
-import com.cakeshop.domain.payment.infra.TossPaymentClient.ApprovalResult;
 import com.cakeshop.domain.payment.service.PaymentRecoveryService.CompensationRequest;
 import com.cakeshop.domain.payment.service.TossPaymentApprovalResolver.ApprovalResolution;
 import com.cakeshop.domain.payment.service.TossPaymentApprovalResolver.ApprovalState;
@@ -36,33 +35,6 @@ public class PaymentFacade {
 
     /** 일반·수제 주문의 Toss 결제를 승인하고 내부 상태를 완료한다. */
     public void confirmPayment(long memberId, long orderId, PaymentConfirmForm form) {
-        confirm(
-                memberId,
-                orderId,
-                form,
-                orderPaymentQueryService::getMemberPaymentExecutionOrder,
-                paymentService::completePayment
-        );
-    }
-
-    /** 기존 일반 주문 결제 호출부의 호환용 진입점이다. */
-    public void confirmGeneralPayment(long memberId, long orderId, PaymentConfirmForm form) {
-        confirm(
-                memberId,
-                orderId,
-                form,
-                orderPaymentQueryService::getMemberGeneralPaymentOrder,
-                paymentService::completeGeneralPayment
-        );
-    }
-
-    private void confirm(
-            long memberId,
-            long orderId,
-            PaymentConfirmForm form,
-            PaymentOrderLoader orderLoader,
-            PaymentCompleter completer
-    ) {
         PaymentOrder ownedOrder = orderPaymentQueryService.getMemberPaymentOrder(memberId, orderId);
         Payment completedPayment = paymentService.findDonePayment(orderId).orElse(null);
         if (completedPayment != null) {
@@ -71,7 +43,8 @@ public class PaymentFacade {
             return;
         }
 
-        PaymentExecutionOrder order = orderLoader.load(memberId, orderId);
+        PaymentExecutionOrder order = orderPaymentQueryService
+                .getMemberPaymentExecutionOrder(memberId, orderId);
         validatePaymentExpiration(order.paymentExpiresAt());
 
         Payment payment = paymentService.getReadyPayment(orderId);
@@ -81,7 +54,7 @@ public class PaymentFacade {
         try {
             // Toss 승인 응답을 받은 뒤에도 내부 완료 직전에 만료 경계를 다시 확인한다.
             validatePaymentExpiration(order.paymentExpiresAt());
-            completer.complete(order, resolved.payment(), resolved.approval().approval());
+            paymentService.completePayment(order, resolved.payment(), resolved.approval().approval());
         } catch (RuntimeException exception) {
             Payment concurrentlyCompleted = findConcurrentlyCompleted(orderId);
             if (concurrentlyCompleted == null) {
@@ -239,15 +212,5 @@ public class PaymentFacade {
     }
 
     private record ResolvedApproval(Payment payment, ApprovalResolution approval) {
-    }
-
-    @FunctionalInterface
-    private interface PaymentOrderLoader {
-        PaymentExecutionOrder load(long memberId, long orderId);
-    }
-
-    @FunctionalInterface
-    private interface PaymentCompleter {
-        void complete(PaymentExecutionOrder order, Payment payment, ApprovalResult approval);
     }
 }

@@ -106,17 +106,6 @@
            AND attempt_count &lt; 5
     </update>
 
-    <select id="findVerifiedByIdForUpdate" resultMap="emailVerificationResultMap">
-        SELECT <include refid="emailVerificationColumns"/>
-          FROM email_verifications
-         WHERE id = #{id}
-           AND email = #{email}
-           AND purpose = #{purpose}
-           AND verified_at &gt;= #{verifiedSince}
-           AND consumed_at IS NULL
-           FOR UPDATE
-    </select>
-
     <select id="findLatestVerifiedByIdForUpdate" resultMap="emailVerificationResultMap">
         SELECT <include refid="emailVerificationColumns"/>
           FROM email_verifications

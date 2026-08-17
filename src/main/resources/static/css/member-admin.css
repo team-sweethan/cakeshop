@@ -212,6 +212,94 @@
     padding-bottom: 14px;
 }
 
+.member-admin-order-heading {
+    align-items: center;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 18px;
+    padding-bottom: 14px;
+}
+
+.member-admin-order-heading .member-admin-detail-title {
+    margin-bottom: 0;
+}
+
+.member-admin-order-count {
+    color: #6b7280;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.member-admin-order-table th,
+.member-admin-order-table td {
+    white-space: nowrap;
+}
+
+.member-admin-order-table {
+    min-width: 980px;
+    table-layout: fixed;
+}
+
+.member-admin-order-table th:nth-child(1) {
+    width: 190px;
+}
+
+.member-admin-order-table th:nth-child(2),
+.member-admin-order-table th:nth-child(4) {
+    width: 90px;
+}
+
+.member-admin-order-table th:nth-child(3) {
+    width: 180px;
+}
+
+.member-admin-order-table th:nth-child(5),
+.member-admin-order-table th:nth-child(6) {
+    width: 125px;
+}
+
+.member-admin-order-table th:nth-child(7) {
+    width: 100px;
+}
+
+.member-admin-order-table th:nth-child(8) {
+    width: 70px;
+}
+
+.member-admin-order-number,
+.member-admin-order-product {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.member-admin-order-number {
+    max-width: 170px;
+}
+
+.member-admin-order-product {
+    max-width: 165px;
+}
+
+.member-admin-order-additional {
+    color: #6b7280;
+    font-size: 0.875rem;
+}
+
+.member-admin-order-empty {
+    color: #6b7280;
+    margin: 0;
+    padding: 28px 0;
+    text-align: center;
+}
+
+.member-admin-order-pagination {
+    justify-content: center;
+    margin-top: 20px;
+}
+
 .member-admin-history-heading .member-admin-detail-title {
     margin-bottom: 0;
 }

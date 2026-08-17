@@ -11,6 +11,7 @@
             (ci.id = #{target.cartItemId} AND ci.quantity = #{target.quantity})
         </foreach>
         )
+        FOR UPDATE
     </select>
     <delete id="deleteOptionsByMemberIdAndItemIds">
         DELETE cio FROM cart_item_options cio

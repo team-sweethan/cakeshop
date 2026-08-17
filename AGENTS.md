@@ -16,6 +16,8 @@
 
 | 주 작업 | 첫 번째 라우터 |
 |---|---|
+| `member` 기능 개발 | `docs/member/DOMAIN.md` |
+| `cart` 기능 개발 | `docs/cart/DOMAIN.md` |
 | `community` 기능 개발 | `src/main/java/com/cakeshop/domain/community/CLAUDE.md`의 라우팅 지침 |
 | `review` 후기 기능 개발 | `src/main/java/com/cakeshop/domain/review/CLAUDE.md`의 라우팅 지침 |
 | 코드·PR 리뷰, 커밋·PR·병합 | `docs/pull-request.md` |
@@ -64,7 +66,7 @@
 | 정후 | `coupon` |
 | 민정 | `chat`, `notification` |
 | 현규 | `community`, `review` |
-| 시은 | `product`, `statistics` |
+| 시은 | `product`, `dashboard`, `statistics` |
 | 공통 협의 | `store`, `global`, `home` |
 
 ## 작업과 검증 루프

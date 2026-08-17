@@ -3,6 +3,7 @@ package com.cakeshop.domain.member.controller;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -14,6 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -23,10 +25,13 @@ import com.cakeshop.domain.member.dto.view.MemberAdminListView;
 import com.cakeshop.domain.member.entity.MemberStatus;
 import com.cakeshop.domain.member.service.MemberAdminService;
 import com.cakeshop.domain.member.service.MemberSessionService;
+import com.cakeshop.domain.order.dto.view.OrderMemberOrderView;
+import com.cakeshop.domain.order.service.OrderMemberQueryService;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.security.SecurityConfig;
 import com.cakeshop.global.security.MemberDetails;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -49,6 +54,18 @@ class MemberAdminControllerSecurityTests {
 
     @MockitoBean
     private MemberSessionService memberSessionService;
+
+    @MockitoBean
+    private OrderMemberQueryService orderMemberQueryService;
+
+    @BeforeEach
+    void setUpOrderPage() {
+        when(orderMemberQueryService.getAdminMemberOrders(anyLong(), any()))
+                .thenReturn(new PageResult<>(
+                        List.of(),
+                        new PageRequest(1, 10),
+                        0));
+    }
 
     @Test
     @WithAnonymousUser
@@ -133,6 +150,21 @@ class MemberAdminControllerSecurityTests {
 
         when(memberAdminService.getMemberDetail(1L))
                 .thenReturn(member);
+        OrderMemberOrderView order = new OrderMemberOrderView(
+                10L,
+                "ORD-20260816-0001",
+                "주문 제작",
+                "생크림 케이크",
+                2,
+                "제작 중",
+                BigDecimal.valueOf(35000),
+                LocalDateTime.of(2026, 8, 23, 14, 0),
+                LocalDateTime.of(2026, 8, 16, 10, 0));
+        when(orderMemberQueryService.getAdminMemberOrders(anyLong(), any()))
+                .thenReturn(new PageResult<>(
+                        List.of(order),
+                        new PageRequest(1, 10),
+                        1));
 
         mockMvc.perform(get("/admin/members/1")
                         .flashAttr(
@@ -149,6 +181,12 @@ class MemberAdminControllerSecurityTests {
                 .andExpect(content().string(
                         containsString(
                                 "/admin/members/1/suspend")))
+                .andExpect(content().string(
+                        containsString("ORD-20260816-0001")))
+                .andExpect(content().string(
+                        containsString("생크림 케이크")))
+                .andExpect(content().string(
+                        containsString("/admin/orders/10")))
                 .andExpect(content().string(
                         not(containsString(
                                 "/admin/members/1/activate"))));

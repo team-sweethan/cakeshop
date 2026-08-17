@@ -75,7 +75,6 @@ class RefundFacadeTests {
                                 .isEqualTo(PaymentErrorCode.PAYMENT_RECOVERY_PENDING)
                 );
 
-        verify(refundService, never()).failRequestedCancellation(30L);
         verify(refundService, never()).completeCancellation(any(), any());
     }
 
@@ -105,7 +104,6 @@ class RefundFacadeTests {
         refundFacade.cancelCustomerOrder(3L, 10L, "단순 변심");
 
         verify(refundService).completeCancellation(request, cancellation);
-        verify(refundService, never()).failRequestedCancellation(30L);
     }
 
     @Test

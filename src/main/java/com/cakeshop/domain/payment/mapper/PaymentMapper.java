@@ -22,9 +22,6 @@ public interface PaymentMapper {
     // 결제 대기 주문에 금액이 일치하는 결제 시도를 생성하고 상태를 READY로 고정한다.
     int insertReadyPayment(Payment payment);
 
-    // 한 주문에서 발생한 모든 결제 시도를 조회한다.
-    List<Payment> findPaymentsByOrderId(@Param("orderId") long orderId);
-
     // 결제 ID로 한 건을 조회한다.
     Optional<Payment> findPaymentById(@Param("paymentId") long paymentId);
 
@@ -49,22 +46,6 @@ public interface PaymentMapper {
             @Param("approvedAt") LocalDateTime approvedAt
     );
 
-    // READY 결제를 중단 처리하고 PG 상태와 실패 정보를 함께 기록한다.
-    int abortIfReady(
-            @Param("paymentId") long paymentId,
-            @Param("providerStatus") String providerStatus,
-            @Param("failureCode") String failureCode,
-            @Param("failureMessage") String failureMessage
-    );
-
-    // READY 결제를 만료 처리하고 PG 상태와 실패 정보를 함께 기록한다.
-    int expireIfReady(
-            @Param("paymentId") long paymentId,
-            @Param("providerStatus") String providerStatus,
-            @Param("failureCode") String failureCode,
-            @Param("failureMessage") String failureMessage
-    );
-
     /** 관리자가 결제 만료를 확인한 시각을 기록한다. */
     int markExpirationCheckedIfExpired(@Param("paymentId") long paymentId);
 
@@ -80,11 +61,6 @@ public interface PaymentMapper {
 
     // 결제 취소·환불 요청을 REQUESTED 상태로 생성한다.
     int insertPaymentCancellation(PaymentCancellation cancellation);
-
-    // 결제 취소·환불 요청을 ID로 조회한다.
-    Optional<PaymentCancellation> findPaymentCancellationById(
-            @Param("cancellationId") long cancellationId
-    );
 
     // 같은 취소 요청의 동시 완료를 직렬화하기 위해 행 잠금으로 조회한다.
     Optional<PaymentCancellation> findPaymentCancellationByIdForUpdate(

@@ -18,7 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -63,29 +62,20 @@ class PaymentMapperTests {
         insertOrderItem();
     }
 
-    // READY 결제를 INSERT한 뒤 주문 ID로 다시 조회한다.
+    // READY 결제를 INSERT한 뒤 주문의 현재 결제로 다시 조회한다.
     @Test
-    void insertReadyPaymentAndFindPaymentsByOrderId() {
+    void insertReadyPaymentAndFindReadyPaymentByOrderId() {
         Payment payment = newPayment("READY");
 
         assertThat(paymentMapper.insertReadyPayment(payment)).isEqualTo(1);
         assertThat(payment.getId()).isNotNull();
 
-        List<Payment> payments =
-                paymentMapper.findPaymentsByOrderId(orderId);
+        Payment readyPayment = paymentMapper.findReadyPaymentByOrderId(orderId).orElseThrow();
 
-        assertThat(payments)
-                .extracting(Payment::getId)
-                .containsExactly(payment.getId());
-        assertThat(payments)
-                .extracting(Payment::getStatus)
-                .containsOnly(PaymentStatus.READY);
-        assertThat(payments)
-                .extracting(Payment::getTossOrderId)
-                .containsExactly(payment.getTossOrderId());
-        assertThat(payments)
-                .extracting(Payment::getActivePaymentOrderId)
-                .containsExactly(orderId);
+        assertThat(readyPayment.getId()).isEqualTo(payment.getId());
+        assertThat(readyPayment.getStatus()).isEqualTo(PaymentStatus.READY);
+        assertThat(readyPayment.getTossOrderId()).isEqualTo(payment.getTossOrderId());
+        assertThat(readyPayment.getActivePaymentOrderId()).isEqualTo(orderId);
     }
 
     @Test
@@ -166,7 +156,7 @@ class PaymentMapperTests {
                 payment.getId(),
                 guard.getIdempotencyKey()
         )).isEqualTo(1);
-        assertThat(paymentMapper.findPaymentCancellationById(guard.getId()))
+        assertThat(paymentMapper.findPaymentCancellationByIdForUpdate(guard.getId()))
                 .hasValueSatisfying(reopened -> {
                     assertThat(reopened.getStatus()).isEqualTo(PaymentCancellationStatus.REQUESTED);
                     assertThat(reopened.getFailureCode()).isNull();
@@ -315,56 +305,12 @@ class PaymentMapperTests {
     }
 
     @Test
-    void abortIfReady_recordsFailureDataConditionally() {
-        Payment payment = insertPayment("READY-TO-ABORTED");
-
-        assertThat(paymentMapper.abortIfReady(
-                payment.getId(),
-                "ABORTED",
-                "PAY_PROCESS_CANCELED",
-                "사용자가 결제를 중단했습니다."
-        )).isEqualTo(1);
-
-        Payment aborted = findPayment(payment.getId());
-        assertThat(aborted.getStatus()).isEqualTo(PaymentStatus.ABORTED);
-        assertThat(aborted.getProviderStatus()).isEqualTo("ABORTED");
-        assertThat(aborted.getFailureCode()).isEqualTo("PAY_PROCESS_CANCELED");
-        assertThat(aborted.getFailureMessage()).isEqualTo("사용자가 결제를 중단했습니다.");
-        assertThat(paymentMapper.abortIfReady(
-                payment.getId(),
-                "ABORTED",
-                "OTHER",
-                "다시 실패 처리"
-        )).isZero();
-    }
-
-    @Test
-    void expireIfReady_recordsFailureDataConditionally() {
-        Payment payment = insertPayment("READY-TO-EXPIRED");
-
-        assertThat(paymentMapper.expireIfReady(
-                payment.getId(),
-                "EXPIRED",
-                "PAYMENT_TIMEOUT",
-                "결제 유효 시간이 지났습니다."
-        )).isEqualTo(1);
-
-        Payment expired = findPayment(payment.getId());
-        assertThat(expired.getStatus()).isEqualTo(PaymentStatus.EXPIRED);
-        assertThat(expired.getProviderStatus()).isEqualTo("EXPIRED");
-        assertThat(expired.getFailureCode()).isEqualTo("PAYMENT_TIMEOUT");
-        assertThat(expired.getFailureMessage()).isEqualTo("결제 유효 시간이 지났습니다.");
-    }
-
-    @Test
-    void expirationCheck_expiredPayment_updatesListAndAttentionSummary() {
+    void expirationCheck_existingExpiredPayment_updatesListAndAttentionSummary() {
         Payment payment = insertPayment("EXPIRED-CHECK");
-        assertThat(paymentMapper.expireIfReady(
-                payment.getId(),
-                "EXPIRED",
-                "PAYMENT_TIMEOUT",
-                "결제 유효 시간이 지났습니다."
-        )).isEqualTo(1);
+        jdbcTemplate.update(
+                "UPDATE payments SET status = 'EXPIRED' WHERE id = ?",
+                payment.getId()
+        );
 
         assertThat(paymentMapper.summarizePaymentsForAdmin().attentionCount()).isEqualTo(1);
         assertThat(paymentMapper.markExpirationCheckedIfExpired(payment.getId())).isEqualTo(1);
@@ -417,7 +363,7 @@ class PaymentMapperTests {
     }
 
     @Test
-    void insertPaymentCancellationAndFindPaymentCancellationById() {
+    void insertPaymentCancellationAndFindPaymentCancellationByIdForUpdate() {
         Payment payment = insertPayment("CANCELLATION-MAPPER");
         completePayment(payment, "CANCELLATION-MAPPER");
         PaymentCancellation cancellation =
@@ -427,7 +373,7 @@ class PaymentMapperTests {
         assertThat(cancellation.getId()).isNotNull();
 
         PaymentCancellation saved = paymentMapper
-                .findPaymentCancellationById(cancellation.getId())
+                .findPaymentCancellationByIdForUpdate(cancellation.getId())
                 .orElseThrow();
 
         assertThat(saved.getPaymentId()).isEqualTo(payment.getId());
@@ -512,7 +458,7 @@ class PaymentMapperTests {
         )).isPositive();
 
         PaymentCancellation completed = paymentMapper
-                .findPaymentCancellationById(cancellation.getId())
+                .findPaymentCancellationByIdForUpdate(cancellation.getId())
                 .orElseThrow();
         assertThat(completed.getStatus()).isEqualTo(PaymentCancellationStatus.DONE);
         assertThat(completed.getActiveRequestedPaymentId()).isNull();
@@ -552,7 +498,7 @@ class PaymentMapperTests {
         )).isEqualTo(1);
 
         PaymentCancellation failed = paymentMapper
-                .findPaymentCancellationById(cancellation.getId())
+                .findPaymentCancellationByIdForUpdate(cancellation.getId())
                 .orElseThrow();
         assertThat(failed.getStatus()).isEqualTo(PaymentCancellationStatus.FAILED);
         assertThat(failed.getActiveRequestedPaymentId()).isNull();
@@ -679,10 +625,7 @@ class PaymentMapperTests {
     }
 
     private Payment findPayment(long paymentId) {
-        return paymentMapper.findPaymentsByOrderId(orderId).stream()
-                .filter(payment -> payment.getId() == paymentId)
-                .findFirst()
-                .orElseThrow();
+        return paymentMapper.findPaymentById(paymentId).orElseThrow();
     }
 
     // 각 테스트가 기존 DB 데이터에 의존하지 않도록 회원을 직접 준비한다.

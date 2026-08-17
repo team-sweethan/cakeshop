@@ -30,17 +30,11 @@ public record FulfillmentListView(
     ) {
 
         public String orderTypeLabel() {
-            return orderType == OrderType.CUSTOM ? "주문 제작" : "일반 상품";
+            return orderType.orderTypeLabel();
         }
 
         public String statusLabel() {
-            return switch (status) {
-                case UNDER_REVIEW -> "승인 대기";
-                case IN_PRODUCTION -> "제작 중";
-                case READY_FOR_PICKUP -> "픽업 준비";
-                case PICKED_UP -> "픽업 완료";
-                default -> status.name();
-            };
+            return status.statusLabel();
         }
 
         public String statusClass() {

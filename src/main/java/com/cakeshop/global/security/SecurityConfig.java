@@ -170,7 +170,7 @@ public class SecurityConfig {
                     .authorizationEndpoint(endpoint -> {
                         if (registrations != null) {
                             endpoint.authorizationRequestResolver(
-                                    new KakaoPromptAuthorizationRequestResolver(registrations));
+                                    new OAuth2AccountSelectionRequestResolver(registrations));
                         }
                     })
                     .successHandler(oauthSuccessHandler)

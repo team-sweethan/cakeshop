@@ -106,6 +106,7 @@
 | `created_at` | DATETIME(6) |  | X | `CURRENT_TIMESTAMP(6)` | 생성 시각 |
 
 - UK: `uk_post_reports_post_reporter` (`post_id`, `reporter_id`)
+- INDEX: `idx_post_reports_status_post_id` (`status`, `post_id`)
 - FK: `post_id` → `posts.id`, `reporter_id` → `members.id`
 - CHECK: `chk_post_reports_status` — `status IN ('PENDING', 'RESOLVED', 'REJECTED')`
 

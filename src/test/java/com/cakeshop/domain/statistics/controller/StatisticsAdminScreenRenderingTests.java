@@ -14,10 +14,9 @@ import com.cakeshop.domain.statistics.dto.view.AdditionalMetricsView;
 import com.cakeshop.domain.statistics.dto.view.ProductStatisticsView;
 import com.cakeshop.domain.statistics.dto.view.StatisticsTrendView;
 import com.cakeshop.domain.statistics.error.StatisticsErrorCode;
-import com.cakeshop.domain.statistics.service.DashboardReadModelQueryService;
-import com.cakeshop.domain.statistics.service.AdditionalMetricsReadModelQueryService;
-import com.cakeshop.domain.statistics.service.PeriodStatisticsReadModelQueryService;
-import com.cakeshop.domain.statistics.service.ProductPeriodStatisticsReadModelQueryService;
+import com.cakeshop.domain.statistics.service.query.AdditionalMetricsReadModelQueryService;
+import com.cakeshop.domain.statistics.service.query.PeriodStatisticsReadModelQueryService;
+import com.cakeshop.domain.statistics.service.query.ProductPeriodStatisticsReadModelQueryService;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.security.SecurityConfig;
 import java.math.BigDecimal;
@@ -37,9 +36,6 @@ class StatisticsAdminScreenRenderingTests {
 
     @Autowired
     private MockMvc mockMvc;
-
-    @MockitoBean
-    private DashboardReadModelQueryService dashboardReadModelQueryService;
 
     @MockitoBean
     private PeriodStatisticsReadModelQueryService periodStatisticsReadModelQueryService;

@@ -43,6 +43,7 @@ import com.cakeshop.domain.coupon.service.CouponAdminService;
 import com.cakeshop.domain.member.controller.MemberAdminController;
 import com.cakeshop.domain.member.service.MemberAdminService;
 import com.cakeshop.domain.member.service.MemberSessionService;
+import com.cakeshop.domain.order.service.OrderMemberQueryService;
 import com.cakeshop.domain.notification.controller.NotificationAdminController;
 import com.cakeshop.domain.order.controller.admin.FulfillmentAdminController;
 import com.cakeshop.domain.order.controller.admin.OrderAdminController;
@@ -65,12 +66,13 @@ import com.cakeshop.domain.review.dto.view.AdminReviewListView;
 import com.cakeshop.domain.review.entity.ReviewStatus;
 import com.cakeshop.domain.review.service.ReviewAdminService;
 import com.cakeshop.domain.statistics.controller.StatisticsAdminController;
+import com.cakeshop.domain.dashboard.controller.DashboardAdminController;
 import com.cakeshop.domain.statistics.dto.view.PeriodStatisticsView;
-import com.cakeshop.domain.statistics.dto.view.StatisticsDashboardView;
-import com.cakeshop.domain.statistics.service.DashboardReadModelQueryService;
-import com.cakeshop.domain.statistics.service.AdditionalMetricsReadModelQueryService;
-import com.cakeshop.domain.statistics.service.PeriodStatisticsReadModelQueryService;
-import com.cakeshop.domain.statistics.service.ProductPeriodStatisticsReadModelQueryService;
+import com.cakeshop.domain.dashboard.dto.view.DashboardView;
+import com.cakeshop.domain.dashboard.service.DashboardReadModelQueryService;
+import com.cakeshop.domain.statistics.service.query.AdditionalMetricsReadModelQueryService;
+import com.cakeshop.domain.statistics.service.query.PeriodStatisticsReadModelQueryService;
+import com.cakeshop.domain.statistics.service.query.ProductPeriodStatisticsReadModelQueryService;
 
 class AdminPageControllerTests {
 
@@ -162,9 +164,12 @@ class AdminPageControllerTests {
         when(communityService.getComments(anyLong(), any()))
                 .thenReturn(new CommentSectionView(List.of(), 0, 0, 20));
         when(dashboardReadModelQueryService.getDashboard())
-                .thenReturn(new StatisticsDashboardView(
+                .thenReturn(new DashboardView(
                         0L,
                         BigDecimal.ZERO,
+                        0L,
+                        0L,
+                        0L,
                         0L,
                         0L,
                         0L,
@@ -184,8 +189,8 @@ class AdminPageControllerTests {
                 ));
 
         mockMvc = MockMvcBuilders.standaloneSetup(
+                new DashboardAdminController(dashboardReadModelQueryService),
                 new StatisticsAdminController(
-                        dashboardReadModelQueryService,
                         periodStatisticsReadModelQueryService,
                         productStatisticsQueryService,
                         additionalMetricsQueryService
@@ -203,7 +208,8 @@ class AdminPageControllerTests {
                 new PaymentAdminController(paymentAdminQueryService),
                 new MemberAdminController(
                         Mockito.mock(MemberAdminService.class),
-                        Mockito.mock(MemberSessionService.class)),
+                        Mockito.mock(MemberSessionService.class),
+                        Mockito.mock(OrderMemberQueryService.class)),
                 new ReviewAdminController(reviewAdminService),
                 new NotificationAdminController(),
                 new CommunityAdminController(communityAdminService, communityService),

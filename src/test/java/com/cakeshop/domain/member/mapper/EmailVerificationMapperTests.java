@@ -56,7 +56,7 @@ class EmailVerificationMapperTests {
                 verification.getEmail(),
                 EmailVerificationPurpose.SIGNUP,
                 NOW)).isOne();
-        EmailVerification verified = emailVerificationMapper.findVerifiedByIdForUpdate(
+        EmailVerification verified = emailVerificationMapper.findLatestVerifiedByIdForUpdate(
                         verification.getId(),
                         verification.getEmail(),
                         EmailVerificationPurpose.SIGNUP,
@@ -87,7 +87,7 @@ class EmailVerificationMapperTests {
     }
 
     @Test
-    void resend_newRequest_doesNotInvalidateVerifiedSessionRequest() {
+    void resend_newRequest_invalidatesOldVerifiedRequest() {
         EmailVerification oldRequest = insert("resend@example.com", NOW.plusMinutes(5));
         assertThat(emailVerificationMapper.markVerified(
                 oldRequest.getId(),
@@ -97,11 +97,11 @@ class EmailVerificationMapperTests {
 
         insert("resend@example.com", NOW.plusMinutes(6));
 
-        assertThat(emailVerificationMapper.findVerifiedByIdForUpdate(
+        assertThat(emailVerificationMapper.findLatestVerifiedByIdForUpdate(
                 oldRequest.getId(),
                 oldRequest.getEmail(),
                 EmailVerificationPurpose.SIGNUP,
-                NOW.minusMinutes(10))).isPresent();
+                NOW.minusMinutes(10))).isEmpty();
         assertThat(emailVerificationMapper.markVerified(
                 oldRequest.getId(),
                 oldRequest.getEmail(),

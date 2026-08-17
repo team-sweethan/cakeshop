@@ -1,5 +1,7 @@
 package com.cakeshop.domain.order.dto.view;
 
+import com.cakeshop.domain.order.entity.OrderType;
+
 /** 결제 관리자 화면이 주문 도메인에서 필요로 하는 최소 주문 정보다. */
 public record OrderPaymentAdminView(
         long orderId,
@@ -7,4 +9,8 @@ public record OrderPaymentAdminView(
         String ordererName,
         String orderType
 ) {
+
+    public String orderTypeLabel() {
+        return OrderType.valueOf(orderType).orderTypeLabel();
+    }
 }

@@ -49,6 +49,6 @@ public class CartAddForm {
     }
 
     public void setRequirements(String requirements) {
-        this.requirements = requirements;
+        this.requirements = requirements == null ? null : requirements.strip();
     }
 }

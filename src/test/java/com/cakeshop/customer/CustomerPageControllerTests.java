@@ -27,7 +27,9 @@ import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.notification.controller.NotificationUserController;
 import com.cakeshop.domain.order.controller.customer.OrderController;
 import com.cakeshop.domain.order.dto.view.OrderDetailView;
+import com.cakeshop.domain.order.dto.view.OrderMemberSummaryView;
 import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView;
+import com.cakeshop.domain.order.service.OrderMemberQueryService;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
 import com.cakeshop.domain.order.service.customer.OrderCustomerService;
 import com.cakeshop.domain.order.service.OrderService;
@@ -101,6 +103,9 @@ class CustomerPageControllerTests {
                 org.mockito.ArgumentMatchers.anyLong(),
                 org.mockito.ArgumentMatchers.any(PageRequest.class)
         )).thenReturn(new PageResult<>(List.<CustomerCouponView>of(), new PageRequest(1, 10), 0));
+        OrderMemberQueryService orderMemberQueryService = mock(OrderMemberQueryService.class);
+        when(orderMemberQueryService.getMyPageOrders(1L))
+                .thenReturn(new OrderMemberSummaryView(List.of(), List.of()));
         OrderCheckoutService orderCheckoutService = mock(OrderCheckoutService.class);
         when(orderCheckoutService.getGeneralCheckout(
                 org.mockito.ArgumentMatchers.anyLong(),
@@ -137,6 +142,7 @@ class CustomerPageControllerTests {
                         new MyPageController(
                                 memberService,
                                 couponMemberQueryService,
+                                orderMemberQueryService,
                                 mock(SessionRegistry.class)),
                         new NotificationUserController())
                 .setCustomArgumentResolvers(
@@ -191,6 +197,22 @@ class CustomerPageControllerTests {
         assertThat(
                 new ClassPathResource("static/js/customer-mockup.js").exists())
                 .isTrue();
+    }
+
+    @Test
+    void socialLoginLinks_requestAccountSelection() throws IOException {
+        String loginTemplate = new ClassPathResource("templates/auth/login.html")
+                .getContentAsString(StandardCharsets.UTF_8);
+        String passwordRecoveryTemplate = new ClassPathResource(
+                "templates/customer/member/find-password.html")
+                .getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(loginTemplate)
+                .contains("@{/oauth2/authorization/google(prompt=select_account)}")
+                .contains("@{/oauth2/authorization/kakao(prompt=select_account)}");
+        assertThat(passwordRecoveryTemplate)
+                .contains("@{/oauth2/authorization/google(prompt=select_account)}")
+                .contains("@{/oauth2/authorization/kakao(prompt=select_account)}");
     }
 
     @Test

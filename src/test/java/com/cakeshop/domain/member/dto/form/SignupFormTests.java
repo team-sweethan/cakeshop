@@ -39,9 +39,9 @@ class SignupFormTests {
     }
 
     @Test
-    void validate_validMemberInput_acceptsForm() {
+    void validate_emailWithOuterSpaces_normalizesBeforeValidation() {
         SignupForm form = new SignupForm();
-        form.setEmail("member@cakeshop.local");
+        form.setEmail("  MEMBER@cakeshop.local  ");
         form.setPassword("Password1!");
         form.setPasswordConfirm("Password1!");
         form.setName("홍길동");
@@ -50,6 +50,7 @@ class SignupFormTests {
         form.setBirthDate(LocalDate.of(2000, 1, 15));
 
         assertThat(validator.validate(form)).isEmpty();
+        assertThat(form.getEmail()).isEqualTo("member@cakeshop.local");
     }
 
     @Test

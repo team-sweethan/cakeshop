@@ -2,6 +2,7 @@ package com.cakeshop.domain.member.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -25,6 +26,8 @@ import com.cakeshop.domain.member.entity.MemberStatus;
 import com.cakeshop.domain.member.service.MemberAdminService;
 import com.cakeshop.domain.member.service.MemberSessionService;
 import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
+import com.cakeshop.domain.order.dto.view.OrderMemberOrderView;
+import com.cakeshop.domain.order.service.OrderMemberQueryService;
 import com.cakeshop.global.security.MemberDetails;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
@@ -57,7 +60,8 @@ class MemberAdminControllerTests {
                 .standaloneSetup(
                         new MemberAdminController(
                                 memberAdminService,
-                                mock(MemberSessionService.class)))
+                                mock(MemberSessionService.class),
+                                mock(OrderMemberQueryService.class)))
                 .build();
 
         mockMvc.perform(get("/admin/members")
@@ -104,7 +108,8 @@ class MemberAdminControllerTests {
                 .standaloneSetup(
                         new MemberAdminController(
                                 memberAdminService,
-                                mock(MemberSessionService.class)))
+                                mock(MemberSessionService.class),
+                                mock(OrderMemberQueryService.class)))
                 .build();
 
         mockMvc.perform(get("/admin/members")
@@ -135,23 +140,41 @@ class MemberAdminControllerTests {
         MemberAdminService memberAdminService =
                 mock(MemberAdminService.class);
         MemberAdminDetailView member = detail();
+        OrderMemberQueryService orderMemberQueryService =
+                mock(OrderMemberQueryService.class);
+        PageResult<OrderMemberOrderView> orderPageResult =
+                new PageResult<>(
+                        List.of(),
+                        new PageRequest(2, 10),
+                        12);
 
         when(memberAdminService.getMemberDetail(1L))
                 .thenReturn(member);
+        when(orderMemberQueryService.getAdminMemberOrders(anyLong(), any()))
+                .thenReturn(orderPageResult);
 
         MockMvc mockMvc = MockMvcBuilders
                 .standaloneSetup(
                         new MemberAdminController(
                                 memberAdminService,
-                                mock(MemberSessionService.class)))
+                                mock(MemberSessionService.class),
+                                orderMemberQueryService))
                 .build();
 
-        mockMvc.perform(get("/admin/members/1"))
+        mockMvc.perform(get("/admin/members/1")
+                        .param("orderPage", "2"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("admin/member/detail"))
-                .andExpect(model().attribute("member", member));
+                .andExpect(model().attribute("member", member))
+                .andExpect(model().attribute("orderPageResult", orderPageResult));
 
         verify(memberAdminService).getMemberDetail(1L);
+        ArgumentCaptor<PageRequest> orderPageCaptor =
+                ArgumentCaptor.forClass(PageRequest.class);
+        verify(orderMemberQueryService)
+                .getAdminMemberOrders(anyLong(), orderPageCaptor.capture());
+        assertThat(orderPageCaptor.getValue().getPage()).isEqualTo(2);
+        assertThat(orderPageCaptor.getValue().getSize()).isEqualTo(10);
     }
 
     @Test
@@ -170,7 +193,8 @@ class MemberAdminControllerTests {
                 .standaloneSetup(
                         new MemberAdminController(
                                 memberAdminService,
-                                memberSessionService))
+                                memberSessionService,
+                                mock(OrderMemberQueryService.class)))
                 .setCustomArgumentResolvers(
                         new AdminDetailsArgumentResolver())
                 .build();
@@ -200,7 +224,8 @@ class MemberAdminControllerTests {
                 .standaloneSetup(
                         new MemberAdminController(
                                 memberAdminService,
-                                memberSessionService))
+                                memberSessionService,
+                                mock(OrderMemberQueryService.class)))
                 .setCustomArgumentResolvers(
                         new AdminDetailsArgumentResolver())
                 .build();
@@ -227,7 +252,8 @@ class MemberAdminControllerTests {
                 .standaloneSetup(
                         new MemberAdminController(
                                 memberAdminService,
-                                mock(MemberSessionService.class)))
+                                mock(MemberSessionService.class),
+                                mock(OrderMemberQueryService.class)))
                 .setCustomArgumentResolvers(
                         new AdminDetailsArgumentResolver())
                 .build();
