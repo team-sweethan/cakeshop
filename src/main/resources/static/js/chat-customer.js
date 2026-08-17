@@ -126,7 +126,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // D. 웹소켓 연결/재연결 완료 시 단절 구간 오프라인 메시지 및 주문 목록 재조회 완료 후 최신 읽음 커서 전파!
         await loadMessages(roomId);
         loadOrderBanners(roomId);
-        if (lastFetchedMessageId > 0) {
+        if (lastFetchedMessageId > 0 && document.visibilityState === "visible") {
           sendReadCursor(roomId, lastFetchedMessageId);
         }
 

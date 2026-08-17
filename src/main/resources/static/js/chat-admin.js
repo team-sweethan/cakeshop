@@ -199,7 +199,7 @@ document.addEventListener("DOMContentLoaded", () => {
         subscribeActiveRoomWebSocket(selectedChatRoomId);
         await loadAdminMessages(selectedChatRoomId, true);
         await loadAdminSidePanel(selectedChatRoomId);
-        if (lastFetchedMessageId > 0) {
+        if (lastFetchedMessageId > 0 && document.visibilityState === "visible") {
           markRead(selectedChatRoomId, lastFetchedMessageId);
         }
       }
