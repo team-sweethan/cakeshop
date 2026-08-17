@@ -266,11 +266,12 @@ document.addEventListener("DOMContentLoaded", () => {
         existingRoom.responseStatus = newStatus;
         if (msg.id) existingRoom.lastMessageId = msg.id;
 
+        const isVisibleActive = isCurrentActive && document.visibilityState === "visible";
         if (typeof msg.unreadCount === "number") {
-          existingRoom.unreadCount = isCurrentActive ? 0 : msg.unreadCount;
-        } else if (!isCurrentActive && msg.senderType !== "ADMIN") {
+          existingRoom.unreadCount = isVisibleActive ? 0 : msg.unreadCount;
+        } else if (!isVisibleActive && msg.senderType !== "ADMIN") {
           existingRoom.unreadCount = (existingRoom.unreadCount || 0) + 1;
-        } else if (isCurrentActive || msg.senderType === "ADMIN") {
+        } else if (isVisibleActive || msg.senderType === "ADMIN") {
           existingRoom.unreadCount = 0;
         }
       }

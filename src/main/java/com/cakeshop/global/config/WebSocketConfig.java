@@ -92,7 +92,21 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                                 throw new AccessDeniedException("올바르지 않은 채팅방 구독 목적지입니다.");
                             }
                         }
-                        // B-3. 그 외 허용되지 않은 상위 와일드카드(/topic/**, /topic/* 등) 구독 전면 차단
+                        // B-3. 개인 알림 토픽(/topic/notifications/{memberId}) 구독은 본인 또는 관리자 검증
+                        else if (destination.startsWith("/topic/notifications/")) {
+                            String subPath = destination.substring("/topic/notifications/".length());
+                            try {
+                                Long targetMemberId = Long.parseLong(subPath);
+                                if (principal instanceof Authentication auth && auth.getPrincipal() instanceof MemberDetails memberDetails) {
+                                    if (!memberDetails.getMemberId().equals(targetMemberId) && !memberDetails.isAdmin()) {
+                                        throw new AccessDeniedException("본인의 알림 토픽만 구독할 수 있습니다.");
+                                    }
+                                }
+                            } catch (NumberFormatException e) {
+                                throw new AccessDeniedException("올바르지 않은 알림 구독 목적지입니다.");
+                            }
+                        }
+                        // B-4. 그 외 허용되지 않은 상위 와일드카드(/topic/**, /topic/* 등) 구독 전면 차단
                         else {
                             throw new AccessDeniedException("허용되지 않은 구독 목적지입니다.");
                         }

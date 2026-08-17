@@ -6,23 +6,26 @@
       return;
     }
 
+    const currentMemberId = getCurrentMemberId();
+    const isAdmin = isAdminUser();
+
+    // 비로그인 익명 유저인 경우 보호된 웹소켓 연결 시도 안함
+    if (!currentMemberId && !isAdmin) {
+      return;
+    }
+
+    if (notificationStompClient && notificationStompClient.connected) {
+      return;
+    }
+
     const socket = new SockJS("/ws");
     notificationStompClient = Stomp.over(socket);
     notificationStompClient.debug = null;
 
     notificationStompClient.connect({}, () => {
-      const currentMemberId = getCurrentMemberId();
-
-      // 1. 개인 고객 알림 구독 (/topic/notifications/{memberId})
+      // 1. 개인 알림 구독 (/topic/notifications/{memberId})
       if (currentMemberId) {
         notificationStompClient.subscribe(`/topic/notifications/${currentMemberId}`, (event) => {
-          handleNotificationReceived(event);
-        });
-      }
-
-      // 2. 관리자 알림 구독 (/topic/admin/notifications)
-      if (isAdminUser()) {
-        notificationStompClient.subscribe("/topic/admin/notifications", (event) => {
           handleNotificationReceived(event);
         });
       }
@@ -47,7 +50,7 @@
         updateNotificationUnreadCount();
       }
 
-      // 3. 현재 알림 목록 화면(/notifications)을 보는 중인 경우 DOM 동적 상단 삽입
+      // 3. 현재 알림 목록 화면(/notifications 또는 /admin/notifications)에 DOM 동적 상단 삽입
       appendNotificationToDOM(notification);
     } catch (e) {
       console.error("알림 수신 처리 오류:", e);
@@ -55,30 +58,68 @@
   }
 
   function appendNotificationToDOM(notification) {
-    const listContainer = document.querySelector("[data-notification-list]");
-    if (!listContainer) return;
+    // 1. 고객용 알림 목록 컨테이너 (#notification-container)
+    const customerContainer = document.getElementById("notification-container");
+    if (customerContainer) {
+      const detailBtn = notification.targetUrl
+        ? `<a class="btn" data-noti-id="${notification.id || ''}" href="${escapeHtmlNoti(notification.targetUrl)}">상세</a>`
+        : "";
 
-    const item = document.createElement("div");
-    item.className = "notification-card notification-card--unread";
-    item.style.cssText = "margin-bottom: 12px; padding: 12px; border: 1px solid #e5e7eb; border-radius: 6px; background: #fff;";
-    item.innerHTML = `
-      <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-        <span class="badge badge--primary" style="font-weight: bold;">${escapeHtmlNoti(notification.title || "알림")}</span>
-        <span class="text-muted" style="font-size: 12px;">방금 전</span>
-      </div>
-      <p style="margin: 0; font-size: 13px; color: #374151;">${escapeHtmlNoti(notification.content || "")}</p>
-    `;
-    if (notification.targetUrl) {
-      item.style.cursor = "pointer";
-      item.addEventListener("click", () => {
-        window.location.href = notification.targetUrl;
-      });
+      const article = document.createElement("article");
+      article.className = "notification-item is-unread";
+      if (notification.id) article.setAttribute("data-id", notification.id);
+      article.innerHTML = `
+        <div class="cluster" style="align-items:flex-start">
+          <span class="notification-dot" aria-hidden="true"></span>
+          <div>
+            <span class="badge">${escapeHtmlNoti(notification.title || '알림')}</span>
+            <p>${escapeHtmlNoti(notification.content || '')}</p>
+            <time class="text-muted">방금 전</time>
+          </div>
+        </div>
+        ${detailBtn}
+      `;
+
+      if (customerContainer.querySelector("p.text-muted")) {
+        customerContainer.innerHTML = "";
+      }
+
+      if (customerContainer.firstChild) {
+        customerContainer.insertBefore(article, customerContainer.firstChild);
+      } else {
+        customerContainer.appendChild(article);
+      }
+      return;
     }
 
-    if (listContainer.firstChild) {
-      listContainer.insertBefore(item, listContainer.firstChild);
-    } else {
-      listContainer.appendChild(item);
+    // 2. 관리자용 알림 목록 컨테이너 (#admin-notification-container)
+    const adminContainer = document.getElementById("admin-notification-container");
+    if (adminContainer) {
+      const detailBtn = notification.targetUrl
+        ? `<a class="btn btn--sm" data-noti-id="${notification.id || ''}" href="${escapeHtmlNoti(notification.targetUrl)}">상세</a>`
+        : "";
+
+      const tr = document.createElement("tr");
+      tr.className = "admin-noti-row is-unread";
+      if (notification.id) tr.setAttribute("data-id", notification.id);
+      tr.style.cssText = "font-weight: 600; background-color: rgba(255, 243, 205, 0.2);";
+      tr.innerHTML = `
+        <td>방금 전</td>
+        <td><span class="badge">${escapeHtmlNoti(notification.title || '알림')}</span></td>
+        <td>${escapeHtmlNoti(notification.content || '')}</td>
+        <td><span class="badge badge--info">미읽음</span></td>
+        <td>${detailBtn}</td>
+      `;
+
+      if (adminContainer.querySelector("td.text-muted")) {
+        adminContainer.innerHTML = "";
+      }
+
+      if (adminContainer.firstChild) {
+        adminContainer.insertBefore(tr, adminContainer.firstChild);
+      } else {
+        adminContainer.appendChild(tr);
+      }
     }
   }
 

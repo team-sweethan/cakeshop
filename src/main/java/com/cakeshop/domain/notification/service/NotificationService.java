@@ -237,22 +237,9 @@ public class NotificationService {
             if (receiverId != null) {
                 messagingTemplate.convertAndSend("/topic/notifications/" + receiverId, responseDTO);
             }
-            if (responseDTO.getType() != null && isAdminNotificationType(responseDTO.getType())) {
-                messagingTemplate.convertAndSend("/topic/admin/notifications", responseDTO);
-            }
         } catch (Exception e) {
             // 웹소켓 전파 예외는 메인 발송 로직에 영향을 주지 않는다.
         }
-    }
-
-    private boolean isAdminNotificationType(NotificationType type) {
-        if (type == null) return false;
-        return type.name().startsWith("ADMIN_")
-                || type == NotificationType.NEW_ORDER
-                || type == NotificationType.NEW_CUSTOM_ORDER
-                || type == NotificationType.ORDER_CANCEL_REQUEST
-                || type == NotificationType.NEW_REVIEW
-                || type == NotificationType.REFUND_FAILED;
     }
 
     // 특정 회원 알림 목록 최신순 페이징 조회
