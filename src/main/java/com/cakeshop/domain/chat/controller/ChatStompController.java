@@ -74,7 +74,7 @@ public class ChatStompController {
 
         MemberDetails memberDetails = (MemberDetails) ((Authentication) principal).getPrincipal();
 
-        chatService.updateReadCursor(
+        Long actualReadMessageId = chatService.updateReadCursor(
                 request.getChatRoomId(),
                 memberDetails.getMemberId(),
                 memberDetails.isAdmin(),
@@ -84,7 +84,7 @@ public class ChatStompController {
         // 읽음 처리 완료 후 상대방 화면에 읽음 이벤트 전파 (/topic/chat/{roomId}/read)
         Object readPayload = Map.of(
                 "chatRoomId", request.getChatRoomId(),
-                "lastReadMessageId", request.getLastReadMessageId(),
+                "lastReadMessageId", actualReadMessageId,
                 "readerSide", memberDetails.isAdmin() ? "ADMIN" : "CUSTOMER"
         );
 

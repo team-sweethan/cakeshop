@@ -12,6 +12,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let stompClient = null;
   let roomSub = null;
   let readSub = null;
+  let orderSub = null;
 
   const adminRoomListContainer = document.getElementById("adminChatRoomList");
   const adminChatMessagesContainer = document.getElementById("adminChatMessages");
@@ -20,15 +21,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const saveAdminNoteBtn = document.getElementById("saveAdminNoteBtn");
   const adminSearchInput = document.getElementById("adminChatSearch");
 
-  const adminChatImageInput = document.getElementById("adminChatImageInput");
-  const adminImageFileName = document.getElementById("adminImageFileName");
-
   // 목업 스크립트(admin-mockup.js) 이벤트 간섭 전면 차단을 위한 폼 클로닝
   if (adminChatForm) {
     const freshForm = adminChatForm.cloneNode(true);
     adminChatForm.parentNode.replaceChild(freshForm, adminChatForm);
     adminChatForm = freshForm;
   }
+
+  const adminChatImageInput = document.getElementById("adminChatImageInput");
+  const adminImageFileName = document.getElementById("adminImageFileName");
 
   // CSRF 메타 태그 획득 헬퍼
   function getCsrfHeaders() {
@@ -192,10 +193,12 @@ document.addEventListener("DOMContentLoaded", () => {
       // 배열 맨 앞으로 이동
       adminRoomsData = [existingRoom, ...adminRoomsData.filter((r) => (r.chatRoomId || r.id) !== rId)];
     } else {
+      const resolvedCustomerId = msg.customerId || (msg.senderType === "CUSTOMER" ? msg.senderId : null);
+      const resolvedCustomerName = msg.customerName || (msg.senderType === "CUSTOMER" ? msg.senderName : (resolvedCustomerId ? `고객 #${resolvedCustomerId}` : "고객"));
       const newRoom = {
         chatRoomId: rId,
-        customerId: msg.senderId,
-        customerName: msg.senderName || `고객 #${msg.senderId}`,
+        customerId: resolvedCustomerId,
+        customerName: resolvedCustomerName,
         responseStatus: newStatus,
         lastMessageContent: msg.content || (msg.imageUrls && msg.imageUrls.length > 0 ? "(사진)" : ""),
         lastMessageCreatedAt: msg.createdAt,
@@ -349,12 +352,13 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // 활성화된 채팅방 메시지/읽음 구독
+  // 활성화된 채팅방 메시지/읽음/연동주문 구독
   function subscribeActiveRoomWebSocket(roomId) {
     if (!stompClient || !stompClient.connected) return;
 
     if (roomSub) roomSub.unsubscribe();
     if (readSub) readSub.unsubscribe();
+    if (orderSub) orderSub.unsubscribe();
 
     // 대화 수신 구독
     roomSub = stompClient.subscribe(`/topic/chat/${roomId}`, (message) => {
@@ -377,6 +381,17 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       } catch (e) {
         console.error("고객 읽음 수신 오류:", e);
+      }
+    });
+
+    // 실시간 연동 주문 갱신 구독
+    orderSub = stompClient.subscribe(`/topic/chat/${roomId}/orders`, (event) => {
+      try {
+        if (selectedChatRoomId === roomId) {
+          loadAdminSidePanel(roomId);
+        }
+      } catch (e) {
+        console.error("관리자 연동 주문 갱신 수신 오류:", e);
       }
     });
   }

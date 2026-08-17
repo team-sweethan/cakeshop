@@ -17,6 +17,8 @@ import lombok.Setter;
 public class ChatMessageResponse {
     private Long id;                                   // 메시지 ID
     private Long chatRoomId;                           // 채팅방 ID
+    private Long customerId;                           // 채팅방 고객 회원 ID
+    private String customerName;                       // 채팅방 고객 이름
     private Long senderId;                             // 발신자 회원 ID
     private String senderName;                         // 발신자 이름 (예: "홍길동", "관리자")
     private String senderType;                         // 발신자 유형 ("CUSTOMER", "ADMIN")

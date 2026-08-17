@@ -231,9 +231,16 @@ public class ChatService {
         }
         String senderType = isAdmin ? "ADMIN" : "CUSTOMER";
         String senderName = isAdmin ? "관리자" : "고객";
+
+        ChatRoom chatRoom = chatMapper.findChatRoomById(roomId);
+        Long customerId = chatRoom != null ? chatRoom.getCustomerId() : null;
+        String customerName = customerId != null ? memberChatQueryService.getCustomerName(customerId) : "고객";
+
         return ChatMessageResponse.builder()
                 .id(message.getId())
                 .chatRoomId(message.getChatRoomId())
+                .customerId(customerId)
+                .customerName(customerName)
                 .senderId(message.getSenderId())
                 .senderName(senderName)
                 .senderType(senderType)
@@ -379,9 +386,9 @@ public class ChatService {
         chatMapper.upsertChatRoomOrder(roomOrder);
     }
 
-    // 고객·관리자 읽음 커서 갱신 (Derived Side 기반 해킹 차단)
+    // 고객·관리자 읽음 커서 갱신 (Derived Side 기반 해킹 차단, 실제 DB 반영 커서 ID 반환)
     @Transactional
-    public void updateReadCursor(Long chatRoomId, Long currentUserId, boolean isAdmin, Long lastReadMessageId) {
+    public Long updateReadCursor(Long chatRoomId, Long currentUserId, boolean isAdmin, Long lastReadMessageId) {
         if (lastReadMessageId == null || lastReadMessageId <= 0) {
             throw new BusinessException(CommonErrorCode.INVALID_INPUT);
         }
@@ -407,6 +414,11 @@ public class ChatService {
                 .build();
 
         chatMapper.upsertReadCursor(cursor);
+
+        ChatRoomReadCursor actualCursor = chatMapper.findReadCursor(chatRoomId, derivedSide);
+        return actualCursor != null && actualCursor.getLastReadMessageId() != null
+                ? actualCursor.getLastReadMessageId()
+                : lastReadMessageId;
     }
 
     // 고객·관리자 읽음 커서 조회 (공통)
@@ -597,9 +609,13 @@ public class ChatService {
                     ? productNameMap.get(msg.getProductId())
                     : null;
 
+            String customerName = memberChatQueryService.getCustomerName(chatRoom.getCustomerId());
+
             return ChatMessageResponse.builder()
                     .id(msg.getId())
                     .chatRoomId(msg.getChatRoomId())
+                    .customerId(chatRoom.getCustomerId())
+                    .customerName(customerName)
                     .senderId(msg.getSenderId())
                     .senderName(senderName)
                     .senderType(senderType)
