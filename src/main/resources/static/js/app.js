@@ -31,12 +31,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
 document.addEventListener("cart:updated", (event) => updateCartCount(event.detail));
 
-// 안 읽은 알림 개수 DB API 호출 및 뱃지 업데이트
+// 안 읽은 알림 개수 DB API 호출 및 뱃지 업데이트 (세대 번호 관리로 지연 응답 덮어쓰기 방지)
+let unreadCountSeq = 0;
 async function updateNotificationUnreadCount() {
+  const currentSeq = ++unreadCountSeq;
   try {
     const response = await fetch('/api/notifications/unread-count');
-    if (!response.ok) return;
+    if (!response.ok || currentSeq !== unreadCountSeq) return;
     const count = await response.json();
+    if (currentSeq !== unreadCountSeq) return;
     document.querySelectorAll('[data-unread-count]').forEach((element) => {
       element.textContent = count;
       element.style.display = count > 0 ? 'inline-block' : 'none';
@@ -51,7 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // 토스트 팝업 생성 및 렌더링 헬퍼 함수
-function showToast(title, content, targetUrl) {
+function showToast(title, content, targetUrl, notificationId) {
   let container = document.querySelector(".toast-container");
   if (!container) {
     container = document.createElement("div");
@@ -67,7 +70,22 @@ function showToast(title, content, targetUrl) {
   `;
 
   toast.addEventListener("click", () => {
-    if (targetUrl) {
+    if (notificationId) {
+      const csrfToken = document.querySelector('meta[name="_csrf"]')?.getAttribute('content');
+      const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.getAttribute('content');
+      const headers = {};
+      if (csrfToken && csrfHeader) headers[csrfHeader] = csrfToken;
+
+      fetch(`/api/notifications/${notificationId}/read`, {
+        method: "PATCH",
+        headers: headers,
+        keepalive: true
+      }).finally(() => {
+        if (targetUrl) {
+          window.location.href = targetUrl;
+        }
+      });
+    } else if (targetUrl) {
       window.location.href = targetUrl;
     }
   });

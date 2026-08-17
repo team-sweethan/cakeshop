@@ -42,7 +42,7 @@
 
       // 1. 토스트 팝업 띄우기
       if (typeof showToast === "function") {
-        showToast(notification.title, notification.content, notification.targetUrl);
+        showToast(notification.title, notification.content, notification.targetUrl, notification.id);
       }
 
       // 2. 헤더 알림 배지 숫자 +1 동적 증가
@@ -168,15 +168,22 @@
   }
 
   function attachCustomerItemEvents(article, notification) {
+    if (notification && notification.id) article.setAttribute("data-id", notification.id);
     const detailLink = article.querySelector("a[data-noti-id]");
+    if (detailLink && notification && notification.id) detailLink.setAttribute("data-noti-id", notification.id);
+
+    if (article.dataset.hasNotiClick === "true") return;
+    article.dataset.hasNotiClick = "true";
+
     if (detailLink) {
       detailLink.addEventListener("click", function (e) {
         const isUnread = article.classList.contains("is-unread");
-        if (!isUnread || !notification.id) return;
+        const notiId = this.getAttribute("data-noti-id") || article.getAttribute("data-id");
+        if (!isUnread || !notiId) return;
 
         e.preventDefault();
         const targetHref = this.href;
-        markReadApi(notification.id).finally(() => {
+        markReadApi(notiId).finally(() => {
           location.href = targetHref;
         });
       });
@@ -184,9 +191,10 @@
 
     article.addEventListener("click", function (e) {
       if (e.target.closest("a, button")) return;
-      if (!notification.id || !article.classList.contains("is-unread")) return;
+      const notiId = article.getAttribute("data-id");
+      if (!notiId || !article.classList.contains("is-unread")) return;
 
-      markReadApi(notification.id).then(ok => {
+      markReadApi(notiId).then(ok => {
         if (ok) {
           article.classList.remove("is-unread");
           const dot = article.querySelector(".notification-dot");
@@ -200,15 +208,22 @@
   }
 
   function attachAdminRowEvents(tr, notification) {
+    if (notification && notification.id) tr.setAttribute("data-id", notification.id);
     const detailLink = tr.querySelector("a[data-noti-id]");
+    if (detailLink && notification && notification.id) detailLink.setAttribute("data-noti-id", notification.id);
+
+    if (tr.dataset.hasNotiClick === "true") return;
+    tr.dataset.hasNotiClick = "true";
+
     if (detailLink) {
       detailLink.addEventListener("click", function (e) {
         const isUnread = tr.classList.contains("is-unread");
-        if (!isUnread || !notification.id) return;
+        const notiId = this.getAttribute("data-noti-id") || tr.getAttribute("data-id");
+        if (!isUnread || !notiId) return;
 
         e.preventDefault();
         const targetHref = this.href;
-        markReadApi(notification.id).finally(() => {
+        markReadApi(notiId).finally(() => {
           location.href = targetHref;
         });
       });
@@ -216,9 +231,10 @@
 
     tr.addEventListener("click", function (e) {
       if (e.target.closest("a, button")) return;
-      if (!notification.id || !tr.classList.contains("is-unread")) return;
+      const notiId = tr.getAttribute("data-id");
+      if (!notiId || !tr.classList.contains("is-unread")) return;
 
-      markReadApi(notification.id).then(ok => {
+      markReadApi(notiId).then(ok => {
         if (ok) {
           tr.classList.remove("is-unread");
           tr.style.cssText = "";
