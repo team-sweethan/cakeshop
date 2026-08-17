@@ -9,7 +9,8 @@ public record TodayPickupScheduleView(
         LocalDateTime pickupAt,
         String orderNumber,
         String productName,
-        OrderStatus status
+        OrderStatus status,
+        PickupUrgency urgency
 ) {
 
     public String statusLabel() {

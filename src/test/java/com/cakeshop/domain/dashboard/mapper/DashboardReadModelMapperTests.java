@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.dashboard.dto.view.LowStockProductView;
+import com.cakeshop.domain.dashboard.dto.view.PickupUrgency;
 import com.cakeshop.domain.dashboard.dto.view.RecentOrderView;
 import com.cakeshop.domain.dashboard.dto.view.TodayPickupScheduleView;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
@@ -24,6 +25,7 @@ class DashboardReadModelMapperTests {
     private static final LocalDateTime START =
             LocalDateTime.of(2026, 8, 6, 0, 0);
     private static final LocalDateTime END = START.plusDays(1);
+    private static final LocalDateTime PICKUP_QUERY_REFERENCE_AT = START.plusHours(10);
 
     private final DashboardReadModelMapper dashboardReadModelMapper;
     private final JdbcTemplate jdbcTemplate;
@@ -344,14 +346,14 @@ class DashboardReadModelMapperTests {
                 "SCHEDULE-11",
                 "GENERAL",
                 "READY_FOR_PICKUP",
-                START.plusHours(11),
+                PICKUP_QUERY_REFERENCE_AT.plusHours(1),
                 "열한시 상품"
         );
         long nine = insertPickupOrder(
                 "SCHEDULE-09",
                 "GENERAL",
                 "READY_FOR_PICKUP",
-                START.plusHours(9),
+                PICKUP_QUERY_REFERENCE_AT.minusNanos(1_000),
                 "딸기 케이크",
                 "초코 케이크"
         );
@@ -359,21 +361,21 @@ class DashboardReadModelMapperTests {
                 "SCHEDULE-10-A",
                 "GENERAL",
                 "READY_FOR_PICKUP",
-                START.plusHours(10),
+                PICKUP_QUERY_REFERENCE_AT,
                 "열시 첫 상품"
         );
         long tenSecond = insertPickupOrder(
                 "SCHEDULE-10-B",
                 "CUSTOM",
                 "READY_FOR_PICKUP",
-                START.plusHours(10),
+                PICKUP_QUERY_REFERENCE_AT,
                 "열시 두 번째 상품"
         );
         long twelve = insertPickupOrder(
                 "SCHEDULE-12",
                 "GENERAL",
                 "READY_FOR_PICKUP",
-                START.plusHours(12),
+                PICKUP_QUERY_REFERENCE_AT.plusHours(1).plusNanos(1_000),
                 "열두시 상품"
         );
         insertPickupOrder(
@@ -385,7 +387,12 @@ class DashboardReadModelMapperTests {
         );
 
         List<TodayPickupScheduleView> schedules =
-                dashboardReadModelMapper.findTodayPickupSchedules(START, END, 5);
+                dashboardReadModelMapper.findTodayPickupSchedules(
+                        START,
+                        END,
+                        PICKUP_QUERY_REFERENCE_AT,
+                        5
+                );
 
         assertThat(schedules)
                 .extracting(TodayPickupScheduleView::orderId)
@@ -393,6 +400,16 @@ class DashboardReadModelMapperTests {
         assertThat(schedules.getFirst().productName()).isEqualTo("딸기 케이크 외 1개");
         assertThat(schedules.getFirst().status()).isEqualTo(OrderStatus.READY_FOR_PICKUP);
         assertThat(schedules.getFirst().statusLabel()).isEqualTo("픽업 준비");
+        assertThat(schedules)
+                .extracting(TodayPickupScheduleView::urgency)
+                .containsExactly(
+                        PickupUrgency.OVERDUE,
+                        PickupUrgency.IMMINENT,
+                        PickupUrgency.IMMINENT,
+                        PickupUrgency.IMMINENT,
+                        PickupUrgency.SCHEDULED
+                );
+        assertThat(schedules.getFirst().urgency().label()).isEqualTo("지연");
     }
 
     @Test
@@ -407,7 +424,12 @@ class DashboardReadModelMapperTests {
 
         long count = dashboardReadModelMapper.countTodayPickups(START, END);
         List<TodayPickupScheduleView> schedules =
-                dashboardReadModelMapper.findTodayPickupSchedules(START, END, 5);
+                dashboardReadModelMapper.findTodayPickupSchedules(
+                        START,
+                        END,
+                        PICKUP_QUERY_REFERENCE_AT,
+                        5
+                );
 
         assertThat(count).isZero();
         assertThat(schedules).isEmpty();

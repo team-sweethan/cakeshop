@@ -110,7 +110,13 @@
                     ELSE ''
                 END
             ) AS product_name,
-            pickup_order.status
+            pickup_order.status,
+            CASE
+                WHEN pickup_order.pickup_at &lt; #{queryReferenceAt} THEN 'OVERDUE'
+                WHEN pickup_order.pickup_at &lt;= DATE_ADD(#{queryReferenceAt}, INTERVAL 1 HOUR)
+                    THEN 'IMMINENT'
+                ELSE 'SCHEDULED'
+            END AS urgency
         FROM orders AS pickup_order
         WHERE pickup_order.pickup_at &gt;= #{start}
           AND pickup_order.pickup_at &lt; #{end}

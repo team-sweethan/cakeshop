@@ -43,6 +43,7 @@ public interface DashboardReadModelMapper {
     List<TodayPickupScheduleView> findTodayPickupSchedules(
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end,
+            @Param("queryReferenceAt") LocalDateTime queryReferenceAt,
             @Param("limit") int limit
     );
 

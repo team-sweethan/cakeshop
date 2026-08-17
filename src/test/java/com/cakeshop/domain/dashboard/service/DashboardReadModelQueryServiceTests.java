@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.dashboard.dto.view.DashboardView;
 import com.cakeshop.domain.dashboard.dto.view.LowStockProductView;
+import com.cakeshop.domain.dashboard.dto.view.PickupUrgency;
 import com.cakeshop.domain.dashboard.dto.view.RecentOrderView;
 import com.cakeshop.domain.dashboard.dto.view.TodayPickupScheduleView;
 import com.cakeshop.domain.dashboard.mapper.DashboardReadModelMapper;
@@ -29,6 +30,8 @@ class DashboardReadModelQueryServiceTests {
             Instant.parse("2026-08-06T15:30:00Z"),
             SEOUL
     );
+    private static final LocalDateTime QUERY_REFERENCE_AT =
+            LocalDateTime.of(2026, 8, 7, 0, 30);
 
     @Mock
     private DashboardReadModelMapper dashboardReadModelMapper;
@@ -48,10 +51,16 @@ class DashboardReadModelQueryServiceTests {
                 start.plusHours(11),
                 "ORDER-10",
                 "딸기 케이크",
-                OrderStatus.READY_FOR_PICKUP
+                OrderStatus.READY_FOR_PICKUP,
+                PickupUrgency.SCHEDULED
         );
         when(dashboardReadModelMapper.countTodayPickups(start, end)).thenReturn(4L);
-        when(dashboardReadModelMapper.findTodayPickupSchedules(start, end, 5))
+        when(dashboardReadModelMapper.findTodayPickupSchedules(
+                start,
+                end,
+                QUERY_REFERENCE_AT,
+                5
+        ))
                 .thenReturn(List.of(pickup));
         RecentOrderView recentOrder = new RecentOrderView(
                 20L,
@@ -77,7 +86,7 @@ class DashboardReadModelQueryServiceTests {
         DashboardView dashboard = service.getDashboard();
 
         assertThat(dashboard.queryReferenceAt())
-                .isEqualTo(LocalDateTime.of(2026, 8, 7, 0, 30));
+                .isEqualTo(QUERY_REFERENCE_AT);
         assertThat(dashboard.todayOrderCount()).isEqualTo(3L);
         assertThat(dashboard.todaySalesAmount()).isEqualByComparingTo("120000");
         assertThat(dashboard.approvalPendingCount()).isEqualTo(5L);
@@ -95,7 +104,12 @@ class DashboardReadModelQueryServiceTests {
         verify(dashboardReadModelMapper).countPaymentsRequiringAttention();
         verify(dashboardReadModelMapper).countCustomOrdersInProduction();
         verify(dashboardReadModelMapper).countTodayPickups(start, end);
-        verify(dashboardReadModelMapper).findTodayPickupSchedules(start, end, 5);
+        verify(dashboardReadModelMapper).findTodayPickupSchedules(
+                start,
+                end,
+                QUERY_REFERENCE_AT,
+                5
+        );
         verify(dashboardReadModelMapper).findRecentOrders(5);
         verify(dashboardReadModelMapper).countLowStockProducts();
         verify(dashboardReadModelMapper).findLowStockProducts(5);
