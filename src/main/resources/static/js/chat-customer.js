@@ -93,7 +93,7 @@ document.addEventListener("DOMContentLoaded", () => {
           try {
             const readData = JSON.parse(event.body);
             if (readData.readerSide === "ADMIN") {
-              markAllMyMessagesRead();
+              markAllMyMessagesRead(readData.lastReadMessageId || readData.lastMessageId);
             }
           } catch (e) {
             console.error("읽음 이벤트 수신 오류:", e);
@@ -110,8 +110,9 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         });
 
-        // D. 웹소켓 연결 완료 시 초기 읽음 커서도 소켓으로 실시간 전파!
+        // D. 웹소켓 연결/재연결 완료 시 단절 구간 오프라인 메시지 및 커서 재동기화!
         if (lastFetchedMessageId > 0) {
+          loadMessages(roomId);
           sendReadCursor(roomId, lastFetchedMessageId);
         }
 
@@ -157,11 +158,21 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // 상대방이 읽었을 때 내 메시지의 "미읽음" 텍스트를 "읽음"으로 실시간 변경
-  function markAllMyMessagesRead() {
-    const readBadges = document.querySelectorAll(".chat-msg--me .chat-msg__read");
-    readBadges.forEach((badge) => {
-      badge.textContent = "읽음";
+  // 상대방이 읽었을 때 내 메시지의 "미읽음" 텍스트를 "읽음"으로 실시간 변경 (lastReadMessageId 이하만 반영)
+  function markAllMyMessagesRead(lastReadMessageId) {
+    const myMessages = document.querySelectorAll("#chatMessagesContainer .chat-msg--me");
+    myMessages.forEach((msgEl) => {
+      const msgIdAttr = msgEl.getAttribute("id");
+      if (msgIdAttr && msgIdAttr.startsWith("msg-")) {
+        const msgId = parseInt(msgIdAttr.substring("msg-".length()), 10);
+        if (!isNaN(msgId) && lastReadMessageId && msgId <= lastReadMessageId) {
+          const badge = msgEl.querySelector(".chat-msg__read");
+          if (badge) badge.textContent = "읽음";
+        }
+      } else if (!lastReadMessageId) {
+        const badge = msgEl.querySelector(".chat-msg__read");
+        if (badge) badge.textContent = "읽음";
+      }
     });
   }
 

@@ -155,9 +155,12 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       });
 
-      // 연결 완료 후 현재 활성화된 방이 있다면 소켓 구독 및 읽음 커서 재전파!
+      // 연결/재연결 완료 시 대시보드 대화방 목록 및 활성 대화 스냅샷 다시 동기화!
+      loadAdminRooms();
       if (selectedChatRoomId) {
         subscribeActiveRoomWebSocket(selectedChatRoomId);
+        loadAdminMessages(selectedChatRoomId);
+        loadAdminSidePanel(selectedChatRoomId);
         if (lastFetchedMessageId > 0) {
           markRead(selectedChatRoomId, lastFetchedMessageId);
         }
