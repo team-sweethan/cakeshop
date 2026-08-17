@@ -219,6 +219,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const rId = msg.chatRoomId;
     const newStatus = msg.responseStatus ? msg.responseStatus : (msg.senderType === "ADMIN" ? "WAITING_CUSTOMER" : "WAITING_ADMIN");
+    let existingRoom = adminRoomsData.find((r) => (r.chatRoomId || r.id) === rId);
+    const isCurrentActive = selectedChatRoomId === rId;
 
     // 현재 탭 필터 조건 검증 (미답변 탭일 때 답변완료 방이면 제거, 완료 탭일 때 미답변 방이면 제거)
     if (currentFilter === "unread" && newStatus !== "WAITING_ADMIN") {
@@ -249,9 +251,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       return;
     }
-
-    let existingRoom = adminRoomsData.find((r) => (r.chatRoomId || r.id) === rId);
-    const isCurrentActive = selectedChatRoomId === rId;
 
     if (existingRoom) {
       const isOlderMessage = msg.id && existingRoom.lastMessageId && msg.id < existingRoom.lastMessageId;
