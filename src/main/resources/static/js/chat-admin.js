@@ -186,6 +186,8 @@ document.addEventListener("DOMContentLoaded", () => {
       if (selectedChatRoomId === rId) {
         clearMainAndSidePanel();
       }
+      const unreadCountTotal = adminRoomsData.filter((r) => r.responseStatus === "WAITING_ADMIN").length;
+      updateUnreadTabBadge(unreadCountTotal);
       return;
     }
     if (currentFilter === "done" && newStatus !== "RESOLVED") {
@@ -194,6 +196,8 @@ document.addEventListener("DOMContentLoaded", () => {
       if (selectedChatRoomId === rId) {
         clearMainAndSidePanel();
       }
+      const unreadCountTotal = adminRoomsData.filter((r) => r.responseStatus === "WAITING_ADMIN").length;
+      updateUnreadTabBadge(unreadCountTotal);
       return;
     }
 
@@ -404,7 +408,7 @@ document.addEventListener("DOMContentLoaded", () => {
       try {
         const readData = JSON.parse(event.body);
         if (readData.readerSide === "CUSTOMER") {
-          markAllAdminMessagesRead();
+          markAllAdminMessagesRead(readData.lastReadMessageId || readData.lastMessageId);
         }
       } catch (e) {
         console.error("고객 읽음 수신 오류:", e);
@@ -484,10 +488,20 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function markAllAdminMessagesRead() {
-    const readBadges = document.querySelectorAll(".admin-chat-main-room .chat-msg--me .chat-msg__read");
-    readBadges.forEach((badge) => {
-      badge.textContent = "읽음";
+  function markAllAdminMessagesRead(lastReadMessageId) {
+    const readMessages = document.querySelectorAll(".admin-chat-main-room .chat-msg--me");
+    readMessages.forEach((msgEl) => {
+      const msgIdAttr = msgEl.getAttribute("id");
+      if (msgIdAttr && msgIdAttr.startsWith("admin-msg-")) {
+        const msgId = parseInt(msgIdAttr.substring("admin-msg-".length()), 10);
+        if (!isNaN(msgId) && lastReadMessageId && msgId <= lastReadMessageId) {
+          const badge = msgEl.querySelector(".chat-msg__read");
+          if (badge) badge.textContent = "읽음";
+        }
+      } else if (!lastReadMessageId) {
+        const badge = msgEl.querySelector(".chat-msg__read");
+        if (badge) badge.textContent = "읽음";
+      }
     });
   }
 

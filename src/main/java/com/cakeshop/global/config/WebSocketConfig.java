@@ -56,7 +56,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                         }
                     }
 
-                    // B. 토픽 구독(SUBSCRIBE) 권한 및 보안 검증
+                    // B. 토픽 구독(SUBSCRIBE) 권한 및 보안 검증 (허용 목록 이외 상위 와일드카드 /topic/** 전체 차단)
                     if (StompCommand.SUBSCRIBE.equals(command) && destination != null) {
                         // B-1. 관리자 전용 토픽(/topic/admin/**) 구독은 ADMIN 권한만 허용
                         if (destination.startsWith("/topic/admin/")) {
@@ -66,9 +66,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                                 throw new AccessDeniedException("관리자만 해당 토픽을 구독할 수 있습니다.");
                             }
                         }
-
                         // B-2. 채팅방 토픽(/topic/chat/**) 구독은 방 소유자 및 활성 회원 검증 (와일드카드 패턴 차단)
-                        if (destination.startsWith("/topic/chat/")) {
+                        else if (destination.startsWith("/topic/chat/")) {
                             String subPath = destination.substring("/topic/chat/".length());
                             String[] parts = subPath.split("/");
                             if (parts.length > 0 && !parts[0].isBlank()) {
@@ -87,6 +86,10 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                             } else {
                                 throw new AccessDeniedException("올바르지 않은 채팅방 구독 목적지입니다.");
                             }
+                        }
+                        // B-3. 그 외 허용되지 않은 상위 와일드카드(/topic/**, /topic/* 등) 구독 전면 차단
+                        else {
+                            throw new AccessDeniedException("허용되지 않은 구독 목적지입니다.");
                         }
                     }
                 }
