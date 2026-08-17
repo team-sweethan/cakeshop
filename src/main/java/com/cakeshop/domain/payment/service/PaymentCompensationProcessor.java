@@ -6,6 +6,7 @@ import com.cakeshop.domain.payment.infra.TossPaymentClient;
 import com.cakeshop.domain.payment.infra.TossPaymentClient.CancellationResult;
 import com.cakeshop.domain.payment.infra.TossPaymentClient.PaymentLookupResult;
 import com.cakeshop.domain.payment.service.PaymentRecoveryService.CompensationRequest;
+import com.cakeshop.domain.payment.service.TossPaymentApprovalResolver.ApprovalResolution;
 import com.cakeshop.global.error.BusinessException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,13 +23,16 @@ public class PaymentCompensationProcessor {
 
     private final PaymentRecoveryService paymentRecoveryService;
     private final TossPaymentClient tossPaymentClient;
+    private final TossPaymentApprovalResolver approvalResolver;
 
     public PaymentCompensationProcessor(
             PaymentRecoveryService paymentRecoveryService,
-            TossPaymentClient tossPaymentClient
+            TossPaymentClient tossPaymentClient,
+            TossPaymentApprovalResolver approvalResolver
     ) {
         this.paymentRecoveryService = paymentRecoveryService;
         this.tossPaymentClient = tossPaymentClient;
+        this.approvalResolver = approvalResolver;
     }
 
     public Optional<CompensationRequest> findPrepared(Payment payment) {
@@ -39,7 +43,7 @@ public class PaymentCompensationProcessor {
         paymentRecoveryService.releaseUnapprovedCompensation(request);
     }
 
-    public List<CompensationRequest> getPreparedCompensations(int batchSize) {
+    private List<CompensationRequest> getPreparedCompensations(int batchSize) {
         return paymentRecoveryService.getPreparedCompensations(batchSize);
     }
 
@@ -77,13 +81,35 @@ public class PaymentCompensationProcessor {
         return new BusinessException(PaymentErrorCode.PAYMENT_COMPENSATED);
     }
 
-    public void completePrepared(CompensationRequest request) {
+    private void completePrepared(CompensationRequest request) {
         execute(request);
     }
 
     public BusinessException cancelPrepared(CompensationRequest request) {
         execute(request);
         return new BusinessException(PaymentErrorCode.PAYMENT_COMPENSATED);
+    }
+
+    /** 영속화된 미완료 보상 취소를 같은 멱등키로 다시 처리한다. */
+    public void recoverPendingCompensations(int batchSize) {
+        for (CompensationRequest request : getPreparedCompensations(batchSize)) {
+            try {
+                recover(request);
+            } catch (RuntimeException recoveryFailure) {
+                log.warn("Pending payment compensation could not be completed.");
+            }
+        }
+    }
+
+    private void recover(CompensationRequest request) {
+        ApprovalResolution approvalState = approvalResolver.resolveCompensationState(request);
+        switch (approvalState.state()) {
+            case NOT_APPROVED -> releaseUnapproved(request);
+            case IN_PROGRESS -> {
+                return;
+            }
+            case DONE, CANCELED, FINAL_OR_UNKNOWN -> completePrepared(request);
+        }
     }
 
     private void execute(CompensationRequest request) {

@@ -8,16 +8,16 @@ import org.springframework.stereotype.Component;
 @Component
 public class PaymentRecoveryScheduler {
 
-    private final PaymentFacade paymentFacade;
+    private final PaymentCompensationProcessor compensationProcessor;
     private final RefundFacade refundFacade;
     private final int batchSize;
 
     public PaymentRecoveryScheduler(
-            PaymentFacade paymentFacade,
+            PaymentCompensationProcessor compensationProcessor,
             RefundFacade refundFacade,
             @Value("${app.payment.recovery.batch-size:50}") int batchSize
     ) {
-        this.paymentFacade = paymentFacade;
+        this.compensationProcessor = compensationProcessor;
         this.refundFacade = refundFacade;
         this.batchSize = batchSize;
     }
@@ -27,7 +27,7 @@ public class PaymentRecoveryScheduler {
             initialDelayString = "${app.payment.recovery.initial-delay:60s}"
     )
     public void recoverPendingCompensations() {
-        paymentFacade.recoverPendingCompensations(batchSize);
+        compensationProcessor.recoverPendingCompensations(batchSize);
         refundFacade.recoverPendingCancellations(batchSize);
     }
 }
