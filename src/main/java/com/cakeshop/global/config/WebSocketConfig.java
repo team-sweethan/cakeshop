@@ -1,7 +1,6 @@
 package com.cakeshop.global.config;
 
-import com.cakeshop.domain.chat.entity.ChatRoom;
-import com.cakeshop.domain.chat.mapper.ChatMapper;
+import com.cakeshop.domain.chat.service.ChatService;
 import com.cakeshop.global.security.MemberDetails;
 import java.security.Principal;
 import lombok.RequiredArgsConstructor;
@@ -14,7 +13,6 @@ import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
@@ -25,7 +23,7 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 @RequiredArgsConstructor
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
-    private final ChatMapper chatMapper;
+    private final ChatService chatService;
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
@@ -55,12 +53,11 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                             try {
                                 Long roomId = Long.parseLong(parts[0]);
                                 if (principal instanceof Authentication auth && auth.getPrincipal() instanceof MemberDetails memberDetails) {
-                                    if (!memberDetails.isAdmin()) {
-                                        ChatRoom room = chatMapper.findChatRoomById(roomId);
-                                        if (room == null || !memberDetails.getMemberId().equals(room.getCustomerId())) {
-                                            throw new AccessDeniedException("해당 채팅방에 대한 구독 권한이 없습니다.");
-                                        }
-                                    }
+                                    chatService.validateSubscribeAccess(
+                                            roomId,
+                                            memberDetails.getMemberId(),
+                                            memberDetails.isAdmin()
+                                    );
                                 }
                             } catch (NumberFormatException e) {
                                 // 파싱 불가 시 무시

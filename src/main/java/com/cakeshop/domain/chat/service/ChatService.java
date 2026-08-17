@@ -77,6 +77,13 @@ public class ChatService {
         }
     }
 
+    // STOMP WebSocket 구독 시 소유권 및 정지/탈퇴 회원 상태 런타임 검증 계약
+    @Transactional(readOnly = true)
+    public void validateSubscribeAccess(Long roomId, Long currentUserId, boolean isAdmin) {
+        ChatRoom room = chatMapper.findChatRoomById(roomId);
+        validateRoomAccess(room, currentUserId, isAdmin);
+    }
+
     // 1. 공통 & 고객용 기능 (Customer)
     // 없으면 방 만들고, 있으면 만들어져있는거 반환 (동시성 충돌 발생 시 기존 방 흡수)
     @Transactional
