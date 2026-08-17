@@ -15,6 +15,8 @@ import com.cakeshop.domain.notification.entity.DeliveryScope;
 import com.cakeshop.domain.notification.entity.Notification;
 import com.cakeshop.domain.notification.entity.NotificationType;
 
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -26,6 +28,7 @@ public class NotificationService {
     private final NotificationMapper notificationMapper;
     private final SolapiKakaoAlimtalkClient solapiKakaoAlimtalkClient;
     private final NotificationDeliveryService notificationDeliveryService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     // 알림 생성
     @Transactional
@@ -74,6 +77,24 @@ public class NotificationService {
                     String receiverPhone = notificationMapper.findReceiverPhone(request.getReceiverId(), request.getOrderId());
                     registerSmsSending(existingId, receiverPhone, title, content);
                 }
+
+                Long bundleId = existing != null ? existing.getId() : notificationMapper.findIdByReceiverIdAndEventKey(request.getReceiverId(), eventKey);
+                NotificationResponse bundleResponse = NotificationResponse.builder()
+                        .id(bundleId)
+                        .type(request.getType())
+                        .title(title)
+                        .content(content)
+                        .isRead(false)
+                        .createdAt(existing != null ? existing.getCreatedAt() : now)
+                        .orderId(request.getOrderId())
+                        .chatRoomId(request.getChatRoomId())
+                        .commentId(request.getCommentId())
+                        .postId(request.getPostId())
+                        .reviewId(request.getReviewId())
+                        .userCouponId(request.getUserCouponId())
+                        .lastEventAt(now)
+                        .build();
+                registerWebSocketSending(request.getReceiverId(), bundleResponse);
             }
             // 일반 알림(주문, 쿠폰 등) 중복 시에는 읽은 상태 유지를 위해 멱등하게 종료
             return;
@@ -129,6 +150,24 @@ public class NotificationService {
             String receiverPhone = notificationMapper.findReceiverPhone(request.getReceiverId(), request.getOrderId());
             registerSmsSending(notification.getId(), receiverPhone, title, content);
         }
+
+        // 알림 실시간 웹소켓(STOMP) 전파 (DB 트랜잭션 커밋 완료 후 안전하게 방송)
+        NotificationResponse responseDTO = NotificationResponse.builder()
+                .id(notification.getId())
+                .type(notification.getNotificationType())
+                .title(title)
+                .content(content)
+                .isRead(false)
+                .createdAt(notification.getCreatedAt())
+                .orderId(notification.getOrderId())
+                .chatRoomId(notification.getChatRoomId())
+                .commentId(notification.getCommentId())
+                .postId(notification.getPostId())
+                .reviewId(notification.getReviewId())
+                .userCouponId(notification.getUserCouponId())
+                .lastEventAt(notification.getLastEventAt())
+                .build();
+        registerWebSocketSending(request.getReceiverId(), responseDTO);
     }
 
     private void registerSmsSending(Long notificationId, String receiverPhone, String title, String content) {
@@ -177,6 +216,43 @@ public class NotificationService {
                     .build();
             notificationDeliveryService.recordDelivery(delivery);
         }
+    }
+
+    private void registerWebSocketSending(Long receiverId, NotificationResponse responseDTO) {
+        if (responseDTO == null) return;
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    executeWebSocketSending(receiverId, responseDTO);
+                }
+            });
+        } else {
+            executeWebSocketSending(receiverId, responseDTO);
+        }
+    }
+
+    private void executeWebSocketSending(Long receiverId, NotificationResponse responseDTO) {
+        try {
+            if (receiverId != null) {
+                messagingTemplate.convertAndSend("/topic/notifications/" + receiverId, responseDTO);
+            }
+            if (responseDTO.getType() != null && isAdminNotificationType(responseDTO.getType())) {
+                messagingTemplate.convertAndSend("/topic/admin/notifications", responseDTO);
+            }
+        } catch (Exception e) {
+            // 웹소켓 전파 예외는 메인 발송 로직에 영향을 주지 않는다.
+        }
+    }
+
+    private boolean isAdminNotificationType(NotificationType type) {
+        if (type == null) return false;
+        return type.name().startsWith("ADMIN_")
+                || type == NotificationType.NEW_ORDER
+                || type == NotificationType.NEW_CUSTOM_ORDER
+                || type == NotificationType.ORDER_CANCEL_REQUEST
+                || type == NotificationType.NEW_REVIEW
+                || type == NotificationType.REFUND_FAILED;
     }
 
     // 특정 회원 알림 목록 최신순 페이징 조회
