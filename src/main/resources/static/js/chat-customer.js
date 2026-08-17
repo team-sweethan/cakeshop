@@ -64,12 +64,22 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  let reconnectTimer = null;
+  let isConnectingWebSocket = false;
+
   // 웹소켓 STOMP 연결 및 실시간 구독
   function connectWebSocket(roomId) {
     if (stompClient && stompClient.connected) return Promise.resolve();
+    if (isConnectingWebSocket) return Promise.resolve();
     if (typeof SockJS === "undefined" || typeof Stomp === "undefined") {
       console.warn("SockJS 또는 Stomp 라이브러리가 로드되지 않았습니다.");
       return Promise.resolve();
+    }
+
+    isConnectingWebSocket = true;
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
     }
 
     return new Promise((resolve) => {
@@ -78,6 +88,8 @@ document.addEventListener("DOMContentLoaded", () => {
       stompClient.debug = null; // 디버그 콘솔 로그 숨김
 
       stompClient.connect({}, async () => {
+        isConnectingWebSocket = false;
+
         // A. 대화 메시지 실시간 수신 구독 (/topic/chat/{roomId})
         stompClient.subscribe(`/topic/chat/${roomId}`, (message) => {
           try {
@@ -103,6 +115,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // C. 실시간 연동 주문 목록 수신 구독 (/topic/chat/{roomId}/orders)
         stompClient.subscribe(`/topic/chat/${roomId}/orders`, (event) => {
           try {
+            orderBannerFetchGen++;
             const orders = JSON.parse(event.body);
             renderOrderSidebar(orders);
           } catch (e) {
@@ -119,9 +132,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
         resolve();
       }, (err) => {
+        isConnectingWebSocket = false;
         console.error("웹소켓 연결 실시간 에러:", err);
-        // 지연 재연결 (5초 후 자동 재연결 시도)
-        setTimeout(() => {
+        if (reconnectTimer) clearTimeout(reconnectTimer);
+        reconnectTimer = setTimeout(() => {
           if (currentChatRoomId) {
             connectWebSocket(currentChatRoomId);
           }
@@ -307,13 +321,17 @@ document.addEventListener("DOMContentLoaded", () => {
     return msgDiv;
   }
 
+  let orderBannerFetchGen = 0;
+
   // 3. 연동 주문 배너 목록 조회 및 동적 헤더 건수 갱신
   async function loadOrderBanners(roomId) {
     if (!orderSidebarStack) return;
+    const currentGen = ++orderBannerFetchGen;
     try {
       const response = await fetch(`/api/chat/rooms/${roomId}/orders`);
-      if (!response.ok) return;
+      if (!response.ok || currentChatRoomId !== roomId) return;
       const orders = await response.json();
+      if (currentGen !== orderBannerFetchGen) return;
       renderOrderSidebar(orders);
     } catch (err) {
       console.error("연동 주문 조회 실패:", err);

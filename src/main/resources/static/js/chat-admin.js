@@ -558,8 +558,8 @@ document.addEventListener("DOMContentLoaded", () => {
   function renderAdminTimeline(messages) {
     if (!adminChatMessagesContainer) return;
 
-    // REST 조회 중 STOMP로 먼저 도착했던 신규 메시지 DOM 보존
-    const existingMsgEls = Array.from(adminChatMessagesContainer.querySelectorAll("[id^='admin-msg-']"));
+    // REST 조회 중 STOMP로 먼저 도착했던 신규 메시지 및 상품 배너 DOM 보존
+    const existingMsgEls = Array.from(adminChatMessagesContainer.querySelectorAll("[id^='admin-msg-'], [id^='admin-banner-msg-']"));
 
     adminChatMessagesContainer.innerHTML = "";
 
@@ -622,9 +622,9 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
-    // REST 스냅샷에 포함되지 않았던 실시간 메시지 DOM 재첨부 (덮어쓰기 방지)
+    // REST 스냅샷에 포함되지 않았던 실시간 메시지 및 배너 DOM 재첨부 (덮어쓰기 방지)
     existingMsgEls.forEach((el) => {
-      const idStr = el.id.replace("admin-msg-", "");
+      const idStr = el.id.replace("admin-banner-msg-", "").replace("admin-msg-", "");
       if (!renderedIds.has(idStr)) {
         adminChatMessagesContainer.appendChild(el);
       }
@@ -636,8 +636,12 @@ document.addEventListener("DOMContentLoaded", () => {
   // 문의 상품 중앙 시스템 배너 카드 생성 헬퍼
   function appendProductBannerDOM(msg, container) {
     if (!msg || !msg.productId || !container) return;
+    const bannerId = msg.id ? `admin-banner-msg-${msg.id}` : null;
+    if (bannerId && document.getElementById(bannerId)) return;
+
     const pName = msg.productName ? escapeHtml(msg.productName) : `상품 #${msg.productId}`;
     const bannerDiv = document.createElement("div");
+    if (bannerId) bannerDiv.id = bannerId;
     bannerDiv.className = "chat-msg chat-msg--system";
     bannerDiv.style.cssText = "margin: 14px 0 8px 0; text-align: center;";
     bannerDiv.innerHTML = `
@@ -802,9 +806,6 @@ document.addEventListener("DOMContentLoaded", () => {
           pendingAttachment = null;
           if (adminImageFileName) adminImageFileName.textContent = "선택된 파일 없음";
           if (adminChatImageInput) adminChatImageInput.value = "";
-
-          // 답변 작성 후 관리자 목록 1페이지 재조회 (미답변 탭 필터 동기화)
-          setTimeout(() => loadAdminRooms(1), 300);
         } catch (stompErr) {
           console.error("관리자 STOMP 메시지 발신 실패:", stompErr);
           alert("답변 전송 중 오류가 발생했습니다.");
