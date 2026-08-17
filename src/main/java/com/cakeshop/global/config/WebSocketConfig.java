@@ -13,6 +13,7 @@ import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
@@ -43,24 +44,46 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
             @Override
             public Message<?> preSend(Message<?> message, MessageChannel channel) {
                 StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
-                if (accessor != null && StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
+                if (accessor != null) {
+                    StompCommand command = accessor.getCommand();
                     String destination = accessor.getDestination();
                     Principal principal = accessor.getUser();
-                    if (destination != null && destination.startsWith("/topic/chat/")) {
-                        String subPath = destination.substring("/topic/chat/".length());
-                        String[] parts = subPath.split("/");
-                        if (parts.length > 0 && !parts[0].isBlank()) {
-                            try {
-                                Long roomId = Long.parseLong(parts[0]);
-                                if (principal instanceof Authentication auth && auth.getPrincipal() instanceof MemberDetails memberDetails) {
-                                    chatService.validateSubscribeAccess(
-                                            roomId,
-                                            memberDetails.getMemberId(),
-                                            memberDetails.isAdmin()
-                                    );
+
+                    // A. 클라이언트가 /topic/이나 /queue/로 직접 SEND하는 행위 차단 (컨트롤러 우회 방지)
+                    if (StompCommand.SEND.equals(command) && destination != null) {
+                        if (destination.startsWith("/topic/") || destination.startsWith("/queue/")) {
+                            throw new AccessDeniedException("브로커 목적지로 직접 메시지를 발신할 수 없습니다.");
+                        }
+                    }
+
+                    // B. 토픽 구독(SUBSCRIBE) 권한 및 보안 검증
+                    if (StompCommand.SUBSCRIBE.equals(command) && destination != null) {
+                        // B-1. 관리자 전용 토픽(/topic/admin/**) 구독은 ADMIN 권한만 허용
+                        if (destination.startsWith("/topic/admin/")) {
+                            if (!(principal instanceof Authentication auth
+                                    && auth.getPrincipal() instanceof MemberDetails memberDetails
+                                    && memberDetails.isAdmin())) {
+                                throw new AccessDeniedException("관리자만 해당 토픽을 구독할 수 있습니다.");
+                            }
+                        }
+
+                        // B-2. 채팅방 토픽(/topic/chat/**) 구독은 방 소유자 및 활성 회원 검증
+                        if (destination.startsWith("/topic/chat/")) {
+                            String subPath = destination.substring("/topic/chat/".length());
+                            String[] parts = subPath.split("/");
+                            if (parts.length > 0 && !parts[0].isBlank()) {
+                                try {
+                                    Long roomId = Long.parseLong(parts[0]);
+                                    if (principal instanceof Authentication auth && auth.getPrincipal() instanceof MemberDetails memberDetails) {
+                                        chatService.validateSubscribeAccess(
+                                                roomId,
+                                                memberDetails.getMemberId(),
+                                                memberDetails.isAdmin()
+                                        );
+                                    }
+                                } catch (NumberFormatException e) {
+                                    // 파싱 불가 시 무시
                                 }
-                            } catch (NumberFormatException e) {
-                                // 파싱 불가 시 무시
                             }
                         }
                     }

@@ -55,7 +55,7 @@ public class ChatEventListener {
                     orders
             );
         } catch (Exception e) {
-            log.error("채팅방 결제 완료 이벤트 실시간 전파 처리 중 오류 발생: {}", e.getMessage(), e);
+            log.error("채팅방 결제 완료 이벤트 실시간 전파 처리 실패 (orderId={})", event.orderId());
         }
     }
 }

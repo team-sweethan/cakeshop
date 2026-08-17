@@ -240,8 +240,21 @@ public class ChatApiController {
             return ResponseEntity.status(401).build();
         }
 
-        chatService.updateReadCursor(
+        Long actualReadMessageId = chatService.updateReadCursor(
                 chatRoomId, memberDetails.getMemberId(), memberDetails.isAdmin(), lastReadMessageId);
+
+        if (actualReadMessageId != null && actualReadMessageId > 0) {
+            try {
+                String readerSide = memberDetails.isAdmin() ? "ADMIN" : "CUSTOMER";
+                Object readPayload = java.util.Map.of(
+                        "readerSide", readerSide,
+                        "lastReadMessageId", actualReadMessageId
+                );
+                messagingTemplate.convertAndSend("/topic/chat/" + chatRoomId + "/read", readPayload);
+            } catch (Exception e) {
+                // 실시간 방송 실패 시에도 REST 응답 성공 유지
+            }
+        }
         return ResponseEntity.ok().build();
     }
 
