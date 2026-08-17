@@ -99,7 +99,6 @@ document.addEventListener("DOMContentLoaded", () => {
           newRooms.forEach((r) => {
             const existing = roomMap.get(r.chatRoomId || r.id);
             if (existing) {
-              r.unreadCount = Math.max(r.unreadCount || 0, existing.unreadCount || 0);
               if (existing.lastMessageCreatedAt && r.lastMessageCreatedAt && new Date(existing.lastMessageCreatedAt) > new Date(r.lastMessageCreatedAt)) {
                 r.lastMessageCreatedAt = existing.lastMessageCreatedAt;
                 r.lastMessageContent = existing.lastMessageContent;
@@ -120,15 +119,15 @@ document.addEventListener("DOMContentLoaded", () => {
         updateUnreadTabBadge(unreadCount);
       }
 
-      // 현재 탭 목록 결과에 기존 선택된 방이 없거나 비어있는 경우 갱신
+      // 현재 탭 목록 결과에 기존 선택된 방이 없거나 비어있는 경우 갱신 (재연결 동기화 시에는 선택 유지)
       if (adminRoomsData && adminRoomsData.length > 0) {
         const existsInTab = adminRoomsData.some(r => (r.chatRoomId || r.id) === selectedChatRoomId);
-        if (!selectedChatRoomId || !existsInTab) {
+        if (!isReconnect && (!selectedChatRoomId || !existsInTab)) {
           const firstRoom = adminRoomsData[0];
           const rId = firstRoom.chatRoomId || firstRoom.id;
           selectChatRoom(rId, firstRoom.customerId);
         }
-      } else {
+      } else if (!isReconnect) {
         clearMainAndSidePanel();
       }
 
@@ -173,10 +172,10 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       // 연결/재연결 완료 시 대시보드 대화방 목록 및 활성 대화 스냅샷 다시 동기화 후 최신 읽음 커서 전송!
-      await loadAdminRooms();
+      await loadAdminRooms(1, false, true);
       if (selectedChatRoomId) {
         subscribeActiveRoomWebSocket(selectedChatRoomId);
-        await loadAdminMessages(selectedChatRoomId);
+        await loadAdminMessages(selectedChatRoomId, true);
         await loadAdminSidePanel(selectedChatRoomId);
         if (lastFetchedMessageId > 0) {
           markRead(selectedChatRoomId, lastFetchedMessageId);
@@ -225,11 +224,16 @@ document.addEventListener("DOMContentLoaded", () => {
     const isCurrentActive = selectedChatRoomId === rId;
 
     if (existingRoom) {
-      existingRoom.lastMessageContent = msg.lastMessageContent || msg.content || existingRoom.lastMessageContent || (msg.imageUrls && msg.imageUrls.length > 0 ? "(사진)" : "");
-      if (msg.lastMessageCreatedAt || msg.createdAt) {
-        existingRoom.lastMessageCreatedAt = msg.lastMessageCreatedAt || msg.createdAt;
+      const isOlderMessage = msg.id && existingRoom.lastMessageId && msg.id < existingRoom.lastMessageId;
+      if (!isOlderMessage) {
+        existingRoom.lastMessageContent = msg.lastMessageContent || msg.content || existingRoom.lastMessageContent || (msg.imageUrls && msg.imageUrls.length > 0 ? "(사진)" : "");
+        if (msg.lastMessageCreatedAt || msg.createdAt) {
+          existingRoom.lastMessageCreatedAt = msg.lastMessageCreatedAt || msg.createdAt;
+        }
+        existingRoom.responseStatus = newStatus;
+        if (msg.id) existingRoom.lastMessageId = msg.id;
       }
-      existingRoom.responseStatus = newStatus;
+
       if (typeof msg.unreadCount === "number") {
         existingRoom.unreadCount = isCurrentActive ? 0 : msg.unreadCount;
       } else if (!isCurrentActive && msg.senderType !== "ADMIN") {
@@ -576,15 +580,17 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // 2. 대화 타임라인 렌더링
-  async function loadAdminMessages(roomId) {
+  async function loadAdminMessages(roomId, isBackgroundReload = false) {
     if (!adminChatMessagesContainer) return;
-    adminChatMessagesContainer.innerHTML = `<div class="text-muted" style="text-align:center; padding:30px;">대화 내용을 불러오는 중입니다...</div>`;
+    if (!isBackgroundReload) {
+      adminChatMessagesContainer.innerHTML = `<div class="text-muted" style="text-align:center; padding:30px;">대화 내용을 불러오는 중입니다...</div>`;
+    }
     try {
       const response = await fetch(`/api/chat/messages?chatRoomId=${roomId}&page=1&size=50`);
       if (selectedChatRoomId !== roomId) return;
 
       if (!response.ok) {
-        if (selectedChatRoomId === roomId) {
+        if (selectedChatRoomId === roomId && !isBackgroundReload) {
           adminChatMessagesContainer.innerHTML = `<div class="text-muted" style="text-align:center; padding:30px;">대화 내역을 불러오는 데 실패했습니다.</div>`;
         }
         return;
@@ -595,7 +601,7 @@ document.addEventListener("DOMContentLoaded", () => {
       renderAdminTimeline(messages);
     } catch (err) {
       console.error("관리자 대화 내역 조회 실패:", err);
-      if (selectedChatRoomId === roomId) {
+      if (selectedChatRoomId === roomId && !isBackgroundReload) {
         adminChatMessagesContainer.innerHTML = `<div class="text-muted" style="text-align:center; padding:30px;">대화 내역을 불러오는 중 오류가 발생했습니다.</div>`;
       }
     }
