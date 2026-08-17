@@ -180,10 +180,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const emptyNotice = chatMessagesContainer.querySelector(".empty-chat-notice");
     if (emptyNotice) emptyNotice.remove();
 
-    appendProductBannerDOM(msg, chatMessagesContainer);
     const msgEl = createMessageDOM(msg);
     if (msg.id) msgEl.id = `msg-${msg.id}`;
     insertMessageInOrder(chatMessagesContainer, msgEl, msg.id);
+
+    if (msg.productId) {
+      appendProductBannerDOM(msg, chatMessagesContainer, msgEl);
+    }
     scrollToBottom();
 
     if (msg.id) {
@@ -300,7 +303,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // 문의 상품 중앙 시스템 배너 카드 생성 헬퍼
-  function appendProductBannerDOM(msg, container) {
+  function appendProductBannerDOM(msg, container, targetMsgEl) {
     if (!msg || !msg.productId || !container) return;
     const bannerId = msg.id ? `banner-msg-${msg.id}` : null;
     if (bannerId && document.getElementById(bannerId)) return;
@@ -315,7 +318,11 @@ document.addEventListener("DOMContentLoaded", () => {
         <strong>[문의 상품]: </strong> <span style="font-weight: 700;">${pName}</span>
       </div>
     `;
-    container.appendChild(bannerDiv);
+    if (targetMsgEl && targetMsgEl.parentNode === container) {
+      container.insertBefore(bannerDiv, targetMsgEl);
+    } else {
+      container.appendChild(bannerDiv);
+    }
   }
 
   // 메시지 단일 DOM 생성

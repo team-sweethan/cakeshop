@@ -93,6 +93,20 @@ document.addEventListener("DOMContentLoaded", () => {
       if (append) {
         adminRoomsData = adminRoomsData.concat(newRooms);
       } else {
+        if (adminRoomsData && adminRoomsData.length > 0) {
+          const roomMap = new Map();
+          adminRoomsData.forEach((r) => roomMap.set(r.chatRoomId || r.id, r));
+          newRooms.forEach((r) => {
+            const existing = roomMap.get(r.chatRoomId || r.id);
+            if (existing) {
+              r.unreadCount = Math.max(r.unreadCount || 0, existing.unreadCount || 0);
+              if (existing.lastMessageCreatedAt && r.lastMessageCreatedAt && new Date(existing.lastMessageCreatedAt) > new Date(r.lastMessageCreatedAt)) {
+                r.lastMessageCreatedAt = existing.lastMessageCreatedAt;
+                r.lastMessageContent = existing.lastMessageContent;
+              }
+            }
+          });
+        }
         adminRoomsData = newRooms;
       }
 
@@ -359,8 +373,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (selectedChatRoomId !== roomId) {
       isAdminUploadingAttachment = false;
+      isMemoDirty = false;
       const inputEl = document.getElementById("adminChatInput");
       if (inputEl) inputEl.value = "";
+      const inputMemo = document.getElementById("adminCustomerNote");
+      if (inputMemo) inputMemo.value = "";
       pendingAttachment = null;
       if (adminImageFileName) adminImageFileName.textContent = "선택된 파일 없음";
       if (adminChatImageInput) adminChatImageInput.value = "";
@@ -471,8 +488,6 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    appendProductBannerDOM(msg, adminChatMessagesContainer);
-
     const isAdminSender = msg.senderType === "ADMIN";
     const msgDiv = document.createElement("div");
     msgDiv.className = `chat-msg ${isAdminSender ? "chat-msg--me" : "chat-msg--other"}`;
@@ -514,6 +529,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     insertMessageInOrder(adminChatMessagesContainer, msgDiv, msg.id);
+
+    if (msg.productId) {
+      appendProductBannerDOM(msg, adminChatMessagesContainer, msgDiv);
+    }
     scrollToBottom();
 
     if (msg.id) {
@@ -679,9 +698,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // 문의 상품 중앙 시스템 배너 카드 생성 헬퍼
-  function appendProductBannerDOM(msg, container) {
+  function appendProductBannerDOM(msg, container, targetMsgEl) {
     if (!msg || !msg.productId || !container) return;
-    const bannerId = msg.id ? `admin-banner-msg-${msg.id}` : null;
+    const bannerId = msg.id ? (container === adminChatMessagesContainer ? `admin-banner-msg-${msg.id}` : `banner-msg-${msg.id}`) : null;
     if (bannerId && document.getElementById(bannerId)) return;
 
     const pName = msg.productName ? escapeHtml(msg.productName) : `상품 #${msg.productId}`;
@@ -694,7 +713,11 @@ document.addEventListener("DOMContentLoaded", () => {
         <strong>[문의 상품]: </strong> <span style="font-weight: 700;">${pName}</span>
       </div>
     `;
-    container.appendChild(bannerDiv);
+    if (targetMsgEl && targetMsgEl.parentNode === container) {
+      container.insertBefore(bannerDiv, targetMsgEl);
+    } else {
+      container.appendChild(bannerDiv);
+    }
   }
 
   let sidePanelFetchGen = 0;
