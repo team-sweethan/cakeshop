@@ -55,6 +55,15 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  function adjustUnreadTabBadge(delta) {
+    const badge = document.getElementById("adminUnreadCountBadge");
+    if (badge) {
+      let current = parseInt(badge.textContent || "0", 10);
+      if (isNaN(current)) current = 0;
+      updateUnreadTabBadge(Math.max(0, current + delta));
+    }
+  }
+
   let currentRoomPage = 1;
   const ROOM_PAGE_SIZE = 100;
   let hasMoreRooms = false;
@@ -62,7 +71,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let adminRoomsFetchGen = 0;
 
   // 1. 관리자 전체 채팅방 목록 서버 필터 조회
-  async function loadAdminRooms(page = 1, append = false) {
+  async function loadAdminRooms(page = 1, append = false, isReconnect = false) {
     const reqFilter = currentFilter;
     const currentGen = ++adminRoomsFetchGen;
     if (!append) {
@@ -205,8 +214,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (selectedChatRoomId === rId) {
         clearMainAndSidePanel();
       }
-      const unreadCountTotal = adminRoomsData.filter((r) => r.responseStatus === "WAITING_ADMIN").length;
-      updateUnreadTabBadge(unreadCountTotal);
+      adjustUnreadTabBadge(-1);
       return;
     }
     if (currentFilter === "done" && newStatus !== "RESOLVED") {
@@ -215,8 +223,9 @@ document.addEventListener("DOMContentLoaded", () => {
       if (selectedChatRoomId === rId) {
         clearMainAndSidePanel();
       }
-      const unreadCountTotal = adminRoomsData.filter((r) => r.responseStatus === "WAITING_ADMIN").length;
-      updateUnreadTabBadge(unreadCountTotal);
+      if (newStatus === "WAITING_ADMIN") {
+        adjustUnreadTabBadge(1);
+      }
       return;
     }
 
