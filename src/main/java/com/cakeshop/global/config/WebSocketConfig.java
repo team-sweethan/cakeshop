@@ -67,7 +67,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                             }
                         }
 
-                        // B-2. 채팅방 토픽(/topic/chat/**) 구독은 방 소유자 및 활성 회원 검증
+                        // B-2. 채팅방 토픽(/topic/chat/**) 구독은 방 소유자 및 활성 회원 검증 (와일드카드 패턴 차단)
                         if (destination.startsWith("/topic/chat/")) {
                             String subPath = destination.substring("/topic/chat/".length());
                             String[] parts = subPath.split("/");
@@ -82,8 +82,10 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                                         );
                                     }
                                 } catch (NumberFormatException e) {
-                                    // 파싱 불가 시 무시
+                                    throw new AccessDeniedException("올바르지 않은 채팅방 구독 목적지입니다.");
                                 }
+                            } else {
+                                throw new AccessDeniedException("올바르지 않은 채팅방 구독 목적지입니다.");
                             }
                         }
                     }

@@ -183,11 +183,17 @@ document.addEventListener("DOMContentLoaded", () => {
     if (currentFilter === "unread" && newStatus !== "WAITING_ADMIN") {
       adminRoomsData = adminRoomsData.filter((r) => (r.chatRoomId || r.id) !== rId);
       renderRoomList();
+      if (selectedChatRoomId === rId) {
+        clearMainAndSidePanel();
+      }
       return;
     }
     if (currentFilter === "done" && newStatus !== "RESOLVED") {
       adminRoomsData = adminRoomsData.filter((r) => (r.chatRoomId || r.id) !== rId);
       renderRoomList();
+      if (selectedChatRoomId === rId) {
+        clearMainAndSidePanel();
+      }
       return;
     }
 
@@ -374,9 +380,12 @@ document.addEventListener("DOMContentLoaded", () => {
   function subscribeActiveRoomWebSocket(roomId) {
     if (!stompClient || !stompClient.connected) return;
 
-    if (roomSub) roomSub.unsubscribe();
-    if (readSub) readSub.unsubscribe();
-    if (orderSub) orderSub.unsubscribe();
+    try { if (roomSub) roomSub.unsubscribe(); } catch (e) {}
+    try { if (readSub) readSub.unsubscribe(); } catch (e) {}
+    try { if (orderSub) orderSub.unsubscribe(); } catch (e) {}
+    roomSub = null;
+    readSub = null;
+    orderSub = null;
 
     // 대화 수신 구독
     roomSub = stompClient.subscribe(`/topic/chat/${roomId}`, (message) => {
@@ -830,7 +839,9 @@ document.addEventListener("DOMContentLoaded", () => {
           if (adminChatImageInput) adminChatImageInput.value = "";
         }
       } finally {
-        isAdminUploadingAttachment = false;
+        if (adminChatImageInput && adminChatImageInput.files[0] === currentUploadFile) {
+          isAdminUploadingAttachment = false;
+        }
       }
     });
   }

@@ -391,7 +391,7 @@ document.addEventListener("DOMContentLoaded", () => {
         attachments: pendingAttachment ? [pendingAttachment] : []
       };
 
-      // 웹소켓 연결되어 있으면 STOMP로 실시간 발신
+      // 웹소켓 연결되어 있으면 STOMP로 실시간 발신 (실패 시 REST Fallback으로 자동 전환하여 drafts 보존)
       if (stompClient && stompClient.connected) {
         try {
           stompClient.send("/app/chat/message", {}, JSON.stringify(payload));
@@ -399,11 +399,10 @@ document.addEventListener("DOMContentLoaded", () => {
           pendingAttachment = null;
           if (imageFileName) imageFileName.textContent = "선택된 파일 없음";
           if (chatImageInput) chatImageInput.value = "";
+          return;
         } catch (stompErr) {
-          console.error("STOMP 메시지 발신 실패:", stompErr);
-          alert("실시간 메시지 발신 중 에러가 발생했습니다.");
+          console.warn("STOMP 메시지 발신 실패, REST Fallback으로 자동 전환합니다:", stompErr);
         }
-        return;
       }
 
       // REST Fallback (웹소켓 미연결 시)
