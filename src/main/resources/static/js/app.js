@@ -49,3 +49,47 @@ async function updateNotificationUnreadCount() {
 document.addEventListener('DOMContentLoaded', () => {
   updateNotificationUnreadCount();
 });
+
+// 토스트 팝업 생성 및 렌더링 헬퍼 함수
+function showToast(title, content, targetUrl) {
+  let container = document.querySelector(".toast-container");
+  if (!container) {
+    container = document.createElement("div");
+    container.className = "toast-container";
+    document.body.appendChild(container);
+  }
+
+  const toast = document.createElement("div");
+  toast.className = "toast-item";
+  toast.innerHTML = `
+    <div class="toast-title">🔔 ${escapeHtmlApp(title || "알림")}</div>
+    <div class="toast-content">${escapeHtmlApp(content || "")}</div>
+  `;
+
+  toast.addEventListener("click", () => {
+    if (targetUrl) {
+      window.location.href = targetUrl;
+    }
+  });
+
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.classList.add("toast-item--out");
+    setTimeout(() => {
+      if (toast.parentNode) {
+        toast.parentNode.removeChild(toast);
+      }
+    }, 300);
+  }, 3500);
+}
+
+function escapeHtmlApp(text) {
+  if (!text) return "";
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
