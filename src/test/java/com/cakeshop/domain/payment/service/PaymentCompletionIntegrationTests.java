@@ -153,7 +153,7 @@ class PaymentCompletionIntegrationTests {
                 APPROVED_AT
         );
 
-        paymentService.completeGeneralPayment(order, readyPayment, approval);
+        paymentService.completePayment(order, readyPayment, approval);
 
         Integer stockQuantity = jdbcTemplate.queryForObject(
                 "SELECT stock_quantity FROM products WHERE id = ?",
@@ -162,9 +162,7 @@ class PaymentCompletionIntegrationTests {
         );
         assertThat(stockQuantity).isEqualTo(3);
 
-        Payment completedPayment = paymentMapper
-                .findPaymentsByOrderId(orderId)
-                .getFirst();
+        Payment completedPayment = paymentMapper.findPaymentById(readyPayment.getId()).orElseThrow();
         assertThat(completedPayment.getStatus()).isEqualTo(PaymentStatus.DONE);
         assertThat(completedPayment.getPaymentKey())
                 .isEqualTo(approval.paymentKey());
@@ -303,7 +301,7 @@ class PaymentCompletionIntegrationTests {
                 40_000,
                 APPROVED_AT
         );
-        paymentService.completeGeneralPayment(order, readyPayment, approval);
+        paymentService.completePayment(order, readyPayment, approval);
         Payment donePayment = paymentMapper.findDonePaymentByOrderId(orderId)
                 .orElseThrow();
         CompensationRequest request = paymentRecoveryService.createRequest(
@@ -330,8 +328,7 @@ class PaymentCompletionIntegrationTests {
         paymentRecoveryService.completeCompensation(request, cancellation);
         paymentRecoveryService.completeCompensation(request, cancellation);
 
-        Payment canceledPayment = paymentMapper.findPaymentsByOrderId(orderId)
-                .getFirst();
+        Payment canceledPayment = paymentMapper.findPaymentById(donePayment.getId()).orElseThrow();
         assertThat(canceledPayment.getStatus()).isEqualTo(PaymentStatus.CANCELED);
         assertThat(canceledPayment.getPaymentKey()).isEqualTo(approval.paymentKey());
         assertThat(canceledPayment.getFailureCode())
@@ -383,8 +380,7 @@ class PaymentCompletionIntegrationTests {
                 .getPaymentKey()).isEqualTo(paymentKey);
         paymentRecoveryService.completeCompensation(request, cancellation);
 
-        Payment canceledPayment = paymentMapper.findPaymentsByOrderId(orderId)
-                .getFirst();
+        Payment canceledPayment = paymentMapper.findPaymentById(readyPayment.getId()).orElseThrow();
         assertThat(canceledPayment.getStatus()).isEqualTo(PaymentStatus.CANCELED);
         assertThat(canceledPayment.getPaymentKey()).isEqualTo(paymentKey);
         assertThat(orderMapper.findOrderById(orderId).orElseThrow().getStatus())
