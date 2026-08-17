@@ -58,10 +58,10 @@
 | 취소·환불 주문 | 확정 | 결제 완료 후 취소·환불이 완료된 주문은 제외 |
 | 빈 결과 | 확정 | `0` 반환 |
 | 조회 구현 | 확정 | `DashboardReadModelMapper`에서 `payment` 테이블을 읽기 전용으로 조회 |
-| 조건 검토 | 합의 필요 | 결제 상태와 취소·환불 조건을 `payment` 도메인 담당자가 검토 |
+| 조건 검토 | 확정 | `payment` 담당자가 결제 상태와 취소·환불 조건을 확정 |
 
 오늘 주문은 `Asia/Seoul` 기준 오늘 승인된 `DONE` 결제 중 취소·환불되지 않은 고유 주문의
-개수로 정의한다. 구체적인 SQL 상태 조건은 `payment` 도메인 담당자가 검토한 후 구현한다.
+개수로 정의한다. 구체적인 SQL 상태 조건은 `payment` 담당자가 확정한 조건을 따른다.
 
 ### 3-2. 오늘 매출
 
@@ -79,7 +79,7 @@
 | 과거 결제의 당일 환불 | 확정 | 이 지표에서 다루지 않고 기간별 분석 화면의 후속 범위로 분리 |
 | 빈 결과 | 확정 | `0원` 반환 |
 | 조회 구현 | 확정 | `DashboardReadModelMapper`에서 `payment` 테이블을 읽기 전용으로 조회 |
-| 조건 검토 | 합의 필요 | 매출 및 취소·환불 조건을 `payment` 도메인 담당자가 검토 |
+| 조건 검토 | 확정 | `payment` 담당자가 매출 및 취소·환불 조건을 확정 |
 
 오늘 매출은 `Asia/Seoul` 기준 오늘 승인된 `DONE` 결제 중 취소·환불되지 않은 결제 금액의
 합계로 정의한다. 기간별 순매출과 환불 분석은 `/admin/statistics`의 후속 범위에서 다룬다.
@@ -99,7 +99,7 @@
 | 빈 결과 | 확정 | `0` 반환 |
 | 이동 화면 | 확정 | `/admin/fulfillment?status=UNDER_REVIEW` |
 | 조회 구현 | 확정 | `DashboardReadModelMapper`에서 주문·결제·결제 취소 테이블을 읽기 전용으로 조회 |
-| 조건 검토 | 합의 필요 | 주문제작 상태 조건을 `order` 도메인 담당자가 검토 |
+| 조건 검토 | 확정 | `order` 담당자가 주문제작 상태 조건을 확정 |
 
 승인 대기는 결제가 완료되어 `UNDER_REVIEW`로 전이된 `CUSTOM` 주문 중 관리자가 제작을 시작하거나
 반려하기 전인 주문 수로 정의한다. 단, `REQUESTED` 결제 취소가 있으면 제작 시작과 반려를 처리할 수
@@ -120,7 +120,7 @@
 | 빈 결과 | 확정 | `0` 반환 |
 | 이동 화면 | 확정 | `/admin/payments` |
 | 조회 구현 | 확정 | `DashboardReadModelMapper`에서 결제·취소 테이블을 읽기 전용으로 조회 |
-| 조건 검토 | 합의 필요 | 기존 관리자 결제 요약과 정의가 달라지지 않도록 `payment` 담당자가 검토 |
+| 조건 검토 | 확정 | `payment` 담당자가 기존 관리자 결제 요약과 동일한 정의임을 확정 |
 
 확인 필요 결제는 다음 조건 중 하나를 충족하는 결제 건수로 정의한다.
 
@@ -149,7 +149,7 @@ OR payment_cancellations.status IN (REQUESTED, FAILED)
 | 빈 결과 | 확정 | `0` 반환 |
 | 이동 화면 | 확정 | `/admin/fulfillment?status=IN_PRODUCTION` |
 | 조회 구현 | 확정 | `DashboardReadModelMapper`에서 주문·결제·결제 취소 테이블을 읽기 전용으로 조회 |
-| 조건 검토 | 합의 필요 | 주문제작 상태 조건을 `order` 도메인 담당자가 검토 |
+| 조건 검토 | 확정 | `order` 담당자가 주문제작 상태 조건을 확정 |
 
 제작 중은 관리자가 제작을 시작하여 `IN_PRODUCTION`으로 전이된 `CUSTOM` 주문 중 제작 완료 전인
 주문 수로 정의한다. 단, `REQUESTED` 결제 취소가 있으면 제작 완료 처리를 할 수 없으므로 집계에서
@@ -177,7 +177,7 @@ OR payment_cancellations.status IN (REQUESTED, FAILED)
 | 상세 이동 | 확정 | `/admin/orders/{orderId}` |
 | 빈 결과 | 확정 | 건수는 `0`, 일정은 빈 목록 반환 |
 | 조회 구현 | 확정 | `DashboardReadModelMapper`에서 주문 테이블을 읽기 전용으로 조회 |
-| 조건 검토 | 합의 필요 | `READY_FOR_PICKUP` 상태 조건을 `order` 도메인 담당자가 검토 |
+| 조건 검토 | 확정 | `order` 담당자가 `READY_FOR_PICKUP` 상태 조건을 확정 |
 
 오늘 픽업 예정은 `Asia/Seoul` 기준 `pickup_at`이 오늘이고 현재 `READY_FOR_PICKUP` 상태인
 주문으로 정의한다. 결제 완료 여부는 해당 상태의 전이 규칙으로 보장하므로 대시보드 조회에서
@@ -200,7 +200,7 @@ OR payment_cancellations.status IN (REQUESTED, FAILED)
 | 상세 이동 | 확정 | `/admin/orders/{orderId}` |
 | 빈 결과 | 확정 | 빈 목록 반환 |
 | 조회 구현 | 확정 | `DashboardReadModelMapper`에서 주문·주문 항목 테이블을 읽기 전용으로 조회 |
-| 조건 검토 | 합의 필요 | `/admin/orders`와 조회 대상·정렬 기준이 같은지 `order` 도메인 담당자가 검토 |
+| 조건 검토 | 확정 | `order` 담당자가 `/admin/orders`와 동일한 조회 대상·정렬 기준임을 확정 |
 
 최근 주문은 `/admin/orders`와 동일하게 모든 주문 상태를 대상으로 `created_at`과 주문 ID의
 내림차순으로 조회한 최대 5건이다. 결제 완료 여부와 상태로 필터링하지 않으며, 대시보드에는
@@ -260,7 +260,7 @@ ReadModel 조회와 이동 링크도 제공하지 않는다.
 | 빈 결과 | 확정 | `0` 반환 |
 | 이동 화면 | 확정 | `/admin/community?sort=REPORTS` |
 | 조회 구현 | 확정 | `DashboardReadModelMapper`에서 게시글·게시글 신고 테이블을 읽기 전용으로 조회 |
-| 조건 검토 | 합의 필요 | 신고 상태와 처리 단위를 `community` 도메인 담당자가 검토 |
+| 조건 검토 | 확정 | `community` 담당자가 신고 상태와 처리 단위를 확정 |
 
 신고 처리 대기 게시글은 `PENDING` 신고가 하나 이상 있고 상태가 `DELETED`가 아닌 고유 게시글
 수로 정의한다. 작성자가 삭제한 게시글은 관리자가 신고를 기각하거나 차단할 수 없으므로 처리 대상에서
