@@ -1,7 +1,5 @@
 package com.cakeshop.domain.order.dto.view;
 
-import java.time.LocalDateTime;
-
 /**
  * ******************************
  * 작성자 : HyunGyu-Cho
@@ -17,7 +15,6 @@ public record OrderReviewTargetView(
         Long productId,
         String productName,
         String orderNumber,
-        boolean pickedUp,
-        LocalDateTime pickedUpAt
+        boolean pickedUp
 ) {
 }

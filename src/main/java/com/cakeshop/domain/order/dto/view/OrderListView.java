@@ -10,7 +10,6 @@ import java.time.LocalDateTime;
 public record OrderListView(
         long orderId,
         String orderNumber,
-        long memberId,
         String ordererName,
         OrderType orderType,
         OrderStatus status,

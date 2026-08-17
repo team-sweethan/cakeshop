@@ -301,7 +301,6 @@ class ReviewControllerTests {
                 903L,
                 "딸기 생크림 케이크",
                 "ORD-20260810-001",
-                true,
-                LocalDateTime.of(2026, 8, 1, 10, 0));
+                true);
     }
 }

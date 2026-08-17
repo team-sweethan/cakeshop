@@ -1,7 +1,8 @@
 package com.cakeshop.domain.order.service;
 
-import com.cakeshop.domain.order.dto.form.customer.GeneralOrderForm;
-import com.cakeshop.domain.order.dto.form.customer.CartOrderForm;
+import com.cakeshop.domain.order.dto.form.customer.OrderCartCreateForm;
+import com.cakeshop.domain.order.dto.form.customer.OrderCreateForm;
+import com.cakeshop.domain.order.dto.form.customer.OrderGeneralCreateForm;
 import com.cakeshop.domain.cart.dto.view.CartOrderItemView;
 import com.cakeshop.domain.cart.service.CartOrderQueryService;
 import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
@@ -59,7 +60,7 @@ public class OrderServiceImpl implements OrderService {
     /** 일반 상품 주문, 주문 항목 스냅샷, READY 결제를 하나의 트랜잭션으로 생성한다. */
     @Override
     @Transactional
-    public long createGeneralOrder(long memberId, GeneralOrderForm form) {
+    public long createGeneralOrder(long memberId, OrderGeneralCreateForm form) {
         if (!memberCouponQueryService.lockActiveCouponIssuableMember(memberId)) {
             throw new BusinessException(CommonErrorCode.FORBIDDEN);
         }
@@ -133,7 +134,7 @@ public class OrderServiceImpl implements OrderService {
      */
     @Override
     @Transactional
-    public long createCartOrder(long memberId, CartOrderForm form) {
+    public long createCartOrder(long memberId, OrderCartCreateForm form) {
         if (!memberCouponQueryService.lockActiveCouponIssuableMember(memberId)) {
             throw new BusinessException(CommonErrorCode.FORBIDDEN);
         }
@@ -226,7 +227,7 @@ public class OrderServiceImpl implements OrderService {
         }
     }
 
-    private void validateForm(GeneralOrderForm form) {
+    private void validateForm(OrderGeneralCreateForm form) {
         if (form == null
                 || isBlank(form.getOrdererName())
                 || isBlank(form.getOrdererPhone())
@@ -242,7 +243,7 @@ public class OrderServiceImpl implements OrderService {
         }
     }
 
-    private void validateCartForm(CartOrderForm form) {
+    private void validateCartForm(OrderCartCreateForm form) {
         if (form == null
                 || isBlank(form.getOrdererName())
                 || isBlank(form.getOrdererPhone())
@@ -267,7 +268,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     /** 현재 상품·옵션 정보를 검증하고 주문 항목 스냅샷에 저장할 값을 계산한다. */
-    private PreparedOrderItem prepareItem(GeneralOrderForm form) {
+    private PreparedOrderItem prepareItem(OrderGeneralCreateForm form) {
         if (form.getQuantity() == null || form.getQuantity() <= 0) {
             throw new BusinessException(OrderErrorCode.INVALID_QUANTITY);
         }
@@ -310,7 +311,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private PreparedOrderItem prepareCartItem(CartOrderItemView item) {
-        GeneralOrderForm form = new GeneralOrderForm();
+        OrderGeneralCreateForm form = new OrderGeneralCreateForm();
         form.setProductId(item.productId());
         form.setQuantity(item.quantity());
         form.setOptionIds(item.optionIds());
@@ -341,7 +342,7 @@ public class OrderServiceImpl implements OrderService {
     /** 결제 대기 상태와 결제 만료 시각이 설정된 일반 주문을 구성한다. */
     private Order createOrder(
             long memberId,
-            GeneralOrderForm form,
+            OrderGeneralCreateForm form,
             BigDecimal originalAmount,
             LocalDateTime now
     ) {
@@ -350,7 +351,7 @@ public class OrderServiceImpl implements OrderService {
 
     private Order createOrder(
             long memberId,
-            com.cakeshop.domain.order.dto.form.customer.CreateOrderForm form,
+            OrderCreateForm form,
             String requestKey,
             BigDecimal originalAmount,
             LocalDateTime now

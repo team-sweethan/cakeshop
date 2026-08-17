@@ -3,7 +3,7 @@ package com.cakeshop.domain.order.service.customer;
 import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
 import com.cakeshop.domain.member.service.MemberCouponQueryService;
 import com.cakeshop.domain.member.service.MemberService;
-import com.cakeshop.domain.order.dto.form.customer.CustomOrderForm;
+import com.cakeshop.domain.order.dto.form.customer.OrderCustomCreateForm;
 import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.order.entity.OrderItem;
 import com.cakeshop.domain.order.entity.OrderItemOption;
@@ -51,7 +51,7 @@ public class CustomerCustomOrderService {
 
     /** 수제 주문과 스냅샷, 쿠폰 예약, READY 결제를 한 트랜잭션으로 생성한다. */
     @Transactional
-    public long createCustomOrder(long memberId, CustomOrderForm form) {
+    public long createCustomOrder(long memberId, OrderCustomCreateForm form) {
         if (!memberCouponQueryService.lockActiveCouponIssuableMember(memberId)) {
             throw new BusinessException(CommonErrorCode.FORBIDDEN);
         }
@@ -129,7 +129,7 @@ public class CustomerCustomOrderService {
         }
     }
 
-    private void validateForm(CustomOrderForm form) {
+    private void validateForm(OrderCustomCreateForm form) {
         if (form == null
                 || isBlank(form.getOrdererName())
                 || isBlank(form.getOrdererPhone())
@@ -143,7 +143,7 @@ public class CustomerCustomOrderService {
         }
     }
 
-    private void validateDisplayedOriginalAmount(CustomOrderForm form, BigDecimal latestOriginalAmount) {
+    private void validateDisplayedOriginalAmount(OrderCustomCreateForm form, BigDecimal latestOriginalAmount) {
         if (form.getDisplayedOriginalAmount().compareTo(latestOriginalAmount) != 0) {
             throw new BusinessException(OrderErrorCode.ORDER_AMOUNT_CHANGED);
         }
@@ -161,7 +161,7 @@ public class CustomerCustomOrderService {
         }
     }
 
-    private PreparedCustomItem prepareCustomItem(CustomOrderForm form) {
+    private PreparedCustomItem prepareCustomItem(OrderCustomCreateForm form) {
         ProductSalesInfo product = productQueryService.getSalesInfo(form.getProductId());
         if (product.productType() != ProductType.CUSTOM) {
             throw new BusinessException(OrderErrorCode.CUSTOM_PRODUCT_REQUIRED);
@@ -196,7 +196,7 @@ public class CustomerCustomOrderService {
 
     private Order createOrder(
             long memberId,
-            CustomOrderForm form,
+            OrderCustomCreateForm form,
             BigDecimal originalAmount,
             LocalDateTime paymentExpiresAt
     ) {

@@ -113,11 +113,11 @@ class AdminPageControllerTests {
 
         AdminOrderService adminOrderService = Mockito.mock(AdminOrderService.class);
         when(adminOrderService.getOrder(1L)).thenReturn(new OrderDetailView(
-                1L, "ORD-1", 1L, OrderType.GENERAL, OrderStatus.PENDING_PAYMENT,
+                1L, "ORD-1", OrderType.GENERAL, OrderStatus.PENDING_PAYMENT,
                 "주문자", "010-1111-1111", "수령자", "010-2222-2222",
                 BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
                 LocalDateTime.of(2026, 8, 1, 10, 0), null, false,
-                null, null, null, null, LocalDateTime.of(2026, 8, 1, 9, 0), false, List.of()
+                null, LocalDateTime.of(2026, 8, 1, 9, 0), false, List.of()
         ));
 
         PaymentAdminService paymentAdminQueryService =

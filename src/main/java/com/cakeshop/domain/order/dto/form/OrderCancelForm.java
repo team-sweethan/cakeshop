@@ -7,7 +7,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class CancelForm {
+public class OrderCancelForm {
 
     @NotBlank
     @Size(max = 200)

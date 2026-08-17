@@ -2,7 +2,6 @@ package com.cakeshop.domain.order.dto.view;
 
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.entity.OrderType;
-import com.cakeshop.domain.product.entity.ProductType;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -12,7 +11,6 @@ import java.util.List;
 public record OrderDetailView(
         long orderId,
         String orderNumber,
-        long memberId,
         OrderType orderType,
         OrderStatus status,
         String ordererName,
@@ -26,9 +24,6 @@ public record OrderDetailView(
         LocalDateTime paymentExpiresAt,
         boolean paymentPending,
         String requestMessage,
-        String rejectReason,
-        LocalDateTime canceledAt,
-        String cancelReason,
         LocalDateTime createdAt,
         boolean cancelRequestAvailable,
         List<Item> items
@@ -38,17 +33,13 @@ public record OrderDetailView(
         return status.statusLabel();
     }
 
-    public boolean readyForPickup() {
-        return status == OrderStatus.READY_FOR_PICKUP;
-    }
-
-    public boolean fulfillmentManageable() {
+    public boolean isFulfillmentManageable() {
         return status == OrderStatus.READY_FOR_PICKUP
                 || (orderType == OrderType.CUSTOM
                 && (status == OrderStatus.UNDER_REVIEW || status == OrderStatus.IN_PRODUCTION));
     }
 
-    public boolean adminCancellationAvailable() {
+    public boolean isAdminCancellationAvailable() {
         return orderType == OrderType.GENERAL && cancelRequestAvailable();
     }
 
@@ -59,27 +50,17 @@ public record OrderDetailView(
     }
 
     public record Item(
-            long orderItemId,
-            Long productId,
             String productName,
-            ProductType productType,
             int quantity,
-            BigDecimal basePrice,
-            BigDecimal optionAmount,
             BigDecimal totalAmount,
             String requirements,
-            List<Option> options,
-            List<Image> images
+            List<Option> options
     ) {
     }
 
     public record Option(
             String groupName,
-            String optionName,
-            BigDecimal additionalPrice
+            String optionName
     ) {
-    }
-
-    public record Image(String imageUrl, int sortOrder) {
     }
 }
