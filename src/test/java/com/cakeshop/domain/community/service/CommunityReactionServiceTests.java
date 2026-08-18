@@ -77,30 +77,61 @@ class CommunityReactionServiceTests {
                 mock(CommunityPostImageService.class));
     }
 
-    /** 좋아요는 잠금, 저장, 재계산 순서로 처리한다. */
+    /** 좋아요는 조건부 카운터 UPDATE가 먼저고, 1행일 때만 행을 넣는다. 정상 경로에 읽기가 없다. */
     @Test
-    void addLike_publishedPost_locksThePostBeforeTouchingLikes() {
-        givenLockedPost(PostStatus.PUBLISHED);
+    void addLike_publishedPost_incrementsCounterBeforeInsertingRow() {
+        when(communityMapper.increaseLikeCount(POST_ID, OTHER_MEMBER_ID)).thenReturn(1);
 
         communityReactionService.addLike(POST_ID, OTHER_MEMBER_ID);
 
         InOrder order = inOrder(communityMapper);
-        order.verify(communityMapper).lockPost(POST_ID);
+        order.verify(communityMapper).increaseLikeCount(POST_ID, OTHER_MEMBER_ID);
         order.verify(communityMapper).insertLike(POST_ID, OTHER_MEMBER_ID);
-        order.verify(communityMapper).recalculateLikeCount(POST_ID);
+        verify(communityMapper, never()).lockPost(anyLong());
     }
 
-    /** 좋아요 취소도 잠금부터 처리한다. */
+    /** 취소도 같은 모양이다 — 카운터 UPDATE가 먼저, 1행일 때만 행을 지운다. */
     @Test
-    void removeLike_publishedPost_locksThePostBeforeTouchingLikes() {
-        givenLockedPost(PostStatus.PUBLISHED);
+    void removeLike_publishedPost_decrementsCounterBeforeDeletingRow() {
+        when(communityMapper.decreaseLikeCount(POST_ID, OTHER_MEMBER_ID)).thenReturn(1);
+        when(communityMapper.deleteLike(POST_ID, OTHER_MEMBER_ID)).thenReturn(1);
 
         communityReactionService.removeLike(POST_ID, OTHER_MEMBER_ID);
 
         InOrder order = inOrder(communityMapper);
-        order.verify(communityMapper).lockPost(POST_ID);
+        order.verify(communityMapper).decreaseLikeCount(POST_ID, OTHER_MEMBER_ID);
         order.verify(communityMapper).deleteLike(POST_ID, OTHER_MEMBER_ID);
-        order.verify(communityMapper).recalculateLikeCount(POST_ID);
+        verify(communityMapper, never()).lockPost(anyLong());
+    }
+
+    /** 이미 눌린 추가는 멱등 성공이다 — 행을 넣지 않고 조용히 끝난다. */
+    @Test
+    void addLike_alreadyLiked_succeedsWithoutInsertingRow() {
+        givenLockedPost(PostStatus.PUBLISHED);
+
+        communityReactionService.addLike(POST_ID, OTHER_MEMBER_ID);
+
+        verify(communityMapper, never()).insertLike(anyLong(), anyLong());
+    }
+
+    /** 누른 적 없는 취소도 멱등 성공이다. */
+    @Test
+    void removeLike_neverLiked_succeedsWithoutDeletingRow() {
+        givenLockedPost(PostStatus.PUBLISHED);
+
+        communityReactionService.removeLike(POST_ID, OTHER_MEMBER_ID);
+
+        verify(communityMapper, never()).deleteLike(anyLong(), anyLong());
+    }
+
+    /** 카운터는 줄었는데 지울 행이 없으면 던진다 — 커밋되면 카운터가 실제보다 작아진다. */
+    @Test
+    void removeLike_counterRowMismatch_failsSoTransactionRollsBack() {
+        when(communityMapper.decreaseLikeCount(POST_ID, OTHER_MEMBER_ID)).thenReturn(1);
+        when(communityMapper.deleteLike(POST_ID, OTHER_MEMBER_ID)).thenReturn(0);
+
+        assertThatThrownBy(() -> communityReactionService.removeLike(POST_ID, OTHER_MEMBER_ID))
+                .isInstanceOf(IllegalStateException.class);
     }
 
     /** 삭제·미존재 글과 다른 작성자의 차단 글은 숨기고, 작성자에게만 차단을 알린다. */
@@ -121,7 +152,6 @@ class CommunityReactionServiceTests {
                 .isEqualTo(expected);
 
         verify(communityMapper, never()).insertLike(anyLong(), anyLong());
-        verify(communityMapper, never()).recalculateLikeCount(anyLong());
     }
 
     @Test
@@ -134,7 +164,6 @@ class CommunityReactionServiceTests {
                 .isEqualTo(CommunityErrorCode.POST_NOT_FOUND);
 
         verify(communityMapper, never()).deleteLike(anyLong(), anyLong());
-        verify(communityMapper, never()).recalculateLikeCount(anyLong());
     }
 
     /** 신고 사유를 정리해 저장한다. */

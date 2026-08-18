@@ -31,24 +31,42 @@ public class CommunityReactionService {
 
     /*
      * 신고는 글을 읽어야 성립하고, 노출 판단은 게시글 쪽이 갖는다. 여기서 다시 읽으면
-     * 규칙이 두 벌이 된다. 좋아요는 잠금이 필요해 이 경로를 쓰지 않는다(아래 참조).
+     * 규칙이 두 벌이 된다. 좋아요는 정상 경로에서 글을 읽지 않는다(아래 참조).
      */
     private final CommunityPostService communityPostService;
 
+    /*
+     * 좋아요는 조건부 원자 UPDATE 로 시작한다(specs/community-reaction.md A8).
+     *
+     * 카운터 증감이 노출 조건과 중복 여부를 한 문장에서 판단하면서 posts 행의 배타
+     * 잠금을 먼저 잡는다 — 조회수(increaseViewCount, H13)와 같은 모양이고, 잠금 순서
+     * 규율(posts 먼저)도 그대로다. 0행이면 그때만 글을 잠가 읽어 이유를 가른다:
+     * 없는 글·비노출 글이면 던지고, PUBLISHED 인데 0행이면 원하는 상태가 이미
+     * 이뤄져 있는 것이라 멱등 성공이다.
+     */
     @Transactional
     public void addLike(long postId, long memberId) {
-        requireLikeablePost(postId, memberId);
+        if (communityMapper.increaseLikeCount(postId, memberId) == 0) {
+            requireLikeablePost(postId, memberId);
+            return;
+        }
 
         communityMapper.insertLike(postId, memberId);
-        communityMapper.recalculateLikeCount(postId);
     }
 
     @Transactional
     public void removeLike(long postId, long memberId) {
-        requireLikeablePost(postId, memberId);
+        if (communityMapper.decreaseLikeCount(postId, memberId) == 0) {
+            requireLikeablePost(postId, memberId);
+            return;
+        }
 
-        communityMapper.deleteLike(postId, memberId);
-        communityMapper.recalculateLikeCount(postId);
+        if (communityMapper.deleteLike(postId, memberId) != 1) {
+            // 카운터는 줄었는데 지울 행이 없다. EXISTS 를 통과한 뒤라 있을 수 없는
+            // 상태이고, 그대로 커밋하면 카운터가 실제 행 수보다 작아진다. 전체를 되돌린다.
+            throw new IllegalStateException(
+                    "좋아요 행이 카운터와 어긋납니다. postId=" + postId + ", memberId=" + memberId);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -92,9 +110,12 @@ public class CommunityReactionService {
     }
 
     /*
-     * 좋아요만 게시글 Service를 거치지 않고 `lockPost`로 직접 읽는다. 뒤따르는 재계산이
-     * 같은 `posts` 행에 배타 잠금을 걸어야 하고, 그 잠금을 여기서 먼저 잡지 않으면
-     * H13과 같은 모양의 교착이 된다. 읽는 방법이 다를 뿐 판단하는 규칙은 신고와 같다.
+     * 좋아요의 0행 실패만 여기로 온다. UPDATE 가 이미 배타 잠금을 잡는 정상 경로에는
+     * 읽기가 없고, 실패했을 때만 글을 잠가 읽어 이유를 가른다 — 게시글 Service 를
+     * 거치지 않는 것은 신고와 달리 상세 조합이 필요 없어서다. 판단 규칙은 신고와 같다.
+     *
+     * 여기를 끝까지 통과하면 글이 PUBLISHED 라는 뜻이고, 그런데도 UPDATE 가 0행이었다면
+     * 좋아요 상태가 이미 목표와 같았던 것이다 — 호출자는 멱등 성공으로 끝낸다.
      */
     private void requireLikeablePost(long postId, long memberId) {
         PostLockRow post = communityMapper.lockPost(postId);

@@ -450,22 +450,71 @@ class CommunityMapperTests {
     }
 
     @Test
-    void recalculateLikeCount_wrongCache_recountsRowsWithoutMarkingPostAsEdited() {
+    void increaseLikeCount_firstLike_incrementsWithoutMarkingPostAsEdited() {
         long postId = insertPost("좋아요 대상", PostStatus.PUBLISHED, BASE_TIME);
-        long otherMemberId = insertMember(
-                "liker-" + System.nanoTime() + "@cakeshop.local", "다른 회원", "ACTIVE");
-
-        communityMapper.insertLike(postId, memberId);
-        communityMapper.insertLike(postId, otherMemberId);
-        jdbcTemplate.update(
-                "UPDATE posts SET like_count = 99, updated_at = updated_at WHERE id = ?", postId);
         LocalDateTime before = updatedAtOf(postId);
 
-        communityMapper.recalculateLikeCount(postId);
+        assertThat(communityMapper.increaseLikeCount(postId, memberId)).isEqualTo(1);
 
-        assertThat(likeCountOf(postId)).isEqualTo(2);
+        assertThat(likeCountOf(postId)).isEqualTo(1);
         assertThat(updatedAtOf(postId)).isEqualTo(before);
         assertThat(communityMapper.findPostById(postId).isEdited()).isFalse();
+    }
+
+    /** 이미 눌린 회원의 재요청은 0행이다 — 멱등 판단이 카운터 UPDATE 안에 있다. */
+    @Test
+    void increaseLikeCount_alreadyLiked_changesNothing() {
+        long postId = insertPost("좋아요 대상", PostStatus.PUBLISHED, BASE_TIME);
+        communityMapper.increaseLikeCount(postId, memberId);
+        communityMapper.insertLike(postId, memberId);
+
+        assertThat(communityMapper.increaseLikeCount(postId, memberId)).isZero();
+        assertThat(likeCountOf(postId)).isEqualTo(1);
+    }
+
+    /** 노출 조건도 같은 UPDATE 안이다 — 비노출 글은 0행이라 확인과 쓰기 사이에 창이 없다. */
+    @Test
+    void increaseLikeCount_hiddenPost_changesNothing() {
+        long blocked = insertPost("차단 글", PostStatus.BLOCKED, BASE_TIME);
+        long deleted = insertPost("삭제 글", PostStatus.DELETED, BASE_TIME);
+
+        assertThat(communityMapper.increaseLikeCount(blocked, memberId)).isZero();
+        assertThat(communityMapper.increaseLikeCount(deleted, memberId)).isZero();
+        assertThat(likeCountOf(blocked)).isZero();
+        assertThat(likeCountOf(deleted)).isZero();
+    }
+
+    @Test
+    void decreaseLikeCount_likedPost_decrementsWithoutMarkingPostAsEdited() {
+        long postId = insertPost("좋아요 대상", PostStatus.PUBLISHED, BASE_TIME);
+        communityMapper.increaseLikeCount(postId, memberId);
+        communityMapper.insertLike(postId, memberId);
+        LocalDateTime before = updatedAtOf(postId);
+
+        assertThat(communityMapper.decreaseLikeCount(postId, memberId)).isEqualTo(1);
+
+        assertThat(likeCountOf(postId)).isZero();
+        assertThat(updatedAtOf(postId)).isEqualTo(before);
+        assertThat(communityMapper.findPostById(postId).isEdited()).isFalse();
+    }
+
+    /** 누른 적 없는 취소는 0행이다 — EXISTS 조건이 카운터가 음수로 가는 길을 막는다. */
+    @Test
+    void decreaseLikeCount_neverLiked_changesNothingSoCountStaysAtZero() {
+        long postId = insertPost("좋아요 대상", PostStatus.PUBLISHED, BASE_TIME);
+
+        assertThat(communityMapper.decreaseLikeCount(postId, memberId)).isZero();
+        assertThat(likeCountOf(postId)).isZero();
+    }
+
+    /** 중복 INSERT는 UNIQUE가 던진다 — 카운터 UPDATE의 NOT EXISTS가 뚫리면 울리는 경보다. */
+    @Test
+    void insertLike_duplicate_violatesUnique() {
+        long postId = insertPost("좋아요 대상", PostStatus.PUBLISHED, BASE_TIME);
+        communityMapper.insertLike(postId, memberId);
+
+        assertThatThrownBy(() -> communityMapper.insertLike(postId, memberId))
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     @Test

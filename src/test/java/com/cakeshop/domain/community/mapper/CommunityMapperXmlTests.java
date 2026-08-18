@@ -121,6 +121,33 @@ class CommunityMapperXmlTests {
                 .doesNotContain("JOIN");
     }
 
+    /** 좋아요 카운터는 노출 조건·중복 여부를 한 UPDATE 안에서 판단한다(increaseViewCount와 같은 모양). */
+    @Test
+    void likeCounterUpdates_checkStatusAndRowStateAtomically() {
+        assertThat(normalizedSql("increaseLikeCount"))
+                .contains("UPDATE POSTS P")
+                .contains("P.LIKE_COUNT = P.LIKE_COUNT + 1")
+                .contains("P.UPDATED_AT = P.UPDATED_AT")
+                .contains("P.STATUS = 'PUBLISHED'")
+                .contains("NOT EXISTS");
+
+        assertThat(normalizedSql("decreaseLikeCount"))
+                .contains("UPDATE POSTS P")
+                .contains("P.LIKE_COUNT = P.LIKE_COUNT - 1")
+                .contains("P.UPDATED_AT = P.UPDATED_AT")
+                .contains("P.STATUS = 'PUBLISHED'")
+                .contains("EXISTS")
+                .doesNotContain("NOT EXISTS");
+    }
+
+    /** 중복 삼킴이 UPDATE 가드로 옮겨 갔으므로 INSERT는 맨몸이어야 한다 — UNIQUE가 경보로 남는다. */
+    @Test
+    void insertLike_hasNoDuplicateSwallowing() {
+        assertThat(normalizedSql("insertLike"))
+                .doesNotContain("ON DUPLICATE")
+                .doesNotContain("IGNORE");
+    }
+
     @Test
     void findPostsForAdmin_countsPendingReportsWithScalarSubquery() {
         String sql = normalizedSql("findPostsForAdmin");
