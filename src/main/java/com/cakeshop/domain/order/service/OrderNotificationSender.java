@@ -76,6 +76,11 @@ public class OrderNotificationSender {
     }
 
     public void sendOrderCanceled(long orderId, long customerId) {
+        sendOrderCanceledToCustomer(orderId, customerId);
+        sendOrderCanceledToAdmins(orderId, customerId);
+    }
+
+    public void sendOrderCanceledToCustomer(long orderId, long customerId) {
         try {
             notificationService.makeNotification(NotificationRequest.builder()
                     .receiverId(customerId)
@@ -85,10 +90,16 @@ public class OrderNotificationSender {
                     .deliveryScope(DeliveryScope.WEB_AND_SMS)
                     .args(new Object[0])
                     .build());
+        } catch (Exception e) {
+            log.error("고객 주문 취소 알림 발송 오류 (orderId={}):", orderId, e);
+        }
+    }
 
+    public void sendOrderCanceledToAdmins(long orderId, long customerId) {
+        try {
             sendToActiveAdmins(orderId, customerId, NotificationType.ORDER_CANCEL_REQUEST, "ORDER_CANCEL_REQUEST:ALL_ADMINS:" + orderId, new Object[]{String.valueOf(orderId)});
         } catch (Exception e) {
-            log.error("주문 취소 알림 발송 오류 (orderId={}):", orderId, e);
+            log.error("관리자 주문 취소 알림 발송 오류 (orderId={}):", orderId, e);
         }
     }
 

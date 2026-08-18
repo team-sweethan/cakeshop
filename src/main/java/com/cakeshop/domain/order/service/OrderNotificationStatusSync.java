@@ -66,10 +66,13 @@ public class OrderNotificationStatusSync {
                         orderNotificationSender.sendCustomOrderRejected(orderId, memberId);
                     }
                 } else if ("CANCELED".equalsIgnoreCase(statusStr)) {
-                    String eventKey = "ORDER_CANCELED:" + memberId + ":" + orderId;
-                    if (!notificationOrderQueryService.existsByReceiverIdAndEventKey(memberId, eventKey)) {
-                        orderNotificationSender.sendOrderCanceled(orderId, memberId);
+                    // 고객 취소 알림 독립 체크 및 발송
+                    String customerEventKey = "ORDER_CANCELED:" + memberId + ":" + orderId;
+                    if (!notificationOrderQueryService.existsByReceiverIdAndEventKey(memberId, customerEventKey)) {
+                        orderNotificationSender.sendOrderCanceledToCustomer(orderId, memberId);
                     }
+                    // 관리자 취소 알림 독립 전송 (내부 멱등성 및 개별 관리자 체크 수행)
+                    orderNotificationSender.sendOrderCanceledToAdmins(orderId, memberId);
                 }
 
                 if (order.orderUpdatedAt() != null && order.orderUpdatedAt().isAfter(maxProcessedTime)) {
