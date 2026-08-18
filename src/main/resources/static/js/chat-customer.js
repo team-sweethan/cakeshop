@@ -193,6 +193,8 @@ document.addEventListener("DOMContentLoaded", () => {
       lastFetchedMessageId = Math.max(lastFetchedMessageId, msg.id);
     }
 
+    updateReadBadges(chatMessagesContainer);
+
     // 상대방(관리자) 메시지 수신 시 탭이 활성화된(visible) 상태에서만 즉시 읽음 커서 전송
     if (msg.senderType !== "CUSTOMER" && msg.id) {
       if (document.visibilityState === "visible") {
@@ -218,23 +220,40 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  // 가장 최근(마지막) 내 메시지에만 읽음/미읽음 배지 표시 헬퍼
+  function updateReadBadges(container) {
+    if (!container) return;
+    const myMessages = container.querySelectorAll(".chat-msg--me");
+    myMessages.forEach((msgEl, index) => {
+      const badge = msgEl.querySelector(".chat-msg__read");
+      if (!badge) return;
+      if (index === myMessages.length - 1) {
+        badge.style.display = "";
+      } else {
+        badge.style.display = "none";
+      }
+    });
+  }
+
   // 상대방이 읽었을 때 내 메시지의 "미읽음" 텍스트를 "읽음"으로 실시간 변경 (lastReadMessageId 이하만 반영)
   function markAllMyMessagesRead(lastReadMessageId) {
     if (!chatMessagesContainer) return;
+    const targetReadId = lastReadMessageId ? parseInt(lastReadMessageId, 10) : null;
     const myMessages = chatMessagesContainer.querySelectorAll(".chat-msg--me");
     myMessages.forEach((msgEl) => {
       const msgIdAttr = msgEl.getAttribute("id");
       if (msgIdAttr && msgIdAttr.startsWith("msg-")) {
         const msgId = parseInt(msgIdAttr.substring("msg-".length()), 10);
-        if (!isNaN(msgId) && lastReadMessageId && msgId <= lastReadMessageId) {
+        if (!isNaN(msgId) && (targetReadId === null || isNaN(targetReadId) || msgId <= targetReadId)) {
           const badge = msgEl.querySelector(".chat-msg__read");
           if (badge) badge.textContent = "읽음";
         }
-      } else if (!lastReadMessageId) {
+      } else if (!targetReadId) {
         const badge = msgEl.querySelector(".chat-msg__read");
         if (badge) badge.textContent = "읽음";
       }
     });
+    updateReadBadges(chatMessagesContainer);
   }
 
   // 2. 대화 메시지 목록 조회 & 타임라인 렌더링
@@ -303,7 +322,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     lastFetchedMessageId = maxId;
-
+    updateReadBadges(chatMessagesContainer);
     scrollToBottom();
   }
 
@@ -520,6 +539,9 @@ document.addEventListener("DOMContentLoaded", () => {
       if (stompClient && stompClient.connected) {
         try {
           stompClient.send("/app/chat/message", {}, JSON.stringify(payload));
+          if (lastFetchedMessageId > 0) {
+            sendReadCursor(currentChatRoomId, lastFetchedMessageId);
+          }
           chatInput.value = "";
           pendingAttachment = null;
           if (imageFileName) imageFileName.textContent = "선택된 파일 없음";

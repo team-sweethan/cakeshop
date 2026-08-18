@@ -597,6 +597,8 @@ document.addEventListener("DOMContentLoaded", () => {
       lastFetchedMessageId = Math.max(lastFetchedMessageId, msg.id);
     }
 
+    updateReadBadges(adminChatMessagesContainer);
+
     if (!isAdminSender && msg.id) {
       if (document.visibilityState === "visible") {
         markRead(selectedChatRoomId, msg.id);
@@ -610,11 +612,26 @@ document.addEventListener("DOMContentLoaded", () => {
       markRead(selectedChatRoomId, lastFetchedMessageId);
     }
   });
-  window.addEventListener("focus", () => {
+  document.addEventListener("click", () => {
     if (selectedChatRoomId && lastFetchedMessageId > 0) {
       markRead(selectedChatRoomId, lastFetchedMessageId);
     }
   });
+
+  // 가장 최근(마지막) 내 메시지에만 읽음/미읽음 배지 표시 헬퍼
+  function updateReadBadges(container) {
+    if (!container) return;
+    const myMessages = container.querySelectorAll(".chat-msg--me");
+    myMessages.forEach((msgEl, index) => {
+      const badge = msgEl.querySelector(".chat-msg__read");
+      if (!badge) return;
+      if (index === myMessages.length - 1) {
+        badge.style.display = "";
+      } else {
+        badge.style.display = "none";
+      }
+    });
+  }
 
   function markAllAdminMessagesRead(lastReadMessageId) {
     if (!adminChatMessagesContainer) return;
@@ -633,6 +650,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (badge) badge.textContent = "읽음";
       }
     });
+    updateReadBadges(adminChatMessagesContainer);
   }
 
   // 2. 대화 타임라인 렌더링
@@ -755,7 +773,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     lastFetchedMessageId = maxId;
-
+    updateReadBadges(adminChatMessagesContainer);
     scrollToBottom();
   }
 
@@ -927,6 +945,9 @@ document.addEventListener("DOMContentLoaded", () => {
       if (stompClient && stompClient.connected) {
         try {
           stompClient.send("/app/chat/message", {}, JSON.stringify(payload));
+          if (lastFetchedMessageId > 0 && selectedChatRoomId) {
+            markRead(selectedChatRoomId, lastFetchedMessageId);
+          }
           if (inputEl) inputEl.value = "";
           pendingAttachment = null;
           if (adminImageFileName) adminImageFileName.textContent = "선택된 파일 없음";
