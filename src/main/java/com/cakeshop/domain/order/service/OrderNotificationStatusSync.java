@@ -6,6 +6,7 @@ import com.cakeshop.domain.order.mapper.OrderChatMapper;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -18,7 +19,7 @@ import org.springframework.stereotype.Component;
  * 담당자 : 주환
  * 작성일 : 2026-08-18
  * 기능 : 주문 상태 변경 독립 감지 및 알림 동기화 스케줄러
- * 설명 : 타 도메인 코드를 직접 수정하지 않고, 서울 시각 Clock, 과거 1일 복구 탐색, 비동기 스레드 풀(@Async), 시간 커서 페이징(since) 및 NotificationOrderQueryService 멱등성 검사를 통해 제작 승인, 반려, 취소 알림을 발송한다.
+ * 설명 : 타 도메인 코드를 직접 수정하지 않고, 서울 시각 Clock, 과거 1일 복구 탐색, AtomicBoolean 직렬화, 비동기 스레드 풀(@Async), 시간 커서 페이징(since) 및 NotificationOrderQueryService 멱등성 검사를 통해 제작 승인, 반려, 취소 알림을 발송한다.
  * ******************************
  */
 @Slf4j
@@ -31,11 +32,17 @@ public class OrderNotificationStatusSync {
     private final NotificationOrderQueryService notificationOrderQueryService;
     private final Clock clock;
 
+    private final AtomicBoolean isRunning = new AtomicBoolean(false);
     private LocalDateTime lastSyncTime;
 
     @Async
     @Scheduled(fixedDelay = 3000)
     public void syncOrderNotifications() {
+        if (!isRunning.compareAndSet(false, true)) {
+            log.trace("이전 동기화 배치가 여전히 실행 중이므로 이번 스케줄 조회를 직렬화(스킵)합니다.");
+            return;
+        }
+
         try {
             if (lastSyncTime == null) {
                 // 재시작 시 다운타임(10분 초과) 동안의 미처리 알림 복구를 위해 최근 1일 전부터 탐색
@@ -94,6 +101,8 @@ public class OrderNotificationStatusSync {
             }
         } catch (Exception e) {
             log.error("주문 상태 변경 동기화 알림 처리 전체 실패:", e);
+        } finally {
+            isRunning.set(false);
         }
     }
 }

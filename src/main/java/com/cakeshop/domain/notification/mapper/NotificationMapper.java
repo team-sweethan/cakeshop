@@ -51,6 +51,9 @@ public interface NotificationMapper {
     // 이미 SENT 성공 발송 이력이 있는지 확인
     boolean hasSentDelivery(@Param("notificationId") Long notificationId);
 
+    // 이미 발송 시도 이력(SENT, FAILED, SKIPPED)이 한 번이라도 존재하는지 확인
+    boolean hasAttemptedDelivery(@Param("notificationId") Long notificationId);
+
     // 수신 회원 전화번호 조회 (주문서 작성 번호 우선, 알림톡 발송용)
     String findReceiverPhone(@Param("receiverId") Long receiverId, @Param("orderId") Long orderId); 
 
