@@ -27,6 +27,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
         CommunityService.class,
         MemberCommunityQueryService.class,
         CommunityMemberViewLoader.class,
+        CommunityPostAccessPolicy.class,
         PopularPostReader.class,
         ClockConfig.class})
 class CommunityViewCountTests {

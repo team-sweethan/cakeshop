@@ -101,6 +101,7 @@ class CommunityServiceTests {
         communityService = new CommunityService(
                 communityMapper,
                 new CommunityMemberViewLoader(memberCommunityQueryService),
+                new CommunityPostAccessPolicy(),
                 readerAt(NOW));
     }
 
@@ -333,6 +334,7 @@ class CommunityServiceTests {
         CommunityService serviceAt = new CommunityService(
                 communityMapper,
                 new CommunityMemberViewLoader(memberCommunityQueryService),
+                new CommunityPostAccessPolicy(),
                 readerAt(now));
         givenConfirmedRanking(rankingDate, popular(1, 11L));
 
