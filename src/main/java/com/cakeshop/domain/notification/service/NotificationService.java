@@ -99,10 +99,10 @@ public class NotificationService {
                         .build();
                 registerWebSocketSending(request.getReceiverId(), bundleResponse);
             } else {
-                // 일반 알림(주문 등) 중복 시 발송 시도 이력(SENT, FAILED, SKIPPED)이 없는 미처리 건에 한해 1회 SMS를 발송한다. (무한 3초 재발송 차단)
+                // 일반 알림(주문 등) 중복 시 기존 SMS 전송이 완료(SENT)되지 않은 상태라면 SMS를 재발송한다.
                 if (scope == DeliveryScope.WEB_AND_SMS && request.getReceiverId() != null) {
                     Long existingId = notificationMapper.findIdByReceiverIdAndEventKey(request.getReceiverId(), eventKey);
-                    if (existingId != null && !notificationMapper.hasAttemptedDelivery(existingId)) {
+                    if (existingId != null && !notificationMapper.hasSentDelivery(existingId)) {
                         String receiverPhone = notificationMapper.findReceiverPhone(request.getReceiverId(), request.getOrderId());
                         registerSmsSending(existingId, receiverPhone, title, content);
                     }
