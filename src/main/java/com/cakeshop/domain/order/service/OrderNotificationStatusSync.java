@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
  * 담당자 : 주환
  * 작성일 : 2026-08-18
  * 기능 : 주문 상태 변경 독립 감지 및 알림 동기화 스케줄러
- * 설명 : 타 도메인 코드를 직접 수정하지 않고, 서울 시각 Clock, 비동기 스레드 풀(@Async), 시간 커서 페이징(since) 및 NotificationOrderQueryService 멱등성 검사를 통해 제작 승인, 반려, 취소 알림을 발송한다.
+ * 설명 : 타 도메인 코드를 직접 수정하지 않고, 서울 시각 Clock, 과거 1일 복구 탐색, 비동기 스레드 풀(@Async), 시간 커서 페이징(since) 및 NotificationOrderQueryService 멱등성 검사를 통해 제작 승인, 반려, 취소 알림을 발송한다.
  * ******************************
  */
 @Slf4j
@@ -38,7 +38,8 @@ public class OrderNotificationStatusSync {
     public void syncOrderNotifications() {
         try {
             if (lastSyncTime == null) {
-                lastSyncTime = LocalDateTime.now(clock).minusMinutes(10);
+                // 재시작 시 다운타임(10분 초과) 동안의 미처리 알림 복구를 위해 최근 1일 전부터 탐색
+                lastSyncTime = LocalDateTime.now(clock).minusDays(1);
             }
 
             List<OrderChatView> recentOrders = orderChatMapper.findRecentStatusChangedOrders(lastSyncTime);
