@@ -47,6 +47,8 @@
 
           <p style="white-space:pre-wrap" th:text="${review.content}">후기 본문</p>
 
+          <div th:replace="~{fragments/customer/product-review :: images(${review.images})}"></div>
+
           <div th:replace="~{fragments/customer/product-review :: reply(${review.reply})}"></div>
 
           <div class="cluster" th:unless="${review.blocked}">

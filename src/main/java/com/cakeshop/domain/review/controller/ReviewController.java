@@ -1,5 +1,7 @@
 package com.cakeshop.domain.review.controller;
 
+import java.util.Map;
+
 import jakarta.validation.Valid;
 
 import lombok.RequiredArgsConstructor;
@@ -20,15 +22,23 @@ import com.cakeshop.domain.review.dto.form.ReviewEditForm;
 import com.cakeshop.domain.review.dto.form.ReviewWriteForm;
 import com.cakeshop.domain.review.dto.view.MyReviewView;
 import com.cakeshop.domain.review.dto.view.ProductReviewView;
+import com.cakeshop.domain.review.error.ReviewErrorCode;
 import com.cakeshop.domain.review.service.ReviewService;
 import com.cakeshop.global.common.paging.PageNavigation;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
+import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.security.MemberDetails;
 
 @Controller
 @RequiredArgsConstructor
 public class ReviewController {
+
+    private static final Map<ReviewErrorCode, String> FORM_ERROR_FIELDS = Map.of(
+            ReviewErrorCode.INVALID_IMAGE_FILE, "images",
+            ReviewErrorCode.IMAGE_TOO_LARGE, "images",
+            ReviewErrorCode.IMAGE_LIMIT_EXCEEDED, "images"
+    );
 
     private final ReviewService reviewService;
 
@@ -118,7 +128,25 @@ public class ReviewController {
             return "customer/review/form";
         }
 
-        reviewService.write(reviewWriteForm, memberId);
+        try {
+            reviewService.write(reviewWriteForm, memberId);
+        } catch (BusinessException exception) {
+            String field = FORM_ERROR_FIELDS.get(exception.getErrorCode());
+
+            if (field == null) {
+                throw exception;
+            }
+
+            bindingResult.rejectValue(
+                    field,
+                    exception.getErrorCode().code(),
+                    exception.getErrorCode().message());
+            model.addAttribute(
+                    "target",
+                    reviewService.getWriteTarget(reviewWriteForm.getOrderItemId(), memberId));
+
+            return "customer/review/form";
+        }
 
         return "redirect:/mypage/reviews";
     }

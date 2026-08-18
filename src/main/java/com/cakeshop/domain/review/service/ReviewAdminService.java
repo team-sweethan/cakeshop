@@ -23,6 +23,7 @@ import com.cakeshop.domain.review.dto.query.ReviewRow;
 import com.cakeshop.domain.review.dto.view.AdminReviewDetailView;
 import com.cakeshop.domain.review.dto.view.AdminReviewListView;
 import com.cakeshop.domain.review.dto.view.AdminReviewRating;
+import com.cakeshop.domain.review.dto.view.ReviewImageView;
 import com.cakeshop.domain.review.dto.view.ReviewReplyView;
 import com.cakeshop.domain.review.entity.ReviewReply;
 import com.cakeshop.domain.review.entity.ReviewStatus;
@@ -46,6 +47,7 @@ public class ReviewAdminService {
     private final ProductReviewCommandService productReviewCommandService;
     private final MemberReviewQueryService memberReviewQueryService;
     private final OrderReviewQueryService orderReviewQueryService;
+    private final ReviewImageService reviewImageService;
 
     @Transactional(readOnly = true)
     public PageResult<AdminReviewListView> getReviews(
@@ -83,11 +85,14 @@ public class ReviewAdminService {
         ReviewRow review = requireFound(reviewMapper.findById(reviewId));
 
         List<ReviewRow> rows = List.of(review);
+        Map<Long, List<ReviewImageView>> images = reviewImageService.getImagesByReviewIds(
+                List.of(reviewId));
 
         return AdminReviewDetailView.from(
                 review,
                 findAuthors(rows).get(review.memberId()),
                 findOrderSnapshots(rows).get(review.orderItemId()),
+                images.getOrDefault(reviewId, List.of()),
                 ReviewReplyView.from(reviewReplyMapper.findByReviewId(reviewId)));
     }
 

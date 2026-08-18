@@ -1,6 +1,7 @@
 package com.cakeshop.domain.review.dto.view;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import com.cakeshop.domain.member.dto.view.MemberReviewView;
 import com.cakeshop.domain.review.dto.query.ReviewRow;
@@ -14,13 +15,17 @@ public record ProductReviewView(
         Integer serviceRating,
         String content,
         LocalDateTime createdAt,
+        List<ReviewImageView> images,
         ReviewReplyView reply
 ) {
 
     public static final String WITHDRAWN_AUTHOR_NAME = "탈퇴한 회원";
 
     public static ProductReviewView from(
-            ReviewRow row, MemberReviewView author, ReviewReplyView reply) {
+            ReviewRow row,
+            MemberReviewView author,
+            List<ReviewImageView> images,
+            ReviewReplyView reply) {
 
         return new ProductReviewView(
                 row.id(),
@@ -33,6 +38,7 @@ public record ProductReviewView(
                 row.serviceRating(),
                 row.content(),
                 row.createdAt(),
+                images == null ? List.of() : List.copyOf(images),
                 reply);
     }
 }

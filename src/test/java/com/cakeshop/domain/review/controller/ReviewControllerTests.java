@@ -8,9 +8,11 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
@@ -30,6 +32,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -39,9 +42,11 @@ import com.cakeshop.domain.review.dto.form.ReviewEditForm;
 import com.cakeshop.domain.review.dto.form.ReviewWriteForm;
 import com.cakeshop.domain.review.dto.view.MyReviewView;
 import com.cakeshop.domain.review.entity.ReviewStatus;
+import com.cakeshop.domain.review.error.ReviewErrorCode;
 import com.cakeshop.domain.review.service.ReviewService;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
+import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.error.GlobalExceptionHandler;
 import com.cakeshop.global.security.MemberDetails;
 
@@ -208,6 +213,27 @@ class ReviewControllerTests {
     }
 
     @Test
+    void write_imageLimitError_rerendersTheFormWithAnImageFieldError() throws Exception {
+        when(reviewService.getWriteTarget(ORDER_ITEM_ID, MEMBER_ID)).thenReturn(target());
+        doThrow(new BusinessException(ReviewErrorCode.IMAGE_LIMIT_EXCEEDED))
+                .when(reviewService).write(any(), eq(MEMBER_ID));
+
+        mockMvc.perform(multipart("/reviews")
+                        .file(new MockMultipartFile(
+                                "images", "review.jpg", "image/jpeg",
+                                new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF}))
+                        .param("orderItemId", String.valueOf(ORDER_ITEM_ID))
+                        .param("overallRating", "5")
+                        .param("tasteRating", "5")
+                        .param("designRating", "4")
+                        .param("serviceRating", "4")
+                        .param("content", "맛있게 잘 먹었습니다. 다음에도 주문할게요."))
+                .andExpect(status().isOk())
+                .andExpect(view().name("customer/review/form"))
+                .andExpect(model().attributeHasFieldErrors("reviewWriteForm", "images"));
+    }
+
+    @Test
     void editForm_ownReview_prefillsTheFormWithWhatWasSaved() throws Exception {
         when(reviewService.getEditableReview(REVIEW_ID, MEMBER_ID)).thenReturn(myReview());
 
@@ -292,6 +318,7 @@ class ReviewControllerTests {
                 "맛있게 잘 먹었습니다.",
                 LocalDateTime.of(2026, 8, 9, 12, 0),
                 ReviewStatus.PUBLISHED,
+                List.of(),
                 null);
     }
 

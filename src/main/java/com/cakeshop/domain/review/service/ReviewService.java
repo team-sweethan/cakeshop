@@ -28,6 +28,7 @@ import com.cakeshop.domain.review.dto.query.ProductRatingAggregate;
 import com.cakeshop.domain.review.dto.query.ReviewRow;
 import com.cakeshop.domain.review.dto.view.MyReviewView;
 import com.cakeshop.domain.review.dto.view.ProductReviewView;
+import com.cakeshop.domain.review.dto.view.ReviewImageView;
 import com.cakeshop.domain.review.dto.view.ReviewReplyView;
 import com.cakeshop.domain.review.entity.Review;
 import com.cakeshop.domain.review.entity.ReviewStatus;
@@ -50,6 +51,7 @@ public class ReviewService {
     private final ProductReviewCommandService productReviewCommandService;
     private final ProductQueryService productQueryService;
     private final MemberReviewQueryService memberReviewQueryService;
+    private final ReviewImageService reviewImageService;
     private final ReviewNotificationService reviewNotificationService;
 
     @Transactional(readOnly = true)
@@ -104,11 +106,15 @@ public class ReviewService {
                 memberId, pageRequest.getOffset(), pageRequest.getSize());
 
         Map<Long, OrderReviewSnapshotView> snapshots = findOrderSnapshots(rows);
+        Map<Long, List<ReviewImageView>> images = findImages(rows);
         Map<Long, ReviewReplyView> replies = findReplies(rows);
 
         List<MyReviewView> content = rows.stream()
                 .map(row -> MyReviewView.from(
-                        row, snapshots.get(row.orderItemId()), replies.get(row.id())))
+                        row,
+                        snapshots.get(row.orderItemId()),
+                        images.getOrDefault(row.id(), List.of()),
+                        replies.get(row.id())))
                 .toList();
 
         return new PageResult<>(content, pageRequest, total);
@@ -121,6 +127,7 @@ public class ReviewService {
         return MyReviewView.from(
                 review,
                 findOrderSnapshots(List.of(review)).get(review.orderItemId()),
+                findImages(List.of(review)).getOrDefault(review.id(), List.of()),
                 null);
     }
 
@@ -128,6 +135,10 @@ public class ReviewService {
     public void write(ReviewWriteForm form, long memberId) {
         // 폼을 연 뒤 제출까지 시간이 벌어질 수 있고, 폼을 거치지 않은 직접 호출도 막아야 한다.
         OrderReviewTargetView target = requireWritableTarget(form.getOrderItemId(), memberId);
+
+        // 느린 외부 파일 저장은 상품 행 잠금 전에 끝낸다. 이후 DB 쓰기가 실패하면
+        // ReviewImageService 가 등록한 트랜잭션 콜백이 저장된 파일을 정리한다.
+        List<String> imageUrls = reviewImageService.store(form.getImages());
 
         // 저장보다 먼저 잠근다. 뒤집으면 INSERT 의 FK 확인이 상품 행에 공유 잠금을 걸고 집계가
         // 그것을 배타로 승격하려 해, 같은 상품에 후기가 동시에 들어올 때 교착한다 (D1).
@@ -150,6 +161,8 @@ public class ReviewService {
             // 막히지 않고 uk_reviews_order_item 이 최종 방어선이다.
             throw new BusinessException(ReviewErrorCode.ALREADY_REVIEWED);
         }
+
+        reviewImageService.attach(review.getId(), imageUrls);
 
         recalculateRating(target.productId());
 
@@ -237,12 +250,24 @@ public class ReviewService {
 
     private List<ProductReviewView> toProductReviewViews(List<ReviewRow> rows) {
         Map<Long, MemberReviewView> authors = findAuthors(rows);
+        Map<Long, List<ReviewImageView>> images = findImages(rows);
         Map<Long, ReviewReplyView> replies = findReplies(rows);
 
         return rows.stream()
                 .map(row -> ProductReviewView.from(
-                        row, authors.get(row.memberId()), replies.get(row.id())))
+                        row,
+                        authors.get(row.memberId()),
+                        images.getOrDefault(row.id(), List.of()),
+                        replies.get(row.id())))
                 .toList();
+    }
+
+    private Map<Long, List<ReviewImageView>> findImages(List<ReviewRow> rows) {
+        return reviewImageService.getImagesByReviewIds(rows.stream()
+                .map(ReviewRow::id)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList());
     }
 
     private Map<Long, ReviewReplyView> findReplies(List<ReviewRow> rows) {
