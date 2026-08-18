@@ -6,7 +6,7 @@
 
 ## 문서 기준
 
-- 기준 migration: `V0__initial_schema.sql`부터 `V20260818_005803__remove_unused_payment_columns.sql`까지 42개
+- 기준 migration: `V0__initial_schema.sql`부터 `V20260818_104810__remove_unused_payment_cancellation_failure_message.sql`까지 43개
 - 최종 물리 테이블: 46개
 - migration의 중간 상태, 데이터 보정용 임시 테이블과 이미 삭제된 컬럼·인덱스는 기록하지 않는다.
 - 담당자 이름은 현재 리뷰 경계를 나타낸다. 파일명과 경로는 담당 변경과 무관하게 도메인명을 유지한다.

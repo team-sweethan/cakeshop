@@ -80,3 +80,4 @@
 - `V20260813_094912__add_statistics_additional_metrics.sql`
 - `V20260813_104053__add_payment_expiration_check.sql`
 - `V20260818_005803__remove_unused_payment_columns.sql`
+- `V20260818_104810__remove_unused_payment_cancellation_failure_message.sql`
