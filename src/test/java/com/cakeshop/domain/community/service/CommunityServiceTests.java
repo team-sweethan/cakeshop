@@ -42,6 +42,7 @@ import com.cakeshop.domain.community.entity.Post;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
 import com.cakeshop.domain.community.mapper.CommunityMapper;
+import com.cakeshop.domain.community.mapper.CommunityPopularPostMapper;
 import com.cakeshop.domain.member.dto.view.MemberCommunityView;
 import com.cakeshop.domain.member.service.MemberCommunityQueryService;
 import com.cakeshop.global.common.paging.PageRequest;
@@ -87,12 +88,14 @@ class CommunityServiceTests {
     private static final PageRequest FIRST_PAGE = new PageRequest(1, 20);
 
     private CommunityMapper communityMapper;
+    private CommunityPopularPostMapper communityPopularPostMapper;
     private MemberCommunityQueryService memberCommunityQueryService;
     private CommunityService communityService;
 
     @BeforeEach
     void setUp() {
         communityMapper = mock(CommunityMapper.class);
+        communityPopularPostMapper = mock(CommunityPopularPostMapper.class);
         memberCommunityQueryService = mock(MemberCommunityQueryService.class);
         when(memberCommunityQueryService.getMembersByIds(anyList())).thenReturn(List.of());
         communityService = new CommunityService(
@@ -100,7 +103,7 @@ class CommunityServiceTests {
     }
 
     private PopularPostReader readerAt(LocalDateTime now) {
-        return new PopularPostReader(communityMapper, fixedClockAt(now));
+        return new PopularPostReader(communityPopularPostMapper, fixedClockAt(now));
     }
 
     /** 서울 기준 고정 시계를 만든다. */
@@ -270,7 +273,7 @@ class CommunityServiceTests {
         assertThat(section.rankingDate()).isEqualTo(YESTERDAY);
         assertThat(section.posts()).extracting(PopularPostView::postId).containsExactly(11L, 22L);
         // 인기글은 10건만 조회한다.
-        verify(communityMapper).findPopularPosts(YESTERDAY, 10);
+        verify(communityPopularPostMapper).findPopularPosts(YESTERDAY, 10);
     }
 
     /** 인기글은 필터 없는 목록의 첫 페이지에만 노출한다. */
@@ -285,20 +288,20 @@ class CommunityServiceTests {
 
         assertThat(section.isEmpty()).isTrue();
         assertThat(section.rankingDate()).isNull();
-        verify(communityMapper, never()).findLatestRankingDate();
-        verify(communityMapper, never()).findPopularPosts(any(), anyInt());
+        verify(communityPopularPostMapper, never()).findLatestRankingDate();
+        verify(communityPopularPostMapper, never()).findPopularPosts(any(), anyInt());
     }
 
     /** 확정일이 없으면 인기글을 조회하지 않는다. */
     @Test
     void getPopularSection_noConfirmedRun_returnsEmptyWithoutQueryingPosts() {
-        when(communityMapper.findLatestRankingDate()).thenReturn(null);
+        when(communityPopularPostMapper.findLatestRankingDate()).thenReturn(null);
 
         PopularSectionView section = communityService.getPopularSection(null, FIRST_PAGE);
 
         assertThat(section.isEmpty()).isTrue();
         assertThat(section.rankingDate()).isNull();
-        verify(communityMapper, never()).findPopularPosts(any(), anyInt());
+        verify(communityPopularPostMapper, never()).findPopularPosts(any(), anyInt());
     }
 
     /** 노출할 인기글이 없으면 빈 영역을 반환한다. */
@@ -740,8 +743,8 @@ class CommunityServiceTests {
     }
 
     private void givenConfirmedRanking(LocalDate rankingDate, PopularPostView... posts) {
-        when(communityMapper.findLatestRankingDate()).thenReturn(rankingDate);
-        when(communityMapper.findPopularPosts(rankingDate, 10)).thenReturn(List.of(posts));
+        when(communityPopularPostMapper.findLatestRankingDate()).thenReturn(rankingDate);
+        when(communityPopularPostMapper.findPopularPosts(rankingDate, 10)).thenReturn(List.of(posts));
     }
 
     private static PopularPostView popular(int ranking, long postId) {

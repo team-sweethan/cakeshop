@@ -4,7 +4,7 @@ import java.time.LocalDate;
 
 import lombok.RequiredArgsConstructor;
 
-import com.cakeshop.domain.community.mapper.CommunityMapper;
+import com.cakeshop.domain.community.mapper.CommunityPopularPostMapper;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,7 +32,7 @@ public class PopularPostBatchService {
      */
     private static final int SNAPSHOT_SIZE = 20;
 
-    private final CommunityMapper communityMapper;
+    private final CommunityPopularPostMapper communityPopularPostMapper;
 
     /**
      * 이 날짜의 인기글을 확정한다. 이미 확정된 날짜면 아무것도 하지 않는다.
@@ -55,17 +55,17 @@ public class PopularPostBatchService {
      */
     @Transactional
     public void createDailyRanking(LocalDate rankingDate) {
-        if (communityMapper.existsBatchRun(rankingDate)) {
+        if (communityPopularPostMapper.existsBatchRun(rankingDate)) {
             log.info("인기글 배치를 건너뜁니다. 이미 확정된 날짜입니다. rankingDate={}", rankingDate);
             return;
         }
 
-        communityMapper.deleteDailyRanking(rankingDate);
+        communityPopularPostMapper.deleteDailyRanking(rankingDate);
 
-        int rankedCount = communityMapper.insertDailyRanking(rankingDate, SNAPSHOT_SIZE);
+        int rankedCount = communityPopularPostMapper.insertDailyRanking(rankingDate, SNAPSHOT_SIZE);
 
         // 0건이어도 기록한다. 이 줄이 빠지면 활동 없는 날이 "안 돈 날"과 같아진다(D11).
-        communityMapper.insertBatchRun(rankingDate, rankedCount);
+        communityPopularPostMapper.insertBatchRun(rankingDate, rankedCount);
 
         log.info("인기글 배치를 확정했습니다. rankingDate={}, postCount={}", rankingDate, rankedCount);
     }

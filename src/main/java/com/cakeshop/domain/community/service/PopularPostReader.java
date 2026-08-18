@@ -10,7 +10,7 @@ import lombok.RequiredArgsConstructor;
 
 import com.cakeshop.domain.community.dto.view.PopularPostView;
 import com.cakeshop.domain.community.dto.view.PopularSectionView;
-import com.cakeshop.domain.community.mapper.CommunityMapper;
+import com.cakeshop.domain.community.mapper.CommunityPopularPostMapper;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,11 +34,11 @@ class PopularPostReader {
 
     private static final LocalTime STALE_WARNING_GRACE_UNTIL = LocalTime.of(1, 0);
 
-    private final CommunityMapper communityMapper;
+    private final CommunityPopularPostMapper communityPopularPostMapper;
     private final Clock clock;
 
     PopularSectionView read(int limit) {
-        LocalDate rankingDate = communityMapper.findLatestRankingDate();
+        LocalDate rankingDate = communityPopularPostMapper.findLatestRankingDate();
 
         if (rankingDate == null) {
             return PopularSectionView.empty();
@@ -46,7 +46,7 @@ class PopularPostReader {
 
         warnIfRankingIsStale(rankingDate);
 
-        List<PopularPostView> popularPosts = communityMapper.findPopularPosts(rankingDate, limit);
+        List<PopularPostView> popularPosts = communityPopularPostMapper.findPopularPosts(rankingDate, limit);
 
         if (popularPosts.isEmpty()) {
             return PopularSectionView.empty();
