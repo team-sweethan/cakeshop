@@ -11,14 +11,12 @@ import lombok.RequiredArgsConstructor;
 
 import com.cakeshop.domain.community.dto.command.PostUpdateCommand;
 import com.cakeshop.domain.community.dto.form.PostForm;
-import com.cakeshop.domain.community.dto.form.ReportForm;
 import com.cakeshop.domain.community.dto.view.PopularSectionView;
 import com.cakeshop.domain.community.dto.view.PostCategoryView;
 import com.cakeshop.domain.community.dto.query.PostDetailRow;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.query.PostListRow;
 import com.cakeshop.domain.community.dto.view.PostListView;
-import com.cakeshop.domain.community.dto.query.PostLockRow;
 import com.cakeshop.domain.community.dto.view.PostSort;
 import com.cakeshop.domain.community.entity.Post;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
@@ -28,7 +26,6 @@ import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
 
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -155,73 +152,6 @@ public class CommunityService {
     @Transactional(readOnly = true)
     public PostDetailView getCommentablePost(long postId, long memberId) {
         return requireCommentablePost(postId, memberId);
-    }
-
-    @Transactional
-    public void addLike(long postId, long memberId) {
-        requireLikeablePost(postId, memberId);
-
-        communityMapper.insertLike(postId, memberId);
-        communityMapper.recalculateLikeCount(postId);
-    }
-
-    @Transactional
-    public void removeLike(long postId, long memberId) {
-        requireLikeablePost(postId, memberId);
-
-        communityMapper.deleteLike(postId, memberId);
-        communityMapper.recalculateLikeCount(postId);
-    }
-
-    @Transactional(readOnly = true)
-    public boolean isLikedBy(long postId, long memberId) {
-        return communityMapper.existsLike(postId, memberId);
-    }
-
-    @Transactional
-    public void reportPost(long postId, ReportForm form, long reporterId) {
-        requireReportablePost(postId, reporterId);
-
-        try {
-            communityMapper.insertReport(postId, reporterId, form.getReason());
-        } catch (DuplicateKeyException e) {
-            throw new BusinessException(CommunityErrorCode.ALREADY_REPORTED);
-        }
-    }
-
-    @Transactional(readOnly = true)
-    public PostDetailView getReportablePost(long postId, long memberId) {
-        return requireReportablePost(postId, memberId);
-    }
-
-    @Transactional(readOnly = true)
-    public boolean isReportedBy(long postId, long memberId) {
-        return communityMapper.existsReport(postId, memberId);
-    }
-
-    private PostDetailView requireReportablePost(long postId, long memberId) {
-        PostDetailView post = requireVisiblePost(postId, memberId);
-
-        if (communityPostAccessPolicy.isAuthor(post.memberId(), memberId)) {
-            throw new BusinessException(CommunityErrorCode.OWN_POST_REPORT);
-        }
-
-        if (communityMapper.existsReport(postId, memberId)) {
-            throw new BusinessException(CommunityErrorCode.ALREADY_REPORTED);
-        }
-
-        return post;
-    }
-
-    private void requireLikeablePost(long postId, long memberId) {
-        PostLockRow post = communityMapper.lockPost(postId);
-
-        if (post == null) {
-            throw new BusinessException(CommunityErrorCode.POST_NOT_FOUND);
-        }
-
-        communityPostAccessPolicy.requireVisible(post.status(), post.memberId(), memberId);
-        communityPostAccessPolicy.requirePublished(post.status());
     }
 
     private PostDetailView requireCommentablePost(long postId, Long memberId) {

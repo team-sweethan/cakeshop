@@ -10,6 +10,7 @@ import com.cakeshop.domain.community.dto.view.PostSort;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
 import com.cakeshop.domain.community.service.CommunityCommentService;
 import com.cakeshop.domain.community.service.CommunityNoticeService;
+import com.cakeshop.domain.community.service.CommunityReactionService;
 import com.cakeshop.domain.community.service.CommunityService;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.common.paging.PageNavigation;
@@ -49,6 +50,7 @@ public class CommunityController {
     private final CommunityService communityService;
     private final CommunityCommentService communityCommentService;
     private final CommunityNoticeService communityNoticeService;
+    private final CommunityReactionService communityReactionService;
 
     @GetMapping("/community")
     public String list(
@@ -158,7 +160,7 @@ public class CommunityController {
             @RequestParam(name = "comments", required = false) String comments,
             @AuthenticationPrincipal MemberDetails memberDetails
     ) {
-        communityService.addLike(postId, memberDetails.getMemberId());
+        communityReactionService.addLike(postId, memberDetails.getMemberId());
 
         return redirectToDetail(postId, comments);
     }
@@ -176,13 +178,13 @@ public class CommunityController {
     ) {
         long memberId = memberDetails.getMemberId();
 
-        PostDetailView post = communityService.getReportablePost(postId, memberId);
+        PostDetailView post = communityReactionService.getReportablePost(postId, memberId);
 
         if (bindingResult.hasErrors()) {
             return prepareDetail(model, post, memberId, comments);
         }
 
-        communityService.reportPost(postId, reportForm, memberId);
+        communityReactionService.reportPost(postId, reportForm, memberId);
 
         redirectAttributes.addFlashAttribute("successMessage", "신고를 접수했습니다.");
 
@@ -195,7 +197,7 @@ public class CommunityController {
             @RequestParam(name = "comments", required = false) String comments,
             @AuthenticationPrincipal MemberDetails memberDetails
     ) {
-        communityService.removeLike(postId, memberDetails.getMemberId());
+        communityReactionService.removeLike(postId, memberDetails.getMemberId());
 
         return redirectToDetail(postId, comments);
     }
@@ -225,7 +227,7 @@ public class CommunityController {
 
         model.addAttribute(
                 "likedByViewer",
-                canWrite && communityService.isLikedBy(post.id(), viewerId)
+                canWrite && communityReactionService.isLikedBy(post.id(), viewerId)
         );
 
         boolean canReport =
@@ -234,7 +236,7 @@ public class CommunityController {
 
         model.addAttribute(
                 "alreadyReported",
-                canReport && communityService.isReportedBy(post.id(), viewerId)
+                canReport && communityReactionService.isReportedBy(post.id(), viewerId)
         );
 
         model.addAttribute(

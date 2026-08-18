@@ -28,7 +28,7 @@ class CommunityTransactionTests {
     private static final LocalDateTime CREATED_AT = LocalDateTime.of(2026, 3, 1, 10, 0);
 
     @Autowired
-    private CommunityService communityService;
+    private CommunityReactionService communityReactionService;
 
     @Autowired
     private CommunityAdminService communityAdminService;
@@ -104,7 +104,7 @@ class CommunityTransactionTests {
                 .when(communityMapper)
                 .recalculateLikeCount(postId);
 
-        assertThatThrownBy(() -> communityService.addLike(postId, memberId))
+        assertThatThrownBy(() -> communityReactionService.addLike(postId, memberId))
                 .isInstanceOf(IllegalStateException.class);
 
         assertThat(likeRows()).isZero();
@@ -121,7 +121,7 @@ class CommunityTransactionTests {
                 .when(communityMapper)
                 .recalculateLikeCount(postId);
 
-        assertThatThrownBy(() -> communityService.removeLike(postId, memberId))
+        assertThatThrownBy(() -> communityReactionService.removeLike(postId, memberId))
                 .isInstanceOf(IllegalStateException.class);
 
         assertThat(likeRows()).isEqualTo(1);
