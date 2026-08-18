@@ -61,6 +61,18 @@ class CommunityDomainBoundaryTests {
                 .isEmpty();
     }
 
+    @Test
+    void communityMapperXml_staysDirectlyUnderMapperDirectory() throws IOException {
+        List<String> nested = mapperXmlFiles().stream()
+                .filter(mapperXml -> !MAPPER_DIRECTORY.equals(mapperXml.getParent()))
+                .map(Path::toString)
+                .toList();
+
+        assertThat(nested)
+                .as("매퍼 XML은 %s 바로 아래에 둔다 (conventions.md 매퍼 위치 규칙)", MAPPER_DIRECTORY)
+                .isEmpty();
+    }
+
     /** 커뮤니티 코드가 합의된 회원 계약만 정확히 사용하는지 확인한다. */
     @Test
     void communitySources_useExactlyAgreedMemberContract() throws IOException {
