@@ -99,7 +99,9 @@ class CommunityServiceTests {
         memberCommunityQueryService = mock(MemberCommunityQueryService.class);
         when(memberCommunityQueryService.getMembersByIds(anyList())).thenReturn(List.of());
         communityService = new CommunityService(
-                communityMapper, memberCommunityQueryService, readerAt(NOW));
+                communityMapper,
+                new CommunityMemberViewLoader(memberCommunityQueryService),
+                readerAt(NOW));
     }
 
     private PopularPostReader readerAt(LocalDateTime now) {
@@ -329,7 +331,9 @@ class CommunityServiceTests {
     void getPopularSection_staleRanking_warnsOnlyAfterGrace(
             LocalDate rankingDate, LocalDateTime now, boolean expectWarning) {
         CommunityService serviceAt = new CommunityService(
-                communityMapper, memberCommunityQueryService, readerAt(now));
+                communityMapper,
+                new CommunityMemberViewLoader(memberCommunityQueryService),
+                readerAt(now));
         givenConfirmedRanking(rankingDate, popular(1, 11L));
 
         List<String> warnings = warningsWhile(() -> serviceAt.getPopularSection(null, FIRST_PAGE));

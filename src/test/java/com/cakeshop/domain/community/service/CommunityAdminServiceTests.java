@@ -62,7 +62,9 @@ class CommunityAdminServiceTests {
         communityMapper = mock(CommunityMapper.class);
         memberCommunityQueryService = mock(MemberCommunityQueryService.class);
         communityAdminService = new CommunityAdminService(
-                communityAdminMapper, communityMapper, memberCommunityQueryService);
+                communityAdminMapper,
+                communityMapper,
+                new CommunityMemberViewLoader(memberCommunityQueryService));
     }
 
     /** 차단은 잠금, 상태 변경, 신고 종료 순서로 처리한다. */
