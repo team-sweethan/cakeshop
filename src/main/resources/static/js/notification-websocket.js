@@ -274,8 +274,12 @@
   }
 
   function getCurrentMemberId() {
+    const metaEl = document.querySelector('meta[name="member-id"]');
+    if (metaEl && metaEl.content && metaEl.content !== "null" && metaEl.content.trim() !== "") {
+      return metaEl.content.trim();
+    }
     const element = document.querySelector("[data-member-id]");
-    if (element && element.dataset && element.dataset.memberId) {
+    if (element && element.dataset && element.dataset.memberId && element.dataset.memberId !== "null") {
       return element.dataset.memberId;
     }
     return null;

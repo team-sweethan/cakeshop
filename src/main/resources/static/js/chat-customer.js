@@ -53,7 +53,7 @@ document.addEventListener("DOMContentLoaded", () => {
       await loadMessages(currentChatRoomId);
       await loadOrderBanners(currentChatRoomId);
       if (lastFetchedMessageId > 0) {
-        await updateReadCursor(currentChatRoomId, lastFetchedMessageId);
+        sendReadCursor(currentChatRoomId, lastFetchedMessageId);
       }
 
     } catch (err) {
@@ -127,7 +127,7 @@ document.addEventListener("DOMContentLoaded", () => {
         await loadMessages(roomId);
         loadOrderBanners(roomId);
         if (lastFetchedMessageId > 0 && document.visibilityState === "visible") {
-          sendReadCursor(roomId, lastFetchedMessageId);
+          sendReadCursor(roomId, lastFetchedMessageId, true);
         }
 
         resolve();
@@ -193,43 +193,65 @@ document.addEventListener("DOMContentLoaded", () => {
       lastFetchedMessageId = Math.max(lastFetchedMessageId, msg.id);
     }
 
-    // 상대방(관리자) 메시지 수신 시 탭이 활성화된(visible) 상태에서만 즉시 읽음 커서 전송
+    updateReadBadges(chatMessagesContainer);
+
+    // 상대방(관리자) 메시지 수신 시 즉시 읽음 커서 전송
     if (msg.senderType !== "CUSTOMER" && msg.id) {
-      if (document.visibilityState === "visible") {
-        sendReadCursor(currentChatRoomId, msg.id);
-      }
+      sendReadCursor(currentChatRoomId, msg.id, true);
     }
   }
 
-  // 탭으로 돌아왔을 때(포커스 복귀 시) 읽지 않은 메시지 커서 일괄 갱신
+  // 탭 복귀, 포커스, 클릭 시 읽음 커서 즉시 강제 발송
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible" && currentChatRoomId && lastFetchedMessageId > 0) {
-      sendReadCursor(currentChatRoomId, lastFetchedMessageId);
+      sendReadCursor(currentChatRoomId, lastFetchedMessageId, true);
     }
   });
   window.addEventListener("focus", () => {
     if (currentChatRoomId && lastFetchedMessageId > 0) {
-      sendReadCursor(currentChatRoomId, lastFetchedMessageId);
+      sendReadCursor(currentChatRoomId, lastFetchedMessageId, true);
     }
   });
+  document.addEventListener("click", () => {
+    if (currentChatRoomId && lastFetchedMessageId > 0) {
+      sendReadCursor(currentChatRoomId, lastFetchedMessageId, true);
+    }
+  });
+
+  // 가장 최근(마지막) 내 메시지에만 읽음/미읽음 배지 표시 헬퍼
+  function updateReadBadges(container) {
+    if (!container) return;
+    const myMessages = container.querySelectorAll(".chat-msg--me");
+    myMessages.forEach((msgEl, index) => {
+      const badge = msgEl.querySelector(".chat-msg__read");
+      if (!badge) return;
+      if (index === myMessages.length - 1) {
+        badge.style.display = "";
+      } else {
+        badge.style.display = "none";
+      }
+    });
+  }
 
   // 상대방이 읽었을 때 내 메시지의 "미읽음" 텍스트를 "읽음"으로 실시간 변경 (lastReadMessageId 이하만 반영)
   function markAllMyMessagesRead(lastReadMessageId) {
     if (!chatMessagesContainer) return;
+    const targetReadId = lastReadMessageId ? parseInt(lastReadMessageId, 10) : null;
     const myMessages = chatMessagesContainer.querySelectorAll(".chat-msg--me");
     myMessages.forEach((msgEl) => {
+      const badge = msgEl.querySelector(".chat-msg__read");
+      if (!badge) return;
       const msgIdAttr = msgEl.getAttribute("id");
       if (msgIdAttr && msgIdAttr.startsWith("msg-")) {
-        const msgId = parseInt(msgIdAttr.substring("msg-".length()), 10);
-        if (!isNaN(msgId) && lastReadMessageId && msgId <= lastReadMessageId) {
-          const badge = msgEl.querySelector(".chat-msg__read");
-          if (badge) badge.textContent = "읽음";
+        const msgId = parseInt(msgIdAttr.substring("msg-".length), 10);
+        if (!isNaN(msgId) && (targetReadId === null || isNaN(targetReadId) || msgId <= targetReadId)) {
+          badge.textContent = "읽음";
         }
-      } else if (!lastReadMessageId) {
-        const badge = msgEl.querySelector(".chat-msg__read");
-        if (badge) badge.textContent = "읽음";
+      } else {
+        badge.textContent = "읽음";
       }
     });
+    updateReadBadges(chatMessagesContainer);
   }
 
   // 2. 대화 메시지 목록 조회 & 타임라인 렌더링
@@ -298,7 +320,10 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     lastFetchedMessageId = maxId;
-
+    updateReadBadges(chatMessagesContainer);
+    if (lastFetchedMessageId > 0 && currentChatRoomId) {
+      sendReadCursor(currentChatRoomId, lastFetchedMessageId);
+    }
     scrollToBottom();
   }
 
@@ -515,6 +540,9 @@ document.addEventListener("DOMContentLoaded", () => {
       if (stompClient && stompClient.connected) {
         try {
           stompClient.send("/app/chat/message", {}, JSON.stringify(payload));
+          if (lastFetchedMessageId > 0) {
+            sendReadCursor(currentChatRoomId, lastFetchedMessageId);
+          }
           chatInput.value = "";
           pendingAttachment = null;
           if (imageFileName) imageFileName.textContent = "선택된 파일 없음";
@@ -616,9 +644,15 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  let lastSentReadCursorId = 0;
+
   // 6. 읽음 커서 갱신 (STOMP 또는 REST API)
-  function sendReadCursor(roomId, lastMsgId) {
-    if (!roomId || !lastMsgId) return;
+  function sendReadCursor(roomId, lastMsgId, force = false) {
+    if (!roomId || !lastMsgId || lastMsgId <= 0) return;
+    if (document.visibilityState !== "visible") return;
+    if (!force && lastMsgId <= lastSentReadCursorId) return;
+
+    lastSentReadCursorId = lastMsgId;
     if (stompClient && stompClient.connected) {
       stompClient.send("/app/chat/read", {}, JSON.stringify({
         chatRoomId: roomId,

@@ -55,6 +55,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // 토스트 팝업 생성 및 렌더링 헬퍼 함수
 function showToast(title, content, targetUrl, notificationId) {
+  if (!title && !content) return;
+
   let container = document.querySelector(".toast-container");
   if (!container) {
     container = document.createElement("div");
@@ -95,7 +97,7 @@ function showToast(title, content, targetUrl, notificationId) {
         toast.parentNode.removeChild(toast);
       }
     }, 300);
-  }, 3500);
+  }, 4000);
 }
 
 function escapeHtmlApp(text) {

@@ -37,7 +37,8 @@ public class NotificationResponse {
         
         // 관리자 알림인 경우 /admin/... URL 반환
         if (type != null && isAdminType(type)) {
-            if (chatRoomId != null || type == NotificationType.ADMIN_CHAT) return "/admin/chat";
+            if (chatRoomId != null) return "/admin/chat?roomId=" + chatRoomId;
+            if (type == NotificationType.ADMIN_CHAT) return "/admin/chat";
             if (orderId != null) return "/admin/orders/" + orderId;
             if (postId != null) return "/admin/community/" + postId;
             if (reviewId != null) return "/admin/reviews";

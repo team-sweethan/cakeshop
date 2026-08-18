@@ -1,10 +1,11 @@
 package com.cakeshop.global.config;
 
 import com.cakeshop.domain.chat.service.ChatService;
+import com.cakeshop.domain.member.service.MemberChatQueryService;
 import com.cakeshop.global.security.MemberDetails;
 import java.security.Principal;
-import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.config.ChannelRegistration;
@@ -21,10 +22,16 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 
 @Configuration
 @EnableWebSocketMessageBroker
-@RequiredArgsConstructor
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
+    private final MemberChatQueryService memberChatQueryService;
     private final ChatService chatService;
+
+    public WebSocketConfig(MemberChatQueryService memberChatQueryService,
+                           @Lazy ChatService chatService) {
+        this.memberChatQueryService = memberChatQueryService;
+        this.chatService = chatService;
+    }
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
@@ -49,15 +56,18 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                     String destination = accessor.getDestination();
                     Principal principal = accessor.getUser();
 
-                    // A. 클라이언트가 /topic/이나 /queue/로 직접 SEND하는 행위 차단 및 정지 회원 발신 거부
+                    // 0. 정지 또는 유효하지 않은 회원의 웹소켓 사용 실시간 차단 (CONNECT 또는 SUBSCRIBE 시 검증)
+                    if ((StompCommand.CONNECT.equals(command) || StompCommand.SUBSCRIBE.equals(command))
+                            && principal instanceof Authentication auth && auth.getPrincipal() instanceof MemberDetails memberDetails) {
+                        if (!memberDetails.isAdmin() && !memberChatQueryService.existsCustomer(memberDetails.getMemberId())) {
+                            throw new AccessDeniedException("정지되었거나 유효하지 않은 회원은 웹소켓 서비스를 이용할 수 없습니다.");
+                        }
+                    }
+
+                    // A. 클라이언트가 /topic/이나 /queue/로 직접 SEND하는 행위 차단
                     if (StompCommand.SEND.equals(command) && destination != null) {
                         if (destination.startsWith("/topic/") || destination.startsWith("/queue/")) {
                             throw new AccessDeniedException("브로커 목적지로 직접 메시지를 발신할 수 없습니다.");
-                        }
-                        if (principal instanceof Authentication auth && auth.getPrincipal() instanceof MemberDetails memberDetails) {
-                            if (!memberDetails.isAdmin() && !chatService.existsCustomer(memberDetails.getMemberId())) {
-                                throw new AccessDeniedException("정지되었거나 유효하지 않은 회원은 메시지를 발신할 수 없습니다.");
-                            }
                         }
                     }
 

@@ -707,36 +707,9 @@
 })();
 
 
-/* source: cakeProjectSample/js/notification.js — 실시간 토스트 알림 데모(전 페이지 공통) */
+/* source: cakeProjectSample/js/notification.js — 실시간 토스트 알림 (실제 WebSocket 연동으로 대체됨) */
 (function () {
   "use strict";
-  document.addEventListener("DOMContentLoaded", function () {
-    // 고객용 실시간 토스트 알림 팝업 기능
-    function showCustomerToast(message, linkUrl) {
-      let container = document.querySelector(".toast-container");
-      if (!container) {
-        container = document.createElement("div");
-        container.className = "toast-container";
-        document.body.appendChild(container);
-      }
-      const toast = document.createElement("div");
-      toast.className = "toast-item";
-      toast.innerHTML = '<span>' + message + '</span><span style="font-size:11px; opacity:0.8;">[이동 ➔]</span>';
-      if (linkUrl) {
-        toast.addEventListener("click", function () { location.href = linkUrl; });
-      }
-      container.appendChild(toast);
-      setTimeout(function () { toast.classList.add("is-show"); }, 50);
-      setTimeout(function () {
-        toast.classList.remove("is-show");
-        setTimeout(function () { toast.remove(); }, 400);
-      }, 4000);
-    }
-    // 고객 페이지 접속 1.2초 후 토스트 알림 목업을 자동 시연한다.
-    setTimeout(function () {
-      showCustomerToast("🎉 [주문 승인] 레터링 케이크 제작이 승인되었습니다! 결제를 진행해 주세요.", "/chat");
-    }, 1200);
-  });
 })();
 
 /* source: cakeProjectSample/js/chat.js — 고객 채팅방 상호작용 */

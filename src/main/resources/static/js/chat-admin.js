@@ -90,6 +90,8 @@ document.addEventListener("DOMContentLoaded", () => {
       let queryUrl = `/api/admin/chat/rooms?page=${page}&size=${ROOM_PAGE_SIZE}`;
       if (reqFilter === "unread") {
         queryUrl += "&status=WAITING_ADMIN";
+      } else if (reqFilter === "replied") {
+        queryUrl += "&status=WAITING_CUSTOMER";
       } else if (reqFilter === "done") {
         queryUrl += "&status=RESOLVED";
       }
@@ -147,13 +149,20 @@ document.addEventListener("DOMContentLoaded", () => {
         updateUnreadTabBadge(unreadCount);
       }
 
-      // 현재 탭 목록 결과에 기존 선택된 방이 없거나 비어있는 경우 갱신 (재연결 동기화 시에는 선택 유지)
-      if (adminRoomsData && adminRoomsData.length > 0) {
-        const existsInTab = adminRoomsData.some(r => (r.chatRoomId || r.id) === selectedChatRoomId);
-        if (!isReconnect && (!selectedChatRoomId || !existsInTab)) {
-          const firstRoom = adminRoomsData[0];
-          const rId = firstRoom.chatRoomId || firstRoom.id;
-          selectChatRoom(rId, firstRoom.customerId);
+      // 초기 진입 시 URL 파라미터 또는 기존 선택된 방 복원 (새로고침 시 방 유지)
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlRoomId = urlParams.get("roomId") ? parseInt(urlParams.get("roomId"), 10) : null;
+      const initialRoomId = selectedChatRoomId || urlRoomId;
+
+      if (initialRoomId) {
+        const targetRoom = adminRoomsData.find(r => (r.chatRoomId || r.id) === initialRoomId);
+        if (targetRoom) {
+          if (!selectedChatRoomId) {
+            const customerId = targetRoom.customerId || targetRoom.memberId;
+            selectChatRoom(initialRoomId, customerId);
+          }
+        } else if (!isReconnect) {
+          clearMainAndSidePanel();
         }
       } else if (!isReconnect) {
         clearMainAndSidePanel();
@@ -164,7 +173,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     } catch (err) {
       console.error("관리자 방 목록 조회 실패:", err);
-      if (!append) {
+      if (!append && !isReconnect && !selectedChatRoomId) {
         clearMainAndSidePanel();
       }
     }
@@ -200,16 +209,17 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       // 연결/재연결 완료 시 대시보드 대화방 목록 및 활성 대화 스냅샷 다시 동기화 후 최신 읽음 커서 전송!
-      const pageToReload = Math.max(1, currentAdminPage || 1);
+      const pageToReload = Math.max(1, currentRoomPage || 1);
       for (let p = 1; p <= pageToReload; p++) {
         await loadAdminRooms(p, p > 1, true);
       }
+      currentRoomPage = pageToReload;
       if (selectedChatRoomId) {
         subscribeActiveRoomWebSocket(selectedChatRoomId);
         await loadAdminMessages(selectedChatRoomId, true);
         await loadAdminSidePanel(selectedChatRoomId);
         if (lastFetchedMessageId > 0 && document.visibilityState === "visible") {
-          markRead(selectedChatRoomId, lastFetchedMessageId);
+          markRead(selectedChatRoomId, lastFetchedMessageId, true);
         }
       }
     }, (err) => {
@@ -231,17 +241,55 @@ document.addEventListener("DOMContentLoaded", () => {
     let existingRoom = adminRoomsData.find((r) => (r.chatRoomId || r.id) === rId);
     const isCurrentActive = selectedChatRoomId === rId;
 
-    // 현재 탭 필터 조건 검증 (미답변 탭일 때 답변완료 방이면 제거, 완료 탭일 때 미답변 방이면 제거)
+    // 현재 탭 필터 조건 검증 (미답변, 답변완료, 상담완료)
     if (currentFilter === "unread" && newStatus !== "WAITING_ADMIN") {
+      const wasUnread = existingRoom && existingRoom.responseStatus === "WAITING_ADMIN";
+      if (isCurrentActive) {
+        // 내가 현재 대화 중인 방이면 목록에서 바로 없애지 않고 '답변 완료' 상태로 유지
+        if (existingRoom) {
+          existingRoom.responseStatus = newStatus;
+          existingRoom.unreadCount = 0;
+          if (msg.lastMessageContent || msg.content) {
+            existingRoom.lastMessageContent = msg.lastMessageContent || msg.content;
+          }
+          if (msg.lastMessageCreatedAt || msg.createdAt) {
+            existingRoom.lastMessageCreatedAt = msg.lastMessageCreatedAt || msg.createdAt;
+          }
+          renderRoomList();
+        }
+        if (wasUnread) {
+          adjustUnreadTabBadge(-1);
+        }
+        return;
+      }
+
       removedRoomIds.add(rId);
       const existingIdx = adminRoomsData.findIndex((r) => (r.chatRoomId || r.id) === rId);
       if (existingIdx !== -1) {
         adminRoomsData.splice(existingIdx, 1);
         renderRoomList();
-        if (selectedChatRoomId === rId) {
-          clearMainAndSidePanel();
+        if (wasUnread) {
+          adjustUnreadTabBadge(-1);
         }
-        adjustUnreadTabBadge(-1);
+      }
+      return;
+    }
+    if (currentFilter === "replied" && newStatus !== "WAITING_CUSTOMER") {
+      if (isCurrentActive) {
+        if (existingRoom) {
+          existingRoom.responseStatus = newStatus;
+          renderRoomList();
+        }
+        return;
+      }
+      removedRoomIds.add(rId);
+      const existingIdx = adminRoomsData.findIndex((r) => (r.chatRoomId || r.id) === rId);
+      if (existingIdx !== -1) {
+        adminRoomsData.splice(existingIdx, 1);
+        renderRoomList();
+      }
+      if (newStatus === "WAITING_ADMIN" && (!existingRoom || existingRoom.responseStatus !== "WAITING_ADMIN")) {
+        adjustUnreadTabBadge(1);
       }
       return;
     }
@@ -251,9 +299,6 @@ document.addEventListener("DOMContentLoaded", () => {
       if (existingIdx !== -1) {
         adminRoomsData.splice(existingIdx, 1);
         renderRoomList();
-        if (selectedChatRoomId === rId) {
-          clearMainAndSidePanel();
-        }
       }
       if (newStatus === "WAITING_ADMIN" && (!existingRoom || existingRoom.responseStatus !== "WAITING_ADMIN")) {
         adjustUnreadTabBadge(1);
@@ -313,8 +358,14 @@ document.addEventListener("DOMContentLoaded", () => {
     selectedChatRoomId = null;
     selectedCustomerId = null;
 
+    try {
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.delete("roomId");
+      window.history.replaceState(null, "", currentUrl.toString());
+    } catch (e) {}
+
     if (adminChatMessagesContainer) {
-      adminChatMessagesContainer.innerHTML = `<div class="text-muted" style="text-align:center; padding:40px;">대화방을 선택하거나 활성화된 문의 내역이 없습니다.</div>`;
+      adminChatMessagesContainer.innerHTML = `<div class="text-muted" style="text-align:center; padding:40px;">좌측 대화방 목록에서 상담할 대화방을 선택해 주세요.</div>`;
     }
 
     const infoPanel = document.querySelector(".admin-chat-info-panel");
@@ -354,7 +405,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (filteredRooms.length === 0) {
       adminRoomListContainer.innerHTML = `<p class="text-muted" style="font-size:12px; padding:10px;">해당하는 채팅방이 없습니다.</p>`;
-      if (!searchKeyword) {
+      if (!searchKeyword && !selectedChatRoomId) {
         clearMainAndSidePanel();
       }
       return;
@@ -368,9 +419,12 @@ document.addEventListener("DOMContentLoaded", () => {
       itemDiv.style.cssText = "cursor:pointer; padding:10px; margin-bottom:8px;";
 
       const isWaitingAdmin = room.responseStatus === "WAITING_ADMIN";
+      const isResolved = room.responseStatus === "RESOLVED";
       const statusBadge = isWaitingAdmin
         ? `<span class="badge badge--danger">답변 대기</span>`
-        : `<span class="badge badge--info">답변 완료</span>`;
+        : (isResolved
+            ? `<span class="badge badge--secondary">상담 완료</span>`
+            : `<span class="badge badge--info">답변 완료</span>`);
 
       const unreadBadge = room.unreadCount > 0
         ? `<span class="badge badge--danger">${room.unreadCount}</span>`
@@ -439,6 +493,14 @@ document.addEventListener("DOMContentLoaded", () => {
     selectedChatRoomId = roomId;
     selectedCustomerId = customerId;
     lastFetchedMessageId = 0;
+    lastSentAdminReadCursorId = 0;
+
+    // URL 파라미터 동기화 (새로고침 시 해당 방 유지)
+    try {
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.set("roomId", roomId);
+      window.history.replaceState(null, "", currentUrl.toString());
+    } catch (e) {}
 
     const headerTitle = document.querySelector(".admin-chat-main-room .chat-room__header strong");
     const targetRoom = adminRoomsData.find((r) => (r.chatRoomId || r.id) === roomId);
@@ -455,7 +517,7 @@ document.addEventListener("DOMContentLoaded", () => {
     await loadAdminMessages(roomId);
     await loadAdminSidePanel(roomId);
     if (lastFetchedMessageId > 0 && selectedChatRoomId === roomId) {
-      await markRead(roomId, lastFetchedMessageId);
+      await markRead(roomId, lastFetchedMessageId, true);
       if (targetRoom) {
         targetRoom.unreadCount = 0;
         renderRoomList();
@@ -478,7 +540,7 @@ document.addEventListener("DOMContentLoaded", () => {
     roomSub = stompClient.subscribe(`/topic/chat/${roomId}`, (message) => {
       try {
         const msg = JSON.parse(message.body);
-        if (selectedChatRoomId === roomId) {
+        if (String(selectedChatRoomId) === String(roomId)) {
           appendIncomingAdminMessage(msg);
         }
       } catch (e) {
@@ -490,7 +552,7 @@ document.addEventListener("DOMContentLoaded", () => {
     readSub = stompClient.subscribe(`/topic/chat/${roomId}/read`, (event) => {
       try {
         const readData = JSON.parse(event.body);
-        if (selectedChatRoomId === roomId && readData.readerSide === "CUSTOMER") {
+        if (String(selectedChatRoomId) === String(roomId) && readData.readerSide === "CUSTOMER") {
           markAllAdminMessagesRead(readData.lastReadMessageId || readData.lastMessageId);
         }
       } catch (e) {
@@ -501,7 +563,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // 실시간 연동 주문 갱신 구독
     orderSub = stompClient.subscribe(`/topic/chat/${roomId}/orders`, (event) => {
       try {
-        if (selectedChatRoomId === roomId) {
+        if (String(selectedChatRoomId) === String(roomId)) {
           loadAdminSidePanel(roomId);
         }
       } catch (e) {
@@ -541,6 +603,11 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    const emptyNotice = adminChatMessagesContainer.querySelector(".empty-chat-notice, .text-muted");
+    if (emptyNotice && adminChatMessagesContainer.querySelectorAll("[id^='admin-msg-']").length === 0) {
+      emptyNotice.remove();
+    }
+
     const isAdminSender = msg.senderType === "ADMIN";
     const msgDiv = document.createElement("div");
     msgDiv.className = `chat-msg ${isAdminSender ? "chat-msg--me" : "chat-msg--other"}`;
@@ -560,10 +627,10 @@ document.addEventListener("DOMContentLoaded", () => {
         <div class="chat-msg__body">
           ${attachmentsHtml}
           <div class="chat-msg__content">${escapeHtml(msg.content || "")}</div>
-        </div>
-        <div class="chat-msg__meta">
-          <span class="chat-msg__read">${msg.isRead ? "읽음" : "미읽음"}</span>
-          <span class="chat-msg__time">${formattedTime}</span>
+          <div class="chat-msg__meta">
+            <span class="chat-msg__read">${(msg.isRead || msg.read) ? "읽음" : "미읽음"}</span>
+            <span class="chat-msg__time">${formattedTime}</span>
+          </div>
         </div>
       `;
     } else {
@@ -592,40 +659,63 @@ document.addEventListener("DOMContentLoaded", () => {
       lastFetchedMessageId = Math.max(lastFetchedMessageId, msg.id);
     }
 
+    updateReadBadges(adminChatMessagesContainer);
+
     if (!isAdminSender && msg.id) {
-      if (document.visibilityState === "visible") {
-        markRead(selectedChatRoomId, msg.id);
-      }
+      markRead(selectedChatRoomId, msg.id, true);
     }
   }
 
-  // 탭으로 돌아왔을 때(포커스 복귀 시) 관리자 읽음 커서 일괄 갱신
+  // 탭 복귀, 포커스, 클릭 시 관리자 읽음 커서 즉시 강제 발송
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible" && selectedChatRoomId && lastFetchedMessageId > 0) {
-      markRead(selectedChatRoomId, lastFetchedMessageId);
+      markRead(selectedChatRoomId, lastFetchedMessageId, true);
     }
   });
   window.addEventListener("focus", () => {
     if (selectedChatRoomId && lastFetchedMessageId > 0) {
-      markRead(selectedChatRoomId, lastFetchedMessageId);
+      markRead(selectedChatRoomId, lastFetchedMessageId, true);
+    }
+  });
+  document.addEventListener("click", () => {
+    if (selectedChatRoomId && lastFetchedMessageId > 0) {
+      markRead(selectedChatRoomId, lastFetchedMessageId, true);
     }
   });
 
-  function markAllAdminMessagesRead(lastReadMessageId) {
-    const readMessages = document.querySelectorAll(".admin-chat-main-room .chat-msg--me");
-    readMessages.forEach((msgEl) => {
-      const msgIdAttr = msgEl.getAttribute("id");
-      if (msgIdAttr && msgIdAttr.startsWith("admin-msg-")) {
-        const msgId = parseInt(msgIdAttr.substring("admin-msg-".length()), 10);
-        if (!isNaN(msgId) && lastReadMessageId && msgId <= lastReadMessageId) {
-          const badge = msgEl.querySelector(".chat-msg__read");
-          if (badge) badge.textContent = "읽음";
-        }
-      } else if (!lastReadMessageId) {
-        const badge = msgEl.querySelector(".chat-msg__read");
-        if (badge) badge.textContent = "읽음";
+  // 가장 최근(마지막) 내 메시지에만 읽음/미읽음 배지 표시 헬퍼
+  function updateReadBadges(container) {
+    if (!container) return;
+    const myMessages = container.querySelectorAll(".chat-msg--me");
+    myMessages.forEach((msgEl, index) => {
+      const badge = msgEl.querySelector(".chat-msg__read");
+      if (!badge) return;
+      if (index === myMessages.length - 1) {
+        badge.style.display = "";
+      } else {
+        badge.style.display = "none";
       }
     });
+  }
+
+  function markAllAdminMessagesRead(lastReadMessageId) {
+    if (!adminChatMessagesContainer) return;
+    const targetReadId = lastReadMessageId ? parseInt(lastReadMessageId, 10) : null;
+    const readMessages = adminChatMessagesContainer.querySelectorAll(".chat-msg--me");
+    readMessages.forEach((msgEl) => {
+      const badge = msgEl.querySelector(".chat-msg__read");
+      if (!badge) return;
+      const msgIdAttr = msgEl.getAttribute("id");
+      if (msgIdAttr && msgIdAttr.startsWith("admin-msg-")) {
+        const msgId = parseInt(msgIdAttr.substring("admin-msg-".length), 10);
+        if (!isNaN(msgId) && (targetReadId === null || isNaN(targetReadId) || msgId <= targetReadId)) {
+          badge.textContent = "읽음";
+        }
+      } else {
+        badge.textContent = "읽음";
+      }
+    });
+    updateReadBadges(adminChatMessagesContainer);
   }
 
   // 2. 대화 타임라인 렌더링
@@ -674,7 +764,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!messages || messages.length === 0) {
       if (existingMsgEls.length === 0) {
-        adminChatMessagesContainer.innerHTML = `<div class="text-muted" style="text-align:center; padding:30px;">대화 기록이 없습니다.</div>`;
+        adminChatMessagesContainer.innerHTML = `<div class="text-muted empty-chat-notice" style="text-align:center; padding:30px;">대화 기록이 없습니다.</div>`;
         lastFetchedMessageId = 0;
         return;
       }
@@ -748,7 +838,10 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     lastFetchedMessageId = maxId;
-
+    updateReadBadges(adminChatMessagesContainer);
+    if (lastFetchedMessageId > 0 && selectedChatRoomId) {
+      markRead(selectedChatRoomId, lastFetchedMessageId);
+    }
     scrollToBottom();
   }
 
@@ -920,6 +1013,9 @@ document.addEventListener("DOMContentLoaded", () => {
       if (stompClient && stompClient.connected) {
         try {
           stompClient.send("/app/chat/message", {}, JSON.stringify(payload));
+          if (lastFetchedMessageId > 0 && selectedChatRoomId) {
+            markRead(selectedChatRoomId, lastFetchedMessageId);
+          }
           if (inputEl) inputEl.value = "";
           pendingAttachment = null;
           if (adminImageFileName) adminImageFileName.textContent = "선택된 파일 없음";
@@ -1093,9 +1189,15 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  let lastSentAdminReadCursorId = 0;
+
   // 6. 관리자 읽음 커서 갱신
-  function markRead(roomId, lastMsgId) {
-    if (!roomId || !lastMsgId) return;
+  function markRead(roomId, lastMsgId, force = false) {
+    if (!roomId || !lastMsgId || lastMsgId <= 0) return;
+    if (document.visibilityState !== "visible") return;
+    if (!force && lastMsgId <= lastSentAdminReadCursorId) return;
+
+    lastSentAdminReadCursorId = lastMsgId;
     if (stompClient && stompClient.connected) {
       stompClient.send("/app/chat/read", {}, JSON.stringify({
         chatRoomId: roomId,
