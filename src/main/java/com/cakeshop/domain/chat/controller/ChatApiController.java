@@ -257,6 +257,7 @@ public class ChatApiController {
             try {
                 String readerSide = memberDetails.isAdmin() ? "ADMIN" : "CUSTOMER";
                 Object readPayload = java.util.Map.of(
+                        "chatRoomId", chatRoomId,
                         "readerSide", readerSide,
                         "lastReadMessageId", actualReadMessageId
                 );

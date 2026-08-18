@@ -127,7 +127,7 @@ document.addEventListener("DOMContentLoaded", () => {
         await loadMessages(roomId);
         loadOrderBanners(roomId);
         if (lastFetchedMessageId > 0 && document.visibilityState === "visible") {
-          sendReadCursor(roomId, lastFetchedMessageId);
+          sendReadCursor(roomId, lastFetchedMessageId, true);
         }
 
         resolve();
@@ -197,24 +197,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // 상대방(관리자) 메시지 수신 시 즉시 읽음 커서 전송
     if (msg.senderType !== "CUSTOMER" && msg.id) {
-      sendReadCursor(currentChatRoomId, msg.id);
+      sendReadCursor(currentChatRoomId, msg.id, true);
     }
   }
 
-  // 탭으로 돌아왔을 때(포커스 복귀 시) 읽지 않은 메시지 커서 일괄 갱신
+  // 탭 복귀, 포커스, 클릭 시 읽음 커서 즉시 강제 발송
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible" && currentChatRoomId && lastFetchedMessageId > 0) {
-      sendReadCursor(currentChatRoomId, lastFetchedMessageId);
+      sendReadCursor(currentChatRoomId, lastFetchedMessageId, true);
     }
   });
   window.addEventListener("focus", () => {
     if (currentChatRoomId && lastFetchedMessageId > 0) {
-      sendReadCursor(currentChatRoomId, lastFetchedMessageId);
+      sendReadCursor(currentChatRoomId, lastFetchedMessageId, true);
     }
   });
   document.addEventListener("click", () => {
     if (currentChatRoomId && lastFetchedMessageId > 0) {
-      sendReadCursor(currentChatRoomId, lastFetchedMessageId);
+      sendReadCursor(currentChatRoomId, lastFetchedMessageId, true);
     }
   });
 
@@ -239,16 +239,16 @@ document.addEventListener("DOMContentLoaded", () => {
     const targetReadId = lastReadMessageId ? parseInt(lastReadMessageId, 10) : null;
     const myMessages = chatMessagesContainer.querySelectorAll(".chat-msg--me");
     myMessages.forEach((msgEl) => {
+      const badge = msgEl.querySelector(".chat-msg__read");
+      if (!badge) return;
       const msgIdAttr = msgEl.getAttribute("id");
       if (msgIdAttr && msgIdAttr.startsWith("msg-")) {
-        const msgId = parseInt(msgIdAttr.substring("msg-".length()), 10);
+        const msgId = parseInt(msgIdAttr.substring("msg-".length), 10);
         if (!isNaN(msgId) && (targetReadId === null || isNaN(targetReadId) || msgId <= targetReadId)) {
-          const badge = msgEl.querySelector(".chat-msg__read");
-          if (badge) badge.textContent = "읽음";
+          badge.textContent = "읽음";
         }
-      } else if (!targetReadId) {
-        const badge = msgEl.querySelector(".chat-msg__read");
-        if (badge) badge.textContent = "읽음";
+      } else {
+        badge.textContent = "읽음";
       }
     });
     updateReadBadges(chatMessagesContainer);
@@ -321,6 +321,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     lastFetchedMessageId = maxId;
     updateReadBadges(chatMessagesContainer);
+    if (lastFetchedMessageId > 0 && currentChatRoomId) {
+      sendReadCursor(currentChatRoomId, lastFetchedMessageId);
+    }
     scrollToBottom();
   }
 
@@ -641,9 +644,15 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  let lastSentReadCursorId = 0;
+
   // 6. 읽음 커서 갱신 (STOMP 또는 REST API)
-  function sendReadCursor(roomId, lastMsgId) {
-    if (!roomId || !lastMsgId) return;
+  function sendReadCursor(roomId, lastMsgId, force = false) {
+    if (!roomId || !lastMsgId || lastMsgId <= 0) return;
+    if (document.visibilityState !== "visible") return;
+    if (!force && lastMsgId <= lastSentReadCursorId) return;
+
+    lastSentReadCursorId = lastMsgId;
     if (stompClient && stompClient.connected) {
       stompClient.send("/app/chat/read", {}, JSON.stringify({
         chatRoomId: roomId,

@@ -147,13 +147,11 @@ document.addEventListener("DOMContentLoaded", () => {
         updateUnreadTabBadge(unreadCount);
       }
 
-      // 현재 탭 목록 결과에 기존 선택된 방이 없거나 비어있는 경우 갱신 (재연결 동기화 시에는 선택 유지)
+      // 초기 진입 시 자동 선택하지 않고, 빈 메인 패널 유지 (클릭 시 진입)
       if (adminRoomsData && adminRoomsData.length > 0) {
         const existsInTab = adminRoomsData.some(r => (r.chatRoomId || r.id) === selectedChatRoomId);
-        if (!isReconnect && (!selectedChatRoomId || !existsInTab)) {
-          const firstRoom = adminRoomsData[0];
-          const rId = firstRoom.chatRoomId || firstRoom.id;
-          selectChatRoom(rId, firstRoom.customerId);
+        if (!selectedChatRoomId || !existsInTab) {
+          clearMainAndSidePanel();
         }
       } else if (!isReconnect) {
         clearMainAndSidePanel();
@@ -210,7 +208,7 @@ document.addEventListener("DOMContentLoaded", () => {
         await loadAdminMessages(selectedChatRoomId, true);
         await loadAdminSidePanel(selectedChatRoomId);
         if (lastFetchedMessageId > 0 && document.visibilityState === "visible") {
-          markRead(selectedChatRoomId, lastFetchedMessageId);
+          markRead(selectedChatRoomId, lastFetchedMessageId, true);
         }
       }
     }, (err) => {
@@ -315,7 +313,7 @@ document.addEventListener("DOMContentLoaded", () => {
     selectedCustomerId = null;
 
     if (adminChatMessagesContainer) {
-      adminChatMessagesContainer.innerHTML = `<div class="text-muted" style="text-align:center; padding:40px;">대화방을 선택하거나 활성화된 문의 내역이 없습니다.</div>`;
+      adminChatMessagesContainer.innerHTML = `<div class="text-muted" style="text-align:center; padding:40px;">좌측 대화방 목록에서 상담할 대화방을 선택해 주세요.</div>`;
     }
 
     const infoPanel = document.querySelector(".admin-chat-info-panel");
@@ -440,6 +438,7 @@ document.addEventListener("DOMContentLoaded", () => {
     selectedChatRoomId = roomId;
     selectedCustomerId = customerId;
     lastFetchedMessageId = 0;
+    lastSentAdminReadCursorId = 0;
 
     const headerTitle = document.querySelector(".admin-chat-main-room .chat-room__header strong");
     const targetRoom = adminRoomsData.find((r) => (r.chatRoomId || r.id) === roomId);
@@ -456,7 +455,7 @@ document.addEventListener("DOMContentLoaded", () => {
     await loadAdminMessages(roomId);
     await loadAdminSidePanel(roomId);
     if (lastFetchedMessageId > 0 && selectedChatRoomId === roomId) {
-      await markRead(roomId, lastFetchedMessageId);
+      await markRead(roomId, lastFetchedMessageId, true);
       if (targetRoom) {
         targetRoom.unreadCount = 0;
         renderRoomList();
@@ -601,19 +600,24 @@ document.addEventListener("DOMContentLoaded", () => {
     updateReadBadges(adminChatMessagesContainer);
 
     if (!isAdminSender && msg.id) {
-      markRead(selectedChatRoomId, msg.id);
+      markRead(selectedChatRoomId, msg.id, true);
     }
   }
 
-  // 탭으로 돌아왔을 때(포커스 복귀 시) 관리자 읽음 커서 일괄 갱신
+  // 탭 복귀, 포커스, 클릭 시 관리자 읽음 커서 즉시 강제 발송
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible" && selectedChatRoomId && lastFetchedMessageId > 0) {
-      markRead(selectedChatRoomId, lastFetchedMessageId);
+      markRead(selectedChatRoomId, lastFetchedMessageId, true);
+    }
+  });
+  window.addEventListener("focus", () => {
+    if (selectedChatRoomId && lastFetchedMessageId > 0) {
+      markRead(selectedChatRoomId, lastFetchedMessageId, true);
     }
   });
   document.addEventListener("click", () => {
     if (selectedChatRoomId && lastFetchedMessageId > 0) {
-      markRead(selectedChatRoomId, lastFetchedMessageId);
+      markRead(selectedChatRoomId, lastFetchedMessageId, true);
     }
   });
 
@@ -637,16 +641,16 @@ document.addEventListener("DOMContentLoaded", () => {
     const targetReadId = lastReadMessageId ? parseInt(lastReadMessageId, 10) : null;
     const readMessages = adminChatMessagesContainer.querySelectorAll(".chat-msg--me");
     readMessages.forEach((msgEl) => {
+      const badge = msgEl.querySelector(".chat-msg__read");
+      if (!badge) return;
       const msgIdAttr = msgEl.getAttribute("id");
       if (msgIdAttr && msgIdAttr.startsWith("admin-msg-")) {
-        const msgId = parseInt(msgIdAttr.substring("admin-msg-".length()), 10);
+        const msgId = parseInt(msgIdAttr.substring("admin-msg-".length), 10);
         if (!isNaN(msgId) && (targetReadId === null || isNaN(targetReadId) || msgId <= targetReadId)) {
-          const badge = msgEl.querySelector(".chat-msg__read");
-          if (badge) badge.textContent = "읽음";
+          badge.textContent = "읽음";
         }
-      } else if (!targetReadId) {
-        const badge = msgEl.querySelector(".chat-msg__read");
-        if (badge) badge.textContent = "읽음";
+      } else {
+        badge.textContent = "읽음";
       }
     });
     updateReadBadges(adminChatMessagesContainer);
@@ -773,6 +777,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     lastFetchedMessageId = maxId;
     updateReadBadges(adminChatMessagesContainer);
+    if (lastFetchedMessageId > 0 && selectedChatRoomId) {
+      markRead(selectedChatRoomId, lastFetchedMessageId);
+    }
     scrollToBottom();
   }
 
@@ -1120,9 +1127,15 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  let lastSentAdminReadCursorId = 0;
+
   // 6. 관리자 읽음 커서 갱신
-  function markRead(roomId, lastMsgId) {
-    if (!roomId || !lastMsgId) return;
+  function markRead(roomId, lastMsgId, force = false) {
+    if (!roomId || !lastMsgId || lastMsgId <= 0) return;
+    if (document.visibilityState !== "visible") return;
+    if (!force && lastMsgId <= lastSentAdminReadCursorId) return;
+
+    lastSentAdminReadCursorId = lastMsgId;
     if (stompClient && stompClient.connected) {
       stompClient.send("/app/chat/read", {}, JSON.stringify({
         chatRoomId: roomId,
