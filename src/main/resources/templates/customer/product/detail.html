@@ -44,8 +44,9 @@
 
     &gt;
 
-    <a th:href="@{/products}">
-      전체 상품
+    <a th:href="@{/products(type=${product.productType})}"
+       th:text="${product.productType.displayName}">
+      상품 유형
     </a>
 
     &gt;
