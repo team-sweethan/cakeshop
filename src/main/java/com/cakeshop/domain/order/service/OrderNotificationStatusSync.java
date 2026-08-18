@@ -3,6 +3,7 @@ package com.cakeshop.domain.order.service;
 import com.cakeshop.domain.notification.service.NotificationOrderQueryService;
 import com.cakeshop.domain.order.dto.view.OrderChatView;
 import com.cakeshop.domain.order.mapper.OrderChatMapper;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -16,7 +17,7 @@ import org.springframework.stereotype.Component;
  * 담당자 : 주환
  * 작성일 : 2026-08-18
  * 기능 : 주문 상태 변경 독립 감지 및 알림 동기화 스케줄러
- * 설명 : 타 도메인 코드를 직접 수정하지 않고, 시간 커서 페이징(since) 및 NotificationOrderQueryService 멱등성 검사를 통해 제작 승인, 반려, 취소 알림을 발송한다.
+ * 설명 : 타 도메인 코드를 직접 수정하지 않고, 서울 시각 Clock, 시간 커서 페이징(since) 및 NotificationOrderQueryService 멱등성 검사를 통해 제작 승인, 반려, 취소 알림을 발송한다.
  * ******************************
  */
 @Slf4j
@@ -27,12 +28,17 @@ public class OrderNotificationStatusSync {
     private final OrderChatMapper orderChatMapper;
     private final OrderNotificationSender orderNotificationSender;
     private final NotificationOrderQueryService notificationOrderQueryService;
+    private final Clock clock;
 
-    private LocalDateTime lastSyncTime = LocalDateTime.now().minusMinutes(10);
+    private LocalDateTime lastSyncTime;
 
     @Scheduled(fixedDelay = 3000)
     public void syncOrderNotifications() {
         try {
+            if (lastSyncTime == null) {
+                lastSyncTime = LocalDateTime.now(clock).minusMinutes(10);
+            }
+
             List<OrderChatView> recentOrders = orderChatMapper.findRecentStatusChangedOrders(lastSyncTime);
             if (recentOrders == null || recentOrders.isEmpty()) {
                 return;
@@ -66,12 +72,11 @@ public class OrderNotificationStatusSync {
                     }
                 }
 
-                if (order.orderCreatedAt() != null && order.orderCreatedAt().isAfter(maxProcessedTime)) {
-                    maxProcessedTime = order.orderCreatedAt();
+                if (order.orderUpdatedAt() != null && order.orderUpdatedAt().isAfter(maxProcessedTime)) {
+                    maxProcessedTime = order.orderUpdatedAt();
                 }
             }
 
-            // 페이지 소비 완료 후 커서를 마지막으로 처리된 시각으로 전진
             if (maxProcessedTime.isAfter(lastSyncTime)) {
                 lastSyncTime = maxProcessedTime;
             }

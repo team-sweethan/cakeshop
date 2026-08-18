@@ -1,6 +1,6 @@
 package com.cakeshop.domain.order.service;
 
-import com.cakeshop.domain.member.service.MemberChatQueryService;
+import com.cakeshop.domain.member.service.MemberNotificationQueryService;
 import com.cakeshop.domain.notification.entity.NotificationType;
 import com.cakeshop.domain.notification.service.NotificationService;
 import java.util.List;
@@ -31,7 +31,7 @@ class OrderNotificationSenderTest {
     private NotificationService notificationService;
 
     @Mock
-    private MemberChatQueryService memberChatQueryService;
+    private MemberNotificationQueryService memberNotificationQueryService;
 
     @InjectMocks
     private OrderNotificationSender orderNotificationSender;
@@ -42,7 +42,7 @@ class OrderNotificationSenderTest {
         long orderId = 100L;
         long customerId = 2L;
         long adminId = 1L;
-        given(memberChatQueryService.findActiveAdminIds()).willReturn(List.of(adminId));
+        given(memberNotificationQueryService.findActiveAdminIds()).willReturn(List.of(adminId));
 
         orderNotificationSender.sendOrderPaid(orderId, customerId, "GENERAL");
 
@@ -60,7 +60,7 @@ class OrderNotificationSenderTest {
         long orderId = 101L;
         long customerId = 2L;
         long adminId = 1L;
-        given(memberChatQueryService.findActiveAdminIds()).willReturn(List.of(adminId));
+        given(memberNotificationQueryService.findActiveAdminIds()).willReturn(List.of(adminId));
 
         orderNotificationSender.sendOrderPaid(orderId, customerId, "CUSTOM");
 
@@ -93,19 +93,24 @@ class OrderNotificationSenderTest {
     }
 
     @Test
-    @DisplayName("주문 취소 시 고객에게 ORDER_CANCELED 알림이 전송된다")
+    @DisplayName("주문 취소 시 고객에게 ORDER_CANCELED 및 관리자에게 ORDER_CANCEL_REQUEST 알림이 전송된다")
     void sendOrderCanceled_dispatchesNotification() {
+        given(memberNotificationQueryService.findActiveAdminIds()).willReturn(List.of(1L));
+
         orderNotificationSender.sendOrderCanceled(202L, 2L);
 
         verify(notificationService).makeNotification(argThat(req ->
                 req.getReceiverId() == 2L && req.getType() == NotificationType.ORDER_CANCELED
+        ));
+        verify(notificationService).makeNotification(argThat(req ->
+                req.getReceiverId() == 1L && req.getType() == NotificationType.ORDER_CANCEL_REQUEST
         ));
     }
 
     @Test
     @DisplayName("환불 실패 시 관리자들에게 REFUND_FAILED 알림이 전송된다")
     void sendRefundFailed_dispatchesNotificationToAdmins() {
-        given(memberChatQueryService.findActiveAdminIds()).willReturn(List.of(1L));
+        given(memberNotificationQueryService.findActiveAdminIds()).willReturn(List.of(1L));
 
         orderNotificationSender.sendRefundFailed(300L, "ORD-20260818-0001");
 

@@ -23,6 +23,7 @@
             o.final_amount AS finalAmount,
             o.pickup_at AS pickupAt,
             o.created_at AS orderCreatedAt,
+            o.updated_at AS orderUpdatedAt,
             (
                 SELECT 
                     CASE 
@@ -48,6 +49,7 @@
             o.final_amount AS finalAmount,
             o.pickup_at AS pickupAt,
             o.created_at AS orderCreatedAt,
+            o.updated_at AS orderUpdatedAt,
             (
                 SELECT 
                     CASE 
@@ -75,6 +77,7 @@
             o.final_amount AS finalAmount,
             o.pickup_at AS pickupAt,
             o.created_at AS orderCreatedAt,
+            o.updated_at AS orderUpdatedAt,
             '주문 케이크' AS representativeProductName
         FROM orders o
         WHERE o.status IN ('IN_PRODUCTION', 'REJECTED', 'CANCELED')

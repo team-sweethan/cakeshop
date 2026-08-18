@@ -1,6 +1,6 @@
 package com.cakeshop.domain.order.service;
 
-import com.cakeshop.domain.member.service.MemberChatQueryService;
+import com.cakeshop.domain.member.service.MemberNotificationQueryService;
 import com.cakeshop.domain.notification.dto.form.NotificationRequest;
 import com.cakeshop.domain.notification.entity.DeliveryScope;
 import com.cakeshop.domain.notification.entity.NotificationType;
@@ -25,32 +25,24 @@ import org.springframework.stereotype.Service;
 public class OrderNotificationSender {
 
     private final NotificationService notificationService;
-    private final MemberChatQueryService memberChatQueryService;
+    private final MemberNotificationQueryService memberNotificationQueryService;
 
     public void sendOrderPaid(long orderId, long customerId, String orderType) {
-        try {
-            boolean isCustom = "CUSTOM".equalsIgnoreCase(orderType);
-            NotificationType customerType = isCustom ? NotificationType.CUSTOM_ORDER_PAID : NotificationType.ORDER_PAID;
-            NotificationType adminType = isCustom ? NotificationType.NEW_CUSTOM_ORDER : NotificationType.NEW_ORDER;
+        boolean isCustom = "CUSTOM".equalsIgnoreCase(orderType);
+        NotificationType customerType = isCustom ? NotificationType.CUSTOM_ORDER_PAID : NotificationType.ORDER_PAID;
+        NotificationType adminType = isCustom ? NotificationType.NEW_CUSTOM_ORDER : NotificationType.NEW_ORDER;
 
-            try {
-                notificationService.makeNotification(NotificationRequest.builder()
-                        .receiverId(customerId)
-                        .actorId(customerId)
-                        .orderId(orderId)
-                        .type(customerType)
-                        .eventKey(customerType.name() + ":" + customerId + ":" + orderId)
-                        .deliveryScope(DeliveryScope.WEB_AND_SMS)
-                        .args(new Object[0])
-                        .build());
-            } catch (Exception e) {
-                log.error("고객(id={}) 결제 완료 알림 발송 오류 (orderId={}):", customerId, orderId, e);
-            }
+        notificationService.makeNotification(NotificationRequest.builder()
+                .receiverId(customerId)
+                .actorId(customerId)
+                .orderId(orderId)
+                .type(customerType)
+                .eventKey(customerType.name() + ":" + customerId + ":" + orderId)
+                .deliveryScope(DeliveryScope.WEB_AND_SMS)
+                .args(new Object[0])
+                .build());
 
-            sendToActiveAdmins(orderId, customerId, adminType, adminType.name() + ":ALL_ADMINS:" + orderId, new Object[0]);
-        } catch (Exception e) {
-            log.error("주문 결제 완료 알림 발송 처리 중 예외 발생 (orderId={}):", orderId, e);
-        }
+        sendToActiveAdmins(orderId, customerId, adminType, adminType.name() + ":ALL_ADMINS:" + orderId, new Object[0]);
     }
 
     public void sendCustomOrderInProduction(long orderId, long customerId) {
@@ -93,6 +85,8 @@ public class OrderNotificationSender {
                     .deliveryScope(DeliveryScope.WEB_AND_SMS)
                     .args(new Object[0])
                     .build());
+
+            sendToActiveAdmins(orderId, customerId, NotificationType.ORDER_CANCEL_REQUEST, "ORDER_CANCEL_REQUEST:ALL_ADMINS:" + orderId, new Object[]{String.valueOf(orderId)});
         } catch (Exception e) {
             log.error("주문 취소 알림 발송 오류 (orderId={}):", orderId, e);
         }
@@ -109,7 +103,7 @@ public class OrderNotificationSender {
 
     private void sendToActiveAdmins(long orderId, Long actorId, NotificationType type, String baseEventKey, Object[] args) {
         try {
-            List<Long> activeAdminIds = memberChatQueryService.findActiveAdminIds();
+            List<Long> activeAdminIds = memberNotificationQueryService.findActiveAdminIds();
             if (activeAdminIds == null || activeAdminIds.isEmpty()) return;
 
             for (Long adminId : activeAdminIds) {
