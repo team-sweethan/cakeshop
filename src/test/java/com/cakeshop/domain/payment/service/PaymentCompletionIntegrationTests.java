@@ -167,7 +167,6 @@ class PaymentCompletionIntegrationTests {
         assertThat(completedPayment.getPaymentKey())
                 .isEqualTo(approval.paymentKey());
         assertThat(completedPayment.getMethod()).isEqualTo("CARD");
-        assertThat(completedPayment.getProviderStatus()).isEqualTo("DONE");
         assertThat(completedPayment.getApprovedAt()).isEqualTo(APPROVED_AT);
 
         Order completedOrder = orderMapper.findOrderById(orderId).orElseThrow();

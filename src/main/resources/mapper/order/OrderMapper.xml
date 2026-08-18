@@ -673,9 +673,7 @@
         SET current_order.status = 'EXPIRED',
             current_order.expired_at = #{expiredAt},
             payment.status = 'EXPIRED',
-            payment.provider_status = 'EXPIRED',
-            payment.failure_code = 'ORDER_EXPIRED',
-            payment.failure_message = '주문 결제 제한 시간이 지났습니다.'
+            payment.failure_code = 'ORDER_EXPIRED'
         WHERE current_order.id = #{orderId}
           AND current_order.status = 'PENDING_PAYMENT'
           AND (payment.id IS NULL OR payment.status = 'READY')

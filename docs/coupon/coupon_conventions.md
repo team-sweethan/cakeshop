@@ -247,7 +247,7 @@ SPECIFIC_MEMBERS
 2. 사용자의 `0원 주문 완료` 요청으로 재고 차감, 결제 `DONE`, 주문 `READY_FOR_PICKUP`,
    예약 쿠폰 `USED` 전환을 하나의 트랜잭션에서 처리한다.
 3. `ZERO_AMOUNT`는 새 상태값이 아니다. PG를 거치지 않은 내부 0원 완료를 구분하기 위해
-   `payments.method`, `payments.provider_status`에 저장하는 값이다.
+   `payments.method`에 저장하는 값이다.
 4. 0원 주문은 결제 만료·취소 시 쿠폰 및 재고 복구 대상이다. 취소할 때는 PG와
    `payment_cancellations`를 거치지 않고, 결제·주문 취소와 쿠폰·재고 복구를 한 트랜잭션에서 처리한다.
 

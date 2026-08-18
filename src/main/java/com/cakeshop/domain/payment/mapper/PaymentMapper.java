@@ -36,7 +36,6 @@ public interface PaymentMapper {
             @Param("paymentId") long paymentId,
             @Param("paymentKey") String paymentKey,
             @Param("method") String method,
-            @Param("providerStatus") String providerStatus,
             @Param("approvedAt") LocalDateTime approvedAt
     );
 
@@ -55,7 +54,6 @@ public interface PaymentMapper {
     // DONE 결제의 전체 취소 결과와 취소 시각을 함께 기록한다.
     int cancelIfDone(
             @Param("paymentId") long paymentId,
-            @Param("providerStatus") String providerStatus,
             @Param("canceledAt") LocalDateTime canceledAt
     );
 
@@ -121,8 +119,7 @@ public interface PaymentMapper {
     // REQUESTED 환불 요청의 실패 정보를 함께 기록한다.
     int failCancellationIfRequested(
             @Param("cancellationId") long cancellationId,
-            @Param("failureCode") String failureCode,
-            @Param("failureMessage") String failureMessage
+            @Param("failureCode") String failureCode
     );
 
     // 승인 호출과 경쟁하지 않도록 DB 현재 시각 기준 1분 유예가 지난 보호 요청만 해제한다.

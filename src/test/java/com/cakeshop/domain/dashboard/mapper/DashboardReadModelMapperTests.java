@@ -895,16 +895,14 @@ class DashboardReadModelMapperTests {
                     method,
                     amount,
                     status,
-                    provider_status,
                     approved_at
                 )
-                VALUES (?, ?, ?, ?, 'CARD', 40000, ?, ?, ?)
+                VALUES (?, ?, ?, ?, 'CARD', 40000, ?, ?)
                 """,
                 orderId,
                 tossOrderId,
                 "PAYMENT-KEY-" + label + "-" + suffix,
                 "IDEMPOTENCY-" + label + "-" + suffix,
-                status,
                 status,
                 approvedAt
         );

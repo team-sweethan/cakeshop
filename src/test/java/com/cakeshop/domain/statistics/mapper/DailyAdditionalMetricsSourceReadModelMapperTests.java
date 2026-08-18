@@ -239,15 +239,14 @@ class DailyAdditionalMetricsSourceReadModelMapperTests {
                 """
                 INSERT INTO payments (
                     order_id, toss_order_id, payment_key, idempotency_key, method,
-                    amount, status, provider_status, approved_at, updated_at
+                    amount, status, approved_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, 'CARD', 20000, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, 'CARD', 20000, ?, ?, ?)
                 """,
                 orderId,
                 "ADDITIONAL-TOSS-" + label + "-" + suffix,
                 "ADDITIONAL-KEY-" + label + "-" + suffix,
                 "ADDITIONAL-IDEMPOTENCY-" + label + "-" + suffix,
-                status,
                 status,
                 approvedAt,
                 approvedAt

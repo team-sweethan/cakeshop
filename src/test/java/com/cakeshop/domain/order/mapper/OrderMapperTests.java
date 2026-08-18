@@ -432,7 +432,6 @@ class OrderMapperTests {
                 """
                 UPDATE payments
                 SET status = 'CANCELED',
-                    provider_status = 'CANCELED',
                     failure_code = 'INTERNAL_COMPLETION_FAILED',
                     canceled_at = ?
                 WHERE id = ?
@@ -818,16 +817,14 @@ class OrderMapperTests {
                     method,
                     amount,
                     status,
-                    provider_status,
                     approved_at
                 )
-                VALUES (?, ?, ?, ?, 'CARD', 40000, ?, ?, CURRENT_TIMESTAMP(6))
+                VALUES (?, ?, ?, ?, 'CARD', 40000, ?, CURRENT_TIMESTAMP(6))
                 """,
                 orderId,
                 tossOrderId,
                 "ORDER-MAPPER-PAYMENT-" + label + "-" + suffix,
                 "ORDER-MAPPER-IDEMPOTENCY-" + label + "-" + suffix,
-                status,
                 status
         );
 
@@ -843,7 +840,6 @@ class OrderMapperTests {
                 """
                 UPDATE payments
                 SET status = 'CANCELED',
-                    provider_status = 'CANCELED',
                     canceled_at = ?
                 WHERE id = ?
                   AND status = 'DONE'

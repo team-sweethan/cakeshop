@@ -459,7 +459,7 @@ class ScreenRenderingTests {
             throws Exception {
         long orderId = createGeneralOrder();
         jdbcTemplate.update(
-            "UPDATE payments SET status = 'DONE', payment_key = ?, method = ?, provider_status = 'DONE' "
+            "UPDATE payments SET status = 'DONE', payment_key = ?, method = ? "
                 + "WHERE order_id = ?",
             "test-payment-key-" + orderId,
             "카드",
@@ -549,7 +549,6 @@ class ScreenRenderingTests {
             """
             UPDATE payments
             SET status = 'DONE',
-                provider_status = 'DONE',
                 payment_key = ?,
                 approved_at = CURRENT_TIMESTAMP(6)
             WHERE order_id = ?
@@ -659,7 +658,6 @@ class ScreenRenderingTests {
             """
             UPDATE payments
             SET status = 'DONE',
-                provider_status = 'DONE',
                 payment_key = ?,
                 method = 'CARD',
                 approved_at = CURRENT_TIMESTAMP(6)
@@ -705,7 +703,7 @@ class ScreenRenderingTests {
                 orderId
         );
         jdbcTemplate.update(
-                "UPDATE payments SET status = 'EXPIRED', provider_status = 'EXPIRED' WHERE id = ?",
+                "UPDATE payments SET status = 'EXPIRED' WHERE id = ?",
                 paymentId
         );
 
@@ -750,7 +748,6 @@ class ScreenRenderingTests {
             """
             UPDATE payments
             SET status = 'DONE',
-                provider_status = 'DONE',
                 payment_key = ?,
                 method = 'CARD',
                 approved_at = CURRENT_TIMESTAMP(6)

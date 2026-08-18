@@ -19,10 +19,8 @@ public class Payment {
     private String method;
     private BigDecimal amount;
     private PaymentStatus status;
-    private String providerStatus;
     private Long activePaymentOrderId;
     private String failureCode;
-    private String failureMessage;
     private LocalDateTime requestedAt;
     private LocalDateTime approvedAt;
     private LocalDateTime canceledAt;
