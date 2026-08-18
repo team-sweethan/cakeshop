@@ -286,13 +286,4 @@ public class NotificationService {
     public int countUnreadNotifications(Long receiverId) {
         return notificationMapper.countUnreadNotifications(receiverId);
     }
-
-    // 중복 event_key 알림 존재 여부 조회 (공개 계약)
-    @Transactional(readOnly = true)
-    public boolean existsByReceiverIdAndEventKey(Long receiverId, String eventKey) {
-        if (receiverId == null || eventKey == null || eventKey.isBlank()) {
-            return false;
-        }
-        return notificationMapper.existsByReceiverIdAndEventKey(receiverId, eventKey);
-    }
 }
