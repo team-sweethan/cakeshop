@@ -145,7 +145,6 @@
               </span>
 
               <form method="post"
-                    sec:authorize="!hasRole('ADMIN')"
                     th:if="${canComment and viewerId == comment.memberId}"
                     th:action="@{/community/{postId}/comments/{commentId}/delete(
                         postId=${post.id},
@@ -168,8 +167,8 @@
         </div>
       </div>
 
+      <!--/* 댓글은 관리자도 단다. 좋아요·신고 블록의 숨김은 그대로다(community-comment.md). */-->
       <form class="section" method="post"
-            sec:authorize="!hasRole('ADMIN')"
             th:if="${canComment}"
             th:object="${commentForm}"
             th:action="@{/community/{postId}/comments(postId=${post.id})}">
