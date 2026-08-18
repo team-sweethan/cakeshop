@@ -1,5 +1,7 @@
 package com.cakeshop.domain.coupon.service;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -34,8 +36,9 @@ class CouponMemberIssueServiceTests {
         when(couponMapper.insertMemberCouponIfAbsent(1L, 2L, true)).thenReturn(1);
         when(couponMapper.increaseIssuedQuantityIfAvailable(1L)).thenReturn(1);
 
-        couponMemberIssueService.issueAutomatically(1L, 2L, true, false);
+        boolean issued = couponMemberIssueService.issueAutomatically(1L, 2L, true, false);
 
+        assertTrue(issued);
         verify(memberCouponQueryService, never()).lockActiveCouponIssuableMember(2L);
         verify(couponMapper).increaseIssuedQuantityIfAvailable(1L);
     }
@@ -45,8 +48,9 @@ class CouponMemberIssueServiceTests {
         when(memberCouponQueryService.lockActiveCouponIssuableMember(2L)).thenReturn(true);
         when(orderCouponQueryService.hasOrderHistory(2L)).thenReturn(true);
 
-        couponMemberIssueService.issueAutomatically(1L, 2L, true, true);
+        boolean issued = couponMemberIssueService.issueAutomatically(1L, 2L, true, true);
 
+        assertFalse(issued);
         verify(memberCouponQueryService).lockActiveCouponIssuableMember(2L);
         verify(orderCouponQueryService).hasOrderHistory(2L);
         verify(couponMapper, never()).insertMemberCouponIfAbsent(1L, 2L, true);
