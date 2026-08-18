@@ -62,7 +62,7 @@ class HomeScreenRenderingTests {
                 .thenReturn(NoticeSectionView.empty());
     }
 
-    /** 메인에 인기글 영역이 없다 — 조각 15에서 뺐다. 되살아나면 이 검사가 먼저 문다. */
+    /** 메인에 인기글 영역이 없다 — 조각 15에서 뺐다. 되살아나면 이 검사가 먼저 문다(H52). */
     @Test
     void home_hasNoPopularSection() throws Exception {
         mockMvc.perform(get("/"))
