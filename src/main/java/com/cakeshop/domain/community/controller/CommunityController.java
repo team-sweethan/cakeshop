@@ -8,6 +8,7 @@ import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
 import com.cakeshop.domain.community.dto.view.PostSort;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
+import com.cakeshop.domain.community.service.CommunityCommentService;
 import com.cakeshop.domain.community.service.CommunityNoticeService;
 import com.cakeshop.domain.community.service.CommunityService;
 import com.cakeshop.global.error.BusinessException;
@@ -46,6 +47,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class CommunityController {
 
     private final CommunityService communityService;
+    private final CommunityCommentService communityCommentService;
     private final CommunityNoticeService communityNoticeService;
 
     @GetMapping("/community")
@@ -133,7 +135,7 @@ public class CommunityController {
             return prepareDetail(model, post, memberId, comments);
         }
 
-        communityService.addComment(postId, commentForm, memberId);
+        communityCommentService.addComment(postId, commentForm, memberId);
 
         return "redirect:/community/" + postId;
     }
@@ -145,7 +147,7 @@ public class CommunityController {
             @RequestParam(name = "comments", required = false) String comments,
             @AuthenticationPrincipal MemberDetails memberDetails
     ) {
-        communityService.deleteComment(postId, commentId, memberDetails.getMemberId());
+        communityCommentService.deleteComment(postId, commentId, memberDetails.getMemberId());
 
         return redirectToDetail(postId, comments);
     }
@@ -237,7 +239,7 @@ public class CommunityController {
 
         model.addAttribute(
                 "commentSection",
-                communityService.getComments(post.id(), parsePositiveInteger(comments))
+                communityCommentService.getComments(post.id(), parsePositiveInteger(comments))
         );
 
         return "customer/community/detail";

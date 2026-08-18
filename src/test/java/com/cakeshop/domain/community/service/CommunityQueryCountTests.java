@@ -37,6 +37,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({
         CommunityService.class,
+        CommunityCommentService.class,
         CommunityAdminService.class,
         MemberCommunityQueryService.class,
         CommunityMemberViewLoader.class,
@@ -58,6 +59,9 @@ class CommunityQueryCountTests {
 
     @Autowired
     private CommunityService communityService;
+
+    @Autowired
+    private CommunityCommentService communityCommentService;
 
     @Autowired
     private CommunityAdminService communityAdminService;
@@ -136,13 +140,13 @@ class CommunityQueryCountTests {
         insertComments(postId, 3);
 
         queryCounter.reset();
-        communityService.getComments(postId, null);
+        communityCommentService.getComments(postId, null);
         int withFewComments = queryCounter.count();
 
         insertComments(postId, 20);
 
         queryCounter.reset();
-        communityService.getComments(postId, null);
+        communityCommentService.getComments(postId, null);
         int withManyComments = queryCounter.count();
 
         assertThat(withFewComments).isEqualTo(EXPECTED_COMMENT_QUERY_COUNT);

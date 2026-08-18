@@ -7,7 +7,7 @@ import com.cakeshop.domain.community.dto.view.AdminPostSort;
 import com.cakeshop.domain.community.dto.view.ReportView;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.service.CommunityAdminService;
-import com.cakeshop.domain.community.service.CommunityService;
+import com.cakeshop.domain.community.service.CommunityCommentService;
 import com.cakeshop.global.common.paging.PageNavigation;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
@@ -44,7 +44,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class CommunityAdminController {
 
     private final CommunityAdminService communityAdminService;
-    private final CommunityService communityService;
+    private final CommunityCommentService communityCommentService;
 
     @GetMapping("/admin/community")
     public String list(
@@ -138,7 +138,8 @@ public class CommunityAdminController {
         model.addAttribute("post", post);
         model.addAttribute("reports", reports);
         model.addAttribute("pendingReportCount", reports.stream().filter(ReportView::isPending).count());
-        model.addAttribute("commentSection", communityService.getComments(post.id(), commentLimit));
+        model.addAttribute(
+                "commentSection", communityCommentService.getComments(post.id(), commentLimit));
 
         return "admin/community/detail";
     }

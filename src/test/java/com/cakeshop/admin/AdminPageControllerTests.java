@@ -37,7 +37,7 @@ import com.cakeshop.domain.community.dto.view.AdminPostListView;
 import com.cakeshop.domain.community.dto.view.CommentSectionView;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.service.CommunityAdminService;
-import com.cakeshop.domain.community.service.CommunityService;
+import com.cakeshop.domain.community.service.CommunityCommentService;
 import com.cakeshop.domain.coupon.controller.CouponAdminController;
 import com.cakeshop.domain.coupon.service.CouponAdminService;
 import com.cakeshop.domain.member.controller.MemberAdminController;
@@ -133,7 +133,7 @@ class AdminPageControllerTests {
         // 이 테스트는 "주소가 그 템플릿을 가리키는가"만 보므로 빈 결과로 충분하다.
         CommunityAdminService communityAdminService =
                 Mockito.mock(CommunityAdminService.class);
-        CommunityService communityService = Mockito.mock(CommunityService.class);
+        CommunityCommentService communityCommentService = Mockito.mock(CommunityCommentService.class);
         DashboardReadModelQueryService dashboardReadModelQueryService =
                 Mockito.mock(DashboardReadModelQueryService.class);
         PeriodStatisticsReadModelQueryService periodStatisticsReadModelQueryService =
@@ -161,7 +161,7 @@ class AdminPageControllerTests {
                         PostStatus.PUBLISHED, null, null, null, 0, 0,
                         LocalDateTime.now(), LocalDateTime.now()));
         when(communityAdminService.getReports(anyLong())).thenReturn(List.of());
-        when(communityService.getComments(anyLong(), any()))
+        when(communityCommentService.getComments(anyLong(), any()))
                 .thenReturn(new CommentSectionView(List.of(), 0, 0, 20));
         when(dashboardReadModelQueryService.getDashboard())
                 .thenReturn(new DashboardView(
@@ -213,7 +213,7 @@ class AdminPageControllerTests {
                         Mockito.mock(OrderMemberQueryService.class)),
                 new ReviewAdminController(reviewAdminService),
                 new NotificationAdminController(),
-                new CommunityAdminController(communityAdminService, communityService),
+                new CommunityAdminController(communityAdminService, communityCommentService),
                 new CouponAdminController(couponAdminService)
         ).build();
 
