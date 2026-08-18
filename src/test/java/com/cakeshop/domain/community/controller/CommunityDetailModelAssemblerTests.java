@@ -112,6 +112,23 @@ class CommunityDetailModelAssemblerTests {
         verify(communityReactionService, never()).isReportedBy(anyLong(), anyLong());
     }
 
+    /**
+     * 로그인 조회자의 ID가 실제로 Model에 실린다.
+     *
+     * <p>`detail.html`이 `viewerId == comment.memberId`로 <b>자기 댓글 삭제 버튼</b>을 가린다.
+     * 바인딩이 사라지면 이 조건이 늘 거짓이 되어 로그인 사용자 전원이 그 버튼을 잃는데,
+     * <b>비로그인 검사만으로는 잡히지 않는다</b> — 속성이 아예 없어도 `getAttribute`는 똑같이
+     * `null`을 돌려주기 때문이다(PR #289 Codex 리뷰).
+     */
+    @Test
+    void viewerId_loggedIn_isBound() {
+        Model model = new ConcurrentModel();
+
+        assembler.assemble(model, postOf(PostStatus.PUBLISHED), OTHER_MEMBER_ID, null);
+
+        assertThat(model.getAttribute("viewerId")).isEqualTo(OTHER_MEMBER_ID);
+    }
+
     /** 비로그인 조회자도 화면이 그려진다. 이때 viewerId는 null이다. */
     @Test
     void viewerId_anonymous_staysNull() {
