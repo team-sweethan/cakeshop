@@ -3,7 +3,6 @@ package com.cakeshop.domain.community.controller;
 import com.cakeshop.domain.community.dto.form.CommentForm;
 import com.cakeshop.domain.community.dto.form.PostForm;
 import com.cakeshop.domain.community.dto.form.ReportForm;
-import com.cakeshop.domain.community.dto.view.CommentSectionView;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
 import com.cakeshop.domain.community.dto.view.PostSort;
@@ -51,7 +50,7 @@ public class CommunityController {
     private final CommunityCommentService communityCommentService;
     private final CommunityNoticeService communityNoticeService;
     private final CommunityReactionService communityReactionService;
-    private final CommunityDetailModelAssembler communityDetailModelAssembler;
+    private final CommunityDetailPage communityDetailPage;
 
     @GetMapping("/community")
     public String list(
@@ -204,21 +203,13 @@ public class CommunityController {
     }
 
     private String redirectToDetail(long postId, String comments) {
-        int limit = CommentSectionView.clampLimit(parsePositiveInteger(comments));
-
-        if (limit == CommentSectionView.DEFAULT_LIMIT) {
-            return "redirect:/community/" + postId;
-        }
-
-        return "redirect:/community/" + postId + "?comments=" + limit;
+        return communityDetailPage.redirect(postId, parsePositiveInteger(comments));
     }
 
     private String prepareDetail(
             Model model, PostDetailView post, Long viewerId, String comments) {
-        communityDetailModelAssembler.assemble(
+        return communityDetailPage.render(
                 model, post, viewerId, parsePositiveInteger(comments));
-
-        return "customer/community/detail";
     }
 
     @GetMapping("/community/new")
