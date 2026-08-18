@@ -61,6 +61,9 @@ class CommunityMapperTests {
     private CommunityAdminMapper communityAdminMapper;
 
     @Autowired
+    private CommunityPopularPostMapper communityPopularPostMapper;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     private long categoryId;
@@ -557,7 +560,7 @@ class CommunityMapperTests {
         insertRanking(RANKING_DATE, 2, visible, 200);
         insertRanking(RANKING_DATE, 3, deleted, 100);
 
-        assertThat(communityMapper.findPopularPosts(RANKING_DATE, 10))
+        assertThat(communityPopularPostMapper.findPopularPosts(RANKING_DATE, 10))
                 .extracting(PopularPostView::postId)
                 .containsExactly(visible);
     }
@@ -574,7 +577,7 @@ class CommunityMapperTests {
         insertRanking(RANKING_DATE, 3, third, 999);
         insertRanking(RANKING_DATE.minusDays(1), 1, yesterday, 1_000);
 
-        assertThat(communityMapper.findPopularPosts(RANKING_DATE, 2))
+        assertThat(communityPopularPostMapper.findPopularPosts(RANKING_DATE, 2))
                 .satisfiesExactly(
                         popular -> {
                             assertThat(popular.ranking()).isEqualTo(1);
@@ -596,8 +599,8 @@ class CommunityMapperTests {
         insertBatchRun(RANKING_DATE.minusDays(1), 1);
         insertBatchRun(RANKING_DATE, 0);
 
-        assertThat(communityMapper.findLatestRankingDate()).isEqualTo(RANKING_DATE);
-        assertThat(communityMapper.findPopularPosts(RANKING_DATE, 10)).isEmpty();
+        assertThat(communityPopularPostMapper.findLatestRankingDate()).isEqualTo(RANKING_DATE);
+        assertThat(communityPopularPostMapper.findPopularPosts(RANKING_DATE, 10)).isEmpty();
     }
 
     private void insertRanking(LocalDate rankingDate, int ranking, long postId, long score) {

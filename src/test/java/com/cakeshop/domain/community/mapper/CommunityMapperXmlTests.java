@@ -29,7 +29,8 @@ class CommunityMapperXmlTests {
     private static final Map<String, Class<?>> MAPPERS = Map.of(
             "mapper/community/CommunityMapper.xml", CommunityMapper.class,
             "mapper/community/CommunityAdminMapper.xml", CommunityAdminMapper.class,
-            "mapper/community/CommunityNoticeMapper.xml", CommunityNoticeMapper.class);
+            "mapper/community/CommunityNoticeMapper.xml", CommunityNoticeMapper.class,
+            "mapper/community/CommunityPopularPostMapper.xml", CommunityPopularPostMapper.class);
 
     private static final String NOTICE_MAPPER_XML = "mapper/community/CommunityNoticeMapper.xml";
 

@@ -14,7 +14,7 @@ import java.util.stream.IntStream;
 import com.cakeshop.domain.community.dto.query.NoticeListRow;
 import com.cakeshop.domain.community.dto.view.PopularPostView;
 import com.cakeshop.domain.community.dto.view.PopularSectionView;
-import com.cakeshop.domain.community.mapper.CommunityMapper;
+import com.cakeshop.domain.community.mapper.CommunityPopularPostMapper;
 import com.cakeshop.domain.community.mapper.CommunityNoticeMapper;
 
 import org.junit.jupiter.api.Test;
@@ -40,19 +40,19 @@ class CommunityHomeQueryServiceTests {
 
     private static final LocalDateTime NOW = RANKING_DATE.plusDays(1).atTime(10, 0);
 
-    private final CommunityMapper communityMapper = mock(CommunityMapper.class);
+    private final CommunityPopularPostMapper communityPopularPostMapper = mock(CommunityPopularPostMapper.class);
 
     private final CommunityNoticeMapper communityNoticeMapper = mock(CommunityNoticeMapper.class);
 
     private final CommunityHomeQueryService communityHomeQueryService =
             new CommunityHomeQueryService(
-                    new PopularPostReader(communityMapper, fixedClock()),
+                    new PopularPostReader(communityPopularPostMapper, fixedClock()),
                     new CommunityNoticeService(communityNoticeMapper, fixedClock()));
 
     @Test
     void getPopularSection_readsLimitOwnedByMain() {
-        when(communityMapper.findLatestRankingDate()).thenReturn(RANKING_DATE);
-        when(communityMapper.findPopularPosts(RANKING_DATE, MAIN_LIMIT))
+        when(communityPopularPostMapper.findLatestRankingDate()).thenReturn(RANKING_DATE);
+        when(communityPopularPostMapper.findPopularPosts(RANKING_DATE, MAIN_LIMIT))
                 .thenReturn(popularPosts(MAIN_LIMIT));
 
         PopularSectionView section = communityHomeQueryService.getPopularSection();
