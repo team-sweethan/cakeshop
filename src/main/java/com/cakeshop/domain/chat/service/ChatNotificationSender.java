@@ -43,15 +43,19 @@ public class ChatNotificationSender {
             String cName = (customerName != null && !customerName.isBlank()) ? customerName : "고객";
 
             for (Long adminId : activeAdminIds) {
-                notificationService.makeNotification(NotificationRequest.builder()
-                        .receiverId(adminId)
-                        .actorId(customerId)
-                        .chatRoomId(chatRoomId)
-                        .chatMessageId(messageId)
-                        .type(NotificationType.ADMIN_CHAT)
-                        .eventKey("ADMIN_CHAT:" + adminId + ":ROOM_" + chatRoomId)
-                        .args(new Object[]{cName})
-                        .build());
+                try {
+                    notificationService.makeNotification(NotificationRequest.builder()
+                            .receiverId(adminId)
+                            .actorId(customerId)
+                            .chatRoomId(chatRoomId)
+                            .chatMessageId(messageId)
+                            .type(NotificationType.ADMIN_CHAT)
+                            .eventKey("ADMIN_CHAT:" + adminId + ":ROOM_" + chatRoomId)
+                            .args(new Object[]{cName})
+                            .build());
+                } catch (Exception e) {
+                    log.error("관리자(id={}) 채팅 알림 발송 중 개별 오류 발생: roomId={}", adminId, chatRoomId, e);
+                }
             }
         } catch (Exception e) {
             log.error("관리자 채팅 알림 발송 중 오류 발생: roomId={}", chatRoomId, e);

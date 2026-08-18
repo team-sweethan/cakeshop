@@ -94,35 +94,9 @@
   });
 })();
 
-/* source: cakeProjectSample/js/admin/notification.js — 관리자 실시간 토스트 알림 데모(전 페이지 공통) */
+/* source: cakeProjectSample/js/admin/notification.js — 관리자 실시간 토스트 알림 (실제 WebSocket 연동으로 대체됨) */
 (function () {
   "use strict";
-  document.addEventListener("DOMContentLoaded", function () {
-    function showAdminToast(message, linkUrl) {
-      let container = document.querySelector(".toast-container");
-      if (!container) {
-        container = document.createElement("div");
-        container.className = "toast-container";
-        document.body.appendChild(container);
-      }
-      const toast = document.createElement("div");
-      toast.className = "toast-item";
-      toast.innerHTML = '<span>' + message + '</span><span style="font-size:11px; opacity:0.8;">[이동 ➔]</span>';
-      if (linkUrl) {
-        toast.addEventListener("click", function () { location.href = linkUrl; });
-      }
-      container.appendChild(toast);
-      setTimeout(function () { toast.classList.add("is-show"); }, 50);
-      setTimeout(function () {
-        toast.classList.remove("is-show");
-        setTimeout(function () { toast.remove(); }, 400);
-      }, 4000);
-    }
-    // 관리자 페이지 접속 1.2초 후 토스트 알림 목업을 자동 시연한다.
-    setTimeout(function () {
-      showAdminToast("💬 [신규 채팅 문의] 김철수: 파란색 레터링 가능한가요?", "/admin/chat");
-    }, 1200);
-  });
 })();
 
 /* source: cakeProjectSample/js/admin/chat.js — 관리자 채팅방 상호작용 */

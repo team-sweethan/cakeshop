@@ -1,12 +1,11 @@
 package com.cakeshop.global.config;
 
-import com.cakeshop.domain.chat.entity.ChatRoom;
-import com.cakeshop.domain.chat.mapper.ChatMapper;
+import com.cakeshop.domain.chat.service.ChatService;
 import com.cakeshop.domain.member.service.MemberChatQueryService;
 import com.cakeshop.global.security.MemberDetails;
 import java.security.Principal;
-import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.config.ChannelRegistration;
@@ -23,11 +22,16 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 
 @Configuration
 @EnableWebSocketMessageBroker
-@RequiredArgsConstructor
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final MemberChatQueryService memberChatQueryService;
-    private final ChatMapper chatMapper;
+    private final ChatService chatService;
+
+    public WebSocketConfig(MemberChatQueryService memberChatQueryService,
+                           @Lazy ChatService chatService) {
+        this.memberChatQueryService = memberChatQueryService;
+        this.chatService = chatService;
+    }
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
@@ -85,7 +89,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                                 try {
                                     Long roomId = Long.parseLong(parts[0]);
                                     if (principal instanceof Authentication auth && auth.getPrincipal() instanceof MemberDetails memberDetails) {
-                                        validateSubscribeAccess(
+                                        chatService.validateSubscribeAccess(
                                                 roomId,
                                                 memberDetails.getMemberId(),
                                                 memberDetails.isAdmin()
@@ -121,15 +125,5 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 return message;
             }
         });
-    }
-
-    private void validateSubscribeAccess(Long chatRoomId, Long currentUserId, boolean isAdmin) {
-        ChatRoom room = chatMapper.findChatRoomById(chatRoomId);
-        if (room == null) {
-            throw new AccessDeniedException("존재하지 않는 채팅방입니다.");
-        }
-        if (!isAdmin && (currentUserId == null || !currentUserId.equals(room.getCustomerId()))) {
-            throw new AccessDeniedException("채팅방 접근 권한이 없습니다.");
-        }
     }
 }
