@@ -5,7 +5,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.cakeshop.domain.order.dto.view.OrderPaymentAdminView;
-import com.cakeshop.domain.order.service.OrderPaymentAdminQueryService;
+import com.cakeshop.domain.order.service.payment.OrderPaymentAdminQueryService;
 import com.cakeshop.domain.payment.dto.form.PaymentAdminSearchCondition;
 import com.cakeshop.domain.payment.dto.view.PaymentAdminPaymentRow;
 import com.cakeshop.domain.payment.dto.view.PaymentAdminSummaryView;

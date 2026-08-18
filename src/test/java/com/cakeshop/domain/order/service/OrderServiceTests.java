@@ -16,7 +16,9 @@ import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.order.mapper.OrderCartMapper;
 import com.cakeshop.domain.order.dto.view.OrderCartItemLink;
 import com.cakeshop.domain.order.mapper.OrderMapper;
-import com.cakeshop.domain.order.service.OrderOptionValidator.ValidatedOption;
+import com.cakeshop.domain.order.service.checkout.OrderOptionValidator;
+import com.cakeshop.domain.order.service.checkout.OrderOptionValidator.ValidatedOption;
+import com.cakeshop.domain.order.service.checkout.PickupAvailabilityPolicy;
 import com.cakeshop.domain.payment.service.PaymentOrderPreparationCommandService;
 import com.cakeshop.domain.product.dto.view.ProductSalesInfo;
 import com.cakeshop.domain.product.entity.ProductType;
@@ -106,7 +108,7 @@ class OrderServiceTests {
         lenient().when(storeService.getStoreView()).thenReturn(storeView());
         lenient().when(memberService.isActiveMember(anyLong())).thenReturn(true);
         lenient().when(memberCouponQueryService.lockActiveCouponIssuableMember(anyLong())).thenReturn(true);
-        orderService = new OrderServiceImpl(
+        orderService = new OrderService(
                 new PickupAvailabilityPolicy(storeService),
                 productQueryService,
                 orderOptionValidator,
@@ -517,7 +519,7 @@ class OrderServiceTests {
 
     @Test
     void createGeneralOrderIsTransactional() throws NoSuchMethodException {
-        Transactional transactional = OrderServiceImpl.class
+        Transactional transactional = OrderService.class
                 .getMethod(
                         "createGeneralOrder",
                         long.class,

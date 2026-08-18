@@ -7,8 +7,12 @@ import com.cakeshop.domain.member.service.MemberCouponQueryService;
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.order.mapper.OrderMapper;
-import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentExecutionOrder;
-import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentProduct;
+import com.cakeshop.domain.order.service.checkout.OrderOptionValidator;
+import com.cakeshop.domain.order.service.checkout.PickupAvailabilityPolicy;
+import com.cakeshop.domain.order.service.payment.OrderExpirationService;
+import com.cakeshop.domain.order.service.payment.OrderPaymentCommandService;
+import com.cakeshop.domain.order.service.payment.OrderPaymentQueryService.PaymentExecutionOrder;
+import com.cakeshop.domain.order.service.payment.OrderPaymentQueryService.PaymentProduct;
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.entity.PaymentStatus;
 import com.cakeshop.domain.payment.infra.TossPaymentClient.ApprovalResult;
@@ -49,7 +53,7 @@ import static org.mockito.Mockito.when;
         PaymentService.class,
         ProductStockService.class,
         OrderPaymentCommandService.class,
-        OrderServiceImpl.class,
+        OrderService.class,
         PickupAvailabilityPolicy.class,
         OrderExpirationService.class
 })

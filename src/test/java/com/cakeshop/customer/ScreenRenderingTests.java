@@ -15,7 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 import com.cakeshop.domain.order.dto.form.customer.GeneralOrderForm;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
-import com.cakeshop.domain.order.service.OrderServiceImpl;
+import com.cakeshop.domain.order.service.OrderService;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,7 +51,7 @@ class ScreenRenderingTests {
     private WebApplicationContext context;
 
     @Autowired
-    private OrderServiceImpl orderService;
+    private OrderService orderService;
 
     @Autowired
     private OrderCheckoutService orderCheckoutService;

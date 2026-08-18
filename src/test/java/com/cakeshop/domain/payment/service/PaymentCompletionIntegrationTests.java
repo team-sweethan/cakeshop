@@ -8,13 +8,13 @@ import com.cakeshop.domain.member.service.MemberCouponQueryService;
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.order.mapper.OrderMapper;
-import com.cakeshop.domain.order.service.OrderOptionValidator;
-import com.cakeshop.domain.order.service.OrderPaymentCommandService;
-import com.cakeshop.domain.order.service.OrderPaymentRecoveryService;
-import com.cakeshop.domain.order.service.OrderServiceImpl;
-import com.cakeshop.domain.order.service.PickupAvailabilityPolicy;
-import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentExecutionOrder;
-import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentProduct;
+import com.cakeshop.domain.order.service.checkout.OrderOptionValidator;
+import com.cakeshop.domain.order.service.checkout.PickupAvailabilityPolicy;
+import com.cakeshop.domain.order.service.payment.OrderPaymentCommandService;
+import com.cakeshop.domain.order.service.payment.OrderPaymentRecoveryService;
+import com.cakeshop.domain.order.service.OrderService;
+import com.cakeshop.domain.order.service.payment.OrderPaymentQueryService.PaymentExecutionOrder;
+import com.cakeshop.domain.order.service.payment.OrderPaymentQueryService.PaymentProduct;
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.entity.PaymentCancellation;
 import com.cakeshop.domain.payment.entity.PaymentCancellationStatus;
@@ -58,7 +58,7 @@ import static org.mockito.Mockito.doThrow;
         PaymentRecoveryService.class,
         OrderPaymentRecoveryService.class,
         OrderPaymentCommandService.class,
-        OrderServiceImpl.class,
+        OrderService.class,
         PickupAvailabilityPolicy.class,
         PaymentOrderPreparationCommandServiceImpl.class,
         ProductStockService.class

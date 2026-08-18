@@ -125,12 +125,12 @@ public class OrderController {
             redirectAttributes.addFlashAttribute("errorMessage", "주문할 상품을 선택해 주세요.");
             return "redirect:/cart";
         }
-        long memberId = requireMemberId(member);
+
         CartOrderForm form = new CartOrderForm();
         form.setCartItemIds(itemIds);
         form.setRequestKey(UUID.randomUUID().toString());
         prefillMemberContact(form, member);
-        return renderCartOrderForm(form, model, memberId);
+        return renderCartOrderForm(form, model, requireMemberId(member));
     }
 
     // 일반 상품 주문 생성
@@ -237,8 +237,7 @@ public class OrderController {
         form.setDisplayedOriginalAmount(checkout.totalAmount());
 
         model.addAttribute("checkout", checkout);
-        model.addAttribute(
-                "availableCoupons",
+        model.addAttribute("availableCoupons",
                 couponOrderQueryService.getAvailableCouponsForMember(memberId, checkout.totalAmount())
         );
         return "customer/order/form";

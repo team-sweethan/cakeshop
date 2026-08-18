@@ -1,5 +1,7 @@
 package com.cakeshop.domain.order.service;
 
+import com.cakeshop.domain.order.service.checkout.OrderAmountCalculator;
+import com.cakeshop.domain.order.service.checkout.OrderOptionValidator;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
