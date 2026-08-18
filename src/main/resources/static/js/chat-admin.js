@@ -200,7 +200,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       // 연결/재연결 완료 시 대시보드 대화방 목록 및 활성 대화 스냅샷 다시 동기화 후 최신 읽음 커서 전송!
-      const pageToReload = Math.max(1, currentAdminPage || 1);
+      const pageToReload = Math.max(1, currentRoomPage || 1);
       for (let p = 1; p <= pageToReload; p++) {
         await loadAdminRooms(p, p > 1, true);
       }
@@ -478,7 +478,7 @@ document.addEventListener("DOMContentLoaded", () => {
     roomSub = stompClient.subscribe(`/topic/chat/${roomId}`, (message) => {
       try {
         const msg = JSON.parse(message.body);
-        if (selectedChatRoomId === roomId) {
+        if (String(selectedChatRoomId) === String(roomId)) {
           appendIncomingAdminMessage(msg);
         }
       } catch (e) {
@@ -490,7 +490,7 @@ document.addEventListener("DOMContentLoaded", () => {
     readSub = stompClient.subscribe(`/topic/chat/${roomId}/read`, (event) => {
       try {
         const readData = JSON.parse(event.body);
-        if (selectedChatRoomId === roomId && readData.readerSide === "CUSTOMER") {
+        if (String(selectedChatRoomId) === String(roomId) && readData.readerSide === "CUSTOMER") {
           markAllAdminMessagesRead(readData.lastReadMessageId || readData.lastMessageId);
         }
       } catch (e) {
@@ -501,7 +501,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // 실시간 연동 주문 갱신 구독
     orderSub = stompClient.subscribe(`/topic/chat/${roomId}/orders`, (event) => {
       try {
-        if (selectedChatRoomId === roomId) {
+        if (String(selectedChatRoomId) === String(roomId)) {
           loadAdminSidePanel(roomId);
         }
       } catch (e) {
@@ -541,6 +541,11 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    const emptyNotice = adminChatMessagesContainer.querySelector(".empty-chat-notice, .text-muted");
+    if (emptyNotice && adminChatMessagesContainer.querySelectorAll("[id^='admin-msg-']").length === 0) {
+      emptyNotice.remove();
+    }
+
     const isAdminSender = msg.senderType === "ADMIN";
     const msgDiv = document.createElement("div");
     msgDiv.className = `chat-msg ${isAdminSender ? "chat-msg--me" : "chat-msg--other"}`;
@@ -560,10 +565,10 @@ document.addEventListener("DOMContentLoaded", () => {
         <div class="chat-msg__body">
           ${attachmentsHtml}
           <div class="chat-msg__content">${escapeHtml(msg.content || "")}</div>
-        </div>
-        <div class="chat-msg__meta">
-          <span class="chat-msg__read">${msg.isRead ? "읽음" : "미읽음"}</span>
-          <span class="chat-msg__time">${formattedTime}</span>
+          <div class="chat-msg__meta">
+            <span class="chat-msg__read">${(msg.isRead || msg.read) ? "읽음" : "미읽음"}</span>
+            <span class="chat-msg__time">${formattedTime}</span>
+          </div>
         </div>
       `;
     } else {
@@ -674,7 +679,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!messages || messages.length === 0) {
       if (existingMsgEls.length === 0) {
-        adminChatMessagesContainer.innerHTML = `<div class="text-muted" style="text-align:center; padding:30px;">대화 기록이 없습니다.</div>`;
+        adminChatMessagesContainer.innerHTML = `<div class="text-muted empty-chat-notice" style="text-align:center; padding:30px;">대화 기록이 없습니다.</div>`;
         lastFetchedMessageId = 0;
         return;
       }
