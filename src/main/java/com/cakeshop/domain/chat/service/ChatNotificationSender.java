@@ -70,7 +70,7 @@ public class ChatNotificationSender {
      */
     public void sendCustomerChatNotification(Long chatRoomId, Long messageId, Long customerId, Long adminId) {
         try {
-            if (customerId == null || customerId <= 0) return;
+            if (customerId == null || customerId <= 0 || !memberChatQueryService.existsCustomer(customerId)) return;
 
             notificationService.makeNotification(NotificationRequest.builder()
                     .receiverId(customerId)

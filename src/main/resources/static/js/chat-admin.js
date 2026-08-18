@@ -286,6 +286,9 @@ document.addEventListener("DOMContentLoaded", () => {
         adminRoomsData.splice(existingIdx, 1);
         renderRoomList();
       }
+      if (newStatus === "WAITING_ADMIN" && (!existingRoom || existingRoom.responseStatus !== "WAITING_ADMIN")) {
+        adjustUnreadTabBadge(1);
+      }
       return;
     }
     if (currentFilter === "done" && newStatus !== "RESOLVED") {
