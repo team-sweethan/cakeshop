@@ -52,6 +52,7 @@ class ProductOptionAdminServiceTests {
     void getOptions_existingProduct_groupsOptionRows() {
         ProductForm product = new ProductForm();
         product.setName("레터링 케이크");
+        product.setProductType(ProductType.CUSTOM);
 
         when(productMapper.findAdminProductFormById(1L))
                 .thenReturn(product);
@@ -67,6 +68,8 @@ class ProductOptionAdminServiceTests {
         assertThat(result.productId()).isEqualTo(1L);
         assertThat(result.productName())
                 .isEqualTo("레터링 케이크");
+        assertThat(result.productType())
+                .isEqualTo(ProductType.CUSTOM);
         assertThat(result.optionGroups()).hasSize(1);
         assertThat(result.optionGroups().getFirst().options())
                 .extracting(option -> option.name())

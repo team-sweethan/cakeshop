@@ -101,7 +101,16 @@
             <span>필수 선택</span>
             <input type="checkbox"
                    name="required"
-                   value="true">
+                   value="true"
+                   th:disabled=
+                           "${management.productType.name()
+                           == 'GENERAL'}">
+            <span class="form-help"
+                  th:if=
+                          "${management.productType.name()
+                          == 'GENERAL'}">
+              일반 상품은 선택 옵션만 설정할 수 있습니다.
+            </span>
           </label>
 
             <div class="form-group">
@@ -278,7 +287,16 @@
               <input type="checkbox"
                      name="required"
                      value="true"
-                     th:checked="${group.required}">
+                     th:checked="${group.required}"
+                     th:disabled=
+                             "${management.productType.name()
+                             == 'GENERAL'}">
+              <span class="form-help"
+                    th:if=
+                            "${management.productType.name()
+                            == 'GENERAL'}">
+                일반 상품은 선택 옵션만 설정할 수 있습니다.
+              </span>
             </label>
 
             <div class="form-group">

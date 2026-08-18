@@ -57,6 +57,7 @@ public class ProductOptionAdminService {
         return new ProductOptionManagementView(
                 productId,
                 product.getName(),
+                product.getProductType(),
                 groupRows(rows)
         );
     }
