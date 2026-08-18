@@ -204,6 +204,7 @@ document.addEventListener("DOMContentLoaded", () => {
       for (let p = 1; p <= pageToReload; p++) {
         await loadAdminRooms(p, p > 1, true);
       }
+      currentRoomPage = pageToReload;
       if (selectedChatRoomId) {
         subscribeActiveRoomWebSocket(selectedChatRoomId);
         await loadAdminMessages(selectedChatRoomId, true);
