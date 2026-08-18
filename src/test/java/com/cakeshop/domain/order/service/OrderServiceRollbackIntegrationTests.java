@@ -4,7 +4,7 @@ import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
 import com.cakeshop.domain.cart.service.CartOrderQueryService;
 import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.member.service.MemberCouponQueryService;
-import com.cakeshop.domain.order.dto.form.customer.GeneralOrderForm;
+import com.cakeshop.domain.order.dto.form.customer.OrderGeneralCreateForm;
 import com.cakeshop.domain.payment.error.PaymentErrorCode;
 import com.cakeshop.domain.payment.service.PaymentOrderPreparationCommandService;
 import com.cakeshop.domain.product.dto.view.ProductOptionGroupView;
@@ -160,8 +160,8 @@ class OrderServiceRollbackIntegrationTests {
         assertThat(countOrderItemOptions()).isZero();
     }
 
-    private GeneralOrderForm createForm() {
-        GeneralOrderForm form = new GeneralOrderForm();
+    private OrderGeneralCreateForm createForm() {
+        OrderGeneralCreateForm form = new OrderGeneralCreateForm();
         form.setRequestKey(UUID.randomUUID().toString());
         form.setOrdererName("주문자");
         form.setOrdererPhone("010-1111-2222");

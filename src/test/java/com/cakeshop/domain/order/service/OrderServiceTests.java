@@ -1,7 +1,7 @@
 package com.cakeshop.domain.order.service;
 
-import com.cakeshop.domain.order.dto.form.customer.GeneralOrderForm;
-import com.cakeshop.domain.order.dto.form.customer.CartOrderForm;
+import com.cakeshop.domain.order.dto.form.customer.OrderCartCreateForm;
+import com.cakeshop.domain.order.dto.form.customer.OrderGeneralCreateForm;
 import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
 import com.cakeshop.domain.cart.service.CartOrderQueryService;
 import com.cakeshop.domain.cart.dto.view.CartOrderItemView;
@@ -149,7 +149,7 @@ class OrderServiceTests {
             return 1;
         });
         when(orderMapper.insertOrderItemOption(any(OrderItemOption.class))).thenReturn(1);
-        GeneralOrderForm form = form(1L, 2, List.of(101L));
+        OrderGeneralCreateForm form = form(1L, 2, List.of(101L));
 
         long orderId = orderService.createGeneralOrder(memberId, form);
 
@@ -235,7 +235,7 @@ class OrderServiceTests {
                 org.mockito.ArgumentMatchers.eq(100L), org.mockito.ArgumentMatchers.anyList()
         )).thenReturn(2);
 
-        CartOrderForm form = new CartOrderForm();
+        OrderCartCreateForm form = new OrderCartCreateForm();
         form.setRequestKey(UUID.randomUUID().toString());
         form.setCartItemIds(List.of(11L, 12L));
         form.setOrdererName("주문자");
@@ -266,7 +266,7 @@ class OrderServiceTests {
                 product(1L, ProductType.GENERAL, "딸기 케이크", 30_000, 2)
         );
         when(orderOptionValidator.validate(1L, List.of())).thenReturn(List.of());
-        GeneralOrderForm form = form(1L, 1, List.of());
+        OrderGeneralCreateForm form = form(1L, 1, List.of());
         form.setDisplayedOriginalAmount(BigDecimal.valueOf(29_000));
 
         assertThatThrownBy(() -> orderService.createGeneralOrder(10L, form))
@@ -301,7 +301,7 @@ class OrderServiceTests {
 
     @Test
     void createGeneralOrder_sameRequestKey_returnsExistingOrderWithoutDuplicateWrites() {
-        GeneralOrderForm form = form(1L, 1, List.of());
+        OrderGeneralCreateForm form = form(1L, 1, List.of());
         Order existingOrder = new Order();
         existingOrder.setId(77L);
         when(orderMapper.findOrderByMemberIdAndRequestKey(
@@ -342,7 +342,7 @@ class OrderServiceTests {
                         "주문 제작 케이크",
                         50_000
                 ));
-        GeneralOrderForm form = form(2L, 1, List.of());
+        OrderGeneralCreateForm form = form(2L, 1, List.of());
 
         assertThatThrownBy(() -> orderService.createGeneralOrder(10L, form))
                 .isInstanceOfSatisfying(
@@ -453,7 +453,7 @@ class OrderServiceTests {
 
     @Test
     void createGeneralOrder_pickupAtCurrentTime_throwsInvalidInput() {
-        GeneralOrderForm form = form(1L, 1, List.of());
+        OrderGeneralCreateForm form = form(1L, 1, List.of());
         form.setPickupAt(FIXED_NOW);
 
         assertThatThrownBy(() ->
@@ -472,7 +472,7 @@ class OrderServiceTests {
     void createGeneralOrder_pickupBeforePaymentExpiration_throwsInvalidInput() {
         lenient().when(storeService.getStoreView())
                 .thenReturn(storeView(Set.of(), List.of(), 5));
-        GeneralOrderForm form = form(1L, 1, List.of());
+        OrderGeneralCreateForm form = form(1L, 1, List.of());
         form.setPickupAt(FIXED_NOW.plusMinutes(5));
 
         assertThatThrownBy(() -> orderService.createGeneralOrder(10L, form))
@@ -521,7 +521,7 @@ class OrderServiceTests {
                 .getMethod(
                         "createGeneralOrder",
                         long.class,
-                        GeneralOrderForm.class
+                        OrderGeneralCreateForm.class
                 )
                 .getAnnotation(Transactional.class);
 
@@ -587,12 +587,12 @@ class OrderServiceTests {
         verify(orderMapper, never()).insertOrder(any(Order.class));
     }
 
-    private GeneralOrderForm form(
+    private OrderGeneralCreateForm form(
             long productId,
             int quantity,
             List<Long> optionIds
     ) {
-        GeneralOrderForm form = new GeneralOrderForm();
+        OrderGeneralCreateForm form = new OrderGeneralCreateForm();
         form.setRequestKey(UUID.randomUUID().toString());
         form.setOrdererName(" 주문자 ");
         form.setOrdererPhone(" 010-1111-2222 ");

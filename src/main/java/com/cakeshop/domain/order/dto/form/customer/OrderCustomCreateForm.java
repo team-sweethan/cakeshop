@@ -11,7 +11,7 @@ import lombok.Setter;
 /** 수제 케이크 주문 생성에 필요한 고객 입력이다. 금액은 요청으로 받지 않는다. */
 @Getter
 @Setter
-public class CustomOrderForm extends CreateOrderForm {
+public class OrderCustomCreateForm extends OrderCreateForm {
 
     @NotNull
     @Positive

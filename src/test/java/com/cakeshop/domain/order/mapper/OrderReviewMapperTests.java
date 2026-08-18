@@ -133,7 +133,6 @@ class OrderReviewMapperTests {
         assertThat(target.productId()).isEqualTo(productId);
         assertThat(target.productName()).isEqualTo("픽업 케이크");
         assertThat(target.pickedUp()).isTrue();
-        assertThat(target.pickedUpAt()).isEqualTo(PICKED_UP_AT);
     }
 
     @Test
@@ -145,7 +144,6 @@ class OrderReviewMapperTests {
 
         assertThat(target).as("픽업 전이라고 비우면 400 과 404 를 못 가른다").isNotNull();
         assertThat(target.pickedUp()).isFalse();
-        assertThat(target.pickedUpAt()).isNull();
     }
 
     @Test

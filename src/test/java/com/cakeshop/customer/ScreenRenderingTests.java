@@ -13,7 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.cakeshop.global.config.MariaDbIntegrationTest;
-import com.cakeshop.domain.order.dto.form.customer.GeneralOrderForm;
+import com.cakeshop.domain.order.dto.form.customer.OrderGeneralCreateForm;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
 import com.cakeshop.domain.order.service.OrderServiceImpl;
 
@@ -1056,7 +1056,7 @@ class ScreenRenderingTests {
             List.of(1L)
         );
 
-        GeneralOrderForm form = new GeneralOrderForm();
+        OrderGeneralCreateForm form = new OrderGeneralCreateForm();
         form.setRequestKey(java.util.UUID.randomUUID().toString());
         form.setProductId(1L);
         form.setQuantity(1);

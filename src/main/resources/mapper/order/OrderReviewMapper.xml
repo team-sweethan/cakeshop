@@ -54,8 +54,7 @@
                oi.product_id            AS productId,
                oi.product_name          AS productName,
                o.order_number           AS orderNumber,
-               (o.status = 'PICKED_UP') AS pickedUp,
-               o.picked_up_at           AS pickedUpAt
+               (o.status = 'PICKED_UP') AS pickedUp
           FROM order_items oi
           JOIN orders o ON o.id = oi.order_id
          WHERE oi.id = #{orderItemId}

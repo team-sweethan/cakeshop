@@ -11,7 +11,7 @@ import java.util.List;
 
 @Getter
 @Setter
-public class GeneralOrderForm extends CreateOrderForm {
+public class OrderGeneralCreateForm extends OrderCreateForm {
 
     @NotNull
     @Positive

@@ -3,10 +3,10 @@ package com.cakeshop.domain.order.controller.customer;
 import com.cakeshop.domain.member.dto.view.MemberProfileView;
 import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.coupon.service.CouponOrderQueryService;
-import com.cakeshop.domain.order.dto.form.CancelForm;
-import com.cakeshop.domain.order.dto.form.customer.CustomOrderForm;
-import com.cakeshop.domain.order.dto.form.customer.GeneralOrderForm;
-import com.cakeshop.domain.order.dto.form.customer.CartOrderForm;
+import com.cakeshop.domain.order.dto.form.OrderCancelForm;
+import com.cakeshop.domain.order.dto.form.customer.OrderCartCreateForm;
+import com.cakeshop.domain.order.dto.form.customer.OrderCustomCreateForm;
+import com.cakeshop.domain.order.dto.form.customer.OrderGeneralCreateForm;
 import com.cakeshop.domain.cart.service.CartOrderQueryService;
 import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
@@ -69,7 +69,7 @@ public class OrderController {
     @GetMapping("/custom/request")
     public String customRequest(
             @AuthenticationPrincipal MemberDetails member,
-            @ModelAttribute("orderForm") CustomOrderForm form,
+            @ModelAttribute("orderForm") OrderCustomCreateForm form,
             Model model
     ) {
         prefillMemberContact(form, member);
@@ -80,7 +80,7 @@ public class OrderController {
     @PostMapping("/custom")
     public String createCustomOrder(
             @AuthenticationPrincipal MemberDetails member,
-            @Valid @ModelAttribute("orderForm") CustomOrderForm form,
+            @Valid @ModelAttribute("orderForm") OrderCustomCreateForm form,
             BindingResult bindingResult,
             Model model
     ) {
@@ -103,7 +103,7 @@ public class OrderController {
     // 일반 상품 주문서 화면
     @GetMapping("/checkout")
     public String checkout(
-            @ModelAttribute("orderForm") GeneralOrderForm form,
+            @ModelAttribute("orderForm") OrderGeneralCreateForm form,
             @AuthenticationPrincipal MemberDetails member,
             Model model
     ) {
@@ -126,7 +126,7 @@ public class OrderController {
             return "redirect:/cart";
         }
         long memberId = requireMemberId(member);
-        CartOrderForm form = new CartOrderForm();
+        OrderCartCreateForm form = new OrderCartCreateForm();
         form.setCartItemIds(itemIds);
         form.setRequestKey(UUID.randomUUID().toString());
         prefillMemberContact(form, member);
@@ -137,7 +137,7 @@ public class OrderController {
     @PostMapping("/general")
     public String createGeneralOrder(
             @AuthenticationPrincipal MemberDetails member,
-            @Valid @ModelAttribute("orderForm") GeneralOrderForm form,
+            @Valid @ModelAttribute("orderForm") OrderGeneralCreateForm form,
             BindingResult bindingResult,
             Model model
     ) {
@@ -165,7 +165,7 @@ public class OrderController {
     @PostMapping("/general/cart")
     public String createCartOrder(
             @AuthenticationPrincipal MemberDetails member,
-            @Valid @ModelAttribute("orderForm") CartOrderForm form,
+            @Valid @ModelAttribute("orderForm") OrderCartCreateForm form,
             BindingResult bindingResult,
             Model model
     ) {
@@ -190,7 +190,7 @@ public class OrderController {
     public String cancel(
             @PathVariable("orderId") long orderId,
             @AuthenticationPrincipal MemberDetails member,
-            @Valid @ModelAttribute CancelForm form,
+            @Valid @ModelAttribute OrderCancelForm form,
             BindingResult bindingResult
     ) {
         if (bindingResult.hasErrors()) {
@@ -229,7 +229,7 @@ public class OrderController {
 
 
     /** 클라이언트 값을 통해 DB정보를 활용해 주문서 화면용 데이터 구성.**/
-    private String renderGeneralOrderForm(GeneralOrderForm form, Model model, long memberId) {
+    private String renderGeneralOrderForm(OrderGeneralCreateForm form, Model model, long memberId) {
         var checkout = orderCheckoutService.getGeneralCheckout(
                 form.getProductId(), form.getQuantity(), form.getOptionIds()
         );
@@ -244,7 +244,7 @@ public class OrderController {
         return "customer/order/form";
     }
 
-    private String renderCustomOrderForm(CustomOrderForm form, Model model, long memberId) {
+    private String renderCustomOrderForm(OrderCustomCreateForm form, Model model, long memberId) {
         var checkout = orderCheckoutService.getCustomCheckout(
                 form.getProductId(),
                 form.getOptionIds()
@@ -261,7 +261,7 @@ public class OrderController {
         return "customer/order/custom-request";
     }
 
-    private String renderCartOrderForm(CartOrderForm form, Model model, long memberId) {
+    private String renderCartOrderForm(OrderCartCreateForm form, Model model, long memberId) {
         var cartItems = cartOrderQueryService.getSelectedOrderItems(memberId, form.getCartItemIds());
         var checkout = orderCheckoutService.getCartCheckout(cartItems);
         form.setDisplayedOriginalAmount(checkout.totalAmount());
@@ -283,7 +283,7 @@ public class OrderController {
 
     /** 최초 주문서 진입 시 최신 회원 연락처를 주문자·픽업자 기본값으로 사용한다. */
     private void prefillMemberContact(
-            GeneralOrderForm form,
+            OrderGeneralCreateForm form,
             MemberDetails member
     ) {
         MemberProfileView profile = memberService.getMemberProfile(
@@ -295,7 +295,7 @@ public class OrderController {
         form.setPickupPhone(profile.phone());
     }
 
-    private void prefillMemberContact(CartOrderForm form, MemberDetails member) {
+    private void prefillMemberContact(OrderCartCreateForm form, MemberDetails member) {
         MemberProfileView profile = memberService.getMemberProfile(member.getUsername());
         form.setOrdererName(profile.name());
         form.setOrdererPhone(profile.phone());
@@ -304,7 +304,7 @@ public class OrderController {
     }
 
     private void prefillMemberContact(
-            CustomOrderForm form,
+            OrderCustomCreateForm form,
             MemberDetails member
     ) {
         MemberProfileView profile = memberService.getMemberProfile(member.getUsername());
