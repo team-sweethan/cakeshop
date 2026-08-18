@@ -16,6 +16,7 @@
   <title>게시글 | 케이크 쇼핑몰</title>
   <link rel="stylesheet" th:href="@{/css/app.css}">
   <link rel="stylesheet" th:href="@{/css/customer-mockup.css}">
+  <link rel="stylesheet" th:href="@{/css/community.css}">
   <script defer th:src="@{/js/app.js}"></script>
   <script defer th:src="@{/js/customer-mockup.js}"></script>
 </head>
@@ -23,7 +24,7 @@
   <header th:replace="~{fragments/common/header :: header}"></header>
   <main class="page-container page-container--narrow">
 
-    <div class="cluster cluster--between">
+    <div class="cluster cluster--between section">
       <a class="btn" th:href="@{/community}">← 목록</a>
 
       <div class="cluster" sec:authorize="!hasRole('ADMIN')" th:if="${canEdit}">
@@ -132,8 +133,8 @@
         오래된 댓글 일부는 표시하지 않습니다.
       </p>
 
-      <div class="stack">
-        <article class="panel" th:each="comment : ${commentSection.comments}">
+      <div>
+        <article class="comment-item" th:each="comment : ${commentSection.comments}">
 
           <p class="text-muted" th:if="${comment.deleted}">삭제된 댓글입니다.</p>
 

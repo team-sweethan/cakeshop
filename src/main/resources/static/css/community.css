@@ -1,0 +1,10 @@
+/* 커뮤니티 고객 화면 전용. 댓글은 상자가 아니라 구분선 목록으로 그린다 —
+   댓글마다 panel 테두리를 두르면 한 줄짜리 댓글도 본문보다 무거워 보인다. */
+.comment-item {
+    border-bottom: 1px solid var(--color-border-light);
+    padding: var(--space-2) 0;
+}
+
+.comment-item:last-child {
+    border-bottom: 0;
+}
