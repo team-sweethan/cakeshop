@@ -38,7 +38,7 @@ docs/community/DOMAIN.md 0.1절에서 <이 조각의 기능 ID>가 어느 spec�
 | 2 | 작성·수정·삭제 | 완료 | 게시글 CRUD, 소유권 검증, soft delete |
 | 3 | 댓글 | 완료 | 1단계 댓글 작성·삭제, 자리 표시 |
 | 6 | 조회수 중복 방지 | 완료 | `post_views` migration, 10분 창(2026-08-04에 날짜 창에서 변경), `view_count`를 파생 값으로 |
-| 4 | 좋아요 | 완료 | 추가/취소 경로 분리, 멱등, `like_count` 재계산 |
+| 4 | 좋아요 | 완료 | 추가/취소 경로 분리, 멱등. `like_count`는 재계산이었다가 **2026-08-18에 조건부 원자 증감으로 개정** — 정본은 `specs/community-reaction.md` A8 |
 | 5 | 신고·차단 | 완료 | 회원 신고, 관리자 차단·해제 화면 |
 | 7 | 조회수 정렬·인기글 | 완료 (7a·7b·7c) | 목록 `?sort=views`, 인기글 영역, 정렬 인덱스 |
 | 10 | 회원 연동 계약 분리 | 완료 (10a~10d) | `members` JOIN 8곳을 `MemberCommunityQueryService` 경유로 바꿨다 |

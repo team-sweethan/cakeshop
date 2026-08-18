@@ -104,10 +104,11 @@ class CommunityReactionServiceTests {
         verify(communityMapper, never()).lockPost(anyLong());
     }
 
-    /** 이미 눌린 추가는 멱등 성공이다 — 행을 넣지 않고 조용히 끝난다. */
+    /** 이미 눌린 추가는 멱등 성공이다 — 잠근 채 좋아요 상태를 확인하고 행을 넣지 않는다. */
     @Test
     void addLike_alreadyLiked_succeedsWithoutInsertingRow() {
         givenLockedPost(PostStatus.PUBLISHED);
+        when(communityMapper.existsLike(POST_ID, OTHER_MEMBER_ID)).thenReturn(true);
 
         communityReactionService.addLike(POST_ID, OTHER_MEMBER_ID);
 
@@ -118,10 +119,48 @@ class CommunityReactionServiceTests {
     @Test
     void removeLike_neverLiked_succeedsWithoutDeletingRow() {
         givenLockedPost(PostStatus.PUBLISHED);
+        when(communityMapper.existsLike(POST_ID, OTHER_MEMBER_ID)).thenReturn(false);
 
         communityReactionService.removeLike(POST_ID, OTHER_MEMBER_ID);
 
         verify(communityMapper, never()).deleteLike(anyLong(), anyLong());
+    }
+
+    /**
+     * 0행과 잠금 사이에 차단이 풀린 경합이다(PR #308 Codex 리뷰). 글 상태만 보고
+     * 멱등 성공으로 끝내면 좋아요가 없는데 성공을 돌려준다 — 잠근 채 상태를 확인하고
+     * 같은 쓰기를 마저 해야 한다.
+     */
+    @Test
+    void addLike_zeroRowsButUnblockedMeanwhile_completesUnderLock() {
+        when(communityMapper.increaseLikeCount(POST_ID, OTHER_MEMBER_ID)).thenReturn(0, 1);
+        givenLockedPost(PostStatus.PUBLISHED);
+        when(communityMapper.existsLike(POST_ID, OTHER_MEMBER_ID)).thenReturn(false);
+
+        communityReactionService.addLike(POST_ID, OTHER_MEMBER_ID);
+
+        InOrder order = inOrder(communityMapper);
+        order.verify(communityMapper).increaseLikeCount(POST_ID, OTHER_MEMBER_ID);
+        order.verify(communityMapper).lockPost(POST_ID);
+        order.verify(communityMapper).increaseLikeCount(POST_ID, OTHER_MEMBER_ID);
+        order.verify(communityMapper).insertLike(POST_ID, OTHER_MEMBER_ID);
+    }
+
+    /** 취소 쪽 같은 경합 — 좋아요 행이 남아 있으면 잠근 채 마저 지운다. */
+    @Test
+    void removeLike_zeroRowsButUnblockedMeanwhile_completesUnderLock() {
+        when(communityMapper.decreaseLikeCount(POST_ID, OTHER_MEMBER_ID)).thenReturn(0, 1);
+        givenLockedPost(PostStatus.PUBLISHED);
+        when(communityMapper.existsLike(POST_ID, OTHER_MEMBER_ID)).thenReturn(true);
+        when(communityMapper.deleteLike(POST_ID, OTHER_MEMBER_ID)).thenReturn(1);
+
+        communityReactionService.removeLike(POST_ID, OTHER_MEMBER_ID);
+
+        InOrder order = inOrder(communityMapper);
+        order.verify(communityMapper).decreaseLikeCount(POST_ID, OTHER_MEMBER_ID);
+        order.verify(communityMapper).lockPost(POST_ID);
+        order.verify(communityMapper).decreaseLikeCount(POST_ID, OTHER_MEMBER_ID);
+        order.verify(communityMapper).deleteLike(POST_ID, OTHER_MEMBER_ID);
     }
 
     /** 카운터는 줄었는데 지울 행이 없으면 던진다 — 커밋되면 카운터가 실제보다 작아진다. */
