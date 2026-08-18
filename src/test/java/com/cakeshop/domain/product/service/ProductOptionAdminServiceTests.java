@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -33,6 +34,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -334,11 +336,12 @@ class ProductOptionAdminServiceTests {
 
     @Test
     void createOption_validForm_insertsNormalizedOption() {
-        when(productMapper.findAdminProductFormById(1L))
-                .thenReturn(new ProductForm());
-        when(productMapper.existsOptionGroupById(1L, 10L))
-                .thenReturn(true);
-        when(productMapper.findAdminOptionRowsByProductId(1L))
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(product(ProductStatus.INACTIVE));
+        when(productMapper.findAdminOptionRowsByGroupIdForUpdate(
+                1L,
+                10L
+        ))
                 .thenReturn(List.of(
                         optionRow(11L, "1호", 2)
                 ));
@@ -360,7 +363,16 @@ class ProductOptionAdminServiceTests {
         ArgumentCaptor<ProductOption> captor =
                 ArgumentCaptor.forClass(ProductOption.class);
 
-        verify(productMapper)
+        InOrder lockOrder = inOrder(productMapper);
+
+        lockOrder.verify(productMapper)
+                .findSalesInfoByIdForUpdate(1L);
+        lockOrder.verify(productMapper)
+                .findAdminOptionRowsByGroupIdForUpdate(
+                        1L,
+                        10L
+                );
+        lockOrder.verify(productMapper)
                 .insertProductOption(captor.capture());
 
         ProductOption saved = captor.getValue();
@@ -593,11 +605,9 @@ class ProductOptionAdminServiceTests {
 
     @Test
     void moveOptionGroup_down_swapsAndNormalizesSortOrder() {
-        when(productMapper.findAdminProductFormById(1L))
-                .thenReturn(new ProductForm());
-        when(productMapper.existsOptionGroupById(1L, 10L))
-                .thenReturn(true);
-        when(productMapper.findAdminOptionRowsByProductId(1L))
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(product(ProductStatus.INACTIVE));
+        when(productMapper.findAdminOptionRowsByProductIdForUpdate(1L))
                 .thenReturn(List.of(
                         groupRow(10L, "크기", 2),
                         groupRow(20L, "맛", 2)
@@ -614,7 +624,13 @@ class ProductOptionAdminServiceTests {
         ArgumentCaptor<Integer> orderCaptor =
                 ArgumentCaptor.forClass(Integer.class);
 
-        verify(productMapper, times(2))
+        InOrder lockOrder = inOrder(productMapper);
+
+        lockOrder.verify(productMapper)
+                .findSalesInfoByIdForUpdate(1L);
+        lockOrder.verify(productMapper)
+                .findAdminOptionRowsByProductIdForUpdate(1L);
+        lockOrder.verify(productMapper, times(2))
                 .updateOptionGroupSortOrder(
                         org.mockito.ArgumentMatchers.eq(1L),
                         idCaptor.capture(),
@@ -629,12 +645,12 @@ class ProductOptionAdminServiceTests {
 
     @Test
     void moveOption_up_swapsAndNormalizesSortOrder() {
-        when(productMapper.existsProductOptionById(
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(product(ProductStatus.INACTIVE));
+        when(productMapper.findAdminOptionRowsByGroupIdForUpdate(
                 1L,
-                10L,
-                12L
-        )).thenReturn(true);
-        when(productMapper.findAdminOptionRowsByProductId(1L))
+                10L
+        ))
                 .thenReturn(List.of(
                         optionRow(11L, "1호", 1),
                         optionRow(12L, "2호", 1)
@@ -652,7 +668,16 @@ class ProductOptionAdminServiceTests {
         ArgumentCaptor<Integer> orderCaptor =
                 ArgumentCaptor.forClass(Integer.class);
 
-        verify(productMapper, times(2))
+        InOrder lockOrder = inOrder(productMapper);
+
+        lockOrder.verify(productMapper)
+                .findSalesInfoByIdForUpdate(1L);
+        lockOrder.verify(productMapper)
+                .findAdminOptionRowsByGroupIdForUpdate(
+                        1L,
+                        10L
+                );
+        lockOrder.verify(productMapper, times(2))
                 .updateProductOptionSortOrder(
                         org.mockito.ArgumentMatchers.eq(1L),
                         org.mockito.ArgumentMatchers.eq(10L),
