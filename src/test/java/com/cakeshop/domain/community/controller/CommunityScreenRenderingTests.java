@@ -462,9 +462,9 @@ class CommunityScreenRenderingTests {
                 .andExpect(content().string(containsString("무기한")));
     }
 
-    /** 목록 상단에 공지 영역을 인기글보다 위에 그리고, 전체보기 링크를 함께 둔다. */
+    /** 공지 고정 행을 게시글 행보다 위에 그리고, 인기글은 사이드바로 뒤에 온다. */
     @Test
-    void communityList_withVisibleNotice_rendersNoticeSectionAbovePopular() throws Exception {
+    void communityList_withVisibleNotice_rendersPinnedNoticeAbovePosts() throws Exception {
         insertNotice("상단에 뜨는 공지", NoticeStatus.PUBLISHED, null, null);
 
         long postId = insertPost(memberId, "이번 주 인기 케이크", "본문", PostStatus.PUBLISHED);
@@ -479,29 +479,30 @@ class CommunityScreenRenderingTests {
                 .getResponse()
                 .getContentAsString();
 
-        assertThat(html.indexOf("공지사항")).isLessThan(html.indexOf("인기글"));
+        assertThat(html.indexOf("상단에 뜨는 공지")).isLessThan(html.indexOf("이번 주 인기 케이크"));
+        assertThat(html.indexOf("상단에 뜨는 공지")).isLessThan(html.indexOf("<h2>인기글</h2>"));
     }
 
-    /** 카테고리를 고르면 공지 영역이 통째로 사라진다. */
+    /** 카테고리를 고르면 공지 고정 행은 사라지지만 공지사항 진입점은 남는다. */
     @Test
-    void communityList_withCategoryFilter_hidesNoticeSection() throws Exception {
+    void communityList_withCategoryFilter_hidesPinnedNoticeKeepsEntryPoint() throws Exception {
         insertNotice("필터에서는 숨는 공지", NoticeStatus.PUBLISHED, null, null);
 
         mockMvc.perform(get("/community").param("categoryId", String.valueOf(categoryId)))
                 .andExpect(status().isOk())
                 .andExpect(content().string(not(containsString("필터에서는 숨는 공지"))))
-                .andExpect(content().string(not(containsString("공지사항"))));
+                .andExpect(content().string(containsString("/community/notices")));
     }
 
-    /** 노출 중인 공지가 없으면 영역이 통째로 사라진다. */
+    /** 노출 중인 공지가 없으면 고정 행은 사라지지만 공지사항 진입점은 남는다. */
     @Test
-    void communityList_withoutVisibleNotice_hidesNoticeSection() throws Exception {
+    void communityList_withoutVisibleNotice_hidesPinnedNoticeKeepsEntryPoint() throws Exception {
         insertNotice("끝난 공지", NoticeStatus.PUBLISHED, null, LocalDateTime.now().minusDays(1));
 
         mockMvc.perform(get("/community"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(not(containsString("끝난 공지"))))
-                .andExpect(content().string(not(containsString("공지사항"))));
+                .andExpect(content().string(containsString("/community/notices")));
     }
 
     /** 전체보기는 비로그인도 열 수 있고, 노출 중인 공지만 그린다. */

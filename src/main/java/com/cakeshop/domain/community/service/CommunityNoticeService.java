@@ -33,8 +33,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class CommunityNoticeService {
 
-    /* 커뮤니티 목록 상단이 쓰는 건수. 메인은 다른 값을 쓴다(`CommunityHomeQueryService`). */
-    private static final int LIST_SECTION_LIMIT = 10;
+    /* 커뮤니티 목록 고정 행이 쓰는 건수. 메인은 다른 값을 쓴다(`CommunityHomeQueryService`). */
+    private static final int LIST_SECTION_LIMIT = 3;
 
     private static final int FIRST_PAGE = 1;
 
@@ -45,7 +45,7 @@ public class CommunityNoticeService {
     private final Clock clock;
 
     /**
-     * 커뮤니티 목록 화면 상단의 공지 영역.
+     * 커뮤니티 목록의 공지 고정 행 영역.
      *
      * <p>1쪽이고 카테고리 필터가 없을 때만 싣는다. 이 조건은 인기글과 같은 이유로 Controller가
      * 아니라 여기 있다 — 화면이 늘 때마다 한 벌씩 늘고, 두 벌이 되는 순간 갈린다.</p>
