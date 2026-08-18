@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Test;
 /**
  * 메인 인기글 계약이 소유하는 것은 <b>건수</b> 하나다.
  *
- * <p>폴백·빈 영역·낡음 경고는 {@code PopularPostReader}가 갖고 {@code CommunityServiceTests}가
+ * <p>폴백·빈 영역·낡음 경고는 {@code PopularPostReader}가 갖고 {@code CommunityPostServiceTests}가
  * 이미 본다. 여기서 다시 보면 같은 결함을 두 번 잡는다(docs/testing.md 4절).
  *
  * <p>목록 화면과 같은 10건을 요청하면 메인 절반이 커뮤니티가 되는데, <b>화면은 그래도 멀쩡해

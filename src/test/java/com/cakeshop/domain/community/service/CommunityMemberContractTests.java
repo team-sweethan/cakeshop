@@ -33,7 +33,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @MariaDbIntegrationTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({
-        CommunityService.class,
+        CommunityPostService.class,
         CommunityCommentService.class,
         CommunityAdminService.class,
         MemberCommunityQueryService.class,
@@ -48,7 +48,7 @@ class CommunityMemberContractTests {
     private static final PageRequest FIRST_PAGE = new PageRequest(1, 20);
 
     @Autowired
-    private CommunityService communityService;
+    private CommunityPostService communityPostService;
 
     @Autowired
     private CommunityCommentService communityCommentService;
@@ -87,7 +87,7 @@ class CommunityMemberContractTests {
         insertPost(withdrawnMemberId, "탈퇴 회원 글");
         insertPost(activeMemberId, "활동 회원 글");
 
-        var posts = communityService.getPosts(categoryId, PostSort.LATEST, FIRST_PAGE).getContent();
+        var posts = communityPostService.getPosts(categoryId, PostSort.LATEST, FIRST_PAGE).getContent();
 
         assertThat(posts)
                 .extracting(PostListView::title, PostListView::authorName)
@@ -100,7 +100,7 @@ class CommunityMemberContractTests {
     void getVisiblePost_withdrawnAuthor_masksName() {
         long postId = insertPost(withdrawnMemberId, "탈퇴 회원 글");
 
-        PostDetailView post = communityService.getVisiblePost(postId, null);
+        PostDetailView post = communityPostService.getVisiblePost(postId, null);
 
         assertThat(post.authorName()).isEqualTo("탈퇴한 회원");
         assertThat(post.authorWithdrawn()).isTrue();

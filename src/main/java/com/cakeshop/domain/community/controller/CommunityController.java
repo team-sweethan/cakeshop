@@ -11,7 +11,7 @@ import com.cakeshop.domain.community.error.CommunityErrorCode;
 import com.cakeshop.domain.community.service.CommunityCommentService;
 import com.cakeshop.domain.community.service.CommunityNoticeService;
 import com.cakeshop.domain.community.service.CommunityReactionService;
-import com.cakeshop.domain.community.service.CommunityService;
+import com.cakeshop.domain.community.service.CommunityPostService;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.common.paging.PageNavigation;
 import com.cakeshop.global.common.paging.PageRequest;
@@ -47,7 +47,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @RequiredArgsConstructor
 public class CommunityController {
 
-    private final CommunityService communityService;
+    private final CommunityPostService communityPostService;
     private final CommunityCommentService communityCommentService;
     private final CommunityNoticeService communityNoticeService;
     private final CommunityReactionService communityReactionService;
@@ -68,14 +68,14 @@ public class CommunityController {
         );
 
         PageResult<PostListView> pageResult =
-                communityService.getPosts(selectedCategoryId, selectedSort, pageRequest);
+                communityPostService.getPosts(selectedCategoryId, selectedSort, pageRequest);
 
         model.addAttribute("pageResult", pageResult);
         model.addAttribute(
                 "pageNavigation",
                 PageNavigation.of(pageResult.getPage(), pageResult.getTotalPages())
         );
-        model.addAttribute("categories", communityService.getActiveCategories());
+        model.addAttribute("categories", communityPostService.getActiveCategories());
         model.addAttribute("selectedCategoryId", selectedCategoryId);
         model.addAttribute("selectedSort", selectedSort);
         model.addAttribute("sortOptions", PostSort.values());
@@ -86,7 +86,7 @@ public class CommunityController {
         );
         model.addAttribute(
                 "popularSection",
-                communityService.getPopularSection(selectedCategoryId, pageRequest)
+                communityPostService.getPopularSection(selectedCategoryId, pageRequest)
         );
 
         return "customer/community/list";
@@ -105,8 +105,8 @@ public class CommunityController {
         Long viewerId = memberDetails == null ? null : memberDetails.getMemberId();
 
         PostDetailView post = comments == null
-                ? communityService.getPostDetail(postId, viewerId, viewerKeyOf(viewerId, request))
-                : communityService.getVisiblePost(postId, viewerId);
+                ? communityPostService.getPostDetail(postId, viewerId, viewerKeyOf(viewerId, request))
+                : communityPostService.getVisiblePost(postId, viewerId);
 
         return prepareDetail(model, post, viewerId, comments);
     }
@@ -131,7 +131,7 @@ public class CommunityController {
     ) {
         long memberId = memberDetails.getMemberId();
 
-        PostDetailView post = communityService.getCommentablePost(postId, memberId);
+        PostDetailView post = communityPostService.getCommentablePost(postId, memberId);
 
         if (bindingResult.hasErrors()) {
             return prepareDetail(model, post, memberId, comments);
@@ -266,7 +266,7 @@ public class CommunityController {
         long postId;
 
         try {
-            postId = communityService.createPost(form, memberDetails.getMemberId());
+            postId = communityPostService.createPost(form, memberDetails.getMemberId());
         } catch (BusinessException e) {
             return rejectCategoryOrRethrow(e, bindingResult, model, null);
         }
@@ -282,7 +282,7 @@ public class CommunityController {
             Model model
     ) {
         PostDetailView post =
-                communityService.getEditablePost(postId, memberDetails.getMemberId());
+                communityPostService.getEditablePost(postId, memberDetails.getMemberId());
 
         form.setCategoryId(post.categoryId());
         form.setTitle(post.title());
@@ -299,14 +299,14 @@ public class CommunityController {
             @AuthenticationPrincipal MemberDetails memberDetails,
             Model model
     ) {
-        communityService.getEditablePost(postId, memberDetails.getMemberId());
+        communityPostService.getEditablePost(postId, memberDetails.getMemberId());
 
         if (bindingResult.hasErrors()) {
             return prepareForm(model, postId);
         }
 
         try {
-            communityService.updatePost(postId, form, memberDetails.getMemberId());
+            communityPostService.updatePost(postId, form, memberDetails.getMemberId());
         } catch (BusinessException e) {
             return rejectCategoryOrRethrow(e, bindingResult, model, postId);
         }
@@ -320,7 +320,7 @@ public class CommunityController {
             @AuthenticationPrincipal MemberDetails memberDetails,
             RedirectAttributes redirectAttributes
     ) {
-        communityService.deletePost(postId, memberDetails.getMemberId());
+        communityPostService.deletePost(postId, memberDetails.getMemberId());
 
         redirectAttributes.addFlashAttribute("successMessage", "게시글을 삭제했습니다.");
 
@@ -340,7 +340,7 @@ public class CommunityController {
     }
 
     private String prepareForm(Model model, Long postId) {
-        model.addAttribute("categories", communityService.getActiveCategories());
+        model.addAttribute("categories", communityPostService.getActiveCategories());
         model.addAttribute("editingPostId", postId);
 
         return "customer/community/form";

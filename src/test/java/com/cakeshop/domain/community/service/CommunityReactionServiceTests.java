@@ -66,8 +66,8 @@ class CommunityReactionServiceTests {
      * 게시글 Service를 목으로 갈지 않는다. 신고에서 볼 수 없는 글을 거르는 것은 그쪽이고,
      * 목으로 두면 아래 비노출 글 표가 아무것도 검증하지 않게 된다.
      */
-    private CommunityService postService(CommunityMemberViewLoader memberViewLoader) {
-        return new CommunityService(
+    private CommunityPostService postService(CommunityMemberViewLoader memberViewLoader) {
+        return new CommunityPostService(
                 communityMapper,
                 memberViewLoader,
                 new CommunityPostAccessPolicy(),

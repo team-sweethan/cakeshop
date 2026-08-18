@@ -24,7 +24,7 @@ import org.springframework.stereotype.Component;
  * 이 셋이 함께 늘면 두 벌이 되고, 두 벌이 되는 순간 갈린다.
  *
  * <p><b>자리별 노출 조건은 여기 없다.</b> 목록의 "1쪽 + 필터 없음"은 그 화면의 규칙이라
- * {@code CommunityService}가, 메인은 {@code CommunityHomeQueryService}가 각자 갖는다.
+ * {@code CommunityPostService}가, 메인은 {@code CommunityHomeQueryService}가 각자 갖는다.
  */
 @Component
 @RequiredArgsConstructor

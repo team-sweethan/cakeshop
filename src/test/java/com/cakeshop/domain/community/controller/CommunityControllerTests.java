@@ -36,7 +36,7 @@ import com.cakeshop.domain.community.error.CommunityErrorCode;
 import com.cakeshop.domain.community.service.CommunityNoticeService;
 import com.cakeshop.domain.community.service.CommunityReactionService;
 import com.cakeshop.domain.community.service.CommunityCommentService;
-import com.cakeshop.domain.community.service.CommunityService;
+import com.cakeshop.domain.community.service.CommunityPostService;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
 import com.cakeshop.global.common.paging.PageRequest;
@@ -60,7 +60,7 @@ class CommunityControllerTests {
 
     private static final LocalDateTime CREATED_AT = LocalDateTime.of(2026, 3, 1, 10, 0);
 
-    private CommunityService communityService;
+    private CommunityPostService communityPostService;
     private CommunityCommentService communityCommentService;
     private CommunityNoticeService communityNoticeService;
     private CommunityReactionService communityReactionService;
@@ -68,7 +68,7 @@ class CommunityControllerTests {
 
     @BeforeEach
     void setUp() {
-        communityService = mock(CommunityService.class);
+        communityPostService = mock(CommunityPostService.class);
         communityCommentService = mock(CommunityCommentService.class);
         communityNoticeService = mock(CommunityNoticeService.class);
         communityReactionService = mock(CommunityReactionService.class);
@@ -76,9 +76,9 @@ class CommunityControllerTests {
         when(communityNoticeService.getListSection(any(), any()))
                 .thenReturn(NoticeSectionView.empty());
 
-        when(communityService.getPosts(any(), any(), any()))
+        when(communityPostService.getPosts(any(), any(), any()))
                 .thenReturn(new PageResult<>(List.of(), new PageRequest(1, 20), 0));
-        when(communityService.getActiveCategories())
+        when(communityPostService.getActiveCategories())
                 .thenReturn(List.of(new PostCategoryView(1L, "QNA", "질문")));
         when(communityCommentService.getComments(anyLong(), any()))
                 .thenReturn(new CommentSectionView(
@@ -87,7 +87,7 @@ class CommunityControllerTests {
         mockMvc = MockMvcBuilders
                 .standaloneSetup(
                         new CommunityController(
-                                communityService,
+                                communityPostService,
                                 communityCommentService,
                                 communityNoticeService,
                                 communityReactionService))
@@ -150,7 +150,7 @@ class CommunityControllerTests {
                 .andExpect(model().attribute("selectedSort", expectedSort))
                 .andExpect(model().attributeExists("sortOptions"));
 
-        verify(communityService).getPosts(eq(expectedCategoryId), eq(expectedSort), any());
+        verify(communityPostService).getPosts(eq(expectedCategoryId), eq(expectedSort), any());
         assertThat(capturedPageRequest().getPage()).isEqualTo(expectedPage);
     }
 
@@ -177,14 +177,14 @@ class CommunityControllerTests {
 
     @Test
     void detail_anonymousViewer_passesNullMemberId() throws Exception {
-        when(communityService.getPostDetail(eq(15L), isNull(), anyString())).thenReturn(publishedPost());
+        when(communityPostService.getPostDetail(eq(15L), isNull(), anyString())).thenReturn(publishedPost());
 
         mockMvc.perform(get("/community/15"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("customer/community/detail"))
                 .andExpect(model().attributeExists("post"));
 
-        verify(communityService).getPostDetail(eq(15L), isNull(), anyString());
+        verify(communityPostService).getPostDetail(eq(15L), isNull(), anyString());
     }
 
     /** 인증 회원 ID를 상세 조회에 전달한다. */
@@ -196,44 +196,44 @@ class CommunityControllerTests {
                 new UsernamePasswordAuthenticationToken(
                         principal, null, principal.getAuthorities()));
 
-        when(communityService.getPostDetail(eq(15L), eq(7L), anyString())).thenReturn(publishedPost());
+        when(communityPostService.getPostDetail(eq(15L), eq(7L), anyString())).thenReturn(publishedPost());
 
         mockMvc.perform(get("/community/15"))
                 .andExpect(status().isOk());
 
-        verify(communityService).getPostDetail(eq(15L), eq(7L), anyString());
+        verify(communityPostService).getPostDetail(eq(15L), eq(7L), anyString());
     }
 
     /** 댓글 더 보기는 조회수를 올리지 않는다. */
     @Test
     void detail_loadingMoreComments_doesNotCountAsView() throws Exception {
-        when(communityService.getVisiblePost(eq(15L), isNull())).thenReturn(publishedPost());
+        when(communityPostService.getVisiblePost(eq(15L), isNull())).thenReturn(publishedPost());
 
         mockMvc.perform(get("/community/15").param("comments", "40"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("customer/community/detail"));
 
-        verify(communityService).getVisiblePost(eq(15L), isNull());
-        verify(communityService, never()).getPostDetail(anyLong(), any(), anyString());
+        verify(communityPostService).getVisiblePost(eq(15L), isNull());
+        verify(communityPostService, never()).getPostDetail(anyLong(), any(), anyString());
     }
 
     /** 직접 상세 진입은 조회수를 반영한다. */
     @Test
     void detail_directEntry_stillCountsAsView() throws Exception {
-        when(communityService.getPostDetail(eq(15L), isNull(), anyString()))
+        when(communityPostService.getPostDetail(eq(15L), isNull(), anyString()))
                 .thenReturn(publishedPost());
 
         mockMvc.perform(get("/community/15")).andExpect(status().isOk());
 
-        verify(communityService).getPostDetail(eq(15L), isNull(), anyString());
-        verify(communityService, never()).getVisiblePost(anyLong(), any());
+        verify(communityPostService).getPostDetail(eq(15L), isNull(), anyString());
+        verify(communityPostService, never()).getVisiblePost(anyLong(), any());
     }
 
     /** 조회자 키는 인증 정보로 만든다. */
     @Test
     void detail_viewerKey_comesFromAuthenticationNotFromRequest() throws Exception {
         authenticateAs(7L);
-        when(communityService.getPostDetail(eq(15L), eq(7L), anyString()))
+        when(communityPostService.getPostDetail(eq(15L), eq(7L), anyString()))
                 .thenReturn(publishedPost());
 
         mockMvc.perform(get("/community/15")
@@ -246,7 +246,7 @@ class CommunityControllerTests {
 
     @Test
     void detail_anonymousViewer_usesSessionAsViewerKey() throws Exception {
-        when(communityService.getPostDetail(eq(15L), isNull(), anyString()))
+        when(communityPostService.getPostDetail(eq(15L), isNull(), anyString()))
                 .thenReturn(publishedPost());
 
         mockMvc.perform(get("/community/15"))
@@ -267,7 +267,7 @@ class CommunityControllerTests {
     @Test
     void create_validForm_redirectsToCreatedPost() throws Exception {
         authenticateAs(7L);
-        when(communityService.createPost(any(), eq(7L))).thenReturn(42L);
+        when(communityPostService.createPost(any(), eq(7L))).thenReturn(42L);
 
         mockMvc.perform(post("/community")
                         .param("categoryId", "1")
@@ -277,7 +277,7 @@ class CommunityControllerTests {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/community/42"));
 
-        verify(communityService).createPost(any(), eq(7L));
+        verify(communityPostService).createPost(any(), eq(7L));
     }
 
     /** 검증 실패 시 작성 폼을 다시 보여 준다. */
@@ -294,13 +294,13 @@ class CommunityControllerTests {
                 .andExpect(model().attributeHasFieldErrors("form", "title"))
                 .andExpect(model().attributeExists("categories"));
 
-        verify(communityService, never()).createPost(any(), anyLong());
+        verify(communityPostService, never()).createPost(any(), anyLong());
     }
 
     @Test
     void editForm_bindsExistingValues() throws Exception {
         authenticateAs(7L);
-        when(communityService.getEditablePost(15L, 7L)).thenReturn(publishedPost());
+        when(communityPostService.getEditablePost(15L, 7L)).thenReturn(publishedPost());
 
         mockMvc.perform(get("/community/15/edit"))
                 .andExpect(status().isOk())
@@ -321,7 +321,7 @@ class CommunityControllerTests {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/community/15"));
 
-        verify(communityService).updatePost(eq(15L), any(), eq(7L));
+        verify(communityPostService).updatePost(eq(15L), any(), eq(7L));
     }
 
     @Test
@@ -338,7 +338,7 @@ class CommunityControllerTests {
                 // 검증 실패 후에도 수정 대상을 유지한다.
                 .andExpect(model().attribute("editingPostId", 15L));
 
-        verify(communityService, never()).updatePost(anyLong(), any(), anyLong());
+        verify(communityPostService, never()).updatePost(anyLong(), any(), anyLong());
     }
 
     @Test
@@ -351,7 +351,7 @@ class CommunityControllerTests {
                 // 삭제 성공 메시지를 전달한다.
                 .andExpect(flash().attribute("successMessage", "게시글을 삭제했습니다."));
 
-        verify(communityService).deletePost(15L, 7L);
+        verify(communityPostService).deletePost(15L, 7L);
     }
 
     /** 수정 권한을 입력값보다 먼저 확인한다. */
@@ -359,7 +359,7 @@ class CommunityControllerTests {
     void edit_invalidForm_checksPermissionBeforeValidation() throws Exception {
         authenticateAs(7L);
         doThrow(new BusinessException(CommunityErrorCode.POST_NOT_FOUND))
-                .when(communityService).getEditablePost(15L, 7L);
+                .when(communityPostService).getEditablePost(15L, 7L);
 
         assertThatThrownBy(() -> mockMvc.perform(post("/community/15/edit")
                         .param("categoryId", "1")
@@ -367,14 +367,14 @@ class CommunityControllerTests {
                         .param("content", "   ")))
                 .hasRootCauseInstanceOf(BusinessException.class);
 
-        verify(communityService, never()).updatePost(anyLong(), any(), anyLong());
+        verify(communityPostService, never()).updatePost(anyLong(), any(), anyLong());
     }
 
     /** 비활성화된 카테고리는 폼 오류로 처리한다. */
     @Test
     void create_categoryDeactivatedWhileWriting_returnsFormWithFieldError() throws Exception {
         authenticateAs(7L);
-        when(communityService.createPost(any(), eq(7L)))
+        when(communityPostService.createPost(any(), eq(7L)))
                 .thenThrow(new BusinessException(CommunityErrorCode.CATEGORY_NOT_FOUND));
 
         mockMvc.perform(post("/community")
@@ -394,7 +394,7 @@ class CommunityControllerTests {
     void edit_categoryDeactivatedWhileWriting_returnsFormKeepingEditTarget() throws Exception {
         authenticateAs(7L);
         doThrow(new BusinessException(CommunityErrorCode.CATEGORY_NOT_FOUND))
-                .when(communityService).updatePost(eq(15L), any(), eq(7L));
+                .when(communityPostService).updatePost(eq(15L), any(), eq(7L));
 
         mockMvc.perform(post("/community/15/edit")
                         .param("categoryId", "1")
@@ -409,7 +409,7 @@ class CommunityControllerTests {
     @Test
     void create_nonCategoryBusinessError_isNotSwallowedIntoForm() throws Exception {
         authenticateAs(7L);
-        when(communityService.createPost(any(), eq(7L)))
+        when(communityPostService.createPost(any(), eq(7L)))
                 .thenThrow(new BusinessException(CommunityErrorCode.POST_NOT_FOUND));
 
         assertThatThrownBy(() -> mockMvc.perform(post("/community")
@@ -421,7 +421,7 @@ class CommunityControllerTests {
 
     @Test
     void detail_bindsCommentSectionAndForm() throws Exception {
-        when(communityService.getPostDetail(eq(15L), isNull(), anyString())).thenReturn(publishedPost());
+        when(communityPostService.getPostDetail(eq(15L), isNull(), anyString())).thenReturn(publishedPost());
 
         mockMvc.perform(get("/community/15"))
                 .andExpect(status().isOk())
@@ -434,7 +434,7 @@ class CommunityControllerTests {
     @Test
     void detail_authenticatedViewer_canComment() throws Exception {
         authenticateAs(7L);
-        when(communityService.getPostDetail(eq(15L), eq(7L), anyString())).thenReturn(publishedPost());
+        when(communityPostService.getPostDetail(eq(15L), eq(7L), anyString())).thenReturn(publishedPost());
 
         mockMvc.perform(get("/community/15"))
                 .andExpect(status().isOk())
@@ -445,7 +445,7 @@ class CommunityControllerTests {
     @Test
     void detail_blockedPost_author_cannotComment() throws Exception {
         authenticateAs(7L);
-        when(communityService.getPostDetail(eq(15L), eq(7L), anyString())).thenReturn(blockedPost());
+        when(communityPostService.getPostDetail(eq(15L), eq(7L), anyString())).thenReturn(blockedPost());
 
         mockMvc.perform(get("/community/15"))
                 .andExpect(status().isOk())
@@ -456,7 +456,7 @@ class CommunityControllerTests {
     @Test
     void detail_commentsParameter_isPassedToService() throws Exception {
         // 댓글 더 보기 경로를 사용한다.
-        when(communityService.getVisiblePost(eq(15L), isNull())).thenReturn(publishedPost());
+        when(communityPostService.getVisiblePost(eq(15L), isNull())).thenReturn(publishedPost());
 
         mockMvc.perform(get("/community/15").param("comments", "40"))
                 .andExpect(status().isOk());
@@ -468,7 +468,7 @@ class CommunityControllerTests {
     @Test
     void detail_invalidCommentsParameter_fallsBackToDefault() throws Exception {
         // 잘못된 값도 댓글 더 보기로 처리한다.
-        when(communityService.getVisiblePost(eq(15L), isNull())).thenReturn(publishedPost());
+        when(communityPostService.getVisiblePost(eq(15L), isNull())).thenReturn(publishedPost());
 
         mockMvc.perform(get("/community/15").param("comments", "전체"))
                 .andExpect(status().isOk());
@@ -479,7 +479,7 @@ class CommunityControllerTests {
     @Test
     void addComment_validForm_redirectsToDetail() throws Exception {
         authenticateAs(7L);
-        when(communityService.getCommentablePost(15L, 7L)).thenReturn(publishedPost());
+        when(communityPostService.getCommentablePost(15L, 7L)).thenReturn(publishedPost());
 
         mockMvc.perform(post("/community/15/comments")
                         .param("content", "댓글 본문")
@@ -494,7 +494,7 @@ class CommunityControllerTests {
     @Test
     void addComment_blankContent_redrawsDetailWithoutCountingAView() throws Exception {
         authenticateAs(7L);
-        when(communityService.getCommentablePost(15L, 7L)).thenReturn(publishedPost());
+        when(communityPostService.getCommentablePost(15L, 7L)).thenReturn(publishedPost());
 
         mockMvc.perform(post("/community/15/comments").param("content", "   "))
                 .andExpect(status().isOk())
@@ -503,14 +503,14 @@ class CommunityControllerTests {
                 .andExpect(model().attributeExists("commentSection"));
 
         verify(communityCommentService, never()).addComment(anyLong(), any(), anyLong());
-        verify(communityService, never()).getPostDetail(anyLong(), any(), anyString());
+        verify(communityPostService, never()).getPostDetail(anyLong(), any(), anyString());
     }
 
     /** 댓글 작성 가능 상태를 입력값보다 먼저 확인한다. */
     @Test
     void addComment_invalidForm_checksPostStateBeforeValidation() throws Exception {
         authenticateAs(7L);
-        when(communityService.getCommentablePost(15L, 7L))
+        when(communityPostService.getCommentablePost(15L, 7L))
                 .thenThrow(new BusinessException(CommunityErrorCode.POST_NOT_FOUND));
 
         assertThatThrownBy(() -> mockMvc.perform(
@@ -524,7 +524,7 @@ class CommunityControllerTests {
     @Test
     void addComment_invalidForm_keepsExpandedCommentLimit() throws Exception {
         authenticateAs(7L);
-        when(communityService.getCommentablePost(15L, 7L)).thenReturn(publishedPost());
+        when(communityPostService.getCommentablePost(15L, 7L)).thenReturn(publishedPost());
 
         mockMvc.perform(post("/community/15/comments")
                         .param("content", "   ")
@@ -591,7 +591,7 @@ class CommunityControllerTests {
     /** 비로그인은 좋아요 여부를 조회하지 않는다. */
     @Test
     void detail_anonymousViewer_doesNotAskWhetherLiked() throws Exception {
-        when(communityService.getPostDetail(eq(15L), isNull(), anyString()))
+        when(communityPostService.getPostDetail(eq(15L), isNull(), anyString()))
                 .thenReturn(publishedPost());
 
         mockMvc.perform(get("/community/15")).andExpect(status().isOk());
@@ -602,7 +602,7 @@ class CommunityControllerTests {
     @Test
     void detail_authenticatedViewer_asksWhetherLiked() throws Exception {
         authenticateAs(7L);
-        when(communityService.getPostDetail(eq(15L), eq(7L), anyString()))
+        when(communityPostService.getPostDetail(eq(15L), eq(7L), anyString()))
                 .thenReturn(publishedPost());
         when(communityReactionService.isLikedBy(15L, 7L)).thenReturn(true);
 
@@ -616,7 +616,7 @@ class CommunityControllerTests {
     @Test
     void detail_blockedPostAuthor_cannotLike() throws Exception {
         authenticateAs(7L);
-        when(communityService.getPostDetail(eq(15L), eq(7L), anyString()))
+        when(communityPostService.getPostDetail(eq(15L), eq(7L), anyString()))
                 .thenReturn(blockedPost());
 
         mockMvc.perform(get("/community/15"))
@@ -662,14 +662,14 @@ class CommunityControllerTests {
 
     private String capturedViewerKey() {
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-        verify(communityService).getPostDetail(anyLong(), any(), captor.capture());
+        verify(communityPostService).getPostDetail(anyLong(), any(), captor.capture());
 
         return captor.getValue();
     }
 
     private PageRequest capturedPageRequest() {
         ArgumentCaptor<PageRequest> captor = ArgumentCaptor.forClass(PageRequest.class);
-        verify(communityService).getPosts(any(), any(), captor.capture());
+        verify(communityPostService).getPosts(any(), any(), captor.capture());
         return captor.getValue();
     }
 
@@ -701,7 +701,7 @@ class CommunityControllerTests {
                 .andExpect(model().attributeExists("commentSection"));
 
         verify(communityReactionService, never()).reportPost(anyLong(), any(), anyLong());
-        verify(communityService, never()).getPostDetail(anyLong(), any(), anyString());
+        verify(communityPostService, never()).getPostDetail(anyLong(), any(), anyString());
     }
 
     /** 신고 가능 상태를 입력값보다 먼저 확인한다. */

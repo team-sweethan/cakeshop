@@ -33,7 +33,7 @@ public class CommunityReactionService {
      * 신고는 글을 읽어야 성립하고, 노출 판단은 게시글 쪽이 갖는다. 여기서 다시 읽으면
      * 규칙이 두 벌이 된다. 좋아요는 잠금이 필요해 이 경로를 쓰지 않는다(아래 참조).
      */
-    private final CommunityService communityService;
+    private final CommunityPostService communityPostService;
 
     @Transactional
     public void addLike(long postId, long memberId) {
@@ -78,7 +78,7 @@ public class CommunityReactionService {
     }
 
     private PostDetailView requireReportablePost(long postId, long memberId) {
-        PostDetailView post = communityService.getVisiblePost(postId, memberId);
+        PostDetailView post = communityPostService.getVisiblePost(postId, memberId);
 
         if (communityPostAccessPolicy.isAuthor(post.memberId(), memberId)) {
             throw new BusinessException(CommunityErrorCode.OWN_POST_REPORT);
