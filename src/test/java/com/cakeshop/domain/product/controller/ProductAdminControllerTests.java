@@ -251,6 +251,41 @@ class ProductAdminControllerTests {
     }
 
     @Test
+    void startSale_generalProductPolicyError_redirectsWithAlert()
+            throws Exception {
+        ProductAdminService productAdminService =
+                mock(ProductAdminService.class);
+        doThrow(new BusinessException(
+                ProductErrorCode
+                        .GENERAL_PRODUCT_REQUIRED_OPTION_NOT_ALLOWED
+        )).when(productAdminService).changeProductStatus(
+                1L,
+                ProductStatus.ACTIVE
+        );
+
+        MockMvc mockMvc = MockMvcBuilders
+                .standaloneSetup(
+                        new ProductAdminController(
+                                productAdminService
+                        )
+                )
+                .build();
+
+        mockMvc.perform(
+                        post("/admin/products/{productId}/status", 1L)
+                                .param("status", "ACTIVE")
+                )
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(
+                        "/admin/products"
+                ))
+                .andExpect(flash().attribute(
+                        "errorMessage",
+                        "일반 상품에는 필수 옵션을 설정할 수 없습니다."
+                ));
+    }
+
+    @Test
     void createFormReturnsProductFormPage()
             throws Exception {
         ProductAdminService productAdminService =
@@ -656,6 +691,56 @@ class ProductAdminControllerTests {
 
         verify(productAdminService, never())
                 .updateProduct(anyLong(), any());
+    }
+
+    @Test
+    void updateProduct_generalProductPolicyError_returnsEditPage()
+            throws Exception {
+        ProductAdminService productAdminService =
+                mock(ProductAdminService.class);
+        doThrow(new BusinessException(
+                ProductErrorCode
+                        .GENERAL_PRODUCT_REQUIRED_OPTION_NOT_ALLOWED
+        )).when(productAdminService).updateProduct(
+                eq(1L),
+                any(ProductForm.class)
+        );
+
+        MockMvc mockMvc = MockMvcBuilders
+                .standaloneSetup(
+                        new ProductAdminController(
+                                productAdminService
+                        )
+                )
+                .build();
+
+        mockMvc.perform(
+                        post("/admin/products/{productId}", 1L)
+                                .param("categoryId", "1")
+                                .param("name", "일반 케이크")
+                                .param("basePrice", "35000")
+                                .param("stockQuantity", "10")
+                                .param("originalStockQuantity", "10")
+                                .param("productType", "GENERAL")
+                                .param("preparationDays", "0")
+                )
+                .andExpect(status().isOk())
+                .andExpect(view().name(
+                        "admin/product/form"
+                ))
+                .andExpect(model().attributeHasErrors(
+                        "productForm"
+                ))
+                .andExpect(model().attribute(
+                        "productId",
+                        1L
+                ))
+                .andExpect(model().attributeExists(
+                        "categories",
+                        "productTypes",
+                        "productImages",
+                        "imageUploadForm"
+                ));
     }
 
     private ProductForm validProductForm() {

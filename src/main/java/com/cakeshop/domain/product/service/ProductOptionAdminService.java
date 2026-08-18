@@ -20,6 +20,7 @@ import com.cakeshop.domain.product.entity.ProductOption;
 import com.cakeshop.domain.product.entity.ProductOptionGroup;
 import com.cakeshop.domain.product.entity.ProductOptionStatus;
 import com.cakeshop.domain.product.entity.ProductStatus;
+import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.error.ProductErrorCode;
 import com.cakeshop.domain.product.mapper.ProductMapper;
 import com.cakeshop.global.error.BusinessException;
@@ -56,6 +57,7 @@ public class ProductOptionAdminService {
         return new ProductOptionManagementView(
                 productId,
                 product.getName(),
+                product.getProductType(),
                 groupRows(rows)
         );
     }
@@ -486,6 +488,11 @@ public class ProductOptionAdminService {
             ProductOptionGroupForm form,
             List<ProductOptionAdminRow> rows
     ) {
+        validateGeneralProductRequiredOption(
+                product,
+                form
+        );
+
         if (product.getStatus() != ProductStatus.ACTIVE) {
             return;
         }
@@ -515,11 +522,29 @@ public class ProductOptionAdminService {
             Product product,
             ProductOptionGroupForm form
     ) {
+        validateGeneralProductRequiredOption(
+                product,
+                form
+        );
+
         if (product.getStatus() == ProductStatus.ACTIVE
                 && form.isRequired()
                 && form.getStatus()
                 == ProductOptionStatus.ACTIVE) {
             throwRequiredOptionGroupEmpty();
+        }
+    }
+
+    private void validateGeneralProductRequiredOption(
+            Product product,
+            ProductOptionGroupForm form
+    ) {
+        if (product.getProductType() == ProductType.GENERAL
+                && form.isRequired()) {
+            throw new BusinessException(
+                    ProductErrorCode
+                            .GENERAL_PRODUCT_REQUIRED_OPTION_NOT_ALLOWED
+            );
         }
     }
 
