@@ -18,8 +18,19 @@
 
     <p style="white-space:pre-wrap" th:text="${review.content}">후기 본문</p>
 
+    <div th:replace="~{fragments/customer/product-review :: images(${review.images})}"></div>
+
     <div th:replace="~{fragments/customer/product-review :: reply(${review.reply})}"></div>
   </article>
+</div>
+
+<div th:fragment="images(images)" th:remove="tag">
+  <div class="grid grid--3" th:if="${!#lists.isEmpty(images)}">
+    <img class="placeholder-image product-card__image"
+         th:each="image : ${images}"
+         th:src="@{${image.imageUrl}}"
+         alt="후기 첨부 이미지">
+  </div>
 </div>
 
 <!-- B1 미리보기·전체 목록과 B3 가 같은 모양을 쓴다. 갈리면 상세에서 본 답글이 다른 화면에서

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cakeshop.domain.review.mapper.ReviewImageMapper">
+    <!-- review_images 외의 테이블을 JOIN 하지 않는다 (DOMAIN.md 2.7). -->
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO review_images (review_id, image_url, sort_order)
+        VALUES (#{reviewId}, #{imageUrl}, #{sortOrder})
+    </insert>
+
+    <select id="findByReviewIds"
+            resultType="com.cakeshop.domain.review.dto.query.ReviewImageRow">
+
+        SELECT id,
+               review_id AS reviewId,
+               image_url AS imageUrl,
+               sort_order AS sortOrder
+          FROM review_images
+         WHERE review_id IN
+        <foreach collection="reviewIds" item="reviewId" open="(" separator="," close=")">
+            #{reviewId}
+        </foreach>
+         ORDER BY review_id, sort_order, id
+    </select>
+</mapper>

@@ -1,5 +1,8 @@
 package com.cakeshop.domain.review.dto.form;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -8,6 +11,8 @@ import jakarta.validation.constraints.Size;
 
 import lombok.Getter;
 import lombok.Setter;
+
+import org.springframework.web.multipart.MultipartFile;
 
 @Getter
 @Setter
@@ -41,6 +46,9 @@ public class ReviewWriteForm {
     @NotBlank(message = "후기 내용을 입력해 주세요.")
     @Size(min = 10, max = 2000, message = "후기는 10자 이상 2000자 이하여야 합니다.")
     private String content;
+
+    // 장수·파일 형식·용량은 파일 내용과 저장 순서를 함께 보는 Service가 검증한다.
+    private List<MultipartFile> images = new ArrayList<>();
 
     public void setContent(String content) {
         this.content = content == null ? null : content.strip();

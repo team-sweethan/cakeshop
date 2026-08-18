@@ -122,7 +122,9 @@ class ReviewScreenRenderingTests {
                 .andExpect(content().string(containsString("id=\"overall-rating\"")))
                 .andExpect(content().string(containsString("id=\"service-rating\"")))
                 .andExpect(content().string(not(containsString("포장"))))
-                .andExpect(content().string(not(containsString("이미지 첨부"))))
+                .andExpect(content().string(containsString("enctype=\"multipart/form-data\"")))
+                .andExpect(content().string(containsString("id=\"review-images\"")))
+                .andExpect(content().string(containsString("후기당 3장까지")))
                 .andExpect(content().string(not(containsString("삭제하기"))))
                 .andExpect(content().string(not(containsString("order_items"))));
     }
@@ -223,6 +225,27 @@ class ReviewScreenRenderingTests {
     }
 
     @Test
+    void productReviewPreviewAndFullList_renderAttachedImagesInOrder() throws Exception {
+        insertReviewWithContent("이미지가 있는 후기입니다.", "PUBLISHED", WRITTEN_AT);
+        insertReviewImageOn("이미지가 있는 후기입니다.", "/uploads/review/second.jpg", 1);
+        insertReviewImageOn("이미지가 있는 후기입니다.", "/uploads/review/first.jpg", 0);
+
+        for (String path : new String[]{
+                "/products/" + productId,
+                "/products/" + productId + "/reviews"}) {
+
+            String body = mockMvc.perform(get(path))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+
+            assertThat(body).contains("/uploads/review/first.jpg");
+            assertThat(body).contains("/uploads/review/second.jpg");
+            assertThat(body.indexOf("/uploads/review/first.jpg"))
+                    .isLessThan(body.indexOf("/uploads/review/second.jpg"));
+        }
+    }
+
+    @Test
     void productReviews_repliedReview_showsTheOwnerReplyOnlyUnderThatReview() throws Exception {
         insertReviewWithContent("답글이 달릴 후기입니다.", "PUBLISHED", WRITTEN_AT);
         insertReviewWithContent("답글이 없는 후기입니다.", "PUBLISHED", WRITTEN_AT.plusDays(1));
@@ -318,6 +341,17 @@ class ReviewScreenRenderingTests {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("사장님 답글")))
                 .andExpect(content().string(containsString("다음에도 찾아 주세요.")));
+    }
+
+    @Test
+    void myReviews_attachedImage_isRendered() throws Exception {
+        insertReviewWithContent("이미지를 올린 내 후기입니다.", "PUBLISHED", WRITTEN_AT);
+        insertReviewImageOn(
+                "이미지를 올린 내 후기입니다.", "/uploads/review/my-review.jpg", 0);
+
+        mockMvc.perform(get("/mypage/reviews").with(authentication(login())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("/uploads/review/my-review.jpg")));
     }
 
     @Test
@@ -506,6 +540,17 @@ class ReviewScreenRenderingTests {
                 reviewId,
                 insertAdmin(),
                 replyContent);
+    }
+
+    private void insertReviewImageOn(String reviewContent, String imageUrl, int sortOrder) {
+        long reviewId = jdbcTemplate.queryForObject(
+                "SELECT id FROM reviews WHERE content = ?", Long.class, reviewContent);
+
+        jdbcTemplate.update(
+                "INSERT INTO review_images (review_id, image_url, sort_order) VALUES (?, ?, ?)",
+                reviewId,
+                imageUrl,
+                sortOrder);
     }
 
     private long insertAdmin() {

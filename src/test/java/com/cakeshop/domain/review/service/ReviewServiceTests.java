@@ -14,6 +14,7 @@ import static org.mockito.Mockito.when;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -21,6 +22,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.cakeshop.domain.member.dto.view.MemberReviewView;
 import com.cakeshop.domain.member.service.MemberReviewQueryService;
@@ -61,6 +64,7 @@ class ReviewServiceTests {
     private ProductReviewCommandService productReviewCommandService;
     private ProductQueryService productQueryService;
     private MemberReviewQueryService memberReviewQueryService;
+    private ReviewImageService reviewImageService;
     private ReviewService reviewService;
 
     @BeforeEach
@@ -72,6 +76,7 @@ class ReviewServiceTests {
         productReviewCommandService = mock(ProductReviewCommandService.class);
         productQueryService = mock(ProductQueryService.class);
         memberReviewQueryService = mock(MemberReviewQueryService.class);
+        reviewImageService = mock(ReviewImageService.class);
         reviewService = new ReviewService(
                 reviewMapper,
                 reviewReplyMapper,
@@ -79,7 +84,10 @@ class ReviewServiceTests {
                 productReviewCommandService,
                 productQueryService,
                 memberReviewQueryService,
+                reviewImageService,
                 reviewNotificationService);
+
+        when(reviewImageService.getImagesByReviewIds(any())).thenReturn(Map.of());
     }
 
     @Test
@@ -313,6 +321,23 @@ class ReviewServiceTests {
         order.verify(reviewMapper).aggregateForUpdate(PRODUCT_ID);
         order.verify(productReviewCommandService)
                 .applyReviewAggregate(PRODUCT_ID, new BigDecimal("4.50"), 2L);
+    }
+
+    @Test
+    void write_imagesAreAttachedToTheGeneratedReviewBeforeAggregation() {
+        givenWritableTarget();
+        List<MultipartFile> uploads = List.of(new MockMultipartFile(
+                "images", "review.jpg", "image/jpeg",
+                new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF}));
+        ReviewWriteForm form = form();
+        form.setImages(uploads);
+
+        reviewService.write(form, MEMBER_ID);
+
+        InOrder order = inOrder(reviewMapper, reviewImageService, productReviewCommandService);
+        order.verify(reviewMapper).insert(any());
+        order.verify(reviewImageService).attach(REVIEW_ID, uploads);
+        order.verify(reviewMapper).aggregateForUpdate(PRODUCT_ID);
     }
 
     @Test

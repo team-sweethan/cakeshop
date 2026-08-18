@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -54,6 +55,7 @@ class ReviewAdminServiceTests {
     private ProductReviewCommandService productReviewCommandService;
     private MemberReviewQueryService memberReviewQueryService;
     private OrderReviewQueryService orderReviewQueryService;
+    private ReviewImageService reviewImageService;
     private ReviewAdminService reviewAdminService;
 
     @BeforeEach
@@ -66,6 +68,7 @@ class ReviewAdminServiceTests {
         productReviewCommandService = mock(ProductReviewCommandService.class);
         memberReviewQueryService = mock(MemberReviewQueryService.class);
         orderReviewQueryService = mock(OrderReviewQueryService.class);
+        reviewImageService = mock(ReviewImageService.class);
 
         reviewAdminService = new ReviewAdminService(
                 reviewAdminMapper,
@@ -75,10 +78,12 @@ class ReviewAdminServiceTests {
                 reviewNotificationService,
                 productReviewCommandService,
                 memberReviewQueryService,
-                orderReviewQueryService);
+                orderReviewQueryService,
+                reviewImageService);
 
         when(memberReviewQueryService.getMembersByIds(any())).thenReturn(List.of());
         when(orderReviewQueryService.findOrderItemSnapshots(any())).thenReturn(List.of());
+        when(reviewImageService.getImagesByReviewIds(any())).thenReturn(Map.of());
     }
 
     @Test

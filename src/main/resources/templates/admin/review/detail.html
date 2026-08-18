@@ -61,6 +61,17 @@
               <p th:text="${review.content}" style="white-space:pre-wrap">후기 본문</p>
             </div>
           </section>
+
+          <section class="section" th:if="${!#lists.isEmpty(review.images)}">
+            <h2 class="section-title"
+                th:text="'첨부 이미지 ' + ${#lists.size(review.images)}">첨부 이미지 0</h2>
+            <div class="panel grid grid--3">
+              <img class="placeholder-image product-card__image"
+                   th:each="image : ${review.images}"
+                   th:src="@{${image.imageUrl}}"
+                   alt="후기 첨부 이미지">
+            </div>
+          </section>
         </div>
 
         <div class="stack">
