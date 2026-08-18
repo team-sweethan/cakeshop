@@ -201,17 +201,80 @@ class CommunityScreenRenderingTests {
                 .andExpect(content().string(containsString("deleteImageIds")));
     }
 
+    /** 관리자에게 열린 것은 댓글뿐이다. 좋아요·신고는 화면에서도 없다(H50). */
     @Test
-    void communityDetail_adminAccount_rendersWithoutCustomerActions() throws Exception {
+    void communityDetail_adminAccount_rendersCommentFormWithoutLikeAndReport() throws Exception {
         long postId = insertPost(memberId, "관리자 조회용 글", "본문", PostStatus.PUBLISHED);
 
         mockMvc.perform(get("/community/" + postId).with(authentication(admin())))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("관리자 조회용 글")))
+                .andExpect(content().string(containsString("/comments")))
+                .andExpect(content().string(containsString("댓글 작성")))
                 .andExpect(content().string(not(containsString("/likes"))))
                 .andExpect(content().string(not(containsString("/reports"))))
-                .andExpect(content().string(not(containsString("/comments"))))
                 .andExpect(content().string(not(containsString("로그인하면 댓글을 쓸 수 있습니다."))));
+    }
+
+    /** 관리자 댓글은 Security를 통과해 실제로 저장된다(H50). */
+    @Test
+    void communityComment_adminAccount_isAcceptedAndStored() throws Exception {
+        long postId = insertPost(memberId, "질문 글", "본문", PostStatus.PUBLISHED);
+        long adminId = insertAdminMember();
+
+        mockMvc.perform(post("/community/" + postId + "/comments")
+                        .param("content", "관리자 답변입니다.")
+                        .with(csrf())
+                        .with(authentication(authenticationOf(adminId, "ADMIN"))))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/community/" + postId));
+
+        assertThat(commentCountOf(postId)).isEqualTo(1);
+    }
+
+    /** 관리자도 자기 댓글은 지운다 — 작성자 본인 규칙 그대로다(H50). */
+    @Test
+    void communityCommentDelete_adminOwnComment_isAcceptedAndSoftDeleted() throws Exception {
+        long postId = insertPost(memberId, "질문 글", "본문", PostStatus.PUBLISHED);
+        long adminId = insertAdminMember();
+        long commentId =
+                insertComment(postId, adminId, "지울 답변", CommentStatus.PUBLISHED, BASE_TIME);
+
+        mockMvc.perform(post("/community/" + postId + "/comments/" + commentId + "/delete")
+                        .with(csrf())
+                        .with(authentication(authenticationOf(adminId, "ADMIN"))))
+                .andExpect(status().is3xxRedirection());
+
+        assertThat(commentStatusOf(commentId)).isEqualTo(CommentStatus.DELETED.name());
+    }
+
+    /** 열지 않은 경계가 열리지 않았다 — 좋아요는 인기 점수라 관리자에게 닫힌 채다(H50). */
+    @Test
+    void communityLike_adminAccount_isForbiddenAndWritesNothing() throws Exception {
+        long postId = insertPost(memberId, "좋아요 대상 글", "본문", PostStatus.PUBLISHED);
+        long adminId = insertAdminMember();
+
+        mockMvc.perform(post("/community/" + postId + "/likes")
+                        .with(csrf())
+                        .with(authentication(authenticationOf(adminId, "ADMIN"))))
+                .andExpect(status().isForbidden());
+
+        assertThat(likeCountOf(postId)).isZero();
+    }
+
+    /** 신고도 닫힌 채다 — 차단 권한자가 자기에게 보고할 일은 없다(H50). */
+    @Test
+    void communityReport_adminAccount_isForbiddenAndWritesNothing() throws Exception {
+        long postId = insertPost(memberId, "신고 대상 글", "본문", PostStatus.PUBLISHED);
+        long adminId = insertAdminMember();
+
+        mockMvc.perform(post("/community/" + postId + "/reports")
+                        .param("reason", "신고 사유")
+                        .with(csrf())
+                        .with(authentication(authenticationOf(adminId, "ADMIN"))))
+                .andExpect(status().isForbidden());
+
+        assertThat(reportCountOf(postId)).isZero();
     }
 
     @Test
@@ -670,14 +733,23 @@ class CommunityScreenRenderingTests {
     }
 
     private long insertMember(String email, String nickname, String status) {
+        return insertMember(email, nickname, status, "USER");
+    }
+
+    private long insertAdminMember() {
+        return insertMember(
+                "screen-admin-" + System.nanoTime() + "@cakeshop.local", "관리자", "ACTIVE", "ADMIN");
+    }
+
+    private long insertMember(String email, String nickname, String status, String role) {
         jdbcTemplate.update(
                 """
                 INSERT INTO members (
                     email, password, nickname, phone, role, status, name, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, 'USER', ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                email, "encoded-password", nickname, "010-0000-0000", status,
+                email, "encoded-password", nickname, "010-0000-0000", role, status,
                 nickname, BASE_TIME, BASE_TIME);
 
         return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
@@ -714,7 +786,7 @@ class CommunityScreenRenderingTests {
                 postId, reporterId, "광고성 게시물입니다", status, BASE_TIME);
     }
 
-    private void insertComment(
+    private long insertComment(
             long postId,
             long authorId,
             String content,
@@ -729,5 +801,27 @@ class CommunityScreenRenderingTests {
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 postId, authorId, content, status.name(), createdAt, createdAt);
+
+        return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+    }
+
+    private Integer commentCountOf(long postId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM comments WHERE post_id = ?", Integer.class, postId);
+    }
+
+    private String commentStatusOf(long commentId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT status FROM comments WHERE id = ?", String.class, commentId);
+    }
+
+    private Integer likeCountOf(long postId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM post_likes WHERE post_id = ?", Integer.class, postId);
+    }
+
+    private Integer reportCountOf(long postId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM post_reports WHERE post_id = ?", Integer.class, postId);
     }
 }

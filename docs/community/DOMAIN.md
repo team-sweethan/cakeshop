@@ -187,7 +187,11 @@ Cakeshop 커뮤니티는 고객이 케이크 관련 질문과 후기를 공유�
 `SecurityConfig`에 이미 반영되어 있다.
 
 - `GET /community`, `GET /community/{id}` → `permitAll` (비로그인 조회 허용)
-- 그 외 커뮤니티 경로 → `anyRequest().authenticated()`
+- **댓글 작성·자기 댓글 삭제 → `hasAnyRole("USER", "ADMIN")`** (2026-08-18). 관리자가 커뮤니티에
+  참여하는 유일한 경로다. 왜 댓글만인지는 `specs/community-comment.md`가 정본이다.
+- 그 외 커뮤니티 쓰기 경로 → `anyRequest().hasRole("USER")`. 2026-08-11의 관리자·고객 분리
+  (`SecurityConfig`, member 담당) 이후 `authenticated()`가 아니라 **일반 회원 전용**이다 — 관리자는
+  좋아요·신고·글쓰기를 할 수 없고, 화면 숨김이 아니라 여기서 강제된다.
 - `/admin/**` → `hasRole("ADMIN")`
 
 **커뮤니티에서 회원 상태(`ACTIVE`/`SUSPENDED`/`WITHDRAWN`)를 재검증하지 않는다.**
