@@ -16,9 +16,12 @@ import com.cakeshop.global.config.MariaDbIntegrationTest;
 import com.cakeshop.domain.order.dto.form.customer.OrderGeneralCreateForm;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
 import com.cakeshop.domain.order.service.OrderServiceImpl;
+import com.cakeshop.domain.product.entity.ProductType;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -231,6 +234,26 @@ class ScreenRenderingTests {
             )))
             .andExpect(content().string(containsString("1:1 문의하기")))
             .andExpect(content().string(not(containsString("data-server-cart-form"))));
+    }
+
+    @ParameterizedTest
+    @EnumSource(ProductType.class)
+    void productDetail_breadcrumb_linksToMatchingProductType(
+            ProductType productType
+    ) throws Exception {
+        long productId = productType == ProductType.GENERAL
+                ? generalProductId
+                : customProductId;
+
+        mockMvc.perform(get("/products/{productId}", productId))
+            .andExpect(status().isOk())
+            .andExpect(content().string(matchesPattern(
+                "(?s).*<a href=\"/products\\?type="
+                    + productType.name()
+                    + "\"[^>]*>\\s*"
+                    + productType.getDisplayName()
+                    + "\\s*</a>.*"
+            )));
     }
 
     @Test
