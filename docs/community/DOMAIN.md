@@ -42,7 +42,7 @@
 | **A7** | 대댓글 (5 depth) | 고객 | — | **없음** | 2차 | `community-comment.md` |
 | **A8** | 좋아요 추가·취소 | 고객 | `POST /community/{id}/likes` · `/likes/delete` | **완료** | 4 | `community-reaction.md` |
 | **A9** | 신고 | 고객 | `POST /community/{id}/reports` | **완료** | 5 | `community-reaction.md` |
-| **B1** | 게시글 목록 | 누구나 | `GET /community` | **완료** | 1 · 7a | `community-read.md` |
+| **B1** | 게시글 목록 | 누구나 | `GET /community` | **완료** | 1 · 7a · 16 | `community-read.md` |
 | **B2** | 게시글 상세 | 누구나 | `GET /community/{id}` | **완료** | 1 | `community-read.md` |
 | **B3** | 조회수와 중복 방지 | — | (B2에 포함) | **완료** | 6 | `community-read.md` |
 | **B4** | 댓글 정렬·분량 (`더 보기`) | 누구나 | `GET /community/{id}?comments=N` | **완료** | 3 · 6 | `community-comment.md` |

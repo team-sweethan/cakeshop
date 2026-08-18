@@ -94,13 +94,14 @@ class CommunityMapperTests {
     }
 
     /**
-     * 정렬 기준마다 순서가 갈리고 값이 같으면 id 내림차순으로 이어진다. 세 글은 작성 시각과
-     * 조회수 순서가 서로 반대라 두 기준이 같은 결과로 통과하지 않는다.
+     * 정렬 기준마다 순서가 갈리고 값이 같으면 id 내림차순으로 이어진다. 세 글은 작성 시각·
+     * 조회수·좋아요 순서가 서로 달라 세 기준이 같은 결과로 통과하지 않는다.
      */
     @ParameterizedTest(name = "{0} 정렬은 {1}, {2}, {3} 순서다")
     @CsvSource({
             "LATEST, 적게 본 최신 글, 많이 본 오래된 글, 적게 본 오래된 글",
-            "VIEWS, 많이 본 오래된 글, 적게 본 최신 글, 적게 본 오래된 글"
+            "VIEWS, 많이 본 오래된 글, 적게 본 최신 글, 적게 본 오래된 글",
+            "LIKES, 적게 본 오래된 글, 적게 본 최신 글, 많이 본 오래된 글"
     })
     void findPublishedPosts_sort_ordersByRequestedKeyThenIdDescending(
             PostSort sort, String first, String second, String third) {
@@ -111,6 +112,10 @@ class CommunityMapperTests {
         setViewCount(fewOld, 3);
         setViewCount(manyOld, 100);
         setViewCount(fewNew, 3);
+
+        setLikeCount(fewOld, 50);
+        setLikeCount(manyOld, 0);
+        setLikeCount(fewNew, 0);
 
         assertThat(findPage(1, 20, sort)).extracting(PostListRow::title)
                 .containsExactly(first, second, third);
@@ -565,6 +570,12 @@ class CommunityMapperTests {
         jdbcTemplate.update(
                 "UPDATE posts SET view_count = ?, updated_at = updated_at WHERE id = ?",
                 viewCount, postId);
+    }
+
+    private void setLikeCount(long postId, long likeCount) {
+        jdbcTemplate.update(
+                "UPDATE posts SET like_count = ?, updated_at = updated_at WHERE id = ?",
+                likeCount, postId);
     }
 
     private long viewCountOf(long postId) {

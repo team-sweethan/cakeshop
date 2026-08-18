@@ -10,9 +10,10 @@ package com.cakeshop.domain.community.dto.view;
  * <p>모르는 값을 오류로 만들지 않고 기본값으로 떨어뜨리는 것은 카테고리·페이지 파라미터와
  * 같은 처리다. 목록은 공개 화면이라 주소가 망가졌다고 오류 페이지를 줄 이유가 없다.
  *
- * <p><b>좋아요 순은 넣지 않는다</b>(PLAN.md 조각 7 D8). 분기마다 tiebreaker·인덱스·형태
- * 검사가 함께 늘어나는데, 좋아요로 줄을 세워 보고 싶은 것은 인기글 점수가 이미 대신한다 —
- * 그 점수에서 가장 큰 계수를 갖는 것이 좋아요다.
+ * <p><b>좋아요순은 D8이 기각했다가 2026-08-18에 열었다</b>(조각 16). 기각 근거였던
+ * "인기글 점수가 대신한다"는 인기글이 7일 창 스냅샷이라 역대 좋아요 많은 글을 대신하지
+ * 못하고, B1이 적어 둔 되돌아올 계기가 조각 15(사이드바 이동·메인 제거)로 실현됐다 —
+ * 근거는 specs/community-read.md B1.
  */
 public enum PostSort {
 
@@ -20,7 +21,10 @@ public enum PostSort {
     LATEST("LATEST", "최신순"),
 
     /** 조회수 많은 순. */
-    VIEWS("VIEWS", "조회수순");
+    VIEWS("VIEWS", "조회수순"),
+
+    /** 좋아요 많은 순. */
+    LIKES("LIKES", "좋아요순");
 
     private final String parameter;
     private final String label;

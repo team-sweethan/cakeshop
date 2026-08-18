@@ -1,0 +1,33 @@
+-- add_post_like_count_sort_index
+-- 생성: 2026-08-18 23:42:48
+--
+-- 규칙
+-- * 이 파일은 공유된 뒤 수정하지 않는다. 변경이 필요하면 새 migration 을 만든다.
+-- * 로컬 샘플 데이터는 여기 넣지 않는다. db/seed/seed-local.sql 을 쓴다.
+-- * 한 migration 은 하나의 배포 가능한 스키마 전환을 담는다. SQL 수만으로 나누거나 합치지 않는다.
+
+-- 좋아요 정렬(`GET /community?sort=LIKES`) 을 받쳐 주는 인덱스
+-- (docs/community/PLAN.md 조각 16).
+--
+-- ▸ 왜 필요한가
+--
+-- 목록 쿼리는 status = 'PUBLISHED' 로 좁힌 뒤 like_count DESC, id DESC 로 정렬해 20 건을
+-- 자른다. 조회수 정렬의 ix_posts_status_view_count 와 같은 자리다 — 받쳐 주는 인덱스가
+-- 없으면 필터를 통과한 게시글 전부를 filesort 한다.
+--
+-- ▸ 컬럼 순서가 규칙이다
+--
+-- (status, like_count, id) 이지 (like_count, status, id) 가 아니다. 선두가 등치 조건인
+-- status 여야 그 값으로 범위를 좁힌 안에서 like_count 가 이미 정렬된 상태가 된다. 좋아요는
+-- 0 이 대부분이라 동점이 흔하고, id 를 세 번째에 두어 tiebreaker 까지 인덱스로 끝낸다.
+-- 순서가 틀려도 화면 결과는 똑같아서 느려질 뿐 드러나지 않는다.
+--
+-- ▸ 카테고리 필터는 이 인덱스를 온전히 쓰지 못한다
+--
+-- ?categoryId= 가 붙으면 선두만 맞는다. 조회수 인덱스와 같은 수용이고, 되돌아올 계기는
+-- PLAN.md R8 과 공유한다.
+--
+-- 되돌리기: DROP INDEX ix_posts_status_like_count 로 되돌릴 수 있다. 데이터를 바꾸지
+-- 않으므로 백업이 필요 없다.
+ALTER TABLE `posts`
+    ADD INDEX `ix_posts_status_like_count` (`status`, `like_count`, `id`);
