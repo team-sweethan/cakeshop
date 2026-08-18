@@ -2,6 +2,7 @@ package com.cakeshop.domain.chat.service;
 
 import com.cakeshop.domain.member.service.MemberChatQueryService;
 import com.cakeshop.domain.notification.dto.form.NotificationRequest;
+import com.cakeshop.domain.notification.entity.DeliveryScope;
 import com.cakeshop.domain.notification.entity.NotificationType;
 import com.cakeshop.domain.notification.service.NotificationService;
 import java.util.List;
@@ -11,8 +12,8 @@ import org.springframework.stereotype.Service;
 
 /**
  * 채팅 알림 발송 서비스
- * - 고객이 메시지 전송 시: 활성 관리자들에게 ADMIN_CHAT 알림 발송
- * - 관리자가 메시지 전송 시: 고객에게 CUSTOMER_CHAT 알림 발송
+ * - 고객이 메시지 전송 시: 활성 관리자들에게 ADMIN_CHAT 알림 발송 (웹 + 30분 쿨타임 SMS)
+ * - 관리자가 메시지 전송 시: 고객에게 CUSTOMER_CHAT 알림 발송 (웹 + 30분 쿨타임 SMS)
  *
  * ⚠️ 반드시 트랜잭션 완료(커밋) 이후에 호출해야 합니다.
  *    ChatStompController / ChatApiController 에서 chatService.sendMessage() 리턴 후 호출하세요.
@@ -51,6 +52,7 @@ public class ChatNotificationSender {
                             .chatMessageId(messageId)
                             .type(NotificationType.ADMIN_CHAT)
                             .eventKey("ADMIN_CHAT:" + adminId + ":ROOM_" + chatRoomId)
+                            .deliveryScope(DeliveryScope.WEB_AND_SMS)
                             .args(new Object[]{cName})
                             .build());
                 } catch (Exception e) {
@@ -77,6 +79,7 @@ public class ChatNotificationSender {
                     .chatMessageId(messageId)
                     .type(NotificationType.CUSTOMER_CHAT)
                     .eventKey("CUSTOMER_CHAT:" + customerId + ":ROOM_" + chatRoomId)
+                    .deliveryScope(DeliveryScope.WEB_AND_SMS)
                     .args(new Object[0])
                     .build());
         } catch (Exception e) {
