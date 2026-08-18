@@ -34,7 +34,7 @@ public class NotificationService {
     private final MemberNotificationQueryService memberNotificationQueryService;
 
     // 알림 생성
-    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    @Transactional
     public void makeNotification(NotificationRequest request) {
 
         // 알림 제목, 내용 만들기
@@ -98,8 +98,16 @@ public class NotificationService {
                         .lastEventAt(now)
                         .build();
                 registerWebSocketSending(request.getReceiverId(), bundleResponse);
+            } else {
+                // 일반 알림(주문 등) 중복 시 기존 SMS 전송이 완료되지 않은 상태(FAILED/SKIPPED)라면 SMS를 재발송한다.
+                if (scope == DeliveryScope.WEB_AND_SMS && request.getReceiverId() != null) {
+                    Long existingId = notificationMapper.findIdByReceiverIdAndEventKey(request.getReceiverId(), eventKey);
+                    if (existingId != null && !notificationMapper.hasSentDelivery(existingId)) {
+                        String receiverPhone = notificationMapper.findReceiverPhone(request.getReceiverId(), request.getOrderId());
+                        registerSmsSending(existingId, receiverPhone, title, content);
+                    }
+                }
             }
-            // 일반 알림(주문, 쿠폰 등) 중복 시에는 읽은 상태 유지를 위해 멱등하게 종료
             return;
         }
 

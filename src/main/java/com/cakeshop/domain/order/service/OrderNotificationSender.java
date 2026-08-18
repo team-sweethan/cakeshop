@@ -10,6 +10,8 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * ******************************
@@ -17,7 +19,7 @@ import org.springframework.stereotype.Service;
  * 담당자 : 주환
  * 작성일 : 2026-08-18
  * 기능 : 주문 및 결제 실시간/문자 알림 전송 서비스
- * 설명 : 주문/결제 라이프사이클 이벤트 발생 시 활성 고객 및 관리자에게 실시간 웹소켓 토스트 및 문자(SMS) 알림을 발송한다.
+ * 설명 : 주문/결제 라이프사이클 이벤트 발생 시 활성 고객 및 관리자에게 독립 트랜잭션(REQUIRES_NEW)에서 안전하게 실시간 웹소켓 토스트 및 문자(SMS) 알림을 발송한다.
  * ******************************
  */
 @Slf4j
@@ -29,6 +31,7 @@ public class OrderNotificationSender {
     private final MemberNotificationQueryService memberNotificationQueryService;
     private final MemberOrderNotificationQueryService memberOrderNotificationQueryService;
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void sendOrderPaid(long orderId, long customerId, String orderType) {
         boolean isCustom = "CUSTOM".equalsIgnoreCase(orderType);
         NotificationType customerType = isCustom ? NotificationType.CUSTOM_ORDER_PAID : NotificationType.ORDER_PAID;
@@ -49,6 +52,7 @@ public class OrderNotificationSender {
         sendToActiveAdmins(orderId, customerId, adminType, adminType.name() + ":ALL_ADMINS:" + orderId, new Object[0]);
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void sendCustomOrderInProduction(long orderId, long customerId) {
         if (!memberNotificationQueryService.isMemberActive(customerId)) {
             return;
@@ -64,6 +68,7 @@ public class OrderNotificationSender {
                 .build());
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void sendCustomOrderRejected(long orderId, long customerId) {
         if (!memberNotificationQueryService.isMemberActive(customerId)) {
             return;
@@ -83,11 +88,13 @@ public class OrderNotificationSender {
         sendOrderCanceled(orderId, customerId, null);
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void sendOrderCanceled(long orderId, long customerId, String orderNumber) {
         sendOrderCanceledToCustomer(orderId, customerId);
         sendOrderCanceledToAdmins(orderId, customerId, orderNumber);
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void sendOrderCanceledToCustomer(long orderId, long customerId) {
         if (!memberNotificationQueryService.isMemberActive(customerId)) {
             return;
@@ -103,6 +110,7 @@ public class OrderNotificationSender {
                 .build());
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void sendOrderCanceledToAdmins(long orderId, long customerId, String orderNumber) {
         try {
             String ordNum = (orderNumber != null && !orderNumber.isBlank()) ? orderNumber : String.valueOf(orderId);
@@ -112,6 +120,7 @@ public class OrderNotificationSender {
         }
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void sendRefundFailed(long orderId, String orderNumber) {
         try {
             String ordNum = (orderNumber != null && !orderNumber.isBlank()) ? orderNumber : String.valueOf(orderId);
