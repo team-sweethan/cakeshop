@@ -389,7 +389,6 @@ public class OrderServiceImpl implements OrderService {
         orderItem.setTotalAmount(preparedItem.totalAmount());
         orderItem.setRequirements(preparedItem.requirements());
         orderItem.setPreparationDays(product.preparationDays());
-        orderItem.setCancellationLimitDays(0);
         requireOneRow(
                 orderMapper.insertOrderItem(orderItem),
                 OrderErrorCode.ORDER_SAVE_FAILED

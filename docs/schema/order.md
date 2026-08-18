@@ -23,16 +23,13 @@
 | `final_amount` | DECIMAL(12, 0) |  | X | 없음 | 최종 결제 금액 |
 | `status` | VARCHAR(30) | INDEX | X | `'PENDING_PAYMENT'` | 주문 상태 |
 | `pickup_at` | DATETIME(6) | INDEX | X | 없음 | 픽업 예정 시각 |
-| `cancellation_blocked_at` | DATETIME(6) |  | O | NULL | 취소 제한 시작 시각 |
 | `payment_expires_at` | DATETIME(6) | INDEX | O | NULL | 결제 만료 시각 |
 | `request_message` | TEXT |  | O | NULL | 주문 요청사항 |
 | `reject_reason` | TEXT |  | O | NULL | 주문 거절 사유 |
 | `approved_at` | DATETIME(6) | INDEX | O | NULL | 승인 시각 |
 | `rejected_at` | DATETIME(6) |  | O | NULL | 거절 시각 |
-| `accepted_at` | DATETIME(6) |  | O | NULL | 접수 시각 |
 | `ready_at` | DATETIME(6) |  | O | NULL | 픽업 준비 완료 시각 |
 | `picked_up_at` | DATETIME(6) |  | O | NULL | 픽업 시각 |
-| `completed_at` | DATETIME(6) |  | O | NULL | 완료 시각 |
 | `canceled_at` | DATETIME(6) |  | O | NULL | 취소 시각 |
 | `cancel_reason` | TEXT |  | O | NULL | 취소 사유 |
 | `canceled_by` | VARCHAR(30) |  | O | NULL | 취소 주체 |
@@ -76,7 +73,6 @@
 | `total_amount` | DECIMAL(12, 0) |  | X | 없음 | 항목 총액 |
 | `requirements` | TEXT |  | O | NULL | 항목 요청사항 |
 | `preparation_days` | SMALLINT UNSIGNED |  | X | `0` | 준비 기간 스냅샷 |
-| `cancellation_limit_days` | SMALLINT UNSIGNED |  | X | `0` | 취소 제한 일수 스냅샷 |
 | `stock_deducted_at` | DATETIME(6) |  | O | NULL | 재고 차감 시각 |
 | `stock_restored_at` | DATETIME(6) |  | O | NULL | 재고 복구 시각 |
 
@@ -131,7 +127,6 @@
 
 - PK: (`order_id`, `cart_item_id`)
 - FK: `fk_order_cart_items_order` (`order_id`) → `orders.id`
-- INDEX: `idx_order_cart_items_order_id` (`order_id`)
 - `cart_item_id`에는 FK를 두지 않는다. 결제 전 사용자가 장바구니 항목을 직접 삭제해도 주문 생성 이력과
   결제 처리가 막히지 않도록 하며, 결제 후 정리는 삭제 행 수와 관계없이 멱등 처리한다.
 
@@ -146,6 +141,7 @@
 - `V20260811_165915__add_custom_production_due_index.sql`
 - `V20260812_115115__add_order_cart_item_links.sql`
 - `V20260812_155402__add_order_cart_item_snapshot_quantity.sql`
+- `V20260818_104741__remove_unused_order_schema.sql`
 
 > `order_cart_items.snapshot_quantity`는 주문 생성 당시 장바구니 수량이다. 결제 후 정리 시 현재 수량과 비교하여, 수량이 변경된 장바구니 항목은 삭제하지 않는다.
 

@@ -72,7 +72,6 @@ class OrderPaymentEntitySchemaTests {
                 Map.entry("finalAmount", BigDecimal.class),
                 Map.entry("status", OrderStatus.class),
                 Map.entry("pickupAt", LocalDateTime.class),
-                Map.entry("cancellationBlockedAt", LocalDateTime.class),
                 Map.entry("paymentExpiresAt", LocalDateTime.class),
                 Map.entry("requestMessage", String.class),
                 Map.entry("rejectReason", String.class),
@@ -108,7 +107,6 @@ class OrderPaymentEntitySchemaTests {
                 Map.entry("totalAmount", BigDecimal.class),
                 Map.entry("requirements", String.class),
                 Map.entry("preparationDays", Integer.class),
-                Map.entry("cancellationLimitDays", Integer.class),
                 Map.entry("stockDeductedAt", LocalDateTime.class),
                 Map.entry("stockRestoredAt", LocalDateTime.class)
         ));

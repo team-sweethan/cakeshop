@@ -25,7 +25,6 @@ public class OrderItem {
     private BigDecimal totalAmount;     // (기본 가격 + 옵션 금액) × 주문 수량
     private String requirements;        // 주문 항목별 제작 요청 사항
     private Integer preparationDays;    // 주문 당시 상품 준비 기간 스냅샷
-    private Integer cancellationLimitDays; // 주문 당시 취소 제한 일수
     private LocalDateTime stockDeductedAt;  // 결제 완료 시 실제 유한 재고를 차감한 시각
     private LocalDateTime stockRestoredAt;  // 취소 완료 시 차감 재고를 복구한 시각
 }
