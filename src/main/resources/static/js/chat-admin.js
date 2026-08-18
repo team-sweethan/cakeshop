@@ -90,6 +90,8 @@ document.addEventListener("DOMContentLoaded", () => {
       let queryUrl = `/api/admin/chat/rooms?page=${page}&size=${ROOM_PAGE_SIZE}`;
       if (reqFilter === "unread") {
         queryUrl += "&status=WAITING_ADMIN";
+      } else if (reqFilter === "replied") {
+        queryUrl += "&status=WAITING_CUSTOMER";
       } else if (reqFilter === "done") {
         queryUrl += "&status=RESOLVED";
       }
@@ -147,13 +149,18 @@ document.addEventListener("DOMContentLoaded", () => {
         updateUnreadTabBadge(unreadCount);
       }
 
-      // 초기 진입 시 자동 선택하지 않고, 빈 메인 패널 유지 (클릭 시 진입)
-      if (adminRoomsData && adminRoomsData.length > 0) {
-        const existsInTab = adminRoomsData.some(r => (r.chatRoomId || r.id) === selectedChatRoomId);
-        if (!selectedChatRoomId || !existsInTab) {
-          clearMainAndSidePanel();
+      // 초기 진입 시 URL 파라미터 또는 기존 선택된 방 복원 (새로고침 시 방 유지)
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlRoomId = urlParams.get("roomId") ? parseInt(urlParams.get("roomId"), 10) : null;
+      const initialRoomId = selectedChatRoomId || urlRoomId;
+
+      if (initialRoomId) {
+        if (!selectedChatRoomId) {
+          const targetRoom = adminRoomsData.find(r => (r.chatRoomId || r.id) === initialRoomId);
+          const customerId = targetRoom ? (targetRoom.customerId || targetRoom.memberId) : null;
+          selectChatRoom(initialRoomId, customerId);
         }
-      } else if (!isReconnect) {
+      } else if (!isReconnect && !selectedChatRoomId) {
         clearMainAndSidePanel();
       }
 
@@ -162,7 +169,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     } catch (err) {
       console.error("관리자 방 목록 조회 실패:", err);
-      if (!append) {
+      if (!append && !isReconnect && !selectedChatRoomId) {
         clearMainAndSidePanel();
       }
     }
@@ -230,17 +237,47 @@ document.addEventListener("DOMContentLoaded", () => {
     let existingRoom = adminRoomsData.find((r) => (r.chatRoomId || r.id) === rId);
     const isCurrentActive = selectedChatRoomId === rId;
 
-    // 현재 탭 필터 조건 검증 (미답변 탭일 때 답변완료 방이면 제거, 완료 탭일 때 미답변 방이면 제거)
+    // 현재 탭 필터 조건 검증 (미답변, 답변완료, 상담완료)
     if (currentFilter === "unread" && newStatus !== "WAITING_ADMIN") {
+      if (isCurrentActive) {
+        // 내가 현재 대화 중인 방이면 목록에서 바로 없애지 않고 '답변 완료' 상태로 유지
+        if (existingRoom) {
+          existingRoom.responseStatus = newStatus;
+          existingRoom.unreadCount = 0;
+          if (msg.lastMessageContent || msg.content) {
+            existingRoom.lastMessageContent = msg.lastMessageContent || msg.content;
+          }
+          if (msg.lastMessageCreatedAt || msg.createdAt) {
+            existingRoom.lastMessageCreatedAt = msg.lastMessageCreatedAt || msg.createdAt;
+          }
+          renderRoomList();
+        }
+        adjustUnreadTabBadge(-1);
+        return;
+      }
+
       removedRoomIds.add(rId);
       const existingIdx = adminRoomsData.findIndex((r) => (r.chatRoomId || r.id) === rId);
       if (existingIdx !== -1) {
         adminRoomsData.splice(existingIdx, 1);
         renderRoomList();
-        if (selectedChatRoomId === rId) {
-          clearMainAndSidePanel();
-        }
         adjustUnreadTabBadge(-1);
+      }
+      return;
+    }
+    if (currentFilter === "replied" && newStatus !== "WAITING_CUSTOMER") {
+      if (isCurrentActive) {
+        if (existingRoom) {
+          existingRoom.responseStatus = newStatus;
+          renderRoomList();
+        }
+        return;
+      }
+      removedRoomIds.add(rId);
+      const existingIdx = adminRoomsData.findIndex((r) => (r.chatRoomId || r.id) === rId);
+      if (existingIdx !== -1) {
+        adminRoomsData.splice(existingIdx, 1);
+        renderRoomList();
       }
       return;
     }
@@ -250,9 +287,6 @@ document.addEventListener("DOMContentLoaded", () => {
       if (existingIdx !== -1) {
         adminRoomsData.splice(existingIdx, 1);
         renderRoomList();
-        if (selectedChatRoomId === rId) {
-          clearMainAndSidePanel();
-        }
       }
       if (newStatus === "WAITING_ADMIN" && (!existingRoom || existingRoom.responseStatus !== "WAITING_ADMIN")) {
         adjustUnreadTabBadge(1);
@@ -312,6 +346,12 @@ document.addEventListener("DOMContentLoaded", () => {
     selectedChatRoomId = null;
     selectedCustomerId = null;
 
+    try {
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.delete("roomId");
+      window.history.replaceState(null, "", currentUrl.toString());
+    } catch (e) {}
+
     if (adminChatMessagesContainer) {
       adminChatMessagesContainer.innerHTML = `<div class="text-muted" style="text-align:center; padding:40px;">좌측 대화방 목록에서 상담할 대화방을 선택해 주세요.</div>`;
     }
@@ -353,7 +393,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (filteredRooms.length === 0) {
       adminRoomListContainer.innerHTML = `<p class="text-muted" style="font-size:12px; padding:10px;">해당하는 채팅방이 없습니다.</p>`;
-      if (!searchKeyword) {
+      if (!searchKeyword && !selectedChatRoomId) {
         clearMainAndSidePanel();
       }
       return;
@@ -367,9 +407,12 @@ document.addEventListener("DOMContentLoaded", () => {
       itemDiv.style.cssText = "cursor:pointer; padding:10px; margin-bottom:8px;";
 
       const isWaitingAdmin = room.responseStatus === "WAITING_ADMIN";
+      const isResolved = room.responseStatus === "RESOLVED";
       const statusBadge = isWaitingAdmin
         ? `<span class="badge badge--danger">답변 대기</span>`
-        : `<span class="badge badge--info">답변 완료</span>`;
+        : (isResolved
+            ? `<span class="badge badge--secondary">상담 완료</span>`
+            : `<span class="badge badge--info">답변 완료</span>`);
 
       const unreadBadge = room.unreadCount > 0
         ? `<span class="badge badge--danger">${room.unreadCount}</span>`
@@ -439,6 +482,13 @@ document.addEventListener("DOMContentLoaded", () => {
     selectedCustomerId = customerId;
     lastFetchedMessageId = 0;
     lastSentAdminReadCursorId = 0;
+
+    // URL 파라미터 동기화 (새로고침 시 해당 방 유지)
+    try {
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.set("roomId", roomId);
+      window.history.replaceState(null, "", currentUrl.toString());
+    } catch (e) {}
 
     const headerTitle = document.querySelector(".admin-chat-main-room .chat-room__header strong");
     const targetRoom = adminRoomsData.find((r) => (r.chatRoomId || r.id) === roomId);
