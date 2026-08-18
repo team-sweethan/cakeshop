@@ -92,7 +92,7 @@ class CommunityControllerTests {
                                 communityNoticeService,
                                 communityReactionService,
                                 // 조립기를 목으로 갈면 아래 Model 속성 검사가 전부 빈 값을 본다.
-                                new CommunityDetailModelAssembler(
+                                new CommunityDetailPage(
                                         communityCommentService, communityReactionService)))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .build();

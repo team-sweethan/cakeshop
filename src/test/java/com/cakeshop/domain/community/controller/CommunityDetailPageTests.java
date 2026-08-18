@@ -32,7 +32,7 @@ import org.springframework.ui.Model;
  * 이 넷은 <b>틀려도 서버에 오류가 없고</b>, 버튼이 사라지거나 남을 뿐이라 사람 눈으로도 자기
  * 계정으로는 잘 드러나지 않는다.
  */
-class CommunityDetailModelAssemblerTests {
+class CommunityDetailPageTests {
 
     private static final long POST_ID = 15L;
     private static final long AUTHOR_ID = 7L;
@@ -41,7 +41,7 @@ class CommunityDetailModelAssemblerTests {
 
     private CommunityCommentService communityCommentService;
     private CommunityReactionService communityReactionService;
-    private CommunityDetailModelAssembler assembler;
+    private CommunityDetailPage detailPage;
 
     @BeforeEach
     void setUp() {
@@ -52,7 +52,7 @@ class CommunityDetailModelAssemblerTests {
                 .thenReturn(new CommentSectionView(
                         List.of(), 0, 0, CommentSectionView.DEFAULT_LIMIT));
 
-        assembler = new CommunityDetailModelAssembler(
+        detailPage = new CommunityDetailPage(
                 communityCommentService, communityReactionService);
     }
 
@@ -68,7 +68,7 @@ class CommunityDetailModelAssemblerTests {
             PostStatus status, Boolean asAuthor, boolean expected) {
         Model model = new ConcurrentModel();
 
-        assembler.assemble(model, postOf(status), viewerOf(asAuthor), null);
+        detailPage.assemble(model, postOf(status), viewerOf(asAuthor), null);
 
         assertThat(model.getAttribute("canEdit")).isEqualTo(expected);
     }
@@ -85,7 +85,7 @@ class CommunityDetailModelAssemblerTests {
             PostStatus status, Boolean asAuthor, boolean expected) {
         Model model = new ConcurrentModel();
 
-        assembler.assemble(model, postOf(status), viewerOf(asAuthor), null);
+        detailPage.assemble(model, postOf(status), viewerOf(asAuthor), null);
 
         assertThat(model.getAttribute("canReport")).isEqualTo(expected);
     }
@@ -96,7 +96,7 @@ class CommunityDetailModelAssemblerTests {
         when(communityReactionService.isReportedBy(POST_ID, OTHER_MEMBER_ID)).thenReturn(true);
         Model model = new ConcurrentModel();
 
-        assembler.assemble(model, postOf(PostStatus.PUBLISHED), OTHER_MEMBER_ID, null);
+        detailPage.assemble(model, postOf(PostStatus.PUBLISHED), OTHER_MEMBER_ID, null);
 
         assertThat(model.getAttribute("alreadyReported")).isEqualTo(true);
     }
@@ -106,7 +106,7 @@ class CommunityDetailModelAssemblerTests {
     void alreadyReported_ownPost_doesNotQuery() {
         Model model = new ConcurrentModel();
 
-        assembler.assemble(model, postOf(PostStatus.PUBLISHED), AUTHOR_ID, null);
+        detailPage.assemble(model, postOf(PostStatus.PUBLISHED), AUTHOR_ID, null);
 
         assertThat(model.getAttribute("alreadyReported")).isEqualTo(false);
         verify(communityReactionService, never()).isReportedBy(anyLong(), anyLong());
@@ -124,7 +124,7 @@ class CommunityDetailModelAssemblerTests {
     void viewerId_loggedIn_isBound() {
         Model model = new ConcurrentModel();
 
-        assembler.assemble(model, postOf(PostStatus.PUBLISHED), OTHER_MEMBER_ID, null);
+        detailPage.assemble(model, postOf(PostStatus.PUBLISHED), OTHER_MEMBER_ID, null);
 
         assertThat(model.getAttribute("viewerId")).isEqualTo(OTHER_MEMBER_ID);
     }
@@ -134,7 +134,7 @@ class CommunityDetailModelAssemblerTests {
     void viewerId_anonymous_staysNull() {
         Model model = new ConcurrentModel();
 
-        assembler.assemble(model, postOf(PostStatus.PUBLISHED), null, null);
+        detailPage.assemble(model, postOf(PostStatus.PUBLISHED), null, null);
 
         assertThat(model.getAttribute("viewerId")).isNull();
         assertThat(model.getAttribute("canEdit")).isEqualTo(false);
@@ -146,7 +146,7 @@ class CommunityDetailModelAssemblerTests {
     void commentLimit_isPassedThrough() {
         Model model = new ConcurrentModel();
 
-        assembler.assemble(model, postOf(PostStatus.PUBLISHED), AUTHOR_ID, 40);
+        detailPage.assemble(model, postOf(PostStatus.PUBLISHED), AUTHOR_ID, 40);
 
         verify(communityCommentService).getComments(POST_ID, 40);
     }
