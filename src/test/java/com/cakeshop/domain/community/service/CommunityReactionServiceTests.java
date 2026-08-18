@@ -73,7 +73,8 @@ class CommunityReactionServiceTests {
                 new CommunityPostAccessPolicy(),
                 new PopularPostReader(
                         mock(CommunityPopularPostMapper.class),
-                        Clock.system(SEOUL)));
+                        Clock.system(SEOUL)),
+                mock(CommunityPostImageService.class));
     }
 
     /** 좋아요는 잠금, 저장, 재계산 순서로 처리한다. */

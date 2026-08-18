@@ -25,6 +25,7 @@
     <h1 th:text="${editingPostId} != null ? '글 수정' : '글쓰기'">글쓰기</h1>
 
     <form method="post"
+          enctype="multipart/form-data"
           th:object="${form}"
           th:action="${editingPostId} != null
                      ? @{/community/{postId}/edit(postId=${editingPostId})}
@@ -51,6 +52,24 @@
                   style="min-height:220px" placeholder="내용을 입력하세요"
                   maxlength="5000" required></textarea>
         <p class="field-error" th:errors="*{content}"></p>
+      </div>
+
+      <!--/* 첨부는 본문 안이 아니라 목록이다. 규칙은 docs/community/specs/community-post.md A4. */-->
+      <div class="form-group">
+        <label class="form-label" for="images">이미지</label>
+
+        <div class="stack" th:if="${!#lists.isEmpty(postImages)}">
+          <label class="cluster" th:each="image : ${postImages}">
+            <input type="checkbox" name="deleteImageIds" th:value="${image.id}">
+            <img class="thumb" th:src="@{${image.imageUrl}}" alt="첨부 이미지" style="max-width:120px">
+            <span class="text-muted">지우기</span>
+          </label>
+        </div>
+
+        <input class="form-control" id="images" type="file" name="images"
+               multiple accept="image/jpeg,image/png">
+        <p class="note">JPG·PNG만, 한 장에 5MB까지, 게시글당 5장까지 올릴 수 있습니다.</p>
+        <p class="field-error" th:errors="*{images}"></p>
       </div>
 
       <div class="cluster cluster--between section">

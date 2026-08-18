@@ -7,7 +7,8 @@ public enum FileStorageDirectory {
     REVIEW("review"),
     BANNER("banner"),
     CUSTOMER("customer"),
-    STORE("store");
+    STORE("store"),
+    COMMUNITY("community");
 
     private final String path;
 

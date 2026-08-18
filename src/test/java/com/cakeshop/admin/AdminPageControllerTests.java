@@ -3,6 +3,7 @@ package com.cakeshop.admin;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -38,6 +39,7 @@ import com.cakeshop.domain.community.dto.view.CommentSectionView;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.service.CommunityAdminService;
 import com.cakeshop.domain.community.service.CommunityCommentService;
+import com.cakeshop.domain.community.service.CommunityPostImageService;
 import com.cakeshop.domain.coupon.controller.CouponAdminController;
 import com.cakeshop.domain.coupon.service.CouponAdminService;
 import com.cakeshop.domain.member.controller.MemberAdminController;
@@ -213,7 +215,7 @@ class AdminPageControllerTests {
                         Mockito.mock(OrderMemberQueryService.class)),
                 new ReviewAdminController(reviewAdminService),
                 new NotificationAdminController(),
-                new CommunityAdminController(communityAdminService, communityCommentService),
+                new CommunityAdminController(communityAdminService, communityCommentService, mock(CommunityPostImageService.class)),
                 new CouponAdminController(couponAdminService)
         ).build();
 

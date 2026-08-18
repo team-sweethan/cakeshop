@@ -102,7 +102,8 @@ class CommunityPostServiceTests {
                 communityMapper,
                 new CommunityMemberViewLoader(memberCommunityQueryService),
                 new CommunityPostAccessPolicy(),
-                readerAt(NOW));
+                readerAt(NOW),
+                mock(CommunityPostImageService.class));
     }
 
     private PopularPostReader readerAt(LocalDateTime now) {
@@ -311,7 +312,8 @@ class CommunityPostServiceTests {
                 communityMapper,
                 new CommunityMemberViewLoader(memberCommunityQueryService),
                 new CommunityPostAccessPolicy(),
-                readerAt(now));
+                readerAt(now),
+                mock(CommunityPostImageService.class));
         givenConfirmedRanking(rankingDate, popular(1, 11L));
 
         List<String> warnings = warningsWhile(() -> serviceAt.getPopularSection(null, FIRST_PAGE));

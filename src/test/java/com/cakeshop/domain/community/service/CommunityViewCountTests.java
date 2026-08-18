@@ -9,6 +9,7 @@ import com.cakeshop.domain.community.mapper.CommunityMapper;
 import com.cakeshop.domain.member.service.MemberCommunityQueryService;
 import com.cakeshop.global.config.ClockConfig;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
+import com.cakeshop.global.infra.FileStorageClient;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,6 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /** 조회수 캐시와 조회 이력의 일치를 확인한다. */
 @MybatisTest
@@ -28,11 +30,16 @@ import org.springframework.jdbc.core.JdbcTemplate;
         MemberCommunityQueryService.class,
         CommunityMemberViewLoader.class,
         CommunityPostAccessPolicy.class,
+        CommunityPostImageService.class,
+        CommunityImageValidator.class,
         PopularPostReader.class,
         ClockConfig.class})
 class CommunityViewCountTests {
 
     private static final LocalDateTime BASE_TIME = LocalDateTime.of(2026, 3, 1, 10, 0);
+
+    @MockitoBean
+    private FileStorageClient fileStorageClient;
 
     @Autowired
     private CommunityPostService communityPostService;

@@ -23,6 +23,7 @@ import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
 import com.cakeshop.domain.community.service.CommunityCommentService;
+import com.cakeshop.domain.community.service.CommunityPostImageService;
 import com.cakeshop.domain.community.service.CommunityReactionService;
 import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
 import com.cakeshop.global.error.BusinessException;
@@ -67,7 +68,7 @@ class CommunityReactionControllerTests {
                                 communityReactionService,
                                 // 상세 화면을 목으로 갈면 재렌더링 검사가 빈 Model 을 본다.
                                 new CommunityDetailPage(
-                                        communityCommentService, communityReactionService)))
+                                        communityCommentService, communityReactionService, mock(CommunityPostImageService.class))))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .build();
     }

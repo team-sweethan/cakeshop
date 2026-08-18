@@ -12,6 +12,7 @@ import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.domain.member.service.MemberCommunityQueryService;
 import com.cakeshop.global.config.ClockConfig;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
+import com.cakeshop.global.infra.FileStorageClient;
 
 import org.apache.ibatis.executor.Executor;
 import org.apache.ibatis.mapping.MappedStatement;
@@ -30,6 +31,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /** 주요 조회의 쿼리 수가 데이터 건수에 따라 증가하지 않는지 확인한다. */
 @MybatisTest
@@ -42,6 +44,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
         MemberCommunityQueryService.class,
         CommunityMemberViewLoader.class,
         CommunityPostAccessPolicy.class,
+        CommunityPostImageService.class,
+        CommunityImageValidator.class,
         PopularPostReader.class,
         ClockConfig.class})
 class CommunityQueryCountTests {
@@ -56,6 +60,9 @@ class CommunityQueryCountTests {
 
     /** 관리자 목록, 개수, 작성자 조회 횟수다. */
     private static final int EXPECTED_ADMIN_QUERY_COUNT = 3;
+
+    @MockitoBean
+    private FileStorageClient fileStorageClient;
 
     @Autowired
     private CommunityPostService communityPostService;

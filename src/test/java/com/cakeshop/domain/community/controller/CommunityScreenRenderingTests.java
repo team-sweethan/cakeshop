@@ -173,6 +173,35 @@ class CommunityScreenRenderingTests {
     }
 
     @Test
+    void communityDetail_attachedImages_renderBelowContentInSortOrder() throws Exception {
+        long postId = insertPost(memberId, "첨부 있는 글", "본문", PostStatus.PUBLISHED);
+        insertPostImage(postId, "/uploads/community/202608/second.jpg", 1);
+        insertPostImage(postId, "/uploads/community/202608/first.jpg", 0);
+
+        String body = mockMvc.perform(get("/community/" + postId))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(body.indexOf("본문")).isLessThan(body.indexOf("first.jpg"));
+        assertThat(body.indexOf("first.jpg")).isLessThan(body.indexOf("second.jpg"));
+    }
+
+    @Test
+    void communityEditForm_existingImages_renderWithDeleteChoice() throws Exception {
+        long postId = insertPost(memberId, "첨부 있는 글", "본문", PostStatus.PUBLISHED);
+        insertPostImage(postId, "/uploads/community/202608/first.jpg", 0);
+
+        mockMvc.perform(get("/community/" + postId + "/edit")
+                        .with(authentication(authorOf(memberId))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("multipart/form-data")))
+                .andExpect(content().string(containsString("first.jpg")))
+                .andExpect(content().string(containsString("deleteImageIds")));
+    }
+
+    @Test
     void communityDetail_adminAccount_rendersWithoutCustomerActions() throws Exception {
         long postId = insertPost(memberId, "관리자 조회용 글", "본문", PostStatus.PUBLISHED);
 
@@ -304,6 +333,17 @@ class CommunityScreenRenderingTests {
                 .andExpect(content().string(containsString("본문입니다")))
                 .andExpect(content().string(containsString("신고한사람")))
                 .andExpect(content().string(containsString("광고성 게시물입니다")));
+    }
+
+    /** 신고 사유가 이미지인 경우가 있어 차단을 판단하는 화면이 첨부를 함께 보여 준다. */
+    @Test
+    void communityAdminDetail_attachedImages_renderForAdmin() throws Exception {
+        long postId = insertPost(memberId, "첨부 신고 대상", "본문", PostStatus.BLOCKED);
+        insertPostImage(postId, "/uploads/community/202608/reported.jpg", 0);
+
+        mockMvc.perform(get("/admin/community/" + postId).with(authentication(admin())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("reported.jpg")));
     }
 
     /** 일반 회원의 차단 요청을 Security에서 거절한다. */
@@ -654,6 +694,15 @@ class CommunityScreenRenderingTests {
                 authorId, categoryId, title, content, status.name(), BASE_TIME, BASE_TIME);
 
         return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+    }
+
+    private void insertPostImage(long postId, String imageUrl, int sortOrder) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO post_images (post_id, image_url, sort_order)
+                VALUES (?, ?, ?)
+                """,
+                postId, imageUrl, sortOrder);
     }
 
     private void insertReport(long postId, long reporterId, String status) {

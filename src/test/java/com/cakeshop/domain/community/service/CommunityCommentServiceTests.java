@@ -85,7 +85,8 @@ class CommunityCommentServiceTests {
                 new CommunityPostAccessPolicy(),
                 new PopularPostReader(
                         mock(CommunityPopularPostMapper.class),
-                        Clock.system(SEOUL)));
+                        Clock.system(SEOUL)),
+                mock(CommunityPostImageService.class));
     }
 
     /** 댓글 작성자를 회원 계약으로 채운다. */

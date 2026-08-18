@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import com.cakeshop.domain.community.dto.view.CommentSectionView;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.service.CommunityCommentService;
+import com.cakeshop.domain.community.service.CommunityPostImageService;
 import com.cakeshop.domain.community.service.CommunityReactionService;
 
 import org.springframework.stereotype.Component;
@@ -30,6 +31,7 @@ class CommunityDetailPage {
 
     private final CommunityCommentService communityCommentService;
     private final CommunityReactionService communityReactionService;
+    private final CommunityPostImageService communityPostImageService;
 
     /** 상세 화면을 그린다. 진입점마다 이 한 줄만 부르면 Model 이 같아진다. */
     String render(Model model, PostDetailView post, Long viewerId, String comments) {
@@ -79,6 +81,8 @@ class CommunityDetailPage {
                 "alreadyReported",
                 canReport && communityReactionService.isReportedBy(post.id(), viewerId)
         );
+
+        model.addAttribute("postImages", communityPostImageService.getImages(post.id()));
 
         model.addAttribute(
                 "commentSection",
