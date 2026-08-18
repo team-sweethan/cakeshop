@@ -83,7 +83,7 @@ class CommunityDomainBoundaryTests {
     private List<Path> mapperXmlFiles() throws IOException {
         List<Path> mappers;
 
-        try (Stream<Path> paths = Files.list(MAPPER_DIRECTORY)) {
+        try (Stream<Path> paths = Files.walk(MAPPER_DIRECTORY)) {
             mappers = paths.filter(path -> path.toString().endsWith(".xml")).sorted().toList();
         }
 

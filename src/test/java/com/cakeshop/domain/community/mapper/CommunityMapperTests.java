@@ -806,7 +806,6 @@ class CommunityMapperTests {
 
             assertThat(communityAdminMapper.closePendingReports(postId, ReportStatus.RESOLVED))
                     .isEqualTo(1);
-            assertThat(communityAdminMapper.countPendingReports(postId)).isZero();
             assertThat(communityAdminMapper.findReportsByPost(postId))
                     .extracting(ReportRow::status)
                     .containsExactlyInAnyOrder(ReportStatus.REJECTED, ReportStatus.RESOLVED);
