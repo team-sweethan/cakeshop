@@ -42,8 +42,9 @@ import org.springframework.web.context.WebApplicationContext;
  * <p>이 클래스가 소유하는 것은 네 가지다. 템플릿별 대표 렌더링(템플릿명과 Model 연결), 사용자 입력
  * escaping, 화면 결과가 실질적으로 달라지는 상태, 그리고 커뮤니티 고유의 인가 거절과 그 뒤의 DB 상태다.
  *
- * <p>업무 규칙은 다른 테스트가 소유한다. 상태별 노출·인기글 판정·댓글 상한 계산은
- * {@code CommunityServiceTests}, Model 계약과 요청 파라미터 처리는 {@code CommunityControllerTests}, 조회수는
+ * <p>업무 규칙은 다른 테스트가 소유한다. 상태별 노출·인기글 판정은 {@code CommunityServiceTests},
+ * 댓글 상한 계산은 {@code CommunityCommentServiceTests}, Model 계약과 요청 파라미터 처리는
+ * {@code CommunityControllerTests}, 조회수는
  * {@code CommunityViewCountTests}, 탈퇴 회원 마스킹은 {@code CommunityMemberContractTests},
  * SQL 결과는 {@code CommunityMapperTests}가 본다. docs/testing.md 8절에 따라 권한별 버튼, 안내 문구,
  * 집계 포맷과 HTML 조각은 여기에서 고정하지 않는다. 다만 페이지 링크의 조건 보존과 댓글 상한 도달

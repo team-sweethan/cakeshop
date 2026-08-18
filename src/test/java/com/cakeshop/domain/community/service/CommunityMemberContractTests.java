@@ -34,6 +34,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({
         CommunityService.class,
+        CommunityCommentService.class,
         CommunityAdminService.class,
         MemberCommunityQueryService.class,
         CommunityMemberViewLoader.class,
@@ -48,6 +49,9 @@ class CommunityMemberContractTests {
 
     @Autowired
     private CommunityService communityService;
+
+    @Autowired
+    private CommunityCommentService communityCommentService;
 
     @Autowired
     private CommunityAdminService communityAdminService;
@@ -109,7 +113,7 @@ class CommunityMemberContractTests {
         insertComment(postId, withdrawnMemberId);
         insertComment(postId, activeMemberId);
 
-        CommentSectionView section = communityService.getComments(postId, null);
+        CommentSectionView section = communityCommentService.getComments(postId, null);
 
         assertThat(section.comments())
                 .extracting(CommentView::authorName)

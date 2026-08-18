@@ -34,6 +34,7 @@ import com.cakeshop.domain.community.dto.view.PostSort;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
 import com.cakeshop.domain.community.service.CommunityNoticeService;
+import com.cakeshop.domain.community.service.CommunityCommentService;
 import com.cakeshop.domain.community.service.CommunityService;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
@@ -59,12 +60,14 @@ class CommunityControllerTests {
     private static final LocalDateTime CREATED_AT = LocalDateTime.of(2026, 3, 1, 10, 0);
 
     private CommunityService communityService;
+    private CommunityCommentService communityCommentService;
     private CommunityNoticeService communityNoticeService;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         communityService = mock(CommunityService.class);
+        communityCommentService = mock(CommunityCommentService.class);
         communityNoticeService = mock(CommunityNoticeService.class);
 
         when(communityNoticeService.getListSection(any(), any()))
@@ -74,13 +77,16 @@ class CommunityControllerTests {
                 .thenReturn(new PageResult<>(List.of(), new PageRequest(1, 20), 0));
         when(communityService.getActiveCategories())
                 .thenReturn(List.of(new PostCategoryView(1L, "QNA", "질문")));
-        when(communityService.getComments(anyLong(), any()))
+        when(communityCommentService.getComments(anyLong(), any()))
                 .thenReturn(new CommentSectionView(
                         List.of(), 0, 0, CommentSectionView.DEFAULT_LIMIT));
 
         mockMvc = MockMvcBuilders
                 .standaloneSetup(
-                        new CommunityController(communityService, communityNoticeService))
+                        new CommunityController(
+                                communityService,
+                                communityCommentService,
+                                communityNoticeService))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .build();
     }
@@ -451,7 +457,7 @@ class CommunityControllerTests {
         mockMvc.perform(get("/community/15").param("comments", "40"))
                 .andExpect(status().isOk());
 
-        verify(communityService).getComments(15L, 40);
+        verify(communityCommentService).getComments(15L, 40);
     }
 
     /** 잘못된 댓글 조회 수에는 기본값을 사용한다. */
@@ -463,7 +469,7 @@ class CommunityControllerTests {
         mockMvc.perform(get("/community/15").param("comments", "전체"))
                 .andExpect(status().isOk());
 
-        verify(communityService).getComments(15L, null);
+        verify(communityCommentService).getComments(15L, null);
     }
 
     @Test
@@ -477,7 +483,7 @@ class CommunityControllerTests {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/community/15"));
 
-        verify(communityService).addComment(eq(15L), any(), eq(7L));
+        verify(communityCommentService).addComment(eq(15L), any(), eq(7L));
     }
 
     /** 댓글 검증 실패 시 조회수 없이 상세를 다시 그린다. */
@@ -492,7 +498,7 @@ class CommunityControllerTests {
                 .andExpect(model().attributeHasFieldErrors("commentForm", "content"))
                 .andExpect(model().attributeExists("commentSection"));
 
-        verify(communityService, never()).addComment(anyLong(), any(), anyLong());
+        verify(communityCommentService, never()).addComment(anyLong(), any(), anyLong());
         verify(communityService, never()).getPostDetail(anyLong(), any(), anyString());
     }
 
@@ -507,7 +513,7 @@ class CommunityControllerTests {
                         post("/community/15/comments").param("content", "   ")))
                 .hasRootCauseInstanceOf(BusinessException.class);
 
-        verify(communityService, never()).addComment(anyLong(), any(), anyLong());
+        verify(communityCommentService, never()).addComment(anyLong(), any(), anyLong());
     }
 
     /** 검증 실패는 리다이렉트가 아니라 재렌더링이므로 Service에 전달하는 범위로 확인한다. */
@@ -521,7 +527,7 @@ class CommunityControllerTests {
                         .param("comments", "40"))
                 .andExpect(status().isOk());
 
-        verify(communityService).getComments(15L, 40);
+        verify(communityCommentService).getComments(15L, 40);
     }
 
     @Test
@@ -532,7 +538,7 @@ class CommunityControllerTests {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/community/15"));
 
-        verify(communityService).deleteComment(15L, 8L, 7L);
+        verify(communityCommentService).deleteComment(15L, 8L, 7L);
     }
 
     /**

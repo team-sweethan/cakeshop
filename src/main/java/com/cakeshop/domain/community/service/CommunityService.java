@@ -10,13 +10,8 @@ import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 
 import com.cakeshop.domain.community.dto.command.PostUpdateCommand;
-import com.cakeshop.domain.community.dto.form.CommentForm;
 import com.cakeshop.domain.community.dto.form.PostForm;
 import com.cakeshop.domain.community.dto.form.ReportForm;
-import com.cakeshop.domain.community.dto.query.CommentCountRow;
-import com.cakeshop.domain.community.dto.view.CommentSectionView;
-import com.cakeshop.domain.community.dto.query.CommentRow;
-import com.cakeshop.domain.community.dto.view.CommentView;
 import com.cakeshop.domain.community.dto.view.PopularSectionView;
 import com.cakeshop.domain.community.dto.view.PostCategoryView;
 import com.cakeshop.domain.community.dto.query.PostDetailRow;
@@ -25,8 +20,6 @@ import com.cakeshop.domain.community.dto.query.PostListRow;
 import com.cakeshop.domain.community.dto.view.PostListView;
 import com.cakeshop.domain.community.dto.query.PostLockRow;
 import com.cakeshop.domain.community.dto.view.PostSort;
-import com.cakeshop.domain.community.entity.Comment;
-import com.cakeshop.domain.community.entity.CommentStatus;
 import com.cakeshop.domain.community.entity.Post;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
 import com.cakeshop.domain.community.mapper.CommunityMapper;
@@ -160,52 +153,8 @@ public class CommunityService {
     }
 
     @Transactional(readOnly = true)
-    public CommentSectionView getComments(long postId, Integer requestedLimit) {
-        int limit = CommentSectionView.clampLimit(requestedLimit);
-
-        List<CommentRow> rows = communityMapper.findRecentComments(postId, limit);
-        CommentCountRow counts = communityMapper.countComments(postId);
-
-        Map<Long, MemberCommunityView> authors =
-                communityMemberViewLoader.findByIds(rows.stream().map(CommentRow::memberId));
-
-        List<CommentView> recent = rows.stream()
-                .map(row -> CommentView.of(row, authors.get(row.memberId())))
-                .toList();
-
-        return new CommentSectionView(
-                List.copyOf(recent.reversed()),
-                counts.publishedCount(),
-                counts.rowCount(),
-                limit
-        );
-    }
-
-    @Transactional(readOnly = true)
     public PostDetailView getCommentablePost(long postId, long memberId) {
         return requireCommentablePost(postId, memberId);
-    }
-
-    @Transactional
-    public void addComment(long postId, CommentForm form, long authorId) {
-        requireCommentablePost(postId, authorId);
-
-        communityMapper.insertComment(
-                Comment.create(postId, authorId, form.getContent()));
-    }
-
-    @Transactional
-    public void deleteComment(long postId, long commentId, long memberId) {
-        requireCommentablePost(postId, memberId);
-        requireOwnCommentTransition(
-                postId, commentId, memberId, CommentStatus.DELETED);
-
-        requireCommentApplied(
-                communityMapper.deleteComment(commentId, postId, memberId),
-                postId,
-                commentId,
-                memberId
-        );
     }
 
     @Transactional
@@ -275,41 +224,12 @@ public class CommunityService {
         communityPostAccessPolicy.requirePublished(post.status());
     }
 
-    private void requireCommentApplied(
-            int affectedRows, long postId, long commentId, long memberId) {
-        if (affectedRows > 0) {
-            return;
-        }
-
-        requireCommentablePost(postId, memberId);
-        requireOwnCommentTransition(
-                postId, commentId, memberId, CommentStatus.DELETED);
-
-        throw new BusinessException(CommunityErrorCode.COMMENT_NOT_FOUND);
-    }
-
     private PostDetailView requireCommentablePost(long postId, Long memberId) {
         PostDetailView post = requireVisiblePost(postId, memberId);
 
         communityPostAccessPolicy.requirePublished(post.status());
 
         return post;
-    }
-
-    private void requireOwnCommentTransition(
-            long postId,
-            long commentId,
-            long memberId,
-            CommentStatus next) {
-        // 소유권 판단에만 쓰므로 작성자 표기가 필요 없고, 그래서 회원 조회도 붙지 않는다.
-        CommentRow comment = communityMapper.findCommentById(commentId);
-
-        if (comment == null
-                || !comment.postId().equals(postId)
-                || !comment.memberId().equals(memberId)
-                || !comment.status().canTransitionTo(next)) {
-            throw new BusinessException(CommunityErrorCode.COMMENT_NOT_FOUND);
-        }
     }
 
     private PostDetailView requireVisiblePost(long postId, Long viewerId) {
