@@ -600,9 +600,7 @@ document.addEventListener("DOMContentLoaded", () => {
     updateReadBadges(adminChatMessagesContainer);
 
     if (!isAdminSender && msg.id) {
-      if (document.visibilityState === "visible") {
-        markRead(selectedChatRoomId, msg.id);
-      }
+      markRead(selectedChatRoomId, msg.id);
     }
   }
 

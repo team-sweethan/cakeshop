@@ -53,7 +53,7 @@ document.addEventListener("DOMContentLoaded", () => {
       await loadMessages(currentChatRoomId);
       await loadOrderBanners(currentChatRoomId);
       if (lastFetchedMessageId > 0) {
-        await updateReadCursor(currentChatRoomId, lastFetchedMessageId);
+        sendReadCursor(currentChatRoomId, lastFetchedMessageId);
       }
 
     } catch (err) {
@@ -195,11 +195,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     updateReadBadges(chatMessagesContainer);
 
-    // 상대방(관리자) 메시지 수신 시 탭이 활성화된(visible) 상태에서만 즉시 읽음 커서 전송
+    // 상대방(관리자) 메시지 수신 시 즉시 읽음 커서 전송
     if (msg.senderType !== "CUSTOMER" && msg.id) {
-      if (document.visibilityState === "visible") {
-        sendReadCursor(currentChatRoomId, msg.id);
-      }
+      sendReadCursor(currentChatRoomId, msg.id);
     }
   }
 
