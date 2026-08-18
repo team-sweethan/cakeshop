@@ -58,6 +58,14 @@
         <p th:text="${post.content}" style="white-space:pre-wrap">본문</p>
       </div>
 
+      <!--/* 첨부는 본문 아래 목록으로 붙는다(specs/community-post.md A4). */-->
+      <div class="stack section" th:if="${!#lists.isEmpty(postImages)}">
+        <img th:each="image : ${postImages}"
+             th:src="@{${image.imageUrl}}"
+             alt="첨부 이미지"
+             style="max-width:100%">
+      </div>
+
       <div class="cluster section" sec:authorize="!hasRole('ADMIN')">
         <span class="text-muted" th:text="'좋아요 ' + ${post.likeCount}">좋아요 0</span>
 

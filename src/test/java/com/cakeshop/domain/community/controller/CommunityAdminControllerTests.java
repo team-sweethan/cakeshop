@@ -28,6 +28,7 @@ import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.entity.ReportStatus;
 import com.cakeshop.domain.community.service.CommunityAdminService;
 import com.cakeshop.domain.community.service.CommunityCommentService;
+import com.cakeshop.domain.community.service.CommunityPostImageService;
 import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
@@ -70,7 +71,7 @@ class CommunityAdminControllerTests {
 
         mockMvc = MockMvcBuilders
                 .standaloneSetup(
-                        new CommunityAdminController(communityAdminService, communityCommentService))
+                        new CommunityAdminController(communityAdminService, communityCommentService, mock(CommunityPostImageService.class)))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .build();
     }

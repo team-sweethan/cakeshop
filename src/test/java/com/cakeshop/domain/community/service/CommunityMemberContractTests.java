@@ -19,6 +19,7 @@ import com.cakeshop.domain.member.service.MemberCommunityQueryService;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.config.ClockConfig;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
+import com.cakeshop.global.infra.FileStorageClient;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,6 +28,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /** 커뮤니티와 회원 조회 계약의 실제 DB 조립 결과를 검증한다. */
 @MybatisTest
@@ -39,6 +41,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
         MemberCommunityQueryService.class,
         CommunityMemberViewLoader.class,
         CommunityPostAccessPolicy.class,
+        CommunityPostImageService.class,
+        CommunityImageValidator.class,
         PopularPostReader.class,
         ClockConfig.class})
 class CommunityMemberContractTests {
@@ -46,6 +50,9 @@ class CommunityMemberContractTests {
     private static final LocalDateTime BASE_TIME = LocalDateTime.of(2026, 3, 1, 10, 0);
 
     private static final PageRequest FIRST_PAGE = new PageRequest(1, 20);
+
+    @MockitoBean
+    private FileStorageClient fileStorageClient;
 
     @Autowired
     private CommunityPostService communityPostService;

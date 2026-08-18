@@ -34,6 +34,7 @@ import com.cakeshop.domain.community.dto.view.PostSort;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
 import com.cakeshop.domain.community.service.CommunityNoticeService;
+import com.cakeshop.domain.community.service.CommunityPostImageService;
 import com.cakeshop.domain.community.service.CommunityReactionService;
 import com.cakeshop.domain.community.service.CommunityCommentService;
 import com.cakeshop.domain.community.service.CommunityPostService;
@@ -88,10 +89,11 @@ class CommunityControllerTests {
                 .standaloneSetup(
                         new CommunityController(
                                 communityPostService,
+                                mock(CommunityPostImageService.class),
                                 communityNoticeService,
                                 // 상세 화면을 목으로 갈면 아래 Model 속성 검사가 전부 빈 값을 본다.
                                 new CommunityDetailPage(
-                                        communityCommentService, communityReactionService)))
+                                        communityCommentService, communityReactionService, mock(CommunityPostImageService.class))))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .build();
     }

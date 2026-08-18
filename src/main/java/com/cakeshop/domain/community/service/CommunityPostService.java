@@ -51,6 +51,7 @@ public class CommunityPostService {
     private final CommunityMemberViewLoader communityMemberViewLoader;
     private final CommunityPostAccessPolicy communityPostAccessPolicy;
     private final PopularPostReader popularPostReader;
+    private final CommunityPostImageService communityPostImageService;
 
     @Transactional(readOnly = true)
     public PageResult<PostListView> getPosts(
@@ -118,6 +119,9 @@ public class CommunityPostService {
 
         communityMapper.insertPost(post);
 
+        // 같은 트랜잭션 안에서 붙인다. 나누면 글은 올라갔는데 첨부만 빠진 글이 생긴다.
+        communityPostImageService.attach(post.getId(), form.getImages());
+
         return post.getId();
     }
 
@@ -140,6 +144,13 @@ public class CommunityPostService {
         );
 
         requireApplied(communityMapper.updatePost(command), postId, editorId);
+
+        communityPostImageService.applyEdit(
+                postId,
+                editorId,
+                form.getDeleteImageIds(),
+                form.getImages()
+        );
     }
 
     @Transactional

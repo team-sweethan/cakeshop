@@ -36,7 +36,7 @@
 | **A1** | 게시글 작성 | 고객 | `GET /community/new` · `POST /community` | **완료** | 2 | `community-post.md` |
 | **A2** | 게시글 수정 | 작성자 | `GET·POST /community/{id}/edit` | **완료** | 2 | `community-post.md` |
 | **A3** | 게시글 삭제 | 작성자 | `POST /community/{id}/delete` | **완료** | 2 | `community-post.md` |
-| **A4** | 이미지 첨부 | 고객 | (A1·A2에 포함) | **없음** | 2차 | `community-post.md` |
+| **A4** | 이미지 첨부 | 고객 | (A1·A2에 포함) | **완료** | 12 | `community-post.md` |
 | **A5** | 댓글 작성 | 고객 | `POST /community/{postId}/comments` | **완료** | 3 | `community-comment.md` |
 | **A6** | 댓글 삭제 | 댓글 작성자 | `POST /community/{postId}/comments/{commentId}/delete` | **완료** | 3 | `community-comment.md` |
 | **A7** | 대댓글 (5 depth) | 고객 | — | **없음** | 2차 | `community-comment.md` |
@@ -83,7 +83,7 @@ Cakeshop 커뮤니티는 고객이 케이크 관련 질문과 후기를 공유�
 |---|---|
 | 검색 | 2차에서 다룬다. 단순한 제목·본문 `LIKE` 검색은 데이터가 늘면 성능 부담이 될 수 있으므로, 실제 요구와 데이터 규모를 확인한 뒤 구현 방식과 인프라 도입 여부를 별도로 합의한다 |
 | 무한 스크롤 | 게시글 목록은 1차에서 쪽 번호 페이징으로 간다. **댓글의 `이전 댓글 더 보기`는 이것이 아니다** — 스크롤이 아니라 사용자가 누를 때만 늘어나고, 주소가 바뀌는 링크라 JS 없이 동작한다 (`specs/community-comment.md` B4) |
-| 이미지 첨부 | `post_images` 테이블은 V0에 있지만 1차에서는 쓰지 않는다 |
+| ~~이미지 첨부~~ | **끝났다 (조각 12).** 규칙은 `specs/community-post.md` A4가 정본이다 |
 | 대댓글 | `parent_comment_id` 컬럼은 V0에 있지만 **코드에 등장시키지 않는다** (`specs/community-comment.md` A7) |
 
 ### 범위 밖
@@ -164,10 +164,11 @@ Cakeshop 커뮤니티는 고객이 케이크 관련 질문과 후기를 공유�
 
 ### 4.5 게시글 삭제와 자식 데이터
 
-게시글을 soft delete해도 `comments`, `post_likes`, `post_reports` 행은 **그대로 둔다.**
+게시글을 soft delete해도 `comments`, `post_likes`, `post_reports`, `post_images` 행은 **그대로 둔다.**
 
 - 게시글이 `DELETED`면 상세가 404이므로 댓글이 노출될 경로가 없다. 자식까지 일괄 `DELETED`로 바꾸는 것은 중복이고, "원래 삭제돼 있던 댓글"과 "게시글 때문에 삭제된 댓글"을 구분할 수 없게 만든다.
 - **대신 댓글·좋아요·신고 Service는 대상 게시글이 `PUBLISHED`인지 반드시 검증해야 한다.** 이 검증이 없으면 삭제된 글에 API로 직접 댓글을 달 수 있다. 테스트로 고정할 항목이다.
+- **첨부 이미지는 행뿐 아니라 저장된 파일도 남고, 그 파일의 URL은 계속 열려 있다.** 정적 경로(`/uploads/**`)가 인증 없이 열려 있어서다. 알고 받아들인 구멍이고 근거와 되돌아올 계기는 `specs/community-post.md` A4와 `PLAN.md` R33에 있다.
 
 **이 검증은 불변식이 아니라 권한 판단이다.** 확인하는 SELECT와 뒤따르는 쓰기 사이에 게시글이 차단·삭제되면 그 쓰기는 그대로 통과한다. **부모 행을 잠가서 막지 않는다** — 위 첫 항목이 말하듯 "비노출 글에는 자식 행이 없다"는 불변식 자체가 없으므로 지킬 것이 없고, 댓글 쓰기마다 게시글 행을 잠그면 `specs/community-read.md` B3의 조회수 UPDATE와 같은 행을 두고 경합한다. 남는 창과 되돌아올 계기는 `PLAN.md` R14에 있다.
 

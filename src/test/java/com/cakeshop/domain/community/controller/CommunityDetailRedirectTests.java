@@ -16,6 +16,7 @@ import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.service.CommunityCommentService;
 import com.cakeshop.domain.community.service.CommunityPostService;
+import com.cakeshop.domain.community.service.CommunityPostImageService;
 import com.cakeshop.domain.community.service.CommunityReactionService;
 import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
 import com.cakeshop.global.security.MemberDetails;
@@ -55,7 +56,7 @@ class CommunityDetailRedirectTests {
                         List.of(), 0, 0, CommentSectionView.DEFAULT_LIMIT));
 
         CommunityDetailPage detailPage =
-                new CommunityDetailPage(communityCommentService, communityReactionService);
+                new CommunityDetailPage(communityCommentService, communityReactionService, mock(CommunityPostImageService.class));
 
         mockMvc = MockMvcBuilders
                 .standaloneSetup(

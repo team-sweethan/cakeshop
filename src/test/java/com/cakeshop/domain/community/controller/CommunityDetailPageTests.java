@@ -15,6 +15,7 @@ import com.cakeshop.domain.community.dto.view.CommentSectionView;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.service.CommunityCommentService;
+import com.cakeshop.domain.community.service.CommunityPostImageService;
 import com.cakeshop.domain.community.service.CommunityReactionService;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -53,7 +54,7 @@ class CommunityDetailPageTests {
                         List.of(), 0, 0, CommentSectionView.DEFAULT_LIMIT));
 
         detailPage = new CommunityDetailPage(
-                communityCommentService, communityReactionService);
+                communityCommentService, communityReactionService, mock(CommunityPostImageService.class));
     }
 
     /** 수정 버튼은 노출 중인 자기 글에만 나온다. */

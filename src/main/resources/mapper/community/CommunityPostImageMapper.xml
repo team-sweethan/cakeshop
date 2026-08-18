@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+******************************
+작성자 : HyunGyu-Cho
+담당자 : 현규
+작성일 : 2026-08-18
+기능 : 커뮤니티 데이터 접근
+설명 : CommunityPostImageMapper 첨부 이미지의 조회와 변경을 수행한다.
+******************************
+
+첨부의 소유자는 post_images 에 없다. member_id 를 갖는 것은 posts 라서, 쓰기 조건은 전부
+posts 를 JOIN 해서 만든다. 이미지 id 만으로 지우면 id 를 바꿔 넣는 것만으로 남의 첨부가
+지워진다 — specs/community-post.md H48 이 그 자리를 문다.
+-->
+<mapper namespace="com.cakeshop.domain.community.mapper.CommunityPostImageMapper">
+
+    <!--
+    지울 수 있는 첨부의 조건. 조회와 삭제가 같은 조건을 봐야 "읽어서 파일을 지웠는데 행은
+    안 지워졌다"가 생기지 않는다.
+    -->
+    <sql id="deletableImage">
+        pi.post_id = #{postId}
+        AND p.member_id = #{memberId}
+        AND p.status = 'PUBLISHED'
+        AND pi.id IN
+        <foreach collection="imageIds" item="imageId" open="(" separator="," close=")">
+            #{imageId}
+        </foreach>
+    </sql>
+
+    <select id="findImagesByPostId"
+            resultType="com.cakeshop.domain.community.dto.view.PostImageView">
+
+        SELECT
+        pi.id,
+        pi.image_url,
+        pi.sort_order
+
+        FROM post_images pi
+
+        WHERE pi.post_id = #{postId}
+
+        ORDER BY pi.sort_order, pi.id
+    </select>
+
+    <select id="countImagesByPostId" resultType="int">
+
+        SELECT COUNT(*)
+
+        FROM post_images pi
+
+        WHERE pi.post_id = #{postId}
+    </select>
+
+    <!-- 첫 장은 0 이다. sort_order 는 등록 순서일 뿐이라 빈자리를 메우지 않는다. -->
+    <select id="findNextSortOrder" resultType="int">
+
+        SELECT COALESCE(MAX(pi.sort_order) + 1, 0)
+
+        FROM post_images pi
+
+        WHERE pi.post_id = #{postId}
+    </select>
+
+    <insert id="insertImage" useGeneratedKeys="true" keyProperty="id">
+
+        INSERT INTO post_images (post_id, image_url, sort_order)
+        VALUES (#{postId}, #{imageUrl}, #{sortOrder})
+    </insert>
+
+    <select id="findDeletableImages"
+            resultType="com.cakeshop.domain.community.dto.view.PostImageView">
+
+        SELECT
+        pi.id,
+        pi.image_url,
+        pi.sort_order
+
+        FROM post_images pi
+        JOIN posts p ON p.id = pi.post_id
+
+        WHERE <include refid="deletableImage"/>
+
+        ORDER BY pi.sort_order, pi.id
+    </select>
+
+    <delete id="deleteImages">
+
+        DELETE pi
+
+        FROM post_images pi
+        JOIN posts p ON p.id = pi.post_id
+
+        WHERE <include refid="deletableImage"/>
+    </delete>
+
+</mapper>

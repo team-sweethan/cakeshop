@@ -1,5 +1,8 @@
 package com.cakeshop.domain.community.controller;
 
+import java.util.List;
+import java.util.Map;
+
 import com.cakeshop.domain.community.dto.form.CommentForm;
 import com.cakeshop.domain.community.dto.form.PostForm;
 import com.cakeshop.domain.community.dto.form.ReportForm;
@@ -8,6 +11,7 @@ import com.cakeshop.domain.community.dto.view.PostListView;
 import com.cakeshop.domain.community.dto.view.PostSort;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
 import com.cakeshop.domain.community.service.CommunityNoticeService;
+import com.cakeshop.domain.community.service.CommunityPostImageService;
 import com.cakeshop.domain.community.service.CommunityPostService;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.common.paging.PageNavigation;
@@ -44,7 +48,17 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @RequiredArgsConstructor
 public class CommunityController {
 
+    /** 폼으로 돌려보낼 거절과 그 오류가 붙을 입력 칸이다. 여기 없는 거절은 그대로 올라간다. */
+    private static final Map<CommunityErrorCode, String> FORM_ERROR_FIELDS = Map.of(
+            CommunityErrorCode.CATEGORY_NOT_FOUND, "categoryId",
+            CommunityErrorCode.INVALID_IMAGE_FILE, "images",
+            CommunityErrorCode.IMAGE_TOO_LARGE, "images",
+            CommunityErrorCode.IMAGE_LIMIT_EXCEEDED, "images",
+            CommunityErrorCode.IMAGE_NOT_FOUND, "images"
+    );
+
     private final CommunityPostService communityPostService;
+    private final CommunityPostImageService communityPostImageService;
     private final CommunityNoticeService communityNoticeService;
     private final CommunityDetailPage communityDetailPage;
 
@@ -136,7 +150,7 @@ public class CommunityController {
         try {
             postId = communityPostService.createPost(form, memberDetails.getMemberId());
         } catch (BusinessException e) {
-            return rejectCategoryOrRethrow(e, bindingResult, model, null);
+            return rejectFormErrorOrRethrow(e, bindingResult, model, null);
         }
 
         return "redirect:/community/" + postId;
@@ -176,7 +190,7 @@ public class CommunityController {
         try {
             communityPostService.updatePost(postId, form, memberDetails.getMemberId());
         } catch (BusinessException e) {
-            return rejectCategoryOrRethrow(e, bindingResult, model, postId);
+            return rejectFormErrorOrRethrow(e, bindingResult, model, postId);
         }
 
         return "redirect:/community/" + postId;
@@ -195,14 +209,22 @@ public class CommunityController {
         return "redirect:/community";
     }
 
-    private String rejectCategoryOrRethrow(
+    /*
+     * 폼에서 고칠 수 있는 거절은 폼으로 돌려보내고 나머지는 그대로 올린다.
+     *
+     * <p>첨부 오류가 여기 있는 이유는 장수 상한이 폼 혼자 알 수 없는 값이기 때문이다 — 이미
+     * 붙어 있는 장수와 함께 세야 해서 Service 가 판단하고, 그 결과가 오류 화면이 아니라 입력한
+     * 제목·본문이 살아 있는 폼으로 돌아와야 한다.
+     */
+    private String rejectFormErrorOrRethrow(
             BusinessException e, BindingResult bindingResult, Model model, Long postId) {
-        if (e.getErrorCode() != CommunityErrorCode.CATEGORY_NOT_FOUND) {
+        String field = FORM_ERROR_FIELDS.get(e.getErrorCode());
+
+        if (field == null) {
             throw e;
         }
 
-        bindingResult.rejectValue(
-                "categoryId", "categoryNotFound", e.getErrorCode().message());
+        bindingResult.rejectValue(field, e.getErrorCode().code(), e.getErrorCode().message());
 
         return prepareForm(model, postId);
     }
@@ -210,6 +232,10 @@ public class CommunityController {
     private String prepareForm(Model model, Long postId) {
         model.addAttribute("categories", communityPostService.getActiveCategories());
         model.addAttribute("editingPostId", postId);
+        model.addAttribute(
+                "postImages",
+                postId == null ? List.of() : communityPostImageService.getImages(postId)
+        );
 
         return "customer/community/form";
     }

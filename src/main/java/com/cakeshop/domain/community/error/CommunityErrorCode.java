@@ -32,7 +32,15 @@ public enum CommunityErrorCode implements ErrorCode {
 
     NOTICE_NOT_FOUND("COMMUNITY_008", "공지사항을 찾을 수 없습니다.", 404),
 
-    INVALID_NOTICE_TRANSITION("COMMUNITY_009", "지금 상태에서 할 수 없는 조치입니다.", 400);
+    INVALID_NOTICE_TRANSITION("COMMUNITY_009", "지금 상태에서 할 수 없는 조치입니다.", 400),
+
+    INVALID_IMAGE_FILE("COMMUNITY_010", "JPG 또는 PNG 이미지만 첨부할 수 있습니다.", 400),
+
+    IMAGE_TOO_LARGE("COMMUNITY_011", "이미지는 한 장에 5MB까지 첨부할 수 있습니다.", 400),
+
+    IMAGE_LIMIT_EXCEEDED("COMMUNITY_012", "이미지는 게시글당 5장까지 첨부할 수 있습니다.", 400),
+
+    IMAGE_NOT_FOUND("COMMUNITY_013", "첨부 이미지를 찾을 수 없습니다.", 404);
 
     private final String code;
     private final String message;
