@@ -59,7 +59,7 @@ class CommunityDetailPage {
         model.addAttribute("viewerId", viewerId);
         model.addAttribute(
                 "canEdit",
-                viewerId != null && viewerId.equals(post.memberId()) && !post.isBlocked()
+                post.isAuthoredBy(viewerId) && !post.isBlocked()
         );
 
         boolean canWrite = viewerId != null && !post.isBlocked();
@@ -72,7 +72,7 @@ class CommunityDetailPage {
         );
 
         boolean canReport =
-                viewerId != null && !viewerId.equals(post.memberId()) && !post.isBlocked();
+                viewerId != null && !post.isAuthoredBy(viewerId) && !post.isBlocked();
         model.addAttribute("canReport", canReport);
 
         model.addAttribute(
