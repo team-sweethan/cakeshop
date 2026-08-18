@@ -51,6 +51,7 @@ public class CommunityController {
     private final CommunityCommentService communityCommentService;
     private final CommunityNoticeService communityNoticeService;
     private final CommunityReactionService communityReactionService;
+    private final CommunityDetailModelAssembler communityDetailModelAssembler;
 
     @GetMapping("/community")
     public String list(
@@ -214,35 +215,8 @@ public class CommunityController {
 
     private String prepareDetail(
             Model model, PostDetailView post, Long viewerId, String comments) {
-        model.addAttribute("post", post);
-        model.addAttribute("viewerId", viewerId);
-        model.addAttribute(
-                "canEdit",
-                viewerId != null && viewerId.equals(post.memberId()) && !post.isBlocked()
-        );
-
-        boolean canWrite = viewerId != null && !post.isBlocked();
-        model.addAttribute("canComment", canWrite);
-        model.addAttribute("canLike", canWrite);
-
-        model.addAttribute(
-                "likedByViewer",
-                canWrite && communityReactionService.isLikedBy(post.id(), viewerId)
-        );
-
-        boolean canReport =
-                viewerId != null && !viewerId.equals(post.memberId()) && !post.isBlocked();
-        model.addAttribute("canReport", canReport);
-
-        model.addAttribute(
-                "alreadyReported",
-                canReport && communityReactionService.isReportedBy(post.id(), viewerId)
-        );
-
-        model.addAttribute(
-                "commentSection",
-                communityCommentService.getComments(post.id(), parsePositiveInteger(comments))
-        );
+        communityDetailModelAssembler.assemble(
+                model, post, viewerId, parsePositiveInteger(comments));
 
         return "customer/community/detail";
     }
