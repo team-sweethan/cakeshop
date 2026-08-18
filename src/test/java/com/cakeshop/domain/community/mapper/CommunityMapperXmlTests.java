@@ -83,6 +83,8 @@ class CommunityMapperXmlTests {
                 .contains("ORDER BY P.CREATED_AT DESC, P.ID DESC");
         assertThat(normalizedSql("findPublishedPosts", Map.of("sort", PostSort.VIEWS)))
                 .contains("ORDER BY P.VIEW_COUNT DESC, P.ID DESC");
+        assertThat(normalizedSql("findPublishedPosts", Map.of("sort", PostSort.LIKES)))
+                .contains("ORDER BY P.LIKE_COUNT DESC, P.ID DESC");
     }
 
     @Test

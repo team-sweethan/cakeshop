@@ -124,6 +124,8 @@ class CommunityControllerTests {
             "전체, -, -, -, LATEST, 1",
             "-, VIEWS, -, -, VIEWS, 1",
             "-, views, -, -, VIEWS, 1",
+            "-, LIKES, -, -, LIKES, 1",
+            "-, likes, -, -, LIKES, 1",
             "-, 'id; DROP TABLE posts', -, -, LATEST, 1",
             "-, -, abc, -, LATEST, 1"
     })

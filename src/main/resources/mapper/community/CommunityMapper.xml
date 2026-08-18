@@ -43,6 +43,9 @@
             <when test="sort != null and sort.name() == 'VIEWS'">
                 ORDER BY p.view_count DESC, p.id DESC
             </when>
+            <when test="sort != null and sort.name() == 'LIKES'">
+                ORDER BY p.like_count DESC, p.id DESC
+            </when>
             <otherwise>
                 ORDER BY p.created_at DESC, p.id DESC
             </otherwise>
