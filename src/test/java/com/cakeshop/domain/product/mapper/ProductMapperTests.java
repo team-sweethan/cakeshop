@@ -229,6 +229,22 @@ class ProductMapperTests {
     }
 
     @Test
+    void publicList_withoutMaximumPrice_includesProductOverOneHundredThousandWon() {
+        ProductSearchCondition condition = baseCondition();
+
+        List<ProductListView> products =
+                productMapper.findPublicProducts(
+                        condition,
+                        10,
+                        0
+                );
+
+        assertThat(products)
+                .extracting(ProductListView::name)
+                .contains(keyword + " F 10만원 초과 주문 제작");
+    }
+
+    @Test
     void publicList_productsWithAndWithoutImages_returnsRepresentativeOrNull() {
         jdbcTemplate.update(
                 """

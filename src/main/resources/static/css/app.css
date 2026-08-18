@@ -1172,17 +1172,20 @@ h2.section-title {
 }
 
 .price-range {
-    align-items: center;
+    align-items: stretch;
     display: grid;
-    gap: 4px;
-    grid-template-columns:minmax(0, 1fr) auto minmax(0, 1fr)
+    gap: 8px;
+    grid-template-columns: minmax(0, 1fr)
 }
 
 .price-range .form-control {
     min-width: 0;
-    padding-left: 5px;
-    padding-right: 5px;
     width: 100%
+}
+
+.price-range > span {
+    line-height: 1;
+    text-align: center
 }
 
 .btn[hidden] {
