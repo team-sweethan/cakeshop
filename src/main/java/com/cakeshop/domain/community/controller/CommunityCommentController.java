@@ -42,6 +42,7 @@ public class CommunityCommentController {
     private final CommunityCommentService communityCommentService;
     private final CommunityDetailPage communityDetailPage;
 
+    // 댓글 작성
     @PostMapping("/community/{postId:\\d+}/comments")
     public String addComment(
             @PathVariable("postId") long postId,

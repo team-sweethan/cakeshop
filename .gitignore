@@ -4,6 +4,7 @@ out/
 .idea/
 *.iml
 .vscode/
+.claude/
 application-prod.yml
 .env
 uploads/
