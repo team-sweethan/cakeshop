@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
  * 담당자 : 주환
  * 작성일 : 2026-08-18
  * 기능 : 픽업 안내 알림(하루 전/당일) 자동 동기화 스케줄러
- * 설명 : 매일 아침 9시 pickup_at 날짜를 조회하여 픽업 하루 전 및 픽업 당일 안내 알림/SMS를 멱등하게 전송한다.
+ * 설명 : 서울 시각(Asia/Seoul) 기준 매 시간 정각 픽업 하루 전 및 픽업 당일 안내 알림/SMS를 멱등하게 전송하며, 오전 9시 이후 다운타임 누락건도 당일 내 자동 복구한다.
  * ******************************
  */
 @Slf4j
@@ -31,9 +31,9 @@ public class OrderPickupNotificationSync {
 
     private final AtomicBoolean isRunning = new AtomicBoolean(false);
 
-    /** 매일 아침 9시 픽업 안내 알림 발송 */
+    /** 서울 시간대 기준 매 시간 정각 픽업 안내 알림 체크 및 복구 발송 */
     @Async
-    @Scheduled(cron = "0 0 9 * * *")
+    @Scheduled(cron = "0 0 * * * *", zone = "Asia/Seoul")
     public void syncPickupReminderNotifications() {
         if (!isRunning.compareAndSet(false, true)) {
             log.trace("이전 픽업 안내 배치가 실행 중이므로 스킵합니다.");
