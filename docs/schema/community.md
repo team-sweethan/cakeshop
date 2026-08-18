@@ -43,6 +43,7 @@
 - FK: `member_id`, `blocked_by` → 각각 `members.id`; `category_id` → `post_categories.id`
 - CHECK: `chk_posts_status` — `status IN ('PUBLISHED', 'DELETED', 'BLOCKED')`
 - INDEX: `ix_posts_status_view_count` (`status`, `view_count`, `id`)
+- INDEX: `ix_posts_status_like_count` (`status`, `like_count`, `id`)
 - INDEX: `idx_posts_created_at` (`created_at`)
 
 ## `comments`
@@ -191,3 +192,4 @@
 - `V20260805_073107__add_daily_popular_posts.sql`
 - `V20260812_065639__add_community_notices.sql`
 - `V20260813_094912__add_statistics_additional_metrics.sql`
+- `V20260818_234248__add_post_like_count_sort_index.sql`
