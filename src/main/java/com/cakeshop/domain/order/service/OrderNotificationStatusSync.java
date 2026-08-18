@@ -54,29 +54,35 @@ public class OrderNotificationStatusSync {
                 String statusStr = order.status();
                 long orderId = order.id();
                 long memberId = order.memberId();
+                String orderNumber = order.orderNumber();
 
-                if ("IN_PRODUCTION".equalsIgnoreCase(statusStr)) {
-                    String eventKey = "CUSTOM_ORDER_IN_PRODUCTION:" + memberId + ":" + orderId;
-                    if (!notificationOrderQueryService.existsByReceiverIdAndEventKey(memberId, eventKey)) {
-                        orderNotificationSender.sendCustomOrderInProduction(orderId, memberId);
+                try {
+                    if ("IN_PRODUCTION".equalsIgnoreCase(statusStr)) {
+                        String eventKey = "CUSTOM_ORDER_IN_PRODUCTION:" + memberId + ":" + orderId;
+                        if (!notificationOrderQueryService.isNotificationFullySent(memberId, eventKey)) {
+                            orderNotificationSender.sendCustomOrderInProduction(orderId, memberId);
+                        }
+                    } else if ("REJECTED".equalsIgnoreCase(statusStr)) {
+                        String eventKey = "CUSTOM_ORDER_REJECTED:" + memberId + ":" + orderId;
+                        if (!notificationOrderQueryService.isNotificationFullySent(memberId, eventKey)) {
+                            orderNotificationSender.sendCustomOrderRejected(orderId, memberId);
+                        }
+                    } else if ("CANCELED".equalsIgnoreCase(statusStr)) {
+                        // 고객 취소 알림 체크 및 전송
+                        String customerEventKey = "ORDER_CANCELED:" + memberId + ":" + orderId;
+                        if (!notificationOrderQueryService.isNotificationFullySent(memberId, customerEventKey)) {
+                            orderNotificationSender.sendOrderCanceledToCustomer(orderId, memberId);
+                        }
+                        // 관리자 취소 알림 전송 (주문번호 포함)
+                        orderNotificationSender.sendOrderCanceledToAdmins(orderId, memberId, orderNumber);
                     }
-                } else if ("REJECTED".equalsIgnoreCase(statusStr)) {
-                    String eventKey = "CUSTOM_ORDER_REJECTED:" + memberId + ":" + orderId;
-                    if (!notificationOrderQueryService.existsByReceiverIdAndEventKey(memberId, eventKey)) {
-                        orderNotificationSender.sendCustomOrderRejected(orderId, memberId);
-                    }
-                } else if ("CANCELED".equalsIgnoreCase(statusStr)) {
-                    // 고객 취소 알림 독립 체크 및 발송
-                    String customerEventKey = "ORDER_CANCELED:" + memberId + ":" + orderId;
-                    if (!notificationOrderQueryService.existsByReceiverIdAndEventKey(memberId, customerEventKey)) {
-                        orderNotificationSender.sendOrderCanceledToCustomer(orderId, memberId);
-                    }
-                    // 관리자 취소 알림 독립 전송 (내부 멱등성 및 개별 관리자 체크 수행)
-                    orderNotificationSender.sendOrderCanceledToAdmins(orderId, memberId);
-                }
 
-                if (order.orderUpdatedAt() != null && order.orderUpdatedAt().isAfter(maxProcessedTime)) {
-                    maxProcessedTime = order.orderUpdatedAt();
+                    if (order.orderUpdatedAt() != null && order.orderUpdatedAt().isAfter(maxProcessedTime)) {
+                        maxProcessedTime = order.orderUpdatedAt();
+                    }
+                } catch (Exception itemException) {
+                    log.error("주문(orderId={}) 상태 동기화 알림 발송 중 오류 발생. 해당 시점까지만 커서 유지:", orderId, itemException);
+                    break;
                 }
             }
 
@@ -84,7 +90,7 @@ public class OrderNotificationStatusSync {
                 lastSyncTime = maxProcessedTime;
             }
         } catch (Exception e) {
-            log.error("주문 상태 변경 동기화 알림 처리 실패:", e);
+            log.error("주문 상태 변경 동기화 알림 처리 전체 실패:", e);
         }
     }
 }

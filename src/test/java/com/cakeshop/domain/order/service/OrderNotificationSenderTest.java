@@ -42,6 +42,7 @@ class OrderNotificationSenderTest {
         long orderId = 100L;
         long customerId = 2L;
         long adminId = 1L;
+        given(memberNotificationQueryService.isMemberActive(customerId)).willReturn(true);
         given(memberNotificationQueryService.findActiveAdminIds()).willReturn(List.of(adminId));
 
         orderNotificationSender.sendOrderPaid(orderId, customerId, "GENERAL");
@@ -60,6 +61,7 @@ class OrderNotificationSenderTest {
         long orderId = 101L;
         long customerId = 2L;
         long adminId = 1L;
+        given(memberNotificationQueryService.isMemberActive(customerId)).willReturn(true);
         given(memberNotificationQueryService.findActiveAdminIds()).willReturn(List.of(adminId));
 
         orderNotificationSender.sendOrderPaid(orderId, customerId, "CUSTOM");
@@ -75,6 +77,8 @@ class OrderNotificationSenderTest {
     @Test
     @DisplayName("주문제작 제작 승인 시 고객에게 CUSTOM_ORDER_IN_PRODUCTION 알림이 전송된다")
     void sendCustomOrderInProduction_dispatchesNotification() {
+        given(memberNotificationQueryService.isMemberActive(2L)).willReturn(true);
+
         orderNotificationSender.sendCustomOrderInProduction(200L, 2L);
 
         verify(notificationService).makeNotification(argThat(req ->
@@ -85,6 +89,8 @@ class OrderNotificationSenderTest {
     @Test
     @DisplayName("주문제작 반려 시 고객에게 CUSTOM_ORDER_REJECTED 알림이 전송된다")
     void sendCustomOrderRejected_dispatchesNotification() {
+        given(memberNotificationQueryService.isMemberActive(2L)).willReturn(true);
+
         orderNotificationSender.sendCustomOrderRejected(201L, 2L);
 
         verify(notificationService).makeNotification(argThat(req ->
@@ -95,9 +101,10 @@ class OrderNotificationSenderTest {
     @Test
     @DisplayName("주문 취소 시 고객에게 ORDER_CANCELED 및 관리자에게 ORDER_CANCEL_REQUEST 알림이 전송된다")
     void sendOrderCanceled_dispatchesNotification() {
+        given(memberNotificationQueryService.isMemberActive(2L)).willReturn(true);
         given(memberNotificationQueryService.findActiveAdminIds()).willReturn(List.of(1L));
 
-        orderNotificationSender.sendOrderCanceled(202L, 2L);
+        orderNotificationSender.sendOrderCanceled(202L, 2L, "ORD-20260818-0001");
 
         verify(notificationService).makeNotification(argThat(req ->
                 req.getReceiverId() == 2L && req.getType() == NotificationType.ORDER_CANCELED

@@ -16,7 +16,7 @@ import org.springframework.stereotype.Service;
  * 담당자 : 주환
  * 작성일 : 2026-08-18
  * 기능 : 주문 및 결제 실시간/문자 알림 전송 서비스
- * 설명 : 주문/결제 라이프사이클 이벤트 발생 시 고객 및 관리자에게 실시간 웹소켓 토스트 및 문자(SMS) 알림을 발송한다.
+ * 설명 : 주문/결제 라이프사이클 이벤트 발생 시 활성 고객 및 관리자에게 실시간 웹소켓 토스트 및 문자(SMS) 알림을 발송한다.
  * ******************************
  */
 @Slf4j
@@ -32,72 +32,79 @@ public class OrderNotificationSender {
         NotificationType customerType = isCustom ? NotificationType.CUSTOM_ORDER_PAID : NotificationType.ORDER_PAID;
         NotificationType adminType = isCustom ? NotificationType.NEW_CUSTOM_ORDER : NotificationType.NEW_ORDER;
 
-        notificationService.makeNotification(NotificationRequest.builder()
-                .receiverId(customerId)
-                .actorId(customerId)
-                .orderId(orderId)
-                .type(customerType)
-                .eventKey(customerType.name() + ":" + customerId + ":" + orderId)
-                .deliveryScope(DeliveryScope.WEB_AND_SMS)
-                .args(new Object[0])
-                .build());
+        if (memberNotificationQueryService.isMemberActive(customerId)) {
+            notificationService.makeNotification(NotificationRequest.builder()
+                    .receiverId(customerId)
+                    .actorId(customerId)
+                    .orderId(orderId)
+                    .type(customerType)
+                    .eventKey(customerType.name() + ":" + customerId + ":" + orderId)
+                    .deliveryScope(DeliveryScope.WEB_AND_SMS)
+                    .args(new Object[0])
+                    .build());
+        }
 
         sendToActiveAdmins(orderId, customerId, adminType, adminType.name() + ":ALL_ADMINS:" + orderId, new Object[0]);
     }
 
     public void sendCustomOrderInProduction(long orderId, long customerId) {
-        try {
-            notificationService.makeNotification(NotificationRequest.builder()
-                    .receiverId(customerId)
-                    .orderId(orderId)
-                    .type(NotificationType.CUSTOM_ORDER_IN_PRODUCTION)
-                    .eventKey("CUSTOM_ORDER_IN_PRODUCTION:" + customerId + ":" + orderId)
-                    .deliveryScope(DeliveryScope.WEB_AND_SMS)
-                    .args(new Object[0])
-                    .build());
-        } catch (Exception e) {
-            log.error("주문제작 제작 승인 알림 발송 오류 (orderId={}):", orderId, e);
+        if (!memberNotificationQueryService.isMemberActive(customerId)) {
+            return;
         }
+
+        notificationService.makeNotification(NotificationRequest.builder()
+                .receiverId(customerId)
+                .orderId(orderId)
+                .type(NotificationType.CUSTOM_ORDER_IN_PRODUCTION)
+                .eventKey("CUSTOM_ORDER_IN_PRODUCTION:" + customerId + ":" + orderId)
+                .deliveryScope(DeliveryScope.WEB_AND_SMS)
+                .args(new Object[0])
+                .build());
     }
 
     public void sendCustomOrderRejected(long orderId, long customerId) {
-        try {
-            notificationService.makeNotification(NotificationRequest.builder()
-                    .receiverId(customerId)
-                    .orderId(orderId)
-                    .type(NotificationType.CUSTOM_ORDER_REJECTED)
-                    .eventKey("CUSTOM_ORDER_REJECTED:" + customerId + ":" + orderId)
-                    .deliveryScope(DeliveryScope.WEB_AND_SMS)
-                    .args(new Object[0])
-                    .build());
-        } catch (Exception e) {
-            log.error("주문제작 반려 알림 발송 오류 (orderId={}):", orderId, e);
+        if (!memberNotificationQueryService.isMemberActive(customerId)) {
+            return;
         }
+
+        notificationService.makeNotification(NotificationRequest.builder()
+                .receiverId(customerId)
+                .orderId(orderId)
+                .type(NotificationType.CUSTOM_ORDER_REJECTED)
+                .eventKey("CUSTOM_ORDER_REJECTED:" + customerId + ":" + orderId)
+                .deliveryScope(DeliveryScope.WEB_AND_SMS)
+                .args(new Object[0])
+                .build());
     }
 
     public void sendOrderCanceled(long orderId, long customerId) {
+        sendOrderCanceled(orderId, customerId, null);
+    }
+
+    public void sendOrderCanceled(long orderId, long customerId, String orderNumber) {
         sendOrderCanceledToCustomer(orderId, customerId);
-        sendOrderCanceledToAdmins(orderId, customerId);
+        sendOrderCanceledToAdmins(orderId, customerId, orderNumber);
     }
 
     public void sendOrderCanceledToCustomer(long orderId, long customerId) {
-        try {
-            notificationService.makeNotification(NotificationRequest.builder()
-                    .receiverId(customerId)
-                    .orderId(orderId)
-                    .type(NotificationType.ORDER_CANCELED)
-                    .eventKey("ORDER_CANCELED:" + customerId + ":" + orderId)
-                    .deliveryScope(DeliveryScope.WEB_AND_SMS)
-                    .args(new Object[0])
-                    .build());
-        } catch (Exception e) {
-            log.error("고객 주문 취소 알림 발송 오류 (orderId={}):", orderId, e);
+        if (!memberNotificationQueryService.isMemberActive(customerId)) {
+            return;
         }
+
+        notificationService.makeNotification(NotificationRequest.builder()
+                .receiverId(customerId)
+                .orderId(orderId)
+                .type(NotificationType.ORDER_CANCELED)
+                .eventKey("ORDER_CANCELED:" + customerId + ":" + orderId)
+                .deliveryScope(DeliveryScope.WEB_AND_SMS)
+                .args(new Object[0])
+                .build());
     }
 
-    public void sendOrderCanceledToAdmins(long orderId, long customerId) {
+    public void sendOrderCanceledToAdmins(long orderId, long customerId, String orderNumber) {
         try {
-            sendToActiveAdmins(orderId, customerId, NotificationType.ORDER_CANCEL_REQUEST, "ORDER_CANCEL_REQUEST:ALL_ADMINS:" + orderId, new Object[]{String.valueOf(orderId)});
+            String ordNum = (orderNumber != null && !orderNumber.isBlank()) ? orderNumber : String.valueOf(orderId);
+            sendToActiveAdmins(orderId, customerId, NotificationType.ORDER_CANCEL_REQUEST, "ORDER_CANCEL_REQUEST:ALL_ADMINS:" + orderId, new Object[]{ordNum});
         } catch (Exception e) {
             log.error("관리자 주문 취소 알림 발송 오류 (orderId={}):", orderId, e);
         }
