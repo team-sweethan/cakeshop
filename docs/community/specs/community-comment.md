@@ -58,4 +58,4 @@
 
 > **댓글 구역은 H1b에도 걸린다.** 같은 `CommunityQueryCountTests`가 네 화면의 고정 쿼리 수를 함께 들고 있고, 조각 10b에서 작성자 조회가 붙으며 댓글 구역의 기대값이 2→3으로 올랐다. 여기를 고칠 때 기대값이 함께 움직이면 `../DOMAIN.md` 11절을 본다.
 
-**H11 — 댓글 삭제의 소유권·게시글·상태 조건이 SQL에도 있음.** 남의 댓글·이미 지운 댓글·다른 글의 주소로는 UPDATE가 0행이고, 0행이 성공으로 넘어가지 않는다. `CommunityMapperTests`가 조건마다 갱신 행 수와 실제 값을 함께 보고, `CommunityServiceTests`가 0행일 때 지금 상태를 다시 읽어 404/403을 내는지 본다. `community-post.md` H2a·H2d의 댓글판이다.
+**H11 — 댓글 삭제의 소유권·게시글·상태 조건이 SQL에도 있음.** 남의 댓글·이미 지운 댓글·다른 글의 주소로는 UPDATE가 0행이고, 0행이 성공으로 넘어가지 않는다. `CommunityMapperTests`가 조건마다 갱신 행 수와 실제 값을 함께 보고, `CommunityCommentServiceTests`가 0행일 때 지금 상태를 다시 읽어 404/403을 내는지 본다. `community-post.md` H2a·H2d의 댓글판이다.
