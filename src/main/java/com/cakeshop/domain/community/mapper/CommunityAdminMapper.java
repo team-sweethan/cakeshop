@@ -43,10 +43,6 @@ public interface CommunityAdminMapper {
             @Param("postId") long postId
     );
 
-    long countPendingReports(
-            @Param("postId") long postId
-    );
-
     int blockPost(
             @Param("postId") long postId,
             @Param("reason") String reason,

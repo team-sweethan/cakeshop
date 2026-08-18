@@ -27,14 +27,6 @@
         ORDER BY pr.created_at DESC, pr.id DESC
     </select>
 
-    <select id="countPendingReports" resultType="long">
-
-        SELECT COUNT(*)
-        FROM post_reports pr
-        WHERE pr.post_id = #{postId}
-        AND pr.status = 'PENDING'
-    </select>
-
     <sql id="adminPostConditions">
         <where>
             <if test="status != null">
