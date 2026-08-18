@@ -64,6 +64,10 @@ class ProductControllerTests {
                         "pageResult",
                         pageResult
                 ))
+                .andExpect(model().attribute(
+                        "productListTitle",
+                        "상품 목록 - 일반 케이크"
+                ))
                 .andExpect(model().attributeExists(
                         "condition",
                         "productTypes",
@@ -131,7 +135,11 @@ class ProductControllerTests {
                         .param("page", "not-a-number")
                         .param("size", "-1"))
                 .andExpect(status().isOk())
-                .andExpect(view().name("customer/product/list"));
+                .andExpect(view().name("customer/product/list"))
+                .andExpect(model().attribute(
+                        "productListTitle",
+                        "상품 목록"
+                ));
 
         ArgumentCaptor<ProductSearchCondition> conditionCaptor =
                 ArgumentCaptor.forClass(

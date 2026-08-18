@@ -5,7 +5,9 @@
   <meta name="viewport"
         content="width=device-width, initial-scale=1.0">
 
-  <title>상품 목록 | 케이크 쇼핑몰</title>
+  <title th:text="${productListTitle + ' | 케이크 쇼핑몰'}">
+    상품 목록 | 케이크 쇼핑몰
+  </title>
 
   <link rel="stylesheet"
         th:href="@{/css/app.css(v='product-image-square')}">
@@ -19,14 +21,15 @@
           th:src="@{/js/product-list-filter.js}"></script>
 </head>
 
-<body data-page-title="상품 목록">
+<body data-page-title="상품 목록"
+      th:attr="data-page-title=${productListTitle}">
 <header th:replace="~{fragments/common/header :: header}">
 </header>
 
 <main class="page-container">
   <div th:replace="~{fragments/common/alert :: alert}"></div>
 
-  <h1>상품 목록</h1>
+  <h1 th:text="${productListTitle}">상품 목록</h1>
 
   <form method="get"
         th:action="@{/products}"
