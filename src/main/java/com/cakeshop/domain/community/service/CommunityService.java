@@ -28,7 +28,6 @@ import com.cakeshop.domain.community.dto.view.PostSort;
 import com.cakeshop.domain.community.entity.Comment;
 import com.cakeshop.domain.community.entity.CommentStatus;
 import com.cakeshop.domain.community.entity.Post;
-import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
 import com.cakeshop.domain.community.mapper.CommunityMapper;
 import com.cakeshop.domain.member.dto.view.MemberCommunityView;
@@ -60,6 +59,7 @@ public class CommunityService {
 
     private final CommunityMapper communityMapper;
     private final CommunityMemberViewLoader communityMemberViewLoader;
+    private final CommunityPostAccessPolicy communityPostAccessPolicy;
     private final PopularPostReader popularPostReader;
 
     @Transactional(readOnly = true)
@@ -253,7 +253,7 @@ public class CommunityService {
     private PostDetailView requireReportablePost(long postId, long memberId) {
         PostDetailView post = requireVisiblePost(postId, memberId);
 
-        if (isAuthor(post.memberId(), memberId)) {
+        if (communityPostAccessPolicy.isAuthor(post.memberId(), memberId)) {
             throw new BusinessException(CommunityErrorCode.OWN_POST_REPORT);
         }
 
@@ -267,16 +267,12 @@ public class CommunityService {
     private void requireLikeablePost(long postId, long memberId) {
         PostLockRow post = communityMapper.lockPost(postId);
 
-        if (post == null
-                || post.status() == PostStatus.DELETED
-                || (post.status() == PostStatus.BLOCKED
-                        && !Long.valueOf(memberId).equals(post.memberId()))) {
+        if (post == null) {
             throw new BusinessException(CommunityErrorCode.POST_NOT_FOUND);
         }
 
-        if (post.status() != PostStatus.PUBLISHED) {
-            throw new BusinessException(CommunityErrorCode.BLOCKED_POST);
-        }
+        communityPostAccessPolicy.requireVisible(post.status(), post.memberId(), memberId);
+        communityPostAccessPolicy.requirePublished(post.status());
     }
 
     private void requireCommentApplied(
@@ -295,9 +291,7 @@ public class CommunityService {
     private PostDetailView requireCommentablePost(long postId, Long memberId) {
         PostDetailView post = requireVisiblePost(postId, memberId);
 
-        if (post.status() != PostStatus.PUBLISHED) {
-            throw new BusinessException(CommunityErrorCode.BLOCKED_POST);
-        }
+        communityPostAccessPolicy.requirePublished(post.status());
 
         return post;
     }
@@ -319,11 +313,9 @@ public class CommunityService {
     }
 
     private PostDetailView requireVisiblePost(long postId, Long viewerId) {
-        PostDetailRow post = communityMapper.findPostById(postId);
+        PostDetailRow post = requireFoundPost(postId);
 
-        if (post == null || !isVisibleTo(post, viewerId)) {
-            throw new BusinessException(CommunityErrorCode.POST_NOT_FOUND);
-        }
+        communityPostAccessPolicy.requireVisible(post.status(), post.memberId(), viewerId);
 
         return toDetailView(post);
     }
@@ -339,19 +331,21 @@ public class CommunityService {
     }
 
     private PostDetailView requireEditablePost(long postId, long editorId) {
+        PostDetailRow post = requireFoundPost(postId);
+
+        communityPostAccessPolicy.requireEditable(post.status(), post.memberId(), editorId);
+
+        return toDetailView(post);
+    }
+
+    private PostDetailRow requireFoundPost(long postId) {
         PostDetailRow post = communityMapper.findPostById(postId);
 
-        if (post == null
-                || !isAuthor(post.memberId(), editorId)
-                || post.status() == PostStatus.DELETED) {
+        if (post == null) {
             throw new BusinessException(CommunityErrorCode.POST_NOT_FOUND);
         }
 
-        if (post.status() == PostStatus.BLOCKED) {
-            throw new BusinessException(CommunityErrorCode.BLOCKED_POST);
-        }
-
-        return toDetailView(post);
+        return post;
     }
 
     /**
@@ -370,15 +364,4 @@ public class CommunityService {
         }
     }
 
-    private boolean isVisibleTo(PostDetailRow post, Long viewerId) {
-        return switch (post.status()) {
-            case PUBLISHED -> true;
-            case BLOCKED -> isAuthor(post.memberId(), viewerId);
-            case DELETED -> false;
-        };
-    }
-
-    private boolean isAuthor(Long postMemberId, Long viewerId) {
-        return viewerId != null && viewerId.equals(postMemberId);
-    }
 }
