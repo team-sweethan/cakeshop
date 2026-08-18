@@ -60,7 +60,7 @@
 | **C6** | 공지 작성·수정 | 관리자 | `GET·POST /admin/community/notices/new` · `/{id}/edit` | **완료** | 14a | `community-notice.md` |
 | **C7** | 공지 삭제 | 관리자 | `POST /admin/community/notices/{id}/delete` | **완료** | 14a | `community-notice.md` |
 | **D1** | 작성자 표시명 | — | (Service 계약) | **완료** | 10 | 이 문서 8절 |
-| **D2** | 메인 인기글 계약 | — | (Service 계약) | **완료** | 13 | `community-popular.md` |
+| **D2** | 메인 인기글 계약 | — | (Service 계약) | **제거** — 조각 15가 메인 노출을 뺐다. 계약 클래스는 공지(D3)용으로 남는다 | 13 · 15 | `community-popular.md` |
 | **D3** | 메인 공지 계약 | — | (D2와 같은 계약에 추가) | **완료** | 14c | `community-notice.md` |
 | **E1** | 상태 enum + `CHECK` | — | — | **완료** | 0 | 이 문서 4절 |
 | **E2** | 카테고리 주입 | — | — | **완료** | 0 | 이 문서 10절 |
