@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+******************************
+작성자 : 김민정
+담당자 : 수민
+작성일 : 2026-08-18
+기능 : 주문 알림 연동 전용 관리자 회원 조회 SQL
+설명 : MemberOrderNotificationQueryService가 사용하는 읽기 전용 활성 관리자 ID 목록 조회를 둔다.
+******************************
+-->
+<mapper namespace="com.cakeshop.domain.member.mapper.MemberOrderNotificationMapper">
+
+    <!-- 활성화된 관리자 회원 ID 목록 조회 -->
+    <select id="findActiveAdminIds" resultType="long">
+        SELECT id
+        FROM members
+        WHERE role = 'ADMIN' AND status = 'ACTIVE'
+    </select>
+
+</mapper>

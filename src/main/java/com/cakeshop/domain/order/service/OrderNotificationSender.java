@@ -1,6 +1,7 @@
 package com.cakeshop.domain.order.service;
 
 import com.cakeshop.domain.member.service.MemberNotificationQueryService;
+import com.cakeshop.domain.member.service.MemberOrderNotificationQueryService;
 import com.cakeshop.domain.notification.dto.form.NotificationRequest;
 import com.cakeshop.domain.notification.entity.DeliveryScope;
 import com.cakeshop.domain.notification.entity.NotificationType;
@@ -26,6 +27,7 @@ public class OrderNotificationSender {
 
     private final NotificationService notificationService;
     private final MemberNotificationQueryService memberNotificationQueryService;
+    private final MemberOrderNotificationQueryService memberOrderNotificationQueryService;
 
     public void sendOrderPaid(long orderId, long customerId, String orderType) {
         boolean isCustom = "CUSTOM".equalsIgnoreCase(orderType);
@@ -121,7 +123,7 @@ public class OrderNotificationSender {
 
     private void sendToActiveAdmins(long orderId, Long actorId, NotificationType type, String baseEventKey, Object[] args) {
         try {
-            List<Long> activeAdminIds = memberNotificationQueryService.findActiveAdminIds();
+            List<Long> activeAdminIds = memberOrderNotificationQueryService.findActiveAdminIds();
             if (activeAdminIds == null || activeAdminIds.isEmpty()) return;
 
             for (Long adminId : activeAdminIds) {

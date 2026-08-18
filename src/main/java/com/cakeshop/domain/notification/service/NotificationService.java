@@ -34,7 +34,7 @@ public class NotificationService {
     private final MemberNotificationQueryService memberNotificationQueryService;
 
     // 알림 생성
-    @Transactional
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public void makeNotification(NotificationRequest request) {
 
         // 알림 제목, 내용 만들기
