@@ -4,6 +4,9 @@
 > `docs/community/DOMAIN.md`다. 어느 spec인지는 `DOMAIN.md` 0.1절 기능 목록이 가리킨다.
 > 이 문서는 **작업 순서, 진행 상태, 하네스 인덱스, 결정 로그, 위험**만 다룬다.
 > 규칙이 바뀌면 정본 문서를 고치고, 여기에는 "언제 왜 바꿨는지"만 한 줄 남긴다.
+>
+> 끝난 조각의 구현 기록은 `history/`, 한 줄로 재구성이 안 되는 결정의 배경은 `decisions/`에 있다.
+> 둘 다 지금 하는 일을 구속하지 않으므로 기본으로 읽지 않는다 — 필요할 때 해당 파일 하나만 연다.
 
 ## 작업 방식
 
@@ -57,499 +60,57 @@ docs/community/DOMAIN.md 0.1절에서 <이 조각의 기능 ID>가 어느 spec�
 >
 > **6 → 7 순서는 여전히 지켜야 한다.** 7은 조회수를 화면의 순위로 내보내는 일이고, 6이 없으면 **새로고침만으로 순위가 오르는 화면을 공개하는 것**이 된다. 지금은 6이 끝났으므로 7은 언제 해도 된다.
 
-### 조각 0 — 준비
+## 조각 기록
 
-**왜 먼저인가**: 조각 1의 모든 쿼리가 `status='PUBLISHED'` 조건에 의존하고, 카테고리가 없으면 게시글을 하나도 만들 수 없다. 순서를 바꾸면 조각 1에서 되돌아와야 한다.
+끝난 조각의 착수 항목·구현 기록·검증 목록은 `history/`에 있다. **머지되었고 지금 구속하지 않는 것만**
+그리로 옮긴다 — 아래 하네스 인덱스·위험·결정 로그는 과거 기록처럼 보여도 현재 구속이라 대상이 아니다.
 
-- `PostStatus { PUBLISHED, DELETED, BLOCKED }` + `canTransitionTo` (`MemberStatus` 선례를 따름)
-- 새 migration: `posts.status` CHECK 제약
-- 새 migration: `post_categories`에 `QNA/REVIEW/FREE` 주입
-- migration 파일명은 직접 짓지 않고 `gradlew newMigration -Pdesc=<snake_case>`로 생성
+**아래 표를 지우지 않는다.** 공유 migration과 시드가 `PLAN.md 조각 7b`·`PLAN.md 조각 14a`처럼
+**조각 번호로 이 문서를 가리킨다.** migration 은 고칠 수 없으므로, 그 번호로 들어온 사람이 여기서
+기록 파일을 찾을 수 있어야 한다.
 
-**검증**: 전이 규칙 단위 테스트(허용 3 / 금지 3), MariaDB Testcontainers로 CHECK 제약이 잘못된 값을 거부하는지, 카테고리 3건이 주입되는지.
-
-**완료 (2026-08-02, `4c9cdb7`)**. `PostStatus`(전이 규칙 포함), `CommentStatus`, `V20260802_113219__add_post_status_constraint.sql`(`posts`·`comments` 두 컬럼), `V20260802_113229__provision_post_categories.sql`을 추가했다. 검증은 `PostStatusTests`와 `CommunitySchemaTests`로 고정했고 하네스 표에 H0a·H0b로 올렸다. `comments.status`도 함께 제약을 건 것은 계획보다 넓지만, 댓글 자리 표시 정책(DOMAIN.md 4.4)이 상태값에 의존하므로 같은 migration에 담았다.
-
-### 조각 1 — 목록·상세
-
-- `CommunityMapper` + `CommunityMapper.xml`: 목록(스칼라 서브쿼리), 총 개수, 상세, 조회수 증가
-- `CommunityService`: `PageRequest`/`PageResult` 사용, 상세 조회 시 `UPDATE → SELECT` 단일 트랜잭션
-- 목록/상세 DTO 분리 (`dto/view/`)
-- `CommunityController` 뷰 바인딩, 템플릿 2종(`list`, `detail`) 채우기 — `form`은 작성 화면이라 조각 2다
-
-**검증**:
-- `./gradlew clean test`
-- **H1a** — 목록 SQL이 스칼라 서브쿼리 형태인지 정적 검사 (`GROUP BY`가 없고 `SELECT COUNT(*) FROM comments`를 포함)
-- **H1b** — 게시글 건수를 늘려도 실행 쿼리 수가 변하지 않는지 (목록 1 + 총 개수 1)
-- 상태별 상세 접근 규칙 (DOMAIN.md 4.3 표의 각 칸)
-- 페이징 경계: 마지막 페이지, 범위 밖 페이지, `created_at`이 동일한 글이 중복·누락되지 않는지
-
-**완료 (2026-08-02)**. `CommunityMapper`(+XML) 5개 statement, `CommunityService`, `CommunityController`, `dto/view` 3종, 템플릿 2종을 추가했다. 검증은 `CommunityMapperXmlTests`(5), `CommunityMapperTests`(20), `CommunityQueryCountTests`(2), `CommunityServiceTests`(12), `CommunityControllerTests`(9), `CommunityScreenRenderingTests`(20), `CommunitySeedTests`(4), `CommunityScreenDocTests`(6) 78건으로 고정했다. 하네스 표에 H1a·H1b·H1c·H4·H5·H6·H7을 올렸다.
-
-`bootRun`으로 띄워 목록·상세·페이징·필터·404·조회수·이스케이프를 브라우저에서 확인했다. 그 과정에서 `seed-local.sql`이 카테고리를 지우는 문제를 발견해, 커뮤니티 전용 시드 `db/seed/seed-community.sql`을 새로 만들었다(아래 결정 로그).
-
-구현 중 DOMAIN.md에 없던 빈칸 두 개를 채우고 6.2에 반영했다: 노출되지 않는 글은 조회수를 올리지 않는다(UPDATE의 `status` 조건), 조회수 UPDATE는 `updated_at`을 명시적으로 보존한다.
-
-이후 화면 명세 `docs/community/SCREENS.md`와 H7을 추가하면서, 명세를 쓰는 과정에서 렌더링 테스트가 없던 자리 네 곳(쪽 이동 블록, 작성 화면, 작성 화면의 비로그인 차단, `(수정됨)` 표시)을 발견해 함께 고정했다.
-
-H7은 리뷰를 거치며 다섯 번 강해졌다.
-
-| 단계 | 무엇까지 봤나 | 무엇이 여전히 통과했나 |
-|---|---|---|
-| 1 | 소스에 메서드 이름이 있는가 | `@Test`를 떼거나 `@Disabled`를 붙인 테스트 |
-| 2 | JUnit이 실행하는 테스트인가 | **문구와 아무 상관없는** 테스트를 연결한 경우 |
-| 3 | 본문에 문구가 등장하는가 | 입력 fixture로 쓰거나 `not(...)`으로 **없다고** 단언한 경우 |
-| 4 | `containsString`으로 **있다고 단언**하는가 | 정적 import를 지운 `Matchers.not(...)`, 조건부 비활성화(`@DisabledOnOs`) |
-| 5 | 한정한 `not`도 부정으로 세고, `org.junit.jupiter.api.condition`도 거절하는가 | 작은따옴표 `th:text='...'`, 안쪽까지 한정한 `Matchers.not(Matchers.containsString(...))` |
-| 6 | 두 표기도 함께 거절하는가 | **표기법은 계속 남는다.** 여기서 멈추고 보증 수준을 문서에 적었다 — R9 |
-
-메서드 경계도 중괄호만 세다가 문자열·주석을 인식하는 스캐너로 바꿨다. 문자열 안의 `"}"` 하나가 본문을 일찍 잘라 **뒤쪽 assertion을 통째로 빠뜨리는데**, 그렇게 비는 것은 실패가 아니라 통과로 나타나서 더 나쁘다.
-
-`build.gradle`에는 `docs/`에 더해 `src/test/java`도 `test` 입력으로 등록했다. 이 검사는 컴파일된 클래스가 아니라 소스 원문을 읽으므로 **바이트코드가 같은 수정이 검사 결과를 바꾼다.** 등록하지 않으면 Gradle이 `UP-TO-DATE`로 건너뛴다.
-
-다섯 번 모두 같은 실수였다 — **"검사가 있다"와 "검사가 문다"는 다르다.** 매번 "이번엔 됐다"고 생각한 자리에서 한 겹이 더 나왔고, 공통점은 빈 곳이 **실패가 아니라 통과의 모습**으로 나타난다는 것이다. 스스로는 못 찾는다. 통과하니까.
-
-여섯 번째에 멈춘 이유는 구멍이 없어져서가 아니다. **이 검사는 성질이 아니라 대리물(소스 텍스트의 모양)을 보므로 표기법의 수만큼 구멍이 남는다.** 한 겹 더 두껍게 만드는 것은 다음 표기 하나를 막을 뿐 종류를 없애지 못한다. 그래서 표기 2건을 막고, 이 하네스가 **어디까지 보증하는지**를 SCREENS.md와 R9에 적는 쪽으로 방향을 바꿨다.
-
-### 조각 2 — 작성·수정·삭제
-
-- 소유권 검증은 인증 사용자 기준으로 Service에서
-- 삭제 = `PUBLISHED → DELETED` 전이
-- 입력 검증 (DOMAIN.md 7)
-
-**검증**: 남의 글 수정·삭제 시도 거부, `BLOCKED` 글 수정·삭제 시도 거부, 검증 실패 케이스, 공백만 입력 거부.
-
-**완료 (2026-08-03)**. `CommunityMapper` +4 statement(`insertPost`·`updatePost`·`deletePost`·`existsActiveCategory`), `Post` 엔티티(쓰기 경로 필드만), `dto/form/PostForm`, `CommunityService` 3개 메서드 + `getEditablePost`, `CommunityController` 5개 핸들러, `form.html` 전면 교체(작성·수정 공용), `detail.html` 수정·삭제 버튼. migration은 없다 — `posts`에 필요한 컬럼이 V0에 전부 있다.
-
-검증은 `CommunityMapperTests`(+11), `CommunityServiceTests`(+15), `CommunityControllerTests`(+7), `CommunityScreenRenderingTests`(+5)로 고정했다. 하네스 표에 H2a·H2b·H2d를 올렸다.
-
-목업이던 `form.html`의 거짓 다섯 개를 걷어냈다(`screens/new.md`의 "이 화면에 없는 것"). 분류 선택지는 `categories` 모델로, `data-mock-form`과 목업 안내는 삭제, 사진 첨부 입력 삭제, 본문 `maxlength=5000` 추가. `SecurityConfig`의 `publicPreview` 목록에서 `/community/new`도 뺐다 — 저장 경로가 생긴 화면을 비로그인에게 열어 두면 폼을 다 채우고 등록에서야 튕긴다.
-
-`screens/edit.md`의 보류 3건은 아래 결정 로그에 남겼다.
-
-### 조각 3 — 댓글
-
-- 대상 게시글이 `PUBLISHED`인지 검증 (DOMAIN.md 4.5)
-- 삭제 시 자리 표시, 개수 집계에서 제외
-- `parent_comment_id`를 코드에 등장시키지 않는다
-
-**검증**: 삭제된 게시글에 댓글 작성 시도 거부, 삭제된 댓글이 개수에 안 세이는지, 남의 댓글 삭제 거부.
-
-**완료 (2026-08-03)**. `CommunityMapper` +5 statement(`findRecentComments`·`countComments`·`findCommentById`·`insertComment`·`deleteComment`), `Comment` 엔티티(쓰기 경로 필드만), `dto/form/CommentForm`, `dto/view` 3종(`CommentView`·`CommentCountView`·`CommentSectionView`), `CommunityService` 5개 메서드, `CommunityController` 2개 핸들러 + 상세 확장, `detail.html`의 "댓글 기능은 준비 중입니다" 자리를 실제 댓글로 교체. migration은 없다 — `comments`에 필요한 컬럼이 V0에 전부 있다. `SecurityConfig`도 그대로다. 새 경로는 `anyRequest().authenticated()`에 걸린다.
-
-검증은 `CommunityMapperTests`(+16), `CommunityMapperXmlTests`(+4), `CommunityServiceTests`(+19), `CommunityControllerTests`(+9), `CommunityScreenRenderingTests`(+10), `CommunityQueryCountTests`(+1), 새 `CommunityCommentScopeTests`(2)로 고정했다. 하네스 표에 H8·H9·H10·H11을 올렸다.
-
-보류 항목이던 **댓글 페이징을 "최신 20건 + `이전 댓글 더 보기`"로 결정**했다(아래 결정 로그). DOMAIN.md 6.4에 정렬·분량·경로·상한을 함께 적었고 9절의 보류 줄을 지웠다.
-
-구현 중 DOMAIN.md에 없던 빈칸 셋을 채우고 6.4에 반영했다: 댓글을 지울 수 있는 사람은 작성자 본인뿐이라는 것(게시글 작성자·관리자에게 권한이 없다), 댓글 작성뿐 아니라 **삭제에도** 게시글이 `PUBLISHED`여야 한다는 것, 삭제된 댓글의 본문을 조회 단계에서 `NULL`로 지운다는 것.
-
-`getPostDetail`을 둘로 갈랐다. 댓글 검증이 실패해 상세를 다시 그릴 때 조회수를 올리면, **빈 댓글을 여러 번 보내는 것만으로 조회수가 오른다.** 화면에는 숫자가 커질 뿐이라 원인을 찾을 수 없다. 조회수를 올리는 `getPostDetail`과 올리지 않는 `getVisiblePost`로 나누고, 노출 판단은 `requireVisiblePost` 하나가 맡는다.
-
-### 조각 4 — 좋아요
-
-- POST/DELETE 분리, 둘 다 멱등
-- `like_count` 재계산
-
-**검증**: 같은 요청 반복 시 카운트 불변, **동시 요청 후 `like_count == post_likes 실제 개수`**, 삭제된 게시글에 좋아요 시도 거부.
-
-**완료 (2026-08-04)**. `CommunityMapper` +5 statement(`lockPost`·`insertLike`·`deleteLike`·`recalculateLikeCount`·`existsLike`), `dto/view/PostLockView`, `CommunityService` 3개 메서드 + `requireLikeablePost`, `CommunityController` 2개 핸들러 + 상세 모델 확장(`canLike`·`likedByViewer`), `detail.html`의 숫자만 있던 `좋아요 N` 자리를 버튼과 함께 교체. migration은 없다 — `post_likes`(`UNIQUE(post_id, member_id)` + FK 2개)와 `posts.like_count`가 V0에 전부 있다. `SecurityConfig`도 그대로다. 공개 규칙이 `GET` 한정이라 새 POST 경로는 `anyRequest().authenticated()`에 걸린다.
-
-검증은 `CommunityMapperTests`(+7), `CommunityMapperXmlTests`(+3), `CommunityServiceTests`(+9), `CommunityControllerTests`(+8), `CommunityScreenRenderingTests`(+5), 새 `CommunityLikeConcurrencyTests`(3)로 고정했다. 하네스 표에 H2c(예정이던 것)와 H15를 올렸다.
-
-**교착이 조각 6과 같은 자리에서 다시 나왔고, 이번에는 미리 막았다.** `post_likes` INSERT가 FK 확인으로 부모 `posts` 행에 공유 잠금을 걸고 뒤따르는 재계산이 배타 잠금을 기다리는, H13과 똑같은 모양이다. **다만 해법은 쓸 수 없었다** — 조회수는 순서를 뒤집어 풀었는데, 여기서는 재계산이 INSERT 이후여야 새 행을 세므로 뒤집을 데가 없다. 그래서 `SELECT ... FOR UPDATE`로 배타 잠금을 앞에서 잡아 요청들이 한 줄로 서게 했다. **같은 종류의 함정이 두 번째로 나왔다는 것이 이 조각에서 배운 것이다** — `posts` 행에 쓰는 경로가 늘 때마다 잠금 순서를 따져야 한다.
-
-**하네스가 무는지 직접 확인했다.** `FOR UPDATE`를 떼고 돌려 보니 `CommunityLikeConcurrencyTests` 세 개가 전부 `DeadlockLoserDataAccessException`으로 실패했고, 형태 검사도 함께 물었다. 교착은 추측이 아니라 **실제로 나는 것**이었다. 조각 1에서 배운 대로 — "검사가 있다"와 "검사가 문다"는 다르다.
-
-잠금 조회를 `findPostById`로 재사용하지 않은 이유가 하나 더 있다. **`FOR UPDATE`는 조인한 테이블의 행까지 잠근다.** 상세 조회는 `post_categories`·`members`를 조인하므로 그대로 썼다면 좋아요 한 번에 카테고리 행이 잠기고 **같은 분류의 모든 글이 서로 줄을 선다.** 교착처럼 터지지 않고 조용히 느려지기만 해서 더 찾기 어려운 종류다. 그래서 `posts`만 읽는 `lockPost`와 `PostLockView`를 따로 뒀다.
-
-**이 잠금 덕분에 좋아요 경로에는 R14의 경합 창이 없다.** 댓글에서 같은 잠금을 마다한 근거가 "막는 값이 싸지 않다"였는데, 좋아요는 `like_count` 때문에 어차피 같은 행에 배타 잠금을 잡아야 해서 값이 0이다. R14는 댓글에 대해서만 유효하다.
-
-### 조각 5 — 신고·차단
-
-- 중복 신고 에러 응답, 취소 불가
-- 관리자 차단·해제, `blocked_*` 기록 및 해제 후 보존
-- 보류 항목 결정: `post_reports.status` 전이, 관리자 목록 필터·정렬
-
-**검증**: 중복 신고 거부, 비관리자의 차단 API 접근 거부(화면 숨김이 아니라 Security), 차단 해제 후 `blocked_*`가 남아 있는지.
-
-**관리자 목업 두 화면은 도메인 규칙보다 먼저 그려졌다.** 규칙에 없는 기능이 버튼으로 존재한다 — 특히 `게시글 영구 삭제`와 댓글 `삭제`는 **DOMAIN.md에 없는 권한**이고, 관리자 조치는 차단뿐이며 `BLOCKED → DELETED`는 금지다(4.2, 6.7). 상태 어휘도 화면은 `정상`/`제재`, 문서는 `차단`으로 갈려 있다. 조각 5는 `screens/admin-detail.md`의 "조각 5에서 정하거나 고쳐야 할 것" 표를 정리하는 일부터 시작한다.
-
-**완료 (2026-08-04)**. 보류 2건과 목업 정리를 먼저 확정하고(아래 결정 로그) 구현했다.
-
-- **신고**: `CommunityMapper` +5 statement(`insertReport`·`existsReport`·`findReportsByPost`·~~`countPendingReports`~~(2026-08-18 삭제, 아래 결정 로그)·`closePendingReports`), `dto/form/ReportForm`, `dto/view/ReportView`, `CommunityService` 3개 메서드 + `requireReportablePost`, `CommunityController.report` + 상세 모델 확장(`canReport`·`alreadyReported`), `detail.html`에 접힌 신고 폼.
-- **차단·해제·기각**: `ReportStatus`(전이 규칙 포함), `V20260804_074043__add_post_report_status_constraint.sql`, `CommunityMapper` +5 statement(`findPostsForAdmin`·`countPostsForAdmin`·`findPostByIdForAdmin`·`blockPost`·`unblockPost`), `dto/view` 3종(`AdminPostListView`·`AdminPostDetailView`·`AdminPostSort`), `dto/form/BlockForm`, 새 `CommunityAdminService`, `CommunityAdminController` 5개 핸들러, 관리자 템플릿 2종 전면 교체.
-- migration은 CHECK 제약 하나뿐이다 — `post_reports`와 `posts.blocked_*`가 V0에 전부 있다. `SecurityConfig`도 그대로다. 새 경로는 `/admin/**` → `hasRole("ADMIN")`과 `anyRequest().authenticated()`에 걸린다.
-
-검증은 `CommunitySchemaTests`, `CommunityMapperXmlTests`, `CommunityMapperTests`, `CommunityServiceTests`, `CommunityAdminServiceTests`, `CommunityControllerTests`, `CommunityAdminControllerTests`, `CommunityScreenRenderingTests`로 고정했다. 하네스 표에 H16·H17·H18을 올렸다.
-
-**관리자 서비스를 따로 뒀다.** 고객 경로는 "노출 중인 글만"이 기본이고 그 판단이 거의 모든 메서드에 붙어 있는데, 관리자 경로는 **모든 상태를 보는 것이 기본**이다(4.3). 한 클래스에 섞으면 노출 판단을 빠뜨린 메서드가 고객 경로에서 호출되는 날이 오고, 그때 새는 것은 차단된 글의 본문이다.
-
-**`posts` 행에 쓰는 세 번째 경로였고, 이번에는 처음부터 잠그고 시작했다.** 조회수(H13)·좋아요(H15)와 같은 자리다. 차단은 `posts`와 `post_reports`를 함께 바꾸므로 잠금 없이 하면 좋아요·조회수 경로와 순서가 엇갈린다. `lockPost`를 그대로 재사용했다 — 조인이 없는 것이 이 자리에서도 그대로 필요했다.
-
-**전이 판단을 `PostStatus.canTransitionTo`에 맡겼다.** 관리자 경로에 조건을 새로 적으면 전이 규칙이 두 벌이 되고, enum만 고치는 날 이 경로만 옛 규칙으로 남는다. `BLOCKED → BLOCKED`가 거짓인 덕분에 "이미 차단된 글 다시 차단"이 자동으로 막혔다 — 막지 않으면 원래 조치의 시각과 사유가 덮이는데 화면에는 성공으로 보인다.
-
-**신고는 좋아요와 정반대라 코드에서 그 대비를 두 번 적었다.** 좋아요는 중복이 멱등 성공, 신고는 중복이 에러다(6.6). 그래서 `insertReport`에는 `IGNORE`도 `ON DUPLICATE KEY`도 없고, XML 형태 검사가 그 부재를 고정한다 — 나중에 "여기도 좋아요처럼" 하고 붙이면 중복 신고가 조용히 성공한다.
-
-구현 중 걸린 것 하나: **Thymeleaf가 HTML 주석을 응답에 그대로 내보낸다.** 관리자 상세 주석에 "이 버튼은 없앴다"고 적으면서 없앤 문구를 그대로 썼더니, 그 문구가 화면에 없다고 단언하는 테스트가 주석 때문에 실패했다. 고객 상세에서 이미 겪고 적어 둔 함정인데 같은 자리에서 다시 밟았다.
-
-### 조각 6 — 조회수 중복 방지
-
-**왜 이것이 먼저인가**: 조각 7의 순위가 전부 이 값에 기댄다. 순서를 바꾸면 **조작이 되는 순위 화면**을 먼저 공개하게 되고, 그 사이 쌓인 `view_count`는 나중에 신뢰할 수 없어 어차피 다시 세야 한다.
-
-- 새 migration: `post_views(post_id, viewer_key, viewed_on)` + `UNIQUE (post_id, viewer_key, viewed_on)` + `posts(id)` FK — **당시 계획이다. 2026-08-04에 10분 창으로 바뀌면서 `viewed_on`과 `UNIQUE`가 없어졌다**(DOMAIN.md 6.2가 정본)
-- `viewer_key`는 회원이면 `M:{memberId}`, 비로그인이면 `S:{sessionId}` (DOMAIN.md 6.2)
-- 상세 조회 흐름을 `INSERT 시도 → 삽입 1행일 때만 view_count +1 → SELECT 상세`로 바꾼다
-- migration 파일명은 직접 짓지 않고 `gradlew newMigration -Pdesc=<snake_case>`로 생성
-
-**검증**:
-- 같은 회원이 같은 날 같은 글을 여러 번 열어도 `view_count`가 1만 오르는지
-- 날짜가 바뀌면 다시 오르는지
-- **동시 요청 후 `view_count == post_views 실제 개수`** (H2c의 좋아요판과 같은 형태)
-- 노출되지 않는 글은 `post_views` 행도 남기지 않는지 — 지금은 `view_count`만 안 오른다
-- 비로그인 세션이 유지되는 동안 재조회가 안 세이는지
-- 조각 3의 `더 보기`를 눌러도 조회수가 안 오르는지 (지금은 클릭마다 오른다 — R13)
-
-**함께 손봐야 하는 것**: `CommunityQueryCountTests.getPostDetail_queryCount_isFixed`가 상세 SELECT 1회를 단언한다. `INSERT`는 update 경로라 세지 않지만, 중복 여부를 SELECT로 확인하는 구현으로 가면 이 수가 바뀐다 — **DB가 판단하게 두면 안 바뀐다.**
-
-**완료 (2026-08-04)**. `V20260803_235726__add_post_views.sql`, `CommunityMapper.recordView` 및 `increaseViewCount` 재작성, `CommunityService.getPostDetail`에 `viewerKey` 추가, `CommunityController.viewerKeyOf`, `seed-community.sql`에 조회 이력 절 추가. 하네스 표에 H12·H13·H14를 올렸다.
-
-검증은 `CommunityMapperTests`(+8), `CommunityMapperXmlTests`(+2), `CommunityServiceTests`(+3), `CommunityControllerTests`(+2), 새 `CommunityViewCountTests`(6)·`CommunityViewCountConcurrencyTests`(2)로 고정했다.
-
-**구현 중 교착 상태를 발견해 설계를 바꿨다.** 처음에는 "이력을 먼저 넣고, 새로 들어갔으면 숫자를 올린다"로 만들었는데, `post_views` INSERT가 FK 확인 때문에 부모인 `posts` 행에 **공유 잠금(S)** 을 걸고 그 다음 조회수 UPDATE가 같은 행의 **배타 잠금(X)** 을 기다린다. 같은 글을 동시에 연 요청 둘이 서로 S를 쥔 채 상대의 X를 기다리면 그대로 교착이다. 인기 있는 글일수록 더 잘 터지는데, **단일 스레드 테스트로는 절대 드러나지 않는다.** `CommunityViewCountConcurrencyTests`를 만들고 나서야 잡혔다.
-
-그래서 순서를 뒤집어 조회수 UPDATE가 X를 먼저 잡고 `NOT EXISTS`로 중복까지 판단하게 했다. 이력 INSERT는 이미 X를 쥔 상태에서 하므로 잠금이 뒤집히지 않는다. 이 순서를 H13이 고정한다.
-
-**`ON DUPLICATE KEY UPDATE`의 갱신 행 수를 믿을 수 없다는 것도 여기서 드러났다.** MariaDB JDBC 드라이버가 `CLIENT_FOUND_ROWS`를 켜서 갱신 행 수가 '바뀐 행'이 아니라 '찾은 행'을 뜻한다. "값이 그대로면 0"에 기대는 방식은 여기서 언제나 1을 돌려주고, **제약은 멀쩡히 도는데 숫자만 부푼다.** 이력과 숫자를 비교해 보기 전에는 드러나지 않는다.
-
-시드에서 **기존 버그도 하나 고쳤다.** `like_count` 재계산 UPDATE가 `updated_at`을 보존하지 않아, 좋아요를 받은 글마다 화면에 `(수정됨)`이 붙어 있었다. 6.2·6.3이 경고하는 바로 그 유형이고 같은 파일이라 함께 고쳤다.
-
-### 조각 7 — 조회수 정렬·인기글
-
-> **한 문장**: 최근 7일 활동을 **매일 새벽 배치가 한 번** 집계해 그날의 인기글을 확정하고 날짜별 스냅샷으로 고정한다. 화면은 확정된 결과만 읽는다.
-
-> ✅ **정본은 이제 `DOMAIN.md` 6.9다 (2026-08-05, 7b와 함께 신설).** 아래 D1~D11은 **그 결정에 이르기까지의 근거와 대안**이고, "무엇이 규칙인가"를 물으면 6.9를 본다. 둘이 어긋나면 6.9가 옳다.
->
-> 화면 쪽(D6·D7)도 **7c에서 6.9의 "화면" 절로 옮겼다 (2026-08-05).** 여기에 남은 것은 근거와 대안뿐이다.
-
-DOMAIN.md 9의 보류 항목 넷이 **전부 닫혔다.**
-
-| 보류 항목 | 상태 |
+| 조각 | 기록 |
 |---|---|
-| `sort=likes` 추가 여부 | **닫음 (조각 7a)**. 넣지 않는다 — DOMAIN.md 6.1에 근거와 함께 반영 완료 |
-| 인기글의 기간 | **닫음 (조각 7b)**. 기간별 최근 7일 — DOMAIN.md 6.9에 근거와 함께 반영 완료 |
-| 인기글을 어디에 두나 | **닫음 (조각 7c)**. 목록 화면 상단의 영역 — DOMAIN.md 6.9와 9절, `SCREENS.md`에 반영 완료 |
-| `post_views` 보관 기간 | **닫음 (조각 7b)**. 1차에서는 정리하지 않는다 — 6.9와 R25에 반영 완료 |
+| 0 — 준비 | `history/2026-08-slice-0-prep.md` |
+| 1 — 목록·상세 | `history/2026-08-slice-1-list-detail.md` |
+| 2 — 작성·수정·삭제 | `history/2026-08-slice-2-post-crud.md` |
+| 3 — 댓글 | `history/2026-08-slice-3-comment.md` |
+| 4 — 좋아요 | `history/2026-08-slice-4-like.md` |
+| 5 — 신고·차단 | `history/2026-08-slice-5-report-block.md` |
+| 6 — 조회수 중복 방지 | `history/2026-08-slice-6-view-dedup.md` |
+| 7 — 조회수 정렬·인기글 | `history/2026-08-slice-7-sort-popular.md` (7a·7b·7c) |
+| 10 — 회원 연동 계약 분리 | `history/2026-08-slice-10-member-contract.md` (10a~10d) |
+| 14 — 공지사항 | `history/2026-08-slice-14-notice.md` (14a·14b·14c) |
 
-#### 결정
+조각 13(메인 인기글 노출)은 따로 기록이 없다. 위 표의 조각 순서 줄과 결정 로그가 전부다.
 
-| # | 결정 | 근거 |
+## 조각 7 결정 (D1~D11)
+
+> **정본은 `specs/community-popular.md`다.** 아래 결정들은 그 규칙에 이르기까지의 판단이고,
+> "무엇이 규칙인가"를 물으면 spec을 본다. 둘이 어긋나면 spec이 옳다.
+>
+> **이 표는 번호와 한 줄 요약만 갖는다.** 하네스 인덱스와 같은 방식이다 — 근거는 그 결정을
+> 소유하는 문서 본문에 있고, 여기 두 벌로 적지 않는다.
+>
+> **그런데 번호는 여기 남아야 한다.** `V20260805_073107__add_daily_popular_posts.sql`·
+> `seed-community.sql`·`ClockConfig`·`PopularPostScheduler`·`PostSort`·`MariaDbTestContainerConfig`가
+> `PLAN.md D3`처럼 **번호로** 이 문서를 가리키는데 공유 migration은 고칠 수 없다. 번호로 들어온
+> 사람이 여기서 한 홉 안에 근거에 닿을 수 있어야 한다.
+
+| # | 결정 | 근거를 가진 곳 |
 |---|---|---|
-| D1 | 점수 = **최근 7일** 창의 `조회수*1 + 좋아요*25 + 댓글 쓴 서로 다른 회원 수*15` | 조회수는 비로그인 키가 세션 id라 조작 가능하고(R12) 10분 창에서 뷰어 하나가 하루 144까지 올린다. 원안의 `조회수 + 좋아요*5 + 댓글*3`은 **가장 못 믿을 신호에 가장 큰 볼륨**을 준다 — 원안 예시조차 773점 중 조회수가 530이다. 좋아요는 `UNIQUE(post_id, member_id)`라 구조적 상한이 있다. 창을 두는 이유는 기간이 없으면 초기에 쌓인 글이 인기글 영역을 영구 점유하기 때문이고, 하루가 아니라 7일인 이유는 활동이 적은 날에 좋아요 두 개짜리 글이 1위가 되어 순위가 잡음이 되기 때문이다. **댓글을 건수가 아니라 사람 수로 세는 이유는 아래에 따로 적는다** |
-| D10 | 배치가 넘기는 날짜 경계를 **DB 시계 기준으로 맞춘다.** 집계 SQL이 `targetDate`를 그대로 `created_at`과 비교하지 않고, JDBC 연결의 세션 시간대를 `Asia/Seoul`로 고정한다 | 아래 "시계가 두 벌이 되는 첫 경로" |
-| D2 | 집계 원본은 `post_views`·`post_likes`·`comments`의 `created_at`. **일일 카운터 테이블(`post_daily_metrics`)을 두지 않는다** | 아래 "카운터 테이블을 두지 않는 이유" |
-| D3 | 배치는 `@Scheduled(cron = "0 5 0 * * *", zone = "Asia/Seoul")`, 대상은 **전날** | 선례 `OrderExpireScheduler`, `SchedulingConfig`에 `@EnableScheduling`이 이미 있다. 00시 정각이 아니라 00:05인 것은 자정 경계의 쓰기가 커밋될 여유를 두기 위해서다. **`zone`을 적는 것만으로는 부족하다** — 그건 배치가 깨어나는 시각일 뿐이고, 넘긴 날짜가 DB의 `created_at`과 같은 기준인지는 D10이 맡는다 |
-| D4 | 멱등성 = **한 트랜잭션에서 `DELETE by date` → `INSERT` → 실행 기록**. 단 **이미 기록된 날짜는 아무것도 하지 않고 끝낸다** | 스케줄러는 실패하고 다시 돌 수 있다. 같은 입력이면 같은 결과여야 하므로 동점 tiebreaker까지 SQL에 박는다. **그런데 원본이 변하면 입력이 같지 않다** — 좋아요 취소·댓글 삭제 뒤에 같은 날짜를 다시 돌리면 확정된 순위와 근거 수치가 조용히 바뀌고, 그러면 "원본이 변해도 그날 기록은 남는다"는 스냅샷의 목적이 무너진다(PR #103 Codex 리뷰). 그래서 재실행은 **실패한 날짜에만** 의미가 있다. 성공한 날짜를 건너뛰어도 잃는 것이 없는 이유는 H31이 "실패하면 아예 손대지 않음"을 보증하기 때문이다 — **기록이 있다는 것이 곧 성공했다는 뜻**이라 판단이 성립한다. **다만 이 건너뛰기가 R22를 해소하지는 않는다.** 확인(SELECT)과 기록(INSERT)이 트랜잭션의 양 끝에 있어 **날짜를 원자적으로 선점하지 않는다** — 여러 인스턴스가 같은 시각에 깨면 전부 "기록 없음"을 보고 전부 집계한 뒤, 마지막 `INSERT`에서 PK 충돌로 한쪽만 남고 나머지는 통째로 rollback된다. 즉 줄어드는 것은 **시차를 두고 도는 재시도**뿐이고, 동시 실행의 낭비와 로그에 남는 중복키 예외는 그대로다(PR #103 Codex 리뷰 4라운드). 원자적 선점은 잠금 행이나 실행 상태 컬럼을 요구하는데, 단일 서버 전제를 R22에서 이미 수용했으므로 여기서 도입하지 않는다 — **이 행이 주는 보증은 "재실행이 확정된 날짜를 덮어쓰지 않는다"까지이고, 동시 실행 조율은 R22의 몫이다** |
-| D11 | **실행 기록 테이블 `popular_post_batch_runs`를 따로 둔다.** 순위가 0건인 날도 행이 남는다 | 순위 행만으로는 **"안 돈 날"과 "돌았는데 0건인 날"이 구분되지 않는다** — 둘 다 행이 없다. 구분이 안 되면 (1) D6의 `MAX(ranking_date)`가 옛 날짜로 계속 폴백해 **7일 창 밖의 오래된 글이 무기한 노출되고**, (2) D4의 "이미 기록됐나" 판단이 매일 거짓이 되며, (3) 실패 경고가 정상 상태에서 울린다. 세 지적이 전부 같은 빈자리에서 나왔다(PR #103 Codex 리뷰 3라운드). **저장하는 것이 결과뿐이고 실행 사실이 아니었다**는 것이 원래의 누락이다. 테이블 하나가 느는 대가는 받는다 — 순위 행에 sentinel을 섞는 방법(0위 행 등)은 `PRIMARY KEY(ranking_date, ranking)`·FK·화면 쿼리를 전부 오염시킨다 |
-| D5 | 배치는 **TOP 20 저장**, 화면은 **10건 노출**. **선정 SQL도 그 시점의 `PUBLISHED`만 대상으로 삼고**, 화면이 노출 시 현재 `status`를 다시 확인한다 | 노출 판단의 유일 기준은 언제나 현재 `status`다(4.1). **두 곳 모두 걸러야 한다.** 선정에서 안 거르면 이미 지워진 글이 스냅샷의 20칸을 먹는다 — 4.5가 "게시글을 지워도 자식 행은 그대로 둔다"라서 지워진 글도 창 안의 조회·좋아요·댓글을 그대로 갖고 있고, 삭제 직전에 인기였던 글일수록 상위를 차지한다. 비노출 글이 11건을 넘으면 화면이 10건보다 적게 나오거나 통째로 빈다(PR #103 Codex 리뷰). **20−10의 여유는 그 몫이 아니라 선정 이후의 상태 변화를 흡수하는 몫이다** — 둘을 헷갈리면 여유분을 아무리 늘려도 모자란다 |
-| D6 | 화면은 **실행 기록의 최신 날짜**(`MAX(ranking_date) FROM popular_post_batch_runs`)를 읽는다. 그날의 순위가 0건이거나 확정 실행이 하나도 없으면 **인기글 영역 자체를 그리지 않는다.** 폴백은 **사용자 경험을 위한 의도된 설계**이고, 그 대가로 **최신 확정일이 어제보다 오래됐으면 경고 로그를 남긴다 — 단 서울 기준 01:00 이후에만 본다** | 첫 배포 후 첫 배치 전에는 보여 줄 것이 없고, 배치를 한 번 거른 날에도 없다. 최신 확정일로 폴백하면 거른 밤이 "빈 화면"이 아니라 "어제 목록 유지"로 degrade 된다 — 인기글은 하루 낡아도 읽을 만하지만(R24가 이미 최대 24시간 낡음을 설계로 받아들였다) 갑자기 비면 화면이 고장 난 것처럼 보인다. **대가는 폴백이 자기 일을 잘한다는 것 그 자체다** — 사용자에게 매끄러운 만큼 운영자에게도 아무 일 없어 보이고, 그래서 순위가 조용히 낡아 간다. H31이 막는 것은 애초에 폴백이 발동할 상황(재집계 중 스냅샷 소실)이고, 로그는 **그럼에도 발동했을 때 남는 유일한 흔적**이다. 둘은 경쟁하지 않는다 — 사용자에게는 매끄럽게, 운영자에게는 투명하게가 이 행의 목표다. **경고에 01:00 유예를 두는 이유**: 배치가 00:05에 도므로 00:00~00:04에는 정상 상태에서도 최신 확정일이 그제다. 유예가 없으면 매일 새벽 목록 요청마다 경고가 찍혀 **정상 운영이 장애로 오인된다**(PR #103 Codex 리뷰). 울지 않아야 할 때 우는 경고는 아무도 안 보게 되므로, 이건 로그를 붙인 목적 자체를 무너뜨리는 자리다. **기준을 00:05가 아니라 01:00으로 두는 이유는 00:05가 배치가 끝나는 시각이 아니라 시작하는 시각이기 때문이다**(4라운드). 집계가 도는 중에 들어온 요청은 아직 그제 날짜를 보므로, 크론 시각을 그대로 유예 종료로 쓰면 **실행 시간이 길어질수록 오경보 창이 도로 넓어진다.** 55분은 지금 데이터에 근거한 값이 아니라 **집계가 그보다 오래 걸리면 경고보다 먼저 다른 문제가 있다**는 판단이다 — 실행 시간을 재는 수단이 아직 없으므로 근거는 나중에 생긴다. 이 유예는 D3의 크론 시각과 한 벌이라 **한쪽을 바꾸면 다른 쪽도 바꿔야 한다.** **되돌아올 계기**: 배치 실행 시간이 실제로 수십 분대에 들어서면 유예를 늘리는 대신 **실행 중 상태를 기록해**(실행 기록에 시작 행을 먼저 남기는 식) 시각 기반 추정을 버린다 |
-| D7 | 인기글은 **목록 화면 상단 영역**. 1쪽이고 카테고리 필터가 없을 때만 | 별도 화면이면 `SCREENS.md` 인덱스와 `screens/` 파일이 함께 생기는데 얻는 것은 주소 하나다. 필터를 건 화면에 전체 인기글이 뜨면 필터가 안 먹은 것처럼 보인다 |
-| D8 | 정렬 옵션은 `latest`(기본) / `views` 둘뿐. **`sort=likes`는 넣지 않는다** | 분기마다 tiebreaker·인덱스·형태 검사가 따라붙는데, 좋아요 순으로 보고 싶은 것을 인기글 점수가 이미 대신한다(D1이 좋아요에 가장 큰 계수를 준다) |
-| D9 | `post_views`는 1차에서 **정리하지 않는다** | 지우면 `view_count == COUNT(post_views)`(H14)가 깨진다. 스냅샷이 과거 순위를 보존하므로 나중에 정리로 넘어갈 근거는 생겼다 — R25에 계기와 함께 남긴다 |
+| D1 | 점수 = **최근 7일** 창의 `조회수*1 + 좋아요*25 + 댓글 쓴 서로 다른 회원 수*15` | `decisions/ADR-001-popularity-scoring.md` |
+| D10 | 배치가 넘기는 날짜 경계를 **DB 시계 기준으로 맞춘다.** 집계 SQL이 `targetDate`를 그대로 `created_at`과 비교하지 않고, JDBC 연결의 세션 시간대를 `Asia/Seoul`로 고정한다 | `decisions/ADR-003-db-session-timezone.md` |
+| D2 | 집계 원본은 `post_views`·`post_likes`·`comments`의 `created_at`. **일일 카운터 테이블(`post_daily_metrics`)을 두지 않는다** | `decisions/ADR-002-no-counter-table.md` |
+| D3 | 배치는 `@Scheduled(cron = "0 5 0 * * *", zone = "Asia/Seoul")`, 대상은 **전날** | `history/2026-08-slice-7-sort-popular.md` |
+| D4 | 멱등성 = **한 트랜잭션에서 `DELETE by date` → `INSERT` → 실행 기록**. 단 **이미 기록된 날짜는 아무것도 하지 않고 끝낸다** | `history/2026-08-slice-7-sort-popular.md` |
+| D11 | **실행 기록 테이블 `popular_post_batch_runs`를 따로 둔다.** 순위가 0건인 날도 행이 남는다 | `history/2026-08-slice-7-sort-popular.md` |
+| D5 | 배치는 **TOP 20 저장**, 화면은 **10건 노출**. **선정 SQL도 그 시점의 `PUBLISHED`만 대상으로 삼고**, 화면이 노출 시 현재 `status`를 다시 확인한다 | `history/2026-08-slice-7-sort-popular.md` |
+| D6 | 화면은 **실행 기록의 최신 날짜**(`MAX(ranking_date) FROM popular_post_batch_runs`)를 읽는다. 그날의 순위가 0건이거나 확정 실행이 하나도 없으면 **인기글 영역 자체를 그리지 않는다.** 폴백은 **사용자 경험을 위한 의도된 설계**이고, 그 대가로 **최신 확정일이 어제보다 오래됐으면 경고 로그를 남긴다 — 단 서울 기준 01:00 이후에만 본다** | `history/2026-08-slice-7-sort-popular.md` |
+| D7 | 인기글은 **목록 화면 상단 영역**. 1쪽이고 카테고리 필터가 없을 때만 | `history/2026-08-slice-7-sort-popular.md` |
+| D8 | 정렬 옵션은 `latest`(기본) / `views` 둘뿐. **`sort=likes`는 넣지 않는다** | `history/2026-08-slice-7-sort-popular.md` |
+| D9 | `post_views`는 1차에서 **정리하지 않는다** | `history/2026-08-slice-7-sort-popular.md` |
 
-#### 카운터 테이블을 두지 않는 이유 (D2)
-
-원안은 `post_daily_metrics(metric_date, post_id, view_count, like_count, comment_count)`를 두고 조회·좋아요·댓글마다 실시간으로 올리는 구조였다. 두지 않기로 한 근거는 셋이다.
-
-1. **요청 경로에 잠금이 하나 더 붙는다.** 조회수와 좋아요는 이미 `posts` 행 잠금 순서로 교착을 세 번 맞은 경로다(H13·H15·H17). 같은 트랜잭션에 `(metric_date, post_id)` 행 잠금이 추가되면 **잠금 순서가 두 벌**이 되고, 조각 6과 4에서 겪은 모양이 그대로 재현될 자리가 생긴다. 원안 12절이 이것을 Hot Row(성능)로 다루지만 실제 위험은 성능이 아니라 교착이다.
-2. **좋아요 취소와 댓글 삭제가 저절로 맞는다.** `deleteLike`는 실제로 행을 지우므로(`CommunityMapper.xml`) 원본을 세면 취소가 그대로 반영된다. 증가만 하는 카운터였다면 취소–재좋아요 반복으로 점수를 무한히 올릴 수 있었다. 댓글도 `status`로 그냥 빠진다 — 원안 4.3이 "삭제된 댓글은 배치 재계산 시 제외"라고 적었지만, 증가 카운터는 재계산할 근거를 갖고 있지 않다.
-3. **아끼는 값이 하룻밤에 한 번이다.** 카운터는 배치 한 번을 위해 요청 수만큼의 쓰기를 미리 하는 거래다. 배치는 인덱스로 창을 잘라 읽으면 되고, 그 인덱스는 어차피 만든다.
-
-**학습 목표는 깎이지 않는다** — 스케줄러·크론·멱등성·스냅샷·트랜잭션 경계는 전부 그대로다. 카운터 테이블은 배치가 아니라 실시간 집계 쪽 주제다.
-
-#### 댓글을 건수가 아니라 사람 수로 세는 이유 (D1)
-
-처음 점수식은 `댓글*15`였다. **그런데 `comments`에는 `UNIQUE(post_id, member_id)`가 없다** — FK 셋뿐이고, 한 사람이 같은 글에 댓글을 몇 개든 달 수 있다. 계정 하나가 댓글 20개를 달면 300점이고, 이건 좋아요 12명분이다.
-
-이 배점의 근거가 정확히 **"좋아요는 `UNIQUE(post_id, member_id)`라 구조적 상한이 있다"**였다. 그 상한이 없는 신호에 두 번째로 큰 계수를 준 것은 자기 근거와 어긋난다 — 조회수 계수를 1로 낮춘 논리를 댓글에는 적용하지 않았다(PR #103 Codex 리뷰).
-
-그래서 **댓글 기여를 `COUNT(DISTINCT member_id)`로 센다.** 그러면 댓글도 좋아요와 같은 구조적 상한(회원 하나당 최대 1)을 갖고, 계수 15의 근거가 비로소 성립한다. 집계 SQL의 `UNION ALL` 형태는 그대로다 — 댓글 쪽 갈래만 `GROUP BY post_id, member_id`로 한 번 접고 세면 된다.
-
-**바뀌는 것은 집계 SQL 한 곳뿐이다.** `comments` 스키마에 `UNIQUE`를 걸지 않는다 — "한 사람이 댓글 한 번만"이 아니라 **"한 사람이 몇 개를 달든 점수는 15점까지"**다.
-
-| | 지금 | 바뀐 뒤 |
-|---|---|---|
-| `comments` 스키마 | FK 3개, UNIQUE 없음 | **그대로.** migration 없음 |
-| 댓글 쓰기(`insertComment`) | 한 글에 몇 번이든 | **그대로** |
-| 화면의 `댓글 N` | 건수 (4.4) | **그대로** |
-| 인기 점수의 댓글 항 | `COUNT(*) * 15` | `COUNT(DISTINCT member_id) * 15` |
-
-한 글에 여러 번 답하는 것은 정상적인 대화이고, 막으면 커뮤니티의 기능이 줄어든다. 고칠 자리는 쓰기 규칙이 아니라 **점수가 무엇을 신뢰하는가**다. 점수와 화면이 다른 것을 세게 되지만 둘은 목적이 다르다 — 표시는 "얼마나 이야기가 오갔나"이고 점수는 "몇 사람이 반응했나"다. **그 차이가 곧 이 선택의 대가이고, R27에 계기와 함께 적었다.**
-
-#### 시계가 두 벌이 되는 첫 경로 (D10)
-
-스케줄러는 `LocalDate.now(ZoneId.of("Asia/Seoul"))`로 날짜를 정하는데 `created_at`은 DB의 `CURRENT_TIMESTAMP(6)`로 박힌다. **`application.yml`의 local·rds JDBC URL 어디에도 세션 시간대 설정이 없다** — DB가 UTC면 서울 기준 `targetDate 00:00`이 실제로는 전날 15:00을 가리켜 창이 9시간 어긋난다(PR #103 Codex 리뷰).
-
-지금까지 이 문제가 없었던 것은 **조회수 10분 창이 시각을 애플리케이션에서 받지 않기 때문**이다 — `NOW(6) - INTERVAL 10 MINUTE`은 DB 시계 하나로 끝나고, 그래서 "서버가 여러 대여도 시계는 하나다"라고 migration 주석에 적을 수 있었다(H13). **배치는 시계가 두 벌이 되는 첫 경로다.**
-
-고르는 방법은 셋이다.
-
-1. **JDBC 세션 시간대를 고정한다** (`connectionTimeZone=+09:00&forceConnectionTimeZoneToSession=true`). 한 줄이고 전역이라, 앞으로 시각을 다루는 모든 경로가 같은 기준을 갖는다.
-2. 서울 날짜 경계를 애플리케이션에서 `Instant`로 바꿔 넘긴다. 배치만 고쳐지고 다음 경로는 다시 따져야 한다.
-3. 집계 SQL 안에서 변환한다(`CONVERT_TZ`). MariaDB의 시간대 테이블이 채워져 있어야 하고, 로컬·CI·운영이 서로 다를 수 있다.
-
-**1번으로 간다.** 문제의 성격이 "이 배치가 날짜를 잘못 넘긴다"가 아니라 **"애플리케이션과 DB가 서로 다른 시간대를 쓴다"**이므로, 배치 안에서 고치면 같은 함정이 다음 경로에서 또 나온다. 다만 커뮤니티 밖 전역 설정이라 **7b에서 이 변경만 따로 확인한다** — 기존 시각 데이터의 해석이 바뀌는지, 다른 도메인 테스트가 영향을 받는지. 영향이 있으면 2번으로 내려간다.
-
-**확인했다 — 영향 없어 1번을 유지한다 (2026-08-05).** 두 프로필의 URL에 파라미터를 건 뒤 `./gradlew test` 전체 84개 스위트 899건이 통과했고, 커뮤니티 밖 도메인에서 깨진 것이 없다. **기존 시각 데이터의 해석은 바뀌지 않는다** — 지금까지 시각을 애플리케이션으로 실어 나른 경로가 없기 때문이다. `created_at`은 전부 DB가 `CURRENT_TIMESTAMP(6)`로 박았고 조회수 창도 `NOW(6)` 하나로 끝나므로, 저장된 값은 세션 시간대와 무관하게 그대로다. 바뀌는 것은 **앞으로 JDBC를 건너는 `LocalDateTime`의 기준**뿐이고, 그것이 정확히 이 설정으로 맞추려던 것이다. 이 확인은 되풀이할 필요가 없다 — 다음에 다시 물을 자리는 "전역으로 걸어도 되나"가 아니라 **새로 생기는 시각 경로가 이 기준을 쓰는가**다.
-
-**위 확인의 범위를 좁힌다 — "값이 안 움직인다"와 "해석이 안 바뀐다"는 다르다 (2026-08-05, PR #115 Codex 리뷰).** 앞 문단은 저장된 값이 세션 시간대와 무관하게 그대로라는 것에서 **해석도 그대로**라는 결론으로 갔는데, 그 두 걸음 사이가 비어 있었다. 우리 시각 컬럼은 `DATETIME` 73개에 `TIMESTAMP` 0개이고, **`DATETIME`은 시간대가 안 붙은 벽시계 숫자라 값이 안 움직이는 것이 맞다.** 그런데 바로 그 성질 때문에 **기존 행만 옛 기준에 남고 `NOW(6)`는 새 기준으로 간다.** `TIMESTAMP`였다면 읽을 때 자동 변환되어 함께 따라왔을 자리다 — 안 움직이는 것이 여기서는 방어가 아니라 구멍이다. 그래서 UTC 세션으로 데이터가 쌓인 DB에서는 조회수 10분 창이 기존 이력을 못 보고 인기글 7일 창의 경계가 9시간 밀린다. **결론(1번 유지)은 그대로다** — 해당하는 DB가 지금 없기 때문이고, 없는 이유와 되돌아올 계기는 R31에 적었다. 앞 문단이 틀린 것이 아니라 **적용 조건을 안 적어서 일반 진술처럼 읽혔다.**
-
-**시간대를 이름으로 적으면 연결이 아예 안 된다 (2026-08-05, 구현 중 확인).** 계획은 3번의 단점으로만 "MariaDB의 시간대 테이블이 채워져 있어야 한다"를 적었는데, **1번도 값이 이름이면 똑같이 걸린다.** `forceConnectionTimeZoneToSession=true`가 세션에 `SET time_zone`을 거는 순간 `mysql.time_zone_name`을 읽기 때문이다. 기본 설치에는 비어 있어서 `connectionTimeZone=Asia/Seoul`로 `bootRun`을 하면 Flyway가 첫 연결에서 `Unknown or incorrect time zone: 'Asia/Seoul'`로 죽는다 — **앱이 뜨지 않는다.**
-
-그래서 **값을 `+09:00` 고정 오프셋으로 적는다.** 한국 표준시는 1988년 이후 서머타임이 없어 오프셋과 이름이 언제나 같은 값이므로 잃는 것이 없고, 대신 **팀원마다 로컬 DB에 tzinfo를 적재해야 하는 설치 단계가 사라진다.** 이름을 고집하면 README의 설치 절차가 한 단계 늘고, 그 단계를 건너뛴 사람은 커뮤니티와 무관한 화면까지 못 띄운다. 선택의 성격이 "정확도 대 편의"가 아니라 **"이름이 주는 이득이 없는데 전제만 늘어난다"**였다.
-
-**경계 테스트는 시간대까지 본다**(H23). DB를 UTC로 띄운 컨테이너에서도 서울 기준 창이 나오는지 확인하지 않으면, 로컬이 우연히 서울이라 통과하고 운영에서만 어긋난다 — H19가 "로컬에서는 절대 안 보인다"고 적어 둔 것과 같은 종류다. **그래서 테스트 컨테이너는 UTC로 두고 연결 파라미터만 건다**(`MariaDbTestContainerConfig`). 컨테이너까지 서울로 띄우면 세션 설정이 빠져도 전부 통과해 이 하네스가 무력해진다.
-
-#### 7a — 정렬 옵션
-
-인기글과 독립이고 제일 작다. 먼저 해서 목록 쿼리의 정렬 분기를 만들어 둔다.
-
-- 목록 `?sort=` (`latest` 기본 / `views`). **허용값은 `<choose>`로 매핑하고 `${}`로 잇지 않는다**(`AGENTS.md`). 조각 5의 `AdminPostSort`가 선례다
-- 모르는 값은 오류가 아니라 기본 정렬로 떨어뜨린다 — 목록은 공개 화면이고 주소로 들어오는 값이다
-- **분기마다 `, p.id DESC` tiebreaker를 유지한다.** 조회수는 0이 흔해 최신순보다 동점이 잦고, 동점 정렬이 흔들리면 페이지 경계에서 글이 중복·누락된다
-- 새 migration: `(status, view_count, id)` 인덱스 (R8과 같은 자리)
-- `screens/list.md`에 정렬 선택지 문자열 추가
-
-**완료 (2026-08-04)**. `PostSort` enum(`AdminPostSort` 선례), `CommunityMapper.findPublishedPosts`에 `sort` 파라미터와 XML `<choose>` 분기, `CommunityService.getPosts`·`CommunityController.list` 통과, `list.html` 정렬 링크 2개, `V20260804_130038__add_post_view_count_sort_index.sql`을 추가했다. 검증은 `CommunityMapperXmlTests`(+2), `CommunityMapperTests`(+3), `CommunityServiceTests`(+1), `CommunityControllerTests`(+3), `CommunityScreenRenderingTests`(+2), `CommunitySchemaTests`(+1)로 고정하고 하네스 표에 H28·H29를 올렸다. `./gradlew clean test` 875건 통과.
-
-구현하며 계획에 없던 자리 하나를 채웠다 — **필터 링크와 정렬 링크가 서로의 현재 값을 함께 실어야 한다.** 안 실으면 분류를 고른 뒤 조회수순을 누르는 순간 분류가 조용히 풀리는데, 목록은 멀쩡히 그려지고 글만 늘어나서 사용자에게는 "정렬이 이상하다"로 보인다. 관리자 목록이 이미 같은 방식이었고(조각 5), 쪽 이동 링크도 셋을 다 싣도록 함께 고쳤다. 렌더링 검사는 **한 링크 안에** 둘 다 있는지를 본다 — 따로 찾으면 상단 필터 링크가 `categoryId`를 갖고 있어서 정렬이 그것을 잃어도 통과한다(조각 1에서 쪽 이동 링크로 배운 그대로다). **양쪽 방향을 다 본다**: 한쪽만 보면 한 방향만 값을 싣는 구현이 통과한다.
-
-인덱스는 컬럼 순서까지 스키마 검사로 고정했다(H29). `(view_count, status, id)`로 뒤집혀도 화면 결과는 똑같고 스캔량만 안 준다 — 조각 4의 `lockPost` 조인과 같은 종류로, **터지지 않고 조용히 느려지기만 하는** 자리라 형태를 직접 적어 두는 것 말고는 잡을 방법이 없다. 카테고리 필터가 붙으면 이 인덱스를 온전히 쓰지 못하는 것은 migration 주석에 남겼고, 트리거는 R8과 공유한다.
-
-#### 7b — 배치
-
-**새 migration 하나** (`gradlew newMigration -Pdesc=add_daily_popular_posts`)
-
-```sql
-CREATE TABLE IF NOT EXISTS daily_popular_posts (
-    ranking_date DATE   NOT NULL,
-    ranking      INT    NOT NULL,
-    post_id      BIGINT NOT NULL,
-    popularity_score BIGINT NOT NULL,
-    view_count BIGINT NOT NULL, like_count BIGINT NOT NULL, comment_count BIGINT NOT NULL,
-    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-    PRIMARY KEY (ranking_date, ranking),
-    CONSTRAINT uk_daily_popular_post UNIQUE (ranking_date, post_id),
-    CONSTRAINT fk_daily_popular_posts_post FOREIGN KEY (post_id) REFERENCES posts(id)
-);
-```
-
-선정 당시의 조회수·좋아요·댓글 수를 함께 담는 이유는 **순위가 왜 그랬는지가 사후에 설명되어야** 하기 때문이다. 원본이 나중에 변해도 그날의 기록은 그대로 남는다.
-
-같은 파일에 **실행 기록 테이블**을 함께 만든다 (D11).
-
-```sql
-CREATE TABLE IF NOT EXISTS popular_post_batch_runs (
-    ranking_date DATE   NOT NULL,
-    post_count   INT    NOT NULL,
-    executed_at  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-    PRIMARY KEY (ranking_date)
-);
-```
-
-**순위 행과 실행 사실은 다른 것이다.** `daily_popular_posts`만 두면 "그날 배치가 돌았는가"에 답할 수 없다 — 활동이 없어 `INSERT`가 0행인 날과 배치가 아예 안 돈 날이 **둘 다 "행 없음"으로 똑같이 보인다.** 이 표에는 0건인 날도 `post_count = 0`으로 행이 남으므로 둘이 갈린다. FK는 걸지 않는다: 순위가 0건인 날에는 참조할 게 없고, 이 표가 가리키는 것은 게시글이 아니라 **실행**이다.
-
-같은 파일에 **집계용 인덱스 셋**을 함께 만든다. 없으면 배치가 세 테이블을 통째로 스캔한다 — 지금 `post_views`의 유일한 인덱스는 선두가 `post_id`(`ix_post_views_post_viewer_created`)라 `created_at` 범위로는 못 탄다.
-
-```sql
-ALTER TABLE post_views ADD INDEX IF NOT EXISTS ix_post_views_created (created_at, post_id);
-ALTER TABLE post_likes ADD INDEX IF NOT EXISTS ix_post_likes_created (created_at, post_id);
-ALTER TABLE comments   ADD INDEX IF NOT EXISTS ix_comments_created   (created_at, post_id);
-```
-
-**`IF NOT EXISTS`가 이 파일의 규칙이다.** 두 `CREATE TABLE`에도 붙인다. 이 migration은 서로 다른 다섯 테이블을 건드리므로 **한 문장으로 묶을 수가 없고**, MariaDB의 DDL은 트랜잭션이 아니라서 세 번째 문장이 잠금 시간 초과로 실패하면 앞의 테이블과 인덱스 둘만 남은 채 버전은 기록되지 않는다. 그러면 재시도가 매번 `Table already exists`로 죽는다 — 손으로 지우기 전에는 복구되지 않는다(PR #103 Codex 리뷰).
-
-**파일을 다섯으로 쪼개는 방법은 쓰지 않는다.** migration 템플릿의 규칙이 "서로 의존하는 DDL 은 파일을 나누지 말고 이 파일에 함께 담는다"이고, 이 다섯은 **함께 있어야 배치가 동작하는 한 벌**이다. 나누면 인덱스 없이 테이블만 있는 중간 버전이 정상 상태로 기록되어, 그 시점에 배치가 돌면 세 테이블을 통째로 스캔한다.
-
-`IF NOT EXISTS`는 문장 단위 재시도를 안전하게 만들어 같은 문제를 푼다 — **부분 적용이 남아도 재실행이 그 자리를 그냥 지나간다.** V20260804_102934가 세 `ALTER`를 한 문장으로 묶어 푼 것과 목적은 같고, 대상 테이블이 여럿이라 수단만 다르다.
-
-**집계 SQL의 형태**: 세 원본을 창으로 **먼저 자른 뒤** `UNION ALL` + `GROUP BY post_id`. 게시글마다 도는 스칼라 서브쿼리로 쓰면 대상이 **전체 게시글**이 되어 창의 이득이 사라진다. 조각 1의 H1a와 반대 방향의 판단인데, 이유는 "무엇에 비례하는가"가 다르기 때문이다 — 목록은 한 쪽 20건에 비례하지만 배치는 창 안의 이벤트 수에 비례한다.
-
-- 창: `created_at >= targetDate - 6일 00:00:00` **이상**, `targetDate + 1일 00:00:00` **미만** (대상일 포함 7칸). 시간대 기준은 D10
-- 댓글은 `status = 'PUBLISHED'`만 세고, **건수가 아니라 `COUNT(DISTINCT member_id)`다**(D1). 댓글 갈래만 `GROUP BY post_id, member_id`로 한 번 접는다
-- 점수 0인 글은 제외한다 — 활동 없는 글로 20칸을 채우지 않는다
-- 순위는 `ROW_NUMBER() OVER (ORDER BY score DESC, post_id DESC)`. 테스트 컨테이너가 `mariadb:11.4.10`이라 윈도 함수를 쓸 수 있다
-- **동점 tiebreaker를 SQL에 박는다.** 없으면 같은 날짜를 두 번 돌렸을 때 순위가 흔들려 D4의 멱등성이 거짓이 된다
-
-**Java**
-
-- `PopularPostBatchService.createDailyRanking(LocalDate)` — `@Transactional`. **실행 기록을 먼저 확인하고 있으면 즉시 끝낸다**(D4) → `DELETE` → `INSERT ... SELECT` → **실행 기록 `INSERT`**. 넷이 한 트랜잭션인 것이 중요하다: 순위만 들어가고 기록이 없으면 다음 실행이 그 날짜를 다시 계산하고, 기록만 들어가고 순위가 없으면 0건인 날과 구분되지 않는다. **확인과 기록이 트랜잭션의 양 끝이라 이 순서는 날짜를 선점하지 않는다** — 동시에 깬 인스턴스는 전부 집계하고 마지막에 한쪽만 남는다(D4 말미, R22)
-- `PopularPostScheduler` — 크론으로 깨어나 **전날을 계산해 서비스에 넘기는 일만** 한다. 날짜 계산과 집계를 갈라 둬야 테스트가 서비스를 직접 부를 수 있다. 시계는 `Clock` 빈으로 주입해 고정한다
-
-**완료 (2026-08-05).** `V20260805_073107__add_daily_popular_posts.sql`(테이블 둘 + 집계 인덱스 셋), `CommunityMapper`에 배치 문장 넷(`existsBatchRun`·`deleteDailyRanking`·`insertDailyRanking`·`insertBatchRun`) — **2026-08-18에 `CommunityPopularPostMapper`로 옮겼다** —, `PopularPostBatchService`, `PopularPostScheduler`, `ClockConfig`, 시드 두 곳을 추가했다. 정본은 `DOMAIN.md` 6.9로 옮겼고 9절의 보류 둘을 닫았다. 검증은 `PopularPostBatchTests`(11), `CommunityMapperXmlTests`(+5), `CommunitySchemaTests`(+1), `CommunitySeedTests`(+2), `PopularPostSchedulerTests`(1)로 고정했다. `./gradlew test` 899건 통과.
-
-~~**배치 문장을 별도 매퍼로 빼지 않았다.**~~ **뒤집혔다 (2026-08-18, 아래 결정 로그).** 인기글 문장 여섯을 `CommunityPopularPostMapper`로 뗐다. 아래 근거 셋 중 첫째는 전제가 사라졌고, 나머지 둘은 배치와 화면 조회를 **함께** 옮겨 그대로 지켜진다. 당시 문장은 아래에 남겨 둔다 — 매퍼는 고객·관리자로만 가른다는 규칙(CLAUDE.md)을 따랐고, 7c의 화면 조회도 같은 파일로 들어온다. 인기글 SQL이 두 파일로 흩어지면 **선정과 노출이 각각 `PUBLISHED`를 봐야 한다는 D5**를 한자리에서 볼 수 없다. 규칙이 든 근거(같은 `posts` 행의 잠금 순서)는 배치에 해당하지 않지만, 규칙을 좁게 해석해 예외를 만드는 것보다 한 파일에 두는 편이 이 자리에서는 더 얻는 것이 많았다.
-
-**계획에 없던 자리 하나를 채웠다 — 시간대를 이름으로 적으면 앱이 아예 안 뜬다.** D10의 서술을 그대로 옮겨 `connectionTimeZone=Asia/Seoul`로 적었더니 Flyway가 첫 연결에서 죽었다. 근거와 대안은 D10 아래에 적었고, 값은 `+09:00`이다. **계획서에 적힌 설정 문자열이 검증된 값이 아니라는 것**이 이 조각에서 배운 것이다 — 3번 방식의 단점으로만 적어 둔 전제가 1번 방식에도 그대로 걸려 있었다.
-
-**H22의 시나리오를 D4에 맞춰 고쳐 썼다.** 원래 문장은 "같은 날짜로 두 번 돌려도 결과가 같다"인데, 3라운드에서 D4가 확정된 날짜를 건너뛰게 되면서 **두 번째 호출이 집계 SQL에 닿지도 않는다** — 그대로 구현하면 tiebreaker가 없어도 통과하는 검사가 된다. H31에서 한 번 밟은 것과 같은 종류의 자기충돌이라, 실행 기록만 지우고 부르도록 바꿨다(실패한 날의 재실행이 실제로 밟는 경로이기도 하다).
-
-#### 7c — 화면
-
-- `CommunityMapper`(**2026-08-18에 `CommunityPopularPostMapper`로 옮겼다**): `findLatestRankingDate()` — **`popular_post_batch_runs`에서 읽는다**(D11), `daily_popular_posts`가 아니다 — + `findPopularPosts(rankingDate, limit)`. 후자는 `JOIN posts p ... AND p.status = 'PUBLISHED' ORDER BY ranking LIMIT 10`
-- `CommunityService.getList`가 인기글을 함께 싣는다. **1쪽 + 카테고리 필터 없음**일 때만 (D7)
-- `list.html` 상단 영역, `screens/list.md` 갱신 — 문자열 표, 확정 날짜 표기, **비었을 때 영역이 통째로 사라진다는 사실**
-
-**시드 두 곳을 함께 고친다.** `daily_popular_posts.post_id`가 `posts`를 참조하므로, 배치가 한 번이라도 돈 뒤에는 `seed-local.sql`·`seed-community.sql`의 `DELETE FROM posts`가 FK 위반으로 죽는다 — **시드 재실행이 통째로 실패한다.** `post_views`를 넣을 때 똑같이 겪은 자리이고 그때 남긴 주석 형식이 두 파일에 이미 있다(`e275bc7`). `DELETE FROM daily_popular_posts;`를 `DELETE FROM posts;`보다 위에 넣고, 실행 기록(`popular_post_batch_runs`)도 함께 지운다 — FK는 없지만 남겨 두면 **시드로 글을 새로 깔아도 배치가 "이미 돌았다"고 판단해 건너뛴다**(D4). **테이블을 만드는 커밋에서 함께 한다** — 먼저 넣으면 없는 테이블을 지우게 되어 지금 멀쩡한 시드가 깨진다. H6을 함께 넓힌다(PR #103 Codex 리뷰).
-
-**검증**: H21~H28, H31~H33. 스케줄러의 크론 표현식 자체는 테스트하지 않는다 — 시간을 기다리는 테스트가 되고, 값이 틀려도 실패까지 하루가 걸린다. 대신 스케줄러가 `LocalDate.now(서울) - 1일`을 넘기는지만 고정한 시계로 본다.
-
-**H1a는 넓혀야 한다** — 지금 H1a는 목록 SQL이 `ORDER BY p.created_at DESC, p.id DESC`인지 단언한다. 정렬 분기가 생기면 이 단언은 그대로는 깨지고, `<choose>`의 **분기마다** 형태를 고정하도록 넓혀야 한다. 넓히지 않고 지우면 tiebreaker가 사라져도 아무도 모른다.
-
-**완료 (2026-08-05).** `PopularPostView`·`PopularSectionView`, `CommunityMapper`에 조회 문장 둘(`findLatestRankingDate`·`findPopularPosts`) — **2026-08-18에 `CommunityPopularPostMapper`로 옮겼다** —, `CommunityService.getPopularSection`, `CommunityController.list`의 모델, `list.html` 상단 영역을 추가했다. 정본은 `DOMAIN.md` 6.9의 "화면" 절로 옮겼고 9절의 마지막 보류(인기글을 어디에 두나)를 닫았다. `SCREENS.md` 17행의 유보 문단도 함께 정리했다 — 인기글은 새 화면이 아니라 목록 화면이 넓어진 것이라 `screens/list.md`가 받는다. 검증은 `CommunityServiceTests`(+8), `CommunityMapperXmlTests`(+2), `CommunityMapperTests`(+6), `CommunityScreenRenderingTests`(+2)로 고정하고 H25와 H27을 **적용**으로 올렸다. `./gradlew test` 918건 통과.
-
-**슬라이스 테스트 둘이 함께 깨졌다.** `CommunityService`가 `Clock`을 주입받게 되면서 `@Import(CommunityService.class)`만 있던 `CommunityQueryCountTests`·`CommunityViewCountTests`가 컨텍스트를 못 띄웠다. `ClockConfig`를 함께 올려 고쳤다 — **슬라이스는 필요한 빈을 스스로 다 적어야 한다**는 성질이 드러난 자리이고, 생성자에 협력자를 하나 더 붙일 때마다 이 목록을 본다.
-
-**계획에 없던 자리 셋을 채웠다.**
-
-1. **인기글 줄에 숫자를 싣지 않는다.** 계획은 "무엇을 그리는지"를 비워 두었고, 스냅샷이 조회·좋아요·댓글을 함께 보존하니 그리는 것이 자연스러워 보인다. 그런데 **같은 글이 아래 목록에도 나오고 그쪽은 현재 수치다** — 한 화면에 같은 글의 숫자가 둘이면 사용자에게는 어느 쪽도 못 믿을 값이 된다. 스냅샷의 근거 수치는 사후 설명용이지 화면용이 아니다(D5가 "왜 그랬는지가 설명되어야 한다"고 적은 대상은 운영자다).
-2. **D7의 조건(1쪽 + 필터 없음)을 Controller가 아니라 Service에 뒀다.** 계획서 문장이 "`getList`가 인기글을 함께 싣는다"여서 어느 층의 일인지가 열려 있었다. 규칙은 화면이 늘면 한 벌씩 늘고 **두 벌이 되는 순간 갈린다** — 조각 3·5에서 두 번 밟은 자리다. 검사는 결과가 비었는지가 아니라 **매퍼를 아예 안 부르는지**를 본다: 조회해 놓고 버리는 구현도 화면은 똑같고, 필터를 건 모든 공개 요청이 쿼리를 두 번 더 돌린다.
-3. **확정된 실행이 하나도 없을 때는 경고를 남기지 않는다.** D6은 "최신 확정일이 어제보다 오래되면 경고"라고만 적었는데, 확정 실행이 아예 없는 상태는 그 비교에 닿지 못한다. 첫 배포 직후에는 그것이 정상이고 배치가 몇 주째 안 돈 상태와 구분할 수단이 지금은 없다 — 조용한 쪽으로 틀렸고, 그 빈자리를 R30에 적었다.
-
-### 조각 14 — 공지사항
-
-규칙의 정본은 `specs/community-notice.md`다. 여기에는 **무엇을 어떤 순서로 만드는지**만 둔다.
-
-셋으로 나눈 기준은 "그 조각만으로 브라우저에서 확인이 되는가"다. 표만 만들고 끝나는 조각은 두지
-않는다 — 확인할 화면이 없으면 다음 조각에서 되돌아온다.
-
-#### 14a — 표와 관리자 CRUD (E4·C5·C6·C7) — **완료**
-
-**왜 먼저였나**: 표가 없으면 아무것도 못 하고, 관리자 CRUD가 없으면 고객 화면에 보여 줄 공지를
-만들 방법이 시드밖에 없다. 관리자 화면까지 닿아야 14b를 손으로 확인할 수 있다.
-
-- migration `V20260812_065639__add_community_notices.sql` — 표 + 상태 `CHECK` + **기간 `CHECK`**
-- `Notice` entity, `NoticeStatus` enum(`PUBLISHED → DELETED`만 허용, `MemberStatus`·`PostStatus` 선례)
-- `CommunityNoticeMapper` + XML **하나**. 게시글처럼 고객·관리자로 나누지 않는다 — 14b의
-  `<sql id="visibleNotice">`를 고객 조회 셋이 `<include>`로만 써야 하는데, 네임스페이스가 갈리면
-  건너 참조하거나 복사하게 되고 spec E4가 막으려던 자리가 그대로 열린다. 대신 노출 조건을 **걸지
-  않는** 관리자 조회는 `selectAdmin*` 이름으로 뗐다(모든 상태·모든 기간)
-- dto: `NoticeForm`, `NoticeUpdateCommand`, `AdminNoticeListRow`·`AdminNoticeDetailRow`·`NoticeLockRow`,
-  `AdminNoticeListView`·`AdminNoticeDetailView`, `NoticeDisplayStatus`(`예정`/`노출 중`/`종료`/`삭제됨`)
-- `CommunityNoticeAdminService` — `Clock` 주입, 잠금 → 전이 확인 → 조건부 UPDATE → 0행 거절
-  (`CommunityAdminService`와 같은 순서)
-- `CommunityNoticeAdminController` (`/admin/community/notices/**`)
-- 화면: `templates/admin/community/notice/{list,form}.html`. 진입점은 **관리자 커뮤니티 목록의
-  버튼**이다 — 사이드바(`fragments/admin/**`)는 공통 협의 파일이라 건드리지 않았다
-- `seed-community.sql` 9절에 네 상태 샘플. **시각은 실행일 기준 상대값**(2026-08-11 결정 로그)
-
-**검증**: H39·H40·H41(근거는 spec `검증` 절). 그 밖에 상태 전이 enum 표, 재삭제 0행, `DELETED`
-공지 수정 거절, 폼 기간 검증, 관리자 목록 렌더링을 각 계층 테스트가 본다.
-
-#### 14b — 고객 노출 (B8 상단 영역 · B9 전체보기 · B10 상세) — **완료**
-
-- `<sql id="visibleNotice">` 하나와 그것을 `<include>`하는 조회 3종: 상단·전체보기가 함께 쓰는
-  목록, 개수, 상세 1건. 정렬도 `<sql id="visibleNoticeOrder">` 하나다
-- `CommunityNoticeService` — 자리별 건수 상수(목록 상단 10), 페이지 크기 20, `now`를 `Clock`으로
-  만들어 Mapper에 넘김. **상단 영역의 "1쪽 + 필터 없음"은 Controller가 아니라 여기 있다**
-  (인기글 D7과 같은 자리)
-- `CommunityNoticeController` (`GET /community/notices`, `/community/notices/{id}`)
-- `CommunityController` 목록 모델에 상단 영역 추가
-- **`SecurityConfig`에 고객 경로 둘을 따로 적었다** — 기존 `/community/{id:\d+}`가 숫자만 받아
-  `"notices"`가 걸리지 않는다. 안 적으면 비로그인이 로그인 화면으로 튕긴다
-- 화면: `customer/community/notice/{list,detail}.html` 신설, `list.html` 최상단에 영역(**인기글보다 위**)과 전체보기 링크
-- `detail.html`을 재사용하지 않는다. **폴더를 나누는 것이 그 결정을 드러내는 자리다** — 같은
-  폴더에 `detail.html`과 나란히 두면 다음 사람이 재사용을 먼저 떠올린다
-
-**검증**: H42·H43·H44(근거는 spec `검증` 절). 그 밖에 정렬 키와 화면 날짜가 같은 값인지, 404 규칙,
-페이징, 본문 이스케이프를 각 계층 테스트가 본다.
-
-#### 14c — 메인 노출 (D3) — **완료**
-
-- `CommunityHomeQueryService.getNoticeSection()`(3건). **새 계약 클래스를 만들지 않았다**
-- `HomeService`·`HomeController`·`main.html`
-- `home`은 공통 협의 도메인이라 PR에서 확인을 받는다(조각 13과 같다)
-
-**자리는 서비스 안내와 카테고리 사이로 정했다**(2026-08-12, 사용자 결정 변경).
-
-**검증**: H45(근거는 spec `검증` 절) — 건수 3, 빈 영역, 그리고 **서비스 안내 < 공지 < 카테고리 순서인지**.
-
-### 조각 10 — 회원 연동 계약 분리
-
-**왜 지금인가**: 커뮤니티 SQL 8곳이 `members`를 직접 JOIN한다 — `conventions.md` 15.1 위반이다. 15.9의 ReadModel 예외는 **집계·요약**에만 열려 있고 게시글 목록은 한 도메인의 목록이라 해당이 없다(문서가 "관리자 후기 목록·검색"을 명시적으로 제외했고, 관리자 화면이라는 이유로 넓히지 말라고 따로 못박았다). 다만 15.8이 기존 코드를 일괄로 옮기는 것을 말리므로 한 번에 걷어내지 않고 조각으로 쪼갠다.
-
-**걷어낼 수 있다고 판단한 근거**: JOIN 8곳이 쓰는 것은 `m.nickname`과 `(m.status = 'WITHDRAWN')` **두 값뿐**이고, `WHERE`·`ORDER BY` 어디에도 members 컬럼이 없다. 필터는 `p.status`·`p.category_id`, 정렬은 `p.created_at`·`p.view_count`·`pending_report_count`다. 그래서 "ID 목록 → 회원 요약 조립"으로 형태를 바꿔도 결과가 같다. **조각 5에서 관리자 목록에 작성자 검색을 넣지 않기로 한 결정이 여기서 값을 했다** — 넣었으면 members가 `WHERE`에 들어가 조립으로 대체할 수 없었다.
-
-| | 자리 | 상태 |
-|---|---|---|
-| 10a | 회원 쪽 계약 신설 (`member` 폴더) | **완료** |
-| 10b | `CommunityMapper.xml` 4곳 (목록·상세·댓글 2) | **완료** |
-| 10c | `CommunityAdminMapper.xml` 4곳 (신고·관리자 목록·상세 작성자·차단 관리자) | **완료** |
-| 10d | 경계 회귀 테스트 | **완료** |
-
-**10a에서 만든 것** — 전부 새 파일이고 회원 담당자의 기존 코드는 고치지 않았다(팀 합의: `member` 폴더에 `MemberCommunity*`를 허락 없이 만들 수 있되 담당자 코드는 수정하지 않는다).
-
-```text
-member/dto/view/MemberCommunityView.java        (id, nickname, withdrawn)
-member/mapper/MemberCommunityMapper.java
-member/service/MemberCommunityQueryService.java  getMembersByIds(List<Long>)
-resources/mapper/member/MemberCommunityMapper.xml
-```
-
-**계약을 짜며 내린 결정 셋.**
-
-1. **`MemberStatus`를 노출하지 않는다.** enum을 돌려주면 커뮤니티가 `member.entity`를 import하게 되고, 그건 10d가 잡아야 할 바로 그 냄새다. 지금 SQL이 하던 `(status = 'WITHDRAWN')` 계산을 회원 쪽 XML에 그대로 남겨 탈퇴 판정이라는 업무 규칙을 소유 도메인에 둔다(15.1). 커뮤니티는 `withdrawn` boolean만 받는다.
-2. **단건 조회 메서드를 같이 만들지 않았다**(15.8 "필요한 계약만"). 상세 화면도 원소 1개짜리 리스트로 부르면 된다. 필요해지면 그때 추가한다.
-3. **없는 ID는 예외가 아니라 누락으로 다룬다.** 목록 조립이 회원 한 명 때문에 실패하면 게시글 목록 전체가 안 보인다. 수민님 PR #119의 `MemberQueryService.findByMemberId`가 `NOT_FOUND`를 던져 목록에 쓸 수 없었던 자리가 이것이다.
-
-**#119와의 관계**: 건드리지 않는다. 머지되면 `MemberQueryService`(범용)와 `MemberCommunityQueryService`(커뮤니티 전용)가 공존한다. 15.2 표가 `<소유 도메인><참조 도메인>QueryService`를 지시하므로 커뮤니티가 쓸 계약은 후자다. `MemberCouponQueryService`가 같은 형태의 선례다.
-
-**10b·10c에서 나올 동작 변화 둘 — 미리 적어 둔다.**
-
-- 지금은 `INNER JOIN`이라 **회원 행이 없으면 게시글이 목록에서 조용히 사라진다.** 조립으로 바꾸면 게시글은 남고 작성자만 "탈퇴한 회원"이 된다. 8절의 규칙에 오히려 맞는 방향이지만 명백한 동작 변화라 10d의 단언으로 못박는다.
-- 쿼리가 2방으로 갈리면서 **게시글과 작성자를 읽는 사이의 원자성이 없어진다.** 닉네임이 그 사이 바뀔 수 있다. 표시용이라 실질 영향은 없고, 상태 변경의 근거로 쓰는 값이 아니다(15.9의 같은 취지).
-
-**10d가 볼 것**: 커뮤니티 XML에 `members` 참조가 남아 있지 않은지, 커뮤니티 코드가 `member.entity`를 import하지 않는지, 회원 행이 없는 게시글이 목록에서 **빠지지 않는지**. 앞의 둘은 형태 검사라 H1a·H28과 같은 종류다 — 지우면 조용히 통과하므로 형태를 직접 적어 두는 것 말고는 잡을 방법이 없다.
-
-**10b에서 계획에 없던 자리 하나를 채웠다 — 컬럼만 빼는 것으로는 JOIN을 걷어낼 수 없다.** MyBatis 생성자 자동 매핑은 결과 컬럼 수가 record 생성자의 인자 수와 정확히 같아야 해서, `m.nickname`과 `(m.status = 'WITHDRAWN')`을 SELECT에서 지우자 `PostDetailView`가 "14개를 받아야 하는데 12개"라며 전부 터졌다. 그래서 **매퍼 반환 타입을 작성자 없는 Row로 분리했다** — `PostListRow`·`PostDetailRow`·`CommentRow`.
-
-결과적으로 이게 더 나은 모양이다. 작성자 자리를 비워 둔 View를 들고 다니는 형태였다면 **빈 채로 화면까지 새어 나가도 컴파일과 테스트가 통과한다.** Row에는 그 자리가 아예 없고, `PostListView.of(row, author)`를 거쳐야만 화면용 DTO가 되므로 빠뜨릴 수가 없다. 노출·소유권 판단은 작성자 없이 끝나므로 Row만으로 하고, 상세가 실제로 화면에 나가는 자리에서만 회원을 조회한다. **댓글 소유권 검사(`requireOwnComment`)에는 회원 조회가 붙지 않는다** — 표기가 필요 없는 경로다.
-
-**H1b(쿼리 수)의 기대값이 한 회씩 늘었다**: 목록 2→3, 댓글 구역 2→3, 상세 1→2. 늘어난 것은 게시글·댓글 수와 무관한 **고정 1회**이고, "적은 글과 많은 글의 횟수가 같은지"를 함께 단언하므로 회원을 행마다 조회하는 형태로 바뀌면 여전히 깨진다.
-
-**매퍼 테스트에서 작성자 검사 3건을 덜어내고 Service 쪽으로 옮겼다.** 작성자 판정이 더 이상 커뮤니티 SQL의 책임이 아니기 때문이다. 지운 것이 아니라 자리를 옮긴 것이고, SQL 층의 탈퇴 판정은 `MemberCommunityMapperTests`가 맡는다.
-
-**10c는 10b의 형태를 그대로 따랐다** — `AdminPostListRow`·`AdminPostDetailRow`·`ReportRow`를 만들고 `CommunityAdminService`가 조립한다. **이제 커뮤니티 XML 두 벌 모두 `members` 참조가 0건이다.**
-
-한 자리만 모양이 달랐다. **차단 관리자는 `LEFT JOIN`이었다.** 상세는 작성자와 차단 관리자 **둘**을 봐야 하므로 두 ID를 한 번의 배치 조회로 함께 받는다. `blocked_by`가 null이면 조회 대상에서 빠지고 화면의 차단 관리자 자리도 그대로 빈다 — LEFT JOIN이던 때와 결과가 같다. `AdminPostDetailRow`가 닉네임이 아니라 `blockedBy` ID를 들고 있는 것이 그 때문이고, 매퍼 테스트의 차단 기록 검사도 닉네임이 아니라 ID를 보도록 바꿨다.
-
-**관리자 쪽에는 목록 조회의 쿼리 수 하네스가 없었다.** H1b는 고객 목록만 봤다. 관리자 목록에도 같은 N+1 위험이 생겼으므로 **10d에서 H1b를 관리자 목록까지 넓혔다.**
-
-**10d — 되돌아오는 것을 막는다.** 조각 10이 한 일은 JOIN을 지운 것이지만, 지운 상태를 유지하는 것은 다른 문제다. **JOIN 하나를 다시 넣으면 화면 결과가 똑같고 기존 테스트도 전부 통과한다.** 빠르고 편하기까지 해서 되돌아올 이유는 늘 있다. 그래서 세 갈래로 막았다.
-
-- **형태 검사**(`CommunityDomainBoundaryTests`) — 커뮤니티 SQL이 `members`를 건드리지 않는지, 커뮤니티 코드가 회원 도메인에서 **합의된 계약 둘만 정확히** 쓰는지 확인한다. 허용 계약의 누락과 미합의 참조를 한 검사에서 함께 잡는다.
-- **실제 DB 조립 검사**(`CommunityMemberContractTests`) — 탈퇴 회원의 글·댓글·신고가 목록에 남고 표시명만 가려지는지를 고객·관리자 양쪽에서 본다. 15.9의 마지막 문단이 가리키는 자리다: `members.status`에 값이 하나 늘거나 `nickname`이 옮겨 가면 화면의 작성자가 전부 "탈퇴한 회원"이 되는데 커뮤니티 쪽 검사는 전부 초록불이다.
-- **쿼리 수**(H1b) — 관리자 목록까지 넓혔다.
-
-하네스 표에는 H34·H35로 올렸다.
-
-**하네스가 무는지 직접 확인했다.** `findPostById`에 `JOIN members`를 되돌리고 `CommunityService`에 `MemberStatus` import를 심으니 형태 검사 3개가 전부 빨간불이 됐고, 관리자 목록 조립을 행마다 조회하는 형태로 바꾸니 H1b가 물었다. 조각 4에서 배운 대로 — **"검사가 있다"와 "검사가 문다"는 다르다.**
-
-**그런데 무는 폭이 좁았다 (PR #144 Codex 리뷰).** 위에서 심은 것은 **행마다** 조회하는 형태였는데, 되돌아올 가능성이 더 큰 쪽은 **작성자마다**(`distinct()` 후 단건 조회) 조회하는 형태다. 그런데 두 검사 모두 게시글을 전부 같은 회원으로 만들고 있어서, 작성자가 하나뿐이라 그 회귀는 조회가 한 번으로 끝나 그대로 통과했다. 실제 목록은 작성자가 제각각이라 그 구현이 곧 N+1인데 **데이터가 그것을 구분하지 못했다.** 같은 종류가 하나 더 있었다 — 관리자 상세 검사가 작성자와 차단 관리자를 같은 회원으로 두어 **두 자리를 뒤바꿔도 통과**했다.
-
-셋 다 이 문서가 여러 번 적어 온 모양이다 — 조각 7a의 H28("한쪽만 보면 정렬을 통째로 지운 구현이 통과한다"), 조각 6의 H19("한쪽만 보면 창이 1분이든 하루든 통과한다")와 같은 자리다. **검사가 무는 것을 확인했더라도 어떤 회귀를 심었는지가 그만큼 중요하다.** 고친 뒤 Codex가 말한 형태를 그대로 심어 두 검사가 무는 것을 다시 확인했다.
-
-**2차 리뷰에서 네 건이 더 나왔고 넷 다 같은 종류였다** — 검사가 보는 범위가 실제 규칙보다 좁았다.
-
-- **테이블 하나만 봤다.** `members`만 탐지해서 `social_accounts`·`member_status_histories`를 직접 붙이면 그대로 통과했다. 회원 도메인 소유 테이블 전부로 넓혔다. `member_coupons`는 이름과 달리 쿠폰 도메인 소유라 넣지 않았고, 그 이유를 상수 옆에 적어 뒀다.
-- **SQL 주석을 안 걷어냈다.** XML 주석만 걷어내서, "여기서는 members 대신 회원 계약을 쓴다"고 `--`로 적어 두기만 해도 CI가 빨간불이 됐다. **거짓 실패는 검사보다 나쁘다** — 다음 사람이 지우는 것은 JOIN이 아니라 설명이다. H1a·H28에서 주석을 걷어내는 것과 같은 이유인데 XML 쪽만 빠져 있었다.
-- **차단 관리자 fixture가 `USER`였다.** 운영에서 `blocked_by`에 남는 회원은 관리자다. 전부 `USER`로 두면 회원 계약에 `role = 'USER'` 조건이 붙어도 통과하는데, 실제 관리자 상세에서는 차단 관리자 자리가 빈다. **같은 폴더의 `MemberCouponQueryMapper`가 실제로 역할을 걸러 조회하므로** 그 형태를 따라가는 변경은 충분히 있을 법하다.
-- **실명과 닉네임을 같은 값으로 넣었다.** 매퍼가 `nickname` 대신 `name`을 조회하도록 바뀌어도 모든 표시명 단언이 통과한다. **화면에 실명이 뜨는 회귀라 개인정보 문제**고, 넷 중 결과가 가장 무겁다. 10a의 `MemberCommunityMapperTests`도 같은 자리여서 함께 고쳤다.
-
-두 회귀(`nickname`→`name`, `role = 'USER'` 필터)를 실제로 심어 무는 것을 확인했다.
-
-`build.gradle`에도 `src/main/java`를 `test` 입력으로 등록했다. H34는 컴파일된 클래스가 아니라 원문을 읽는데, 쓰지 않는 import를 되살리는 변경은 검사 결과를 바꾸지만 바이트코드는 그대로여서 Gradle이 `test`를 건너뛴다.
-
-**10d에서 하지 않은 것 하나**: "회원 행이 없는 게시글이 목록에서 빠지지 않는지"를 실제 DB로 확인할 수 없다. `posts.member_id`가 members를 참조하는 NOT NULL FK라 그런 행을 만들 수가 없다. 탈퇴는 행을 지우는 것이 아니라 `WITHDRAWN` 상태로 두는 것이므로 실제로 도달하는 경계는 탈퇴 쪽이고, FK가 없는 상황을 가정한 조립 규칙은 Service 테스트가 mock으로 본다. **막지 못한 것이 아니라 DB가 이미 막고 있는 자리**라 테스트 클래스 주석에 근거를 적어 뒀다.
 
 ## 하네스 인덱스
 
