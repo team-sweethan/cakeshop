@@ -15,6 +15,8 @@
   <script defer th:src="@{/js/app.js}"></script>
   <script defer
           th:src="@{/js/customer-mockup.js}"></script>
+  <script defer
+          th:src="@{/js/product-list-filter.js}"></script>
 </head>
 
 <body data-page-title="상품 목록">
@@ -96,13 +98,13 @@
         <div class="form-group">
           <strong class="form-label">가격대</strong>
 
-          <div class="price-range">
+          <div class="price-range"
+               data-product-price-range>
             <input class="form-control"
                    name="minPrice"
                    type="number"
                    min="0"
-                   max="100000"
-                   step="1000"
+                   step="1"
                    value="0"
                    th:value="${condition.minPrice}"
                    aria-label="최소 가격">
@@ -113,14 +115,10 @@
                    name="maxPrice"
                    type="number"
                    min="0"
-                   max="100000"
-                   step="1000"
-                   value="100000"
+                   step="1"
                    th:value="${condition.maxPrice}"
                    aria-label="최대 가격">
           </div>
-
-          <p class="form-help">0원 ~ 100,000원</p>
         </div>
 
         <!-- 재고 상태 -->

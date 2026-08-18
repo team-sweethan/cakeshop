@@ -154,8 +154,7 @@ class ProductControllerTests {
                 .isEqualTo(ProductSort.POPULAR);
         assertThat(condition.getMinPrice())
                 .isEqualByComparingTo("0");
-        assertThat(condition.getMaxPrice())
-                .isEqualByComparingTo("100000");
+        assertThat(condition.getMaxPrice()).isNull();
 
         assertThat(pageCaptor.getValue().getPage()).isEqualTo(1);
         assertThat(pageCaptor.getValue().getSize()).isEqualTo(8);

@@ -155,9 +155,7 @@ public class ProductController {
         }
 
         if (bindingResult.hasFieldErrors("maxPrice")) {
-            condition.setMaxPrice(
-                    BigDecimal.valueOf(100_000)
-            );
+            condition.setMaxPrice(null);
         }
     }
 

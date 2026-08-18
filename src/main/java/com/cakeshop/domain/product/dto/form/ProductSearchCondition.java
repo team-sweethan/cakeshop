@@ -23,8 +23,8 @@ public class ProductSearchCondition {
     /** 최소 가격. 기본값은 0원이다. */
     private BigDecimal minPrice = BigDecimal.ZERO;
 
-    /** 최대 가격. 기본값은 10만원이다. */
-    private BigDecimal maxPrice = BigDecimal.valueOf(100_000);
+    /** 최대 가격. {@code null}이면 가격 상한을 적용하지 않는다. */
+    private BigDecimal maxPrice;
 
     /** 주문 가능 또는 품절 재고 조건. */
     private StockFilter stock;
