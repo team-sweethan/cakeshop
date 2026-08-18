@@ -7,9 +7,7 @@ import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
 import com.cakeshop.domain.community.dto.view.PostSort;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
-import com.cakeshop.domain.community.service.CommunityCommentService;
 import com.cakeshop.domain.community.service.CommunityNoticeService;
-import com.cakeshop.domain.community.service.CommunityReactionService;
 import com.cakeshop.domain.community.service.CommunityPostService;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.common.paging.PageNavigation;
@@ -47,9 +45,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class CommunityController {
 
     private final CommunityPostService communityPostService;
-    private final CommunityCommentService communityCommentService;
     private final CommunityNoticeService communityNoticeService;
-    private final CommunityReactionService communityReactionService;
     private final CommunityDetailPage communityDetailPage;
 
     @GetMapping("/community")
@@ -59,11 +55,11 @@ public class CommunityController {
             @RequestParam(required = false) String page,
             Model model
     ) {
-        Long selectedCategoryId = parsePositiveLong(categoryId);
+        Long selectedCategoryId = CommunityRequestParams.positiveLong(categoryId);
         PostSort selectedSort = PostSort.from(sort);
 
         PageRequest pageRequest = new PageRequest(
-                parsePositiveInteger(page),
+                CommunityRequestParams.positiveInteger(page),
                 PageRequest.DEFAULT_SIZE
         );
 
@@ -108,7 +104,7 @@ public class CommunityController {
                 ? communityPostService.getPostDetail(postId, viewerId, viewerKeyOf(viewerId, request))
                 : communityPostService.getVisiblePost(postId, viewerId);
 
-        return prepareDetail(model, post, viewerId, comments);
+        return communityDetailPage.render(model, post, viewerId, comments);
     }
 
     private String viewerKeyOf(Long viewerId, HttpServletRequest request) {
@@ -117,99 +113,6 @@ public class CommunityController {
         }
 
         return "S:" + request.getSession().getId();
-    }
-
-    @PostMapping("/community/{postId:\\d+}/comments")
-    public String addComment(
-            @PathVariable("postId") long postId,
-            @RequestParam(name = "comments", required = false) String comments,
-            @Valid @ModelAttribute("commentForm") CommentForm commentForm,
-            BindingResult bindingResult,
-            @ModelAttribute("reportForm") ReportForm reportForm,
-            @AuthenticationPrincipal MemberDetails memberDetails,
-            Model model
-    ) {
-        long memberId = memberDetails.getMemberId();
-
-        PostDetailView post = communityPostService.getCommentablePost(postId, memberId);
-
-        if (bindingResult.hasErrors()) {
-            return prepareDetail(model, post, memberId, comments);
-        }
-
-        communityCommentService.addComment(postId, commentForm, memberId);
-
-        return "redirect:/community/" + postId;
-    }
-
-    @PostMapping("/community/{postId:\\d+}/comments/{commentId:\\d+}/delete")
-    public String deleteComment(
-            @PathVariable("postId") long postId,
-            @PathVariable("commentId") long commentId,
-            @RequestParam(name = "comments", required = false) String comments,
-            @AuthenticationPrincipal MemberDetails memberDetails
-    ) {
-        communityCommentService.deleteComment(postId, commentId, memberDetails.getMemberId());
-
-        return redirectToDetail(postId, comments);
-    }
-
-    @PostMapping("/community/{postId:\\d+}/likes")
-    public String addLike(
-            @PathVariable("postId") long postId,
-            @RequestParam(name = "comments", required = false) String comments,
-            @AuthenticationPrincipal MemberDetails memberDetails
-    ) {
-        communityReactionService.addLike(postId, memberDetails.getMemberId());
-
-        return redirectToDetail(postId, comments);
-    }
-
-    @PostMapping("/community/{postId:\\d+}/reports")
-    public String report(
-            @PathVariable("postId") long postId,
-            @RequestParam(name = "comments", required = false) String comments,
-            @Valid @ModelAttribute("reportForm") ReportForm reportForm,
-            BindingResult bindingResult,
-            @ModelAttribute("commentForm") CommentForm commentForm,
-            @AuthenticationPrincipal MemberDetails memberDetails,
-            Model model,
-            RedirectAttributes redirectAttributes
-    ) {
-        long memberId = memberDetails.getMemberId();
-
-        PostDetailView post = communityReactionService.getReportablePost(postId, memberId);
-
-        if (bindingResult.hasErrors()) {
-            return prepareDetail(model, post, memberId, comments);
-        }
-
-        communityReactionService.reportPost(postId, reportForm, memberId);
-
-        redirectAttributes.addFlashAttribute("successMessage", "신고를 접수했습니다.");
-
-        return redirectToDetail(postId, comments);
-    }
-
-    @PostMapping("/community/{postId:\\d+}/likes/delete")
-    public String removeLike(
-            @PathVariable("postId") long postId,
-            @RequestParam(name = "comments", required = false) String comments,
-            @AuthenticationPrincipal MemberDetails memberDetails
-    ) {
-        communityReactionService.removeLike(postId, memberDetails.getMemberId());
-
-        return redirectToDetail(postId, comments);
-    }
-
-    private String redirectToDetail(long postId, String comments) {
-        return communityDetailPage.redirect(postId, parsePositiveInteger(comments));
-    }
-
-    private String prepareDetail(
-            Model model, PostDetailView post, Long viewerId, String comments) {
-        return communityDetailPage.render(
-                model, post, viewerId, parsePositiveInteger(comments));
     }
 
     @GetMapping("/community/new")
@@ -311,26 +214,4 @@ public class CommunityController {
         return "customer/community/form";
     }
 
-    private Integer parsePositiveInteger(String value) {
-        Long parsed = parsePositiveLong(value);
-
-        if (parsed == null || parsed > Integer.MAX_VALUE) {
-            return null;
-        }
-
-        return parsed.intValue();
-    }
-
-    private Long parsePositiveLong(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-
-        try {
-            long parsed = Long.parseLong(value.trim());
-            return parsed > 0 ? parsed : null;
-        } catch (NumberFormatException ignored) {
-            return null;
-        }
-    }
 }

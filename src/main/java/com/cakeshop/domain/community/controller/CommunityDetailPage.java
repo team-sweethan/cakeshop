@@ -32,8 +32,8 @@ class CommunityDetailPage {
     private final CommunityReactionService communityReactionService;
 
     /** 상세 화면을 그린다. 진입점마다 이 한 줄만 부르면 Model 이 같아진다. */
-    String render(Model model, PostDetailView post, Long viewerId, Integer commentLimit) {
-        assemble(model, post, viewerId, commentLimit);
+    String render(Model model, PostDetailView post, Long viewerId, String comments) {
+        assemble(model, post, viewerId, CommunityRequestParams.positiveInteger(comments));
 
         return VIEW_NAME;
     }
@@ -44,8 +44,8 @@ class CommunityDetailPage {
      * <p>댓글을 더 펼친 상태에서 좋아요를 누르면 다시 접히면 안 된다. 그래서 요청에 실려 온 댓글
      * 상한을 주소에 보존하되, 기본값이면 붙이지 않아 주소가 지저분해지지 않게 한다.
      */
-    String redirect(long postId, Integer commentLimit) {
-        int limit = CommentSectionView.clampLimit(commentLimit);
+    String redirect(long postId, String comments) {
+        int limit = CommentSectionView.clampLimit(CommunityRequestParams.positiveInteger(comments));
 
         if (limit == CommentSectionView.DEFAULT_LIMIT) {
             return "redirect:/community/" + postId;
