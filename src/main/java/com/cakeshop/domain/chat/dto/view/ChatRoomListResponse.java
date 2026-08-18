@@ -22,6 +22,7 @@ public class ChatRoomListResponse {
     
     private String lastMessageContent;           // 마지막 메시지 미리보기 텍스트
     private LocalDateTime lastMessageCreatedAt;  // 마지막 메시지 전송 시각
+    private Long lastMessageId;                  // 마지막 메시지 ID
     private int unreadCount;                     // 안 읽은 메시지 개수 (빨간 뱃지 숫자)
     
     // 대표 연동 주문 정보 (선택)

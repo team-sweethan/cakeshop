@@ -1,10 +1,11 @@
 /**
- * 고객용 1:1 동적 채팅 REST API 연동 스크립트
+ * 고객용 1:1 동적 채팅 REST API + WebSocket STOMP 연동 스크립트
  */
 document.addEventListener("DOMContentLoaded", () => {
   let currentChatRoomId = null;
   let pendingAttachment = null;
   let lastFetchedMessageId = 0;
+  let stompClient = null;
 
   // URL QueryString에서 productId 파라미터 추출
   const urlParams = new URLSearchParams(window.location.search);
@@ -45,6 +46,9 @@ document.addEventListener("DOMContentLoaded", () => {
       const room = await response.json();
       currentChatRoomId = room.id;
 
+      // 웹소켓 실시간 연결 및 구독을 완료될 때까지 기다린 후 초기 메시지 조회!
+      await connectWebSocket(currentChatRoomId);
+
       // 대화 목록 및 연동 주문 조회
       await loadMessages(currentChatRoomId);
       await loadOrderBanners(currentChatRoomId);
@@ -60,6 +64,174 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  let reconnectTimer = null;
+  let isConnectingWebSocket = false;
+
+  // 웹소켓 STOMP 연결 및 실시간 구독
+  function connectWebSocket(roomId) {
+    if (stompClient && stompClient.connected) return Promise.resolve();
+    if (isConnectingWebSocket) return Promise.resolve();
+    if (typeof SockJS === "undefined" || typeof Stomp === "undefined") {
+      console.warn("SockJS 또는 Stomp 라이브러리가 로드되지 않았습니다.");
+      return Promise.resolve();
+    }
+
+    isConnectingWebSocket = true;
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+
+    return new Promise((resolve) => {
+      const socket = new SockJS("/ws");
+      stompClient = Stomp.over(socket);
+      stompClient.debug = null; // 디버그 콘솔 로그 숨김
+
+      stompClient.connect({}, async () => {
+        isConnectingWebSocket = false;
+
+        // A. 대화 메시지 실시간 수신 구독 (/topic/chat/{roomId})
+        stompClient.subscribe(`/topic/chat/${roomId}`, (message) => {
+          try {
+            const msg = JSON.parse(message.body);
+            appendIncomingMessage(msg);
+          } catch (e) {
+            console.error("웹소켓 메시지 파싱 오류:", e);
+          }
+        });
+
+        // B. 상대방(관리자) 읽음 처리 실시간 수신 구독 (/topic/chat/{roomId}/read)
+        stompClient.subscribe(`/topic/chat/${roomId}/read`, (event) => {
+          try {
+            const readData = JSON.parse(event.body);
+            if (readData.readerSide === "ADMIN") {
+              markAllMyMessagesRead(readData.lastReadMessageId || readData.lastMessageId);
+            }
+          } catch (e) {
+            console.error("읽음 이벤트 수신 오류:", e);
+          }
+        });
+
+        // C. 실시간 연동 주문 목록 수신 구독 (/topic/chat/{roomId}/orders)
+        stompClient.subscribe(`/topic/chat/${roomId}/orders`, (event) => {
+          try {
+            orderBannerFetchGen++;
+            const orders = JSON.parse(event.body);
+            renderOrderSidebar(orders);
+          } catch (e) {
+            console.error("주문 배너 수신 오류:", e);
+          }
+        });
+
+        // D. 웹소켓 연결/재연결 완료 시 단절 구간 오프라인 메시지 및 주문 목록 재조회 완료 후 최신 읽음 커서 전파!
+        await loadMessages(roomId);
+        loadOrderBanners(roomId);
+        if (lastFetchedMessageId > 0 && document.visibilityState === "visible") {
+          sendReadCursor(roomId, lastFetchedMessageId);
+        }
+
+        resolve();
+      }, (err) => {
+        isConnectingWebSocket = false;
+        console.error("웹소켓 연결 실시간 에러:", err);
+        if (reconnectTimer) clearTimeout(reconnectTimer);
+        reconnectTimer = setTimeout(() => {
+          if (currentChatRoomId) {
+            connectWebSocket(currentChatRoomId);
+          }
+        }, 5000);
+        resolve();
+      });
+    });
+  }
+
+  // 메시지 ID 숫자 순서대로 타임라인에 안전하게 삽입하는 헬퍼
+  function insertMessageInOrder(container, msgEl, msgId) {
+    if (!container || !msgEl) return;
+    if (!msgId) {
+      container.appendChild(msgEl);
+      return;
+    }
+    const children = Array.from(container.children);
+    for (let i = 0; i < children.length; i++) {
+      const child = children[i];
+      const idAttr = child.id || "";
+      const match = idAttr.match(/(?:admin-)?msg-(\d+)/);
+      if (match) {
+        const childId = parseInt(match[1], 10);
+        if (childId > msgId) {
+          container.insertBefore(msgEl, child);
+          return;
+        }
+      }
+    }
+    container.appendChild(msgEl);
+  }
+
+  // 실시간 수신 메시지 DOM 추가
+  function appendIncomingMessage(msg) {
+    if (!chatMessagesContainer || !msg) return;
+
+    // 중복 추가 방지
+    if (msg.id && document.getElementById(`msg-${msg.id}`)) {
+      return;
+    }
+
+    const emptyNotice = chatMessagesContainer.querySelector(".empty-chat-notice");
+    if (emptyNotice) emptyNotice.remove();
+
+    const msgEl = createMessageDOM(msg);
+    if (msg.id) msgEl.id = `msg-${msg.id}`;
+    insertMessageInOrder(chatMessagesContainer, msgEl, msg.id);
+
+    if (msg.productId) {
+      appendProductBannerDOM(msg, chatMessagesContainer, msgEl);
+    }
+    scrollToBottom();
+
+    if (msg.id) {
+      lastFetchedMessageId = Math.max(lastFetchedMessageId, msg.id);
+    }
+
+    // 상대방(관리자) 메시지 수신 시 탭이 활성화된(visible) 상태에서만 즉시 읽음 커서 전송
+    if (msg.senderType !== "CUSTOMER" && msg.id) {
+      if (document.visibilityState === "visible") {
+        sendReadCursor(currentChatRoomId, msg.id);
+      }
+    }
+  }
+
+  // 탭으로 돌아왔을 때(포커스 복귀 시) 읽지 않은 메시지 커서 일괄 갱신
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && currentChatRoomId && lastFetchedMessageId > 0) {
+      sendReadCursor(currentChatRoomId, lastFetchedMessageId);
+    }
+  });
+  window.addEventListener("focus", () => {
+    if (currentChatRoomId && lastFetchedMessageId > 0) {
+      sendReadCursor(currentChatRoomId, lastFetchedMessageId);
+    }
+  });
+
+  // 상대방이 읽었을 때 내 메시지의 "미읽음" 텍스트를 "읽음"으로 실시간 변경 (lastReadMessageId 이하만 반영)
+  function markAllMyMessagesRead(lastReadMessageId) {
+    if (!chatMessagesContainer) return;
+    const myMessages = chatMessagesContainer.querySelectorAll(".chat-msg--me");
+    myMessages.forEach((msgEl) => {
+      const msgIdAttr = msgEl.getAttribute("id");
+      if (msgIdAttr && msgIdAttr.startsWith("msg-")) {
+        const msgId = parseInt(msgIdAttr.substring("msg-".length()), 10);
+        if (!isNaN(msgId) && lastReadMessageId && msgId <= lastReadMessageId) {
+          const badge = msgEl.querySelector(".chat-msg__read");
+          if (badge) badge.textContent = "읽음";
+        }
+      } else if (!lastReadMessageId) {
+        const badge = msgEl.querySelector(".chat-msg__read");
+        if (badge) badge.textContent = "읽음";
+      }
+    });
+  }
+
   // 2. 대화 메시지 목록 조회 & 타임라인 렌더링
   async function loadMessages(roomId) {
     try {
@@ -72,32 +244,73 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // 타임라인 HTML 렌더링
+  // 타임라인 HTML 렌더링 (REST 스냅샷과 실시간 도착 메시지 ID 기준 병합)
   function renderTimeline(messages) {
     if (!chatMessagesContainer) return;
+
+    // REST 조회 중 STOMP로 실시간 먼저 도착했던 신규 메시지 및 상품 배너 DOM 보존
+    const existingMsgEls = Array.from(chatMessagesContainer.querySelectorAll("[id^='msg-'], [id^='banner-msg-']"));
+    const existingReadSet = new Set();
+    existingMsgEls.forEach((el) => {
+      const readBadge = el.querySelector(".chat-msg__read");
+      if (readBadge && readBadge.textContent.trim() === "읽음") {
+        const idStr = el.id.replace("banner-msg-", "").replace("msg-", "");
+        existingReadSet.add(idStr);
+      }
+    });
+
     chatMessagesContainer.innerHTML = "";
 
     if (!messages || messages.length === 0) {
-      chatMessagesContainer.innerHTML = `<div class="text-muted empty-chat-notice" style="text-align:center; padding:30px;">아직 주고받은 메시지가 없습니다. 문의사항을 남겨보세요!</div>`;
-      return;
+      if (existingMsgEls.length === 0) {
+        chatMessagesContainer.innerHTML = `<div class="text-muted empty-chat-notice" style="text-align:center; padding:30px;">아직 주고받은 메시지가 없습니다. 문의사항을 남겨보세요!</div>`;
+        return;
+      }
     }
 
-    lastFetchedMessageId = messages[messages.length - 1].id;
+    const renderedIds = new Set();
+    let maxId = lastFetchedMessageId;
 
-    messages.forEach((msg) => {
-      appendProductBannerDOM(msg, chatMessagesContainer);
-      const msgEl = createMessageDOM(msg);
-      chatMessagesContainer.appendChild(msgEl);
+    if (messages && messages.length > 0) {
+      maxId = Math.max(maxId, messages[messages.length - 1].id || 0);
+
+      messages.forEach((msg) => {
+        if (msg.id) renderedIds.add(String(msg.id));
+        if (existingReadSet.has(String(msg.id))) {
+          msg.isRead = true;
+          msg.read = true;
+        }
+        appendProductBannerDOM(msg, chatMessagesContainer);
+        const msgEl = createMessageDOM(msg);
+        if (msg.id) msgEl.id = `msg-${msg.id}`;
+        chatMessagesContainer.appendChild(msgEl);
+      });
+    }
+
+    // REST 스냅샷에 포함되지 않았던 실시간 메시지 및 배너 DOM 재첨부 (덮어쓰기 방지)
+    existingMsgEls.forEach((el) => {
+      const idStr = el.id.replace("banner-msg-", "").replace("msg-", "");
+      const parsed = parseInt(idStr, 10);
+      if (!isNaN(parsed)) maxId = Math.max(maxId, parsed);
+      if (!renderedIds.has(idStr)) {
+        chatMessagesContainer.appendChild(el);
+      }
     });
+
+    lastFetchedMessageId = maxId;
 
     scrollToBottom();
   }
 
   // 문의 상품 중앙 시스템 배너 카드 생성 헬퍼
-  function appendProductBannerDOM(msg, container) {
+  function appendProductBannerDOM(msg, container, targetMsgEl) {
     if (!msg || !msg.productId || !container) return;
+    const bannerId = msg.id ? `banner-msg-${msg.id}` : null;
+    if (bannerId && document.getElementById(bannerId)) return;
+
     const pName = msg.productName ? escapeHtml(msg.productName) : `상품 #${msg.productId}`;
     const bannerDiv = document.createElement("div");
+    if (bannerId) bannerDiv.id = bannerId;
     bannerDiv.className = "chat-msg chat-msg--system";
     bannerDiv.style.cssText = "margin: 14px 0 8px 0; text-align: center;";
     bannerDiv.innerHTML = `
@@ -105,7 +318,11 @@ document.addEventListener("DOMContentLoaded", () => {
         <strong>[문의 상품]: </strong> <span style="font-weight: 700;">${pName}</span>
       </div>
     `;
-    container.appendChild(bannerDiv);
+    if (targetMsgEl && targetMsgEl.parentNode === container) {
+      container.insertBefore(bannerDiv, targetMsgEl);
+    } else {
+      container.appendChild(bannerDiv);
+    }
   }
 
   // 메시지 단일 DOM 생성
@@ -152,13 +369,17 @@ document.addEventListener("DOMContentLoaded", () => {
     return msgDiv;
   }
 
+  let orderBannerFetchGen = 0;
+
   // 3. 연동 주문 배너 목록 조회 및 동적 헤더 건수 갱신
   async function loadOrderBanners(roomId) {
     if (!orderSidebarStack) return;
+    const currentGen = ++orderBannerFetchGen;
     try {
       const response = await fetch(`/api/chat/rooms/${roomId}/orders`);
-      if (!response.ok) return;
+      if (!response.ok || currentChatRoomId !== roomId) return;
       const orders = await response.json();
+      if (currentGen !== orderBannerFetchGen) return;
       renderOrderSidebar(orders);
     } catch (err) {
       console.error("연동 주문 조회 실패:", err);
@@ -193,35 +414,35 @@ document.addEventListener("DOMContentLoaded", () => {
         ? ord.totalAmount.toLocaleString() + "원"
         : "-";
 
-  function formatOrderStatus(status) {
-    if (!status) return "접수";
-    switch (String(status).toUpperCase()) {
-      case "READY_FOR_PICKUP": return "픽업 대기";
-      case "IN_PRODUCTION": return "제작 중";
-      case "UNDER_REVIEW": return "주문 확인 중";
-      case "PENDING_PAYMENT": return "결제 대기";
-      case "PICKED_UP": return "픽업 완료";
-      case "CANCELED": return "주문 취소";
-      case "REJECTED": return "주문 거절";
-      case "EXPIRED": return "만료";
-      default: return status;
-    }
-  }
+      function formatOrderStatus(status) {
+        if (!status) return "접수";
+        switch (String(status).toUpperCase()) {
+          case "READY_FOR_PICKUP": return "픽업 대기";
+          case "IN_PRODUCTION": return "제작 중";
+          case "UNDER_REVIEW": return "주문 확인 중";
+          case "PENDING_PAYMENT": return "결제 대기";
+          case "PICKED_UP": return "픽업 완료";
+          case "CANCELED": return "주문 취소";
+          case "REJECTED": return "주문 거절";
+          case "EXPIRED": return "만료";
+          default: return status;
+        }
+      }
 
-  function formatPickupDateTime(rawTime) {
-    if (!rawTime || rawTime === "-") return "-";
-    try {
-      const date = new Date(rawTime);
-      if (isNaN(date.getTime())) return String(rawTime);
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      const hours = String(date.getHours()).padStart(2, "0");
-      const minutes = String(date.getMinutes()).padStart(2, "0");
-      return `${month}월 ${day}일 ${hours}:${minutes}`;
-    } catch (e) {
-      return String(rawTime);
-    }
-  }
+      function formatPickupDateTime(rawTime) {
+        if (!rawTime || rawTime === "-") return "-";
+        try {
+          const date = new Date(rawTime);
+          if (isNaN(date.getTime())) return String(rawTime);
+          const month = String(date.getMonth() + 1).padStart(2, "0");
+          const day = String(date.getDate()).padStart(2, "0");
+          const hours = String(date.getHours()).padStart(2, "0");
+          const minutes = String(date.getMinutes()).padStart(2, "0");
+          return `${month}월 ${day}일 ${hours}:${minutes}`;
+        } catch (e) {
+          return String(rawTime);
+        }
+      }
 
       itemDiv.innerHTML = `
         <div class="cluster cluster--between" style="margin-bottom:4px;">
@@ -258,7 +479,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let isUploadingAttachment = false;
 
-  // 4. 메시지 전송
+  // 4. 메시지 전송 (웹소켓 STOMP 발신 + REST Fallback)
   if (chatForm) {
     chatForm.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -278,6 +499,11 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
+      if (contentText.length > 2000) {
+        alert("메시지는 최대 2,000자까지 입력 가능합니다.");
+        return;
+      }
+
       const payload = {
         chatRoomId: currentChatRoomId,
         content: contentText,
@@ -285,6 +511,21 @@ document.addEventListener("DOMContentLoaded", () => {
         attachments: pendingAttachment ? [pendingAttachment] : []
       };
 
+      // 웹소켓 연결되어 있으면 STOMP로 실시간 발신 (실패 시 REST Fallback으로 자동 전환하여 drafts 보존)
+      if (stompClient && stompClient.connected) {
+        try {
+          stompClient.send("/app/chat/message", {}, JSON.stringify(payload));
+          chatInput.value = "";
+          pendingAttachment = null;
+          if (imageFileName) imageFileName.textContent = "선택된 파일 없음";
+          if (chatImageInput) chatImageInput.value = "";
+          return;
+        } catch (stompErr) {
+          console.warn("STOMP 메시지 발신 실패, REST Fallback으로 자동 전환합니다:", stompErr);
+        }
+      }
+
+      // REST Fallback (웹소켓 미연결 시)
       try {
         const response = await fetch("/api/chat/messages", {
           method: "POST",
@@ -300,45 +541,32 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
 
-        const sentMsg = await response.json();
-        lastFetchedMessageId = sentMsg.id;
-
-        // 폼 초기화
         chatInput.value = "";
         pendingAttachment = null;
         if (imageFileName) imageFileName.textContent = "선택된 파일 없음";
         if (chatImageInput) chatImageInput.value = "";
 
-        // 첫 메시지 전송 시 기존 안내 문구 지우기
-        if (chatMessagesContainer) {
-          const noticeEl = chatMessagesContainer.querySelector(".empty-chat-notice");
-          if (noticeEl) {
-            chatMessagesContainer.innerHTML = "";
-          }
-          appendProductBannerDOM(sentMsg, chatMessagesContainer);
-          const msgEl = createMessageDOM(sentMsg);
-          chatMessagesContainer.appendChild(msgEl);
-          scrollToBottom();
+        await loadMessages(currentChatRoomId);
+        if (lastFetchedMessageId > 0) {
+          await updateReadCursor(currentChatRoomId, lastFetchedMessageId);
         }
 
-        await updateReadCursor(currentChatRoomId, sentMsg.id);
-
       } catch (err) {
-        console.error("전송 에러:", err);
+        console.error("메시지 전송 오류:", err);
         alert("메시지 전송 중 오류가 발생했습니다.");
       }
     });
   }
 
-  // 5. 사진 업로드
+  // 5. 이미지 파일 선택 시 즉시 독립 업로드 실행
   if (chatImageInput) {
     chatImageInput.addEventListener("change", async () => {
       const file = chatImageInput.files[0];
       if (!file) return;
 
       const currentUploadFile = file;
-      if (imageFileName) imageFileName.textContent = `${file.name} (업로드 중...)`;
       isUploadingAttachment = true;
+      if (imageFileName) imageFileName.textContent = `⏳ ${file.name} 업로드 중...`;
 
       const formData = new FormData();
       formData.append("file", file);
@@ -361,7 +589,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         const objectKey = await response.text();
-        if (chatImageInput.files[0] !== currentUploadFile) return; // 새로운 파일로 바뀐 경우 이전 결과 버림!
+        if (chatImageInput.files[0] !== currentUploadFile) return;
 
         pendingAttachment = {
           objectKey: objectKey,
@@ -381,14 +609,26 @@ document.addEventListener("DOMContentLoaded", () => {
           if (chatImageInput) chatImageInput.value = "";
         }
       } finally {
-        if (chatImageInput.files[0] === currentUploadFile) {
+        if (chatImageInput && chatImageInput.files[0] === currentUploadFile) {
           isUploadingAttachment = false;
         }
       }
     });
   }
 
-  // 6. 읽음 커서 갱신 (쿼리 파라미터로 전달)
+  // 6. 읽음 커서 갱신 (STOMP 또는 REST API)
+  function sendReadCursor(roomId, lastMsgId) {
+    if (!roomId || !lastMsgId) return;
+    if (stompClient && stompClient.connected) {
+      stompClient.send("/app/chat/read", {}, JSON.stringify({
+        chatRoomId: roomId,
+        lastReadMessageId: lastMsgId
+      }));
+    } else {
+      updateReadCursor(roomId, lastMsgId);
+    }
+  }
+
   async function updateReadCursor(roomId, lastMsgId) {
     if (!roomId || !lastMsgId) return;
     try {

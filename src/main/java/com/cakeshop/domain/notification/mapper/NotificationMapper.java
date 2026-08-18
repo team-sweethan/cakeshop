@@ -54,6 +54,6 @@ public interface NotificationMapper {
     // 수신 회원 전화번호 조회 (주문서 작성 번호 우선, 알림톡 발송용)
     String findReceiverPhone(@Param("receiverId") Long receiverId, @Param("orderId") Long orderId); 
 
-    // 카카오 알림톡으로도 보내기
+    // 문자로도 알림 보내기
     void saveDelivery(NotificationDelivery delivery);
 }
