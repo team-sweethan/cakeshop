@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -35,6 +36,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
@@ -258,6 +260,44 @@ class ProductAdminServiceTests {
     }
 
     @Test
+    void startSale_generalProductWithRequiredGroup_throwsPolicyError() {
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(productWithStatus(
+                        ProductStatus.INACTIVE,
+                        ProductType.GENERAL
+                ));
+        when(productMapper
+                .findAdminOptionRowsByProductIdForUpdate(1L))
+                .thenReturn(List.of(
+                        requiredGroupRow(
+                                11L,
+                                ProductOptionStatus.ACTIVE
+                        )
+                ));
+
+        assertThatThrownBy(() ->
+                productAdminService.changeProductStatus(
+                        1L,
+                        ProductStatus.ACTIVE
+                )
+        ).isInstanceOfSatisfying(
+                BusinessException.class,
+                exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(
+                                        ProductErrorCode
+                                                .GENERAL_PRODUCT_REQUIRED_OPTION_NOT_ALLOWED
+                                )
+        );
+
+        verify(productMapper, never())
+                .updateProductStatus(
+                        anyLong(),
+                        any(ProductStatus.class)
+                );
+    }
+
+    @Test
     void activeCategoriesAreReturned() {
         ProductCategoryOptionView category =
                 new ProductCategoryOptionView(
@@ -469,7 +509,6 @@ class ProductAdminServiceTests {
 
     @Test
     void updateProductChangesOnlyBasicInformation() {
-        ProductForm existingForm = validProductForm();
         ProductForm updateForm = validProductForm();
 
         updateForm.setName("  수정 케이크  ");
@@ -481,8 +520,8 @@ class ProductAdminServiceTests {
         updateForm.setProductType(ProductType.CUSTOM);
         updateForm.setPreparationDays(3);
 
-        when(productMapper.findAdminProductFormById(1L))
-                .thenReturn(existingForm);
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(productWithStatus(ProductStatus.INACTIVE));
         when(productMapper.existsActiveCategoryById(1L))
                 .thenReturn(true);
         when(productMapper.updateProduct(
@@ -534,7 +573,7 @@ class ProductAdminServiceTests {
     void updateMissingProductThrowsNotFoundException() {
         ProductForm form = validProductForm();
 
-        when(productMapper.findAdminProductFormById(999L))
+        when(productMapper.findSalesInfoByIdForUpdate(999L))
                 .thenReturn(null);
 
         assertThatThrownBy(() ->
@@ -565,8 +604,8 @@ class ProductAdminServiceTests {
     void updateProductWithInactiveCategoryThrowsException() {
         ProductForm form = validProductForm();
 
-        when(productMapper.findAdminProductFormById(1L))
-                .thenReturn(validProductForm());
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(productWithStatus(ProductStatus.INACTIVE));
         when(productMapper.existsActiveCategoryById(1L))
                 .thenReturn(false);
 
@@ -596,18 +635,20 @@ class ProductAdminServiceTests {
     void updateProductWithChangedStockThrowsUpdateConflictException() {
         ProductForm form = validProductForm();
 
-        when(productMapper.findAdminProductFormById(1L))
-                .thenReturn(
-                        validProductForm(),
-                        validProductForm()
-                );
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(productWithStatus(ProductStatus.INACTIVE));
         when(productMapper.existsActiveCategoryById(1L))
                 .thenReturn(true);
+        when(productMapper
+                .findAdminOptionRowsByProductIdForUpdate(1L))
+                .thenReturn(List.of());
         when(productMapper.updateProduct(
                 any(Product.class),
                 any()
         ))
                 .thenReturn(0);
+        when(productMapper.findAdminProductFormById(1L))
+                .thenReturn(validProductForm());
 
         assertThatThrownBy(() ->
                 productAdminService.updateProduct(
@@ -629,18 +670,20 @@ class ProductAdminServiceTests {
     void updateProductDeletedDuringUpdateThrowsNotFoundException() {
         ProductForm form = validProductForm();
 
-        when(productMapper.findAdminProductFormById(1L))
-                .thenReturn(
-                        validProductForm(),
-                        (ProductForm) null
-                );
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(productWithStatus(ProductStatus.INACTIVE));
         when(productMapper.existsActiveCategoryById(1L))
                 .thenReturn(true);
+        when(productMapper
+                .findAdminOptionRowsByProductIdForUpdate(1L))
+                .thenReturn(List.of());
         when(productMapper.updateProduct(
                 any(Product.class),
                 any()
         ))
                 .thenReturn(0);
+        when(productMapper.findAdminProductFormById(1L))
+                .thenReturn(null);
 
         assertThatThrownBy(() ->
                 productAdminService.updateProduct(
@@ -656,6 +699,75 @@ class ProductAdminServiceTests {
                                                 ProductErrorCode.NOT_FOUND
                                         )
                 );
+    }
+
+    @Test
+    void updateProduct_customToGeneralWithRequiredGroup_throwsPolicyError() {
+        ProductForm form = validProductForm();
+
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(productWithStatus(
+                        ProductStatus.INACTIVE,
+                        ProductType.CUSTOM
+                ));
+        when(productMapper.existsActiveCategoryById(1L))
+                .thenReturn(true);
+        when(productMapper
+                .findAdminOptionRowsByProductIdForUpdate(1L))
+                .thenReturn(List.of(requiredGroupRow(
+                        11L,
+                        ProductOptionStatus.ACTIVE
+                )));
+
+        assertThatThrownBy(() ->
+                productAdminService.updateProduct(1L, form)
+        ).isInstanceOfSatisfying(
+                BusinessException.class,
+                exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(
+                                        ProductErrorCode
+                                                .GENERAL_PRODUCT_REQUIRED_OPTION_NOT_ALLOWED
+                                )
+        );
+
+        InOrder lockOrder = inOrder(productMapper);
+        lockOrder.verify(productMapper)
+                .findSalesInfoByIdForUpdate(1L);
+        lockOrder.verify(productMapper)
+                .findAdminOptionRowsByProductIdForUpdate(1L);
+        verify(productMapper, never())
+                .updateProduct(
+                        any(Product.class),
+                        any()
+                );
+    }
+
+    @Test
+    void updateProduct_customToGeneralWithOptionalGroup_updatesProduct() {
+        ProductForm form = validProductForm();
+
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(productWithStatus(
+                        ProductStatus.INACTIVE,
+                        ProductType.CUSTOM
+                ));
+        when(productMapper.existsActiveCategoryById(1L))
+                .thenReturn(true);
+        when(productMapper
+                .findAdminOptionRowsByProductIdForUpdate(1L))
+                .thenReturn(List.of(optionGroupRow(false)));
+        when(productMapper.updateProduct(
+                any(Product.class),
+                any()
+        )).thenReturn(1);
+
+        productAdminService.updateProduct(1L, form);
+
+        verify(productMapper).updateProduct(
+                any(Product.class),
+                any()
+        );
     }
 
     @Test
@@ -691,12 +803,36 @@ class ProductAdminServiceTests {
      * 상품 등록 테스트에 사용할 정상 입력값을 만든다.
      */
     private Product productWithStatus(ProductStatus status) {
+        return productWithStatus(status, ProductType.CUSTOM);
+    }
+
+    private Product productWithStatus(
+            ProductStatus status,
+            ProductType productType
+    ) {
         Product product = new Product();
 
         product.setId(1L);
         product.setStatus(status);
+        product.setProductType(productType);
 
         return product;
+    }
+
+    private ProductOptionAdminRow optionGroupRow(boolean required) {
+        return new ProductOptionAdminRow(
+                10L,
+                "크기",
+                required,
+                ProductOptionSelectionType.SINGLE,
+                ProductOptionStatus.ACTIVE,
+                1,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
     }
 
     private ProductOptionAdminRow requiredGroupRow(

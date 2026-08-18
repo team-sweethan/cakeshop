@@ -120,6 +120,7 @@ public class ProductAdminService {
 
         if (status == ProductStatus.ACTIVE) {
             validateRequiredOptionsForSale(
+                    product,
                     productMapper
                             .findAdminOptionRowsByProductIdForUpdate(
                                     productId
@@ -143,8 +144,14 @@ public class ProductAdminService {
     }
 
     private void validateRequiredOptionsForSale(
+            Product product,
             List<ProductOptionAdminRow> rows
     ) {
+        validateGeneralProductRequiredOptions(
+                product.getProductType(),
+                rows
+        );
+
         Map<Long, Boolean> activeRequiredGroups =
                 new LinkedHashMap<>();
 
@@ -302,13 +309,13 @@ public class ProductAdminService {
             long productId,
             ProductForm form
     ) {
-        // 수정할 상품이 실제로 존재하는지 확인한다.
-        ProductForm existingForm =
-                productMapper.findAdminProductFormById(
+        // 옵션 수정과 같은 순서로 상품을 잠가 정책 검증 중 동시 변경을 막는다.
+        Product existingProduct =
+                productMapper.findSalesInfoByIdForUpdate(
                         productId
                 );
 
-        if (existingForm == null) {
+        if (existingProduct == null) {
             throw new BusinessException(
                     ProductErrorCode.NOT_FOUND
             );
@@ -327,6 +334,16 @@ public class ProductAdminService {
 
         // 상품 유형에 맞게 준비 기간을 정규화하고 검증한다.
         applyProductPreparationPolicy(form);
+
+        if (form.getProductType() == ProductType.GENERAL) {
+            validateGeneralProductRequiredOptions(
+                    form.getProductType(),
+                    productMapper
+                            .findAdminOptionRowsByProductIdForUpdate(
+                                    productId
+                            )
+            );
+        }
 
         // 검증된 수정 폼을 DB 업데이트에 사용할 Product 객체로 변환한다.
         Product product = new Product();
@@ -365,6 +382,25 @@ public class ProductAdminService {
 
             throw new BusinessException(
                     ProductErrorCode.UPDATE_CONFLICT
+            );
+        }
+    }
+
+    private void validateGeneralProductRequiredOptions(
+            ProductType productType,
+            List<ProductOptionAdminRow> rows
+    ) {
+        if (productType != ProductType.GENERAL) {
+            return;
+        }
+
+        boolean hasRequiredOptionGroup = rows.stream()
+                .anyMatch(ProductOptionAdminRow::required);
+
+        if (hasRequiredOptionGroup) {
+            throw new BusinessException(
+                    ProductErrorCode
+                            .GENERAL_PRODUCT_REQUIRED_OPTION_NOT_ALLOWED
             );
         }
     }

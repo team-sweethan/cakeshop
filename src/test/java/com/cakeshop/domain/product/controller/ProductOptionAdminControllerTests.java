@@ -23,6 +23,7 @@ import com.cakeshop.domain.product.dto.form.ProductOptionMoveDirection;
 import com.cakeshop.domain.product.dto.view.ProductOptionManagementView;
 import com.cakeshop.domain.product.service.ProductOptionAdminService;
 import com.cakeshop.domain.product.entity.ProductOptionStatus;
+import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.error.ProductErrorCode;
 import com.cakeshop.global.error.BusinessException;
 
@@ -45,6 +46,7 @@ class ProductOptionAdminControllerTests {
                 new ProductOptionManagementView(
                         1L,
                         "레터링 케이크",
+                        ProductType.CUSTOM,
                         List.of()
                 );
 
@@ -188,6 +190,43 @@ class ProductOptionAdminControllerTests {
     }
 
     @Test
+    void createOptionGroup_generalProductPolicyError_redirectsWithAlert()
+            throws Exception {
+        ProductOptionAdminService service =
+                org.mockito.Mockito.mock(
+                        ProductOptionAdminService.class
+                );
+        doThrow(new BusinessException(
+                ProductErrorCode
+                        .GENERAL_PRODUCT_REQUIRED_OPTION_NOT_ALLOWED
+        )).when(service).createOptionGroup(
+                org.mockito.ArgumentMatchers.eq(1L),
+                any(ProductOptionGroupForm.class)
+        );
+        MockMvc mockMvc = mockMvc(service);
+
+        mockMvc.perform(
+                        post("/admin/products/1/option-groups")
+                                .param("name", "크기")
+                                .param("required", "true")
+                                .param("selectionType", "SINGLE")
+                                .param("status", "ACTIVE")
+                )
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(
+                        "/admin/products/1/options"
+                ))
+                .andExpect(flash().attribute(
+                        "errorMessage",
+                        "일반 상품에는 필수 옵션을 설정할 수 없습니다."
+                ))
+                .andExpect(flash().attribute(
+                        "openCreate",
+                        true
+                ));
+    }
+
+    @Test
     void updateOptionGroup_requiredPolicyError_redirectsWithAlert()
             throws Exception {
         ProductOptionAdminService service =
@@ -220,6 +259,47 @@ class ProductOptionAdminControllerTests {
                 .andExpect(flash().attribute(
                         "errorMessage",
                         "필수 옵션 그룹에는 하나 이상의 활성 옵션이 필요합니다."
+                ))
+                .andExpect(flash().attribute(
+                        "openGroup",
+                        10L
+                ));
+    }
+
+    @Test
+    void updateOptionGroup_generalProductPolicyError_redirectsWithAlert()
+            throws Exception {
+        ProductOptionAdminService service =
+                org.mockito.Mockito.mock(
+                        ProductOptionAdminService.class
+                );
+        doThrow(new BusinessException(
+                ProductErrorCode
+                        .GENERAL_PRODUCT_REQUIRED_OPTION_NOT_ALLOWED
+        )).when(service).updateOptionGroup(
+                org.mockito.ArgumentMatchers.eq(1L),
+                org.mockito.ArgumentMatchers.eq(10L),
+                any(ProductOptionGroupForm.class)
+        );
+        MockMvc mockMvc = mockMvc(service);
+
+        mockMvc.perform(
+                        post(
+                                "/admin/products/1"
+                                        + "/option-groups/10"
+                        )
+                                .param("name", "크기")
+                                .param("required", "true")
+                                .param("selectionType", "SINGLE")
+                                .param("status", "ACTIVE")
+                )
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(
+                        "/admin/products/1/options"
+                ))
+                .andExpect(flash().attribute(
+                        "errorMessage",
+                        "일반 상품에는 필수 옵션을 설정할 수 없습니다."
                 ))
                 .andExpect(flash().attribute(
                         "openGroup",

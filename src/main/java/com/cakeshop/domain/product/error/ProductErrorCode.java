@@ -122,6 +122,12 @@ public enum ProductErrorCode implements ErrorCode {
             "PRODUCT_020",
             "상품 이미지를 교체하지 못했습니다. 다시 시도해 주세요.",
             500
+    ),
+
+    GENERAL_PRODUCT_REQUIRED_OPTION_NOT_ALLOWED(
+            "PRODUCT_021",
+            "일반 상품에는 필수 옵션을 설정할 수 없습니다.",
+            409
     );
 
     private final String code;
