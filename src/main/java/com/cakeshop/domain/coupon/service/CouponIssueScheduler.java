@@ -19,8 +19,8 @@ public class CouponIssueScheduler {
         this.couponIssueService = couponIssueService;
     }
 
-    /** 생일 쿠폰 발급을 서울 시간 기준 매일 00:00에 실행한다. */
-    @Scheduled(cron = "0 0 0 * * *", zone = "Asia/Seoul")
+    /** 생일 쿠폰 발급을 서울 시간 기준 매시 정각에 실행한다. */
+    @Scheduled(cron = "0 0 * * * *", zone = "Asia/Seoul")
     public void issueCoupons() {
         try {
             couponIssueService.issueBirthdayCoupons();

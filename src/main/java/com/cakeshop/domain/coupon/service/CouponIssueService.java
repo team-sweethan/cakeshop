@@ -71,7 +71,7 @@ public class CouponIssueService {
         }
     }
 
-    /** 매일 00:00에 해당 월 생일 회원을 조회하고, 조회 시점의 대상에게 독립 트랜잭션으로 발급한다. */
+    /** 매시 정각에 해당 월 생일 회원을 조회하고, 조회 시점의 대상에게 독립 트랜잭션으로 발급한다. */
     public void issueBirthdayCoupons() {
         int month = LocalDateTime.now(clock).getMonthValue();
         List<Long> birthdayMemberIds = memberCouponQueryService.getBirthdayMemberIds(month);
@@ -89,7 +89,7 @@ public class CouponIssueService {
     private BirthdayIssueResult issueBirthdayMembers(Long couponId, List<Long> memberIds) {
         int issuedMemberCount = 0;
         int skippedMemberCount = 0;
-        List<Long> failedMemberIds = new java.util.ArrayList<>();
+        int failedMemberCount = 0;
 
         for (Long memberId : memberIds) {
             try {
@@ -98,17 +98,12 @@ public class CouponIssueService {
                 } else {
                     skippedMemberCount++;
                 }
-            } catch (RuntimeException exception) {
-                failedMemberIds.add(memberId);
-                log.warn(
-                        "생일 쿠폰 자동 발급에 실패했습니다. couponId={}, memberId={}, exceptionType={}",
-                        couponId,
-                        memberId,
-                        exception.getClass().getSimpleName()
-                );
+            } catch (RuntimeException ignored) {
+                // 회원 식별 정보는 운영 로그에 남기지 않고, 배치 종료 후 실패 건수만 기록한다.
+                failedMemberCount++;
             }
         }
-        return new BirthdayIssueResult(issuedMemberCount, skippedMemberCount, failedMemberIds);
+        return new BirthdayIssueResult(issuedMemberCount, skippedMemberCount, failedMemberCount);
     }
 
     /** 쿠폰별 자동 발급 결과를 실제 신규 발급·제외·오류로 나눠 기록한다. */
@@ -116,7 +111,7 @@ public class CouponIssueService {
                                         int month,
                                         int candidateMemberCount,
                                         BirthdayIssueResult result) {
-        if (result.failedMemberIds().isEmpty()) {
+        if (result.failedMemberCount() == 0) {
             log.info(
                     "생일 쿠폰 자동 발급을 완료했습니다. couponId={}, month={}, candidateMemberCount={}, issuedMemberCount={}, skippedMemberCount={}",
                     couponId,
@@ -128,14 +123,13 @@ public class CouponIssueService {
             return;
         }
         log.warn(
-                "생일 쿠폰 자동 발급 중 일부 회원 발급에 실패했습니다. couponId={}, month={}, candidateMemberCount={}, issuedMemberCount={}, skippedMemberCount={}, failedCount={}, failedMemberIds={}",
+                "생일 쿠폰 자동 발급 중 일부 회원 발급에 실패했습니다. couponId={}, month={}, candidateMemberCount={}, issuedMemberCount={}, skippedMemberCount={}, failedCount={}",
                 couponId,
                 month,
                 candidateMemberCount,
                 result.issuedMemberCount(),
                 result.skippedMemberCount(),
-                result.failedMemberIds().size(),
-                result.failedMemberIds()
+                result.failedMemberCount()
         );
     }
 
@@ -159,7 +153,7 @@ public class CouponIssueService {
     private record BirthdayIssueResult(
             int issuedMemberCount,
             int skippedMemberCount,
-            List<Long> failedMemberIds
+            int failedMemberCount
     ) {
     }
 }

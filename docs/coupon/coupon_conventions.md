@@ -90,7 +90,7 @@
 | 전체 회원 | `ALL_MEMBERS` | `NULL` (제한 없음) | 등록 직후 기존 활성 회원에게 일괄 발급 |
 | 신규 회원 | `NEW_MEMBERS` | `NULL` (제한 없음) | 유효기간 중 회원가입 완료 시 발급 |
 | 첫 주문 회원 | `FIRST_ORDER` | `NULL` (제한 없음) | 등록 시점의 미주문 기존 회원에게 일괄 발급하며, INSERT 조건과 직전 조회에서 주문 이력을 다시 확인 |
-| 생일 회원 | `BIRTHDAY` | `NULL` (제한 없음) | 매일 00:00(Asia/Seoul) 스케줄러가 해당 월 생일 회원에게 발급 |
+| 생일 회원 | `BIRTHDAY` | `NULL` (제한 없음) | 매시 정각(Asia/Seoul) 스케줄러가 해당 월 생일 회원에게 발급 |
 | 특정 회원 | `SPECIFIC_MEMBERS` | 양의 정수 필수 | 상세 화면에서 관리자가 선택해 수동 발급 |
 
 ### 3.1 자동 발급 대상 자격 판단 시점
@@ -173,9 +173,9 @@ NEW_MEMBERS
 회원가입 완료 -> member 도메인 -> CouponMemberCommandService.issueNewMemberCoupons(memberId)
 
 BIRTHDAY
-매일 00:00(Asia/Seoul) -> CouponIssueScheduler -> CouponIssueService.issueBirthdayCoupons()
+매시 정각(Asia/Seoul) -> CouponIssueScheduler -> CouponIssueService.issueBirthdayCoupons()
            -> member 도메인의 해당 월 생일 회원 조회 -> member_coupons
-           -> 쿠폰별 실제 신규 발급·제외 건수와 실패 회원 ID를 운영 로그로 기록
+           -> 쿠폰별 실제 신규 발급·제외·실패 건수를 운영 로그로 기록
 
 SPECIFIC_MEMBERS
 관리자 상세 화면 -> CouponAdminService.issueSpecificMember() -> member_coupons
