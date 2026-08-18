@@ -98,8 +98,16 @@ public class NotificationService {
                         .lastEventAt(now)
                         .build();
                 registerWebSocketSending(request.getReceiverId(), bundleResponse);
+            } else {
+                // 일반 알림(주문 등) 중복 시 발송 시도 이력(SENT, FAILED, SKIPPED)이 없는 미처리 건에 한해 1회 SMS를 발송한다. (무한 3초 재발송 차단)
+                if (scope == DeliveryScope.WEB_AND_SMS && request.getReceiverId() != null) {
+                    Long existingId = notificationMapper.findIdByReceiverIdAndEventKey(request.getReceiverId(), eventKey);
+                    if (existingId != null && !notificationMapper.hasAttemptedDelivery(existingId)) {
+                        String receiverPhone = notificationMapper.findReceiverPhone(request.getReceiverId(), request.getOrderId());
+                        registerSmsSending(existingId, receiverPhone, title, content);
+                    }
+                }
             }
-            // 일반 알림(주문, 쿠폰 등) 중복 시에는 읽은 상태 유지를 위해 멱등하게 종료
             return;
         }
 
