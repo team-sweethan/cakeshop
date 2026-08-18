@@ -71,7 +71,7 @@ public class CartController {
             }
             return "redirect:/products/" + form.getProductId();
         }
-//        redirectAttributes.addFlashAttribute("successMessage", "장바구니에 담았습니다.");
+        redirectAttributes.addFlashAttribute("successMessage", "장바구니에 담았습니다.");
         return "redirect:/products?type=GENERAL";
     }
 
