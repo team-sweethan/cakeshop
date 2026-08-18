@@ -26,6 +26,7 @@ import com.cakeshop.domain.product.entity.ProductOptionGroup;
 import com.cakeshop.domain.product.entity.ProductOptionSelectionType;
 import com.cakeshop.domain.product.entity.ProductOptionStatus;
 import com.cakeshop.domain.product.entity.ProductStatus;
+import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.error.ProductErrorCode;
 import com.cakeshop.domain.product.mapper.ProductMapper;
 import com.cakeshop.global.error.BusinessException;
@@ -93,7 +94,7 @@ class ProductOptionAdminServiceTests {
     }
 
     @Test
-    void createOptionGroup_validForm_insertsNormalizedGroup() {
+    void createOptionGroup_customProductRequiredForm_insertsNormalizedGroup() {
         when(productMapper.findSalesInfoByIdForUpdate(1L))
                 .thenReturn(product(ProductStatus.INACTIVE));
         doAnswer(invocation -> {
@@ -128,6 +129,68 @@ class ProductOptionAdminServiceTests {
         assertThat(saved.getStatus())
                 .isEqualTo(ProductOptionStatus.ACTIVE);
         assertThat(saved.getSortOrder()).isEqualTo(1);
+    }
+
+    @Test
+    void createOptionGroup_generalProductRequiredForm_throwsPolicyError() {
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(product(
+                        ProductStatus.INACTIVE,
+                        ProductType.GENERAL
+                ));
+
+        assertThatThrownBy(() ->
+                productOptionAdminService.createOptionGroup(
+                        1L,
+                        optionGroupForm()
+                )
+        ).isInstanceOfSatisfying(
+                BusinessException.class,
+                exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(
+                                        ProductErrorCode
+                                                .GENERAL_PRODUCT_REQUIRED_OPTION_NOT_ALLOWED
+                                )
+        );
+
+        verify(productMapper, never())
+                .insertOptionGroup(
+                        any(ProductOptionGroup.class)
+                );
+    }
+
+    @Test
+    void createOptionGroup_generalProductOptionalForm_insertsGroup() {
+        ProductOptionGroupForm form = optionGroupForm();
+        form.setRequired(false);
+
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(product(
+                        ProductStatus.INACTIVE,
+                        ProductType.GENERAL
+                ));
+        doAnswer(invocation -> {
+            ProductOptionGroup optionGroup =
+                    invocation.getArgument(0);
+            optionGroup.setId(10L);
+            return 1;
+        }).when(productMapper).insertOptionGroup(
+                any(ProductOptionGroup.class)
+        );
+
+        productOptionAdminService.createOptionGroup(
+                1L,
+                form
+        );
+
+        ArgumentCaptor<ProductOptionGroup> captor =
+                ArgumentCaptor.forClass(
+                        ProductOptionGroup.class
+                );
+        verify(productMapper)
+                .insertOptionGroup(captor.capture());
+        assertThat(captor.getValue().isRequired()).isFalse();
     }
 
     @Test
@@ -180,6 +243,52 @@ class ProductOptionAdminServiceTests {
                                 .isEqualTo(
                                         ProductErrorCode
                                                 .OPTION_GROUP_NOT_FOUND
+                                )
+        );
+
+        verify(productMapper, never())
+                .updateOptionGroup(
+                        anyLong(),
+                        any(ProductOptionGroup.class)
+                );
+    }
+
+    @Test
+    void updateOptionGroup_generalProductMadeRequired_throwsPolicyError() {
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(product(
+                        ProductStatus.INACTIVE,
+                        ProductType.GENERAL
+                ));
+        when(productMapper
+                .findAdminOptionRowsByGroupIdForUpdate(
+                        1L,
+                        10L
+                ))
+                .thenReturn(List.of(
+                        optionRow(
+                                false,
+                                ProductOptionStatus.ACTIVE,
+                                11L,
+                                "1호",
+                                ProductOptionStatus.ACTIVE,
+                                1
+                        )
+                ));
+
+        assertThatThrownBy(() ->
+                productOptionAdminService.updateOptionGroup(
+                        1L,
+                        10L,
+                        optionGroupForm()
+                )
+        ).isInstanceOfSatisfying(
+                BusinessException.class,
+                exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(
+                                        ProductErrorCode
+                                                .GENERAL_PRODUCT_REQUIRED_OPTION_NOT_ALLOWED
                                 )
         );
 
@@ -730,10 +839,18 @@ class ProductOptionAdminServiceTests {
     }
 
     private Product product(ProductStatus status) {
+        return product(status, ProductType.CUSTOM);
+    }
+
+    private Product product(
+            ProductStatus status,
+            ProductType productType
+    ) {
         Product product = new Product();
 
         product.setId(1L);
         product.setStatus(status);
+        product.setProductType(productType);
 
         return product;
     }
