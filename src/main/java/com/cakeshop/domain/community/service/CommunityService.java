@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import lombok.RequiredArgsConstructor;
 
@@ -31,7 +32,6 @@ import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
 import com.cakeshop.domain.community.mapper.CommunityMapper;
 import com.cakeshop.domain.member.dto.view.MemberCommunityView;
-import com.cakeshop.domain.member.service.MemberCommunityQueryService;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
@@ -59,7 +59,7 @@ public class CommunityService {
     private static final int FIRST_PAGE = 1;
 
     private final CommunityMapper communityMapper;
-    private final MemberCommunityQueryService memberCommunityQueryService;
+    private final CommunityMemberViewLoader communityMemberViewLoader;
     private final PopularPostReader popularPostReader;
 
     @Transactional(readOnly = true)
@@ -78,7 +78,7 @@ public class CommunityService {
         long totalElements = communityMapper.countPublishedPosts(categoryId);
 
         Map<Long, MemberCommunityView> authors =
-                findAuthors(rows.stream().map(PostListRow::memberId).toList());
+                communityMemberViewLoader.findByIds(rows.stream().map(PostListRow::memberId));
 
         List<PostListView> posts = rows.stream()
                 .map(row -> PostListView.of(row, authors.get(row.memberId())))
@@ -167,7 +167,7 @@ public class CommunityService {
         CommentCountRow counts = communityMapper.countComments(postId);
 
         Map<Long, MemberCommunityView> authors =
-                findAuthors(rows.stream().map(CommentRow::memberId).toList());
+                communityMemberViewLoader.findByIds(rows.stream().map(CommentRow::memberId));
 
         List<CommentView> recent = rows.stream()
                 .map(row -> CommentView.of(row, authors.get(row.memberId())))
@@ -361,23 +361,7 @@ public class CommunityService {
      * 나가는 자리에서만 회원을 조회한다.</p>
      */
     private PostDetailView toDetailView(PostDetailRow row) {
-        return PostDetailView.of(row, findAuthors(List.of(row.memberId())).get(row.memberId()));
-    }
-
-    /**
-     * 회원 ID 목록으로 작성자 정보를 한 번에 조회해 ID로 찾을 수 있게 담는다.
-     *
-     * <p>게시글마다 회원을 따로 조회하면 N+1이 된다(H1b). 없는 회원은 Map에서 빠지고,
-     * 그 자리는 각 View의 {@code withAuthor}가 탈퇴로 처리한다.</p>
-     */
-    private Map<Long, MemberCommunityView> findAuthors(List<Long> memberIds) {
-        List<Long> distinctIds = memberIds.stream()
-                .filter(Objects::nonNull)
-                .distinct()
-                .toList();
-
-        return memberCommunityQueryService.getMembersByIds(distinctIds).stream()
-                .collect(Collectors.toMap(MemberCommunityView::id, Function.identity()));
+        return PostDetailView.of(row, communityMemberViewLoader.findByIds(Stream.of(row.memberId())).get(row.memberId()));
     }
 
     private void requireActiveCategory(Long categoryId) {
