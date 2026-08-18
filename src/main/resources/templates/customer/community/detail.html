@@ -24,16 +24,13 @@
   <header th:replace="~{fragments/common/header :: header}"></header>
   <main class="page-container page-container--narrow">
 
-    <div class="cluster cluster--between section">
-      <a class="btn" th:href="@{/community}">← 목록</a>
-
-      <div class="cluster" sec:authorize="!hasRole('ADMIN')" th:if="${canEdit}">
-        <a class="btn" th:href="@{/community/{postId}/edit(postId=${post.id})}">수정</a>
-        <form method="post" th:action="@{/community/{postId}/delete(postId=${post.id})}"
-              onsubmit="return confirm('게시글을 삭제할까요? 되돌릴 수 없습니다.');">
-          <button class="btn btn--danger" type="submit">삭제</button>
-        </form>
-      </div>
+    <div class="cluster section" style="justify-content:flex-end"
+         sec:authorize="!hasRole('ADMIN')" th:if="${canEdit}">
+      <a class="btn" th:href="@{/community/{postId}/edit(postId=${post.id})}">수정</a>
+      <form method="post" th:action="@{/community/{postId}/delete(postId=${post.id})}"
+            onsubmit="return confirm('게시글을 삭제할까요? 되돌릴 수 없습니다.');">
+        <button class="btn btn--danger" type="submit">삭제</button>
+      </form>
     </div>
 
     <div th:replace="~{fragments/common/alert :: alert}"></div>
@@ -192,6 +189,10 @@
         <a th:href="@{/login}">로그인하면 댓글을 쓸 수 있습니다.</a>
       </p>
     </section>
+
+    <div class="cluster section">
+      <a class="btn" th:href="@{/community}">← 목록</a>
+    </div>
   </main>
   <footer th:replace="~{fragments/common/footer :: footer(${store})}"></footer>
 </body>

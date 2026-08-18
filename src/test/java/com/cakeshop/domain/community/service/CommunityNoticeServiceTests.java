@@ -31,7 +31,7 @@ class CommunityNoticeServiceTests {
 
     private static final long NOTICE_ID = 42L;
 
-    private static final int LIST_SECTION_LIMIT = 10;
+    private static final int LIST_SECTION_LIMIT = 3;
 
     private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 3, 1, 10, 0);
