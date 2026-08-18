@@ -121,13 +121,15 @@ document.addEventListener("DOMContentLoaded", () => {
           newRooms.forEach((r) => {
             const existing = roomMap.get(r.chatRoomId || r.id);
             if (existing) {
-              if (existing.lastMessageId && r.lastMessageId && existing.lastMessageId > r.lastMessageId) {
+              const isExistingNewer = (existing.lastMessageId && r.lastMessageId && existing.lastMessageId > r.lastMessageId) ||
+                (existing.lastMessageCreatedAt && r.lastMessageCreatedAt && new Date(existing.lastMessageCreatedAt) > new Date(r.lastMessageCreatedAt));
+
+              if (isExistingNewer) {
                 r.lastMessageId = existing.lastMessageId;
                 r.lastMessageCreatedAt = existing.lastMessageCreatedAt;
                 r.lastMessageContent = existing.lastMessageContent;
-              } else if (existing.lastMessageCreatedAt && r.lastMessageCreatedAt && new Date(existing.lastMessageCreatedAt) > new Date(r.lastMessageCreatedAt)) {
-                r.lastMessageCreatedAt = existing.lastMessageCreatedAt;
-                r.lastMessageContent = existing.lastMessageContent;
+                if (existing.responseStatus) r.responseStatus = existing.responseStatus;
+                if (typeof existing.unreadCount === "number") r.unreadCount = existing.unreadCount;
               }
             }
           });
@@ -198,7 +200,10 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       // 연결/재연결 완료 시 대시보드 대화방 목록 및 활성 대화 스냅샷 다시 동기화 후 최신 읽음 커서 전송!
-      await loadAdminRooms(1, false, true);
+      const pageToReload = Math.max(1, currentAdminPage || 1);
+      for (let p = 1; p <= pageToReload; p++) {
+        await loadAdminRooms(p, p > 1, true);
+      }
       if (selectedChatRoomId) {
         subscribeActiveRoomWebSocket(selectedChatRoomId);
         await loadAdminMessages(selectedChatRoomId, true);
@@ -257,20 +262,22 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (existingRoom) {
-      const isOlderMessage = msg.id && existingRoom.lastMessageId && msg.id < existingRoom.lastMessageId;
+      const incomingMsgId = msg.lastMessageId || msg.id;
+      const isOlderMessage = incomingMsgId && existingRoom.lastMessageId && incomingMsgId < existingRoom.lastMessageId;
       if (!isOlderMessage) {
         existingRoom.lastMessageContent = msg.lastMessageContent || msg.content || existingRoom.lastMessageContent || (msg.imageUrls && msg.imageUrls.length > 0 ? "(사진)" : "");
         if (msg.lastMessageCreatedAt || msg.createdAt) {
           existingRoom.lastMessageCreatedAt = msg.lastMessageCreatedAt || msg.createdAt;
         }
         existingRoom.responseStatus = newStatus;
-        if (msg.id) existingRoom.lastMessageId = msg.id;
+        if (incomingMsgId) existingRoom.lastMessageId = incomingMsgId;
 
+        const isVisibleActive = isCurrentActive && document.visibilityState === "visible";
         if (typeof msg.unreadCount === "number") {
-          existingRoom.unreadCount = isCurrentActive ? 0 : msg.unreadCount;
-        } else if (!isCurrentActive && msg.senderType !== "ADMIN") {
+          existingRoom.unreadCount = isVisibleActive ? 0 : msg.unreadCount;
+        } else if (!isVisibleActive && msg.senderType !== "ADMIN") {
           existingRoom.unreadCount = (existingRoom.unreadCount || 0) + 1;
-        } else if (isCurrentActive || msg.senderType === "ADMIN") {
+        } else if (isVisibleActive || msg.senderType === "ADMIN") {
           existingRoom.unreadCount = 0;
         }
       }

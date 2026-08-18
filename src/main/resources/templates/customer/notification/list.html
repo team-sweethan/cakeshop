@@ -93,8 +93,23 @@
               `;
             });
 
-            // 조립된 HTML을 컨테이너 상자에 주입
+            const existingUnreadRealtimeMap = new Map();
+            container.querySelectorAll("article.notification-item.is-unread[data-realtime='true'][data-id]").forEach(node => {
+              existingUnreadRealtimeMap.set(node.getAttribute("data-id"), node);
+            });
+
             container.innerHTML = html;
+
+            existingUnreadRealtimeMap.forEach((realtimeNode, id) => {
+              const restNode = container.querySelector(`article.notification-item[data-id="${id}"]`);
+              if (restNode) {
+                container.replaceChild(realtimeNode, restNode);
+              } else if (container.firstChild) {
+                container.insertBefore(realtimeNode, container.firstChild);
+              } else {
+                container.appendChild(realtimeNode);
+              }
+            });
 
             // 개별 알림 항목 클릭 이벤트 추가 (클릭 시 읽음 처리)
             attachItemClickEvents();
@@ -194,6 +209,7 @@
       }
 
       // 🚀 페이지 첫 진입 시 알림 목록 로드 실행
+      window.loadNotifications = loadNotifications;
       loadNotifications();
     });
   </script>
