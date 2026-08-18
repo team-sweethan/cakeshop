@@ -49,7 +49,7 @@ class CommunitySeedIntegrationTests {
         assertOnlySeedRankingRemains();
         assertThat(activeCategoryCodes()).containsExactly("QNA", "REVIEW", "FREE");
         assertThat(count("SELECT COUNT(*) FROM comments WHERE parent_comment_id IS NOT NULL"))
-                .isZero();
+                .isEqualTo(3);
     }
 
     @Test

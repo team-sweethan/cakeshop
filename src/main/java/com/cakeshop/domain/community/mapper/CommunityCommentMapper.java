@@ -4,6 +4,7 @@ import java.util.List;
 
 import com.cakeshop.domain.community.dto.query.CommentCountRow;
 import com.cakeshop.domain.community.dto.query.CommentRow;
+import com.cakeshop.domain.community.dto.query.ReplyCountRow;
 import com.cakeshop.domain.community.entity.Comment;
 
 import org.apache.ibatis.annotations.Mapper;
@@ -21,9 +22,19 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 public interface CommunityCommentMapper {
 
-    List<CommentRow> findRecentComments(
+    List<CommentRow> findRecentRootComments(
             @Param("postId") long postId,
             @Param("limit") int limit
+    );
+
+    List<CommentRow> findRepliesByParentId(
+            @Param("parentCommentId") long parentCommentId,
+            @Param("postId") long postId,
+            @Param("limit") int limit
+    );
+
+    List<ReplyCountRow> countRepliesByParentIds(
+            @Param("parentIds") List<Long> parentIds
     );
 
     CommentCountRow countComments(
@@ -35,6 +46,13 @@ public interface CommunityCommentMapper {
     );
 
     int insertComment(Comment comment);
+
+    int insertReply(
+            @Param("postId") long postId,
+            @Param("parentCommentId") long parentCommentId,
+            @Param("memberId") long memberId,
+            @Param("content") String content
+    );
 
     int deleteComment(
             @Param("commentId") long commentId,

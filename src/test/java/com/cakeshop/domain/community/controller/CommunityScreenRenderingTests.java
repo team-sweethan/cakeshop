@@ -353,6 +353,57 @@ class CommunityScreenRenderingTests {
                 .andExpect(content().string(containsString("댓글 0")));
     }
 
+    /** 답글은 접힌 채 개수만 보이고, 본문은 펼치기 전에는 응답에 없다. */
+    @Test
+    void communityDetail_collapsedThread_showsReplyCountWithoutReplyBodies() throws Exception {
+        long postId = insertPost(memberId, "답글 달린 글", "본문", PostStatus.PUBLISHED);
+        long rootId = insertComment(postId, memberId, "뿌리 댓글",
+                CommentStatus.PUBLISHED, BASE_TIME);
+        insertReply(postId, rootId, "숨어 있는 답글", CommentStatus.PUBLISHED);
+        insertReply(postId, rootId, "지워진 답글 본문", CommentStatus.DELETED);
+
+        mockMvc.perform(get("/community/" + postId))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("답글 2개 보기")))
+                .andExpect(content().string(not(containsString("숨어 있는 답글"))));
+    }
+
+    /** 펼치면 답글이 오래된 순으로 나오고, 삭제된 답글은 자리 표시로 남는다. */
+    @Test
+    void communityDetail_expandedThread_showsRepliesWithPlaceholders() throws Exception {
+        long postId = insertPost(memberId, "답글 달린 글", "본문", PostStatus.PUBLISHED);
+        long rootId = insertComment(postId, memberId, "뿌리 댓글",
+                CommentStatus.PUBLISHED, BASE_TIME);
+        insertReply(postId, rootId, "보이는 답글", CommentStatus.PUBLISHED);
+        insertReply(postId, rootId, "지워진 답글 본문", CommentStatus.DELETED);
+
+        mockMvc.perform(get("/community/" + postId)
+                        .param("replies", String.valueOf(rootId))
+                        .with(authentication(authorOf(memberId))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("보이는 답글")))
+                .andExpect(content().string(not(containsString("지워진 답글 본문"))))
+                .andExpect(content().string(containsString("삭제된 댓글입니다.")))
+                .andExpect(content().string(containsString("답글 접기")))
+                .andExpect(content().string(containsString("name=\"replyTo\"")));
+    }
+
+    /** 삭제된 뿌리를 펼치면 남은 답글은 보이지만 새 답글 폼은 없다. */
+    @Test
+    void communityDetail_deletedRootThread_hasNoReplyForm() throws Exception {
+        long postId = insertPost(memberId, "뿌리 지워진 글", "본문", PostStatus.PUBLISHED);
+        long rootId = insertComment(postId, memberId, "지워진 뿌리 본문",
+                CommentStatus.DELETED, BASE_TIME);
+        insertReply(postId, rootId, "남아 있는 답글", CommentStatus.PUBLISHED);
+
+        mockMvc.perform(get("/community/" + postId)
+                        .param("replies", String.valueOf(rootId))
+                        .with(authentication(authorOf(memberId))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("남아 있는 답글")))
+                .andExpect(content().string(not(containsString("name=\"replyTo\""))));
+    }
+
     /** 댓글 상한에 도달하면 더 펼칠 수 없는 과거 댓글이 있음을 알린다. */
     @Test
     void communityDetail_beyondMaxComments_showsCappedNotice() throws Exception {
@@ -804,6 +855,17 @@ class CommunityScreenRenderingTests {
                 postId, authorId, content, status.name(), createdAt, createdAt);
 
         return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+    }
+
+    private void insertReply(long postId, long parentId, String content, CommentStatus status) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO comments (
+                    post_id, member_id, parent_comment_id, content, status, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                postId, memberId, parentId, content, status.name(), BASE_TIME, BASE_TIME);
     }
 
     private Integer commentCountOf(long postId) {

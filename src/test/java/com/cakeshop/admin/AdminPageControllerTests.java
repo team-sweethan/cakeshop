@@ -164,7 +164,7 @@ class AdminPageControllerTests {
                         PostStatus.PUBLISHED, null, null, null, 0, 0,
                         LocalDateTime.now(), LocalDateTime.now()));
         when(communityAdminService.getReports(anyLong())).thenReturn(List.of());
-        when(communityCommentService.getComments(anyLong(), any()))
+        when(communityCommentService.getComments(anyLong(), any(), any()))
                 .thenReturn(new CommentSectionView(List.of(), 0, 0, 20));
         when(dashboardReadModelQueryService.getDashboard())
                 .thenReturn(new DashboardView(

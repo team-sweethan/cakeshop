@@ -78,21 +78,59 @@
                 th:text="'댓글 ' + ${commentSection.publishedCount}">댓글 0</h2>
 
             <div class="stack">
-              <article class="panel" th:each="comment : ${commentSection.comments}">
-                <p class="text-muted" th:if="${comment.deleted}">삭제된 댓글입니다.</p>
+              <article class="panel" th:each="thread : ${commentSection.threads}">
+                <p class="text-muted" th:if="${thread.root.deleted}">삭제된 댓글입니다.</p>
 
-                <div th:unless="${comment.deleted}">
+                <div th:unless="${thread.root.deleted}">
                   <div class="cluster cluster--between">
-                    <strong th:text="${comment.authorName()}">작성자</strong>
+                    <strong th:text="${thread.root.authorName()}">작성자</strong>
                     <span class="text-muted"
-                          th:text="${#temporals.format(comment.createdAt, 'yyyy.MM.dd')}">2026.01.01</span>
+                          th:text="${#temporals.format(thread.root.createdAt, 'yyyy.MM.dd')}">2026.01.01</span>
                   </div>
-                  <p th:text="${comment.content}" style="white-space:pre-wrap">댓글 본문</p>
+                  <p th:text="${thread.root.content}" style="white-space:pre-wrap">댓글 본문</p>
+                </div>
+
+                <div class="cluster" th:if="${!thread.expanded and thread.replyCount > 0}">
+                  <a class="btn"
+                     th:href="@{/admin/community/{postId}(
+                         postId=${post.id},
+                         comments=${commentSection.limitParam()},
+                         replies=${thread.root.id}
+                     )}"
+                     th:text="'답글 ' + ${thread.replyCount} + '개 보기'">답글 보기</a>
+                </div>
+
+                <div th:if="${thread.expanded}" class="stack" style="margin-left:32px">
+                  <div class="cluster">
+                    <a class="btn"
+                       th:href="@{/admin/community/{postId}(
+                           postId=${post.id},
+                           comments=${commentSection.limitParam()}
+                       )}">답글 접기</a>
+                  </div>
+
+                  <div th:each="reply : ${thread.replies}">
+                    <p class="text-muted" th:if="${reply.deleted}">삭제된 댓글입니다.</p>
+
+                    <div th:unless="${reply.deleted}">
+                      <div class="cluster cluster--between">
+                        <strong th:text="${reply.authorName()}">작성자</strong>
+                        <span class="text-muted"
+                              th:text="${#temporals.format(reply.createdAt, 'yyyy.MM.dd')}">2026.01.01</span>
+                      </div>
+                      <p th:text="${reply.content}" style="white-space:pre-wrap">답글 본문</p>
+                    </div>
+                  </div>
+
+                  <p class="note" th:if="${thread.cappedReplies()}"
+                     th:text="'답글 ' + ${thread.hiddenReplyCount()} + '개는 표시하지 않습니다.'">
+                    답글 일부는 표시하지 않습니다.
+                  </p>
                 </div>
               </article>
 
               <div class="panel panel--dashed text-muted"
-                   th:if="${commentSection.comments.isEmpty()}"
+                   th:if="${commentSection.threads.isEmpty()}"
                    style="text-align:center">
                 아직 댓글이 없습니다.
               </div>

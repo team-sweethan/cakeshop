@@ -81,7 +81,7 @@ class CommunityControllerTests {
                 .thenReturn(new PageResult<>(List.of(), new PageRequest(1, 20), 0));
         when(communityPostService.getActiveCategories())
                 .thenReturn(List.of(new PostCategoryView(1L, "QNA", "질문")));
-        when(communityCommentService.getComments(anyLong(), any()))
+        when(communityCommentService.getComments(anyLong(), any(), any()))
                 .thenReturn(new CommentSectionView(
                         List.of(), 0, 0, CommentSectionView.DEFAULT_LIMIT));
 
@@ -220,6 +220,29 @@ class CommunityControllerTests {
 
         verify(communityPostService).getVisiblePost(eq(15L), isNull());
         verify(communityPostService, never()).getPostDetail(anyLong(), any(), anyString());
+    }
+
+    /** 답글 펼치기도 이미 보고 있는 글 안에서의 이동이라 조회수를 올리지 않는다. */
+    @Test
+    void detail_expandingReplies_doesNotCountAsView() throws Exception {
+        when(communityPostService.getVisiblePost(eq(15L), isNull())).thenReturn(publishedPost());
+
+        mockMvc.perform(get("/community/15").param("replies", "8"))
+                .andExpect(status().isOk());
+
+        verify(communityCommentService).getComments(15L, null, 8L);
+        verify(communityPostService, never()).getPostDetail(anyLong(), any(), anyString());
+    }
+
+    /** 잘못된 replies 값은 펼침 없음으로 떨어진다. */
+    @Test
+    void detail_invalidRepliesParameter_fallsBackToCollapsed() throws Exception {
+        when(communityPostService.getVisiblePost(eq(15L), isNull())).thenReturn(publishedPost());
+
+        mockMvc.perform(get("/community/15").param("replies", "전체"))
+                .andExpect(status().isOk());
+
+        verify(communityCommentService).getComments(15L, null, null);
     }
 
     /** 직접 상세 진입은 조회수를 반영한다. */
@@ -466,7 +489,7 @@ class CommunityControllerTests {
         mockMvc.perform(get("/community/15").param("comments", "40"))
                 .andExpect(status().isOk());
 
-        verify(communityCommentService).getComments(15L, 40);
+        verify(communityCommentService).getComments(15L, 40, null);
     }
 
     /** 잘못된 댓글 조회 수에는 기본값을 사용한다. */
@@ -478,7 +501,7 @@ class CommunityControllerTests {
         mockMvc.perform(get("/community/15").param("comments", "전체"))
                 .andExpect(status().isOk());
 
-        verify(communityCommentService).getComments(15L, null);
+        verify(communityCommentService).getComments(15L, null, null);
     }
 
     /** 비로그인은 좋아요 여부를 조회하지 않는다. */

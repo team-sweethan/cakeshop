@@ -152,6 +152,7 @@ public class CommunityController {
             // {postId} = "37" 을 잡고 long 으로 변환해서 postId = 37L로 넘긴다
             @PathVariable("postId") long postId,
             @RequestParam(name = "comments", required = false) String comments,
+            @RequestParam(name = "replies", required = false) String replies,
 
             // CommentForm: 사용자가 댓글을 입력할 때 사용할 폼 데이터 객체
             // 즉, 상세 페이지에서 댓글 입력 폼이 사용할 객체를 준비한다
@@ -194,12 +195,13 @@ public class CommunityController {
         // 로그인하지 않은 사용자는: viewerId = null
         Long viewerId = memberDetails == null ? null : memberDetails.getMemberId();
 
-        PostDetailView post = comments == null
+        // 댓글 더 보기처럼 답글 펼치기도 이미 보고 있는 글 안에서의 이동이라 조회로 세지 않는다
+        PostDetailView post = comments == null && replies == null
                 ? communityPostService.getPostDetail(postId, viewerId, viewerKeyOf(viewerId, request))
                 : communityPostService.getVisiblePost(postId, viewerId);
 
         // prepareDetail 안에서 model.addAttribute(...) 가 여러개 있음
-        return communityDetailPage.render(model, post, viewerId, comments);
+        return communityDetailPage.render(model, post, viewerId, comments, replies);
     }
 
     private String viewerKeyOf(Long viewerId, HttpServletRequest request) {

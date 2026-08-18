@@ -58,7 +58,7 @@ class CommunityReactionControllerTests {
         communityCommentService = mock(CommunityCommentService.class);
         communityReactionService = mock(CommunityReactionService.class);
 
-        when(communityCommentService.getComments(anyLong(), any()))
+        when(communityCommentService.getComments(anyLong(), any(), any()))
                 .thenReturn(new CommentSectionView(
                         List.of(), 0, 0, CommentSectionView.DEFAULT_LIMIT));
 

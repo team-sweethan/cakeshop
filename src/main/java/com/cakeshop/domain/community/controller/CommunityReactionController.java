@@ -40,22 +40,24 @@ public class CommunityReactionController {
     public String addLike(
             @PathVariable("postId") long postId,
             @RequestParam(name = "comments", required = false) String comments,
+            @RequestParam(name = "replies", required = false) String replies,
             @AuthenticationPrincipal MemberDetails memberDetails
     ) {
         communityReactionService.addLike(postId, memberDetails.getMemberId());
 
-        return communityDetailPage.redirect(postId, comments);
+        return communityDetailPage.redirect(postId, comments, replies);
     }
 
     @PostMapping("/community/{postId:\\d+}/likes/delete")
     public String removeLike(
             @PathVariable("postId") long postId,
             @RequestParam(name = "comments", required = false) String comments,
+            @RequestParam(name = "replies", required = false) String replies,
             @AuthenticationPrincipal MemberDetails memberDetails
     ) {
         communityReactionService.removeLike(postId, memberDetails.getMemberId());
 
-        return communityDetailPage.redirect(postId, comments);
+        return communityDetailPage.redirect(postId, comments, replies);
     }
 
     /*
@@ -66,6 +68,7 @@ public class CommunityReactionController {
     public String report(
             @PathVariable("postId") long postId,
             @RequestParam(name = "comments", required = false) String comments,
+            @RequestParam(name = "replies", required = false) String replies,
             @Valid @ModelAttribute("reportForm") ReportForm reportForm,
             BindingResult bindingResult,
             @ModelAttribute("commentForm") CommentForm commentForm,
@@ -78,13 +81,13 @@ public class CommunityReactionController {
         PostDetailView post = communityReactionService.getReportablePost(postId, memberId);
 
         if (bindingResult.hasErrors()) {
-            return communityDetailPage.render(model, post, memberId, comments);
+            return communityDetailPage.render(model, post, memberId, comments, replies);
         }
 
         communityReactionService.reportPost(postId, reportForm, memberId);
 
         redirectAttributes.addFlashAttribute("successMessage", "신고를 접수했습니다.");
 
-        return communityDetailPage.redirect(postId, comments);
+        return communityDetailPage.redirect(postId, comments, replies);
     }
 }

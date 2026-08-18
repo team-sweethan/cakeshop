@@ -42,11 +42,13 @@ public class CommunityCommentController {
     private final CommunityCommentService communityCommentService;
     private final CommunityDetailPage communityDetailPage;
 
-    // 댓글 작성
+    // 댓글·답글 작성. 답글은 replyTo 가 실려 온다
     @PostMapping("/community/{postId:\\d+}/comments")
     public String addComment(
             @PathVariable("postId") long postId,
             @RequestParam(name = "comments", required = false) String comments,
+            @RequestParam(name = "replies", required = false) String replies,
+            @RequestParam(name = "replyTo", required = false) String replyTo,
             @Valid @ModelAttribute("commentForm") CommentForm commentForm,
             BindingResult bindingResult,
             @ModelAttribute("reportForm") ReportForm reportForm,
@@ -58,12 +60,22 @@ public class CommunityCommentController {
         PostDetailView post = communityPostService.getCommentablePost(postId, memberId);
 
         if (bindingResult.hasErrors()) {
-            return communityDetailPage.render(model, post, memberId, comments);
+            return communityDetailPage.render(model, post, memberId, comments, replies);
         }
 
-        communityCommentService.addComment(postId, commentForm, memberId);
+        Long parentCommentId = CommunityRequestParams.positiveLong(replyTo);
 
-        return "redirect:/community/" + postId;
+        if (parentCommentId == null) {
+            communityCommentService.addComment(postId, commentForm, memberId);
+
+            // 새 댓글은 언제나 최신 20건 안에 있으므로 기본 분량으로 돌아간다
+            return "redirect:/community/" + postId;
+        }
+
+        communityCommentService.addReply(postId, parentCommentId, commentForm, memberId);
+
+        // 방금 쓴 답글이 보여야 하므로 그 묶음을 펼친 채로 돌아간다
+        return communityDetailPage.redirect(postId, comments, String.valueOf(parentCommentId));
     }
 
     @PostMapping("/community/{postId:\\d+}/comments/{commentId:\\d+}/delete")
@@ -71,10 +83,11 @@ public class CommunityCommentController {
             @PathVariable("postId") long postId,
             @PathVariable("commentId") long commentId,
             @RequestParam(name = "comments", required = false) String comments,
+            @RequestParam(name = "replies", required = false) String replies,
             @AuthenticationPrincipal MemberDetails memberDetails
     ) {
         communityCommentService.deleteComment(postId, commentId, memberDetails.getMemberId());
 
-        return communityDetailPage.redirect(postId, comments);
+        return communityDetailPage.redirect(postId, comments, replies);
     }
 }

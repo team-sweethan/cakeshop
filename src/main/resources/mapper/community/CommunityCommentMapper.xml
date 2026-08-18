@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.cakeshop.domain.community.mapper.CommunityCommentMapper">
 
-    <select id="findRecentComments"
+    <select id="findRecentRootComments"
             resultType="com.cakeshop.domain.community.dto.query.CommentRow">
 
         SELECT
@@ -16,16 +16,54 @@
         FROM comments c
 
         WHERE c.post_id = #{postId}
+        AND c.parent_comment_id IS NULL
 
         ORDER BY c.created_at DESC, c.id DESC
         LIMIT #{limit}
+    </select>
+
+    <select id="findRepliesByParentId"
+            resultType="com.cakeshop.domain.community.dto.query.CommentRow">
+
+        SELECT
+        c.id,
+        c.post_id,
+        c.member_id,
+        CASE WHEN c.status = 'PUBLISHED' THEN c.content END AS content,
+        c.status,
+        c.created_at
+
+        FROM comments c
+
+        WHERE c.parent_comment_id = #{parentCommentId}
+        AND c.post_id = #{postId}
+
+        ORDER BY c.created_at ASC, c.id ASC
+        LIMIT #{limit}
+    </select>
+
+    <select id="countRepliesByParentIds"
+            resultType="com.cakeshop.domain.community.dto.query.ReplyCountRow">
+
+        SELECT
+        c.parent_comment_id AS parent_id,
+        COUNT(*) AS reply_count
+
+        FROM comments c
+
+        WHERE c.parent_comment_id IN
+        <foreach collection="parentIds" item="parentId" open="(" separator="," close=")">
+            #{parentId}
+        </foreach>
+
+        GROUP BY c.parent_comment_id
     </select>
 
     <select id="countComments"
             resultType="com.cakeshop.domain.community.dto.query.CommentCountRow">
 
         SELECT
-        COUNT(*) AS row_count,
+        COALESCE(SUM(c.parent_comment_id IS NULL), 0) AS root_row_count,
         COALESCE(SUM(c.status = 'PUBLISHED'), 0) AS published_count
 
         FROM comments c
@@ -52,6 +90,22 @@
 
         INSERT INTO comments (post_id, member_id, content, status)
         VALUES (#{postId}, #{memberId}, #{content}, 'PUBLISHED')
+    </insert>
+
+    <!--
+        답글의 깊이(2단계)·같은 글·부모 노출을 이 한 문장이 지킨다. 부모가 없거나, 다른 글이거나,
+        이미 답글이거나(부모의 부모가 있음), 삭제됐으면 0행이고 0행은 성공으로 넘기지 않는다.
+        post_id 를 파라미터가 아니라 부모 행에서 가져와 답글이 부모와 다른 글에 붙을 수 없다.
+    -->
+    <insert id="insertReply">
+
+        INSERT INTO comments (post_id, member_id, parent_comment_id, content, status)
+        SELECT parent.post_id, #{memberId}, parent.id, #{content}, 'PUBLISHED'
+        FROM comments parent
+        WHERE parent.id = #{parentCommentId}
+        AND parent.post_id = #{postId}
+        AND parent.parent_comment_id IS NULL
+        AND parent.status = 'PUBLISHED'
     </insert>
 
     <update id="deleteComment">

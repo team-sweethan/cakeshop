@@ -81,6 +81,9 @@ DELETE FROM `daily_popular_posts`;
 -- "이미 확정한 날짜" 로 판단해 건너뛰어서(D4) 인기글이 채워지지 않는다.
 -- 지운 자리는 8절이 어제치로 다시 채운다.
 DELETE FROM `popular_post_batch_runs`;
+-- 답글이 뿌리를 참조하므로(fk_comments_parent, ON DELETE 없음) 답글을 먼저 지운다.
+-- 한 문장으로 전부 지우면 삭제 순서에 따라 FK 위반이 난다.
+DELETE FROM `comments` WHERE `parent_comment_id` IS NOT NULL;
 DELETE FROM `comments`;
 DELETE FROM `posts`;
 -- 공지는 posts 와 아무 관계가 없다(별도 표, 자식 표 없음). 순서에 걸리는 것이 없어
@@ -231,7 +234,7 @@ VALUES (@member_id, @free_id,
 --
 -- 삭제된 댓글은 자리 표시로 남기되 개수 집계에서는 제외한다(DOMAIN.md 4.4).
 -- 목록의 "댓글 N"이 삭제된 것을 빼고 세는지 확인할 수 있다.
--- 1차에는 대댓글이 없으므로 parent_comment_id 를 넣지 않는다(6.4).
+-- 답글(2단계)은 조각 8부터 있다 — 아래 6절이 첫 댓글 밑에 심는다.
 -- ---------------------------------------------------------------------------
 
 SET @escaped_post_id := (SELECT `id` FROM `posts` WHERE `title` = 'HTML 이스케이프 확인용 글');
@@ -272,6 +275,27 @@ SELECT @many_comment_post_id,
         UNION ALL SELECT 21 UNION ALL SELECT 22 UNION ALL SELECT 23 UNION ALL SELECT 24
         UNION ALL SELECT 25
        ) comment_seqs;
+
+-- ---------------------------------------------------------------------------
+-- 4-1. 답글 (조각 8)
+--
+-- 접힌 "답글 n개 보기"와 펼친 화면, 삭제된 답글의 자리 표시를 로컬에서 볼 수 있게
+-- 첫 번째 댓글 밑에 셋을 심는다. 삭제된 뿌리("지워진 댓글") 밑에는 심지 않는다 —
+-- 그 뿌리에는 새 답글도 달 수 없다(specs/community-comment.md A7).
+-- ---------------------------------------------------------------------------
+
+SET @reply_root_id := (SELECT `id` FROM `comments`
+                        WHERE `post_id` = @escaped_post_id
+                          AND `content` = '첫 번째 댓글입니다.');
+
+INSERT INTO `comments`
+       (`post_id`, `member_id`, `parent_comment_id`, `content`, `status`, `created_at`, `updated_at`)
+VALUES (@escaped_post_id, @admin_id, @reply_root_id, '첫 번째 답글입니다.', 'PUBLISHED',
+        TIMESTAMP(@activity_day, '10:05:00'), TIMESTAMP(@activity_day, '10:05:00')),
+       (@escaped_post_id, @member_id, @reply_root_id, '지워진 답글의 본문입니다.', 'DELETED',
+        TIMESTAMP(@activity_day, '10:06:00'), TIMESTAMP(@activity_day, '10:06:00')),
+       (@escaped_post_id, @member_id, @reply_root_id, '두 번째 답글입니다.', 'PUBLISHED',
+        TIMESTAMP(@activity_day, '10:07:00'), TIMESTAMP(@activity_day, '10:07:00'));
 
 -- ---------------------------------------------------------------------------
 -- 5. 좋아요

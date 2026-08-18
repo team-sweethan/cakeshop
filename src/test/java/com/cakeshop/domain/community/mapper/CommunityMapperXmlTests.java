@@ -28,6 +28,7 @@ class CommunityMapperXmlTests {
 
     private static final Map<String, Class<?>> MAPPERS = Map.of(
             "mapper/community/CommunityMapper.xml", CommunityMapper.class,
+            "mapper/community/CommunityCommentMapper.xml", CommunityCommentMapper.class,
             "mapper/community/CommunityAdminMapper.xml", CommunityAdminMapper.class,
             "mapper/community/CommunityNoticeMapper.xml", CommunityNoticeMapper.class,
             "mapper/community/CommunityPopularPostMapper.xml", CommunityPopularPostMapper.class);
@@ -85,6 +86,28 @@ class CommunityMapperXmlTests {
                 .contains("ORDER BY P.VIEW_COUNT DESC, P.ID DESC");
         assertThat(normalizedSql("findPublishedPosts", Map.of("sort", PostSort.LIKES)))
                 .contains("ORDER BY P.LIKE_COUNT DESC, P.ID DESC");
+    }
+
+    /**
+     * 댓글 트리의 규칙이 SQL 형태에 있음을 고정한다. 뿌리 목록의 답글 제외, 답글의 오래된 순,
+     * 그리고 답글 조건부 INSERT의 세 조건(같은 글·뿌리·노출 중 부모)은 데이터가 적을 때
+     * 형태가 무너져도 결과가 같아 보인다.
+     */
+    @Test
+    void commentThreadStatements_keepTreeConditionsInSql() {
+        assertThat(normalizedSql("findRecentRootComments"))
+                .contains("PARENT_COMMENT_ID IS NULL")
+                .contains("ORDER BY C.CREATED_AT DESC, C.ID DESC");
+
+        assertThat(normalizedSql("findRepliesByParentId", Map.of("parentCommentId", 1L)))
+                .contains("ORDER BY C.CREATED_AT ASC, C.ID ASC")
+                .contains("C.POST_ID = ?");
+
+        assertThat(normalizedSql("insertReply", Map.of("parentCommentId", 1L)))
+                .contains("SELECT PARENT.POST_ID")
+                .contains("PARENT.POST_ID = ?")
+                .contains("PARENT.PARENT_COMMENT_ID IS NULL")
+                .contains("PARENT.STATUS = 'PUBLISHED'");
     }
 
     @Test
