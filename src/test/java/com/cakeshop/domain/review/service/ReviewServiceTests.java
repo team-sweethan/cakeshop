@@ -88,6 +88,7 @@ class ReviewServiceTests {
                 reviewNotificationService);
 
         when(reviewImageService.getImagesByReviewIds(any())).thenReturn(Map.of());
+        when(reviewImageService.store(any())).thenReturn(List.of());
     }
 
     @Test
@@ -324,19 +325,23 @@ class ReviewServiceTests {
     }
 
     @Test
-    void write_imagesAreAttachedToTheGeneratedReviewBeforeAggregation() {
+    void write_imagesAreStoredBeforeLockAndAttachedBeforeAggregation() {
         givenWritableTarget();
         List<MultipartFile> uploads = List.of(new MockMultipartFile(
                 "images", "review.jpg", "image/jpeg",
                 new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF}));
         ReviewWriteForm form = form();
         form.setImages(uploads);
+        List<String> imageUrls = List.of("/uploads/review/review.jpg");
+        when(reviewImageService.store(uploads)).thenReturn(imageUrls);
 
         reviewService.write(form, MEMBER_ID);
 
         InOrder order = inOrder(reviewMapper, reviewImageService, productReviewCommandService);
+        order.verify(reviewImageService).store(uploads);
+        order.verify(productReviewCommandService).lockForRating(PRODUCT_ID);
         order.verify(reviewMapper).insert(any());
-        order.verify(reviewImageService).attach(REVIEW_ID, uploads);
+        order.verify(reviewImageService).attach(REVIEW_ID, imageUrls);
         order.verify(reviewMapper).aggregateForUpdate(PRODUCT_ID);
     }
 

@@ -240,6 +240,7 @@ class ReviewScreenRenderingTests {
 
             assertThat(body).contains("/uploads/review/first.jpg");
             assertThat(body).contains("/uploads/review/second.jpg");
+            assertThat(body).contains("loading=\"lazy\"");
             assertThat(body.indexOf("/uploads/review/first.jpg"))
                     .isLessThan(body.indexOf("/uploads/review/second.jpg"));
         }
@@ -351,7 +352,8 @@ class ReviewScreenRenderingTests {
 
         mockMvc.perform(get("/mypage/reviews").with(authentication(login())))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("/uploads/review/my-review.jpg")));
+                .andExpect(content().string(containsString("/uploads/review/my-review.jpg")))
+                .andExpect(content().string(containsString("loading=\"lazy\"")));
     }
 
     @Test

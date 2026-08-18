@@ -136,6 +136,10 @@ public class ReviewService {
         // 폼을 연 뒤 제출까지 시간이 벌어질 수 있고, 폼을 거치지 않은 직접 호출도 막아야 한다.
         OrderReviewTargetView target = requireWritableTarget(form.getOrderItemId(), memberId);
 
+        // 느린 외부 파일 저장은 상품 행 잠금 전에 끝낸다. 이후 DB 쓰기가 실패하면
+        // ReviewImageService 가 등록한 트랜잭션 콜백이 저장된 파일을 정리한다.
+        List<String> imageUrls = reviewImageService.store(form.getImages());
+
         // 저장보다 먼저 잠근다. 뒤집으면 INSERT 의 FK 확인이 상품 행에 공유 잠금을 걸고 집계가
         // 그것을 배타로 승격하려 해, 같은 상품에 후기가 동시에 들어올 때 교착한다 (D1).
         productReviewCommandService.lockForRating(target.productId());
@@ -158,7 +162,7 @@ public class ReviewService {
             throw new BusinessException(ReviewErrorCode.ALREADY_REVIEWED);
         }
 
-        reviewImageService.attach(review.getId(), form.getImages());
+        reviewImageService.attach(review.getId(), imageUrls);
 
         recalculateRating(target.productId());
 

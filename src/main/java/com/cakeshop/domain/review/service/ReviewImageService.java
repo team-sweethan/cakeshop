@@ -1,5 +1,6 @@
 package com.cakeshop.domain.review.service;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,11 +38,11 @@ public class ReviewImageService {
     private final ReviewImageValidator reviewImageValidator;
     private final FileStorageClient fileStorageClient;
 
-    void attach(long reviewId, List<MultipartFile> files) {
+    List<String> store(List<MultipartFile> files) {
         List<MultipartFile> uploads = selectUploads(files);
 
         if (uploads.isEmpty()) {
-            return;
+            return List.of();
         }
 
         if (uploads.size() > MAX_IMAGES_PER_REVIEW) {
@@ -51,14 +52,27 @@ public class ReviewImageService {
         // 한 장이라도 어긋나면 파일이나 DB 행을 하나도 만들지 않는다.
         uploads.forEach(reviewImageValidator::validate);
 
-        for (int sortOrder = 0; sortOrder < uploads.size(); sortOrder++) {
-            String imageUrl = store(uploads.get(sortOrder));
+        List<String> imageUrls = new ArrayList<>(uploads.size());
+        for (MultipartFile upload : uploads) {
+            String imageUrl = storeFile(upload);
 
             // 뒤의 이미지 저장, 후기 집계 또는 다른 쓰기가 실패하면 참조 없는 파일을 지운다.
             registerRollbackCleanup(imageUrl);
+            imageUrls.add(imageUrl);
+        }
 
+        return List.copyOf(imageUrls);
+    }
+
+    void attach(long reviewId, List<String> imageUrls) {
+        if (imageUrls == null || imageUrls.isEmpty()) {
+            return;
+        }
+
+        for (int sortOrder = 0; sortOrder < imageUrls.size(); sortOrder++) {
             try {
-                ReviewImage image = ReviewImage.create(reviewId, imageUrl, sortOrder);
+                ReviewImage image = ReviewImage.create(
+                        reviewId, imageUrls.get(sortOrder), sortOrder);
                 if (reviewImageMapper.insert(image) != 1 || image.getId() == null) {
                     throw new BusinessException(ReviewErrorCode.IMAGE_UPLOAD_FAILED);
                 }
@@ -94,7 +108,7 @@ public class ReviewImageService {
                 : files.stream().filter(file -> file != null && !file.isEmpty()).toList();
     }
 
-    private String store(MultipartFile file) {
+    private String storeFile(MultipartFile file) {
         try {
             return fileStorageClient.store(file, IMAGE_DIRECTORY);
         } catch (RuntimeException exception) {

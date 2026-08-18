@@ -17,6 +17,7 @@ import java.util.stream.IntStream;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -58,8 +59,8 @@ class ReviewImageServiceTests {
     }
 
     @Test
-    void attach_overLimit_rejectsBeforeStoringAnything() {
-        assertThatThrownBy(() -> reviewImageService.attach(REVIEW_ID, files(4)))
+    void store_overLimit_rejectsBeforeStoringAnything() {
+        assertThatThrownBy(() -> reviewImageService.store(files(4)))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(ReviewErrorCode.IMAGE_LIMIT_EXCEEDED);
@@ -69,39 +70,41 @@ class ReviewImageServiceTests {
     }
 
     @Test
-    void attach_atLimit_storesEveryFile() {
-        reviewImageService.attach(REVIEW_ID, files(3));
+    void store_atLimit_storesEveryFile() {
+        List<String> imageUrls = reviewImageService.store(files(3));
 
+        assertThat(imageUrls).hasSize(3);
         verify(fileStorageClient, times(3)).store(any(), anyString());
-        verify(reviewImageMapper, times(3)).insert(any(ReviewImage.class));
+        verify(reviewImageMapper, never()).insert(any(ReviewImage.class));
     }
 
     @Test
-    void attach_oneFileInvalid_storesNothing() {
+    void store_oneFileInvalid_storesNothing() {
         List<MultipartFile> uploads = files(3);
         doThrow(new BusinessException(ReviewErrorCode.INVALID_IMAGE_FILE))
                 .when(reviewImageValidator).validate(uploads.get(1));
 
-        assertThatThrownBy(() -> reviewImageService.attach(REVIEW_ID, uploads))
+        assertThatThrownBy(() -> reviewImageService.store(uploads))
                 .isInstanceOf(BusinessException.class);
 
         verify(fileStorageClient, never()).store(any(), anyString());
     }
 
     @Test
-    void attach_emptyPart_isIgnored() {
-        reviewImageService.attach(REVIEW_ID, List.of(
+    void store_emptyPart_isIgnored() {
+        List<String> imageUrls = reviewImageService.store(List.of(
                 new MockMultipartFile("images", "", "application/octet-stream", new byte[0])));
 
+        assertThat(imageUrls).isEmpty();
         verify(fileStorageClient, never()).store(any(), anyString());
     }
 
     @Test
-    void attach_transactionRollback_removesStoredFile() {
+    void store_transactionRollback_removesStoredFile() {
         TransactionSynchronizationManager.initSynchronization();
 
         try {
-            reviewImageService.attach(REVIEW_ID, files(1));
+            reviewImageService.store(files(1));
 
             verify(fileStorageClient, never()).delete(anyString());
 
@@ -113,6 +116,20 @@ class ReviewImageServiceTests {
         } finally {
             TransactionSynchronizationManager.clearSynchronization();
         }
+    }
+
+    @Test
+    void attach_storedUrls_insertsRowsInDisplayOrder() {
+        reviewImageService.attach(
+                REVIEW_ID, List.of("/uploads/review/a.jpg", "/uploads/review/b.jpg"));
+
+        ArgumentCaptor<ReviewImage> images = ArgumentCaptor.forClass(ReviewImage.class);
+        verify(reviewImageMapper, times(2)).insert(images.capture());
+        assertThat(images.getAllValues())
+                .extracting(ReviewImage::getImageUrl, ReviewImage::getSortOrder)
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple("/uploads/review/a.jpg", 0),
+                        org.assertj.core.groups.Tuple.tuple("/uploads/review/b.jpg", 1));
     }
 
     @Test

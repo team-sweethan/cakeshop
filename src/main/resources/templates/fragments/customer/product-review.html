@@ -29,6 +29,7 @@
     <img class="placeholder-image product-card__image"
          th:each="image : ${images}"
          th:src="@{${image.imageUrl}}"
+         loading="lazy"
          alt="후기 첨부 이미지">
   </div>
 </div>
