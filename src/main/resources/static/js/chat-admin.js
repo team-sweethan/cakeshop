@@ -155,14 +155,16 @@ document.addEventListener("DOMContentLoaded", () => {
       const initialRoomId = selectedChatRoomId || urlRoomId;
 
       if (initialRoomId) {
-        if (!selectedChatRoomId) {
-          const targetRoom = adminRoomsData.find(r => (r.chatRoomId || r.id) === initialRoomId);
-          if (targetRoom) {
+        const targetRoom = adminRoomsData.find(r => (r.chatRoomId || r.id) === initialRoomId);
+        if (targetRoom) {
+          if (!selectedChatRoomId) {
             const customerId = targetRoom.customerId || targetRoom.memberId;
             selectChatRoom(initialRoomId, customerId);
           }
+        } else if (!isReconnect) {
+          clearMainAndSidePanel();
         }
-      } else if (!isReconnect && !selectedChatRoomId) {
+      } else if (!isReconnect) {
         clearMainAndSidePanel();
       }
 
