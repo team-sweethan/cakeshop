@@ -16,6 +16,7 @@ import com.cakeshop.domain.coupon.entity.CouponTargetType;
 import com.cakeshop.domain.coupon.mapper.CouponMapper;
 import com.cakeshop.domain.member.service.MemberCouponQueryService;
 import com.cakeshop.domain.order.service.OrderCouponQueryService;
+import com.cakeshop.global.error.BusinessException;
 
 /**
  * 발급 정책에 따라 자동 발급 대상을 찾고, 대상별 발급 작업을 분배한다.
@@ -98,7 +99,7 @@ public class CouponIssueService {
                 } else {
                     skippedMemberCount++;
                 }
-            } catch (RuntimeException ignored) {
+            } catch (BusinessException ignored) {
                 // 회원 식별 정보는 운영 로그에 남기지 않고, 배치 종료 후 실패 건수만 기록한다.
                 failedMemberCount++;
             }

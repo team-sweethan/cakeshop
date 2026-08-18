@@ -4,6 +4,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -123,6 +124,22 @@ class CouponIssueServiceTests {
 
         verify(couponMemberIssueService).issueAutomatically(10L, 10L, false, false);
         verify(couponMemberIssueService).issueAutomatically(10L, 20L, false, false);
+    }
+
+    @Test
+    void issueBirthdayCoupons_stopsRemainingMembersWhenSystemFailureOccurs() {
+        Coupon coupon = coupon(CouponTargetType.BIRTHDAY, LocalDateTime.now().minusDays(1));
+        coupon.setId(10L);
+        when(memberCouponQueryService.getBirthdayMemberIds(org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn(List.of(10L, 20L));
+        when(couponMapper.findCouponsByTargetType(CouponTargetType.BIRTHDAY)).thenReturn(List.of(coupon));
+        when(couponMemberIssueService.issueAutomatically(10L, 10L, false, false))
+                .thenThrow(new IllegalStateException("database connection unavailable"));
+
+        assertThrows(IllegalStateException.class, () -> couponIssueService.issueBirthdayCoupons());
+
+        verify(couponMemberIssueService).issueAutomatically(10L, 10L, false, false);
+        verify(couponMemberIssueService, never()).issueAutomatically(10L, 20L, false, false);
     }
 
     private Coupon coupon(CouponTargetType targetType, LocalDateTime startsAt) {

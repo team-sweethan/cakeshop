@@ -25,7 +25,8 @@ public class CouponIssueScheduler {
         try {
             couponIssueService.issueBirthdayCoupons();
         } catch (RuntimeException exception) {
-            log.error("생일 쿠폰 발급 스케줄러 실행에 실패했습니다.", exception);
+            // 예외 객체에는 SQL·내부 경로·식별 정보가 포함될 수 있어 전달하지 않는다.
+            log.error("생일 쿠폰 발급 스케줄러 실행에 실패했습니다. failureType=SYSTEM");
             throw exception;
         }
     }
