@@ -33,7 +33,6 @@ public class HomeController {
                 homeService.getRecommendedProducts()
         );
         model.addAttribute("noticeSection", homeService.getNoticeSection());
-        model.addAttribute("popularSection", homeService.getPopularSection());
         return "home/main";
     }
 

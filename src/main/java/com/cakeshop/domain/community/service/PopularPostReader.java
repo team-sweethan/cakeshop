@@ -19,12 +19,13 @@ import org.springframework.stereotype.Component;
 /*
  * 확정된 인기글을 읽는 한 곳(specs/community-popular.md B5).
  *
- * <p>인기글이 실리는 자리는 목록 화면과 메인 둘인데, <b>건수만 다르고 규칙은 같다</b> — 최신
- * 확정일로 폴백하고, 그릴 것이 없으면 빈 영역을 주고, 확정일이 밀리면 경고한다. 화면이 늘 때
- * 이 셋이 함께 늘면 두 벌이 되고, 두 벌이 되는 순간 갈린다.
+ * <p>지금 실리는 자리는 커뮤니티 목록 사이드바 하나다(조각 15가 메인을 뺐다). 자리가 하나여도
+ * 읽기를 이 클래스로 유지하는 이유는 규칙(최신 확정일 폴백, 빈 영역, 낡음 경고)이 자리와
+ * 무관해서다 — 자리가 다시 늘 때 이 셋이 함께 늘면 두 벌이 되고, 두 벌이 되는 순간 갈린다.
+ * 메인이 실렸던 동안 실제로 두 자리가 이 한 곳을 썼다.
  *
  * <p><b>자리별 노출 조건은 여기 없다.</b> 목록의 "1쪽 + 필터 없음"은 그 화면의 규칙이라
- * {@code CommunityPostService}가, 메인은 {@code CommunityHomeQueryService}가 각자 갖는다.
+ * {@code CommunityPostService}가 갖는다.
  */
 @Component
 @RequiredArgsConstructor

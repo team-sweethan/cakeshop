@@ -42,7 +42,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class CommunityPostService {
 
-    /* 목록 화면이 쓰는 건수. 메인은 다른 값을 쓴다(`CommunityHomeQueryService`). */
+    /* 목록 사이드바가 쓰는 건수. 자리별 건수는 그 화면의 Service가 갖는다(B5). */
     private static final int POPULAR_POST_LIMIT = 10;
 
     private static final int FIRST_PAGE = 1;
