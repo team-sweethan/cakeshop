@@ -24,7 +24,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 // Service 시계 설정을 함께 로드한다.
 @Import({
-        CommunityService.class,
+        CommunityPostService.class,
         MemberCommunityQueryService.class,
         CommunityMemberViewLoader.class,
         CommunityPostAccessPolicy.class,
@@ -35,7 +35,7 @@ class CommunityViewCountTests {
     private static final LocalDateTime BASE_TIME = LocalDateTime.of(2026, 3, 1, 10, 0);
 
     @Autowired
-    private CommunityService communityService;
+    private CommunityPostService communityPostService;
 
     @Autowired
     private CommunityMapper communityMapper;
@@ -74,9 +74,9 @@ class CommunityViewCountTests {
     void getPostDetail_differentViewers_countEachOnce() {
         long postId = insertPost(PostStatus.PUBLISHED);
 
-        communityService.getPostDetail(postId, null, "S:aaa");
-        communityService.getPostDetail(postId, null, "S:bbb");
-        communityService.getPostDetail(postId, memberId, "M:" + memberId);
+        communityPostService.getPostDetail(postId, null, "S:aaa");
+        communityPostService.getPostDetail(postId, null, "S:bbb");
+        communityPostService.getPostDetail(postId, memberId, "M:" + memberId);
 
         assertThat(viewCountOf(postId)).isEqualTo(3);
         assertThatViewCountMatchesHistory(postId);
@@ -88,7 +88,7 @@ class CommunityViewCountTests {
         long postId = insertPost(PostStatus.PUBLISHED);
 
         for (int i = 0; i < 10; i++) {
-            communityService.getPostDetail(postId, memberId, "M:" + memberId);
+            communityPostService.getPostDetail(postId, memberId, "M:" + memberId);
         }
 
         assertThat(viewCountOf(postId)).isEqualTo(1);
@@ -101,11 +101,11 @@ class CommunityViewCountTests {
         long postId = insertPost(PostStatus.PUBLISHED);
         String viewerKey = "S:reader";
 
-        communityService.getPostDetail(postId, null, viewerKey);
+        communityPostService.getPostDetail(postId, null, viewerKey);
         // 댓글 더 보기를 반복한다.
-        communityService.getPostDetail(postId, null, viewerKey);
-        communityService.getPostDetail(postId, null, viewerKey);
-        communityService.getPostDetail(postId, null, viewerKey);
+        communityPostService.getPostDetail(postId, null, viewerKey);
+        communityPostService.getPostDetail(postId, null, viewerKey);
+        communityPostService.getPostDetail(postId, null, viewerKey);
 
         assertThat(viewCountOf(postId)).isEqualTo(1);
     }
@@ -116,11 +116,11 @@ class CommunityViewCountTests {
         long postId = insertPost(PostStatus.PUBLISHED);
         String viewerKey = "S:reader";
 
-        communityService.getPostDetail(postId, null, viewerKey);
+        communityPostService.getPostDetail(postId, null, viewerKey);
         agePostViews(postId, 11);
 
         // 조회 창 이후 댓글을 더 본다.
-        communityService.getVisiblePost(postId, null);
+        communityPostService.getVisiblePost(postId, null);
 
         assertThat(viewCountOf(postId)).isEqualTo(1);
         assertThatViewCountMatchesHistory(postId);
@@ -141,8 +141,8 @@ class CommunityViewCountTests {
         long blockedPostId = insertPost(PostStatus.BLOCKED);
 
         // 삭제 글과 작성자의 차단 글을 조회한다.
-        catchIgnored(() -> communityService.getPostDetail(deletedPostId, memberId, "M:1"));
-        communityService.getPostDetail(blockedPostId, memberId, "M:" + memberId);
+        catchIgnored(() -> communityPostService.getPostDetail(deletedPostId, memberId, "M:1"));
+        communityPostService.getPostDetail(blockedPostId, memberId, "M:" + memberId);
 
         assertThat(viewCountOf(deletedPostId)).isZero();
         assertThat(viewCountOf(blockedPostId)).isZero();
@@ -155,7 +155,7 @@ class CommunityViewCountTests {
     void getPostDetail_doesNotMarkPostAsEdited() {
         long postId = insertPost(PostStatus.PUBLISHED);
 
-        communityService.getPostDetail(postId, null, "S:aaa");
+        communityPostService.getPostDetail(postId, null, "S:aaa");
 
         assertThat(communityMapper.findPostById(postId).isEdited()).isFalse();
     }

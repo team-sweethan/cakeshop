@@ -36,7 +36,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @MariaDbIntegrationTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({
-        CommunityService.class,
+        CommunityPostService.class,
         CommunityCommentService.class,
         CommunityAdminService.class,
         MemberCommunityQueryService.class,
@@ -58,7 +58,7 @@ class CommunityQueryCountTests {
     private static final int EXPECTED_ADMIN_QUERY_COUNT = 3;
 
     @Autowired
-    private CommunityService communityService;
+    private CommunityPostService communityPostService;
 
     @Autowired
     private CommunityCommentService communityCommentService;
@@ -110,13 +110,13 @@ class CommunityQueryCountTests {
         insertPosts(3, 2);
 
         queryCounter.reset();
-        communityService.getPosts(categoryId, PostSort.LATEST, new PageRequest(1, 20));
+        communityPostService.getPosts(categoryId, PostSort.LATEST, new PageRequest(1, 20));
         int withFewPosts = queryCounter.count();
 
         insertPosts(20, 2);
 
         queryCounter.reset();
-        communityService.getPosts(categoryId, PostSort.LATEST, new PageRequest(1, 20));
+        communityPostService.getPosts(categoryId, PostSort.LATEST, new PageRequest(1, 20));
         int withManyPosts = queryCounter.count();
 
         assertThat(withFewPosts).isEqualTo(EXPECTED_QUERY_COUNT);
@@ -128,7 +128,7 @@ class CommunityQueryCountTests {
         long postId = insertPost();
 
         queryCounter.reset();
-        communityService.getPostDetail(postId, null, "M:1");
+        communityPostService.getPostDetail(postId, null, "M:1");
 
         // 상세와 작성자를 한 번씩 조회한다.
         assertThat(queryCounter.count()).isEqualTo(2);

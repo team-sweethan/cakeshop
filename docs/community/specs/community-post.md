@@ -39,6 +39,6 @@
 
 **H2a — 소유권·상태 조건이 SQL에도 있음.** 남의 글·차단된 글은 UPDATE가 0행이다. `CommunityMapperTests`가 `updatePost`/`deletePost`에 남의 회원 번호와 `BLOCKED` 글을 넣고 갱신 행 수와 실제 값을 함께 본다. 화면과 Service만 막으면 조건이 두 벌로 갈라지고, 갈라진 순간부터 한쪽만 고치는 실수가 가능해진다.
 
-**H2b — 차단된 글에 작성자가 아무 조치도 못 함.** 수정·삭제 모두 403이고 Mapper까지 내려가지 않는다. `CommunityServiceTests`가 버튼 숨김이 아니라 Service 거절을 본다. 화면 쪽은 `CommunityScreenRenderingTests.communityDetail_blockedPostAuthor_showsReasonAndHidesActions`가 맡는다.
+**H2b — 차단된 글에 작성자가 아무 조치도 못 함.** 수정·삭제 모두 403이고 Mapper까지 내려가지 않는다. `CommunityPostServiceTests`가 버튼 숨김이 아니라 Service 거절을 본다. 화면 쪽은 `CommunityScreenRenderingTests.communityDetail_blockedPostAuthor_showsReasonAndHidesActions`가 맡는다.
 
-**H2d — 조건부 UPDATE·DELETE가 0행이면 성공으로 넘어가지 않음.** 검증 통과 후 상태가 바뀐 순간을 잡는다. `CommunityServiceTests`가 갱신 행 수 0을 돌려주게 하고, 그 사이 `BLOCKED`가 되면 403이 나오는지까지 본다. **정상 흐름에서는 0행이 나오지 않으므로 이 검사가 없으면 드러나지 않는다** — 사용자에게는 성공 화면이 나오는데 글은 그대로다.
+**H2d — 조건부 UPDATE·DELETE가 0행이면 성공으로 넘어가지 않음.** 검증 통과 후 상태가 바뀐 순간을 잡는다. `CommunityPostServiceTests`가 갱신 행 수 0을 돌려주게 하고, 그 사이 `BLOCKED`가 되면 403이 나오는지까지 본다. **정상 흐름에서는 0행이 나오지 않으므로 이 검사가 없으면 드러나지 않는다** — 사용자에게는 성공 화면이 나오는데 글은 그대로다.

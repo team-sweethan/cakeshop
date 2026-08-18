@@ -63,8 +63,8 @@ import org.mockito.InOrder;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
 
-/** 커뮤니티 Service의 권한과 상태 계약을 확인한다. */
-class CommunityServiceTests {
+/** 커뮤니티 게시글 Service의 권한과 상태 계약을 확인한다. */
+class CommunityPostServiceTests {
 
     private static final long POST_ID = 42L;
     private static final long COMMENT_ID = 314L;
@@ -90,7 +90,7 @@ class CommunityServiceTests {
     private CommunityMapper communityMapper;
     private CommunityPopularPostMapper communityPopularPostMapper;
     private MemberCommunityQueryService memberCommunityQueryService;
-    private CommunityService communityService;
+    private CommunityPostService communityPostService;
 
     @BeforeEach
     void setUp() {
@@ -98,7 +98,7 @@ class CommunityServiceTests {
         communityPopularPostMapper = mock(CommunityPopularPostMapper.class);
         memberCommunityQueryService = mock(MemberCommunityQueryService.class);
         when(memberCommunityQueryService.getMembersByIds(anyList())).thenReturn(List.of());
-        communityService = new CommunityService(
+        communityPostService = new CommunityPostService(
                 communityMapper,
                 new CommunityMemberViewLoader(memberCommunityQueryService),
                 new CommunityPostAccessPolicy(),
@@ -123,7 +123,7 @@ class CommunityServiceTests {
     void getPostDetail_publishedPost_anonymousViewer_returnsPost() {
         givenPost(PostStatus.PUBLISHED);
 
-        PostDetailView post = communityService.getPostDetail(POST_ID, null, VIEWER_KEY);
+        PostDetailView post = communityPostService.getPostDetail(POST_ID, null, VIEWER_KEY);
 
         assertThat(post.id()).isEqualTo(POST_ID);
         assertThat(post.title()).isEqualTo("제목");
@@ -138,7 +138,7 @@ class CommunityServiceTests {
         givenPost(PostStatus.PUBLISHED);
         givenViewRecorded(true);
 
-        communityService.getPostDetail(POST_ID, null, VIEWER_KEY);
+        communityPostService.getPostDetail(POST_ID, null, VIEWER_KEY);
 
         verify(communityMapper).increaseViewCount(POST_ID, VIEWER_KEY);
         // 조회 이력과 조회수를 함께 반영한다.
@@ -151,7 +151,7 @@ class CommunityServiceTests {
         givenPost(PostStatus.PUBLISHED);
         givenViewRecorded(false);
 
-        communityService.getPostDetail(POST_ID, null, VIEWER_KEY);
+        communityPostService.getPostDetail(POST_ID, null, VIEWER_KEY);
 
         verify(communityMapper, never()).recordView(anyLong(), any());
     }
@@ -161,7 +161,7 @@ class CommunityServiceTests {
         givenPost(PostStatus.DELETED);
 
         // 삭제 글은 작성자에게도 숨긴다.
-        assertThatThrownBy(() -> communityService.getPostDetail(POST_ID, AUTHOR_ID, VIEWER_KEY))
+        assertThatThrownBy(() -> communityPostService.getPostDetail(POST_ID, AUTHOR_ID, VIEWER_KEY))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(CommunityErrorCode.POST_NOT_FOUND);
@@ -171,7 +171,7 @@ class CommunityServiceTests {
     void getPostDetail_blockedPost_author_returnsPostWithBlockedReason() {
         givenPost(PostStatus.BLOCKED);
 
-        PostDetailView post = communityService.getPostDetail(POST_ID, AUTHOR_ID, VIEWER_KEY);
+        PostDetailView post = communityPostService.getPostDetail(POST_ID, AUTHOR_ID, VIEWER_KEY);
 
         // 작성자에게는 차단 사유를 보여 준다.
         assertThat(post.isBlocked()).isTrue();
@@ -182,7 +182,7 @@ class CommunityServiceTests {
     void getPostDetail_blockedPost_otherMember_isNotFound() {
         givenPost(PostStatus.BLOCKED);
 
-        assertThatThrownBy(() -> communityService.getPostDetail(POST_ID, OTHER_MEMBER_ID, VIEWER_KEY))
+        assertThatThrownBy(() -> communityPostService.getPostDetail(POST_ID, OTHER_MEMBER_ID, VIEWER_KEY))
                 .isInstanceOfSatisfying(BusinessException.class, exception -> {
                     assertThat(exception.getErrorCode())
                             .isEqualTo(CommunityErrorCode.POST_NOT_FOUND);
@@ -194,7 +194,7 @@ class CommunityServiceTests {
     void getPostDetail_unknownPost_isNotFound() {
         when(communityMapper.findPostById(POST_ID)).thenReturn(null);
 
-        assertThatThrownBy(() -> communityService.getPostDetail(POST_ID, AUTHOR_ID, VIEWER_KEY))
+        assertThatThrownBy(() -> communityPostService.getPostDetail(POST_ID, AUTHOR_ID, VIEWER_KEY))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(CommunityErrorCode.POST_NOT_FOUND);
@@ -211,7 +211,7 @@ class CommunityServiceTests {
         givenAuthors(new MemberCommunityView(AUTHOR_ID, "글쓴이", false));
 
         PageResult<PostListView> result =
-                communityService.getPosts(3L, PostSort.VIEWS, new PageRequest(3, 20));
+                communityPostService.getPosts(3L, PostSort.VIEWS, new PageRequest(3, 20));
 
         assertThat(result.getContent())
                 .containsExactly(PostListView.of(post, new MemberCommunityView(AUTHOR_ID, "글쓴이", false)));
@@ -231,7 +231,7 @@ class CommunityServiceTests {
         givenAuthors();
 
         PageResult<PostListView> result =
-                communityService.getPosts(null, PostSort.LATEST, FIRST_PAGE);
+                communityPostService.getPosts(null, PostSort.LATEST, FIRST_PAGE);
 
         assertThat(result.getContent()).singleElement()
                 .satisfies(view -> assertThat(view.authorName()).isEqualTo("탈퇴한 회원"));
@@ -246,7 +246,7 @@ class CommunityServiceTests {
     void getPopularSection_firstPageWithoutFilter_returnsLatestConfirmedRanking() {
         givenConfirmedRanking(YESTERDAY, popular(1, 11L), popular(2, 22L));
 
-        PopularSectionView section = communityService.getPopularSection(null, FIRST_PAGE);
+        PopularSectionView section = communityPostService.getPopularSection(null, FIRST_PAGE);
 
         assertThat(section.isEmpty()).isFalse();
         assertThat(section.rankingDate()).isEqualTo(YESTERDAY);
@@ -263,7 +263,7 @@ class CommunityServiceTests {
     }, nullValues = "NONE")
     void getPopularSection_filteredOrLaterPage_returnsEmptySection(Long categoryId, int page) {
         PopularSectionView section =
-                communityService.getPopularSection(categoryId, new PageRequest(page, 20));
+                communityPostService.getPopularSection(categoryId, new PageRequest(page, 20));
 
         assertThat(section.isEmpty()).isTrue();
         assertThat(section.rankingDate()).isNull();
@@ -276,7 +276,7 @@ class CommunityServiceTests {
     void getPopularSection_noConfirmedRun_returnsEmptyWithoutQueryingPosts() {
         when(communityPopularPostMapper.findLatestRankingDate()).thenReturn(null);
 
-        PopularSectionView section = communityService.getPopularSection(null, FIRST_PAGE);
+        PopularSectionView section = communityPostService.getPopularSection(null, FIRST_PAGE);
 
         assertThat(section.isEmpty()).isTrue();
         assertThat(section.rankingDate()).isNull();
@@ -288,7 +288,7 @@ class CommunityServiceTests {
     void getPopularSection_everyRankedPostHidden_returnsEmptySection() {
         givenConfirmedRanking(YESTERDAY);
 
-        PopularSectionView section = communityService.getPopularSection(null, FIRST_PAGE);
+        PopularSectionView section = communityPostService.getPopularSection(null, FIRST_PAGE);
 
         assertThat(section.isEmpty()).isTrue();
         assertThat(section.rankingDate()).isNull();
@@ -307,7 +307,7 @@ class CommunityServiceTests {
     }, nullValues = "NONE")
     void getPopularSection_staleRanking_warnsOnlyAfterGrace(
             LocalDate rankingDate, LocalDateTime now, boolean expectWarning) {
-        CommunityService serviceAt = new CommunityService(
+        CommunityPostService serviceAt = new CommunityPostService(
                 communityMapper,
                 new CommunityMemberViewLoader(memberCommunityQueryService),
                 new CommunityPostAccessPolicy(),
@@ -327,7 +327,7 @@ class CommunityServiceTests {
         // 목에 생성 키 반영을 설정한다.
         givenGeneratedPostId();
 
-        long createdId = communityService.createPost(formOf(CATEGORY_ID, "제목", "본문"), AUTHOR_ID);
+        long createdId = communityPostService.createPost(formOf(CATEGORY_ID, "제목", "본문"), AUTHOR_ID);
 
         assertThat(createdId).isEqualTo(POST_ID);
 
@@ -345,7 +345,7 @@ class CommunityServiceTests {
         when(communityMapper.existsActiveCategory(CATEGORY_ID)).thenReturn(false);
 
         assertThatThrownBy(
-                () -> communityService.createPost(formOf(CATEGORY_ID, "제목", "본문"), AUTHOR_ID))
+                () -> communityPostService.createPost(formOf(CATEGORY_ID, "제목", "본문"), AUTHOR_ID))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(CommunityErrorCode.CATEGORY_NOT_FOUND);
@@ -371,7 +371,7 @@ class CommunityServiceTests {
         givenActiveCategory();
         when(communityMapper.updatePost(any())).thenReturn(1);
 
-        communityService.updatePost(POST_ID, formOf(CATEGORY_ID, "고친 제목", "고친 본문"), AUTHOR_ID);
+        communityPostService.updatePost(POST_ID, formOf(CATEGORY_ID, "고친 제목", "고친 본문"), AUTHOR_ID);
 
         PostUpdateCommand updated = capturedUpdate();
         assertThat(updated.postId()).isEqualTo(POST_ID);
@@ -390,7 +390,7 @@ class CommunityServiceTests {
             PostStatus status, boolean asAuthor, CommunityErrorCode expected) {
         givenPost(status);
 
-        assertThatThrownBy(() -> communityService.updatePost(
+        assertThatThrownBy(() -> communityPostService.updatePost(
                 POST_ID, formOf(CATEGORY_ID, "제목", "본문"), memberIdOf(asAuthor)))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
@@ -404,7 +404,7 @@ class CommunityServiceTests {
         givenPost(PostStatus.PUBLISHED);
         when(communityMapper.existsActiveCategory(CATEGORY_ID)).thenReturn(false);
 
-        assertThatThrownBy(() -> communityService.updatePost(
+        assertThatThrownBy(() -> communityPostService.updatePost(
                 POST_ID, formOf(CATEGORY_ID, "제목", "본문"), AUTHOR_ID))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
@@ -418,7 +418,7 @@ class CommunityServiceTests {
     void getEditablePost_doesNotIncreaseViewCount() {
         givenPost(PostStatus.PUBLISHED);
 
-        communityService.getEditablePost(POST_ID, AUTHOR_ID);
+        communityPostService.getEditablePost(POST_ID, AUTHOR_ID);
 
         verify(communityMapper, never()).increaseViewCount(anyLong(), any());
     }
@@ -428,7 +428,7 @@ class CommunityServiceTests {
         givenPost(PostStatus.PUBLISHED);
         when(communityMapper.deletePost(POST_ID, AUTHOR_ID)).thenReturn(1);
 
-        communityService.deletePost(POST_ID, AUTHOR_ID);
+        communityPostService.deletePost(POST_ID, AUTHOR_ID);
 
         verify(communityMapper).deletePost(POST_ID, AUTHOR_ID);
     }
@@ -447,7 +447,7 @@ class CommunityServiceTests {
             return 0;
         });
 
-        assertThatThrownBy(() -> communityService.deletePost(POST_ID, AUTHOR_ID))
+        assertThatThrownBy(() -> communityPostService.deletePost(POST_ID, AUTHOR_ID))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(expected);
@@ -499,7 +499,7 @@ class CommunityServiceTests {
         return new PopularPostView(ranking, postId, "질문", "제목" + ranking);
     }
 
-    /** 실행 중 발생한 CommunityService 경고를 모은다. */
+    /** 실행 중 발생한 CommunityPostService 경고를 모은다. */
     private List<String> warningsWhile(Runnable action) {
         ch.qos.logback.classic.Logger logger = (ch.qos.logback.classic.Logger)
                 LoggerFactory.getLogger(PopularPostReader.class);

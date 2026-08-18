@@ -40,7 +40,7 @@ public class CommunityCommentService {
      * 댓글을 달 수 있는 글인지는 게시글 쪽이 판단한다. 여기서 다시 읽으면 노출 규칙이
      * 두 벌이 되고, 그 두 벌은 관리자가 글을 차단하는 순간 갈린다.
      */
-    private final CommunityService communityService;
+    private final CommunityPostService communityPostService;
 
     @Transactional(readOnly = true)
     public CommentSectionView getComments(long postId, Integer requestedLimit) {
@@ -66,7 +66,7 @@ public class CommunityCommentService {
 
     @Transactional
     public void addComment(long postId, CommentForm form, long authorId) {
-        communityService.getCommentablePost(postId, authorId);
+        communityPostService.getCommentablePost(postId, authorId);
 
         communityMapper.insertComment(
                 Comment.create(postId, authorId, form.getContent()));
@@ -74,7 +74,7 @@ public class CommunityCommentService {
 
     @Transactional
     public void deleteComment(long postId, long commentId, long memberId) {
-        communityService.getCommentablePost(postId, memberId);
+        communityPostService.getCommentablePost(postId, memberId);
         requireOwnCommentTransition(
                 postId, commentId, memberId, CommentStatus.DELETED);
 
@@ -92,7 +92,7 @@ public class CommunityCommentService {
             return;
         }
 
-        communityService.getCommentablePost(postId, memberId);
+        communityPostService.getCommentablePost(postId, memberId);
         requireOwnCommentTransition(
                 postId, commentId, memberId, CommentStatus.DELETED);
 

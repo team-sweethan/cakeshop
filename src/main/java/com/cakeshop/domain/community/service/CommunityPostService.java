@@ -35,12 +35,12 @@ import org.springframework.transaction.annotation.Transactional;
  * 담당자 : 현규
  * 작성일 : 2026-08-05
  * 기능 : 커뮤니티 비즈니스 로직
- * 설명 : CommunityService 기능의 권한, 상태, 트랜잭션을 관리한다.
+ * 설명 : CommunityPostService 기능의 권한, 상태, 트랜잭션을 관리한다.
  * ******************************
  */
 @Service
 @RequiredArgsConstructor
-public class CommunityService {
+public class CommunityPostService {
 
     /* 목록 화면이 쓰는 건수. 메인은 다른 값을 쓴다(`CommunityHomeQueryService`). */
     private static final int POPULAR_POST_LIMIT = 10;
