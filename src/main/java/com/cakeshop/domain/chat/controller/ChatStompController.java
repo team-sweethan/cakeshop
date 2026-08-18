@@ -4,6 +4,7 @@ import com.cakeshop.domain.chat.dto.form.ChatMessageSendRequest;
 import com.cakeshop.domain.chat.dto.form.ChatRoomReadRequest;
 import com.cakeshop.domain.chat.dto.view.ChatMessageResponse;
 import com.cakeshop.domain.chat.dto.view.ChatRoomListResponse;
+import com.cakeshop.domain.chat.service.ChatNotificationSender;
 import com.cakeshop.domain.chat.service.ChatService;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.error.CommonErrorCode;
@@ -25,6 +26,7 @@ public class ChatStompController {
 
     private final ChatService chatService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final ChatNotificationSender chatNotificationSender;
 
     // 1. 실시간 메시지 전송 (@MessageMapping("/chat/message"))
     // 클라이언트 발신: /app/chat/message
@@ -42,7 +44,7 @@ public class ChatStompController {
         Long senderId = memberDetails.getMemberId();
         boolean isAdmin = memberDetails.isAdmin();
 
-        // 1. 서비스 호출을 통해 메시지 저장 및 완벽한 ChatMessageResponse DTO 생성
+        // 1. 서비스 호출을 통해 메시지 저장 및 완벽한 ChatMessageResponse DTO 생성 (트랜잭션 완료)
         ChatMessageResponse response = chatService.sendMessage(
                 request.getChatRoomId(),
                 senderId,
@@ -60,6 +62,19 @@ public class ChatStompController {
 
         // 2-2. [관리자 대시보드 전파] 관리자 좌측 방 목록이 실시간으로 최상단 이동!
         messagingTemplate.convertAndSend("/topic/admin/rooms", response);
+
+        // 3. 알림 발송 (트랜잭션 완료 후 호출 → afterCommit 중첩 없이 안전하게 WebSocket 전송)
+        try {
+            if (isAdmin) {
+                chatNotificationSender.sendCustomerChatNotification(
+                        response.getChatRoomId(), response.getId(), response.getCustomerId(), senderId);
+            } else {
+                chatNotificationSender.sendAdminChatNotification(
+                        response.getChatRoomId(), response.getId(), senderId, response.getCustomerName());
+            }
+        } catch (Exception e) {
+            // 알림 발송 실패가 채팅 서비스에 영향을 주지 않도록 예외 격리
+        }
     }
 
     // 2. 실시간 읽음 커서 갱신 (@MessageMapping("/chat/read"))

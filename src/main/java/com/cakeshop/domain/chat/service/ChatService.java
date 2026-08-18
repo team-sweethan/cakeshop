@@ -297,7 +297,7 @@ public class ChatService {
         Long customerId = chatRoom != null ? chatRoom.getCustomerId() : null;
         String customerName = customerId != null ? memberChatQueryService.getCustomerName(customerId) : "고객";
 
-        return ChatMessageResponse.builder()
+        ChatMessageResponse response = ChatMessageResponse.builder()
                 .id(message.getId())
                 .chatRoomId(message.getChatRoomId())
                 .customerId(customerId)
@@ -312,6 +312,9 @@ public class ChatService {
                 .isRead(false)
                 .createdAt(message.getCreatedAt())
                 .build();
+
+        // 실시간 알림 발송은 트랜잭션 외부인 컨트롤러 레이어(ChatStompController / ChatApiController)에서 처리합니다.
+        return response;
     }
 
     // S3 저장소에 이미지 파일 직접 업로드 (손님인 경우 DB 기준 활성 회원 검증 추가)

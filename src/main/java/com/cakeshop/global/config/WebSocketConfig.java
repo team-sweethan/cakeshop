@@ -1,6 +1,8 @@
 package com.cakeshop.global.config;
 
-import com.cakeshop.domain.chat.service.ChatService;
+import com.cakeshop.domain.chat.entity.ChatRoom;
+import com.cakeshop.domain.chat.mapper.ChatMapper;
+import com.cakeshop.domain.member.service.MemberChatQueryService;
 import com.cakeshop.global.security.MemberDetails;
 import java.security.Principal;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +26,8 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 @RequiredArgsConstructor
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
-    private final ChatService chatService;
+    private final MemberChatQueryService memberChatQueryService;
+    private final ChatMapper chatMapper;
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
@@ -49,9 +52,10 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                     String destination = accessor.getDestination();
                     Principal principal = accessor.getUser();
 
-                    // 0. 정지 또는 유효하지 않은 회원의 웹소켓 사용 실시간 차단
-                    if (principal instanceof Authentication auth && auth.getPrincipal() instanceof MemberDetails memberDetails) {
-                        if (!memberDetails.isAdmin() && !chatService.existsCustomer(memberDetails.getMemberId())) {
+                    // 0. 정지 또는 유효하지 않은 회원의 웹소켓 사용 실시간 차단 (CONNECT 또는 SUBSCRIBE 시 검증)
+                    if ((StompCommand.CONNECT.equals(command) || StompCommand.SUBSCRIBE.equals(command))
+                            && principal instanceof Authentication auth && auth.getPrincipal() instanceof MemberDetails memberDetails) {
+                        if (!memberDetails.isAdmin() && !memberChatQueryService.existsCustomer(memberDetails.getMemberId())) {
                             throw new AccessDeniedException("정지되었거나 유효하지 않은 회원은 웹소켓 서비스를 이용할 수 없습니다.");
                         }
                     }
@@ -81,7 +85,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                                 try {
                                     Long roomId = Long.parseLong(parts[0]);
                                     if (principal instanceof Authentication auth && auth.getPrincipal() instanceof MemberDetails memberDetails) {
-                                        chatService.validateSubscribeAccess(
+                                        validateSubscribeAccess(
                                                 roomId,
                                                 memberDetails.getMemberId(),
                                                 memberDetails.isAdmin()
@@ -117,5 +121,15 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 return message;
             }
         });
+    }
+
+    private void validateSubscribeAccess(Long chatRoomId, Long currentUserId, boolean isAdmin) {
+        ChatRoom room = chatMapper.findChatRoomById(chatRoomId);
+        if (room == null) {
+            throw new AccessDeniedException("존재하지 않는 채팅방입니다.");
+        }
+        if (!isAdmin && (currentUserId == null || !currentUserId.equals(room.getCustomerId()))) {
+            throw new AccessDeniedException("채팅방 접근 권한이 없습니다.");
+        }
     }
 }

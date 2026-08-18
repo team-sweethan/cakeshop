@@ -157,8 +157,10 @@ document.addEventListener("DOMContentLoaded", () => {
       if (initialRoomId) {
         if (!selectedChatRoomId) {
           const targetRoom = adminRoomsData.find(r => (r.chatRoomId || r.id) === initialRoomId);
-          const customerId = targetRoom ? (targetRoom.customerId || targetRoom.memberId) : null;
-          selectChatRoom(initialRoomId, customerId);
+          if (targetRoom) {
+            const customerId = targetRoom.customerId || targetRoom.memberId;
+            selectChatRoom(initialRoomId, customerId);
+          }
         }
       } else if (!isReconnect && !selectedChatRoomId) {
         clearMainAndSidePanel();
@@ -239,6 +241,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // 현재 탭 필터 조건 검증 (미답변, 답변완료, 상담완료)
     if (currentFilter === "unread" && newStatus !== "WAITING_ADMIN") {
+      const wasUnread = existingRoom && existingRoom.responseStatus === "WAITING_ADMIN";
       if (isCurrentActive) {
         // 내가 현재 대화 중인 방이면 목록에서 바로 없애지 않고 '답변 완료' 상태로 유지
         if (existingRoom) {
@@ -252,7 +255,9 @@ document.addEventListener("DOMContentLoaded", () => {
           }
           renderRoomList();
         }
-        adjustUnreadTabBadge(-1);
+        if (wasUnread) {
+          adjustUnreadTabBadge(-1);
+        }
         return;
       }
 
@@ -261,7 +266,9 @@ document.addEventListener("DOMContentLoaded", () => {
       if (existingIdx !== -1) {
         adminRoomsData.splice(existingIdx, 1);
         renderRoomList();
-        adjustUnreadTabBadge(-1);
+        if (wasUnread) {
+          adjustUnreadTabBadge(-1);
+        }
       }
       return;
     }

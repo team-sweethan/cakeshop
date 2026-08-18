@@ -10,6 +10,7 @@ import com.cakeshop.domain.chat.dto.view.ChatRoomSidePanelResponse;
 import com.cakeshop.domain.chat.entity.ChatMessage;
 import com.cakeshop.domain.chat.entity.ChatResponseStatus;
 import com.cakeshop.domain.chat.entity.ChatRoom;
+import com.cakeshop.domain.chat.service.ChatNotificationSender;
 import com.cakeshop.domain.chat.service.ChatService;
 import com.cakeshop.global.security.MemberDetails;
 import jakarta.validation.Valid;
@@ -29,6 +30,7 @@ import java.util.List;
 public class ChatApiController {
 
     private final ChatService chatService;
+    private final ChatNotificationSender chatNotificationSender;
     private final ProductChatQueryService productChatQueryService;
     private final SimpMessagingTemplate messagingTemplate;
 
@@ -130,6 +132,19 @@ public class ChatApiController {
             messagingTemplate.convertAndSend("/topic/admin/rooms", response);
         } catch (Exception e) {
             // 소켓 방송 중 예외가 발생하더라도 REST 응답은 성공 유지
+        }
+
+        // 알림 발송 (트랜잭션 완료 후 호출 → afterCommit 중첩 없이 안전하게 WebSocket 전송)
+        try {
+            if (memberDetails.isAdmin()) {
+                chatNotificationSender.sendCustomerChatNotification(
+                        response.getChatRoomId(), response.getId(), response.getCustomerId(), memberDetails.getMemberId());
+            } else {
+                chatNotificationSender.sendAdminChatNotification(
+                        response.getChatRoomId(), response.getId(), memberDetails.getMemberId(), response.getCustomerName());
+            }
+        } catch (Exception e) {
+            // 알림 발송 실패가 채팅 서비스에 영향을 주지 않도록 예외 격리
         }
 
         return ResponseEntity.ok(response);
