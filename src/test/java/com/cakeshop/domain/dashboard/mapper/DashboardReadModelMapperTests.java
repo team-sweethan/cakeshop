@@ -857,10 +857,9 @@ class DashboardReadModelMapperTests {
                     base_price,
                     option_amount,
                     total_amount,
-                    preparation_days,
-                    cancellation_limit_days
+                    preparation_days
                 )
-                VALUES (?, ?, ?, ?, 1, 40000, 0, 40000, 0, 0)
+                VALUES (?, ?, ?, ?, 1, 40000, 0, 40000, 0)
                 """,
                 orderId,
                 productId,

@@ -288,9 +288,8 @@ class OrderReviewMapperTests {
                 """
                 INSERT INTO order_items (
                     order_id, product_id, product_name, product_type, quantity,
-                    base_price, option_amount, total_amount, preparation_days,
-                    cancellation_limit_days
-                ) VALUES (?, ?, ?, 'GENERAL', 1, 20000, 0, 20000, 0, 0)
+                    base_price, option_amount, total_amount, preparation_days
+                ) VALUES (?, ?, ?, 'GENERAL', 1, 20000, 0, 20000, 0)
                 """,
                 orderId,
                 productId,

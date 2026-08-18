@@ -759,9 +759,6 @@ class OrderMapperTests {
         order.setFinalAmount(BigDecimal.valueOf(40_000));
         order.setStatus(OrderStatus.PENDING_PAYMENT);
         order.setPickupAt(LocalDateTime.of(2026, 8, 10, 14, 0));
-        order.setCancellationBlockedAt(
-                LocalDateTime.of(2026, 8, 8, 20, 0)
-        );
         order.setPaymentExpiresAt(
                 LocalDateTime.of(2026, 8, 1, 12, 10)
         );
@@ -782,7 +779,6 @@ class OrderMapperTests {
         orderItem.setTotalAmount(BigDecimal.valueOf(45_000));
         orderItem.setRequirements("분홍색 크림");
         orderItem.setPreparationDays(3);
-        orderItem.setCancellationLimitDays(2);
         return orderItem;
     }
 

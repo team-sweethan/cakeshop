@@ -236,7 +236,6 @@ public class CustomerCustomOrderService {
         orderItem.setTotalAmount(preparedItem.totalAmount());
         orderItem.setRequirements(trimToNull(lettering));
         orderItem.setPreparationDays(product.preparationDays());
-        orderItem.setCancellationLimitDays(0);
         requireOneRow(orderMapper.insertOrderItem(orderItem));
 
         for (ValidatedOption selectedOption : preparedItem.selectedOptions()) {

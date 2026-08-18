@@ -431,10 +431,9 @@ class DailyProductStatisticsSourceReadModelMapperTests {
                     base_price,
                     option_amount,
                     total_amount,
-                    preparation_days,
-                    cancellation_limit_days
+                    preparation_days
                 )
-                VALUES (?, ?, ?, 'GENERAL', ?, ?, 0, ?, 0, 0)
+                VALUES (?, ?, ?, 'GENERAL', ?, ?, 0, ?, 0)
                 """,
                 orderId,
                 productId,
