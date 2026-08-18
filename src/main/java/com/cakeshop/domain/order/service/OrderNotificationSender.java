@@ -18,8 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
  * 작성자 : 김민정
  * 담당자 : 주환
  * 작성일 : 2026-08-18
- * 기능 : 주문 및 결제 실시간/문자 알림 전송 서비스
- * 설명 : 주문/결제 라이프사이클 이벤트 발생 시 활성 고객 및 관리자에게 독립 트랜잭션(REQUIRES_NEW)에서 안전하게 실시간 웹소켓 토스트 및 문자(SMS) 알림을 발송한다.
+ * 기능 : 주문, 결제, 픽업 실시간/문자 알림 전송 서비스
+ * 설명 : 주문/결제/픽업 라이프사이클 이벤트 발생 시 활성 고객 및 관리자에게 독립 트랜잭션(REQUIRES_NEW)에서 안전하게 실시간 웹소켓 토스트 및 문자(SMS) 알림을 발송한다.
  * ******************************
  */
 @Slf4j
@@ -127,6 +127,69 @@ public class OrderNotificationSender {
             sendToActiveAdmins(orderId, null, NotificationType.REFUND_FAILED, "REFUND_FAILED:ALL_ADMINS:" + orderId, new Object[]{ordNum});
         } catch (Exception e) {
             log.error("환불 실패 관리자 알림 발송 오류 (orderId={}):", orderId, e);
+        }
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void sendPickupReminderTomorrow(long orderId, long customerId, String orderNumber) {
+        try {
+            String ordNum = (orderNumber != null && !orderNumber.isBlank()) ? orderNumber : String.valueOf(orderId);
+            if (memberNotificationQueryService.isMemberActive(customerId)) {
+                notificationService.makeNotification(NotificationRequest.builder()
+                        .receiverId(customerId)
+                        .orderId(orderId)
+                        .type(NotificationType.CUSTOMER_PICKUP_REMINDER_TOMORROW)
+                        .eventKey("CUSTOMER_PICKUP_TOMORROW:" + customerId + ":" + orderId)
+                        .deliveryScope(DeliveryScope.WEB_AND_SMS)
+                        .args(new Object[0])
+                        .build());
+            }
+
+            sendToActiveAdmins(orderId, customerId, NotificationType.ADMIN_PICKUP_REMINDER_TOMORROW, "ADMIN_PICKUP_TOMORROW:ALL_ADMINS:" + orderId, new Object[]{ordNum});
+        } catch (Exception e) {
+            log.error("픽업 하루 전 알림 발송 오류 (orderId={}):", orderId, e);
+        }
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void sendPickupReminderToday(long orderId, long customerId, String orderNumber) {
+        try {
+            String ordNum = (orderNumber != null && !orderNumber.isBlank()) ? orderNumber : String.valueOf(orderId);
+            if (memberNotificationQueryService.isMemberActive(customerId)) {
+                notificationService.makeNotification(NotificationRequest.builder()
+                        .receiverId(customerId)
+                        .orderId(orderId)
+                        .type(NotificationType.CUSTOMER_PICKUP_REMINDER_TODAY)
+                        .eventKey("CUSTOMER_PICKUP_TODAY:" + customerId + ":" + orderId)
+                        .deliveryScope(DeliveryScope.WEB_AND_SMS)
+                        .args(new Object[0])
+                        .build());
+            }
+
+            sendToActiveAdmins(orderId, customerId, NotificationType.ADMIN_PICKUP_REMINDER_TODAY, "ADMIN_PICKUP_TODAY:ALL_ADMINS:" + orderId, new Object[]{ordNum});
+        } catch (Exception e) {
+            log.error("픽업 당일 알림 발송 오류 (orderId={}):", orderId, e);
+        }
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void sendOrderPickedUp(long orderId, long customerId, String orderNumber) {
+        try {
+            String ordNum = (orderNumber != null && !orderNumber.isBlank()) ? orderNumber : String.valueOf(orderId);
+            if (memberNotificationQueryService.isMemberActive(customerId)) {
+                notificationService.makeNotification(NotificationRequest.builder()
+                        .receiverId(customerId)
+                        .orderId(orderId)
+                        .type(NotificationType.CUSTOMER_ORDER_PICKED_UP)
+                        .eventKey("CUSTOMER_PICKED_UP:" + customerId + ":" + orderId)
+                        .deliveryScope(DeliveryScope.WEB_AND_SMS)
+                        .args(new Object[0])
+                        .build());
+            }
+
+            sendToActiveAdmins(orderId, customerId, NotificationType.ADMIN_PICKEDUP, "ADMIN_PICKEDUP:ALL_ADMINS:" + orderId, new Object[]{ordNum});
+        } catch (Exception e) {
+            log.error("픽업 완료 알림 발송 오류 (orderId={}):", orderId, e);
         }
     }
 

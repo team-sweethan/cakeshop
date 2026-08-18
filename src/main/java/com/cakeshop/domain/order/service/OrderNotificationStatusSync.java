@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
  * 담당자 : 주환
  * 작성일 : 2026-08-18
  * 기능 : 주문 상태 변경 독립 감지 및 알림 동기화 스케줄러
- * 설명 : 타 도메인 코드를 직접 수정하지 않고, 서울 시각 Clock, 과거 1일 복구 탐색, AtomicBoolean 직렬화, 비동기 스레드 풀(@Async), 시간 커서 페이징(since) 및 NotificationOrderQueryService 멱등성 검사를 통해 제작 승인, 반려, 취소 알림을 발송한다.
+ * 설명 : 타 도메인 코드를 직접 수정하지 않고, 서울 시각 Clock, 과거 1일 복구 탐색, AtomicBoolean 직렬화, 비동기 스레드 풀(@Async), 시간 커서 페이징(since) 및 NotificationOrderQueryService 멱등성 검사를 통해 제작 승인, 반려, 취소, 픽업 완료 알림을 발송한다.
  * ******************************
  */
 @Slf4j
@@ -85,6 +85,12 @@ public class OrderNotificationStatusSync {
                         }
                         // 관리자 취소 알림 전송 (주문번호 포함)
                         orderNotificationSender.sendOrderCanceledToAdmins(orderId, memberId, orderNumber);
+                    } else if ("PICKED_UP".equalsIgnoreCase(statusStr)) {
+                        // 픽업 완료 알림 체크 및 전송
+                        String customerEventKey = "CUSTOMER_PICKED_UP:" + memberId + ":" + orderId;
+                        if (!notificationOrderQueryService.isNotificationFullySent(memberId, customerEventKey)) {
+                            orderNotificationSender.sendOrderPickedUp(orderId, memberId, orderNumber);
+                        }
                     }
 
                     if (order.orderUpdatedAt() != null && order.orderUpdatedAt().isAfter(maxProcessedTime)) {
