@@ -93,6 +93,16 @@ public interface CommunityMapper {
             @Param("postId") long postId
     );
 
+    int increaseLikeCount(
+            @Param("postId") long postId,
+            @Param("memberId") long memberId
+    );
+
+    int decreaseLikeCount(
+            @Param("postId") long postId,
+            @Param("memberId") long memberId
+    );
+
     int insertLike(
             @Param("postId") long postId,
             @Param("memberId") long memberId
@@ -101,10 +111,6 @@ public interface CommunityMapper {
     int deleteLike(
             @Param("postId") long postId,
             @Param("memberId") long memberId
-    );
-
-    int recalculateLikeCount(
-            @Param("postId") long postId
     );
 
     boolean existsLike(
