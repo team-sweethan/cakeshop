@@ -617,16 +617,18 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   function markAllAdminMessagesRead(lastReadMessageId) {
-    const readMessages = document.querySelectorAll(".admin-chat-main-room .chat-msg--me");
+    if (!adminChatMessagesContainer) return;
+    const targetReadId = lastReadMessageId ? parseInt(lastReadMessageId, 10) : null;
+    const readMessages = adminChatMessagesContainer.querySelectorAll(".chat-msg--me");
     readMessages.forEach((msgEl) => {
       const msgIdAttr = msgEl.getAttribute("id");
       if (msgIdAttr && msgIdAttr.startsWith("admin-msg-")) {
         const msgId = parseInt(msgIdAttr.substring("admin-msg-".length()), 10);
-        if (!isNaN(msgId) && lastReadMessageId && msgId <= lastReadMessageId) {
+        if (!isNaN(msgId) && (targetReadId === null || isNaN(targetReadId) || msgId <= targetReadId)) {
           const badge = msgEl.querySelector(".chat-msg__read");
           if (badge) badge.textContent = "읽음";
         }
-      } else if (!lastReadMessageId) {
+      } else if (!targetReadId) {
         const badge = msgEl.querySelector(".chat-msg__read");
         if (badge) badge.textContent = "읽음";
       }

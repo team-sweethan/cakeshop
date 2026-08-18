@@ -212,6 +212,11 @@ document.addEventListener("DOMContentLoaded", () => {
       sendReadCursor(currentChatRoomId, lastFetchedMessageId);
     }
   });
+  document.addEventListener("click", () => {
+    if (currentChatRoomId && lastFetchedMessageId > 0) {
+      sendReadCursor(currentChatRoomId, lastFetchedMessageId);
+    }
+  });
 
   // 상대방이 읽었을 때 내 메시지의 "미읽음" 텍스트를 "읽음"으로 실시간 변경 (lastReadMessageId 이하만 반영)
   function markAllMyMessagesRead(lastReadMessageId) {
