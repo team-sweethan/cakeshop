@@ -34,6 +34,7 @@ import com.cakeshop.domain.community.dto.view.PostSort;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
 import com.cakeshop.domain.community.service.CommunityNoticeService;
+import com.cakeshop.domain.community.service.CommunityReactionService;
 import com.cakeshop.domain.community.service.CommunityCommentService;
 import com.cakeshop.domain.community.service.CommunityService;
 import com.cakeshop.global.error.BusinessException;
@@ -62,6 +63,7 @@ class CommunityControllerTests {
     private CommunityService communityService;
     private CommunityCommentService communityCommentService;
     private CommunityNoticeService communityNoticeService;
+    private CommunityReactionService communityReactionService;
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -69,6 +71,7 @@ class CommunityControllerTests {
         communityService = mock(CommunityService.class);
         communityCommentService = mock(CommunityCommentService.class);
         communityNoticeService = mock(CommunityNoticeService.class);
+        communityReactionService = mock(CommunityReactionService.class);
 
         when(communityNoticeService.getListSection(any(), any()))
                 .thenReturn(NoticeSectionView.empty());
@@ -86,7 +89,8 @@ class CommunityControllerTests {
                         new CommunityController(
                                 communityService,
                                 communityCommentService,
-                                communityNoticeService))
+                                communityNoticeService,
+                                communityReactionService))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .build();
     }
@@ -554,7 +558,7 @@ class CommunityControllerTests {
     })
     void detailRedirect_expandedCommentLimit_isKeptOnEveryPath(String path) throws Exception {
         authenticateAs(7L);
-        when(communityService.getReportablePost(15L, 7L)).thenReturn(publishedPost());
+        when(communityReactionService.getReportablePost(15L, 7L)).thenReturn(publishedPost());
 
         mockMvc.perform(post(path)
                         .param("comments", "60")
@@ -592,7 +596,7 @@ class CommunityControllerTests {
 
         mockMvc.perform(get("/community/15")).andExpect(status().isOk());
 
-        verify(communityService, never()).isLikedBy(anyLong(), anyLong());
+        verify(communityReactionService, never()).isLikedBy(anyLong(), anyLong());
     }
 
     @Test
@@ -600,7 +604,7 @@ class CommunityControllerTests {
         authenticateAs(7L);
         when(communityService.getPostDetail(eq(15L), eq(7L), anyString()))
                 .thenReturn(publishedPost());
-        when(communityService.isLikedBy(15L, 7L)).thenReturn(true);
+        when(communityReactionService.isLikedBy(15L, 7L)).thenReturn(true);
 
         mockMvc.perform(get("/community/15"))
                 .andExpect(status().isOk())
@@ -620,7 +624,7 @@ class CommunityControllerTests {
                 .andExpect(model().attribute("canLike", false))
                 .andExpect(model().attribute("likedByViewer", false));
 
-        verify(communityService, never()).isLikedBy(anyLong(), anyLong());
+        verify(communityReactionService, never()).isLikedBy(anyLong(), anyLong());
     }
 
     @Test
@@ -631,9 +635,9 @@ class CommunityControllerTests {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/community/15"));
 
-        verify(communityService).addLike(15L, 7L);
+        verify(communityReactionService).addLike(15L, 7L);
         // 좋아요 추가와 취소 경로는 분리돼 있어 서로를 토글하지 않는다.
-        verify(communityService, never()).removeLike(anyLong(), anyLong());
+        verify(communityReactionService, never()).removeLike(anyLong(), anyLong());
     }
 
     @Test
@@ -644,8 +648,8 @@ class CommunityControllerTests {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/community/15"));
 
-        verify(communityService).removeLike(15L, 7L);
-        verify(communityService, never()).addLike(anyLong(), anyLong());
+        verify(communityReactionService).removeLike(15L, 7L);
+        verify(communityReactionService, never()).addLike(anyLong(), anyLong());
     }
 
     private void authenticateAs(long memberId) {
@@ -672,7 +676,7 @@ class CommunityControllerTests {
     @Test
     void report_validForm_redirectsToDetailWithMessage() throws Exception {
         authenticateAs(9L);
-        when(communityService.getReportablePost(15L, 9L)).thenReturn(publishedPost());
+        when(communityReactionService.getReportablePost(15L, 9L)).thenReturn(publishedPost());
 
         mockMvc.perform(post("/community/15/reports")
                         .param("reason", "광고입니다")
@@ -681,14 +685,14 @@ class CommunityControllerTests {
                 .andExpect(redirectedUrl("/community/15"))
                 .andExpect(flash().attribute("successMessage", "신고를 접수했습니다."));
 
-        verify(communityService).reportPost(eq(15L), any(), eq(9L));
+        verify(communityReactionService).reportPost(eq(15L), any(), eq(9L));
     }
 
     /** 신고 검증 실패 시 조회수 없이 상세를 다시 그린다. */
     @Test
     void report_blankReason_redrawsDetailWithoutCountingAView() throws Exception {
         authenticateAs(9L);
-        when(communityService.getReportablePost(15L, 9L)).thenReturn(publishedPost());
+        when(communityReactionService.getReportablePost(15L, 9L)).thenReturn(publishedPost());
 
         mockMvc.perform(post("/community/15/reports").param("reason", "   "))
                 .andExpect(status().isOk())
@@ -696,7 +700,7 @@ class CommunityControllerTests {
                 .andExpect(model().attributeHasFieldErrors("reportForm", "reason"))
                 .andExpect(model().attributeExists("commentSection"));
 
-        verify(communityService, never()).reportPost(anyLong(), any(), anyLong());
+        verify(communityReactionService, never()).reportPost(anyLong(), any(), anyLong());
         verify(communityService, never()).getPostDetail(anyLong(), any(), anyString());
     }
 
@@ -704,14 +708,14 @@ class CommunityControllerTests {
     @Test
     void report_invisiblePost_checksPermissionBeforeValidation() {
         authenticateAs(9L);
-        when(communityService.getReportablePost(15L, 9L))
+        when(communityReactionService.getReportablePost(15L, 9L))
                 .thenThrow(new BusinessException(CommunityErrorCode.POST_NOT_FOUND));
 
         assertThatThrownBy(() ->
                 mockMvc.perform(post("/community/15/reports").param("reason", "   ")))
                 .hasRootCauseInstanceOf(BusinessException.class);
 
-        verify(communityService, never()).reportPost(anyLong(), any(), anyLong());
+        verify(communityReactionService, never()).reportPost(anyLong(), any(), anyLong());
     }
 
     private PostDetailView publishedPost() {
