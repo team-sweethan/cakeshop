@@ -56,6 +56,9 @@ class CommunityMapperTests {
     @Autowired
     private CommunityMapper communityMapper;
 
+    @Autowired
+    private CommunityCommentMapper communityCommentMapper;
+
     /** 관리자 Mapper도 같은 게시글 픽스처로 확인한다. */
     @Autowired
     private CommunityAdminMapper communityAdminMapper;
@@ -327,7 +330,7 @@ class CommunityMapperTests {
                 postId, "최신", CommentStatus.PUBLISHED, BASE_TIME.plusMinutes(1));
         insertComment(otherPostId, "다른 글의 댓글", CommentStatus.PUBLISHED, BASE_TIME.plusDays(1));
 
-        assertThat(communityMapper.findRecentComments(postId, 2))
+        assertThat(communityCommentMapper.findRecentComments(postId, 2))
                 .extracting(CommentRow::id)
                 .containsExactly(newest, second)
                 .doesNotContain(first);
@@ -338,7 +341,7 @@ class CommunityMapperTests {
         long postId = insertPost("삭제 댓글", PostStatus.PUBLISHED, BASE_TIME);
         insertComment(postId, "지워진 본문", CommentStatus.DELETED, BASE_TIME);
 
-        CommentRow comment = communityMapper.findRecentComments(postId, 20).getFirst();
+        CommentRow comment = communityCommentMapper.findRecentComments(postId, 20).getFirst();
 
         assertThat(comment.isDeleted()).isTrue();
         assertThat(comment.content()).isNull();
@@ -352,8 +355,8 @@ class CommunityMapperTests {
         insertComment(postId, CommentStatus.PUBLISHED);
         insertComment(postId, CommentStatus.DELETED);
 
-        CommentCountRow counts = communityMapper.countComments(postId);
-        CommentCountRow emptyCounts = communityMapper.countComments(emptyPostId);
+        CommentCountRow counts = communityCommentMapper.countComments(postId);
+        CommentCountRow emptyCounts = communityCommentMapper.countComments(emptyPostId);
 
         assertThat(counts.rowCount()).isEqualTo(3);
         assertThat(counts.publishedCount()).isEqualTo(2);
@@ -366,7 +369,7 @@ class CommunityMapperTests {
         long postId = insertPost("글", PostStatus.PUBLISHED, BASE_TIME);
         long commentId = insertComment(postId, "지워진 본문", CommentStatus.DELETED, BASE_TIME);
 
-        CommentRow comment = communityMapper.findCommentById(commentId);
+        CommentRow comment = communityCommentMapper.findCommentById(commentId);
 
         assertThat(comment).isNotNull();
         assertThat(comment.isDeleted()).isTrue();
@@ -378,10 +381,10 @@ class CommunityMapperTests {
         long postId = insertPost("글", PostStatus.PUBLISHED, BASE_TIME);
         Comment comment = Comment.create(postId, memberId, "새 댓글");
 
-        communityMapper.insertComment(comment);
+        communityCommentMapper.insertComment(comment);
 
         assertThat(comment.getId()).isNotNull();
-        CommentRow saved = communityMapper.findCommentById(comment.getId());
+        CommentRow saved = communityCommentMapper.findCommentById(comment.getId());
         assertThat(saved.content()).isEqualTo("새 댓글");
         assertThat(saved.status()).isEqualTo(CommentStatus.PUBLISHED);
         Long parents = jdbcTemplate.queryForObject(
@@ -395,8 +398,8 @@ class CommunityMapperTests {
         long postId = insertPost("글", PostStatus.PUBLISHED, BASE_TIME);
         long commentId = insertComment(postId, "지울 댓글", CommentStatus.PUBLISHED, BASE_TIME);
 
-        assertThat(communityMapper.deleteComment(commentId, postId, memberId)).isEqualTo(1);
-        assertThat(communityMapper.findCommentById(commentId).isDeleted()).isTrue();
+        assertThat(communityCommentMapper.deleteComment(commentId, postId, memberId)).isEqualTo(1);
+        assertThat(communityCommentMapper.findCommentById(commentId).isDeleted()).isTrue();
     }
 
     /** 댓글·글·작성자와 상태가 모두 맞아야 하므로 조건마다 갱신 행 수를 확인한다. */
@@ -417,9 +420,9 @@ class CommunityMapperTests {
         long requesterId = asAuthor ? memberId : withdrawnMemberId;
         long requestedPostId = fromOtherPost ? otherPostId : postId;
 
-        assertThat(communityMapper.deleteComment(commentId, requestedPostId, requesterId))
+        assertThat(communityCommentMapper.deleteComment(commentId, requestedPostId, requesterId))
                 .isZero();
-        assertThat(communityMapper.findCommentById(commentId).isDeleted())
+        assertThat(communityCommentMapper.findCommentById(commentId).isDeleted())
                 .isEqualTo(status == CommentStatus.DELETED);
     }
 

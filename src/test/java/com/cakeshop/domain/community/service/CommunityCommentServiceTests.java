@@ -28,6 +28,7 @@ import com.cakeshop.domain.community.entity.Comment;
 import com.cakeshop.domain.community.entity.CommentStatus;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
+import com.cakeshop.domain.community.mapper.CommunityCommentMapper;
 import com.cakeshop.domain.community.mapper.CommunityMapper;
 import com.cakeshop.domain.community.mapper.CommunityPopularPostMapper;
 import com.cakeshop.domain.member.dto.view.MemberCommunityView;
@@ -56,12 +57,14 @@ class CommunityCommentServiceTests {
     private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
 
     private CommunityMapper communityMapper;
+    private CommunityCommentMapper communityCommentMapper;
     private MemberCommunityQueryService memberCommunityQueryService;
     private CommunityCommentService communityCommentService;
 
     @BeforeEach
     void setUp() {
         communityMapper = mock(CommunityMapper.class);
+        communityCommentMapper = mock(CommunityCommentMapper.class);
         memberCommunityQueryService = mock(MemberCommunityQueryService.class);
         when(memberCommunityQueryService.getMembersByIds(anyList())).thenReturn(List.of());
 
@@ -69,7 +72,7 @@ class CommunityCommentServiceTests {
                 new CommunityMemberViewLoader(memberCommunityQueryService);
 
         communityCommentService = new CommunityCommentService(
-                communityMapper,
+                communityCommentMapper,
                 memberViewLoader,
                 postService(memberViewLoader));
     }
@@ -135,7 +138,7 @@ class CommunityCommentServiceTests {
 
         communityCommentService.getComments(POST_ID, requested);
 
-        verify(communityMapper).findRecentComments(POST_ID, expected);
+        verify(communityCommentMapper).findRecentComments(POST_ID, expected);
     }
 
     private static Stream<Arguments> requestedCommentLimits() {
@@ -148,9 +151,9 @@ class CommunityCommentServiceTests {
     /** 표시 댓글 수와 전체 행 수를 구분한다. */
     @Test
     void getComments_countsPlaceholdersForLoadMoreButNotForDisplayedCount() {
-        when(communityMapper.findRecentComments(anyLong(), anyInt()))
+        when(communityCommentMapper.findRecentComments(anyLong(), anyInt()))
                 .thenReturn(List.of(commentOf(1L, CommentStatus.DELETED)));
-        when(communityMapper.countComments(POST_ID)).thenReturn(new CommentCountRow(5L, 3L));
+        when(communityCommentMapper.countComments(POST_ID)).thenReturn(new CommentCountRow(5L, 3L));
 
         CommentSectionView section = communityCommentService.getComments(POST_ID, null);
 
@@ -189,18 +192,18 @@ class CommunityCommentServiceTests {
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(expected);
 
-        verify(communityMapper, never()).insertComment(any());
+        verify(communityCommentMapper, never()).insertComment(any());
     }
 
     @Test
     void deleteComment_author_softDeletesComment() {
         givenPost(PostStatus.PUBLISHED);
         givenComment(AUTHOR_ID, CommentStatus.PUBLISHED);
-        when(communityMapper.deleteComment(COMMENT_ID, POST_ID, AUTHOR_ID)).thenReturn(1);
+        when(communityCommentMapper.deleteComment(COMMENT_ID, POST_ID, AUTHOR_ID)).thenReturn(1);
 
         communityCommentService.deleteComment(POST_ID, COMMENT_ID, AUTHOR_ID);
 
-        verify(communityMapper).deleteComment(COMMENT_ID, POST_ID, AUTHOR_ID);
+        verify(communityCommentMapper).deleteComment(COMMENT_ID, POST_ID, AUTHOR_ID);
     }
 
     /** 다른 작성자의 댓글, 다른 글의 댓글과 이미 삭제된 댓글은 모두 같은 오류로 숨긴다. */
@@ -213,7 +216,7 @@ class CommunityCommentServiceTests {
     void deleteComment_notOwnDeletableComment_isNotFound(
             boolean onSamePost, boolean ownComment, CommentStatus status) {
         givenPost(PostStatus.PUBLISHED);
-        when(communityMapper.findCommentById(COMMENT_ID)).thenReturn(commentOf(
+        when(communityCommentMapper.findCommentById(COMMENT_ID)).thenReturn(commentOf(
                 COMMENT_ID,
                 onSamePost ? POST_ID : OTHER_POST_ID,
                 memberIdOf(ownComment),
@@ -225,7 +228,7 @@ class CommunityCommentServiceTests {
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(CommunityErrorCode.COMMENT_NOT_FOUND);
 
-        verify(communityMapper, never()).deleteComment(anyLong(), anyLong(), anyLong());
+        verify(communityCommentMapper, never()).deleteComment(anyLong(), anyLong(), anyLong());
     }
 
     /** 조건부 댓글 삭제가 0행이면 성공으로 처리하지 않고, 경합 시점의 글 상태로 실패를 구분한다. */
@@ -238,7 +241,7 @@ class CommunityCommentServiceTests {
             PostStatus statusAfterDelete, CommunityErrorCode expected) {
         givenPost(PostStatus.PUBLISHED);
         givenComment(AUTHOR_ID, CommentStatus.PUBLISHED);
-        when(communityMapper.deleteComment(COMMENT_ID, POST_ID, AUTHOR_ID))
+        when(communityCommentMapper.deleteComment(COMMENT_ID, POST_ID, AUTHOR_ID))
                 .thenAnswer(invocation -> {
                     givenPost(statusAfterDelete);
                     return 0;
@@ -265,20 +268,20 @@ class CommunityCommentServiceTests {
 
     private Comment capturedComment() {
         ArgumentCaptor<Comment> captor = ArgumentCaptor.forClass(Comment.class);
-        verify(communityMapper).insertComment(captor.capture());
+        verify(communityCommentMapper).insertComment(captor.capture());
 
         return captor.getValue();
     }
 
     private void givenComments(CommentRow... comments) {
-        when(communityMapper.findRecentComments(anyLong(), anyInt()))
+        when(communityCommentMapper.findRecentComments(anyLong(), anyInt()))
                 .thenReturn(List.of(comments));
-        when(communityMapper.countComments(POST_ID))
+        when(communityCommentMapper.countComments(POST_ID))
                 .thenReturn(new CommentCountRow(comments.length, comments.length));
     }
 
     private void givenComment(long authorId, CommentStatus status) {
-        when(communityMapper.findCommentById(COMMENT_ID))
+        when(communityCommentMapper.findCommentById(COMMENT_ID))
                 .thenReturn(commentOf(COMMENT_ID, POST_ID, authorId, status));
     }
 

@@ -13,7 +13,7 @@ import com.cakeshop.domain.community.dto.view.CommentView;
 import com.cakeshop.domain.community.entity.Comment;
 import com.cakeshop.domain.community.entity.CommentStatus;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
-import com.cakeshop.domain.community.mapper.CommunityMapper;
+import com.cakeshop.domain.community.mapper.CommunityCommentMapper;
 import com.cakeshop.domain.member.dto.view.MemberCommunityView;
 import com.cakeshop.global.error.BusinessException;
 
@@ -33,7 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class CommunityCommentService {
 
-    private final CommunityMapper communityMapper;
+    private final CommunityCommentMapper communityCommentMapper;
     private final CommunityMemberViewLoader communityMemberViewLoader;
 
     /*
@@ -46,8 +46,8 @@ public class CommunityCommentService {
     public CommentSectionView getComments(long postId, Integer requestedLimit) {
         int limit = CommentSectionView.clampLimit(requestedLimit);
 
-        List<CommentRow> rows = communityMapper.findRecentComments(postId, limit);
-        CommentCountRow counts = communityMapper.countComments(postId);
+        List<CommentRow> rows = communityCommentMapper.findRecentComments(postId, limit);
+        CommentCountRow counts = communityCommentMapper.countComments(postId);
 
         Map<Long, MemberCommunityView> authors =
                 communityMemberViewLoader.findByIds(rows.stream().map(CommentRow::memberId));
@@ -68,7 +68,7 @@ public class CommunityCommentService {
     public void addComment(long postId, CommentForm form, long authorId) {
         communityPostService.getCommentablePost(postId, authorId);
 
-        communityMapper.insertComment(
+        communityCommentMapper.insertComment(
                 Comment.create(postId, authorId, form.getContent()));
     }
 
@@ -79,7 +79,7 @@ public class CommunityCommentService {
                 postId, commentId, memberId, CommentStatus.DELETED);
 
         requireCommentApplied(
-                communityMapper.deleteComment(commentId, postId, memberId),
+                communityCommentMapper.deleteComment(commentId, postId, memberId),
                 postId,
                 commentId,
                 memberId
@@ -105,7 +105,7 @@ public class CommunityCommentService {
             long memberId,
             CommentStatus next) {
         // 소유권 판단에만 쓰므로 작성자 표기가 필요 없고, 그래서 회원 조회도 붙지 않는다.
-        CommentRow comment = communityMapper.findCommentById(commentId);
+        CommentRow comment = communityCommentMapper.findCommentById(commentId);
 
         if (comment == null
                 || !comment.postId().equals(postId)
