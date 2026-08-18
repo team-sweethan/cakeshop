@@ -34,6 +34,7 @@
   기존 스키마 확인은 `docs/database-schema.md`에서 연결되는 해당 `docs/schema/<domain>.md`
 - 도메인 간 계약이나 ReadModel을 설계할 때 `docs/conventions.md` 12절
 - Thymeleaf 화면·프래그먼트·정적 자원을 작성·수정할 때 `docs/frontend-template-format.md`
+- 화면의 웹 접근성 동작을 설계·수정·검증할 때 `docs/web-accessibility.md`
 - 아직 합의되지 않은 연동 정책을 만났을 때 `docs/team-plan.md`
 
 기존 코드와 도메인 라우터가 이미 답을 주는 일반적인 Java·DTO 수정이나 테스트 추가에는 공통 문서를 다시
