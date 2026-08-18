@@ -388,6 +388,28 @@ class CommunityScreenRenderingTests {
                 .andExpect(content().string(containsString("name=\"replyTo\"")));
     }
 
+    /** 답글 작성이 Security 를 통과해 실제로 부모에 연결되어 저장된다. */
+    @Test
+    void communityReply_authenticated_isStoredUnderParent() throws Exception {
+        long postId = insertPost(memberId, "답글 쓸 글", "본문", PostStatus.PUBLISHED);
+        long rootId = insertComment(postId, memberId, "뿌리 댓글",
+                CommentStatus.PUBLISHED, BASE_TIME);
+
+        mockMvc.perform(post("/community/" + postId + "/comments")
+                        .param("content", "화면에서 단 답글")
+                        .param("replyTo", String.valueOf(rootId))
+                        .with(authentication(authorOf(memberId)))
+                        .with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(
+                        "/community/" + postId + "?replies=" + rootId));
+
+        Long storedParent = jdbcTemplate.queryForObject(
+                "SELECT parent_comment_id FROM comments WHERE content = '화면에서 단 답글'",
+                Long.class);
+        assertThat(storedParent).isEqualTo(rootId);
+    }
+
     /** 삭제된 뿌리를 펼치면 남은 답글은 보이지만 새 답글 폼은 없다. */
     @Test
     void communityDetail_deletedRootThread_hasNoReplyForm() throws Exception {
