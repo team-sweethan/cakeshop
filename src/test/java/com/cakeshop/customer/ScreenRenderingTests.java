@@ -79,6 +79,13 @@ class ScreenRenderingTests {
     }
 
     @Test
+    void productList_doesNotRenderMockNotice() throws Exception {
+        mockMvc.perform(get("/products"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(not(containsString("class=\"mock-notice\""))));
+    }
+
+    @Test
     void login_successMessage_rendersCommonPopupFragment() throws Exception {
         mockMvc.perform(get("/login")
                 .flashAttr("successMessage", "회원가입이 완료되었습니다!"))
