@@ -90,14 +90,21 @@ public class NotificationCouponSync {
                     String couponName = (coupon.couponName() != null && !coupon.couponName().isBlank()) ? coupon.couponName() : "할인";
 
                     try {
-                        // 발송 직전 회원 활성 상태 재검증
+                        // 1. 발송 직전 회원 활성 상태 재검증
                         if (!memberNotificationQueryService.isMemberActive(memberId)) {
                             currentCursorTime = expiresAt;
                             currentCursorId = memberCouponId;
                             continue;
                         }
 
-                        // 이미 전송 완료(SENT/DELIVERED 또는 2회 상한)되었으면 스킵하고, 신규 또는 SMS 실패 재시도 대상은 발송
+                        // 2. 발송 직전 쿠폰 사용 가능 상태 (AVAILABLE -> RESERVED / USED 변경 여부) 재검증
+                        if (!couponNotificationQueryService.isMemberCouponAvailableAndUnexpired(memberCouponId, expiresAt)) {
+                            currentCursorTime = expiresAt;
+                            currentCursorId = memberCouponId;
+                            continue;
+                        }
+
+                        // 3. 이미 전송 완료(SENT/DELIVERED 또는 2회 상한)되었으면 스킵하고, 신규 또는 SMS 실패 재시도 대상은 발송
                         if (!notificationCouponQueryService.isCouponExpiringNotificationCompletedOrInactive(memberId, memberCouponId, expiresAt)) {
                             String expireKey = EXPIRE_KEY_FORMAT.format(expiresAt);
                             String eventKey = NotificationType.COUPON_EXPIRING_SOON.name() + ":" + memberId + ":" + memberCouponId + ":" + expireKey;
