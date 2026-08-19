@@ -29,6 +29,7 @@ import com.cakeshop.global.error.CommonErrorCode;
 import com.cakeshop.global.infra.FileStorageClient;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -46,6 +47,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ChatService {
@@ -97,16 +99,27 @@ public class ChatService {
     /**
      * 주문제작 반려 시 시스템이 반려 사유를 고객 채팅방에 자동 발송한다.
      * - 채팅방이 없으면 자동 생성 후 발송한다.
+     * - 발신자로 활성 관리자 중 첫 번째 ID를 사용한다. 활성 관리자가 없으면 발송을 중단한다.
      * - 트랜잭션 외부(이벤트 리스너 @Async)에서 호출되어야 한다.
+     * @return 저장된 메시지 응답 DTO (WebSocket 브로드캐스트에 사용) 또는 발송 불가 시 null
      */
     @Transactional
-    public void sendSystemRejectionMessage(Long customerId, String rejectReason, Long systemSenderId) {
-        if (customerId == null || customerId <= 0) return;
-        if (rejectReason == null || rejectReason.isBlank()) return;
+    public ChatMessageResponse sendSystemRejectionMessage(Long customerId, String rejectReason) {
+        if (customerId == null || customerId <= 0) return null;
+        if (rejectReason == null || rejectReason.isBlank()) return null;
+
+        // P1: 하드코딩 대신 활성 관리자를 동적 조회하여 유효한 발신자 보장
+        List<Long> adminIds = memberChatQueryService.findActiveAdminIds();
+        if (adminIds == null || adminIds.isEmpty()) {
+            log.warn("주문제작 반려 사유 채팅 발송 스킵: 활성 관리자 없음 (customerId={})", customerId);
+            return null;
+        }
+        Long senderId = adminIds.get(0);
 
         ChatRoom chatRoom = getOrMakeChatRoom(customerId);
         String content = "[반려 안내] " + rejectReason;
-        sendMessage(chatRoom.getId(), systemSenderId, true, null, content, null);
+        // P2: ChatMessageResponse를 반환하여 호출 측에서 WebSocket 토픽 브로드캐스트 가능
+        return sendMessage(chatRoom.getId(), senderId, true, null, content, null);
     }
 
     // 고객 존재 및 활성 회원 상태 검증 계약 (인터셉터 전용)
