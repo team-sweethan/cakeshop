@@ -515,6 +515,13 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>
       `;
 
+      if (selectedChatRoomId === rId && room.customerName) {
+        const headerTitle = document.querySelector(".admin-chat-main-room .chat-room__header strong");
+        if (headerTitle) {
+          headerTitle.textContent = `${room.customerName} 님과의 1:1 상담`;
+        }
+      }
+
       itemDiv.addEventListener("click", () => {
         selectChatRoom(rId, room.customerId);
       });
