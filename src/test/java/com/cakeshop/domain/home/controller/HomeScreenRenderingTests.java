@@ -29,8 +29,8 @@ import org.springframework.web.context.WebApplicationContext;
 /**
  * 메인 화면을 실제 Thymeleaf로 렌더링한다.
  *
- * <p>공지 영역이 <b>없을 때 통째로 빠지는지</b>가 이 클래스의 요점이다. 날짜와 제목만 남고 안이
- * 빈 칸은 사용자에게 고장으로 보이지만 서버에는 오류가 없어 로그에도 안 남는다
+ * <p>공지가 <b>없을 때도 영역과 빈 상태 안내가 남는지</b>가 이 클래스의 요점이다. 제목만 남고 안이
+ * 빈 칸이거나 영역 자체가 사라지면 사용자에게 고장으로 보이지만 서버에는 오류가 없어 로그에도 안 남는다
  * (docs/community/specs/community-notice.md H45).
  *
  * <p>영역의 존재는 낱말이 아니라 {@code id}로 본다. 템플릿의 내부 설명은 Thymeleaf parser-level
@@ -117,10 +117,11 @@ class HomeScreenRenderingTests {
     }
 
     @Test
-    void home_noVisibleNotice_dropsNoticeSectionEntirely() throws Exception {
+    void home_noVisibleNotice_showsEmptyNoticeMessage() throws Exception {
         mockMvc.perform(get("/"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(not(containsString(NOTICE_SECTION))));
+                .andExpect(content().string(containsString(NOTICE_SECTION)))
+                .andExpect(content().string(containsString("등록된 공지가 없습니다.")));
     }
 
     /** 공지는 서비스 안내와 카테고리 사이에 둔다. */
