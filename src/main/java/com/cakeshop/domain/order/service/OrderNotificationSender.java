@@ -6,11 +6,6 @@ import com.cakeshop.domain.notification.dto.form.NotificationRequest;
 import com.cakeshop.domain.notification.entity.DeliveryScope;
 import com.cakeshop.domain.notification.entity.NotificationType;
 import com.cakeshop.domain.notification.service.NotificationService;
-import com.cakeshop.domain.order.dto.view.OrderChatView;
-import com.cakeshop.domain.order.mapper.OrderChatMapper;
-import java.time.Clock;
-import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,8 +32,7 @@ public class OrderNotificationSender {
     private final NotificationService notificationService;
     private final MemberNotificationQueryService memberNotificationQueryService;
     private final MemberOrderNotificationQueryService memberOrderNotificationQueryService;
-    private final OrderChatMapper orderChatMapper;
-    private final Clock clock;
+    private final OrderPickupNotificationSender orderPickupNotificationSender;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void sendOrderPaid(long orderId, long customerId, String orderType) {
@@ -60,34 +54,16 @@ public class OrderNotificationSender {
 
         sendToActiveAdmins(orderId, customerId, adminType, adminType.name() + ":ALL_ADMINS:" + orderId, new Object[0]);
 
-        // 결제 알림 트랜잭션이 안전하게 커밋된 후(afterCommit), 익일 픽업 건에 대한 D-1 리마인더를 독립적으로 안전하게 발송
+        // 결제 알림 트랜잭션이 안전하게 커밋된 후(afterCommit), 별도 빈의 프록시를 통해 독립 트랜잭션(REQUIRES_NEW)에서 D-1 리마인더 발송
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    triggerInstantPickupReminderTomorrowIfEligible(orderId, customerId);
+                    orderPickupNotificationSender.sendInstantPickupReminderTomorrowIfEligible(orderId, customerId);
                 }
             });
         } else {
-            triggerInstantPickupReminderTomorrowIfEligible(orderId, customerId);
-        }
-    }
-
-    private void triggerInstantPickupReminderTomorrowIfEligible(long orderId, long customerId) {
-        try {
-            OrderChatView orderView = orderChatMapper.findOrderById(orderId);
-            if (orderView != null && orderView.pickupAt() != null) {
-                LocalDate today = LocalDate.now(clock);
-                LocalTime nowTime = LocalTime.now(clock);
-                LocalDate pickupDate = orderView.pickupAt().toLocalDate();
-                boolean isDaytime = nowTime.getHour() >= 9 && nowTime.getHour() < 21;
-                if (isDaytime && pickupDate.isEqual(today.plusDays(1))) {
-                    sendPickupReminderTomorrowToCustomer(orderId, customerId);
-                    sendPickupReminderTomorrowToAdmins(orderId, customerId, orderView.orderNumber());
-                }
-            }
-        } catch (Exception e) {
-            log.warn("결제 완료 시점 픽업 D-1 리마인더 체크 오류 (orderId={}):", orderId, e);
+            orderPickupNotificationSender.sendInstantPickupReminderTomorrowIfEligible(orderId, customerId);
         }
     }
 
