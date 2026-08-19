@@ -181,8 +181,9 @@ public class CommunityCommentService {
                 .collect(Collectors.toMap(ReplyCountRow::parentId, ReplyCountRow::replyCount));
     }
 
+    /** 새 댓글의 id 를 돌려준다 — 화면이 그 줄로 돌아가려면 필요하다. */
     @Transactional
-    public void addComment(long postId, CommentForm form, long authorId) {
+    public long addComment(long postId, CommentForm form, long authorId) {
         PostDetailView post = communityPostService.getCommentablePost(postId, authorId);
 
         Comment comment = Comment.create(postId, authorId, form.getContent());
@@ -190,14 +191,17 @@ public class CommunityCommentService {
 
         communityCommentNotificationService.notifyNewComment(
                 postId, comment.getId(), post.memberId(), authorId);
+
+        return comment.getId();
     }
 
     /*
      * 답글의 깊이·같은 글·부모 노출 조건은 insertReply 한 문장이 지킨다(0행이면 거절).
      * 부모를 먼저 읽고 조건문으로 거르면 읽기와 쓰기 사이에 부모가 삭제될 수 있다.
      */
+    /** 새 답글의 id 를 돌려준다. 답글은 묶음 맨 아래에 붙으므로 뿌리로는 화면에 안 들어온다. */
     @Transactional
-    public void addReply(long postId, long parentCommentId, CommentForm form, long authorId) {
+    public long addReply(long postId, long parentCommentId, CommentForm form, long authorId) {
         communityPostService.getCommentablePost(postId, authorId);
 
         Comment reply = Comment.createReply(
@@ -209,6 +213,8 @@ public class CommunityCommentService {
 
         communityCommentNotificationService.notifyNewReply(
                 postId, reply.getId(), parentCommentId, authorId);
+
+        return reply.getId();
     }
 
     @Transactional

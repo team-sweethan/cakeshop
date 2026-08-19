@@ -76,16 +76,18 @@ class CommunityCommentControllerTests {
         SecurityContextHolder.clearContext();
     }
 
+    /** 방금 쓴 댓글 그 줄로 돌아간다. 새 댓글은 목록 맨 아래라 맨 위 착지에서 가장 멀다. */
     @Test
     void addComment_validForm_redirectsToDetail() throws Exception {
         authenticateAs(7L);
         when(communityPostService.getCommentablePost(15L, 7L)).thenReturn(publishedPost());
+        when(communityCommentService.addComment(eq(15L), any(), eq(7L))).thenReturn(31L);
 
         mockMvc.perform(post("/community/15/comments")
                         .param("content", "댓글 본문")
                         .param("memberId", "99"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/community/15"));
+                .andExpect(redirectedUrl("/community/15#comment-31"));
 
         verify(communityCommentService).addComment(eq(15L), any(), eq(7L));
     }
@@ -134,18 +136,24 @@ class CommunityCommentControllerTests {
         verify(communityCommentService).getComments(15L, 40, null);
     }
 
-    /** 답글은 방금 쓴 것이 보여야 하므로 그 묶음을 펼친 채로 돌아간다. */
+    /**
+     * 답글은 방금 쓴 것이 보여야 하므로 묶음을 펼친 채로 <b>그 답글 줄</b>로 돌아간다.
+     *
+     * <p>앵커가 부모 뿌리(8)가 아니라 새 답글(31)인 것이 이 검사의 요점이다. 답글은 묶음 맨
+     * 아래에 붙으므로 뿌리에 착지하면 답글이 열 개만 넘어가도 새 답글이 화면 밖에 남는다.
+     */
     @Test
     void addComment_withReplyTo_addsReplyAndReturnsWithThreadExpanded() throws Exception {
         authenticateAs(7L);
         when(communityPostService.getCommentablePost(15L, 7L)).thenReturn(publishedPost());
+        when(communityCommentService.addReply(eq(15L), eq(8L), any(), eq(7L))).thenReturn(31L);
 
         mockMvc.perform(post("/community/15/comments")
                         .param("content", "답글 본문")
                         .param("replyTo", "8")
                         .param("comments", "40"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/community/15?comments=40&replies=8"));
+                .andExpect(redirectedUrl("/community/15?comments=40&replies=8#comment-31"));
 
         verify(communityCommentService).addReply(eq(15L), eq(8L), any(), eq(7L));
         verify(communityCommentService, never()).addComment(anyLong(), any(), anyLong());
@@ -204,7 +212,7 @@ class CommunityCommentControllerTests {
 
         mockMvc.perform(post("/community/15/comments/8/delete"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/community/15"));
+                .andExpect(redirectedUrl("/community/15#comment-8"));
 
         verify(communityCommentService).deleteComment(15L, 8L, 7L);
     }
@@ -217,7 +225,7 @@ class CommunityCommentControllerTests {
         mockMvc.perform(post("/community/15/comments/9/delete")
                         .param("replies", "8"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/community/15?replies=8"));
+                .andExpect(redirectedUrl("/community/15?replies=8#comment-9"));
     }
 
     private void authenticateAs(long memberId) {
