@@ -42,6 +42,48 @@ document.addEventListener("DOMContentLoaded", () => {
     return headers;
   }
 
+  async function openCustomerRoomFromUrl() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomIdParam = urlParams.get("roomId");
+    if (roomIdParam && Number.isSafeInteger(Number(roomIdParam)) && Number(roomIdParam) > 0) {
+      return false;
+    }
+
+    const customerIdParam = urlParams.get("customerId");
+    if (!customerIdParam) return false;
+
+    const customerId = Number(customerIdParam);
+    if (!Number.isSafeInteger(customerId) || customerId <= 0) {
+      console.warn("유효하지 않은 고객 채팅방 이동 요청입니다.");
+      return false;
+    }
+
+    try {
+      const response = await fetch(
+        `/api/admin/chat/room?customerId=${encodeURIComponent(customerId)}`,
+        {
+          method: "POST",
+          headers: getCsrfHeaders()
+        }
+      );
+      if (!response.ok) {
+        throw new Error(`채팅방 생성 또는 조회 실패: ${response.status}`);
+      }
+
+      const room = await response.json();
+      const roomId = room.id || room.chatRoomId;
+      if (!Number.isSafeInteger(roomId) || roomId <= 0) {
+        throw new Error("채팅방 ID가 없습니다.");
+      }
+
+      return { roomId, customerId };
+    } catch (err) {
+      console.error("주문 고객 채팅방 열기 실패:", err);
+      alert("채팅방을 열지 못했습니다. 잠시 후 다시 시도해주세요.");
+      return false;
+    }
+  }
+
   // 미답변 탭 빨간 배지 동적 업데이트 헬퍼
   function updateUnreadTabBadge(count) {
     const badge = document.getElementById("adminUnreadCountBadge");
@@ -152,6 +194,9 @@ document.addEventListener("DOMContentLoaded", () => {
       // 초기 진입 시 URL 파라미터 또는 기존 선택된 방 복원 (새로고침 시 방 유지)
       const urlParams = new URLSearchParams(window.location.search);
       const urlRoomId = urlParams.get("roomId") ? parseInt(urlParams.get("roomId"), 10) : null;
+      const urlCustomerId = urlParams.get("customerId")
+        ? parseInt(urlParams.get("customerId"), 10)
+        : null;
       const initialRoomId = selectedChatRoomId || urlRoomId;
 
       if (initialRoomId) {
@@ -161,7 +206,9 @@ document.addEventListener("DOMContentLoaded", () => {
             const customerId = targetRoom.customerId || targetRoom.memberId;
             selectChatRoom(initialRoomId, customerId);
           }
-        } else if (!isReconnect) {
+        } else if (!selectedChatRoomId && Number.isSafeInteger(urlCustomerId) && urlCustomerId > 0) {
+          selectChatRoom(initialRoomId, urlCustomerId);
+        } else if (!isReconnect && !(Number.isSafeInteger(urlCustomerId) && urlCustomerId > 0)) {
           clearMainAndSidePanel();
         }
       } else if (!isReconnect) {
@@ -1269,6 +1316,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // 초기화 실행
-  loadAdminRooms();
+  // 주문 목록의 customerId 딥링크는 방을 생성·조회한 뒤 목록에 없어도 바로 선택한다.
+  openCustomerRoomFromUrl().then(async (deepLinkedRoom) => {
+    if (deepLinkedRoom) {
+      await selectChatRoom(deepLinkedRoom.roomId, deepLinkedRoom.customerId);
+    }
+    await loadAdminRooms();
+  });
 });

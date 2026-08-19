@@ -782,6 +782,11 @@ class ScreenRenderingTests {
         userDetailsServiceBeanName = "memberDetailsService"
     )
     void adminOrderList_rendersOrderTypeAndWorkspaceGuidance() throws Exception {
+        long customerId = jdbcTemplate.queryForObject(
+            "SELECT id FROM members WHERE email = ?",
+            Long.class,
+            "user@cakeshop.local"
+        );
         createGeneralOrder();
 
         mockMvc.perform(get("/admin/orders"))
@@ -791,7 +796,11 @@ class ScreenRenderingTests {
             .andExpect(content().string(containsString("일반 상품")))
             .andExpect(content().string(containsString(
                 "검토·제작·픽업 업무는 주문 처리에서 진행합니다."
-            )));
+            )))
+            .andExpect(content().string(containsString(
+                "/admin/chat?customerId=" + customerId
+            )))
+            .andExpect(content().string(containsString("채팅하기")));
     }
 
     @Test
