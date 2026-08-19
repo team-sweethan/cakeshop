@@ -53,6 +53,10 @@ jobs:
           fi
           echo "머지된 migration 변경 없음"
 
+  # 문서만 바뀐 변경에는 테스트를 돌리지 않는다. 판정을 별도 잡으로 앞세우지 않는 이유는,
+  # 그러면 모든 실행이 그 잡을 기다리는 값을 내는데 문서 전용 변경은 드물어 손해이기 때문이다.
+  # workflow 수준 paths-ignore 도 쓰지 않는다. 잡이 아예 뜨지 않으면 필수 체크인 `Test` 가
+  # 영원히 대기 상태로 남아 PR 이 막힌다. 잡은 항상 뜨고 안쪽에서 건너뛴다.
   unit_test:
     name: Unit tests
     runs-on: ubuntu-latest
@@ -62,16 +66,28 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
+      - name: Detect docs-only change
+        id: scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: bash .github/scripts/is-docs-only.sh
+
       - name: Set up Java 21
+        if: steps.scope.outputs.skip != 'true'
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
 
       - name: Set up Gradle
+        if: steps.scope.outputs.skip != 'true'
         uses: gradle/actions/setup-gradle@v6
 
       - name: Run unit tests
+        if: steps.scope.outputs.skip != 'true'
         run: ./gradlew unitTest
 
       - name: Upload test results
@@ -94,19 +110,32 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
+      - name: Detect docs-only change
+        id: scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: bash .github/scripts/is-docs-only.sh
+
       - name: Set up Java 21
+        if: steps.scope.outputs.skip != 'true'
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
 
       - name: Set up Gradle
+        if: steps.scope.outputs.skip != 'true'
         uses: gradle/actions/setup-gradle@v6
 
       - name: Verify Docker
+        if: steps.scope.outputs.skip != 'true'
         run: docker info
 
       - name: Run MariaDB tests
+        if: steps.scope.outputs.skip != 'true'
         run: ./gradlew mariaDbTest
 
       - name: Upload test results
