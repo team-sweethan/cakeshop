@@ -89,6 +89,71 @@ class StoreServiceTests {
     }
 
     @Test
+    void deleteImage_existingImage_deletesStoredFileAfterCommit() {
+        Store existing = store();
+        existing.setImageUrl("/uploads/store/202608/photo.jpg");
+        when(storeMapper.findStoreById(StoreService.DEFAULT_STORE_ID)).thenReturn(Optional.of(existing));
+        when(storeMapper.clearImageUrl(
+                StoreService.DEFAULT_STORE_ID,
+                "/uploads/store/202608/photo.jpg"))
+            .thenReturn(1);
+        TransactionSynchronizationManager.initSynchronization();
+
+        storeService.deleteImage();
+
+        verify(storeMapper).clearImageUrl(
+            StoreService.DEFAULT_STORE_ID,
+            "/uploads/store/202608/photo.jpg");
+        verify(fileStorageClient, never()).delete("/uploads/store/202608/photo.jpg");
+
+        TransactionSynchronizationManager.getSynchronizations().forEach(
+            TransactionSynchronization::afterCommit);
+
+        verify(fileStorageClient).delete("/uploads/store/202608/photo.jpg");
+    }
+
+    @Test
+    void deleteImage_withoutImage_doesNotCallDeleteCollaborators() {
+        when(storeMapper.findStoreById(StoreService.DEFAULT_STORE_ID)).thenReturn(Optional.of(store()));
+
+        storeService.deleteImage();
+
+        verify(storeMapper, never()).clearImageUrl(any(), any());
+        verify(fileStorageClient, never()).delete(any());
+    }
+
+    @Test
+    void deleteImage_imageChangedConcurrently_throwsUpdateFailedWithoutDeletingFile() {
+        Store existing = store();
+        existing.setImageUrl("/uploads/store/202608/old.jpg");
+        when(storeMapper.findStoreById(StoreService.DEFAULT_STORE_ID)).thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() -> storeService.deleteImage())
+            .isInstanceOfSatisfying(BusinessException.class,
+                error -> assertThat(error.getErrorCode()).isEqualTo(StoreErrorCode.UPDATE_FAILED));
+        verify(fileStorageClient, never()).delete(any());
+    }
+
+    @Test
+    void deleteImage_transactionRollsBack_keepsStoredFile() {
+        Store existing = store();
+        existing.setImageUrl("/uploads/store/202608/photo.jpg");
+        when(storeMapper.findStoreById(StoreService.DEFAULT_STORE_ID)).thenReturn(Optional.of(existing));
+        when(storeMapper.clearImageUrl(
+                StoreService.DEFAULT_STORE_ID,
+                "/uploads/store/202608/photo.jpg"))
+            .thenReturn(1);
+        TransactionSynchronizationManager.initSynchronization();
+
+        storeService.deleteImage();
+        TransactionSynchronizationManager.getSynchronizations().forEach(
+            synchronization -> synchronization.afterCompletion(
+                TransactionSynchronization.STATUS_ROLLED_BACK));
+
+        verify(fileStorageClient, never()).delete("/uploads/store/202608/photo.jpg");
+    }
+
+    @Test
     void updateBusinessHours_validForm_updatesAllSevenDaysOnly() {
         when(storeMapper.findStoreById(StoreService.DEFAULT_STORE_ID)).thenReturn(Optional.of(store()));
         StoreBusinessHoursForm form = validBusinessHoursForm();

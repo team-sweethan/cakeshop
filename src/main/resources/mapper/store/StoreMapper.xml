@@ -79,6 +79,14 @@
          WHERE id = #{id}
     </update>
 
+    <!-- 조회 이후 사진이 교체됐다면 새 URL을 지우지 않도록 기존 URL까지 조건으로 확인한다. -->
+    <update id="clearImageUrl">
+        UPDATE store
+           SET image_url = NULL
+         WHERE id = #{storeId}
+           AND image_url = #{expectedImageUrl}
+    </update>
+
     <update id="updatePickupInfo">
         UPDATE store
            SET pickup_place = #{pickupPlace},

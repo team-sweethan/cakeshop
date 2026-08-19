@@ -1968,29 +1968,6 @@ body > main {
     justify-content: flex-end
 }
 
-/* 매장 지도/이미지 자리표시자 */
-.store-map {
-    align-items: center;
-    background: var(--color-background-soft);
-    border: 1px solid var(--color-border);
-    color: var(--color-muted);
-    display: flex;
-    font-size: var(--font-xs);
-    justify-content: center;
-    min-height: 170px
-}
-
-/* 고객 메인의 실제 매장 사진 */
-.store-photo {
-    border: 1px solid var(--color-border);
-    display: block;
-    height: 100%;
-    max-height: 280px;
-    min-height: 170px;
-    object-fit: cover;
-    width: 100%
-}
-
 /* 사이드바 브랜드: 서버는 링크(<a>)+<span> 구조라 세로 정렬을 보장한다. */
 .admin-sidebar__brand {
     display: block

@@ -71,6 +71,14 @@ class HomeScreenRenderingTests {
     }
 
     @Test
+    void home_storeImage_usesDedicatedResponsiveMediaArea() throws Exception {
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("href=\"/css/home.css\"")))
+                .andExpect(content().string(containsString("class=\"store-media\"")));
+    }
+
+    @Test
     void home_visibleNotice_showsNoticeSectionWithFullListLink() throws Exception {
         when(communityHomeQueryService.getNoticeSection()).thenReturn(
                 new NoticeSectionView(List.of(

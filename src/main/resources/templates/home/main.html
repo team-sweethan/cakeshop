@@ -8,6 +8,7 @@
 
   <link rel="stylesheet"
         th:href="@{/css/app.css(v='home-product-square')}">
+  <link rel="stylesheet" th:href="@{/css/home.css}">
   <script defer th:src="@{/js/app.js}"></script>
 </head>
 
@@ -218,14 +219,16 @@
           </div>
         </div>
 
-        <img th:if="${store.imageUrl}"
-             th:src="${store.imageUrl}"
-             alt="매장 사진"
-             class="store-photo">
+        <div class="store-media">
+          <img th:if="${store.imageUrl}"
+               th:src="${store.imageUrl}"
+               alt="매장 사진"
+               class="store-photo">
 
-        <div th:unless="${store.imageUrl}"
-             class="placeholder-image store-map">
-          매장 사진 준비 중
+          <div th:unless="${store.imageUrl}"
+               class="placeholder-image store-map">
+            매장 사진 준비 중
+          </div>
         </div>
       </div>
     </section>

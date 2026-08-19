@@ -20,6 +20,9 @@ public interface StoreMapper {
 
     int updateBasicInfo(Store store);
 
+    int clearImageUrl(@Param("storeId") Long storeId,
+                      @Param("expectedImageUrl") String expectedImageUrl);
+
     int updatePickupInfo(Store store);
 
     int upsertBusinessHour(StoreBusinessHour businessHour);
