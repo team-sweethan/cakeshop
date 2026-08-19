@@ -84,6 +84,31 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  async function resolveRoomFromUrl() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomId = Number(urlParams.get("roomId"));
+    if (Number.isSafeInteger(roomId) && roomId > 0) {
+      try {
+        const response = await fetch(`/api/admin/chat/order/rooms/${roomId}`);
+        if (!response.ok) {
+          throw new Error(`채팅방 조회 실패: ${response.status}`);
+        }
+
+        const room = await response.json();
+        if (!Number.isSafeInteger(room.chatRoomId) || !Number.isSafeInteger(room.customerId)) {
+          throw new Error("채팅방 식별 정보가 올바르지 않습니다.");
+        }
+        return { roomId: room.chatRoomId, customerId: room.customerId };
+      } catch (err) {
+        console.error("주문 고객 채팅방 재진입 실패:", err);
+        alert("채팅방을 열지 못했습니다. 잠시 후 다시 시도해주세요.");
+        return false;
+      }
+    }
+
+    return openCustomerRoomFromUrl();
+  }
+
   // 미답변 탭 빨간 배지 동적 업데이트 헬퍼
   function updateUnreadTabBadge(count) {
     const badge = document.getElementById("adminUnreadCountBadge");
@@ -121,7 +146,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // 1. 관리자 전체 채팅방 목록 서버 필터 조회
-  async function loadAdminRooms(page = 1, append = false, isReconnect = false) {
+  async function loadAdminRooms(page = 1, append = false, isReconnect = false, skipInitialSelectionRestore = false) {
     const reqFilter = currentFilter;
     const currentGen = ++adminRoomsFetchGen;
     if (!append) {
@@ -191,23 +216,25 @@ document.addEventListener("DOMContentLoaded", () => {
         updateUnreadTabBadge(unreadCount);
       }
 
-      // 초기 진입 시 URL 파라미터 또는 기존 선택된 방 복원 (새로고침 시 방 유지)
-      const urlParams = new URLSearchParams(window.location.search);
-      const urlRoomId = urlParams.get("roomId") ? parseInt(urlParams.get("roomId"), 10) : null;
-      const initialRoomId = selectedChatRoomId || urlRoomId;
+      if (!skipInitialSelectionRestore) {
+        // 초기 진입 시 URL 파라미터 또는 기존 선택된 방 복원 (새로고침 시 방 유지)
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlRoomId = urlParams.get("roomId") ? parseInt(urlParams.get("roomId"), 10) : null;
+        const initialRoomId = selectedChatRoomId || urlRoomId;
 
-      if (initialRoomId) {
-        const targetRoom = adminRoomsData.find(r => (r.chatRoomId || r.id) === initialRoomId);
-        if (targetRoom) {
-          if (!selectedChatRoomId) {
-            const customerId = targetRoom.customerId || targetRoom.memberId;
-            selectChatRoom(initialRoomId, customerId);
+        if (initialRoomId) {
+          const targetRoom = adminRoomsData.find(r => (r.chatRoomId || r.id) === initialRoomId);
+          if (targetRoom) {
+            if (!selectedChatRoomId) {
+              const customerId = targetRoom.customerId || targetRoom.memberId;
+              selectChatRoom(initialRoomId, customerId);
+            }
+          } else if (!isReconnect) {
+            clearMainAndSidePanel();
           }
         } else if (!isReconnect) {
           clearMainAndSidePanel();
         }
-      } else if (!isReconnect) {
-        clearMainAndSidePanel();
       }
 
       // 웹소켓 연결 및 관리자 대시보드 토픽 구독
@@ -1312,9 +1339,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // 주문 목록의 customerId 딥링크는 방을 생성·조회한 뒤 목록에 없어도 바로 선택한다.
-  openCustomerRoomFromUrl().then(async (deepLinkedRoom) => {
-    await loadAdminRooms();
+  // 주문 목록의 딥링크는 채팅 도메인의 권위 있는 방·고객 조합으로 연다.
+  resolveRoomFromUrl().then(async (deepLinkedRoom) => {
+    await loadAdminRooms(1, false, false, Boolean(deepLinkedRoom));
     if (deepLinkedRoom) {
       await selectChatRoom(deepLinkedRoom.roomId, deepLinkedRoom.customerId);
     }
