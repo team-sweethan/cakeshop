@@ -1,6 +1,7 @@
 package com.cakeshop.domain.review;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -19,6 +20,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.init.DatabasePopulatorUtils;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
+import org.springframework.jdbc.datasource.init.ScriptException;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.context.jdbc.SqlConfig;
@@ -83,6 +85,23 @@ class ReviewSeedIntegrationTests {
                   AND payment.status = 'DONE'
                 """
         )).isEqualTo(4);
+        assertThat(count(
+                """
+                SELECT COUNT(*)
+                FROM orders
+                WHERE order_number LIKE 'SEED-REVIEW-%'
+                  AND updated_at >= CURRENT_TIMESTAMP(6) - INTERVAL 10 MINUTE
+                """
+        )).isEqualTo(4);
+        assertThat(count(
+                """
+                SELECT COUNT(*)
+                FROM payments payment
+                JOIN orders o ON o.id = payment.order_id
+                WHERE o.order_number LIKE 'SEED-REVIEW-%'
+                  AND payment.updated_at >= CURRENT_TIMESTAMP(6) - INTERVAL 10 MINUTE
+                """
+        )).isEqualTo(4);
     }
 
     @Test
@@ -143,6 +162,37 @@ class ReviewSeedIntegrationTests {
         runReviewSeed();
 
         assertThat(snapshot()).isEqualTo(expected);
+    }
+
+    @Test
+    @Transactional
+    void reviewSeed_withAttachedImageStopsBeforeDeletingItsDatabaseReference() {
+        jdbcTemplate.update(
+                """
+                INSERT INTO review_images (review_id, image_url, sort_order)
+                SELECT review.id, 'https://example.com/review-seed-guard.png', 0
+                FROM reviews review
+                JOIN order_items oi ON oi.id = review.order_item_id
+                JOIN orders o ON o.id = oi.order_id
+                WHERE o.order_number = 'SEED-REVIEW-GENERAL-REVIEWED'
+                """
+        );
+        SeedSnapshot expected = snapshot();
+
+        assertThatThrownBy(this::runReviewSeed)
+                .isInstanceOf(ScriptException.class);
+
+        assertThat(snapshot()).isEqualTo(expected);
+        assertThat(count(
+                """
+                SELECT COUNT(*)
+                FROM review_images image
+                JOIN reviews review ON review.id = image.review_id
+                JOIN order_items oi ON oi.id = review.order_item_id
+                JOIN orders o ON o.id = oi.order_id
+                WHERE o.order_number LIKE 'SEED-REVIEW-%'
+                """
+        )).isEqualTo(1);
     }
 
     private List<SeedReviewScenario> reviewScenarios() {

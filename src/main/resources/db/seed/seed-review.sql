@@ -2,6 +2,7 @@
 --
 -- ⚠️ 주의: SEED-REVIEW- 주문과 그 주문에 연결된 결제·후기 데이터를 지우고
 --    샘플을 다시 넣는다. 해당 주문에 직접 작성한 후기도 함께 사라진다.
+--    직접 작성한 후기에 이미지가 있으면 원본 파일을 SQL로 지울 수 없으므로 삭제 전에 중단한다.
 --    운영/공용 DB에서는 절대 실행하지 않는다.
 --
 -- Flyway 관리 대상이 아니다. 스키마 마이그레이션이 모두 적용된 뒤 직접 실행한다.
@@ -22,6 +23,27 @@
 --
 -- 다른 도메인의 로컬 데이터와 AUTO_INCREMENT 는 건드리지 않는다.
 -- ---------------------------------------------------------------------------
+
+-- FileStorageClient를 거치지 않고 review_images 행만 지우면 S3/로컬 원본이 고아 파일로 남는다.
+-- 이미지가 하나라도 있으면 아무 데이터도 지우기 전에 CHECK 위반으로 실행을 멈춘다.
+-- 원본 파일과 review_images 행을 함께 정리한 뒤 이 시드를 다시 실행한다.
+DROP TEMPORARY TABLE IF EXISTS `seed_review_reapply_guard`;
+
+CREATE TEMPORARY TABLE `seed_review_reapply_guard` (
+    `attached_image_count` BIGINT UNSIGNED NOT NULL,
+    CONSTRAINT `chk_seed_review_without_attached_images`
+        CHECK (`attached_image_count` = 0)
+);
+
+INSERT INTO `seed_review_reapply_guard` (`attached_image_count`)
+SELECT COUNT(*)
+FROM `review_images` image
+INNER JOIN `reviews` review ON review.`id` = image.`review_id`
+INNER JOIN `order_items` oi ON oi.`id` = review.`order_item_id`
+INNER JOIN `orders` o ON o.`id` = oi.`order_id`
+WHERE o.`order_number` LIKE 'SEED-REVIEW-%';
+
+DROP TEMPORARY TABLE `seed_review_reapply_guard`;
 
 -- 후기나 주문을 사용하며 생긴 알림은 FK 의 ON DELETE SET NULL 로 남기지 않고 함께 정리한다.
 DELETE delivery
@@ -75,13 +97,6 @@ WHERE notification.`order_id` IN (
 DELETE reply
 FROM `review_replies` reply
 INNER JOIN `reviews` review ON review.`id` = reply.`review_id`
-INNER JOIN `order_items` oi ON oi.`id` = review.`order_item_id`
-INNER JOIN `orders` o ON o.`id` = oi.`order_id`
-WHERE o.`order_number` LIKE 'SEED-REVIEW-%';
-
-DELETE image
-FROM `review_images` image
-INNER JOIN `reviews` review ON review.`id` = image.`review_id`
 INNER JOIN `order_items` oi ON oi.`id` = review.`order_item_id`
 INNER JOIN `orders` o ON o.`id` = oi.`order_id`
 WHERE o.`order_number` LIKE 'SEED-REVIEW-%';
@@ -189,7 +204,7 @@ SELECT
     CASE WHEN sample.`order_type` = 'CUSTOM' THEN admin.`id` END,
     admin.`id`,
     sample.`created_at`,
-    sample.`picked_up_at`
+    CURRENT_TIMESTAMP(6)
 FROM `members` customer
 CROSS JOIN `members` admin
 CROSS JOIN (
@@ -398,7 +413,7 @@ SELECT
     o.`created_at`,
     o.`created_at` + INTERVAL 5 MINUTE,
     o.`created_at`,
-    o.`created_at` + INTERVAL 5 MINUTE
+    CURRENT_TIMESTAMP(6)
 FROM `orders` o
 WHERE o.`order_number` IN (
     'SEED-REVIEW-GENERAL-REVIEWED',
