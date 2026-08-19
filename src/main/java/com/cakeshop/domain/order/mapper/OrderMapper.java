@@ -62,6 +62,12 @@ public interface OrderMapper {
             @Param("requestKey") String requestKey
     );
 
+    /** 회원이 결제를 계속할 수 있는 가장 이른 결제 대기 주문을 조회한다. */
+    Optional<Order> findPendingPaymentOrderByMemberId(
+            @Param("memberId") long memberId,
+            @Param("now") LocalDateTime now
+    );
+
     /** 취소 준비처럼 상태 전이와 경쟁하면 안 되는 작업에서 주문 행을 잠가 조회한다. */
     Optional<Order> findOrderByIdForUpdate(@Param("orderId") long orderId);
 

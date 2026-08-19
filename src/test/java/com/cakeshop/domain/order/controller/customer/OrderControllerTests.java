@@ -7,6 +7,7 @@ import com.cakeshop.domain.coupon.service.CouponOrderQueryService;
 import com.cakeshop.domain.order.dto.view.customer.CustomOrderCheckoutView;
 import com.cakeshop.domain.order.dto.view.customer.CartOrderCheckoutView;
 import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView;
+import com.cakeshop.domain.order.dto.view.customer.OrderCreationResult;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
 import com.cakeshop.domain.order.service.customer.CustomerCustomOrderService;
 import com.cakeshop.domain.order.controller.customer.OrderController;
@@ -31,6 +32,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.math.BigDecimal;
 import java.util.List;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.argThat;
@@ -208,7 +210,7 @@ class OrderControllerTests {
                 form.getProductId().equals(1L)
                         && form.getQuantity().equals(2)
                         && form.getOptionIds().equals(List.of(101L))
-        ))).thenReturn(42L);
+        ))).thenReturn(OrderCreationResult.paymentReady(42L));
 
         mockMvc.perform(post("/orders/general")
                         .param("requestKey", requestKey)
@@ -235,6 +237,37 @@ class OrderControllerTests {
                                 && "초는 빼주세요".equals(form.getRequestMessage())
                 )
         );
+    }
+
+    @Test
+    void createGeneralOrder_pendingPayment_rendersGuideWithPaymentAndNewOrderLinks() throws Exception {
+        OrderCreationResult.PendingPaymentOrder pendingOrder =
+                new OrderCreationResult.PendingPaymentOrder(
+                        42L,
+                        "ORD-PENDING",
+                        LocalDateTime.of(2026, 8, 19, 12, 0)
+                );
+        when(orderService.createGeneralOrder(eq(10L), any()))
+                .thenReturn(new OrderCreationResult(42L, pendingOrder));
+
+        mockMvc.perform(post("/orders/general")
+                        .param("requestKey", UUID.randomUUID().toString())
+                        .param("productId", "1")
+                        .param("quantity", "2")
+                        .param("optionIds", "101")
+                        .param("displayedOriginalAmount", "40000")
+                        .param("ordererName", "홍길동")
+                        .param("ordererPhone", "010-1111-2222")
+                        .param("pickupName", "홍길동")
+                        .param("pickupPhone", "010-1111-2222")
+                        .param("pickupAt", "2099-08-05T14:00"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("customer/order/pending-payment"))
+                .andExpect(model().attribute("pendingOrder", pendingOrder))
+                .andExpect(model().attribute(
+                        "newOrderUrl",
+                        "/orders/checkout?productId=1&quantity=2&optionIds=101"
+                ));
     }
 
     @Test
@@ -305,7 +338,8 @@ class OrderControllerTests {
     @Test
     void createCustomOrder_validRequest_redirectsToPaymentWithCreatedOrderId() throws Exception {
         String requestKey = UUID.randomUUID().toString();
-        when(customerCustomOrderService.createCustomOrder(eq(10L), any())).thenReturn(43L);
+        when(customerCustomOrderService.createCustomOrder(eq(10L), any()))
+                .thenReturn(OrderCreationResult.paymentReady(43L));
 
         mockMvc.perform(post("/orders/custom")
                         .param("requestKey", requestKey)

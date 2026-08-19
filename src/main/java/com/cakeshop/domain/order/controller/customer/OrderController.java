@@ -7,6 +7,7 @@ import com.cakeshop.domain.order.dto.form.OrderCancelForm;
 import com.cakeshop.domain.order.dto.form.customer.OrderCartCreateForm;
 import com.cakeshop.domain.order.dto.form.customer.OrderCustomCreateForm;
 import com.cakeshop.domain.order.dto.form.customer.OrderGeneralCreateForm;
+import com.cakeshop.domain.order.dto.view.customer.OrderCreationResult;
 import com.cakeshop.domain.cart.service.CartOrderQueryService;
 import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
@@ -31,6 +32,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.List;
 import java.util.UUID;
@@ -89,8 +91,12 @@ public class OrderController {
             return renderCustomOrderForm(form, model, memberId);
         }
         try {
-            long orderId = customerCustomOrderService.createCustomOrder(memberId, form);
-            return "redirect:/orders/" + orderId + "/payment";
+            OrderCreationResult result = customerCustomOrderService.createCustomOrder(memberId, form);
+            return paymentRedirectOrPendingGuide(
+                    result,
+                    model,
+                    customOrderFormUrl(form)
+            );
         } catch (BusinessException exception) {
             if (exception.getErrorCode() != OrderErrorCode.ORDER_AMOUNT_CHANGED) {
                 throw exception;
@@ -150,8 +156,12 @@ public class OrderController {
         long memberId = requireMemberId(member);
 
         try {
-            long orderId = orderService.createGeneralOrder(memberId, form);
-            return "redirect:/orders/" + orderId + "/payment";
+            OrderCreationResult result = orderService.createGeneralOrder(memberId, form);
+            return paymentRedirectOrPendingGuide(
+                    result,
+                    model,
+                    generalOrderFormUrl(form)
+            );
         } catch (BusinessException exception) {
             if (exception.getErrorCode() != OrderErrorCode.ORDER_AMOUNT_CHANGED) {
                 throw exception;
@@ -174,8 +184,12 @@ public class OrderController {
             return renderCartOrderForm(form, model, memberId);
         }
         try {
-            long orderId = orderService.createCartOrder(memberId, form);
-            return "redirect:/orders/" + orderId + "/payment";
+            OrderCreationResult result = orderService.createCartOrder(memberId, form);
+            return paymentRedirectOrPendingGuide(
+                    result,
+                    model,
+                    cartOrderFormUrl(form)
+            );
         } catch (BusinessException exception) {
             if (exception.getErrorCode() != OrderErrorCode.ORDER_AMOUNT_CHANGED) {
                 throw exception;
@@ -272,6 +286,46 @@ public class OrderController {
                 couponOrderQueryService.getAvailableCouponsForMember(memberId, checkout.totalAmount())
         );
         return "customer/order/cart-form";
+    }
+
+    private String paymentRedirectOrPendingGuide(
+            OrderCreationResult result,
+            Model model,
+            String newOrderUrl
+    ) {
+        if (!result.requiresPendingPaymentGuide()) {
+            return "redirect:/orders/" + result.orderId() + "/payment";
+        }
+        model.addAttribute("pendingOrder", result.pendingPaymentOrder());
+        model.addAttribute("newOrderUrl", newOrderUrl);
+        return "customer/order/pending-payment";
+    }
+
+    private String generalOrderFormUrl(OrderGeneralCreateForm form) {
+        return UriComponentsBuilder.fromPath("/orders/checkout")
+                .queryParam("productId", form.getProductId())
+                .queryParam("quantity", form.getQuantity())
+                .queryParam("optionIds", form.getOptionIds())
+                .build()
+                .encode()
+                .toUriString();
+    }
+
+    private String cartOrderFormUrl(OrderCartCreateForm form) {
+        return UriComponentsBuilder.fromPath("/orders/checkout/cart")
+                .queryParam("itemIds", form.getCartItemIds())
+                .build()
+                .encode()
+                .toUriString();
+    }
+
+    private String customOrderFormUrl(OrderCustomCreateForm form) {
+        return UriComponentsBuilder.fromPath("/orders/custom/request")
+                .queryParam("productId", form.getProductId())
+                .queryParam("optionIds", form.getOptionIds())
+                .build()
+                .encode()
+                .toUriString();
     }
 
     /** 유효한 아이템인지 확인. **/

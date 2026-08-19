@@ -17,6 +17,7 @@ import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.order.mapper.OrderMapper;
 import com.cakeshop.domain.order.mapper.OrderCartMapper;
 import com.cakeshop.domain.order.dto.view.OrderCartItemLink;
+import com.cakeshop.domain.order.dto.view.customer.OrderCreationResult;
 import com.cakeshop.domain.order.service.checkout.OrderAmountCalculator;
 import com.cakeshop.domain.order.service.checkout.OrderOptionValidator;
 import com.cakeshop.domain.order.service.checkout.OrderOptionValidator.ValidatedOption;
@@ -62,7 +63,7 @@ public class OrderService {
 
     /** 일반 상품 주문, 주문 항목 스냅샷, READY 결제를 하나의 트랜잭션으로 생성한다. */
     @Transactional
-    public long createGeneralOrder(long memberId, OrderGeneralCreateForm form) {
+    public OrderCreationResult createGeneralOrder(long memberId, OrderGeneralCreateForm form) {
         if (!memberCouponQueryService.lockActiveCouponIssuableMember(memberId)) {
             throw new BusinessException(CommonErrorCode.FORBIDDEN);
         }
@@ -76,10 +77,15 @@ public class OrderService {
         ).orElse(null);
 
         if (existingOrder != null) {
-            return existingOrder.getId();
+            return OrderCreationResult.paymentReady(existingOrder.getId());
         }
 
         LocalDateTime now = LocalDateTime.now(clock);
+        Order pendingPaymentOrder = orderMapper.findPendingPaymentOrderByMemberId(memberId, now)
+                .orElse(null);
+        if (pendingPaymentOrder != null) {
+            return OrderCreationResult.pendingPaymentGuide(pendingPaymentOrder);
+        }
         validatePickupAt(form.getPickupAt(), now);
 
         // 클라이언트가 전달한 가격을 사용하지 않고 현재 상품·옵션 정보로 금액을 다시 계산한다.
@@ -100,7 +106,7 @@ public class OrderService {
                     .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_SAVE_FAILED));
             if (Long.valueOf(memberId).equals(persistedOrder.getMemberId())
                     && form.getRequestKey().equals(persistedOrder.getRequestKey())) {
-                return order.getId();
+                return OrderCreationResult.paymentReady(order.getId());
             }
             throw new BusinessException(OrderErrorCode.ORDER_SAVE_FAILED);
         }
@@ -127,7 +133,7 @@ public class OrderService {
                 order.getFinalAmount()
         );
 
-        return order.getId();
+        return OrderCreationResult.paymentReady(order.getId());
     }
 
     /**
@@ -135,7 +141,7 @@ public class OrderService {
      * 상품·옵션·재고와 총 주문 금액은 주문 생성 직전에 현재 DB 기준으로 재검증한다.
      */
     @Transactional
-    public long createCartOrder(long memberId, OrderCartCreateForm form) {
+    public OrderCreationResult createCartOrder(long memberId, OrderCartCreateForm form) {
         if (!memberCouponQueryService.lockActiveCouponIssuableMember(memberId)) {
             throw new BusinessException(CommonErrorCode.FORBIDDEN);
         }
@@ -145,10 +151,15 @@ public class OrderService {
         Order existingOrder = orderMapper.findOrderByMemberIdAndRequestKey(memberId, form.getRequestKey())
                 .orElse(null);
         if (existingOrder != null) {
-            return existingOrder.getId();
+            return OrderCreationResult.paymentReady(existingOrder.getId());
         }
 
         LocalDateTime now = LocalDateTime.now(clock);
+        Order pendingPaymentOrder = orderMapper.findPendingPaymentOrderByMemberId(memberId, now)
+                .orElse(null);
+        if (pendingPaymentOrder != null) {
+            return OrderCreationResult.pendingPaymentGuide(pendingPaymentOrder);
+        }
         validatePickupAt(form.getPickupAt(), now);
 
         List<CartOrderItemView> cartItems = cartOrderQueryService.getSelectedOrderItems(
@@ -175,7 +186,7 @@ public class OrderService {
                     .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_SAVE_FAILED));
             if (Long.valueOf(memberId).equals(persistedOrder.getMemberId())
                     && form.getRequestKey().equals(persistedOrder.getRequestKey())) {
-                return order.getId();
+                return OrderCreationResult.paymentReady(order.getId());
             }
             throw new BusinessException(OrderErrorCode.ORDER_SAVE_FAILED);
         }
@@ -206,7 +217,7 @@ public class OrderService {
         paymentOrderPreparationCommandService.prepareReadyPayment(
                 order.getId(), order.getOrderNumber(), order.getFinalAmount()
         );
-        return order.getId();
+        return OrderCreationResult.paymentReady(order.getId());
     }
 
     /** 세션 값만 신뢰하지 않고 현재 ACTIVE 회원인지 DB 기준으로 검증한다. */

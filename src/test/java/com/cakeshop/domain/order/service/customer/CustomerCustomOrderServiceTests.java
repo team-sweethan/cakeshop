@@ -13,6 +13,7 @@ import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
 import com.cakeshop.domain.member.service.MemberCouponQueryService;
 import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.order.dto.form.customer.OrderCustomCreateForm;
+import com.cakeshop.domain.order.dto.view.customer.OrderCreationResult;
 import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.order.mapper.OrderMapper;
@@ -90,11 +91,12 @@ class CustomerCustomOrderServiceTests {
     @Test
     void createCustomOrder_validRequest_savesServerCalculatedSnapshotAndReadyPayment() {
         stubNewOrder();
-        long orderId = service.createCustomOrder(10L, form());
+        OrderCreationResult result = service.createCustomOrder(10L, form());
 
         ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
         verify(orderMapper).insertOrder(orderCaptor.capture());
-        assertThat(orderId).isEqualTo(20L);
+        assertThat(result.orderId()).isEqualTo(20L);
+        assertThat(result.requiresPendingPaymentGuide()).isFalse();
         org.assertj.core.api.Assertions.assertThat(orderCaptor.getValue().getOrderType())
                 .isEqualTo(com.cakeshop.domain.order.entity.OrderType.CUSTOM);
         org.assertj.core.api.Assertions.assertThat(orderCaptor.getValue().getFinalAmount())
@@ -152,9 +154,29 @@ class CustomerCustomOrderServiceTests {
         when(orderMapper.findOrderByMemberIdAndRequestKey(eq(10L), any()))
                 .thenReturn(Optional.of(existing));
 
-        long orderId = service.createCustomOrder(10L, form());
+        long orderId = service.createCustomOrder(10L, form()).orderId();
 
         org.assertj.core.api.Assertions.assertThat(orderId).isEqualTo(99L);
+        verify(orderMapper, never()).insertOrder(any());
+        verify(paymentPreparationCommandService, never()).prepareReadyPayment(anyLong(), any(), any());
+    }
+
+    @Test
+    void createCustomOrder_otherRequestKeyWithPendingPayment_returnsGuideWithoutDuplicateWrites() {
+        when(memberCouponQueryService.lockActiveCouponIssuableMember(10L)).thenReturn(true);
+        when(memberService.isActiveMember(10L)).thenReturn(true);
+        when(orderMapper.findOrderByMemberIdAndRequestKey(eq(10L), any())).thenReturn(Optional.empty());
+        Order pendingOrder = new Order();
+        pendingOrder.setId(98L);
+        pendingOrder.setOrderNumber("ORD-CUSTOM-PENDING");
+        pendingOrder.setPaymentExpiresAt(LocalDateTime.of(2026, 8, 11, 9, 10));
+        when(orderMapper.findPendingPaymentOrderByMemberId(eq(10L), any()))
+                .thenReturn(Optional.of(pendingOrder));
+
+        OrderCreationResult result = service.createCustomOrder(10L, form());
+
+        assertThat(result.requiresPendingPaymentGuide()).isTrue();
+        assertThat(result.orderId()).isEqualTo(98L);
         verify(orderMapper, never()).insertOrder(any());
         verify(paymentPreparationCommandService, never()).prepareReadyPayment(anyLong(), any(), any());
     }

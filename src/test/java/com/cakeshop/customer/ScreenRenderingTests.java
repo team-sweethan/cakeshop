@@ -1118,6 +1118,6 @@ class ScreenRenderingTests {
             checkout.pickupDates().getFirst().times().getFirst().value()
         );
 
-        return orderService.createGeneralOrder(memberId, form);
+        return orderService.createGeneralOrder(memberId, form).orderId();
     }
 }
