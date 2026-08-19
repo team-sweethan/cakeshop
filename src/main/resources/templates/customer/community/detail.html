@@ -113,13 +113,15 @@
 
     <hr class="divider">
 
-    <section class="section">
+    <section class="section" id="comments">
       <h2 class="section-title"
           th:text="'댓글 ' + ${commentSection.publishedCount}">댓글 0</h2>
 
+      <!--/* 더 보기는 목록이 위쪽으로 자라므로 댓글 구역 머리로 돌아간다. 읽던 줄을 앵커로
+             잡으면 방금 불러온 20개와 다음 `더 보기` 버튼이 통째로 화면 위 밖에 남는다. */-->
       <div class="cluster" th:if="${commentSection.canLoadMore()}">
         <a class="btn"
-           th:href="@{/community/{postId}(
+           th:href="@{|/community/{postId}#comments|(
                postId=${post.id},
                comments=${commentSection.nextLimit()}
            )}">
@@ -139,10 +141,12 @@
           <div th:replace="~{:: commentRow(${thread.root})}"></div>
 
           <!--/* 답글은 접어 두고 묶음 단위로 펼친다. 펼치기는 주소가 바뀌는 링크다
-                 (specs/community-comment.md A7). 삭제된 뿌리에는 새 답글을 달 수 없다. */-->
+                 (specs/community-comment.md A7). 삭제된 뿌리에는 새 답글을 달 수 없다.
+                 링크 끝의 #comment-{id} 는 브라우저 기본 앵커 이동이다 — 없으면 전면 재로드가
+                 문서 맨 위에 착지해 방금 누른 묶음이 화면 밖에 남는다. */-->
           <div class="cluster" th:if="${!thread.expanded}">
             <a class="btn" th:if="${thread.replyCount > 0}"
-               th:href="@{/community/{postId}(
+               th:href="@{|/community/{postId}#comment-${thread.root.id}|(
                    postId=${post.id},
                    comments=${commentSection.limitParam()},
                    replies=${thread.root.id}
@@ -150,7 +154,7 @@
                th:text="'답글 ' + ${thread.replyCount} + '개 보기'">답글 보기</a>
 
             <a class="btn" th:if="${thread.replyCount == 0 and canComment and !thread.root.deleted}"
-               th:href="@{/community/{postId}(
+               th:href="@{|/community/{postId}#comment-${thread.root.id}|(
                    postId=${post.id},
                    comments=${commentSection.limitParam()},
                    replies=${thread.root.id}
@@ -160,7 +164,7 @@
           <div th:if="${thread.expanded}" style="margin-left:32px">
             <div class="cluster">
               <a class="btn"
-                 th:href="@{/community/{postId}(
+                 th:href="@{|/community/{postId}#comment-${thread.root.id}|(
                      postId=${post.id},
                      comments=${commentSection.limitParam()}
                  )}">답글 접기</a>
@@ -250,7 +254,9 @@
     <th:block th:if="${false}">
     <div class="comment-row"
          th:fragment="commentRow(comment)"
-         th:id="'comment-' + ${comment.id}">
+         th:id="'comment-' + ${comment.id}"
+         th:classappend="${focusedCommentId != null and focusedCommentId == comment.id}
+                          ? ' comment-row--focused'">
       <p class="text-muted" th:if="${comment.deleted}">삭제된 댓글입니다.</p>
 
       <div th:unless="${comment.deleted}">

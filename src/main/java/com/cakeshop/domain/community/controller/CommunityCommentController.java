@@ -80,16 +80,21 @@ public class CommunityCommentController {
         }
 
         if (parentCommentId == null) {
-            communityCommentService.addComment(postId, commentForm, memberId);
+            long newCommentId = communityCommentService.addComment(postId, commentForm, memberId);
 
-            // 새 댓글은 언제나 최신 20건 안에 있으므로 기본 분량으로 돌아간다
-            return "redirect:/community/" + postId;
+            // 새 댓글은 언제나 최신 20건 안에 있으므로 기본 분량으로, 그 줄로 돌아간다
+            return "redirect:/community/" + postId + "#comment-" + newCommentId;
         }
 
-        communityCommentService.addReply(postId, parentCommentId, commentForm, memberId);
+        long newReplyId =
+                communityCommentService.addReply(postId, parentCommentId, commentForm, memberId);
 
-        // 방금 쓴 답글이 보여야 하므로 그 묶음을 펼친 채로 돌아간다
-        return communityDetailPage.redirect(postId, comments, String.valueOf(parentCommentId));
+        /*
+         * 묶음을 펼친 채로, 방금 쓴 답글 그 줄로 돌아간다. 뿌리를 앵커로 삼으면 답글이 열 개만
+         * 넘어가도 새 답글이 화면 아래에 남는다 — 답글은 묶음 맨 아래에 붙기 때문이다.
+         */
+        return communityDetailPage.redirectToComment(
+                postId, comments, String.valueOf(parentCommentId), newReplyId);
     }
 
     @PostMapping("/community/{postId:\\d+}/comments/{commentId:\\d+}/delete")
@@ -102,6 +107,7 @@ public class CommunityCommentController {
     ) {
         communityCommentService.deleteComment(postId, commentId, memberDetails.getMemberId());
 
-        return communityDetailPage.redirect(postId, comments, replies);
+        // 지운 줄은 사라지지 않고 "삭제된 댓글입니다"로 남는다. 그 자리로 돌아가야 결과가 보인다.
+        return communityDetailPage.redirectToComment(postId, comments, replies, commentId);
     }
 }

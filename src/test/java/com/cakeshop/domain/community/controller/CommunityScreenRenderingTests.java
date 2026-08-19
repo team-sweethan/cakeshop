@@ -32,6 +32,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
@@ -275,14 +276,20 @@ class CommunityScreenRenderingTests {
         long postId = insertPost(memberId, "질문 글", "본문", PostStatus.PUBLISHED);
         long adminId = insertAdminMember();
 
-        mockMvc.perform(post("/community/" + postId + "/comments")
+        MvcResult result = mockMvc.perform(post("/community/" + postId + "/comments")
                         .param("content", "관리자 답변입니다.")
                         .with(csrf())
                         .with(authentication(authenticationOf(adminId, "ADMIN"))))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/community/" + postId));
+                .andReturn();
 
         assertThat(commentCountOf(postId)).isEqualTo(1);
+
+        // 방금 쓴 댓글 그 줄로 돌아간다. 새 댓글은 목록 맨 아래라 맨 위 착지에서 가장 멀다.
+        Long commentId = jdbcTemplate.queryForObject(
+                "SELECT id FROM comments WHERE content = '관리자 답변입니다.'", Long.class);
+        assertThat(result.getResponse().getRedirectedUrl())
+                .isEqualTo("/community/" + postId + "#comment-" + commentId);
     }
 
     /** 관리자도 자기 댓글은 지운다 — 작성자 본인 규칙 그대로다(H50). */
@@ -441,7 +448,12 @@ class CommunityScreenRenderingTests {
                 .andExpect(content().string(containsString("name=\"replyTo\"")));
     }
 
-    /** 오래된 답글 알림도 전체 GET 한 번으로 부모 묶음과 정확한 앵커를 렌더링한다. */
+    /**
+     * 오래된 답글 알림도 전체 GET 한 번으로 부모 묶음과 정확한 앵커를 렌더링한다.
+     *
+     * <p>표시(`comment-row--focused`)가 붙는 것도 여기서 본다. **어느 줄인지 모르고 들어오는
+     * 경로는 알림뿐이고, 표시는 그 물음에만 답한다.**
+     */
     @Test
     void communityCommentDeepLink_oldReply_rendersExpandedTarget() throws Exception {
         long postId = insertPost(memberId, "오래된 답글이 있는 글", "본문", PostStatus.PUBLISHED);
@@ -460,7 +472,69 @@ class CommunityScreenRenderingTests {
                 .andExpect(content().string(containsString("알림 대상 답글")))
                 .andExpect(content().string(
                         containsString("id=\"comment-" + replyId + "\"")))
-                .andExpect(content().string(containsString("답글 접기")));
+                .andExpect(content().string(containsString("답글 접기")))
+                .andExpect(content().string(containsString("comment-row--focused")));
+    }
+
+    /**
+     * 펼치기 링크가 누른 댓글 자리로 돌아온다. 앵커가 없으면 전면 재로드가 문서 맨 위에 착지해
+     * 방금 누른 묶음이 화면 밖에 남는다 — 링크는 동작하고 화면도 멀쩡해 고장으로 안 보인다.
+     *
+     * <p><b>주소 전체를 문자열로 문다.</b> Thymeleaf 는 파라미터 괄호 <b>뒤</b>에 붙인
+     * 프래그먼트를 예외 없이 표현식 원문 그대로 href 에 출력한다. 앵커만 따로 확인하면 그
+     * 형태가 통과한다.
+     *
+     * <p>기대값의 빈 {@code comments=} 는 이 변경 전부터 있던 모양이다 — 기본 분량이면
+     * {@code limitParam()} 이 null 이고 Thymeleaf 는 null 파라미터를 빈 값으로 그린다. 앵커가
+     * <b>그 뒤에</b> 오는 것이 여기서 무는 것이다.
+     */
+    @Test
+    void communityDetail_replyLinks_carryCommentAnchor() throws Exception {
+        long postId = insertPost(memberId, "앵커 확인용 글", "본문", PostStatus.PUBLISHED);
+        long rootId = insertComment(postId, memberId, "뿌리 댓글",
+                CommentStatus.PUBLISHED, BASE_TIME);
+        insertReply(postId, rootId, "답글", CommentStatus.PUBLISHED);
+
+        mockMvc.perform(get("/community/" + postId))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(
+                        "href=\"/community/" + postId + "?comments=&amp;replies=" + rootId
+                                + "#comment-" + rootId + "\"")));
+
+        // 접기도 같은 자리로 돌아온다. 접고 나면 그 묶음이 짧아져 더 찾기 어렵다.
+        mockMvc.perform(get("/community/" + postId).param("replies", String.valueOf(rootId)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("답글 접기")))
+                .andExpect(content().string(containsString(
+                        "href=\"/community/" + postId + "?comments=#comment-" + rootId + "\"")))
+                // 눌러서 온 사람은 어느 댓글인지 안다. 강조는 답이 아니라 소음이다.
+                .andExpect(content().string(not(containsString("comment-row--focused"))));
+    }
+
+    /**
+     * `이전 댓글 더 보기` 는 댓글 구역 머리로 돌아온다.
+     *
+     * <p>목록은 오래된 것 -> 최신 것 순이라 새로 실린 20개가 <b>위쪽에 끼어든다.</b> 읽던 줄을
+     * 앵커로 잡으면 방금 불러온 20개도, 다음 `더 보기` 버튼도 통째로 화면 위 밖에 남아 누른
+     * 보람이 없다. 구역 머리에 착지해야 둘이 함께 첫 화면에 들어온다.
+     */
+    @Test
+    void communityDetail_loadMoreLink_anchorsAtCommentSectionHead() throws Exception {
+        long postId = insertPost(memberId, "댓글 많은 글", "본문", PostStatus.PUBLISHED);
+
+        for (int i = 0; i <= CommentSectionView.DEFAULT_LIMIT; i++) {
+            insertComment(postId, memberId, "댓글 " + i,
+                    CommentStatus.PUBLISHED, BASE_TIME.plusMinutes(i));
+        }
+
+        mockMvc.perform(get("/community/" + postId))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("이전 댓글 더 보기")))
+                .andExpect(content().string(containsString("id=\"comments\"")))
+                .andExpect(content().string(containsString(
+                        "href=\"/community/" + postId + "?comments="
+                                + (CommentSectionView.DEFAULT_LIMIT + CommentSectionView.STEP)
+                                + "#comments\"")));
     }
 
     /** 답글 작성이 Security 를 통과해 실제로 부모에 연결되어 저장된다. */
@@ -470,19 +544,24 @@ class CommunityScreenRenderingTests {
         long rootId = insertComment(postId, memberId, "뿌리 댓글",
                 CommentStatus.PUBLISHED, BASE_TIME);
 
-        mockMvc.perform(post("/community/" + postId + "/comments")
+        MvcResult result = mockMvc.perform(post("/community/" + postId + "/comments")
                         .param("content", "화면에서 단 답글")
                         .param("replyTo", String.valueOf(rootId))
                         .with(authentication(authorOf(memberId)))
                         .with(csrf()))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl(
-                        "/community/" + postId + "?replies=" + rootId));
+                .andReturn();
 
         Long storedParent = jdbcTemplate.queryForObject(
                 "SELECT parent_comment_id FROM comments WHERE content = '화면에서 단 답글'",
                 Long.class);
         assertThat(storedParent).isEqualTo(rootId);
+
+        // 묶음을 펼친 채로 방금 쓴 답글 줄에 착지한다. 뿌리가 아니라 새 답글이다.
+        Long replyId = jdbcTemplate.queryForObject(
+                "SELECT id FROM comments WHERE content = '화면에서 단 답글'", Long.class);
+        assertThat(result.getResponse().getRedirectedUrl())
+                .isEqualTo("/community/" + postId + "?replies=" + rootId + "#comment-" + replyId);
     }
 
     /** 삭제된 뿌리를 펼치면 남은 답글은 보이지만 새 답글 폼은 없다. */

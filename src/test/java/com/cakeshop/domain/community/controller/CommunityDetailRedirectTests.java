@@ -75,15 +75,21 @@ class CommunityDetailRedirectTests {
     /**
      * 상세로 돌아가는 모든 경로가 펼친 댓글 범위를 유지한다. 신고 경로만 사유가 필요하고
      * 나머지 경로는 넘긴 사유 파라미터를 무시한다.
+     *
+     * <p><b>착지점도 함께 고정한다.</b> 댓글 구역에서 한 일은 {@code #comment-{id}} 로 그 댓글
+     * 자리에 돌아가고, 게시글 반응(좋아요·신고)은 앵커 없이 문서 맨 위다. 기대 주소를 경로마다
+     * 적어 두는 이유는 <b>둘이 갈라져 있다는 사실 자체가 결정</b>이기 때문이다 — 한 열로 묶으면
+     * 나중에 어느 쪽이 규칙이고 어느 쪽이 빠뜨린 것인지 구분할 자리가 없어진다.
      */
-    @ParameterizedTest(name = "{0} 후에도 펼친 댓글 범위를 유지한다")
+    @ParameterizedTest(name = "{0} -> {1}")
     @CsvSource({
-            "/community/15/comments/8/delete",
-            "/community/15/likes",
-            "/community/15/likes/delete",
-            "/community/15/reports"
+            "/community/15/comments/8/delete, /community/15?comments=60#comment-8",
+            "/community/15/likes, /community/15?comments=60",
+            "/community/15/likes/delete, /community/15?comments=60",
+            "/community/15/reports, /community/15?comments=60"
     })
-    void detailRedirect_expandedCommentLimit_isKeptOnEveryPath(String path) throws Exception {
+    void detailRedirect_expandedCommentLimit_isKeptOnEveryPath(String path, String expectedUrl)
+            throws Exception {
         authenticateAs(7L);
         when(communityReactionService.getReportablePost(15L, 7L)).thenReturn(publishedPost());
 
@@ -91,20 +97,23 @@ class CommunityDetailRedirectTests {
                         .param("comments", "60")
                         .param("reason", "광고입니다"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/community/15?comments=60"));
+                .andExpect(redirectedUrl(expectedUrl));
     }
 
     /**
      * 리다이렉트 주소의 댓글 조회 수를 정수 범위로 정규화한다. 정규화는 경로마다 같은 코드가
      * 하므로 대표 경로 하나로 확인하고, 경로별 적용 여부는 위 표가 확인한다.
+     *
+     * <p>대표 경로가 댓글 삭제라 앵커가 함께 붙는다. <b>앵커는 언제나 맨 끝이다</b> — 파라미터
+     * 뒤에 와야 브라우저가 앵커로 읽는다.
      */
     @ParameterizedTest(name = "comments={0} -> {1}")
     @CsvSource({
-            "abc, /community/15",
-            "-1, /community/15",
-            "20, /community/15",
-            "99999999, /community/15?comments=200",
-            "'40 OR 1=1', /community/15"
+            "abc, /community/15#comment-8",
+            "-1, /community/15#comment-8",
+            "20, /community/15#comment-8",
+            "99999999, /community/15?comments=200#comment-8",
+            "'40 OR 1=1', /community/15#comment-8"
     })
     void detailRedirect_commentLimit_isRewrittenAsInteger(String requested, String expectedUrl)
             throws Exception {

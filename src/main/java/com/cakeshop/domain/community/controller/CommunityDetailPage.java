@@ -62,6 +62,24 @@ class CommunityDetailPage {
      * 지저분해지지 않게 한다.
      */
     String redirect(long postId, String comments, String replies) {
+        return redirect(postId, comments, replies, null);
+    }
+
+    /*
+     * 댓글 구역에서 한 일은 그 댓글 자리로 돌아간다.
+     *
+     * <p>앵커가 없으면 브라우저는 문서 맨 위에 착지한다. 그런데 확인해야 할 결과 — 방금 쓴 답글,
+     * "삭제된 댓글입니다"로 바뀐 줄 — 은 <b>눌린 그 자리에 그대로 생긴다.</b> 화면은 멀쩡하고
+     * 사용자만 20~200개 댓글을 다시 훑어 내려가야 하므로 고장으로 보이지도 않는다.
+     *
+     * <p>앵커 이름은 알림 딥링크가 이미 쓰는 {@code comment-{id}} 규약 그대로다
+     * (specs/community-comment.md D4). 화면에 앵커 규약을 두 벌 두지 않는다.
+     */
+    String redirectToComment(long postId, String comments, String replies, long anchorCommentId) {
+        return redirect(postId, comments, replies, anchorCommentId);
+    }
+
+    private String redirect(long postId, String comments, String replies, Long anchorCommentId) {
         int limit = CommentSectionView.clampLimit(CommunityRequestParams.positiveInteger(comments));
         Long expandedRootId = CommunityRequestParams.positiveLong(replies);
 
@@ -77,6 +95,11 @@ class CommunityDetailPage {
             url.append(separator).append("replies=").append(expandedRootId);
         }
 
+        // 프래그먼트는 언제나 맨 끝이다. RedirectView 도 파라미터를 '#' 앞에 넣는다.
+        if (anchorCommentId != null) {
+            url.append("#comment-").append(anchorCommentId);
+        }
+
         return url.toString();
     }
 
@@ -88,6 +111,12 @@ class CommunityDetailPage {
                 communityCommentService.getComments(post.id(), commentLimit, expandedRootId)
         );
         model.addAttribute("expandedRootId", expandedRootId);
+
+        /*
+         * 강조할 댓글이 없는 경로다. 펼치기·작성·삭제로 온 사람은 어느 댓글인지 이미 알고
+         * 눌렀으므로 강조가 답이 아니라 소음이다. 강조는 알림에서 온 경로만 갖는다.
+         */
+        model.addAttribute("focusedCommentId", null);
     }
 
     private void assembleFocused(
@@ -104,6 +133,9 @@ class CommunityDetailPage {
 
         model.addAttribute("commentSection", commentSection);
         model.addAttribute("expandedRootId", expandedRootId);
+
+        // 200개 중 어느 것인지 모르고 들어온 경로다. 여기서만 그 줄을 표시한다.
+        model.addAttribute("focusedCommentId", focusedCommentId);
     }
 
     private void assembleCommon(Model model, PostDetailView post, Long viewerId) {
