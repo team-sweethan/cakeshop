@@ -29,7 +29,7 @@ public class NotificationOrderQueryService {
         return notificationMapper.existsByReceiverIdAndEventKey(receiverId, eventKey);
     }
 
-    /** 수신자와 이벤트 키 기반 알림 생성 및 SMS 정상 발송 이력 완결 여부 조회 */
+    /** 수신자와 이벤트 키 기반 알림 생성 및 SMS 정상 발송 완료(또는 최대 재시도 2회 초과) 여부 조회 */
     @Transactional(readOnly = true)
     public boolean isNotificationFullySent(Long receiverId, String eventKey) {
         if (receiverId == null || eventKey == null || eventKey.isBlank()) {
@@ -39,6 +39,10 @@ public class NotificationOrderQueryService {
         if (notificationId == null) {
             return false;
         }
-        return notificationMapper.hasSentDelivery(notificationId);
+        if (notificationMapper.hasSentDelivery(notificationId)) {
+            return true;
+        }
+        // SMS 발송 시도가 최대 횟수(2회)에 도달한 경우 추가 반복 발송 방지를 위해 완료로 간주
+        return notificationMapper.countDeliveryAttempts(notificationId) >= 2;
     }
 }

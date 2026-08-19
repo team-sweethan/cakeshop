@@ -1,5 +1,6 @@
 package com.cakeshop.domain.order.service;
 
+import com.cakeshop.domain.notification.entity.NotificationType;
 import com.cakeshop.domain.notification.service.NotificationOrderQueryService;
 import com.cakeshop.domain.order.dto.view.OrderChatView;
 import com.cakeshop.domain.order.mapper.OrderChatMapper;
@@ -87,7 +88,7 @@ public class OrderNotificationStatusSync {
                         orderNotificationSender.sendOrderCanceledToAdmins(orderId, memberId, orderNumber);
                     } else if ("PICKED_UP".equalsIgnoreCase(statusStr)) {
                         // 픽업 완료 알림 체크 및 전송
-                        String customerEventKey = "CUSTOMER_PICKED_UP:" + memberId + ":" + orderId;
+                        String customerEventKey = NotificationType.CUSTOMER_ORDER_PICKED_UP.name() + ":" + memberId + ":" + orderId;
                         if (!notificationOrderQueryService.isNotificationFullySent(memberId, customerEventKey)) {
                             orderNotificationSender.sendOrderPickedUp(orderId, memberId, orderNumber);
                         }

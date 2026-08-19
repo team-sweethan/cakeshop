@@ -54,6 +54,9 @@ public interface NotificationMapper {
     // 이미 발송 시도 이력(SENT, FAILED, SKIPPED)이 한 번이라도 존재하는지 확인
     boolean hasAttemptedDelivery(@Param("notificationId") Long notificationId);
 
+    // 발송 시도 총 횟수 조회 (최대 재시도 횟수 제한용)
+    int countDeliveryAttempts(@Param("notificationId") Long notificationId);
+
     // 수신 회원 전화번호 조회 (주문서 작성 번호 우선, 알림톡 발송용)
     String findReceiverPhone(@Param("receiverId") Long receiverId, @Param("orderId") Long orderId); 
 

@@ -143,7 +143,7 @@ public class OrderNotificationSender {
                         .receiverId(customerId)
                         .orderId(orderId)
                         .type(NotificationType.CUSTOMER_PICKUP_REMINDER_TOMORROW)
-                        .eventKey("CUSTOMER_PICKUP_TOMORROW:" + customerId + ":" + orderId)
+                        .eventKey(NotificationType.CUSTOMER_PICKUP_REMINDER_TOMORROW.name() + ":" + customerId + ":" + orderId)
                         .deliveryScope(DeliveryScope.WEB_AND_SMS)
                         .args(new Object[0])
                         .build());
@@ -157,7 +157,7 @@ public class OrderNotificationSender {
     public void sendPickupReminderTomorrowToAdmins(long orderId, long customerId, String orderNumber) {
         try {
             String ordNum = (orderNumber != null && !orderNumber.isBlank()) ? orderNumber : String.valueOf(orderId);
-            sendToActiveAdmins(orderId, customerId, NotificationType.ADMIN_PICKUP_REMINDER_TOMORROW, "ADMIN_PICKUP_TOMORROW:ALL_ADMINS:" + orderId, new Object[]{ordNum});
+            sendToActiveAdmins(orderId, customerId, NotificationType.ADMIN_PICKUP_REMINDER_TOMORROW, NotificationType.ADMIN_PICKUP_REMINDER_TOMORROW.name() + ":ALL_ADMINS:" + orderId, new Object[]{ordNum});
         } catch (Exception e) {
             log.error("관리자 픽업 하루 전 알림 발송 오류 (orderId={}):", orderId, e);
         }
@@ -176,7 +176,7 @@ public class OrderNotificationSender {
                         .receiverId(customerId)
                         .orderId(orderId)
                         .type(NotificationType.CUSTOMER_PICKUP_REMINDER_TODAY)
-                        .eventKey("CUSTOMER_PICKUP_TODAY:" + customerId + ":" + orderId)
+                        .eventKey(NotificationType.CUSTOMER_PICKUP_REMINDER_TODAY.name() + ":" + customerId + ":" + orderId)
                         .deliveryScope(DeliveryScope.WEB_AND_SMS)
                         .args(new Object[0])
                         .build());
@@ -190,7 +190,7 @@ public class OrderNotificationSender {
     public void sendPickupReminderTodayToAdmins(long orderId, long customerId, String orderNumber) {
         try {
             String ordNum = (orderNumber != null && !orderNumber.isBlank()) ? orderNumber : String.valueOf(orderId);
-            sendToActiveAdmins(orderId, customerId, NotificationType.ADMIN_PICKUP_REMINDER_TODAY, "ADMIN_PICKUP_TODAY:ALL_ADMINS:" + orderId, new Object[]{ordNum});
+            sendToActiveAdmins(orderId, customerId, NotificationType.ADMIN_PICKUP_REMINDER_TODAY, NotificationType.ADMIN_PICKUP_REMINDER_TODAY.name() + ":ALL_ADMINS:" + orderId, new Object[]{ordNum});
         } catch (Exception e) {
             log.error("관리자 픽업 당일 알림 발송 오류 (orderId={}):", orderId, e);
         }
@@ -209,7 +209,7 @@ public class OrderNotificationSender {
                         .receiverId(customerId)
                         .orderId(orderId)
                         .type(NotificationType.CUSTOMER_ORDER_PICKED_UP)
-                        .eventKey("CUSTOMER_PICKED_UP:" + customerId + ":" + orderId)
+                        .eventKey(NotificationType.CUSTOMER_ORDER_PICKED_UP.name() + ":" + customerId + ":" + orderId)
                         .deliveryScope(DeliveryScope.WEB_AND_SMS)
                         .args(new Object[0])
                         .build());
@@ -223,7 +223,7 @@ public class OrderNotificationSender {
     public void sendOrderPickedUpToAdmins(long orderId, long customerId, String orderNumber) {
         try {
             String ordNum = (orderNumber != null && !orderNumber.isBlank()) ? orderNumber : String.valueOf(orderId);
-            sendToActiveAdmins(orderId, customerId, NotificationType.ADMIN_PICKEDUP, "ADMIN_PICKEDUP:ALL_ADMINS:" + orderId, new Object[]{ordNum});
+            sendToActiveAdmins(orderId, customerId, NotificationType.ADMIN_PICKEDUP, NotificationType.ADMIN_PICKEDUP.name() + ":ALL_ADMINS:" + orderId, new Object[]{ordNum});
         } catch (Exception e) {
             log.error("관리자 픽업 완료 알림 발송 오류 (orderId={}):", orderId, e);
         }
