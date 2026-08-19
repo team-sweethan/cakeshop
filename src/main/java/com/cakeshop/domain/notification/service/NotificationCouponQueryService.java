@@ -39,6 +39,15 @@ public class NotificationCouponQueryService {
         }
 
         String eventKey = NotificationType.COUPON.name() + ":" + memberId + ":" + memberCouponId;
-        return notificationMapper.existsByReceiverIdAndEventKey(memberId, eventKey);
+        Long notificationId = notificationMapper.findIdByReceiverIdAndEventKey(memberId, eventKey);
+        if (notificationId == null) {
+            return false;
+        }
+
+        // 이미 성공(SENT/DELIVERED) 발송 이력이 있거나, 시도 상한(2회)에 도달했으면 완료 처리
+        if (notificationMapper.hasSentDelivery(notificationId)) {
+            return true;
+        }
+        return notificationMapper.countDeliveryAttempts(notificationId) >= 2;
     }
 }
