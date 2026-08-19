@@ -10,7 +10,6 @@ import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
 import com.cakeshop.domain.community.dto.view.PostSort;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
-import com.cakeshop.domain.community.service.CommunityNoticeService;
 import com.cakeshop.domain.community.service.CommunityPostImageService;
 import com.cakeshop.domain.community.service.CommunityPostService;
 import com.cakeshop.global.error.BusinessException;
@@ -59,7 +58,6 @@ public class CommunityController {
 
     private final CommunityPostService communityPostService;
     private final CommunityPostImageService communityPostImageService;
-    private final CommunityNoticeService communityNoticeService;
     private final CommunityDetailPage communityDetailPage;
 
     // 예시 요청: GET /community?categoryId=2&sort=POPULAR&page=3
@@ -131,10 +129,6 @@ public class CommunityController {
         model.addAttribute("selectedSort", selectedSort);
         model.addAttribute("sortOptions", PostSort.values());
 
-        model.addAttribute(
-                "noticeSection",
-                communityNoticeService.getListSection(selectedCategoryId, pageRequest)
-        );
         model.addAttribute(
                 "popularSection",
                 communityPostService.getPopularSection(selectedCategoryId, pageRequest)

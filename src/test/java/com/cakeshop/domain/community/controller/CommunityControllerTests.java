@@ -26,14 +26,12 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import com.cakeshop.domain.community.dto.view.CommentSectionView;
-import com.cakeshop.domain.community.dto.view.NoticeSectionView;
 import com.cakeshop.domain.community.dto.view.PostCategoryView;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
 import com.cakeshop.domain.community.dto.view.PostSort;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
-import com.cakeshop.domain.community.service.CommunityNoticeService;
 import com.cakeshop.domain.community.service.CommunityPostImageService;
 import com.cakeshop.domain.community.service.CommunityReactionService;
 import com.cakeshop.domain.community.service.CommunityCommentService;
@@ -63,7 +61,6 @@ class CommunityControllerTests {
 
     private CommunityPostService communityPostService;
     private CommunityCommentService communityCommentService;
-    private CommunityNoticeService communityNoticeService;
     private CommunityReactionService communityReactionService;
     private MockMvc mockMvc;
 
@@ -71,11 +68,7 @@ class CommunityControllerTests {
     void setUp() {
         communityPostService = mock(CommunityPostService.class);
         communityCommentService = mock(CommunityCommentService.class);
-        communityNoticeService = mock(CommunityNoticeService.class);
         communityReactionService = mock(CommunityReactionService.class);
-
-        when(communityNoticeService.getListSection(any(), any()))
-                .thenReturn(NoticeSectionView.empty());
 
         when(communityPostService.getPosts(any(), any(), any()))
                 .thenReturn(new PageResult<>(List.of(), new PageRequest(1, 20), 0));
@@ -93,7 +86,6 @@ class CommunityControllerTests {
                         new CommunityController(
                                 communityPostService,
                                 mock(CommunityPostImageService.class),
-                                communityNoticeService,
                                 // 상세 화면을 목으로 갈면 아래 Model 속성 검사가 전부 빈 값을 본다.
                                 new CommunityDetailPage(
                                         communityCommentService, communityReactionService, mock(CommunityPostImageService.class))))
@@ -114,6 +106,7 @@ class CommunityControllerTests {
                 .andExpect(model().attributeExists("pageResult"))
                 .andExpect(model().attributeExists("pageNavigation"))
                 .andExpect(model().attributeExists("categories"))
+                .andExpect(model().attributeDoesNotExist("noticeSection"))
                 .andExpect(model().attribute("selectedCategoryId", (Object) null));
     }
 

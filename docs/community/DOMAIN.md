@@ -49,8 +49,8 @@
 | **B5** | 인기글 영역 | 누구나 | (B1에 포함 — 메인은 15가 제거) | **완료** | 7c · 13 · 15 | `community-popular.md` |
 | **B6** | 검색 | 누구나 | (B1의 파라미터) | **없음** | 2차 | `community-read.md` |
 | **B7** | 무한 스크롤 | 누구나 | (댓글 구역 부분 로드로 재정의 — 게시글 목록은 쪽 번호 유지) | **없음** | 2차 (조각 9) | `community-read.md` |
-| **B8** | 공지 고정 행·상단 영역 | 누구나 | (B1과 메인 `GET /`에 포함) | **완료** | 14b · 14c · 15 | `community-notice.md` |
-| **B9** | 공지 전체보기 | 누구나 | `GET /community/notices` | **완료** | 14b | `community-notice.md` |
+| **B8** | 메인 공지 상단 영역 | 누구나 | (메인 `GET /`에 포함) | **완료** | 14c · 18 | `community-notice.md` |
+| **B9** | 공지 전체보기·GNB 진입점 | 누구나 | `GET /community/notices` | **완료** | 14b · 18 | `community-notice.md` |
 | **B10** | 공지 상세 | 누구나 | `GET /community/notices/{id}` | **완료** | 14b | `community-notice.md` |
 | **C1** | 관리자 목록 | 관리자 | `GET /admin/community` | **완료** | 5 | `community-admin.md` |
 | **C2** | 관리자 상세 | 관리자 | `GET /admin/community/{id}` | **완료** | 5 | `community-admin.md` |

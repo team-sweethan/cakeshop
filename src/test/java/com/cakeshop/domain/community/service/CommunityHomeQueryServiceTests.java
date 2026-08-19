@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Test;
  * <p>노출 조건·정렬은 {@code CommunityNoticeService}와 매퍼가 갖고 각자의 테스트가 이미 본다.
  * 여기서 다시 보면 같은 결함을 두 번 잡는다(docs/testing.md 4절).
  *
- * <p>목록과 같은 10건을 요청해도 <b>화면은 멀쩡해 보인다</b> — 공지가 많은 날과 구분되지 않는다.
+ * <p>건수를 잘못 늘려도 <b>화면은 멀쩡해 보인다</b> — 공지가 많은 날과 구분되지 않는다.
  */
 class CommunityHomeQueryServiceTests {
 
