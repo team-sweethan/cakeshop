@@ -47,7 +47,7 @@ public interface CouponMapper {
                      @Param("expectedStatus") CouponStatus expectedStatus,
                      @Param("nextStatus") CouponStatus nextStatus);
 
-    /** 쿠폰 상태·수량과 중복 발급 이력을 확인한 뒤 발급 이력을 생성한다. */
+    /** 쿠폰 상태·수량·중복 발급 이력을 확인한 뒤 발급 이력을 생성한다. allowBeforeStart는 사전 발급 정책을 뜻한다. */
     int insertMemberCouponIfAbsent(@Param("couponId") Long couponId,
                                    @Param("memberId") Long memberId,
                                    @Param("allowBeforeStart") boolean allowBeforeStart);
