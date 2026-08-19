@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--/**
+ * ******************************
+ * 작성자 : 김민정
+ * 담당자 : 이정후
+ * 작성일 : 2026-08-19
+ * 기능 : 쿠폰 발급 알림용 연동 SQL 매퍼
+ * 설명 : member_coupons 테이블과 coupons 테이블을 조인하여 최근 발급된 쿠폰 목록을 조회한다.
+ * ******************************
+ */-->
+<mapper namespace="com.cakeshop.domain.coupon.mapper.CouponNotificationMapper">
+
+    <select id="findRecentlyIssuedMemberCoupons" resultType="com.cakeshop.domain.coupon.dto.view.CouponNotificationView">
+        SELECT 
+            mc.id AS memberCouponId,
+            mc.coupon_id AS couponId,
+            mc.member_id AS memberId,
+            c.name AS couponName,
+            mc.issued_at AS issuedAt
+        FROM member_coupons mc
+        INNER JOIN coupons c ON c.id = mc.coupon_id
+        WHERE mc.issued_at &gt;= #{since}
+        ORDER BY mc.issued_at ASC, mc.id ASC
+        LIMIT 50
+    </select>
+
+</mapper>
