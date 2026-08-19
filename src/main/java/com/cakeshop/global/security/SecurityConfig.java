@@ -105,6 +105,7 @@ public class SecurityConfig {
                 // "notices"는 그 규칙에 걸리지 않아 여기에 따로 적어야 한다.
                 auth.requestMatchers(HttpMethod.GET,
                                 "/community", "/community/{id:\\d+}",
+                                "/community/{postId:\\d+}/comments/{commentId:\\d+}",
                                 "/community/notices", "/community/notices/{id:\\d+}")
                         .permitAll();
                 auth.requestMatchers(HttpMethod.POST, "/webhooks/toss").permitAll();
