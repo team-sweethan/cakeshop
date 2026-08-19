@@ -204,6 +204,25 @@ public class CommunityController {
         return communityDetailPage.render(model, post, viewerId, comments, replies);
     }
 
+    /*
+     * 알림이 가리키는 댓글을 여는 서버 렌더링 경로다. 일반 GET 한 번으로 상세 전체를 만들고,
+     * 답글이면 Service가 부모 묶음을 펼친다. 이미 보고 있는 글 안의 이동이라 조회수는 올리지 않는다.
+     */
+    @GetMapping("/community/{postId:\\d+}/comments/{commentId:\\d+}")
+    public String commentDetail(
+            @PathVariable("postId") long postId,
+            @PathVariable("commentId") long commentId,
+            @ModelAttribute("commentForm") CommentForm commentForm,
+            @ModelAttribute("reportForm") ReportForm reportForm,
+            @AuthenticationPrincipal MemberDetails memberDetails,
+            Model model
+    ) {
+        Long viewerId = memberDetails == null ? null : memberDetails.getMemberId();
+        PostDetailView post = communityPostService.getVisiblePost(postId, viewerId);
+
+        return communityDetailPage.renderFocused(model, post, viewerId, commentId);
+    }
+
     private String viewerKeyOf(Long viewerId, HttpServletRequest request) {
         if (viewerId != null) {
             return "M:" + viewerId;

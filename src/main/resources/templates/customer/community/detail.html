@@ -248,7 +248,9 @@
            th:if="false" 는 정의 자리에서의 렌더링을 막는 것이고, th:replace 의 조각 탐색은
            처리 전 템플릿 구조에서 찾으므로 영향받지 않는다. */-->
     <th:block th:if="${false}">
-    <div th:fragment="commentRow(comment)" th:remove="tag">
+    <div class="comment-row"
+         th:fragment="commentRow(comment)"
+         th:id="'comment-' + ${comment.id}">
       <p class="text-muted" th:if="${comment.deleted}">삭제된 댓글입니다.</p>
 
       <div th:unless="${comment.deleted}">

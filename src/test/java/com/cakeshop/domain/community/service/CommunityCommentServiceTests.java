@@ -222,6 +222,59 @@ class CommunityCommentServiceTests {
                 .findRepliesByParentId(anyLong(), anyLong(), anyInt());
     }
 
+    /** 알림 대상 뿌리가 기본 창 밖이어도 최신 목록과 함께 제한 안에서 싣는다. */
+    @Test
+    void getFocusedComments_rootOutsideWindow_isIncluded() {
+        CommentRow recent = commentOf(20L, CommentStatus.PUBLISHED);
+        CommentRow focused = commentOf(1L, CommentStatus.PUBLISHED);
+        givenComments(recent);
+        when(communityCommentMapper.findCommentById(1L)).thenReturn(focused);
+        when(communityCommentMapper.countComments(POST_ID)).thenReturn(new CommentCountRow(2L, 2L));
+
+        CommentSectionView section = communityCommentService.getFocusedComments(POST_ID, 1L);
+
+        assertThat(section.threads()).extracting(thread -> thread.root().id())
+                .containsExactly(1L, 20L);
+    }
+
+    /** 알림 대상 답글이면 창 밖 뿌리를 포함하고 그 묶음을 서버에서 펼친다. */
+    @Test
+    void getFocusedComments_reply_expandsItsRootAndIncludesTarget() {
+        CommentRow recent = commentOf(20L, CommentStatus.PUBLISHED);
+        CommentRow root = commentOf(1L, CommentStatus.PUBLISHED);
+        CommentRow reply = replyOf(11L, 1L, CommentStatus.PUBLISHED);
+        givenComments(recent);
+        when(communityCommentMapper.findCommentById(11L)).thenReturn(reply);
+        when(communityCommentMapper.findCommentById(1L)).thenReturn(root);
+        when(communityCommentMapper.countComments(POST_ID)).thenReturn(new CommentCountRow(2L, 3L));
+        when(communityCommentMapper.countRepliesByParentIds(List.of(20L, 1L)))
+                .thenReturn(List.of(new ReplyCountRow(1L, 1L)));
+        when(communityCommentMapper.findRepliesByParentId(
+                1L, POST_ID, CommentSectionView.MAX_LIMIT))
+                .thenReturn(List.of());
+
+        CommentSectionView section = communityCommentService.getFocusedComments(POST_ID, 11L);
+
+        assertThat(section.threads()).first().satisfies(thread -> {
+            assertThat(thread.root().id()).isEqualTo(1L);
+            assertThat(thread.expanded()).isTrue();
+            assertThat(thread.replies()).extracting(CommentView::id).containsExactly(11L);
+        });
+    }
+
+    /** 다른 글의 댓글 id를 섞은 deep link는 대상 댓글을 숨겨 404로 보낸다. */
+    @Test
+    void getFocusedComments_commentFromAnotherPost_isRejected() {
+        when(communityCommentMapper.findCommentById(COMMENT_ID))
+                .thenReturn(commentOf(
+                        COMMENT_ID, OTHER_POST_ID, AUTHOR_ID, CommentStatus.PUBLISHED));
+
+        assertThatThrownBy(() -> communityCommentService.getFocusedComments(POST_ID, COMMENT_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(CommunityErrorCode.COMMENT_NOT_FOUND);
+    }
+
     @Test
     void addReply_savesThroughConditionalInsert() {
         givenPost(PostStatus.PUBLISHED);
@@ -452,6 +505,18 @@ class CommunityCommentServiceTests {
                 postId,
                 authorId,
                 status == CommentStatus.DELETED ? null : "댓글 본문",
+                status,
+                CREATED_AT
+        );
+    }
+
+    private CommentRow replyOf(long commentId, long parentCommentId, CommentStatus status) {
+        return new CommentRow(
+                commentId,
+                POST_ID,
+                AUTHOR_ID,
+                parentCommentId,
+                status == CommentStatus.DELETED ? null : "답글 본문",
                 status,
                 CREATED_AT
         );

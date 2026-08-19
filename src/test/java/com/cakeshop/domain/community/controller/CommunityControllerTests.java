@@ -84,6 +84,9 @@ class CommunityControllerTests {
         when(communityCommentService.getComments(anyLong(), any(), any()))
                 .thenReturn(new CommentSectionView(
                         List.of(), 0, 0, CommentSectionView.DEFAULT_LIMIT));
+        when(communityCommentService.getFocusedComments(anyLong(), anyLong()))
+                .thenReturn(new CommentSectionView(
+                        List.of(), 0, 0, CommentSectionView.DEFAULT_LIMIT));
 
         mockMvc = MockMvcBuilders
                 .standaloneSetup(
@@ -231,6 +234,20 @@ class CommunityControllerTests {
                 .andExpect(status().isOk());
 
         verify(communityCommentService).getComments(15L, null, 8L);
+        verify(communityPostService, never()).getPostDetail(anyLong(), any(), anyString());
+    }
+
+    /** 알림 deep link는 댓글 id를 서버 렌더링에 넘기고 조회수를 올리지 않는다. */
+    @Test
+    void commentDetail_rendersFocusedCommentWithoutCountingView() throws Exception {
+        when(communityPostService.getVisiblePost(eq(15L), isNull())).thenReturn(publishedPost());
+
+        mockMvc.perform(get("/community/15/comments/8"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("customer/community/detail"));
+
+        verify(communityCommentService).getFocusedComments(15L, 8L);
+        verify(communityPostService).getVisiblePost(eq(15L), isNull());
         verify(communityPostService, never()).getPostDetail(anyLong(), any(), anyString());
     }
 
