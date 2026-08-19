@@ -3,8 +3,10 @@ package com.cakeshop.domain.community.controller;
 import com.cakeshop.domain.community.dto.form.CommentForm;
 import com.cakeshop.domain.community.dto.form.ReportForm;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
+import com.cakeshop.domain.community.error.CommunityErrorCode;
 import com.cakeshop.domain.community.service.CommunityCommentService;
 import com.cakeshop.domain.community.service.CommunityPostService;
+import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.security.MemberDetails;
 
 import jakarta.validation.Valid;
@@ -57,13 +59,24 @@ public class CommunityCommentController {
     ) {
         long memberId = memberDetails.getMemberId();
 
+        Long parentCommentId = CommunityRequestParams.positiveLong(replyTo);
+
+        /*
+         * replyTo 가 실려 왔는데 값이 망가졌으면 거절한다. 부재와 파싱 실패를 구분하지 않으면
+         * 변조된 답글 요청이 조용히 뿌리 댓글로 강등되어 저장된다.
+         */
+        if (replyTo != null && !replyTo.isBlank() && parentCommentId == null) {
+            throw new BusinessException(CommunityErrorCode.COMMENT_NOT_FOUND);
+        }
+
         PostDetailView post = communityPostService.getCommentablePost(postId, memberId);
 
         if (bindingResult.hasErrors()) {
+            // 실패한 폼이 어느 쪽(뿌리·답글)인지 화면이 알아야 오류가 그 폼에 그려진다
+            model.addAttribute("failedReplyTo", parentCommentId);
+
             return communityDetailPage.render(model, post, memberId, comments, replies);
         }
-
-        Long parentCommentId = CommunityRequestParams.positiveLong(replyTo);
 
         if (parentCommentId == null) {
             communityCommentService.addComment(postId, commentForm, memberId);

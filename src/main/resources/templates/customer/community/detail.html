@@ -70,12 +70,14 @@
         <form method="post" th:if="${canLike and likedByViewer}"
               th:action="@{/community/{postId}/likes/delete(postId=${post.id})}">
           <input type="hidden" name="comments" th:value="${commentSection.limit}">
+          <input type="hidden" name="replies" th:value="${expandedRootId}">
           <button class="btn" type="submit">좋아요 취소</button>
         </form>
 
         <form method="post" th:if="${canLike and !likedByViewer}"
               th:action="@{/community/{postId}/likes(postId=${post.id})}">
           <input type="hidden" name="comments" th:value="${commentSection.limit}">
+          <input type="hidden" name="replies" th:value="${expandedRootId}">
           <button class="btn btn--primary" type="submit">좋아요</button>
         </form>
       </div>
@@ -89,6 +91,7 @@
         <form method="post"
               th:action="@{/community/{postId}/reports(postId=${post.id})}">
           <input type="hidden" name="comments" th:value="${commentSection.limit}">
+          <input type="hidden" name="replies" th:value="${expandedRootId}">
           <div class="form-group">
             <label class="form-label" for="reportReason">신고 사유</label>
             <textarea class="form-control form-control--textarea" id="reportReason"
@@ -179,10 +182,15 @@
               <input type="hidden" name="replyTo" th:value="${thread.root.id}">
               <div class="form-group">
                 <label class="form-label" th:for="'replyContent-' + ${thread.root.id}">답글 작성</label>
+                <!--/* 검증 실패가 이 묶음의 답글에서 났을 때만 입력값과 오류를 이 폼에 되살린다.
+                       안 가르면 실패한 답글 본문이 아래 뿌리 댓글 폼에 나타난다. */-->
                 <textarea class="form-control form-control--textarea"
                           th:id="'replyContent-' + ${thread.root.id}" name="content"
                           style="min-height:72px" placeholder="답글을 입력하세요"
-                          maxlength="500" required></textarea>
+                          maxlength="500" required
+                          th:text="${failedReplyTo == thread.root.id ? commentForm.content : ''}"></textarea>
+                <p class="field-error" th:if="${failedReplyTo == thread.root.id}"
+                   th:errors="${commentForm.content}"></p>
               </div>
               <div class="cluster cluster--between">
                 <span class="text-muted">등록한 답글은 수정할 수 없습니다.</span>
@@ -208,10 +216,17 @@
         <input type="hidden" name="replies" th:value="${expandedRootId}">
         <div class="form-group">
           <label class="form-label" for="commentContent">댓글 작성</label>
+          <!--/* 실패한 폼이 답글 쪽이면 여기엔 입력값도 오류도 되살리지 않는다 — 그 묶음의
+                 답글 폼이 가져간다. */-->
           <textarea class="form-control form-control--textarea" id="commentContent"
+                    th:if="${failedReplyTo == null}"
                     th:field="*{content}" style="min-height:96px"
                     placeholder="댓글을 입력하세요" maxlength="500" required></textarea>
-          <p class="field-error" th:errors="*{content}"></p>
+          <textarea class="form-control form-control--textarea" id="commentContent"
+                    th:unless="${failedReplyTo == null}"
+                    name="content" style="min-height:96px"
+                    placeholder="댓글을 입력하세요" maxlength="500" required></textarea>
+          <p class="field-error" th:if="${failedReplyTo == null}" th:errors="*{content}"></p>
         </div>
         <div class="cluster cluster--between">
           <span class="text-muted">등록한 댓글은 수정할 수 없습니다.</span>

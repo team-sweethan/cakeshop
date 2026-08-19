@@ -73,7 +73,8 @@ public class CommunityCommentService {
         Map<Long, MemberCommunityView> authors = communityMemberViewLoader.findByIds(
                 Stream.concat(roots.stream(), replies.stream()).map(CommentRow::memberId));
 
-        List<CommentView> replyViews = replies.stream()
+        // 답글도 뿌리처럼 최신 쪽을 남기고 화면은 오래된 순이다 — 그래서 여기서 뒤집는다
+        List<CommentView> replyViews = replies.reversed().stream()
                 .map(row -> CommentView.of(row, authors.get(row.memberId())))
                 .toList();
 

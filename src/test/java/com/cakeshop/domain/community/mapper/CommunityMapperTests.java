@@ -350,9 +350,9 @@ class CommunityMapperTests {
         assertThat(comment.content()).isNull();
     }
 
-    /** 답글은 오래된 순이고, 같은 글의 다른 뿌리·다른 글의 답글은 나오지 않는다. */
+    /** 답글도 최신 쪽을 남기고(상한 대비), 같은 글의 다른 뿌리·다른 글의 답글은 나오지 않는다. */
     @Test
-    void findRepliesByParentId_ordersOldestAndStaysInsideThread() {
+    void findRepliesByParentId_keepsNewestWithinLimitAndStaysInsideThread() {
         long postId = insertPost("이 글", PostStatus.PUBLISHED, BASE_TIME);
         long rootId = insertComment(postId, "뿌리", CommentStatus.PUBLISHED, BASE_TIME);
         long otherRootId = insertComment(postId, "다른 뿌리", CommentStatus.PUBLISHED, BASE_TIME);
@@ -363,10 +363,11 @@ class CommunityMapperTests {
 
         assertThat(communityCommentMapper.findRepliesByParentId(rootId, postId, 200))
                 .extracting(CommentRow::id)
-                .containsExactly(older, newer);
+                .containsExactly(newer, older);
+        // 상한에 걸리면 남는 것은 최신 쪽이다 — 방금 쓴 답글이 화면 밖에 남으면 안 된다
         assertThat(communityCommentMapper.findRepliesByParentId(rootId, postId, 1))
                 .extracting(CommentRow::id)
-                .containsExactly(older);
+                .containsExactly(newer);
     }
 
     /** 뿌리별 답글 수는 자리 표시까지 센다 — 펼치는 길이 사라지면 안 된다. */
@@ -403,13 +404,14 @@ class CommunityMapperTests {
                 });
     }
 
-    /** 깊이 2단계·같은 글·부모 노출을 전부 이 한 문장이 지킨다. 조건마다 0행을 확인한다. */
+    /** 깊이 2단계·같은 글·부모 노출·게시글 노출을 전부 이 한 문장이 지킨다. 조건마다 0행을 확인한다. */
     @ParameterizedTest(name = "{0}")
     @CsvSource({
             "없는 부모에는 달 수 없다, MISSING",
             "다른 글의 댓글에는 달 수 없다, OTHER_POST",
             "답글에는 답글을 달 수 없다, REPLY_PARENT",
-            "삭제된 부모에는 달 수 없다, DELETED_PARENT"
+            "삭제된 부모에는 달 수 없다, DELETED_PARENT",
+            "차단된 글에는 달 수 없다, BLOCKED_POST"
     })
     void insertReply_invalidParent_insertsNothing(String caseName, String parentCase) {
         long postId = insertPost("이 글", PostStatus.PUBLISHED, BASE_TIME);
@@ -424,6 +426,13 @@ class CommunityMapperTests {
             }
             case "DELETED_PARENT" -> insertComment(
                     postId, "지워진 뿌리", CommentStatus.DELETED, BASE_TIME);
+            // Service 확인과 INSERT 사이에 차단되는 경합의 축소판 — 부모는 멀쩡해도 글이 막힌다
+            case "BLOCKED_POST" -> {
+                long rootId = insertComment(postId, "뿌리", CommentStatus.PUBLISHED, BASE_TIME);
+                jdbcTemplate.update(
+                        "UPDATE posts SET status = 'BLOCKED' WHERE id = ?", postId);
+                yield rootId;
+            }
             default -> throw new IllegalArgumentException(parentCase);
         };
 

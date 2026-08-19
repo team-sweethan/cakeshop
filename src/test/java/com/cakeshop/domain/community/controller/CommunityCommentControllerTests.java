@@ -151,6 +151,38 @@ class CommunityCommentControllerTests {
         verify(communityCommentService, never()).addComment(anyLong(), any(), anyLong());
     }
 
+    /** 망가진 replyTo 는 뿌리 댓글로 강등하지 않고 거절한다. */
+    @Test
+    void addComment_malformedReplyTo_isRejected() {
+        authenticateAs(7L);
+
+        assertThatThrownBy(() -> mockMvc.perform(post("/community/15/comments")
+                        .param("content", "답글 본문")
+                        .param("replyTo", "abc")))
+                .hasRootCauseInstanceOf(BusinessException.class);
+
+        verify(communityCommentService, never()).addComment(anyLong(), any(), anyLong());
+        verify(communityCommentService, never())
+                .addReply(anyLong(), anyLong(), any(), anyLong());
+    }
+
+    /** 답글 검증 실패는 실패한 폼이 어느 묶음인지 화면에 알린다. */
+    @Test
+    void addComment_blankReply_marksFailedThread() throws Exception {
+        authenticateAs(7L);
+        when(communityPostService.getCommentablePost(15L, 7L)).thenReturn(publishedPost());
+
+        mockMvc.perform(post("/community/15/comments")
+                        .param("content", "   ")
+                        .param("replyTo", "8")
+                        .param("replies", "8"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("failedReplyTo", 8L));
+
+        verify(communityCommentService, never())
+                .addReply(anyLong(), anyLong(), any(), anyLong());
+    }
+
     @Test
     void deleteComment_redirectsToDetail() throws Exception {
         authenticateAs(7L);

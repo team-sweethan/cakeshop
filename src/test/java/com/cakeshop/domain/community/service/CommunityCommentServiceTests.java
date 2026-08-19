@@ -181,7 +181,7 @@ class CommunityCommentServiceTests {
                 .findRepliesByParentId(anyLong(), anyLong(), anyInt());
     }
 
-    /** 요청한 뿌리만 펼치고, 답글은 오래된 순 그대로 싣는다. */
+    /** 요청한 뿌리만 펼치고, 최신 쪽으로 받은 답글을 오래된 순으로 뒤집어 싣는다. */
     @Test
     void getComments_expandedRoot_loadsRepliesOldestFirst() {
         givenComments(
@@ -192,8 +192,8 @@ class CommunityCommentServiceTests {
         when(communityCommentMapper.findRepliesByParentId(
                 1L, POST_ID, CommentSectionView.MAX_LIMIT))
                 .thenReturn(List.of(
-                        commentOf(10L, CommentStatus.PUBLISHED),
-                        commentOf(11L, CommentStatus.DELETED)));
+                        commentOf(11L, CommentStatus.DELETED),
+                        commentOf(10L, CommentStatus.PUBLISHED)));
 
         CommentSectionView section = communityCommentService.getComments(POST_ID, null, 1L);
 

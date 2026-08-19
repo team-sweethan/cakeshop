@@ -100,14 +100,15 @@ class CommunityMapperXmlTests {
                 .contains("ORDER BY C.CREATED_AT DESC, C.ID DESC");
 
         assertThat(normalizedSql("findRepliesByParentId", Map.of("parentCommentId", 1L)))
-                .contains("ORDER BY C.CREATED_AT ASC, C.ID ASC")
+                .contains("ORDER BY C.CREATED_AT DESC, C.ID DESC")
                 .contains("C.POST_ID = ?");
 
         assertThat(normalizedSql("insertReply", Map.of("parentCommentId", 1L)))
                 .contains("SELECT PARENT.POST_ID")
                 .contains("PARENT.POST_ID = ?")
                 .contains("PARENT.PARENT_COMMENT_ID IS NULL")
-                .contains("PARENT.STATUS = 'PUBLISHED'");
+                .contains("PARENT.STATUS = 'PUBLISHED'")
+                .contains("JOIN POSTS P ON P.ID = PARENT.POST_ID AND P.STATUS = 'PUBLISHED'");
     }
 
     @Test
