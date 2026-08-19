@@ -11,10 +11,13 @@
     return;
   }
 
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   let currentIndex = 0;
 
   window.setInterval(() => {
-    if (rotation.matches(":hover") || rotation.contains(document.activeElement)) {
+    if (reducedMotion.matches
+        || rotation.matches(":hover")
+        || rotation.contains(document.activeElement)) {
       return;
     }
 
