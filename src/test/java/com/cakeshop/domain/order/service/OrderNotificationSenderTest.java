@@ -37,6 +37,9 @@ class OrderNotificationSenderTest {
     @Mock
     private MemberOrderNotificationQueryService memberOrderNotificationQueryService;
 
+    @Mock
+    private OrderPickupNotificationSender orderPickupNotificationSender;
+
     @InjectMocks
     private OrderNotificationSender orderNotificationSender;
 
@@ -57,6 +60,7 @@ class OrderNotificationSenderTest {
         verify(notificationService).makeNotification(argThat(req ->
                 req.getReceiverId() == adminId && req.getType() == NotificationType.NEW_ORDER
         ));
+        verify(orderPickupNotificationSender).sendInstantPickupReminderTomorrowIfEligible(orderId, customerId);
     }
 
     @Test
@@ -76,6 +80,7 @@ class OrderNotificationSenderTest {
         verify(notificationService).makeNotification(argThat(req ->
                 req.getReceiverId() == adminId && req.getType() == NotificationType.NEW_CUSTOM_ORDER
         ));
+        verify(orderPickupNotificationSender).sendInstantPickupReminderTomorrowIfEligible(orderId, customerId);
     }
 
     @Test

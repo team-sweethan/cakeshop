@@ -59,7 +59,7 @@ public class NotificationDeliveryService {
             return delivery.getId();
         } catch (Exception e) {
             log.error("SMS 발송 시도 사전 예약(PENDING) 실패 (notificationId: {})", notificationId, e);
-            return null;
+            throw new IllegalStateException("SMS 발송 시도 예약 실패: notificationId=" + notificationId, e);
         }
     }
 
