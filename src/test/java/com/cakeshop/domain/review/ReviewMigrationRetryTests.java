@@ -10,6 +10,7 @@ import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.FlywayException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.SingleConnectionDataSource;
@@ -18,6 +19,7 @@ import org.testcontainers.utility.DockerImageName;
 
 // 조각 0 migration 의 두 변경을 다시 다른 ALTER 로 쪼개면 이 테스트가 깨진다. DDL 은 문장 단위로
 // 암시적 커밋되어, 절반만 적용된 스키마가 남으면 데이터를 고쳐도 재실행이 제약 중복으로 막힌다.
+@Tag("mariadb")
 class ReviewMigrationRetryTests {
 
     private static final DockerImageName MARIA_DB_IMAGE = DockerImageName.parse("mariadb:11.4.10");

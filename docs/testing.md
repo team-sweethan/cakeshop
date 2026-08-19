@@ -260,6 +260,9 @@ class ProductMapperTests {
 - 테스트마다 필요한 행을 직접 만들고 transaction rollback 또는 명시적 정리로 격리한다.
 - 컨테이너를 테스트 메서드마다 새로 만들지 않는다.
 - DB 통합 테스트는 병렬 실행하지 않는다.
+- MariaDB Testcontainers를 사용하는 테스트는 공통 `@MariaDbIntegrationTest`를 붙인다. 공통 Spring
+  설정을 쓸 수 없어 컨테이너를 직접 띄우는 테스트는 클래스에 `@Tag("mariadb")`를 붙인다. 이 태그가
+  CI의 `unitTest`와 `mariaDbTest` 분리 경계다.
 
 Spring 기동 실패 자체를 검증하는 등 공통 Context로 만들 수 없는 상태만 테스트가 컨테이너를 직접
 관리할 수 있다. 이 경우 일반 설정을 사용할 수 없는 이유를 클래스에 남긴다.
@@ -318,6 +321,10 @@ Spring 기동 실패 자체를 검증하는 등 공통 Context로 만들 수 없
 개발 중에는 변경 대상 테스트를 먼저 실행하고, 공유 브랜치에 push하거나 PR을 올리기 전에는
 README의 명령으로 전체 테스트를 실행한다. CI 설정과 required check는 workflow와
 [pull-request.md](pull-request.md)를 정본으로 한다.
+
+CI는 DB 없는 `unitTest`와 `mariaDbTest`를 별도 러너에서 병렬 실행한다. `unitTest`만 두 JVM으로
+나누고 `mariaDbTest`는 위의 동시성 규칙대로 한 JVM에서 순차 실행한다. 두 결과는 branch protection의
+기존 필수 체크 이름인 `Test` 잡이 합친다.
 
 - 테스트 실패는 제품 코드 결함, 테스트 결함, 환경 결함 중 무엇인지 먼저 구분한다.
 - 같은 원인의 flaky test를 재실행 횟수로 숨기지 않는다.
