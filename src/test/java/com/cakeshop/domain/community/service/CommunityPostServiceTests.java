@@ -206,13 +206,13 @@ class CommunityPostServiceTests {
         PostListRow post = new PostListRow(
                 1L, AUTHOR_ID, "질문", "제목", 0, 0, 0, CREATED_AT);
 
-        when(communityMapper.findPublishedPosts(3L, PostSort.VIEWS, 20, 40))
+        when(communityMapper.findPublishedPosts(3L, null, PostSort.VIEWS, 20, 40))
                 .thenReturn(List.of(post));
-        when(communityMapper.countPublishedPosts(3L)).thenReturn(45L);
+        when(communityMapper.countPublishedPosts(3L, null)).thenReturn(45L);
         givenAuthors(new MemberCommunityView(AUTHOR_ID, "글쓴이", false));
 
         PageResult<PostListView> result =
-                communityPostService.getPosts(3L, PostSort.VIEWS, new PageRequest(3, 20));
+                communityPostService.getPosts(3L, null, PostSort.VIEWS, new PageRequest(3, 20));
 
         assertThat(result.getContent())
                 .containsExactly(PostListView.of(post, new MemberCommunityView(AUTHOR_ID, "글쓴이", false)));
@@ -226,16 +226,67 @@ class CommunityPostServiceTests {
         PostListRow post = new PostListRow(
                 1L, AUTHOR_ID, "질문", "제목", 0, 0, 0, CREATED_AT);
 
-        when(communityMapper.findPublishedPosts(null, PostSort.LATEST, 20, 0))
+        when(communityMapper.findPublishedPosts(null, null, PostSort.LATEST, 20, 0))
                 .thenReturn(List.of(post));
-        when(communityMapper.countPublishedPosts(null)).thenReturn(1L);
+        when(communityMapper.countPublishedPosts(null, null)).thenReturn(1L);
         givenAuthors();
 
         PageResult<PostListView> result =
-                communityPostService.getPosts(null, PostSort.LATEST, FIRST_PAGE);
+                communityPostService.getPosts(null, null, PostSort.LATEST, FIRST_PAGE);
 
         assertThat(result.getContent()).singleElement()
                 .satisfies(view -> assertThat(view.authorName()).isEqualTo("탈퇴한 회원"));
+    }
+
+    /** 공백뿐인 검색어는 조건이 아니다. */
+    @Test
+    void getPosts_blankKeyword_searchesWithoutCondition() {
+        when(communityMapper.findPublishedPosts(null, null, PostSort.LATEST, 20, 0))
+                .thenReturn(List.of());
+        when(communityMapper.countPublishedPosts(null, null)).thenReturn(0L);
+        givenAuthors();
+
+        communityPostService.getPosts(null, "   ", PostSort.LATEST, FIRST_PAGE);
+
+        verify(communityMapper).findPublishedPosts(null, null, PostSort.LATEST, 20, 0);
+        verify(communityMapper).countPublishedPosts(null, null);
+    }
+
+    /** %·_·!는 글자로 넘긴다. 그대로 두면 %가 전건 검색이 된다. */
+    @Test
+    void getPosts_keyword_escapesLikeWildcardsBeforeQuerying() {
+        when(communityMapper.findPublishedPosts(any(), any(), any(), anyInt(), anyInt()))
+                .thenReturn(List.of());
+        when(communityMapper.countPublishedPosts(any(), any())).thenReturn(0L);
+        givenAuthors();
+
+        communityPostService.getPosts(null, "  50%_할인!  ", PostSort.LATEST, FIRST_PAGE);
+
+        verify(communityMapper)
+                .findPublishedPosts(null, "50!%!_할인!!", PostSort.LATEST, 20, 0);
+        verify(communityMapper).countPublishedPosts(null, "50!%!_할인!!");
+    }
+
+    /** 검색 중에는 인기글 사이드바를 그리지 않는다. */
+    @Test
+    void getPopularSection_searching_returnsEmptySection() {
+        PopularSectionView section =
+                communityPostService.getPopularSection(null, "케이크", FIRST_PAGE);
+
+        assertThat(section.isEmpty()).isTrue();
+        verify(communityPopularPostMapper, never()).findLatestRankingDate();
+        verify(communityPopularPostMapper, never()).findPopularPosts(any(), anyInt());
+    }
+
+    /** 공백뿐인 검색어는 검색이 아니므로 사이드바가 그대로 있다. */
+    @Test
+    void getPopularSection_blankKeyword_stillRendersSection() {
+        givenConfirmedRanking(YESTERDAY, popular(1, 11L));
+
+        PopularSectionView section =
+                communityPostService.getPopularSection(null, "  ", FIRST_PAGE);
+
+        assertThat(section.isEmpty()).isFalse();
     }
 
     private void givenAuthors(MemberCommunityView... authors) {
@@ -247,7 +298,7 @@ class CommunityPostServiceTests {
     void getPopularSection_firstPageWithoutFilter_returnsLatestConfirmedRanking() {
         givenConfirmedRanking(YESTERDAY, popular(1, 11L), popular(2, 22L));
 
-        PopularSectionView section = communityPostService.getPopularSection(null, FIRST_PAGE);
+        PopularSectionView section = communityPostService.getPopularSection(null, null, FIRST_PAGE);
 
         assertThat(section.isEmpty()).isFalse();
         assertThat(section.rankingDate()).isEqualTo(YESTERDAY);
@@ -264,7 +315,7 @@ class CommunityPostServiceTests {
     }, nullValues = "NONE")
     void getPopularSection_filteredOrLaterPage_returnsEmptySection(Long categoryId, int page) {
         PopularSectionView section =
-                communityPostService.getPopularSection(categoryId, new PageRequest(page, 20));
+                communityPostService.getPopularSection(categoryId, null, new PageRequest(page, 20));
 
         assertThat(section.isEmpty()).isTrue();
         assertThat(section.rankingDate()).isNull();
@@ -277,7 +328,7 @@ class CommunityPostServiceTests {
     void getPopularSection_noConfirmedRun_returnsEmptyWithoutQueryingPosts() {
         when(communityPopularPostMapper.findLatestRankingDate()).thenReturn(null);
 
-        PopularSectionView section = communityPostService.getPopularSection(null, FIRST_PAGE);
+        PopularSectionView section = communityPostService.getPopularSection(null, null, FIRST_PAGE);
 
         assertThat(section.isEmpty()).isTrue();
         assertThat(section.rankingDate()).isNull();
@@ -289,7 +340,7 @@ class CommunityPostServiceTests {
     void getPopularSection_everyRankedPostHidden_returnsEmptySection() {
         givenConfirmedRanking(YESTERDAY);
 
-        PopularSectionView section = communityPostService.getPopularSection(null, FIRST_PAGE);
+        PopularSectionView section = communityPostService.getPopularSection(null, null, FIRST_PAGE);
 
         assertThat(section.isEmpty()).isTrue();
         assertThat(section.rankingDate()).isNull();
@@ -316,7 +367,7 @@ class CommunityPostServiceTests {
                 mock(CommunityPostImageService.class));
         givenConfirmedRanking(rankingDate, popular(1, 11L));
 
-        List<String> warnings = warningsWhile(() -> serviceAt.getPopularSection(null, FIRST_PAGE));
+        List<String> warnings = warningsWhile(() -> serviceAt.getPopularSection(null, null, FIRST_PAGE));
 
         assertThat(warnings).hasSize(expectWarning ? 1 : 0);
         assertThat(warnings).allSatisfy(

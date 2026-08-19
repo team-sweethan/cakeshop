@@ -60,11 +60,12 @@ public class CommunityController {
     private final CommunityPostImageService communityPostImageService;
     private final CommunityDetailPage communityDetailPage;
 
-    // 예시 요청: GET /community?categoryId=2&sort=POPULAR&page=3
+    // 예시 요청: GET /community?categoryId=2&keyword=케이크&sort=POPULAR&page=3
     @GetMapping("/community")
     public String list(
-            // 매개변수 3개
+            // 매개변수 4개
             @RequestParam(required = false) String categoryId,
+            @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String sort,
             @RequestParam(required = false) String page,
             Model model
@@ -73,6 +74,7 @@ public class CommunityController {
         // 브라우저에서는 값이 전부 문자열로 들어온다
         // 스프링부트 내부에서는 Long, PortSort, int 같은 의미 있는 타입으로 바꾸는 과정
         Long selectedCategoryId = CommunityRequestParams.positiveLong(categoryId);
+        String selectedKeyword = CommunityRequestParams.keyword(keyword);
         PostSort selectedSort = PostSort.from(sort);
 
         // PageRequest는 "몇 페이지 정보를 몇 개씩 조회할지"에 대한 정보를 담은 객체
@@ -114,8 +116,9 @@ public class CommunityController {
             └─ totalPages : 전체 페이지 수
         */
         PageResult<PostListView> pageResult =
-                // public PageResult<PostListView> getPosts(categoryId, sort, pageRequest)
-                communityPostService.getPosts(selectedCategoryId, selectedSort, pageRequest);
+                // public PageResult<PostListView> getPosts(categoryId, keyword, sort, pageRequest)
+                communityPostService.getPosts(
+                        selectedCategoryId, selectedKeyword, selectedSort, pageRequest);
 
         // Model에 화면 재료 담기
         // model.addAttribute("타임리프에서 쓰일 변수 이름", controller에서 사용되는 객체 이름)
@@ -126,12 +129,14 @@ public class CommunityController {
         );
         model.addAttribute("categories", communityPostService.getActiveCategories());
         model.addAttribute("selectedCategoryId", selectedCategoryId);
+        model.addAttribute("selectedKeyword", selectedKeyword);
         model.addAttribute("selectedSort", selectedSort);
         model.addAttribute("sortOptions", PostSort.values());
 
         model.addAttribute(
                 "popularSection",
-                communityPostService.getPopularSection(selectedCategoryId, pageRequest)
+                communityPostService.getPopularSection(
+                        selectedCategoryId, selectedKeyword, pageRequest)
         );
 
         // Thymeleaf HTML 반환

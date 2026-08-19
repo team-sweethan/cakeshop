@@ -56,17 +56,21 @@ public class CommunityPostService {
     @Transactional(readOnly = true)
     public PageResult<PostListView> getPosts(
             Long categoryId,
+            String keyword,
             PostSort sort,
             PageRequest pageRequest
     ) {
+        String searchKeyword = searchKeyword(keyword);
+
         List<PostListRow> rows = communityMapper.findPublishedPosts(
                 categoryId,
+                searchKeyword,
                 sort,
                 pageRequest.getSize(),
                 pageRequest.getOffset()
         );
 
-        long totalElements = communityMapper.countPublishedPosts(categoryId);
+        long totalElements = communityMapper.countPublishedPosts(categoryId, searchKeyword);
 
         Map<Long, MemberCommunityView> authors =
                 communityMemberViewLoader.findByIds(rows.stream().map(PostListRow::memberId));
@@ -78,13 +82,44 @@ public class CommunityPostService {
         return new PageResult<>(posts, pageRequest, totalElements);
     }
 
+    /**
+     * 좁혀 놓은 화면에는 전체 인기글을 싣지 않는다(B5·B6). 검색어가 붙은 화면에 전체 순위가
+     * 뜨면 조건이 안 먹은 것처럼 보이고, 그건 카테고리 필터를 걸었을 때와 같은 상황이다.
+     */
     @Transactional(readOnly = true)
-    public PopularSectionView getPopularSection(Long categoryId, PageRequest pageRequest) {
-        if (categoryId != null || pageRequest.getPage() != FIRST_PAGE) {
+    public PopularSectionView getPopularSection(
+            Long categoryId,
+            String keyword,
+            PageRequest pageRequest
+    ) {
+        if (categoryId != null
+                || searchKeyword(keyword) != null
+                || pageRequest.getPage() != FIRST_PAGE) {
             return PopularSectionView.empty();
         }
 
         return popularPostReader.read(POPULAR_POST_LIMIT);
+    }
+
+    /**
+     * 검색어를 조건으로 쓸 수 있는 형태로 만든다. 공백뿐이면 {@code null}이고, 그것은
+     * "조건을 걸지 않는다"는 뜻이다 — "걸었는데 0건"과는 다른 화면이 되어야 한다(B6).
+     *
+     * <p>{@code %}·{@code _}를 글자로 만드는 것이 여기 있는 이유는, 이스케이프가 빠지면
+     * 검색이 <b>더 잘 되는 것처럼</b> 보이기 때문이다. 결과가 많이 나오는 것을 사용자도
+     * 고장으로 읽지 않는다.
+     */
+    private static String searchKeyword(String keyword) {
+        if (keyword == null || keyword.isBlank()) {
+            return null;
+        }
+
+        return escapeLikeKeyword(keyword.trim());
+    }
+
+    // '!' 를 먼저 바꾸지 않으면 뒤에서 만들어 낸 '!%' 를 다시 이스케이프해 패턴이 어긋난다.
+    private static String escapeLikeKeyword(String keyword) {
+        return keyword.replace("!", "!!").replace("%", "!%").replace("_", "!_");
     }
 
     @Transactional

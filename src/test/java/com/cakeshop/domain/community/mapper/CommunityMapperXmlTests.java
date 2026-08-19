@@ -122,6 +122,25 @@ class CommunityMapperXmlTests {
     }
 
     @Test
+    void publishedPostQueries_applyKeywordToBothListAndCount() {
+        for (String statement : new String[]{"findPublishedPosts", "countPublishedPosts"}) {
+            assertThat(normalizedSql(statement, Map.of("keyword", "케이크")))
+                    .as(statement)
+                    .contains("P.TITLE LIKE CONCAT('%', ?, '%') ESCAPE '!'")
+                    .contains("P.CONTENT LIKE CONCAT('%', ?, '%') ESCAPE '!'");
+        }
+    }
+
+    @Test
+    void publishedPostQueries_omitKeywordConditionWhenNotSearching() {
+        for (String statement : new String[]{"findPublishedPosts", "countPublishedPosts"}) {
+            assertThat(normalizedSql(statement))
+                    .as(statement)
+                    .doesNotContain("LIKE CONCAT");
+        }
+    }
+
+    @Test
     void publishedPostQueries_judgeVisibilityByStatusOnly() {
         for (String statement : new String[]{"findPublishedPosts", "countPublishedPosts"}) {
             assertThat(normalizedSql(statement))
@@ -274,6 +293,7 @@ class CommunityMapperXmlTests {
     private String normalizedSql(String statementId, Map<String, Object> overrides) {
         Map<String, Object> parameters = new HashMap<>();
         parameters.put("categoryId", null);
+        parameters.put("keyword", null);
         parameters.put("postId", 1L);
         parameters.put("commentId", 1L);
         parameters.put("memberId", 1L);

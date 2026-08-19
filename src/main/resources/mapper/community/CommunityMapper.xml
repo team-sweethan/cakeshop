@@ -16,6 +16,11 @@
         <if test="categoryId != null">
             AND p.category_id = #{categoryId}
         </if>
+
+        <if test="keyword != null">
+            AND (p.title LIKE CONCAT('%', #{keyword}, '%') ESCAPE '!'
+            OR p.content LIKE CONCAT('%', #{keyword}, '%') ESCAPE '!')
+        </if>
     </sql>
 
     <select id="findPublishedPosts"

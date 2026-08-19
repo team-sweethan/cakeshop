@@ -1,7 +1,7 @@
 package com.cakeshop.domain.community.controller;
 
 /*
- * 주소로 들어온 숫자 파라미터를 읽는다.
+ * 주소로 들어온 파라미터를 읽는다.
  *
  * <p>쪽 번호·분류 번호·댓글 상한은 모두 사용자가 주소창에 무엇이든 적을 수 있는 값이라, 잘못된
  * 값은 <b>거절이 아니라 "지정하지 않음"</b>으로 다룬다. 없는 쪽을 요청했다고 오류 화면을 띄우면
@@ -24,6 +24,15 @@ final class CommunityRequestParams {
         }
 
         return parsed.intValue();
+    }
+
+    /** 비었거나 공백뿐이면 {@code null}. 조건을 걸지 않는다는 뜻이다. */
+    static String keyword(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+
+        return value.trim();
     }
 
     /** 양수가 아니거나 숫자가 아니면 {@code null}. */

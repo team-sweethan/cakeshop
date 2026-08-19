@@ -157,6 +157,57 @@ class CommunityMapperTests {
                 .isEqualTo(2L);
     }
 
+    /** 제목과 본문 어느 쪽에 있어도 찾는다. */
+    @Test
+    void findPublishedPosts_keyword_matchesTitleOrContent() {
+        long inTitle = insertPost("딸기 케이크 후기", "본문");
+        long inContent = insertPost("주말 기록", "딸기 케이크를 구웠다");
+        insertPost("초코 타르트", "본문");
+
+        assertThat(search("케이크")).containsExactlyInAnyOrder(inTitle, inContent);
+    }
+
+    /** 검색어의 %는 와일드카드가 아니라 글자다. */
+    @Test
+    void findPublishedPosts_percentInKeyword_isMatchedLiterally() {
+        long withPercent = insertPost("할인 20% 행사", "본문");
+        insertPost("그냥 글", "본문");
+        insertPost("또 다른 글", "본문");
+
+        assertThat(search("!%")).containsExactly(withPercent);
+    }
+
+    /** 검색어의 _도 아무 글자 하나가 아니라 글자다. */
+    @Test
+    void findPublishedPosts_underscoreInKeyword_isMatchedLiterally() {
+        long withUnderscore = insertPost("파일명 cake_2026", "본문");
+        insertPost("cake2026", "본문");
+
+        assertThat(search("e!_2")).containsExactly(withUnderscore);
+    }
+
+    /** 검색은 노출 조건을 대신하지 않는다. */
+    @Test
+    void findPublishedPosts_keyword_stillExcludesHiddenPosts() {
+        long published = insertPost("케이크 노출", "본문");
+        insertPost(memberId, categoryId, "케이크 삭제됨", PostStatus.DELETED, BASE_TIME);
+        insertPost(memberId, categoryId, "케이크 차단됨", PostStatus.BLOCKED, BASE_TIME);
+
+        assertThat(search("케이크")).containsExactly(published);
+    }
+
+    /** 목록과 총 건수가 같은 조건을 본다. */
+    @Test
+    void countPublishedPosts_keyword_matchesListResult() {
+        insertPost("케이크 하나", "본문");
+        insertPost("케이크 둘", "본문");
+        insertPost("타르트", "본문");
+
+        assertThat(communityMapper.countPublishedPosts(categoryId, "케이크"))
+                .isEqualTo(search("케이크").size())
+                .isEqualTo(2);
+    }
+
     @Test
     void findPublishedPosts_categoryFilter_returnsOnlyThatCategory() {
         insertPost("이 카테고리", PostStatus.PUBLISHED, BASE_TIME);
@@ -165,7 +216,7 @@ class CommunityMapperTests {
 
         assertThat(findPage(1, 20)).extracting(PostListRow::title)
                 .containsExactly("이 카테고리");
-        assertThat(communityMapper.countPublishedPosts(categoryId)).isEqualTo(1);
+        assertThat(communityMapper.countPublishedPosts(categoryId, null)).isEqualTo(1);
     }
 
     /** 노출 여부는 Service가 판단하므로 숨겨진 글도 상태와 차단 사유를 그대로 반환한다. */
@@ -667,12 +718,33 @@ class CommunityMapperTests {
         return new PostUpdateCommand(postId, authorId, postCategoryId, title, content);
     }
 
+    private long insertPost(String title, String content) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO posts (
+                    member_id, category_id, title, content, status, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, 'PUBLISHED', ?, ?)
+                """,
+                memberId, categoryId, title, content, BASE_TIME, BASE_TIME);
+
+        return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+    }
+
+    private List<Long> search(String keyword) {
+        return communityMapper
+                .findPublishedPosts(categoryId, keyword, PostSort.LATEST, 20, 0)
+                .stream()
+                .map(PostListRow::id)
+                .toList();
+    }
+
     private List<PostListRow> findPage(int page, int size) {
         return findPage(page, size, PostSort.LATEST);
     }
 
     private List<PostListRow> findPage(int page, int size, PostSort sort) {
-        return communityMapper.findPublishedPosts(categoryId, sort, size, (page - 1) * size);
+        return communityMapper.findPublishedPosts(categoryId, null, sort, size, (page - 1) * size);
     }
 
     private void setViewCount(long postId, long viewCount) {

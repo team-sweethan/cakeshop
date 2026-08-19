@@ -124,13 +124,13 @@ class CommunityQueryCountTests {
         insertPosts(3, 2);
 
         queryCounter.reset();
-        communityPostService.getPosts(categoryId, PostSort.LATEST, new PageRequest(1, 20));
+        communityPostService.getPosts(categoryId, null, PostSort.LATEST, new PageRequest(1, 20));
         int withFewPosts = queryCounter.count();
 
         insertPosts(20, 2);
 
         queryCounter.reset();
-        communityPostService.getPosts(categoryId, PostSort.LATEST, new PageRequest(1, 20));
+        communityPostService.getPosts(categoryId, null, PostSort.LATEST, new PageRequest(1, 20));
         int withManyPosts = queryCounter.count();
 
         assertThat(withFewPosts).isEqualTo(EXPECTED_QUERY_COUNT);
