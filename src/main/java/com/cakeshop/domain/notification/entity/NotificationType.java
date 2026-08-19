@@ -19,7 +19,7 @@ public enum NotificationType {
     CUSTOMER_COMMENT_REPLY("답글 알림", "%s님이 회원님의 댓글에 답글을 남겼습니다."),
     CUSTOMER_REVIEW("리뷰 답글 알림", "사장님이 회원님의 리뷰에 답글을 남겼습니다."),
     COUPON("쿠폰 발급", "%s 쿠폰이 발급되었습니다."),
-    COUPON_EXPIRING_SOON("쿠폰 만료 임박", "%s 쿠폰의 사용 기한이 3일 남았습니다. 잊지 말고 사용하세요!"),
+    COUPON_EXPIRING_SOON("쿠폰 만료 임박", "%s 쿠폰의 사용 기한이 %s 남았습니다. 잊지 말고 사용하세요!"),
 
     // === 관리자 관련 알림 (11종) ===
     NEW_ORDER("신규 주문", "새로운 일반 케이크 주문이 접수되었습니다."),

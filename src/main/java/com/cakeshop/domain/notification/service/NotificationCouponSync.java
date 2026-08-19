@@ -6,7 +6,12 @@ import com.cakeshop.domain.member.service.MemberNotificationQueryService;
 import com.cakeshop.domain.notification.dto.form.NotificationRequest;
 import com.cakeshop.domain.notification.entity.DeliveryScope;
 import com.cakeshop.domain.notification.entity.NotificationType;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.RequiredArgsConstructor;
@@ -30,10 +35,13 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class NotificationCouponSync {
 
+    private static final DateTimeFormatter EXPIRE_KEY_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHHmm");
+
     private final CouponNotificationQueryService couponNotificationQueryService;
     private final NotificationCouponQueryService notificationCouponQueryService;
     private final MemberNotificationQueryService memberNotificationQueryService;
     private final NotificationService notificationService;
+    private final Clock clock;
 
     private final AtomicBoolean isRunning = new AtomicBoolean(false);
 
@@ -56,7 +64,7 @@ public class NotificationCouponSync {
             while (loopCount < MAX_LOOPS_PER_RUN) {
                 loopCount++;
 
-                // 만료 3일 이내인 유효 쿠폰 목록 복합 커서 조회
+                // 만료 3일 이내인 유효 쿠폰 중 미발송 대상 목록 복합 커서 조회
                 List<CouponNotificationView> expiringCoupons = couponNotificationQueryService.findExpiringMemberCoupons(
                         3, currentCursorTime, currentCursorId, PAGE_SIZE
                 );
@@ -68,35 +76,42 @@ public class NotificationCouponSync {
                 boolean hadErrorInBatch = false;
 
                 for (CouponNotificationView coupon : expiringCoupons) {
-                    if (coupon.memberCouponId() == null || coupon.memberId() == null) {
+                    if (coupon.memberCouponId() == null || coupon.memberId() == null || coupon.expiresAt() == null) {
                         continue;
                     }
 
                     Long memberId = coupon.memberId();
                     Long memberCouponId = coupon.memberCouponId();
+                    LocalDateTime expiresAt = coupon.expiresAt();
                     String couponName = (coupon.couponName() != null && !coupon.couponName().isBlank()) ? coupon.couponName() : "할인";
 
                     try {
                         // 발송 직전 회원 활성 상태 재검증
                         if (!memberNotificationQueryService.isMemberActive(memberId)) {
-                            currentCursorTime = coupon.expiresAt();
+                            currentCursorTime = expiresAt;
                             currentCursorId = memberCouponId;
                             continue;
                         }
 
-                        // 이미 만료 알림이 발송 완료되었거나 2회 상한에 도달한 건이면 스킵
-                        if (!notificationCouponQueryService.isCouponExpiringNotificationSentOrInactive(memberId, memberCouponId)) {
+                        // 이미 만료 알림이 발송 완료되었거나 2회 상한에 도달한 건이면 스킵 (연장 시 새 키 발송)
+                        if (!notificationCouponQueryService.isCouponExpiringNotificationSentOrInactive(memberId, memberCouponId, expiresAt)) {
+                            String expireKey = EXPIRE_KEY_FORMAT.format(expiresAt);
+                            String eventKey = NotificationType.COUPON_EXPIRING_SOON.name() + ":" + memberId + ":" + memberCouponId + ":" + expireKey;
+
+                            // 실제 남은 기간에 맞게 동적 포맷팅
+                            String remainingText = calculateRemainingText(expiresAt);
+
                             notificationService.makeNotification(NotificationRequest.builder()
                                     .receiverId(memberId)
                                     .userCouponId(memberCouponId)
                                     .type(NotificationType.COUPON_EXPIRING_SOON)
-                                    .eventKey(NotificationType.COUPON_EXPIRING_SOON.name() + ":" + memberId + ":" + memberCouponId)
+                                    .eventKey(eventKey)
                                     .deliveryScope(DeliveryScope.WEB_AND_SMS)
-                                    .args(new Object[]{couponName})
+                                    .args(new Object[]{couponName, remainingText})
                                     .build());
                         }
 
-                        currentCursorTime = coupon.expiresAt();
+                        currentCursorTime = expiresAt;
                         currentCursorId = memberCouponId;
 
                     } catch (Exception e) {
@@ -120,5 +135,22 @@ public class NotificationCouponSync {
         } finally {
             isRunning.set(false);
         }
+    }
+
+    private String calculateRemainingText(LocalDateTime expiresAt) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        LocalDate today = now.toLocalDate();
+        LocalDate expireDate = expiresAt.toLocalDate();
+        long daysBetween = ChronoUnit.DAYS.between(today, expireDate);
+
+        if (daysBetween >= 1) {
+            return daysBetween + "일";
+        }
+
+        long hoursBetween = Duration.between(now, expiresAt).toHours();
+        if (hoursBetween >= 1) {
+            return hoursBetween + "시간";
+        }
+        return "곧";
     }
 }

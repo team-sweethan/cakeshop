@@ -85,29 +85,10 @@ public class NotificationService {
                     registerSmsSending(bundleId, receiverPhone, title, content, Integer.MAX_VALUE);
                 }
             } else {
-                // 일반 알림(주문/쿠폰 등) 중복 시에도 웹소켓 전파 복구 및 기존 SMS 미완료 시 재발송
-                Long existingId = notificationMapper.findIdByReceiverIdAndEventKey(request.getReceiverId(), eventKey);
-                if (existingId != null) {
-                    LocalDateTime now = LocalDateTime.now();
-                    NotificationResponse retryResponse = NotificationResponse.builder()
-                            .id(existingId)
-                            .type(request.getType())
-                            .title(title)
-                            .content(content)
-                            .isRead(false)
-                            .createdAt(now)
-                            .orderId(request.getOrderId())
-                            .chatRoomId(request.getChatRoomId())
-                            .commentId(request.getCommentId())
-                            .postId(request.getPostId())
-                            .reviewId(request.getReviewId())
-                            .userCouponId(request.getUserCouponId())
-                            .lastEventAt(now)
-                            .build();
-                    registerWebSocketSending(request.getReceiverId(), retryResponse);
-
-                    if (scope == DeliveryScope.WEB_AND_SMS && request.getReceiverId() != null
-                            && !notificationMapper.hasSentDelivery(existingId)
+                // 일반 알림(주문/쿠폰 등) 중복 시 웹 토스트는 이미 최초 생성 시 안전하게 전파되었으므로 중복 토스트를 띄우지 않고, 기존 SMS 미완료 시에만 재발송
+                if (scope == DeliveryScope.WEB_AND_SMS && request.getReceiverId() != null) {
+                    Long existingId = notificationMapper.findIdByReceiverIdAndEventKey(request.getReceiverId(), eventKey);
+                    if (existingId != null && !notificationMapper.hasSentDelivery(existingId)
                             && notificationMapper.countDeliveryAttempts(existingId) < 2) {
                         String receiverPhone = notificationMapper.findReceiverPhone(request.getReceiverId(), request.getOrderId());
                         registerSmsSending(existingId, receiverPhone, title, content, 2);

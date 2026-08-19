@@ -7,7 +7,7 @@
  * 담당자 : 이정후
  * 작성일 : 2026-08-19
  * 기능 : 쿠폰 만료 알림용 연동 SQL 매퍼
- * 설명 : member_coupons 테이블과 coupons 테이블을 조인하여 만료 임박(3일 이내) 유효 쿠폰 목록을 복합 커서로 조회한다.
+ * 설명 : member_coupons 테이블과 coupons 테이블을 조인하여 만료 임박(3일 이내) 유효 쿠폰 중 미발송 대상을 복합 커서로 조회한다.
  * ******************************
  */-->
 <mapper namespace="com.cakeshop.domain.coupon.mapper.CouponNotificationMapper">
@@ -21,11 +21,15 @@
             c.expires_at AS expiresAt
         FROM member_coupons mc
         INNER JOIN coupons c ON c.id = mc.coupon_id
+        LEFT JOIN notifications n ON n.receiver_id = mc.member_id
+             AND n.user_coupon_id = mc.id
+             AND n.event_key = CONCAT('COUPON_EXPIRING_SOON:', mc.member_id, ':', mc.id, ':', DATE_FORMAT(c.expires_at, '%Y%m%d%H%i'))
         WHERE mc.status = 'AVAILABLE'
           AND c.status = 'ACTIVE'
           AND c.starts_at &lt;= NOW(6)
           AND c.expires_at &gt; NOW(6)
           AND c.expires_at &lt;= DATE_ADD(NOW(6), INTERVAL #{days} DAY)
+          AND n.id IS NULL
           <if test="lastExpiresAt != null and lastMemberCouponId != null">
               AND (
                   c.expires_at &gt; #{lastExpiresAt}

@@ -3,6 +3,8 @@ package com.cakeshop.domain.notification.service;
 import com.cakeshop.domain.member.service.MemberNotificationQueryService;
 import com.cakeshop.domain.notification.entity.NotificationType;
 import com.cakeshop.domain.notification.mapper.NotificationMapper;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 담당자 : 김민정
  * 작성일 : 2026-08-19
  * 기능 : 쿠폰 알림 전용 멱등성 및 상태 확인 서비스
- * 설명 : 쿠폰 만료 임박 알림이 이미 전송되었는지 또는 수신 회원이 비활성 상태인지 검증한다.
+ * 설명 : 쿠폰 만료 임박 알림이 이미 전송되었는지 또는 수신 회원이 비활성 상태인지 검증한다. (만료일 연장 시 재알림 지원)
  * ******************************
  */
 @Service
@@ -21,15 +23,17 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class NotificationCouponQueryService {
 
+    private static final DateTimeFormatter EXPIRE_KEY_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHHmm");
+
     private final NotificationMapper notificationMapper;
     private final MemberNotificationQueryService memberNotificationQueryService;
 
     /**
      * 특정 회원에게 해당 쿠폰 만료 임박 알림이 이미 전송되었거나 비활성 회원인지 검사한다.
-     * (전송되었거나 비활성이면 true 반환하여 발송을 스킵)
+     * (만료일시가 연장된 경우 새로운 이벤트 키로 간주하여 새 알림 발송을 허용)
      */
-    public boolean isCouponExpiringNotificationSentOrInactive(Long memberId, Long memberCouponId) {
-        if (memberId == null || memberCouponId == null) {
+    public boolean isCouponExpiringNotificationSentOrInactive(Long memberId, Long memberCouponId, LocalDateTime expiresAt) {
+        if (memberId == null || memberCouponId == null || expiresAt == null) {
             return true;
         }
 
@@ -38,7 +42,8 @@ public class NotificationCouponQueryService {
             return true;
         }
 
-        String eventKey = NotificationType.COUPON_EXPIRING_SOON.name() + ":" + memberId + ":" + memberCouponId;
+        String expireKey = EXPIRE_KEY_FORMAT.format(expiresAt);
+        String eventKey = NotificationType.COUPON_EXPIRING_SOON.name() + ":" + memberId + ":" + memberCouponId + ":" + expireKey;
         Long notificationId = notificationMapper.findIdByReceiverIdAndEventKey(memberId, eventKey);
         if (notificationId == null) {
             return false;
