@@ -26,12 +26,15 @@ class RdsDemoSeedIntegrationTests {
     private static final String TEST_ADMIN_HASH =
             new BCryptPasswordEncoder().encode("rds-demo-test-only-password");
     private static final String INVALID_ADMIN_HASH = "$2a$10$" + "!".repeat(53);
+    private static final String COST_31_ADMIN_HASH =
+            TEST_ADMIN_HASH.substring(0, 4) + "31" + TEST_ADMIN_HASH.substring(6);
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @Test
     void seed_usesValidAdminHashAndOnlyTargetsIdentifiedProducts() {
+        changeDatabaseDefaultCharsetToLatin1();
         runSeed();
 
         assertThat(jdbcTemplate.queryForObject(
@@ -127,6 +130,7 @@ class RdsDemoSeedIntegrationTests {
 
         assertInvalidAdminHashIsRejected(INVALID_ADMIN_HASH);
         assertInvalidAdminHashIsRejected(TEST_ADMIN_HASH + "\n");
+        assertInvalidAdminHashIsRejected(COST_31_ADMIN_HASH);
     }
 
     private void runSeed() {
@@ -164,6 +168,16 @@ class RdsDemoSeedIntegrationTests {
                 .isInstanceOf(ScriptException.class);
         assertThat(count("SELECT COUNT(*) FROM members")).isEqualTo(memberCount);
         assertThat(count("SELECT COUNT(*) FROM products")).isEqualTo(productCount);
+    }
+
+    private void changeDatabaseDefaultCharsetToLatin1() {
+        String databaseName = jdbcTemplate.queryForObject("SELECT DATABASE()", String.class);
+        if (databaseName == null || !databaseName.matches("[A-Za-z0-9_]+")) {
+            throw new IllegalStateException("Unexpected test database name: " + databaseName);
+        }
+        jdbcTemplate.execute(
+                "ALTER DATABASE `%s` CHARACTER SET latin1 COLLATE latin1_swedish_ci"
+                        .formatted(databaseName));
     }
 
     private void insertSameNamedProductsOutsideSeedIdentity() {

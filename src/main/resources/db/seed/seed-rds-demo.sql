@@ -4,8 +4,9 @@
 -- 운영 DB에는 실행하지 않는다.
 -- Flyway migration을 모두 적용한 뒤 MariaDB 클라이언트의 일회성 batch로 수동 실행한다.
 -- 대화형 접속에서 SOURCE만 실행하면 오류 후 미커밋 트랜잭션이 세션에 남으므로 금지한다.
--- 관리자 해시 설정과 SOURCE를 하나의 --execute 입력으로 전달하고,
--- --abort-source-on-error를 사용해 성공 또는 실패 직후 클라이언트 연결이 종료되게 한다.
+-- 관리자 해시 설정과 SOURCE만 담은 권한 제한 입력을 표준 입력으로 전달한다.
+-- 해시를 --execute 인자나 셸 명령문에 직접 넣지 않는다.
+-- --batch --abort-source-on-error를 사용하고 입력 종료 후 클라이언트 연결도 종료한다.
 -- 실행 전 같은 DB 세션의 @rds_demo_admin_password_hash 변수에
 -- 이 환경에서만 사용하는 BCrypt 해시를 설정해야 한다.
 -- 비밀번호 원문과 해시는 저장소에 커밋하지 않는다.
@@ -16,13 +17,14 @@
 
 SET time_zone = '+09:00';
 
+-- 애플리케이션의 BCryptPasswordEncoder 기본 strength와 같은 cost 10만 허용한다.
 CREATE TEMPORARY TABLE `_rds_demo_seed_config` (
     `admin_password_hash` VARCHAR(255) NOT NULL,
     CONSTRAINT `chk_rds_demo_admin_password_hash`
         CHECK (
             CHAR_LENGTH(`admin_password_hash`) = 60
             AND CAST(`admin_password_hash` AS BINARY) REGEXP
-                '^[$]2[aby][$](0[4-9]|[12][0-9]|3[01])[$][./A-Za-z0-9]{53}$'
+                '^[$]2[aby][$]10[$][./A-Za-z0-9]{53}$'
         )
 );
 
@@ -498,7 +500,7 @@ WHERE c.`code` = 'CAKE'
 CREATE TEMPORARY TABLE `_rds_demo_seed_products` (
     `product_id` BIGINT NOT NULL PRIMARY KEY,
     `product_name` VARCHAR(255) NOT NULL UNIQUE
-);
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO `_rds_demo_seed_products` (`product_id`, `product_name`)
 SELECT
@@ -578,7 +580,7 @@ CREATE TEMPORARY TABLE `_rds_demo_seed_option_groups` (
     `product_name` VARCHAR(150) NOT NULL,
     `group_name` VARCHAR(100) NOT NULL,
     UNIQUE (`product_name`, `group_name`)
-);
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO `_rds_demo_seed_option_groups`
     (`option_group_id`, `product_name`, `group_name`)
