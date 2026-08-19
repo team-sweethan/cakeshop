@@ -8,6 +8,7 @@ import com.cakeshop.domain.order.dto.view.customer.CustomOrderCheckoutView;
 import com.cakeshop.domain.order.dto.view.customer.CartOrderCheckoutView;
 import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView;
 import com.cakeshop.domain.order.dto.view.customer.OrderCreationResult;
+import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
 import com.cakeshop.domain.order.service.customer.CustomerCustomOrderService;
 import com.cakeshop.domain.order.controller.customer.OrderController;
@@ -324,6 +325,59 @@ class OrderControllerTests {
         verify(pendingPaymentOrderGuideService).verifyNewOrderIntentTarget(10L, 42L);
         verify(orderService).createGeneralOrderAfterPendingPaymentGuide(eq(10L), any());
         verify(orderService).createGeneralOrder(eq(10L), any());
+    }
+
+    @Test
+    void startNewOrderAfterPendingPaymentGuide_retainsIntentWhenDisplayedAmountChanges()
+            throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        GeneralOrderCheckoutView checkout = mock(GeneralOrderCheckoutView.class);
+        when(checkout.totalAmount()).thenReturn(BigDecimal.valueOf(40_000));
+        when(orderCheckoutService.getGeneralCheckout(1L, 2, List.of(101L))).thenReturn(checkout);
+        when(orderService.createGeneralOrderAfterPendingPaymentGuide(eq(10L), any()))
+                .thenThrow(new com.cakeshop.global.error.BusinessException(
+                        OrderErrorCode.ORDER_AMOUNT_CHANGED
+                ))
+                .thenReturn(OrderCreationResult.paymentReady(45L));
+
+        mockMvc.perform(post("/orders/42/pending-payment/new-order")
+                        .session(session)
+                        .param("newOrderUrl", "/orders/checkout?productId=1&quantity=2&optionIds=101"))
+                .andExpect(status().is3xxRedirection());
+
+        mockMvc.perform(post("/orders/general")
+                        .session(session)
+                        .param("requestKey", UUID.randomUUID().toString())
+                        .param("productId", "1")
+                        .param("quantity", "2")
+                        .param("optionIds", "101")
+                        .param("displayedOriginalAmount", "30000")
+                        .param("ordererName", "홍길동")
+                        .param("ordererPhone", "010-1111-2222")
+                        .param("pickupName", "홍길동")
+                        .param("pickupPhone", "010-1111-2222")
+                        .param("pickupAt", "2099-08-05T14:00"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("customer/order/form"));
+
+        mockMvc.perform(post("/orders/general")
+                        .session(session)
+                        .param("requestKey", UUID.randomUUID().toString())
+                        .param("productId", "1")
+                        .param("quantity", "2")
+                        .param("optionIds", "101")
+                        .param("displayedOriginalAmount", "40000")
+                        .param("ordererName", "홍길동")
+                        .param("ordererPhone", "010-1111-2222")
+                        .param("pickupName", "홍길동")
+                        .param("pickupPhone", "010-1111-2222")
+                        .param("pickupAt", "2099-08-05T14:00"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/orders/45/payment"));
+
+        verify(orderService, org.mockito.Mockito.times(2))
+                .createGeneralOrderAfterPendingPaymentGuide(eq(10L), any());
+        verify(orderService, org.mockito.Mockito.never()).createGeneralOrder(eq(10L), any());
     }
 
     @Test

@@ -39,14 +39,13 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 
 @Controller
 @RequestMapping("/orders")
 @RequiredArgsConstructor
 public class OrderController {
 
-    private static final String NEW_ORDER_INTENT_SESSION_KEY =
-            OrderController.class.getName() + ".newOrderIntent";
     private static final Set<String> NEW_ORDER_FORM_PATHS = Set.of(
             "/orders/checkout",
             "/orders/checkout/cart",
@@ -104,9 +103,13 @@ public class OrderController {
             return renderCustomOrderForm(form, model, memberId);
         }
         try {
-            OrderCreationResult result = consumeNewOrderIntent(session, memberId)
-                    ? customerCustomOrderService.createCustomOrderAfterPendingPaymentGuide(memberId, form)
-                    : customerCustomOrderService.createCustomOrder(memberId, form);
+            OrderCreationResult result = createWithNewOrderIntent(
+                    session,
+                    memberId,
+                    useNewOrderIntent -> useNewOrderIntent
+                            ? customerCustomOrderService.createCustomOrderAfterPendingPaymentGuide(memberId, form)
+                            : customerCustomOrderService.createCustomOrder(memberId, form)
+            );
             return paymentRedirectOrPendingGuide(
                     result,
                     model,
@@ -172,9 +175,13 @@ public class OrderController {
         long memberId = requireMemberId(member);
 
         try {
-            OrderCreationResult result = consumeNewOrderIntent(session, memberId)
-                    ? orderService.createGeneralOrderAfterPendingPaymentGuide(memberId, form)
-                    : orderService.createGeneralOrder(memberId, form);
+            OrderCreationResult result = createWithNewOrderIntent(
+                    session,
+                    memberId,
+                    useNewOrderIntent -> useNewOrderIntent
+                            ? orderService.createGeneralOrderAfterPendingPaymentGuide(memberId, form)
+                            : orderService.createGeneralOrder(memberId, form)
+            );
             return paymentRedirectOrPendingGuide(
                     result,
                     model,
@@ -203,9 +210,13 @@ public class OrderController {
             return renderCartOrderForm(form, model, memberId);
         }
         try {
-            OrderCreationResult result = consumeNewOrderIntent(session, memberId)
-                    ? orderService.createCartOrderAfterPendingPaymentGuide(memberId, form)
-                    : orderService.createCartOrder(memberId, form);
+            OrderCreationResult result = createWithNewOrderIntent(
+                    session,
+                    memberId,
+                    useNewOrderIntent -> useNewOrderIntent
+                            ? orderService.createCartOrderAfterPendingPaymentGuide(memberId, form)
+                            : orderService.createCartOrder(memberId, form)
+            );
             return paymentRedirectOrPendingGuide(
                     result,
                     model,
@@ -231,7 +242,7 @@ public class OrderController {
         long memberId = requireMemberId(member);
         String targetUrl = validatedNewOrderUrl(newOrderUrl);
         pendingPaymentOrderGuideService.verifyNewOrderIntentTarget(memberId, orderId);
-        session.setAttribute(NEW_ORDER_INTENT_SESSION_KEY, new PendingPaymentNewOrderIntent(memberId));
+        PendingPaymentNewOrderIntentSession.issue(session, memberId);
         return "redirect:" + targetUrl;
     }
 
@@ -364,10 +375,30 @@ public class OrderController {
                 .toUriString();
     }
 
-    private boolean consumeNewOrderIntent(HttpSession session, long memberId) {
-        Object value = session.getAttribute(NEW_ORDER_INTENT_SESSION_KEY);
-        session.removeAttribute(NEW_ORDER_INTENT_SESSION_KEY);
-        return value instanceof PendingPaymentNewOrderIntent intent && intent.memberId() == memberId;
+    /** 새 주문 의도는 한 요청만 예약하고, 주문 생성 성공 때만 세션에서 소비한다. */
+    private OrderCreationResult createWithNewOrderIntent(
+            HttpSession session,
+            long memberId,
+            Function<Boolean, OrderCreationResult> orderCreator
+    ) {
+        PendingPaymentNewOrderIntentSession.Reservation reservation =
+                PendingPaymentNewOrderIntentSession.reserve(session, memberId);
+        try {
+            OrderCreationResult result = orderCreator.apply(reservation != null);
+            if (reservation != null) {
+                if (result.requiresPendingPaymentGuide()) {
+                    PendingPaymentNewOrderIntentSession.release(session, reservation);
+                } else {
+                    PendingPaymentNewOrderIntentSession.complete(session, reservation);
+                }
+            }
+            return result;
+        } catch (RuntimeException exception) {
+            if (reservation != null) {
+                PendingPaymentNewOrderIntentSession.release(session, reservation);
+            }
+            throw exception;
+        }
     }
 
     /** 주문서 GET 경로만 허용해 새 주문 의도 발급 경로를 외부 리다이렉트에 사용하지 못하게 한다. */
@@ -434,6 +465,4 @@ public class OrderController {
         return member.getMemberId();
     }
 
-    private record PendingPaymentNewOrderIntent(long memberId) {
-    }
 }
