@@ -19,15 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-/**
- * ******************************
- * 작성자 : 김민정
- * 담당자 : 김민정
- * 작성일 : 2026-08-04
- * 기능 : 알림 생성, 조회, 읽음 처리 및 웹소켓/SMS 발송 서비스
- * 설명 : 다양한 도메인 이벤트에 대응하여 알림을 생성하고, 웹소켓 토스트 및 문자(SMS) 알림을 안전하게 전송한다.
- * ******************************
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
