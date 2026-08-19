@@ -34,10 +34,15 @@
 -- 기준 시각 — 아래 모든 시각은 실행한 날에서 거꾸로 센다.
 --
 -- 고정 날짜를 박아 두면 인기글이 **시드를 고치지 않는 한 언젠가 반드시 사라진다.**
--- 배치는 대상일 기준 7일 창만 집계하므로(DOMAIN.md 6.9), 박아 둔 날짜가 창을 벗어난
--- 다음 날부터 로컬의 인기글 영역이 통째로 비고 — 그런데 화면은 "활동이 없는 정상 상태"
--- 와 똑같이 생겨서(그릴 것이 없으면 영역이 통째로 사라진다, 6.9) 시드가 낡은 것인지
--- 기능이 깨진 것인지 구분되지 않는다.
+-- 배치는 대상일 하루만 집계하므로(specs/community-popular.md E3), 박아 둔 날짜가 창을
+-- 벗어난 다음 날부터 로컬의 인기글 영역이 통째로 비고 — 그런데 화면은 "활동이 없는
+-- 정상 상태"와 똑같이 생겨서(그릴 것이 없으면 영역이 통째로 사라진다) 시드가 낡은
+-- 것인지 기능이 깨진 것인지 구분되지 않는다.
+--
+-- **창이 하루가 된 뒤로는 이 시드가 하루짜리다**(PLAN.md R35). 7일 창일 때는 다음 날
+-- 배치가 대상일을 옮겨도 어제치 활동이 창에 엿새 더 걸렸지만, 지금은 하루만 지나면
+-- 그날의 순위가 0건으로 확정되어 영역이 사라진다. 로컬에서 인기글을 다시 보려면
+-- 시드를 다시 실행한다.
 --
 -- 활동을 어제에 두는 이유: 배치의 대상일은 언제나 **전날**이다(PLAN.md D3). 활동을
 -- 오늘에 두면 오늘 밤 배치가 도는 대상일(오늘)에는 들어가지만, 아래 8절이 미리 확정해
@@ -451,14 +456,14 @@ SELECT @activity_day,
           FROM (
                 SELECT `post_id`, 1 AS `view_count`, 0 AS `like_count`, 0 AS `comment_count`
                   FROM `post_views`
-                 WHERE `created_at` >= @activity_day - INTERVAL 6 DAY
+                 WHERE `created_at` >= @activity_day
                    AND `created_at` <  @activity_day + INTERVAL 1 DAY
 
                 UNION ALL
 
                 SELECT `post_id`, 0, 1, 0
                   FROM `post_likes`
-                 WHERE `created_at` >= @activity_day - INTERVAL 6 DAY
+                 WHERE `created_at` >= @activity_day
                    AND `created_at` <  @activity_day + INTERVAL 1 DAY
 
                 UNION ALL
@@ -470,7 +475,7 @@ SELECT @activity_day,
                         SELECT `post_id`, `member_id`
                           FROM `comments`
                          WHERE `status` = 'PUBLISHED'
-                           AND `created_at` >= @activity_day - INTERVAL 6 DAY
+                           AND `created_at` >= @activity_day
                            AND `created_at` <  @activity_day + INTERVAL 1 DAY
                          GROUP BY `post_id`, `member_id`
                        ) commenters

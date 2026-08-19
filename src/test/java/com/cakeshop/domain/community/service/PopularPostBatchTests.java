@@ -32,14 +32,14 @@ class PopularPostBatchTests {
 
     private static final LocalDate RANKING_DATE = LocalDate.of(2025, 1, 15);
 
-    /** 집계 창 시작 시각. */
-    private static final LocalDateTime WINDOW_START = LocalDateTime.of(2025, 1, 9, 0, 0, 0);
+    /** 집계 창 시작 시각 — 대상일 당일 00:00:00이다. */
+    private static final LocalDateTime WINDOW_START = LocalDateTime.of(2025, 1, 15, 0, 0, 0);
 
     /** 집계 창 종료 시각. */
     private static final LocalDateTime WINDOW_END = LocalDateTime.of(2025, 1, 16, 0, 0, 0);
 
     /** 집계 창 내부 시각. */
-    private static final LocalDateTime INSIDE = LocalDateTime.of(2025, 1, 12, 12, 0);
+    private static final LocalDateTime INSIDE = LocalDateTime.of(2025, 1, 15, 12, 0);
 
     /** DATETIME(6)의 최소 간격. */
     private static final long ONE_MICRO_IN_NANOS = 1_000L;
