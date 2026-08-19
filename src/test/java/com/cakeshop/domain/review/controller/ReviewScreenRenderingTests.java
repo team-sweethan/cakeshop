@@ -453,6 +453,19 @@ class ReviewScreenRenderingTests {
     }
 
     @Test
+    void editForm_attachedImages_areShownButNotReplaceable() throws Exception {
+        insertReviewWithContent("이미지를 올린 후기입니다.", "PUBLISHED", WRITTEN_AT);
+        insertReviewImageOn("이미지를 올린 후기입니다.", "/uploads/review/kept.jpg", 0);
+        long reviewId = jdbcTemplate.queryForObject(
+                "SELECT id FROM reviews WHERE member_id = ?", Long.class, memberId);
+
+        mockMvc.perform(get("/reviews/{id}/edit", reviewId).with(authentication(login())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("/uploads/review/kept.jpg")))
+                .andExpect(content().string(not(containsString("id=\"review-images\""))));
+    }
+
+    @Test
     void editForm_othersReview_is404LikeAMissingOne() throws Exception {
         insertReviewWithContent("남의 후기입니다.", "PUBLISHED", WRITTEN_AT);
         long reviewId = jdbcTemplate.queryForObject(

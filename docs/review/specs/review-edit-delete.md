@@ -19,6 +19,8 @@
 - `PUBLISHED` 상태일 때만 수정할 수 있다. `BLOCKED`는 `BLOCKED_REVIEW` 403, `DELETED`는 `REVIEW_NOT_FOUND` 404.
 - **기간 제한을 두지 않는다.** 제한을 두면 기준 시각과 시간대 판단이 따라붙고, 화면에도 남은 기간 표시가 필요해진다. 얻는 것에 비해 비싸다.
 - 수정할 수 있는 것은 **평점 4종과 본문**이다. `order_item_id`·`product_id`·`member_id`는 바뀌지 않는다.
+- **첨부 이미지는 바꿀 수 없지만 화면에는 보인다.** 등록 때 올린 그대로 유지된다는 문구와 함께 읽기 전용으로 싣고, 목록 화면과 같은 `fragments/customer/product-review :: images`를 쓴다. 첨부가 없으면 없다고 적는다.
+  - 조각 8이 A6(`review-write.md`)을 넣을 때 이 화면만 이미지를 한 번도 그리지 않아, **수정 화면에 이미지가 없다 → 삭제됐나**로 읽히는 자리가 남아 있었다(08-20). 편집을 열지 않는다는 결정은 그대로다.
 - **소유권과 기대 상태를 UPDATE 조건에 함께 넣는다.** `UPDATE reviews SET ... WHERE id = ? AND member_id = ? AND status = 'PUBLISHED'`로 쏘고 `affectedRows == 0`이면 그때 원인을 가려 던진다(`DOMAIN 2.1`·`DOMAIN 2.5`와 같은 모양이라 문장이 늘지 않는다).
   - 앞에서 `PUBLISHED`를 **검증만** 해 두면 관리자 숨김(C4(`review-admin.md`))이 그사이 커밋될 때 **작성자가 숨겨진 후기의 내용을 덮어쓴다.** 해제하는 날 차단했던 것과 다른 글이 공개되어, `DOMAIN 2.1`이 정한 "숨겨진 후기에 대해 작성자가 할 수 있는 일은 없다"와 정면으로 어긋난다.
   - **원인을 가릴 때는 잠금 조회로 다시 읽는다.** `REPEATABLE READ`에서 일반 조회는 자격 검증 시점의 스냅샷을 돌려주므로, D1(`product-rating.md`)의 상품 잠금을 기다리는 동안 커밋된 삭제·숨김이 보이지 않는다. 그대로 두면 404·403이어야 할 응답이 전부 `INVALID_REVIEW_TRANSITION` 400으로 뭉개진다(2026-08-10 확정).
