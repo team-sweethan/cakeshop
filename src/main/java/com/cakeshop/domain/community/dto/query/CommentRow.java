@@ -20,12 +20,29 @@ public record CommentRow(
         Long id,
         Long postId,
         Long memberId,
+        Long parentCommentId,
         String content,
         CommentStatus status,
         LocalDateTime createdAt
 ) {
 
+    /** 기존 뿌리 댓글 fixture와 읽기 호출부는 부모가 없는 행을 간단히 만들 수 있다. */
+    public CommentRow(
+            Long id,
+            Long postId,
+            Long memberId,
+            String content,
+            CommentStatus status,
+            LocalDateTime createdAt
+    ) {
+        this(id, postId, memberId, null, content, status, createdAt);
+    }
+
     public boolean isDeleted() {
         return status == CommentStatus.DELETED;
+    }
+
+    public boolean isReply() {
+        return parentCommentId != null;
     }
 }

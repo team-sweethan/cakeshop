@@ -388,6 +388,28 @@ class CommunityScreenRenderingTests {
                 .andExpect(content().string(containsString("name=\"replyTo\"")));
     }
 
+    /** 오래된 답글 알림도 전체 GET 한 번으로 부모 묶음과 정확한 앵커를 렌더링한다. */
+    @Test
+    void communityCommentDeepLink_oldReply_rendersExpandedTarget() throws Exception {
+        long postId = insertPost(memberId, "오래된 답글이 있는 글", "본문", PostStatus.PUBLISHED);
+        long rootId = insertComment(postId, memberId, "알림 대상 뿌리",
+                CommentStatus.PUBLISHED, BASE_TIME);
+        long replyId = insertReply(postId, rootId, "알림 대상 답글", CommentStatus.PUBLISHED);
+
+        for (int i = 0; i < CommentSectionView.DEFAULT_LIMIT; i++) {
+            insertComment(postId, memberId, "더 최신인 댓글 " + i,
+                    CommentStatus.PUBLISHED, BASE_TIME.plusMinutes(i + 1));
+        }
+
+        mockMvc.perform(get("/community/" + postId + "/comments/" + replyId))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("알림 대상 뿌리")))
+                .andExpect(content().string(containsString("알림 대상 답글")))
+                .andExpect(content().string(
+                        containsString("id=\"comment-" + replyId + "\"")))
+                .andExpect(content().string(containsString("답글 접기")));
+    }
+
     /** 답글 작성이 Security 를 통과해 실제로 부모에 연결되어 저장된다. */
     @Test
     void communityReply_authenticated_isStoredUnderParent() throws Exception {
@@ -879,7 +901,7 @@ class CommunityScreenRenderingTests {
         return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
     }
 
-    private void insertReply(long postId, long parentId, String content, CommentStatus status) {
+    private long insertReply(long postId, long parentId, String content, CommentStatus status) {
         jdbcTemplate.update(
                 """
                 INSERT INTO comments (
@@ -888,6 +910,8 @@ class CommunityScreenRenderingTests {
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 postId, memberId, parentId, content, status.name(), BASE_TIME, BASE_TIME);
+
+        return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
     }
 
     private Integer commentCountOf(long postId) {

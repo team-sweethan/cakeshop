@@ -1,5 +1,7 @@
 package com.cakeshop.domain.community.service;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -38,6 +40,10 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class CommunityCommentService {
 
+    private static final Comparator<CommentRow> NEWEST_COMMENT_FIRST =
+            Comparator.comparing(CommentRow::createdAt).reversed()
+                    .thenComparing(CommentRow::id, Comparator.reverseOrder());
+
     private final CommunityCommentMapper communityCommentMapper;
     private final CommunityMemberViewLoader communityMemberViewLoader;
 
@@ -51,9 +57,39 @@ public class CommunityCommentService {
 
     @Transactional(readOnly = true)
     public CommentSectionView getComments(long postId, Integer requestedLimit, Long expandedRootId) {
+        return getComments(postId, requestedLimit, expandedRootId, null);
+    }
+
+    /** 알림 deep link가 가리킨 댓글은 현재 댓글 창 밖이어도 제한 안에서 반드시 포함한다. */
+    @Transactional(readOnly = true)
+    public CommentSectionView getFocusedComments(long postId, long focusedCommentId) {
+        return getComments(postId, null, null, focusedCommentId);
+    }
+
+    private CommentSectionView getComments(
+            long postId,
+            Integer requestedLimit,
+            Long expandedRootId,
+            Long focusedCommentId
+    ) {
         int limit = CommentSectionView.clampLimit(requestedLimit);
 
-        List<CommentRow> roots = communityCommentMapper.findRecentRootComments(postId, limit);
+        CommentRow focused = focusedCommentId == null
+                ? null
+                : requireFocusedComment(postId, focusedCommentId);
+
+        List<CommentRow> roots = new ArrayList<>(
+                communityCommentMapper.findRecentRootComments(postId, limit));
+
+        Long focusedRootId = null;
+        if (focused != null) {
+            focusedRootId = focused.isReply() ? focused.parentCommentId() : focused.id();
+            CommentRow focusedRoot = focused.isReply()
+                    ? requireFocusedComment(postId, focusedRootId)
+                    : focused;
+            includeWithinLimit(roots, focusedRoot, limit);
+        }
+
         CommentCountRow counts = communityCommentMapper.countComments(postId);
         Map<Long, Long> replyCounts = countReplies(roots);
 
@@ -62,16 +98,23 @@ public class CommunityCommentService {
          * 조회하지 않는다. 답글 상한이 뿌리 상한과 같은 값인 이유도 같다(주소 하나로
          * 전부 메모리에 올릴 수 없어야 한다).
          */
+        Long requestedExpandedRootId = focused != null && focused.isReply()
+                ? focusedRootId
+                : expandedRootId;
         Long expanded = roots.stream()
                 .map(CommentRow::id)
-                .filter(id -> id.equals(expandedRootId))
+                .filter(id -> id.equals(requestedExpandedRootId))
                 .findFirst()
                 .orElse(null);
 
-        List<CommentRow> replies = expanded == null
+        List<CommentRow> replies = new ArrayList<>(expanded == null
                 ? List.of()
                 : communityCommentMapper.findRepliesByParentId(
-                        expanded, postId, CommentSectionView.MAX_LIMIT);
+                        expanded, postId, CommentSectionView.MAX_LIMIT));
+
+        if (focused != null && focused.isReply()) {
+            includeWithinLimit(replies, focused, CommentSectionView.MAX_LIMIT);
+        }
 
         Map<Long, MemberCommunityView> authors = communityMemberViewLoader.findByIds(
                 Stream.concat(roots.stream(), replies.stream()).map(CommentRow::memberId));
@@ -98,6 +141,33 @@ public class CommunityCommentService {
                 counts.rootRowCount(),
                 limit
         );
+    }
+
+    private CommentRow requireFocusedComment(long postId, long commentId) {
+        CommentRow comment = communityCommentMapper.findCommentById(commentId);
+
+        if (comment == null || !comment.postId().equals(postId)) {
+            throw new BusinessException(CommunityErrorCode.COMMENT_NOT_FOUND);
+        }
+
+        return comment;
+    }
+
+    /*
+     * 알림 대상이 현재 창 밖이면 최신 목록의 가장 오래된 한 행을 대신한다. 이렇게 해야 뿌리·답글
+     * 상한을 늘리지 않으면서도 deep link의 목적지는 반드시 화면에 남는다.
+     */
+    private void includeWithinLimit(List<CommentRow> comments, CommentRow target, int limit) {
+        if (comments.stream().anyMatch(comment -> comment.id().equals(target.id()))) {
+            return;
+        }
+
+        if (comments.size() >= limit) {
+            comments.removeLast();
+        }
+
+        comments.add(target);
+        comments.sort(NEWEST_COMMENT_FIRST);
     }
 
     private Map<Long, Long> countReplies(List<CommentRow> roots) {
@@ -137,8 +207,6 @@ public class CommunityCommentService {
             throw new BusinessException(CommunityErrorCode.COMMENT_NOT_FOUND);
         }
 
-        // 받는 사람(부모 작성자)은 발송 쪽이 커밋 뒤에 읽는다. 여기서 읽으면 알림 때문에 하는
-        // 조회 하나가 답글을 되돌릴 수 있다
         communityCommentNotificationService.notifyNewReply(
                 postId, reply.getId(), parentCommentId, authorId);
     }

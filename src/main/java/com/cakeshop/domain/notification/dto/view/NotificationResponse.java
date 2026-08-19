@@ -49,7 +49,9 @@ public class NotificationResponse {
         if (type == NotificationType.CUSTOM_ORDER_REJECTED) return "/chat";
         if (orderId != null) return "/orders/" + orderId;
         if (chatRoomId != null) return "/chat";
-        if (postId != null && commentId != null) return "/community/" + postId + "#comment-" + commentId;
+        if (postId != null && commentId != null) {
+            return "/community/" + postId + "/comments/" + commentId + "#comment-" + commentId;
+        }
         if (postId != null) return "/community/" + postId;
         if (reviewId != null) return "/mypage";
         if (userCouponId != null) return "/mypage/coupons";

@@ -46,6 +46,14 @@ class CommunityDetailPage {
         return VIEW_NAME;
     }
 
+    /** 알림 대상 댓글을 포함한 상세 화면 전체를 렌더링한다. */
+    String renderFocused(
+            Model model, PostDetailView post, Long viewerId, long focusedCommentId) {
+        assembleFocused(model, post, viewerId, focusedCommentId);
+
+        return VIEW_NAME;
+    }
+
     /*
      * 상세 화면으로 되돌아가는 주소를 만든다.
      *
@@ -73,6 +81,32 @@ class CommunityDetailPage {
     }
 
     void assemble(Model model, PostDetailView post, Long viewerId, Integer commentLimit, Long expandedRootId) {
+        assembleCommon(model, post, viewerId);
+
+        model.addAttribute(
+                "commentSection",
+                communityCommentService.getComments(post.id(), commentLimit, expandedRootId)
+        );
+        model.addAttribute("expandedRootId", expandedRootId);
+    }
+
+    private void assembleFocused(
+            Model model, PostDetailView post, Long viewerId, long focusedCommentId) {
+        assembleCommon(model, post, viewerId);
+
+        CommentSectionView commentSection =
+                communityCommentService.getFocusedComments(post.id(), focusedCommentId);
+        Long expandedRootId = commentSection.threads().stream()
+                .filter(thread -> thread.expanded())
+                .map(thread -> thread.root().id())
+                .findFirst()
+                .orElse(null);
+
+        model.addAttribute("commentSection", commentSection);
+        model.addAttribute("expandedRootId", expandedRootId);
+    }
+
+    private void assembleCommon(Model model, PostDetailView post, Long viewerId) {
         model.addAttribute("post", post);
         model.addAttribute("viewerId", viewerId);
         model.addAttribute(
@@ -100,10 +134,5 @@ class CommunityDetailPage {
 
         model.addAttribute("postImages", communityPostImageService.getImages(post.id()));
 
-        model.addAttribute(
-                "commentSection",
-                communityCommentService.getComments(post.id(), commentLimit, expandedRootId)
-        );
-        model.addAttribute("expandedRootId", expandedRootId);
     }
 }
