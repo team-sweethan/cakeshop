@@ -14,6 +14,7 @@ import com.cakeshop.domain.community.dto.query.ReplyCountRow;
 import com.cakeshop.domain.community.dto.view.CommentSectionView;
 import com.cakeshop.domain.community.dto.view.CommentThreadView;
 import com.cakeshop.domain.community.dto.view.CommentView;
+import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.entity.Comment;
 import com.cakeshop.domain.community.entity.CommentStatus;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
@@ -45,6 +46,8 @@ public class CommunityCommentService {
      * 두 벌이 되고, 그 두 벌은 관리자가 글을 차단하는 순간 갈린다.
      */
     private final CommunityPostService communityPostService;
+
+    private final CommunityCommentNotificationService communityCommentNotificationService;
 
     @Transactional(readOnly = true)
     public CommentSectionView getComments(long postId, Integer requestedLimit, Long expandedRootId) {
@@ -110,10 +113,13 @@ public class CommunityCommentService {
 
     @Transactional
     public void addComment(long postId, CommentForm form, long authorId) {
-        communityPostService.getCommentablePost(postId, authorId);
+        PostDetailView post = communityPostService.getCommentablePost(postId, authorId);
 
-        communityCommentMapper.insertComment(
-                Comment.create(postId, authorId, form.getContent()));
+        Comment comment = Comment.create(postId, authorId, form.getContent());
+        communityCommentMapper.insertComment(comment);
+
+        communityCommentNotificationService.notifyNewComment(
+                postId, comment.getId(), post.memberId(), authorId);
     }
 
     /*
@@ -124,12 +130,21 @@ public class CommunityCommentService {
     public void addReply(long postId, long parentCommentId, CommentForm form, long authorId) {
         communityPostService.getCommentablePost(postId, authorId);
 
-        int inserted = communityCommentMapper.insertReply(
+        Comment reply = Comment.createReply(
                 postId, parentCommentId, authorId, form.getContent());
 
-        if (inserted == 0) {
+        if (communityCommentMapper.insertReply(reply) == 0) {
             throw new BusinessException(CommunityErrorCode.COMMENT_NOT_FOUND);
         }
+
+        /*
+         * 부모를 여기서 읽는 것은 위 조건과 무관하다 — 알림 수신자를 고르는 읽기이고, 삽입이
+         * 성공한 뒤라 부모가 있었다는 것은 이미 정해져 있다. 판단은 계속 SQL 이 한다.
+         */
+        CommentRow parent = communityCommentMapper.findCommentById(parentCommentId);
+
+        communityCommentNotificationService.notifyNewReply(
+                postId, reply.getId(), parent.memberId(), authorId);
     }
 
     @Transactional

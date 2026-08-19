@@ -54,6 +54,10 @@ class CommunityMemberContractTests {
     @MockitoBean
     private FileStorageClient fileStorageClient;
 
+    /* 이 검사는 조회 조립만 본다. 알림 발송은 CommunityCommentNotificationTests 가 갖는다. */
+    @MockitoBean
+    private CommunityCommentNotificationService communityCommentNotificationService;
+
     @Autowired
     private CommunityPostService communityPostService;
 

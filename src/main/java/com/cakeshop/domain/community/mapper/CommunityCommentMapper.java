@@ -47,12 +47,8 @@ public interface CommunityCommentMapper {
 
     int insertComment(Comment comment);
 
-    int insertReply(
-            @Param("postId") long postId,
-            @Param("parentCommentId") long parentCommentId,
-            @Param("memberId") long memberId,
-            @Param("content") String content
-    );
+    // 알림이 새 답글의 id 를 받아야 해서 Comment 를 넘긴다 — 다중 @Param 으로는 생성 키가 돌아오지 않는다.
+    int insertReply(Comment reply);
 
     int deleteComment(
             @Param("commentId") long commentId,
