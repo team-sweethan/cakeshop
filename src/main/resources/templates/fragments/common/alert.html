@@ -6,26 +6,9 @@
 
 <th:block th:fragment="popup">
   <script data-common-alert-popup th:if="${successMessage}" th:inline="javascript">
-    document.addEventListener("DOMContentLoaded", function() {
-      var msg = /*[[${successMessage}]]*/ "";
-      if (!msg) return;
-      var targetUrl = msg.indexOf("장바구니") !== -1 ? "/cart" : null;
-      if (typeof showToast === "function") {
-        showToast("알림", msg, targetUrl);
-      } else {
-        window.alert(msg);
-      }
-    });
+    window.alert([[${successMessage}]]);
   </script>
   <script data-common-alert-popup th:if="${errorMessage}" th:inline="javascript">
-    document.addEventListener("DOMContentLoaded", function() {
-      var errMsg = /*[[${errorMessage}]]*/ "";
-      if (!errMsg) return;
-      if (typeof showToast === "function") {
-        showToast("안내", errMsg);
-      } else {
-        window.alert(errMsg);
-      }
-    });
+    window.alert([[${errorMessage}]]);
   </script>
 </th:block>
