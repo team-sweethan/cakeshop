@@ -103,6 +103,14 @@ public class ChatService {
      * - 트랜잭션 외부(이벤트 리스너 @Async)에서 호출되어야 한다.
      * @return 저장된 메시지 응답 DTO (WebSocket 브로드캐스트에 사용) 또는 발송 불가 시 null
      */
+    /**
+     * 주문제작 반려 시 시스템이 반려 사유를 고객 채팅방에 자동 발송한다.
+     * - 채팅방이 없으면 자동 생성 후 발송한다.
+     * - 발신자로 활성 관리자 중 첫 번째 ID를 사용한다. 활성 관리자가 없으면 발송을 중단한다.
+     * - 기존 채팅방의 상담 대기 상태(WAITING_ADMIN)를 덮어쓰지 않고 보존한다.
+     * - 트랜잭션 외부(이벤트 리스너 @Async)에서 호출되어야 한다.
+     * @return 저장된 메시지 응답 DTO (WebSocket 브로드캐스트에 사용) 또는 발송 불가 시 null
+     */
     @Transactional
     public ChatMessageResponse sendSystemRejectionMessage(Long customerId, String rejectReason) {
         if (customerId == null || customerId <= 0) return null;
@@ -118,8 +126,32 @@ public class ChatService {
 
         ChatRoom chatRoom = getOrMakeChatRoom(customerId);
         String content = "[반려 안내] " + rejectReason;
-        // P2: ChatMessageResponse를 반환하여 호출 측에서 WebSocket 토픽 브로드캐스트 가능
-        return sendMessage(chatRoom.getId(), senderId, true, null, content, null);
+
+        // P2: 시스템 안내 메시지가 기존 상담 대기 상태(WAITING_ADMIN)를 덮어쓰지 않도록 함
+        // 기존 메시지가 존재하는 방이면 현재 responseStatus 유지, 신규 방이면 WAITING_CUSTOMER
+        ChatResponseStatus targetResponseStatus = (chatRoom.getLastMessageId() != null && chatRoom.getResponseStatus() != null)
+                ? chatRoom.getResponseStatus()
+                : ChatResponseStatus.WAITING_CUSTOMER;
+
+        ChatMessage message = createMessage(chatRoom.getId(), senderId, true, null, content, null, targetResponseStatus);
+
+        String customerName = memberChatQueryService.getCustomerName(customerId);
+
+        return ChatMessageResponse.builder()
+                .id(message.getId())
+                .chatRoomId(message.getChatRoomId())
+                .customerId(customerId)
+                .customerName(customerName != null ? customerName : "고객")
+                .senderId(message.getSenderId())
+                .senderName("관리자")
+                .senderType("ADMIN")
+                .productId(null)
+                .productName(null)
+                .content(message.getContent())
+                .imageUrls(Collections.emptyList())
+                .isRead(false)
+                .createdAt(message.getCreatedAt())
+                .build();
     }
 
     // 고객 존재 및 활성 회원 상태 검증 계약 (인터셉터 전용)
@@ -212,6 +244,11 @@ public class ChatService {
     // 메시지 만들고 저장, 방 상태 갱신
     private ChatMessage createMessage(Long roomId, Long senderId, boolean isAdmin, Long productId, 
         String content, List<ChatMessageAttachmentRequest> attachments) {
+        return createMessage(roomId, senderId, isAdmin, productId, content, attachments, null);
+    }
+
+    private ChatMessage createMessage(Long roomId, Long senderId, boolean isAdmin, Long productId, 
+        String content, List<ChatMessageAttachmentRequest> attachments, ChatResponseStatus overrideResponseStatus) {
 
             // 1. 텅 빈 메시지 저장 차단, 2,000자 상한선 및 첨부파일 최대 5개 상한선 제한
             boolean hasContent = content != null && !content.trim().isEmpty();
@@ -291,11 +328,15 @@ public class ChatService {
                 }
             }
 
+            ChatResponseStatus targetResponseStatus = overrideResponseStatus != null
+                    ? overrideResponseStatus
+                    : (isAdmin ? ChatResponseStatus.WAITING_CUSTOMER : ChatResponseStatus.WAITING_ADMIN);
+
             chatMapper.updateChatRoomLastMessage(
                 roomId,
                 message.getId(),
                 message.getCreatedAt(),
-                isAdmin ? ChatResponseStatus.WAITING_CUSTOMER : ChatResponseStatus.WAITING_ADMIN
+                targetResponseStatus
             );
 
             return message;

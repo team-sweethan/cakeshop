@@ -65,10 +65,10 @@ public class ChatEventListener {
             // P2 수정: 저장된 메시지를 채팅 토픽에 브로드캐스트하여 고객 화면 실시간 갱신
             messagingTemplate.convertAndSend("/topic/chat/" + response.getChatRoomId(), response);
 
-            // 관리자 방 목록 갱신 (미답변 탭 카운트 등 반영)
+            // 관리자 방 목록 갱신 (미답변 탭 카운트 등 반영) - chat-admin.js가 구독하는 /topic/admin/rooms 로 전송
             ChatRoomListResponse roomResponse = chatService.getAdminChatRoomResponse(response.getChatRoomId());
             if (roomResponse != null) {
-                messagingTemplate.convertAndSend("/topic/admin/chat/rooms/update", roomResponse);
+                messagingTemplate.convertAndSend("/topic/admin/rooms", roomResponse);
             }
 
             log.info("주문제작 반려 사유 채팅 메시지 발송 완료 (orderId={}, customerId={}, roomId={})",
