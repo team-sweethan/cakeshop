@@ -11,6 +11,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.init.ScriptUtils;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.test.annotation.DirtiesContext;
 
 @SpringBootTest
@@ -19,7 +20,8 @@ import org.springframework.test.annotation.DirtiesContext;
 class RdsDemoSeedIntegrationTests {
 
     private static final String RDS_DEMO_SEED = "db/seed/seed-rds-demo.sql";
-    private static final String TEST_ADMIN_HASH = "$2a$10$" + "x".repeat(53);
+    private static final String TEST_ADMIN_HASH =
+            new BCryptPasswordEncoder().encode("rds-demo-test-only-password");
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -36,15 +38,24 @@ class RdsDemoSeedIntegrationTests {
         insertSameNamedProductInAnotherCategory();
         runSeed();
 
-        assertThat(jdbcTemplate.queryForObject(
+        assertThat(count(
                 """
                 SELECT COUNT(*)
                 FROM product_option_groups pog
                 INNER JOIN products p ON p.id = pog.product_id
                 INNER JOIN categories c ON c.id = p.category_id
                 WHERE c.code = 'OTHER'
-                """,
-                Long.class
+                """
+        )).isOne();
+        assertThat(count(
+                """
+                SELECT COUNT(*)
+                FROM product_options po
+                INNER JOIN product_option_groups pog ON pog.id = po.option_group_id
+                INNER JOIN products p ON p.id = pog.product_id
+                INNER JOIN categories c ON c.id = p.category_id
+                WHERE c.code = 'OTHER'
+                """
         )).isZero();
     }
 
@@ -83,5 +94,21 @@ class RdsDemoSeedIntegrationTests {
                         ON other_category.code = 'OTHER'
                 WHERE p.name = '레터링 생크림 케이크'
                 """);
+        jdbcTemplate.update(
+                """
+                INSERT INTO product_option_groups (
+                    product_id, name, required, selection_type, sort_order
+                )
+                SELECT p.id, '케이크 크기', 1, 'SINGLE', 1
+                FROM products p
+                INNER JOIN categories c ON c.id = p.category_id
+                WHERE c.code = 'OTHER'
+                  AND p.name = '레터링 생크림 케이크'
+                """);
+    }
+
+    private long count(String sql) {
+        Long result = jdbcTemplate.queryForObject(sql, Long.class);
+        return result == null ? 0 : result;
     }
 }
