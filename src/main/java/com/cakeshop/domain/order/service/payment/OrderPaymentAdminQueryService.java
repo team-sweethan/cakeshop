@@ -1,4 +1,4 @@
-package com.cakeshop.domain.order.service;
+package com.cakeshop.domain.order.service.payment;
 
 import com.cakeshop.domain.order.dto.view.OrderPaymentAdminView;
 import com.cakeshop.domain.order.mapper.OrderMapper;

@@ -1,7 +1,7 @@
 package com.cakeshop.domain.payment.service;
 
 import com.cakeshop.domain.order.dto.view.OrderPaymentAdminView;
-import com.cakeshop.domain.order.service.OrderPaymentAdminQueryService;
+import com.cakeshop.domain.order.service.payment.OrderPaymentAdminQueryService;
 import com.cakeshop.domain.payment.dto.form.PaymentAdminSearchCondition;
 import com.cakeshop.domain.payment.dto.view.PaymentAdminListRow;
 import com.cakeshop.domain.payment.dto.view.PaymentAdminListView;

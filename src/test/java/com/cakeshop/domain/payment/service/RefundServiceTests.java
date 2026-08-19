@@ -12,7 +12,7 @@ import static org.mockito.Mockito.when;
 import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.member.service.MemberOrderQueryService;
 import com.cakeshop.domain.order.error.OrderErrorCode;
-import com.cakeshop.domain.order.service.OrderPaymentCancellationCommandService;
+import com.cakeshop.domain.order.service.payment.OrderPaymentCancellationCommandService;
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.entity.PaymentCancellation;
 import com.cakeshop.domain.payment.entity.PaymentCancellationStatus;

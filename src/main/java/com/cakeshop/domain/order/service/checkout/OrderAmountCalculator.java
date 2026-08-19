@@ -1,7 +1,7 @@
-package com.cakeshop.domain.order.service;
+package com.cakeshop.domain.order.service.checkout;
 
 import com.cakeshop.domain.order.error.OrderErrorCode;
-import com.cakeshop.domain.order.service.OrderOptionValidator.ValidatedOption;
+import com.cakeshop.domain.order.service.checkout.OrderOptionValidator.ValidatedOption;
 import com.cakeshop.global.error.BusinessException;
 import java.math.BigDecimal;
 import java.util.List;

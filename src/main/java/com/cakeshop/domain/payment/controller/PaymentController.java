@@ -80,6 +80,7 @@ public class PaymentController {
         return "customer/payment/fail";
     }
 
+    // 진짜 결제 승인.
     /** Toss 결제 인증 성공 값을 검증하고 주문 유형에 맞게 결제를 완료한다. */
     @PostMapping("/orders/{orderId:\\d+}/payment/confirm")
     public String confirm(

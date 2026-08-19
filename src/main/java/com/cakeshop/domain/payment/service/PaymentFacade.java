@@ -1,8 +1,8 @@
 package com.cakeshop.domain.payment.service;
 
-import com.cakeshop.domain.order.service.OrderPaymentQueryService;
-import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentOrder;
-import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentExecutionOrder;
+import com.cakeshop.domain.order.service.payment.OrderPaymentQueryService;
+import com.cakeshop.domain.order.service.payment.OrderPaymentQueryService.PaymentOrder;
+import com.cakeshop.domain.order.service.payment.OrderPaymentQueryService.PaymentExecutionOrder;
 import com.cakeshop.domain.payment.dto.form.PaymentConfirmForm;
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.error.PaymentErrorCode;
@@ -29,17 +29,20 @@ public class PaymentFacade {
 
     /** 일반·수제 주문의 Toss 결제를 승인하고 내부 상태를 완료한다. */
     public void confirmPayment(long memberId, long orderId, PaymentConfirmForm form) {
+        // 1. 내부 DB
         PaymentOrder ownedOrder = orderPaymentQueryService.getMemberPaymentOrder(memberId, orderId);
         if (isAlreadyCompleted(ownedOrder, orderId, form)) {
             return;
         }
 
-        PaymentExecutionOrder order = orderPaymentQueryService
-                .getMemberPaymentExecutionOrder(memberId, orderId);
+
+        PaymentExecutionOrder order = orderPaymentQueryService.getMemberPaymentExecutionOrder(memberId, orderId);
         validatePaymentExpiration(order.paymentExpiresAt());
 
         Payment payment = paymentService.getReadyPayment(orderId);
         validateRequest(order, payment, form);
+
+        // Toss 승인 영역 진입
         ResolvedApproval resolved = resolvePreparedOrNewApproval(payment, form, orderId);
 
         completeOrCompensate(ownedOrder, order, resolved, form);

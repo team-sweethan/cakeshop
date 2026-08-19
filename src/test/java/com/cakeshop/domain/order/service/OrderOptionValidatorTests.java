@@ -10,7 +10,8 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import com.cakeshop.domain.order.error.OrderErrorCode;
-import com.cakeshop.domain.order.service.OrderOptionValidator.ValidatedOption;
+import com.cakeshop.domain.order.service.checkout.OrderOptionValidator;
+import com.cakeshop.domain.order.service.checkout.OrderOptionValidator.ValidatedOption;
 import com.cakeshop.domain.product.dto.view.ProductOptionGroupView;
 import com.cakeshop.domain.product.dto.view.ProductOptionItemView;
 import com.cakeshop.domain.product.service.ProductService;
