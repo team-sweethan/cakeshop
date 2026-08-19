@@ -108,6 +108,18 @@ class ScreenRenderingTests {
     }
 
     @Test
+    void login_footer_rendersPublicStoreInformation() throws Exception {
+        mockMvc.perform(get("/login"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("케이크 공방")))
+            .andExpect(content().string(containsString("서울특별시 강남구 테헤란로 1")))
+            .andExpect(content().string(containsString("02-000-0000")))
+            .andExpect(content().string(containsString("평일 10:00 ~ 20:00 / 주말 11:00 ~ 21:00")))
+            .andExpect(content().string(containsString("매장 1층 픽업 데스크")))
+            .andExpect(content().string(not(containsString("매장 정보를 준비 중입니다."))));
+    }
+
+    @Test
     void login_authenticationError_rendersFocusableInlineAlert() throws Exception {
         mockMvc.perform(get("/login").param("error", ""))
             .andExpect(status().isOk())
