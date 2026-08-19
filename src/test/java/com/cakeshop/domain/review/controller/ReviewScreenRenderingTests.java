@@ -274,6 +274,33 @@ class ReviewScreenRenderingTests {
     }
 
     @Test
+    void myFocusedReviews_deepLinkTarget_isRenderedWithItsAnchor() throws Exception {
+        insertReviewWithContent("알림이 가리키는 후기입니다.", "PUBLISHED", WRITTEN_AT);
+        long reviewId = jdbcTemplate.queryForObject(
+                "SELECT id FROM reviews WHERE content = ?",
+                Long.class,
+                "알림이 가리키는 후기입니다.");
+
+        mockMvc.perform(get("/mypage/reviews/{reviewId}", reviewId).with(authentication(login())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("알림이 가리키는 후기입니다.")))
+                .andExpect(content().string(containsString("id=\"review-" + reviewId + "\"")));
+    }
+
+    @Test
+    void myFocusedReviews_reviewOfAnotherMember_is404LikeAMissingOne() throws Exception {
+        insertReviewWithContent("남의 후기입니다.", "PUBLISHED", WRITTEN_AT);
+        long reviewId = jdbcTemplate.queryForObject(
+                "SELECT id FROM reviews WHERE content = ?",
+                Long.class,
+                "남의 후기입니다.");
+        jdbcTemplate.update("UPDATE reviews SET member_id = ? WHERE id = ?", otherMemberId(), reviewId);
+
+        mockMvc.perform(get("/mypage/reviews/{reviewId}", reviewId).with(authentication(login())))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void productReviews_noPublishedReview_rendersEmptyNotice() throws Exception {
         mockMvc.perform(get("/products/{id}/reviews", productId))
                 .andExpect(status().isOk())
@@ -574,6 +601,20 @@ class ReviewScreenRenderingTests {
 
         return new UsernamePasswordAuthenticationToken(
                 memberDetails, null, memberDetails.getAuthorities());
+    }
+
+    private long otherMemberId() {
+        String email = "review-screen-other-" + suffix + "@example.com";
+        jdbcTemplate.update(
+                """
+                INSERT INTO members (email, password, name, nickname, phone, role, status)
+                VALUES (?, 'encoded-password', '남', ?, '010-0000-0000', 'USER', 'ACTIVE')
+                """,
+                email,
+                "남" + suffix);
+
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM members WHERE email = ?", Long.class, email);
     }
 
     private long insertMember() {

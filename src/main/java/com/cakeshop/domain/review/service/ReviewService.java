@@ -1,5 +1,7 @@
 package com.cakeshop.domain.review.service;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -44,6 +46,11 @@ import com.cakeshop.global.error.BusinessException;
 public class ReviewService {
 
     public static final int PRODUCT_PREVIEW_SIZE = 3;
+
+    private static final Comparator<ReviewRow> NEWEST_REVIEW_FIRST =
+            Comparator.comparing(ReviewRow::createdAt)
+                    .thenComparing(ReviewRow::id)
+                    .reversed();
 
     private final ReviewMapper reviewMapper;
     private final ReviewReplyMapper reviewReplyMapper;
@@ -105,19 +112,65 @@ public class ReviewService {
         List<ReviewRow> rows = reviewMapper.findByMemberId(
                 memberId, pageRequest.getOffset(), pageRequest.getSize());
 
+        return new PageResult<>(toMyReviewViews(rows), pageRequest, total);
+    }
+
+    /** 알림 deep link가 가리킨 후기는 현재 첫 쪽 밖이어도 제한 안에서 반드시 포함한다. */
+    @Transactional(readOnly = true)
+    public PageResult<MyReviewView> getFocusedMyReviews(long memberId, long focusedReviewId) {
+        ReviewRow focused = requireFocusedReview(focusedReviewId, memberId);
+
+        PageRequest firstPage = new PageRequest(1, null);
+        List<ReviewRow> rows = new ArrayList<>(reviewMapper.findByMemberId(
+                memberId, firstPage.getOffset(), firstPage.getSize()));
+
+        includeWithinLimit(rows, focused, firstPage.getSize());
+
+        return new PageResult<>(
+                toMyReviewViews(rows), firstPage, reviewMapper.countByMemberId(memberId));
+    }
+
+    private List<MyReviewView> toMyReviewViews(List<ReviewRow> rows) {
         Map<Long, OrderReviewSnapshotView> snapshots = findOrderSnapshots(rows);
         Map<Long, List<ReviewImageView>> images = findImages(rows);
         Map<Long, ReviewReplyView> replies = findReplies(rows);
 
-        List<MyReviewView> content = rows.stream()
+        return rows.stream()
                 .map(row -> MyReviewView.from(
                         row,
                         snapshots.get(row.orderItemId()),
                         images.getOrDefault(row.id(), List.of()),
                         replies.get(row.id())))
                 .toList();
+    }
 
-        return new PageResult<>(content, pageRequest, total);
+    private ReviewRow requireFocusedReview(long reviewId, long memberId) {
+        ReviewRow review = reviewMapper.findById(reviewId);
+
+        if (review == null
+                || !Objects.equals(review.memberId(), memberId)
+                || review.status() == ReviewStatus.DELETED) {
+            throw new BusinessException(ReviewErrorCode.REVIEW_NOT_FOUND);
+        }
+
+        return review;
+    }
+
+    /*
+     * 대상이 첫 쪽 밖이면 가장 오래된 한 건을 대신한다. 쪽 크기를 늘리지 않으면서도 deep link 의
+     * 목적지는 반드시 화면에 남는다.
+     */
+    private void includeWithinLimit(List<ReviewRow> reviews, ReviewRow target, int limit) {
+        if (reviews.stream().anyMatch(review -> Objects.equals(review.id(), target.id()))) {
+            return;
+        }
+
+        if (reviews.size() >= limit) {
+            reviews.removeLast();
+        }
+
+        reviews.add(target);
+        reviews.sort(NEWEST_REVIEW_FIRST);
     }
 
     @Transactional(readOnly = true)

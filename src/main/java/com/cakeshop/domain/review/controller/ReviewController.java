@@ -94,6 +94,27 @@ public class ReviewController {
         return "customer/review/my";
     }
 
+    /*
+     * 알림이 가리키는 후기를 여는 서버 렌더링 경로다. 첫 쪽 밖의 후기도 Service 가 창 안에 넣어
+     * 주므로 브라우저 앵커만으로 목적지에 닿는다.
+     */
+    @GetMapping("/mypage/reviews/{reviewId:\\d+}")
+    public String myFocusedList(
+            @PathVariable("reviewId") long reviewId,
+            @AuthenticationPrincipal MemberDetails memberDetails,
+            Model model
+    ) {
+        PageResult<MyReviewView> reviews = reviewService.getFocusedMyReviews(
+                memberDetails.getMemberId(), reviewId);
+
+        model.addAttribute("reviews", reviews);
+        model.addAttribute(
+                "pageNavigation",
+                PageNavigation.of(reviews.getPage(), reviews.getTotalPages()));
+
+        return "customer/review/my";
+    }
+
     @GetMapping("/reviews/new")
     public String form(
             @RequestParam("orderItemId") long orderItemId,

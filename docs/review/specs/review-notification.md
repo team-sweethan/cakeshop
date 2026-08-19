@@ -1,8 +1,8 @@
-# 알림 연동 — D2
+# 알림 연동 — D2·D3
 
 > 공통 규칙(상태·평점·권한·검증·오류 코드·표시·도메인 경계)은 `../DOMAIN.md` 2절이 정본이다.
 > 조각 순서와 진행 상태는 `../PLAN.md`. 결정의 배경은 `../decisions/`.
-> 조각: 7
+> 조각: 7(D2 발송) · 9(D3 링크)
 
 ### D2. 알림
 
@@ -32,6 +32,16 @@
   - 이 대가를 없애려면 발송을 큐로 빼야 하는데 **후기만 바꿔서는 줄지 않는다.** 알림 도메인의 `NotificationService.registerSmsSending`이 같은 `afterCommit` 자리에서 `REQUIRES_NEW`로 외부 발송까지 하고 있어 커넥션을 더 오래 잡는다. 알림 발송 구조를 옮길 때 함께 정리할 항목이다.
 - A4·A5(`review-edit-delete.md`)·C4(`review-admin.md`)에는 알림을 보내지 않는다. C6(`review-reply.md`)도 보내지 않는다.
 
-**남은 것 — 알림에서 후기로 가는 링크.** `notifications.target_url`은 알림 migration이 걷어내고 타입별 ID로 옮겼고, 남아 있는 `NotificationRequest.targetUrl`은 저장되지 않는다. 링크는 `NotificationResponse.getTargetUrl()`이 ID로 되돌려 주는데 후기는 `reviewId != null → "/mypage"` 하나뿐이라, **관리자가 `NEW_REVIEW`에서 그 후기의 관리자 상세(C3)로 갈 수 없다.** 고치려면 그 fallback이 갈라져야 하는데 알림 도메인 파일이라 민정님과 합의가 필요하다.
+### D3. 알림에서 후기로 가는 링크
 
-**링크보다 앞선 것 — 알림 목록 화면 자체가 아직 없다.** `admin/notification/list.html`과 `customer/notification/list.html`은 둘 다 고정 목업이라 `/api/notifications`를 부르지 않는다. 목록·읽음 API는 이미 있고, 지금 살아 있는 표시는 공통 헤더의 미읽음 배지(`app.js`) 하나뿐이다. 관리자든 고객이든 사정이 같으므로 리뷰 알림만의 문제가 아니라 알림 도메인의 남은 화면 작업이다. 알림은 정상 저장되고 배지에 반영되므로 조각 7을 막지는 않는다.
+`notifications.target_url`은 알림 migration이 걷어내고 타입별 ID로 옮겼고, 남아 있는 `NotificationRequest.targetUrl`은 저장되지 않는다. 링크는 `NotificationResponse.getTargetUrl()`이 ID로 되돌려 준다. **후기 두 타입 모두 목록이 아니라 그 후기를 연다.**
+
+| 타입 | 받는 사람 | 링크 |
+|---|---|---|
+| `NEW_REVIEW` | 관리자 | `/admin/reviews/{reviewId}` — C3 관리자 상세 |
+| `CUSTOMER_REVIEW` | 후기 작성자 | `/mypage/reviews/{reviewId}#review-{reviewId}` — B3 내 후기 목록의 그 자리 |
+
+- **고객 쪽은 단건 화면을 새로 만들지 않고 커뮤니티 댓글 deep link와 같은 모양을 쓴다.** `GET /mypage/reviews/{reviewId}`가 내 후기 목록을 그대로 렌더링하되, 대상 후기가 첫 쪽 밖이면 `ReviewService.getFocusedMyReviews`가 가장 오래된 한 건을 밀어내고 창 안에 넣는다. 쪽 크기를 늘리지 않으면서 목적지가 반드시 화면에 남는다. 강조는 `review.css`의 `:target`이고 JavaScript를 쓰지 않는다.
+- **대상은 본인의 `DELETED`가 아닌 후기여야 한다.** 남의 후기와 없는 후기를 `REVIEW_NOT_FOUND` 하나로 묶는 것은 2.5의 이유와 같다. `BLOCKED`는 막지 않는다 — B3이 숨겨진 후기를 작성자에게는 보여 주므로 여기서 더 좁히면 목록과 어긋난다.
+- **`/mypage/reviews/writable`(A1)과 겹치지 않게 경로 변수는 `{reviewId:\d+}`로 숫자만 받는다.**
+- 두 링크 모두 `NotificationResponse`가 파생시키므로 **알림 도메인(민정) 파일을 고친다.** 커뮤니티 댓글 deep link(PR #322)가 같은 자리를 같은 방식으로 이미 고쳤고, 확인은 PR 리뷰어 지정으로 받는다(`docs/pull-request.md` 1절).

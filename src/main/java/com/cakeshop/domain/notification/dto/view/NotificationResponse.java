@@ -41,7 +41,7 @@ public class NotificationResponse {
             if (type == NotificationType.ADMIN_CHAT) return "/admin/chat";
             if (orderId != null) return "/admin/orders/" + orderId;
             if (postId != null) return "/admin/community/" + postId;
-            if (reviewId != null) return "/admin/reviews";
+            if (reviewId != null) return "/admin/reviews/" + reviewId;
             return "/admin";
         }
 
@@ -53,7 +53,9 @@ public class NotificationResponse {
             return "/community/" + postId + "/comments/" + commentId + "#comment-" + commentId;
         }
         if (postId != null) return "/community/" + postId;
-        if (reviewId != null) return "/mypage";
+        if (reviewId != null) {
+            return "/mypage/reviews/" + reviewId + "#review-" + reviewId;
+        }
         if (userCouponId != null) return "/mypage/coupons";
         return null;
     }

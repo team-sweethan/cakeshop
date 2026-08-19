@@ -25,4 +25,21 @@ class NotificationResponseTests {
                     .isEqualTo("/community/42/comments/314#comment-314");
         }
     }
+
+    /** 후기 알림도 목록이 아니라 그 후기를 연다. 관리자는 상세, 작성자는 자기 후기 자리다. */
+    @Test
+    void getTargetUrl_review_opensTheReviewItself() {
+        NotificationResponse newReview = NotificationResponse.builder()
+                .type(NotificationType.NEW_REVIEW)
+                .reviewId(77L)
+                .build();
+
+        NotificationResponse replied = NotificationResponse.builder()
+                .type(NotificationType.CUSTOMER_REVIEW)
+                .reviewId(77L)
+                .build();
+
+        assertThat(newReview.getTargetUrl()).isEqualTo("/admin/reviews/77");
+        assertThat(replied.getTargetUrl()).isEqualTo("/mypage/reviews/77#review-77");
+    }
 }

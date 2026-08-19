@@ -123,6 +123,36 @@ class ReviewControllerTests {
     }
 
     @Test
+    void myFocusedReviews_notificationDeepLink_rendersTheListAroundTheTargetReview()
+            throws Exception {
+
+        when(reviewService.getFocusedMyReviews(anyLong(), anyLong()))
+                .thenReturn(new PageResult<>(List.of(), new PageRequest(1, null), 0));
+
+        mockMvc.perform(get("/mypage/reviews/{reviewId}", REVIEW_ID))
+                .andExpect(status().isOk())
+                .andExpect(view().name("customer/review/my"))
+                .andExpect(model().attributeExists("reviews", "pageNavigation"));
+
+        verify(reviewService).getFocusedMyReviews(MEMBER_ID, REVIEW_ID);
+        verify(reviewService, never()).getMyReviews(anyLong(), any());
+    }
+
+    @Test
+    void myFocusedReviews_writableListPath_isNotSwallowedByTheDeepLinkMapping()
+            throws Exception {
+
+        when(reviewService.getWritableOrderItems(anyLong(), any()))
+                .thenReturn(new PageResult<>(List.of(), new PageRequest(1, null), 0));
+
+        mockMvc.perform(get("/mypage/reviews/writable"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("customer/review/writable"));
+
+        verify(reviewService, never()).getFocusedMyReviews(anyLong(), anyLong());
+    }
+
+    @Test
     void form_withOrderItemId_rendersFormWithTarget() throws Exception {
         when(reviewService.getWriteTarget(ORDER_ITEM_ID, MEMBER_ID)).thenReturn(target());
 
