@@ -130,9 +130,9 @@
 - **답글 id를 받으려고 `insertReply`가 `Comment`를 받는다.** 다중 `@Param`으로는 생성 키가 돌아오지 않고,
   키가 없으면 `event_key`를 부모 id로 만들 수밖에 없어 **같은 부모의 두 번째 답글이 통째로 삼켜진다.**
   조건부 INSERT의 문장과 조건은 그대로다(H53).
-- **부모 댓글 작성자는 INSERT 뒤에 읽는다.** 알림 수신자를 고르는 읽기이고 판단에 쓰지 않는다 —
-  깊이·같은 글·부모 노출은 계속 조건부 INSERT가 지킨다(H53). 삽입이 성공한 뒤라 부모가 있었다는 것은
-  이미 정해져 있다.
+- **부모 댓글 작성자는 답글이 커밋된 뒤 Sender의 `REQUIRES_NEW`에서 읽는다.** 답글 트랜잭션은
+  `parentCommentId`만 넘긴다 — 수신자를 고르는 조회는 알림을 위한 일이므로, 그 조회가 실패해도 이미
+  저장한 답글을 되돌리면 안 된다(H55). 깊이·같은 글·부모 노출 판단은 계속 조건부 INSERT가 지킨다(H53).
 - A6 댓글 삭제에는 알림을 보내지 않는다.
 
 **남은 것 — 알림에서 그 댓글로 가는 링크.** `NotificationResponse.getTargetUrl()`이 만드는
@@ -157,6 +157,6 @@
 
 **H54 — 댓글·답글 알림이 정해진 한 사람에게만 가고, 커밋한 것만 나감.** 수신자(게시글 작성자 / 부모 댓글 작성자), 자기 행위 억제 둘, 답글이 게시글 작성자에게 가지 않는 것, 탈퇴 수신자에게도 저장되는 것, 문구의 작성자 표시명이 화면과 같은 규칙으로 가려지는 것까지. `CommunityCommentNotificationTests`가 실제 MariaDB로 알림 행을 보고, `CommunityCommentNotificationServiceTests`가 발송 없이 억제 규칙만 본다. **"보내지 않는다"는 규칙은 초록 테스트가 저절로 지켜 주지 않는다** — 발송 지점을 하나 더 얹어도 기존 검사는 전부 통과하고, 그때 늘어난 알림은 화면 어디에도 오류로 보이지 않는다.
 
-**H55 — 알림이 댓글 저장을 되돌리지 못하고, 되돌아간 댓글의 알림은 나가지 않음.** 발송이 던져도 댓글은 남고 요청은 성공하며, 커밋 전에 죽으면 알림 행이 없다. 같은 발송을 두 번 불러도 `event_key` UNIQUE가 한 건으로 막는다. `CommunityCommentNotificationTests`. **방향이 뒤집혀도(커밋 전 발송) 정상 경로의 결과는 같다** — 후기 D2가 같은 이유로 같은 검사를 갖는다. `insertReply`가 생성 키를 실제로 돌려주는 것과 0행일 때 id가 비는 것은 `CommunityMapperTests`가 함께 본다 — **키가 없으면 `event_key`가 부모 id로 뭉개져 두 번째 답글의 알림이 조용히 사라진다.**
+**H55 — 알림이 댓글 저장을 되돌리지 못하고, 되돌아간 댓글의 알림은 나가지 않음.** 발송이 던져도 댓글은 남고 요청은 성공하며, 커밋 전에 죽으면 알림 행이 없다. 같은 발송을 두 번 불러도 `event_key` UNIQUE가 한 건으로 막는다. `CommunityCommentNotificationTests`. **방향이 뒤집혀도(커밋 전 발송) 정상 경로의 결과는 같다** — 후기 D2가 같은 이유로 같은 검사를 갖는다. 답글 수신자 조회가 쓰기 트랜잭션 안으로 돌아오는 것은 `CommunityCommentServiceTests`가 막고, 커밋 후 Sender의 수신자 선택·자기 행위 억제는 `CommunityCommentNotificationSenderTests`가 맡는다. `insertReply`가 생성 키를 실제로 돌려주는 것과 0행일 때 id가 비는 것은 `CommunityMapperTests`가 함께 본다 — **키가 없으면 `event_key`가 부모 id로 뭉개져 두 번째 답글의 알림이 조용히 사라진다.**
 
 **H11 — 댓글 삭제의 소유권·게시글·상태 조건이 SQL에도 있음.** 남의 댓글·이미 지운 댓글·다른 글의 주소로는 UPDATE가 0행이고, 0행이 성공으로 넘어가지 않는다. `CommunityMapperTests`가 조건마다 갱신 행 수와 실제 값을 함께 보고, `CommunityCommentServiceTests`가 0행일 때 지금 상태를 다시 읽어 404/403을 내는지 본다. `community-post.md` H2a·H2d의 댓글판이다.

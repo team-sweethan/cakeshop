@@ -276,19 +276,21 @@ class CommunityCommentServiceTests {
                 .notifyNewComment(POST_ID, NEW_COMMENT_ID, AUTHOR_ID, OTHER_MEMBER_ID);
     }
 
-    /** 답글 알림은 부모 댓글 작성자에게 간다 — 글 작성자가 아니다. */
+    /**
+     * 받는 사람이 아니라 부모의 id 를 넘긴다. 여기서 부모를 읽으면 알림 때문에 하는 조회 하나가
+     * 답글을 되돌린다 — 부모 읽기는 커밋 뒤에 도는 발송 쪽에 있다.
+     */
     @Test
-    void addReply_notifiesParentCommentAuthor() {
+    void addReply_handsParentCommentIdToNotificationWithoutReadingIt() {
         givenPost(PostStatus.PUBLISHED);
         givenInsertedReply();
-        when(communityCommentMapper.findCommentById(COMMENT_ID))
-                .thenReturn(commentOf(COMMENT_ID, POST_ID, OTHER_MEMBER_ID, CommentStatus.PUBLISHED));
 
         communityCommentService.addReply(
                 POST_ID, COMMENT_ID, commentFormOf("답글 본문"), AUTHOR_ID);
 
         verify(communityCommentNotificationService)
-                .notifyNewReply(POST_ID, NEW_COMMENT_ID, OTHER_MEMBER_ID, AUTHOR_ID);
+                .notifyNewReply(POST_ID, NEW_COMMENT_ID, COMMENT_ID, AUTHOR_ID);
+        verify(communityCommentMapper, never()).findCommentById(anyLong());
     }
 
     @Test
@@ -425,8 +427,6 @@ class CommunityCommentServiceTests {
 
             return 1;
         });
-        when(communityCommentMapper.findCommentById(COMMENT_ID))
-                .thenReturn(commentOf(COMMENT_ID, CommentStatus.PUBLISHED));
     }
 
     private void givenComments(CommentRow... comments) {

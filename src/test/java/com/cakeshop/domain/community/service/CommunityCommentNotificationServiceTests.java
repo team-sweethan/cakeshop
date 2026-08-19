@@ -10,11 +10,12 @@ import static org.mockito.Mockito.verify;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/** 누구에게 보내고 누구에게 보내지 않는지를 발송 없이 확인한다. */
+/** 발송으로 넘길 식별자와 커밋 전 억제 경계를 확인한다. */
 class CommunityCommentNotificationServiceTests {
 
     private static final long POST_ID = 42L;
     private static final long COMMENT_ID = 314L;
+    private static final long PARENT_COMMENT_ID = 313L;
     private static final long RECEIVER_ID = 7L;
     private static final long ACTOR_ID = 99L;
 
@@ -42,18 +43,12 @@ class CommunityCommentNotificationServiceTests {
         verify(sender, never()).sendNewComment(anyLong(), anyLong(), anyLong(), anyLong());
     }
 
+    /** 받는 사람이 아니라 부모의 id 를 넘긴다 — 부모를 읽는 것은 발송 쪽 일이다. */
     @Test
-    void notifyNewReply_sendsToParentCommentAuthor() {
-        service.notifyNewReply(POST_ID, COMMENT_ID, RECEIVER_ID, ACTOR_ID);
+    void notifyNewReply_passesParentCommentIdWithoutReadingIt() {
+        service.notifyNewReply(POST_ID, COMMENT_ID, PARENT_COMMENT_ID, ACTOR_ID);
 
-        verify(sender).sendNewReply(POST_ID, COMMENT_ID, RECEIVER_ID, ACTOR_ID);
-    }
-
-    @Test
-    void notifyNewReply_byParentCommentAuthor_sendsNothing() {
-        service.notifyNewReply(POST_ID, COMMENT_ID, ACTOR_ID, ACTOR_ID);
-
-        verify(sender, never()).sendNewReply(anyLong(), anyLong(), anyLong(), anyLong());
+        verify(sender).sendNewReply(POST_ID, COMMENT_ID, PARENT_COMMENT_ID, ACTOR_ID);
     }
 
     /** 생성 키가 없으면 접는다. 언박싱에서 죽으면 저장된 댓글에 500 이 따라붙는다. */
@@ -67,7 +62,7 @@ class CommunityCommentNotificationServiceTests {
 
     @Test
     void notifyNewReply_withoutGeneratedId_isFoldedInsteadOfThrowing() {
-        assertThatCode(() -> service.notifyNewReply(POST_ID, null, RECEIVER_ID, ACTOR_ID))
+        assertThatCode(() -> service.notifyNewReply(POST_ID, null, PARENT_COMMENT_ID, ACTOR_ID))
                 .doesNotThrowAnyException();
 
         verify(sender, never()).sendNewReply(anyLong(), anyLong(), anyLong(), anyLong());

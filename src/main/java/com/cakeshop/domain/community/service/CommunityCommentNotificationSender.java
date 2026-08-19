@@ -5,7 +5,9 @@ import java.util.stream.Stream;
 
 import lombok.RequiredArgsConstructor;
 
+import com.cakeshop.domain.community.dto.query.CommentRow;
 import com.cakeshop.domain.community.dto.view.CommentView;
+import com.cakeshop.domain.community.mapper.CommunityCommentMapper;
 import com.cakeshop.domain.member.dto.view.MemberCommunityView;
 import com.cakeshop.domain.notification.dto.form.NotificationRequest;
 import com.cakeshop.domain.notification.entity.NotificationType;
@@ -28,20 +30,33 @@ public class CommunityCommentNotificationSender {
 
     private final NotificationService notificationService;
     private final CommunityMemberViewLoader communityMemberViewLoader;
+    private final CommunityCommentMapper communityCommentMapper;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void sendNewComment(long postId, long commentId, long receiverId, long actorId) {
         send(NotificationType.CUSTOMER_COMMENT, postId, commentId, receiverId, actorId);
     }
 
+    /*
+     * 받는 사람을 여기서 읽는다. 답글 트랜잭션 안에서 읽으면 알림 때문에 하는 조회 하나가
+     * 답글을 되돌릴 수 있어서다 — 이 클래스는 커밋 뒤에 돌고 실패해도 알림만 접힌다.
+     *
+     * 삽입이 성공한 뒤라 부모가 있었다는 것은 이미 정해져 있고, 삭제는 soft delete 라 행이
+     * 남는다. 그래도 없으면 보낼 곳이 없으므로 접는다.
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void sendNewReply(long postId, long replyId, long receiverId, long actorId) {
-        send(NotificationType.CUSTOMER_COMMENT_REPLY, postId, replyId, receiverId, actorId);
+    public void sendNewReply(long postId, long replyId, long parentCommentId, long actorId) {
+        CommentRow parent = communityCommentMapper.findCommentById(parentCommentId);
+
+        if (parent == null || parent.memberId() == actorId) {
+            return;
+        }
+
+        send(NotificationType.CUSTOMER_COMMENT_REPLY, postId, replyId, parent.memberId(), actorId);
     }
 
     private void send(
             NotificationType type, long postId, long commentId, long receiverId, long actorId) {
-
         notificationService.makeNotification(NotificationRequest.builder()
                 .receiverId(receiverId)
                 .actorId(actorId)
