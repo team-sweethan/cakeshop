@@ -86,11 +86,13 @@ public class NotificationCouponSync {
                 lastStartsSyncTime = lastIssuanceSyncTime;
             }
 
+            java.util.Set<Long> processedInRun = new java.util.HashSet<>();
+
             // 1-1. 신규 발급 쿠폰 처리 (idx_member_coupons_issued_at_id 인덱스 기반)
-            syncNewlyIssuedCoupons(now);
+            syncNewlyIssuedCoupons(now, processedInRun);
 
             // 1-2. 사용 시작일 도래 쿠폰 처리 (idx_coupons_status_starts_expires 인덱스 기반)
-            syncStartedCoupons(now);
+            syncStartedCoupons(now, processedInRun);
 
         } catch (Exception e) {
             log.error("쿠폰 발급 알림 동기화 배치 실행 중 예외 발생 (errorType={}):", e.getClass().getSimpleName());
@@ -99,7 +101,7 @@ public class NotificationCouponSync {
         }
     }
 
-    private void syncNewlyIssuedCoupons(LocalDateTime now) {
+    private void syncNewlyIssuedCoupons(LocalDateTime now, java.util.Set<Long> processedInRun) {
         int loopCount = 0;
         final int MAX_LOOPS_PER_RUN = 10;
         final int PAGE_SIZE = 100;
@@ -133,6 +135,8 @@ public class NotificationCouponSync {
                 String couponName = (coupon.couponName() != null && !coupon.couponName().isBlank()) ? coupon.couponName() : "할인";
 
                 try {
+                    processedInRun.add(memberCouponId);
+
                     if (!memberNotificationQueryService.isMemberActive(memberId)) {
                         currentCursorTime = coupon.issuedAt();
                         currentCursorId = memberCouponId;
@@ -175,7 +179,7 @@ public class NotificationCouponSync {
         this.lastIssuanceProcessedMemberCouponId = currentCursorId;
     }
 
-    private void syncStartedCoupons(LocalDateTime now) {
+    private void syncStartedCoupons(LocalDateTime now, java.util.Set<Long> processedInRun) {
         int loopCount = 0;
         final int MAX_LOOPS_PER_RUN = 10;
         final int PAGE_SIZE = 100;
@@ -208,6 +212,13 @@ public class NotificationCouponSync {
                 String couponName = (coupon.couponName() != null && !coupon.couponName().isBlank()) ? coupon.couponName() : "할인";
 
                 try {
+                    // 동일 실행 주기 내 신규 발급 경로에서 이미 처리된 쿠폰은 중복 시도 방지를 위해 스킵
+                    if (processedInRun != null && processedInRun.contains(memberCouponId)) {
+                        currentCursorTime = coupon.startsAt();
+                        currentCursorId = memberCouponId;
+                        continue;
+                    }
+
                     if (!memberNotificationQueryService.isMemberActive(memberId)) {
                         currentCursorTime = coupon.startsAt();
                         currentCursorId = memberCouponId;

@@ -58,6 +58,7 @@
           AND mc.status = 'AVAILABLE'
           AND c.starts_at &lt;= NOW(6)
           AND c.expires_at &gt; NOW(6)
+          AND c.starts_at &gt; mc.issued_at
           AND c.target_type IN ('ALL_MEMBERS', 'NEW_MEMBERS', 'BIRTHDAY', 'SPECIFIC_MEMBERS')
           <if test="since != null">
               AND c.starts_at &gt;= #{since}
