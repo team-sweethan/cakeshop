@@ -34,12 +34,14 @@ Controller -> Service -> Mapper -> DB
 
 ### 현재 남아 있는 경계 예외
 
-이 결정은 도메인 경계 정리가 모든 기존 코드에서 완료됐다는 뜻이 아니다. 현재 코드에는 원칙을 도입하기
-전에 만들어졌거나 아직 계약으로 분리되지 않은 예외가 남아 있다. 대표적으로
+이 결정은 도메인 경계 정리가 모든 기존 코드에서 완료됐다는 뜻이 아니다. 원칙을 도입하기 전에 만들어졌거나
+아직 계약으로 분리되지 않은 코드가 남아 있을 수 있다.
+
+**여기 예시로 적혀 있던 둘은 그 뒤 해소됐다 (2026-08-20 확인).**
 [`RefundService`](../../src/main/java/com/cakeshop/domain/payment/service/RefundService.java)는 주문 Entity와
-`OrderMapper`를 직접 사용하고,
-[`PaymentMapper.xml`](../../src/main/resources/mapper/payment/PaymentMapper.xml)은 `orders` 테이블을 직접
-조회·JOIN한다.
+`OrderMapper`를 직접 쓰지 않고 `OrderPaymentCancellationCommandService` 계약을 호출하며,
+[`PaymentMapper.xml`](../../src/main/resources/mapper/payment/PaymentMapper.xml)에는 `orders` 참조가 한 줄도 없다.
+**남은 예외를 새로 조사하지는 않았으므로 "이제 예외가 없다"로 읽지 않는다** — 확인한 것은 이 둘뿐이다.
 
 이 문서는 해당 예외를 허용 규칙으로 확정하지 않는다. payment·order 담당자가 공개 Service와 최소 DTO
 계약으로 정리해야 할 기존 기술 부채로 기록하며, 정리되기 전까지는 현재 구조 설명과 목표 규칙을 구분해

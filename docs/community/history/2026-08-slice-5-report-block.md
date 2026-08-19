@@ -2,7 +2,8 @@
 
 > **끝난 조각의 기록이다. 지금 구속하지 않는다.**
 > 이 조각이 만든 규칙의 정본은 `../specs/community-reaction.md`와 `../specs/community-admin.md`다.
-> 조각 순서와 진행 상태, 위험과 결정 로그는 `../PLAN.md`.
+> 조각 순서와 진행 상태는 `../PLAN.md`, 발견된 문제는 `../reviews/`,
+> 방향을 고른 판단은 `../decisions/`에 있다.
 
 - 중복 신고 에러 응답, 취소 불가
 - 관리자 차단·해제, `blocked_*` 기록 및 해제 후 보존
@@ -12,9 +13,9 @@
 
 **관리자 목업 두 화면은 도메인 규칙보다 먼저 그려졌다.** 규칙에 없는 기능이 버튼으로 존재한다 — 특히 `게시글 영구 삭제`와 댓글 `삭제`는 **DOMAIN.md에 없는 권한**이고, 관리자 조치는 차단뿐이며 `BLOCKED → DELETED`는 금지다(4.2, 6.7). 상태 어휘도 화면은 `정상`/`제재`, 문서는 `차단`으로 갈려 있다. 조각 5는 `screens/admin-detail.md`의 "조각 5에서 정하거나 고쳐야 할 것" 표를 정리하는 일부터 시작한다.
 
-**완료 (2026-08-04)**. 보류 2건과 목업 정리를 먼저 확정하고(`../PLAN.md`의 결정 로그) 구현했다.
+**완료 (2026-08-04)**. 보류 2건과 목업 정리를 먼저 확정하고(`../decisions/decision-log-1st.md`) 구현했다.
 
-- **신고**: `CommunityMapper` +5 statement(`insertReport`·`existsReport`·`findReportsByPost`·~~`countPendingReports`~~(2026-08-18 삭제, `../PLAN.md`의 결정 로그)·`closePendingReports`), `dto/form/ReportForm`, `dto/view/ReportView`, `CommunityService` 3개 메서드 + `requireReportablePost`, `CommunityController.report` + 상세 모델 확장(`canReport`·`alreadyReported`), `detail.html`에 접힌 신고 폼.
+- **신고**: `CommunityMapper` +5 statement(`insertReport`·`existsReport`·`findReportsByPost`·~~`countPendingReports`~~(2026-08-18 삭제, `../decisions/decision-log-2nd.md`)·`closePendingReports`), `dto/form/ReportForm`, `dto/view/ReportView`, `CommunityService` 3개 메서드 + `requireReportablePost`, `CommunityController.report` + 상세 모델 확장(`canReport`·`alreadyReported`), `detail.html`에 접힌 신고 폼.
 - **차단·해제·기각**: `ReportStatus`(전이 규칙 포함), `V20260804_074043__add_post_report_status_constraint.sql`, `CommunityMapper` +5 statement(`findPostsForAdmin`·`countPostsForAdmin`·`findPostByIdForAdmin`·`blockPost`·`unblockPost`), `dto/view` 3종(`AdminPostListView`·`AdminPostDetailView`·`AdminPostSort`), `dto/form/BlockForm`, 새 `CommunityAdminService`, `CommunityAdminController` 5개 핸들러, 관리자 템플릿 2종 전면 교체.
 - migration은 CHECK 제약 하나뿐이다 — `post_reports`와 `posts.blocked_*`가 V0에 전부 있다. `SecurityConfig`도 그대로다. 새 경로는 `/admin/**` → `hasRole("ADMIN")`과 `anyRequest().authenticated()`에 걸린다.
 

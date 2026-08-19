@@ -2,7 +2,8 @@
 
 > **끝난 조각의 기록이다. 지금 구속하지 않는다.**
 > 이 조각이 만든 규칙의 정본은 `../specs/community-reaction.md`다.
-> 조각 순서와 진행 상태, 위험과 결정 로그는 `../PLAN.md`.
+> 조각 순서와 진행 상태는 `../PLAN.md`, 발견된 문제는 `../reviews/`,
+> 방향을 고른 판단은 `../decisions/`에 있다.
 
 - POST/DELETE 분리, 둘 다 멱등
 - `like_count` 재계산

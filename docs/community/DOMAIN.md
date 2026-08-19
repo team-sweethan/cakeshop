@@ -9,7 +9,10 @@
 | 기능 단위 명세 (입력·처리·출력·검증) | `specs/` — 아래 `spec` 열 |
 | 상태 모델·권한·입력 검증·탈퇴 회원·카테고리 | 이 문서 4·5·7·8·10절 |
 | 아직 안 정해진 것 | 이 문서 9절, 그리고 해당 spec의 2차 절 |
-| 조각 순서, 진행 상태, 하네스 인덱스, 위험, 결정 로그 | `PLAN.md` |
+| 조각 순서, 진행 상태, 번호 인덱스(D·H·R) | `PLAN.md` |
+| 아직 닫히지 않은 위험의 본문, 리뷰 지적과 그 처리 | `reviews/risks.md`·`reviews/findings.md` |
+| 무엇을 언제 왜 정했나 | `decisions/decision-log-1st.md`·`decisions/decision-log-2nd.md`, 그리고 `decisions/ADR-00N-*.md` |
+| 끝난 조각을 어떻게 만들었나 | `history/` |
 | 기능이 어떻게 생겼는지 (비개발자용) | `README.md` — 규칙의 근거로 쓰지 않는다 |
 | 도메인 작업 규칙 (구현 시작 전) | `src/main/java/com/cakeshop/domain/community/CLAUDE.md` |
 
@@ -33,40 +36,40 @@
 
 | ID | 기능 | 액터 | 경로 | 현재 | 조각 | spec |
 |---|---|---|---|---|---|---|
-| **A1** | 게시글 작성 | 고객 | `GET /community/new` · `POST /community` | **완료** | 2 | `community-post.md` |
-| **A2** | 게시글 수정 | 작성자 | `GET·POST /community/{id}/edit` | **완료** | 2 | `community-post.md` |
-| **A3** | 게시글 삭제 | 작성자 | `POST /community/{id}/delete` | **완료** | 2 | `community-post.md` |
-| **A4** | 이미지 첨부 | 고객 | (A1·A2에 포함) | **완료** | 12 | `community-post.md` |
-| **A5** | 댓글 작성 | 고객 | `POST /community/{postId}/comments` | **완료** | 3 | `community-comment.md` |
-| **A6** | 댓글 삭제 | 댓글 작성자 | `POST /community/{postId}/comments/{commentId}/delete` | **완료** | 3 | `community-comment.md` |
-| **A7** | 답글 (2단계) | 고객 | (A5 경로의 `replyTo`) | **완료** | 8 | `community-comment.md` |
-| **A8** | 좋아요 추가·취소 | 고객 | `POST /community/{id}/likes` · `/likes/delete` | **완료** | 4 | `community-reaction.md` |
-| **A9** | 신고 | 고객 | `POST /community/{id}/reports` | **완료** | 5 | `community-reaction.md` |
-| **B1** | 게시글 목록 | 누구나 | `GET /community` | **완료** | 1 · 7a · 16 | `community-read.md` |
-| **B2** | 게시글 상세 | 누구나 | `GET /community/{id}` | **완료** | 1 | `community-read.md` |
-| **B3** | 조회수와 중복 방지 | — | (B2에 포함) | **완료** | 6 | `community-read.md` |
-| **B4** | 댓글 정렬·분량 (`더 보기`) | 누구나 | `GET /community/{id}?comments=N` | **완료** | 3 · 6 | `community-comment.md` |
-| **B5** | 인기글 영역 | 누구나 | (B1에 포함 — 메인은 15가 제거) | **완료** | 7c · 13 · 15 | `community-popular.md` |
-| **B6** | 검색 | 누구나 | `GET /community?keyword=` | **완료** | 21 | `community-read.md` |
-| **B7** | 무한 스크롤 | 누구나 | (댓글 구역 부분 로드로 재정의 — 게시글 목록은 쪽 번호 유지) | **없음** | 2차 (조각 9) | `community-read.md` |
-| **B8** | 메인 공지 상단 영역·롤링 | 누구나 | (메인 `GET /`에 포함) | **완료** | 14c · 18 · 19 | `community-notice.md` |
-| **B9** | 공지 전체보기·GNB 진입점 | 누구나 | `GET /community/notices` | **완료** | 14b · 18 | `community-notice.md` |
-| **B10** | 공지 상세 | 누구나 | `GET /community/notices/{id}` | **완료** | 14b | `community-notice.md` |
-| **C1** | 관리자 목록 | 관리자 | `GET /admin/community` | **완료** | 5 | `community-admin.md` |
-| **C2** | 관리자 상세 | 관리자 | `GET /admin/community/{id}` | **완료** | 5 | `community-admin.md` |
-| **C3** | 차단·해제 | 관리자 | `POST /admin/community/{id}/block` · `/unblock` | **완료** | 5 | `community-admin.md` |
-| **C4** | 신고 기각 | 관리자 | `POST /admin/community/{id}/reports/reject` | **완료** | 5 | `community-admin.md` |
-| **C5** | 관리자 공지 목록 | 관리자 | `GET /admin/community/notices` | **완료** | 14a | `community-notice.md` |
-| **C6** | 공지 작성·수정 | 관리자 | `GET·POST /admin/community/notices/new` · `/{id}/edit` | **완료** | 14a | `community-notice.md` |
-| **C7** | 공지 삭제 | 관리자 | `POST /admin/community/notices/{id}/delete` | **완료** | 14a | `community-notice.md` |
+| **A1** | 게시글 작성 | 고객 | `GET /community/new` · `POST /community` | **완료** | 2 | `specs/community-post.md` |
+| **A2** | 게시글 수정 | 작성자 | `GET·POST /community/{id}/edit` | **완료** | 2 | `specs/community-post.md` |
+| **A3** | 게시글 삭제 | 작성자 | `POST /community/{id}/delete` | **완료** | 2 | `specs/community-post.md` |
+| **A4** | 이미지 첨부 | 고객 | (A1·A2에 포함) | **완료** | 12 | `specs/community-post.md` |
+| **A5** | 댓글 작성 | 고객 | `POST /community/{postId}/comments` | **완료** | 3 | `specs/community-comment.md` |
+| **A6** | 댓글 삭제 | 댓글 작성자 | `POST /community/{postId}/comments/{commentId}/delete` | **완료** | 3 | `specs/community-comment.md` |
+| **A7** | 답글 (2단계) | 고객 | (A5 경로의 `replyTo`) | **완료** | 8 | `specs/community-comment.md` |
+| **A8** | 좋아요 추가·취소 | 고객 | `POST /community/{id}/likes` · `/likes/delete` | **완료** | 4 | `specs/community-reaction.md` |
+| **A9** | 신고 | 고객 | `POST /community/{id}/reports` | **완료** | 5 | `specs/community-reaction.md` |
+| **B1** | 게시글 목록 | 누구나 | `GET /community` | **완료** | 1 · 7a · 16 | `specs/community-read.md` |
+| **B2** | 게시글 상세 | 누구나 | `GET /community/{id}` | **완료** | 1 | `specs/community-read.md` |
+| **B3** | 조회수와 중복 방지 | — | (B2에 포함) | **완료** | 6 | `specs/community-read.md` |
+| **B4** | 댓글 정렬·분량 (`더 보기`) | 누구나 | `GET /community/{id}?comments=N` | **완료** | 3 · 6 | `specs/community-comment.md` |
+| **B5** | 인기글 영역 | 누구나 | (B1에 포함 — 메인은 15가 제거) | **완료** | 7c · 13 · 15 | `specs/community-popular.md` |
+| **B6** | 검색 | 누구나 | `GET /community?keyword=` | **완료** | 21 | `specs/community-read.md` |
+| **B7** | 무한 스크롤 | 누구나 | (댓글 구역 부분 로드로 재정의됐다가 함께 폐기) | **만들지 않는다** — 2026-08-19 사용자 결정으로 조각 9와 함께 제거했다. "아직 없다"가 아니다 | 조각 9 (제거) | `specs/community-read.md` |
+| **B8** | 메인 공지 상단 영역·롤링 | 누구나 | (메인 `GET /`에 포함) | **완료** | 14c · 18 · 19 | `specs/community-notice.md` |
+| **B9** | 공지 전체보기·GNB 진입점 | 누구나 | `GET /community/notices` | **완료** | 14b · 18 | `specs/community-notice.md` |
+| **B10** | 공지 상세 | 누구나 | `GET /community/notices/{id}` | **완료** | 14b | `specs/community-notice.md` |
+| **C1** | 관리자 목록 | 관리자 | `GET /admin/community` | **완료** | 5 | `specs/community-admin.md` |
+| **C2** | 관리자 상세 | 관리자 | `GET /admin/community/{id}` | **완료** | 5 | `specs/community-admin.md` |
+| **C3** | 차단·해제 | 관리자 | `POST /admin/community/{id}/block` · `/unblock` | **완료** | 5 | `specs/community-admin.md` |
+| **C4** | 신고 기각 | 관리자 | `POST /admin/community/{id}/reports/reject` | **완료** | 5 | `specs/community-admin.md` |
+| **C5** | 관리자 공지 목록 | 관리자 | `GET /admin/community/notices` | **완료** | 14a | `specs/community-notice.md` |
+| **C6** | 공지 작성·수정 | 관리자 | `GET·POST /admin/community/notices/new` · `/{id}/edit` | **완료** | 14a | `specs/community-notice.md` |
+| **C7** | 공지 삭제 | 관리자 | `POST /admin/community/notices/{id}/delete` | **완료** | 14a | `specs/community-notice.md` |
 | **D1** | 작성자 표시명 | — | (Service 계약) | **완료** | 10 | 이 문서 8절 |
-| **D2** | 메인 인기글 계약 | — | (Service 계약) | **제거** — 조각 15가 메인 노출을 뺐다. 계약 클래스는 공지(D3)용으로 남는다 | 13 · 15 | `community-popular.md` |
-| **D3** | 메인 공지 계약 | — | (D2와 같은 계약에 추가) | **완료** | 14c | `community-notice.md` |
-| **D4** | 댓글·답글 알림 | — | 알림 발송 + `GET /community/{postId}/comments/{commentId}` | **완료** | 17 | `community-comment.md` |
+| **D2** | 메인 인기글 계약 | — | (Service 계약) | **제거** — 조각 15가 메인 노출을 뺐다. 계약 클래스는 공지(D3)용으로 남는다 | 13 · 15 | `specs/community-popular.md` |
+| **D3** | 메인 공지 계약 | — | (D2와 같은 계약에 추가) | **완료** | 14c | `specs/community-notice.md` |
+| **D4** | 댓글·답글 알림 | — | 알림 발송 + `GET /community/{postId}/comments/{commentId}` | **완료** | 17 | `specs/community-comment.md` |
 | **E1** | 상태 enum + `CHECK` | — | — | **완료** | 0 | 이 문서 4절 |
 | **E2** | 카테고리 주입 | — | — | **완료** | 0 | 이 문서 10절 |
-| **E3** | 인기글 집계 배치 | — | (스케줄러) | **완료** | 7b · 20 | `community-popular.md` |
-| **E4** | 공지 표 + 상태·기간 `CHECK` | — | — | **완료** | 14a | `community-notice.md` |
+| **E3** | 인기글 집계 배치 | — | (스케줄러) | **완료** | 7b · 20 | `specs/community-popular.md` |
+| **E4** | 공지 표 + 상태·기간 `CHECK` | — | — | **완료** | 14a | `specs/community-notice.md` |
 
 ## 1. 한 문장 정의
 
@@ -94,7 +97,8 @@ Cakeshop 커뮤니티는 고객이 케이크 관련 질문과 후기를 공유�
 | 항목 | 왜 안 만드나 |
 |---|---|
 | 카테고리 관리 화면 | 카테고리는 migration으로 주입한다 (10절) |
-| 알림·실시간 댓글 | 커뮤니티 범위 밖이다. 알림은 알림 도메인이 소유한다 |
+| 실시간 댓글 | 커뮤니티 범위 밖이다. 새 댓글은 새로고침으로 본다 |
+| ~~알림~~ | **범위에 들어왔다 (조각 17).** 댓글·답글 발송을 커뮤니티가 부른다(0.1의 D4). 알림의 저장·전파·화면은 여전히 알림 도메인이 소유한다 |
 | 댓글 수정 | 등록한 댓글은 수정할 수 없다 (`specs/community-comment.md` A5·A6) |
 
 > **범위 변경 (2026-08-03).** `인기글·정렬 옵션`은 원래 제외였다. 조회수를 정렬·순위에 쓰기로 하면서 포함으로 옮겼다.
@@ -175,13 +179,16 @@ Cakeshop 커뮤니티는 고객이 케이크 관련 질문과 후기를 공유�
 
 ### 화면은 어디를 보나
 
-커뮤니티 화면은 고객 3종(`templates/customer/community/{list,detail,form}.html`)과 관리자 2종
-(`templates/admin/community/{list,detail}.html`)이다. 작성과 수정은 같은 `form.html`을 쓴다.
+커뮤니티 화면은 **아홉이다.** 고객 5종(`templates/customer/community/{list,detail,form}.html`과
+`notice/{list,detail}.html`), 관리자 4종(`templates/admin/community/{list,detail}.html`과
+`notice/{list,form}.html`). 게시글의 작성과 수정은 같은 `form.html`을, 공지의 작성과 수정은 같은
+`notice/form.html`을 쓴다. **관리자에는 공지 상세 화면이 없다** — 목록에서 바로 수정 폼으로 간다.
+공지 넷은 조각 14가 만들었다.
 
-**무엇이 어떤 조건에서 보이는지는 이 문서의 4.3과 6절이 정본이고, 실제로 무엇이 렌더링되는지는
+**무엇이 어떤 조건에서 보이는지는 이 문서의 4.3과 해당 `specs/*.md`가 정본이고, 실제로 무엇이 렌더링되는지는
 템플릿과 `CommunityScreenRenderingTests`가 보여 준다.** 화면 문구 목록을 따로 문서로 유지하지 않는다 —
 2026-08-09에 `SCREENS.md`와 `screens/*.md`를 걷어냈다. 문구를 문서에 복사해 두면 템플릿과 갈라지는데,
-그 어긋남을 잡아 주던 검사(H7)도 같은 날 폐기했기 때문이다(`PLAN.md` 결정 로그).
+그 어긋남을 잡아 주던 검사(H7)도 같은 날 폐기했기 때문이다(`PLAN.md` 하네스 인덱스의 H7 행).
 
 ## 5. 권한
 
@@ -222,7 +229,7 @@ Cakeshop 커뮤니티는 고객이 케이크 관련 질문과 후기를 공유�
 | 6.8 카테고리 | 이 문서 10절 |
 | 6.9 인기글 | `specs/community-popular.md` B5·E3 |
 
-같은 이유로 `PLAN.md`의 위험·결정 로그에 남은 `6.x` 표기도 고치지 않았다. 과거에 그렇게 적힌 기록이고,
+같은 이유로 `reviews/risks.md`와 `decisions/`의 결정 기록에 남은 `6.x` 표기도 고치지 않았다. 과거에 그렇게 적힌 기록이고,
 이 표가 그것을 지금 자리로 옮겨 준다.
 
 ## 7. 입력 검증
@@ -246,7 +253,7 @@ Cakeshop 커뮤니티는 고객이 케이크 관련 질문과 후기를 공유�
 
 - `posts.member_id`는 NOT NULL FK이므로 탈퇴해도 회원 행은 남는다.
 - **탈퇴 회원의 글·댓글은 유지하고, 작성자명만 "탈퇴한 회원"으로 표시**한다.
-- **탈퇴 여부는 회원 도메인이 판정한다.** 커뮤니티는 `MemberCommunityQueryService`에서 `withdrawn`을 받아 표시명만 고른다. 커뮤니티 SQL이 `members`를 JOIN해 직접 판정하지 않는다(조각 10b, `conventions.md` 15.1).
+- **탈퇴 여부는 회원 도메인이 판정한다.** 커뮤니티는 `MemberCommunityQueryService`에서 `withdrawn`을 받아 표시명만 고른다. 커뮤니티 SQL이 `members`를 JOIN해 직접 판정하지 않는다(조각 10b, `docs/conventions.md` 12절).
 - **회원 행을 찾지 못해도 글은 목록에 남고 작성자만 가려진다.** JOIN하던 때는 그런 글이 목록에서 통째로 사라졌는데, 그건 위 규칙과 어긋난다.
 - 글을 함께 삭제하지 않는 이유: 질문글이 사라지면 거기 달린 답변들이 맥락을 잃는다. 커뮤니티는 개인 소유물이 아니라 공유 자산이다. 실명을 그대로 두지 않는 이유는 개인정보다. 표시명만 바꾸면 데이터를 건드리지 않으므로 되돌릴 수 있다.
 
@@ -282,7 +289,7 @@ Cakeshop 커뮤니티는 고객이 케이크 관련 질문과 후기를 공유�
 
 **H0b — `posts.status`·`comments.status`에 미정의 값이 저장되지 않음.** 카테고리 3종이 활성 상태로 존재하는 것까지. `CommunitySchemaTests`(6)가 MariaDB Testcontainers로 CHECK 제약을 검증한다.
 
-**H1b — 실행 쿼리 수가 행 수와 무관함.** 고객 목록·댓글 구역·상세와 관리자 목록 **네 화면 전부**. `CommunityQueryCountTests`가 MyBatis `Interceptor`로 실행 statement 수를 센다. 조각 10b에서 작성자 조회가 붙어 기대값이 고정 1회씩 늘었고(목록 2→3, 댓글 2→3, 상세 1→2), 10d에서 관리자 목록까지 넓혔다 — 10c에서 같은 N+1 위험이 생겼는데 배치 조회로 막아 뒀을 뿐 고정하지는 않은 상태였다. **기능 하나가 아니라 네 화면에 걸려 있어 여기 있다** — `community-read.md`·`community-comment.md`·`community-admin.md`가 각각 이 행을 가리킨다. 어느 한 화면의 조회를 고치다 기대값이 움직이면 나머지 셋의 기대값도 같은 파일에 있다.
+**H1b — 실행 쿼리 수가 행 수와 무관함.** 고객 목록·댓글 구역·상세와 관리자 목록 **네 화면 전부**. `CommunityQueryCountTests`가 MyBatis `Interceptor`로 실행 statement 수를 센다. 조각 10b에서 작성자 조회가 붙어 기대값이 고정 1회씩 늘었고(목록 2→3, 댓글 2→3, 상세 1→2), 10d에서 관리자 목록까지 넓혔다. **조각 8이 답글 수 조회를 더해 댓글 구역만 다시 3→4로 올랐고, 묶음을 펼치면 5다** — 10c에서 같은 N+1 위험이 생겼는데 배치 조회로 막아 뒀을 뿐 고정하지는 않은 상태였다. **기능 하나가 아니라 네 화면에 걸려 있어 여기 있다** — `specs/community-read.md`·`specs/community-comment.md`·`specs/community-admin.md`가 각각 이 행을 가리킨다. 어느 한 화면의 조회를 고치다 기대값이 움직이면 나머지 셋의 기대값도 같은 파일에 있다.
 
 **H3 — Controller가 Mapper를 직접 호출하지 않음.** ArchUnit. **아직 적용하지 않았다** — 위반이 발생하면 그때 세운다.
 

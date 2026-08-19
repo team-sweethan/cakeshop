@@ -42,7 +42,7 @@ LIMIT #{size} OFFSET #{offset}
 >   - `DOMAIN 2.7`이 검색 조건에 대해 정한 것과 같은 규칙이다 — **리뷰가 뒤에서 거르면 건수가 틀어진다.**
 > - 위 SQL은 **계약의 형태를 정하기 위한 것**이지 리뷰 매퍼에 넣을 문장이 아니다. 리뷰 쪽에 남는 것은 **제외 목록을 만들기 위한 `reviews` 조회**뿐이다.
 
-- **`NOT EXISTS`는 상태를 보지 않는다.** `DELETED` 후기도 행이 남으므로 목록에 다시 뜨지 않는다. 이것이 의도다 — 재작성은 `uk_reviews_order_item`이 막으므로, 목록에 띄워 놓고 저장에서 거절하면 안 된다(`PLAN.md` R10).
+- **`NOT EXISTS`는 상태를 보지 않는다.** `DELETED` 후기도 행이 남으므로 목록에 다시 뜨지 않는다. 이것이 의도다 — 재작성은 `uk_reviews_order_item`이 막으므로, 목록에 띄워 놓고 저장에서 거절하면 안 된다(`../PLAN.md` R10).
 - `order_items.quantity`가 2 이상이어도 후기는 1개다. 후기 단위는 수량이 아니라 주문 상품 행이다.
 - 페이징은 `PageRequest`/`PageResult` 재사용. 크기 20 고정.
 - 정렬 키 `picked_up_at`은 변하지 않으므로 오프셋 페이징으로 충분하다.
@@ -103,7 +103,7 @@ LIMIT #{size} OFFSET #{offset}
 **처리**
 
 - **A2의 검증 4가지를 그대로 다시 수행한다.** 폼을 연 시점과 제출 시점 사이가 벌어질 수 있고, 무엇보다 폼 화면을 거치지 않은 직접 호출을 막아야 한다.
-- `reviews.product_id`는 **요청값을 믿지 않고 `order_items.product_id`에서 파생**시킨다. 같은 값에 이르는 경로가 둘이라 요청값을 그대로 쓰면 남의 상품에 후기를 붙일 수 있다(`PLAN.md` R4).
+- `reviews.product_id`는 **요청값을 믿지 않고 `order_items.product_id`에서 파생**시킨다. 같은 값에 이르는 경로가 둘이라 요청값을 그대로 쓰면 남의 상품에 후기를 붙일 수 있다(`../PLAN.md` R4).
 - `reviews.member_id`는 인증 사용자에서 가져온다. 요청값을 받지 않는다.
 - `status`는 `PUBLISHED`로 저장한다.
 - INSERT는 `uk_reviews_order_item`에 걸릴 수 있다. **`DuplicateKeyException`을 잡아 `ALREADY_REVIEWED`로 바꾼다** — 4번 검증과 INSERT 사이의 동시 요청은 검증만으로 막히지 않는다(커뮤니티 신고 선례).

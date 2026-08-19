@@ -51,8 +51,8 @@ Validation에 사용하지 않으며 불변 `record`를 기본으로 한다. Ent
 |---|---|
 | Form | `BlockForm`, `CommentForm`, `PostForm`, `ReportForm`, `NoticeForm` |
 | Command | `PostUpdateCommand`, `NoticeUpdateCommand` |
-| Query | `PostListRow`, `PostDetailRow`, `CommentRow`, `CommentCountRow`, `PostLockRow`, `NoticeListRow`, `NoticeDetailRow`, `NoticeLockRow`, 관리자 `*Row`(공지 포함) |
-| View | `PostListView`, `PostDetailView`, `CommentView`, `CommentSectionView`, `NoticeView`, `NoticeSectionView`, `NoticeDetailView`, 관리자 `*View`(공지 포함), 인기글 View |
+| Query | `PostListRow`, `PostDetailRow`, `CommentRow`, `CommentCountRow`, `ReplyCountRow`, `ReportRow`, `PostLockRow`, `NoticeListRow`, `NoticeDetailRow`, `NoticeLockRow`, 관리자 `*Row`(공지 포함) |
+| View | `PostListView`, `PostDetailView`, `PostImageView`, `PostCategoryView`, `CommentView`, `CommentThreadView`, `CommentSectionView`, `ReportView`, `NoticeView`, `NoticeSectionView`, `NoticeDetailView`, 관리자 `*View`(공지 포함), 인기글 View |
 
 `NoticeDisplayStatus`는 저장된 값이 아니라 **저장 상태와 노출 기간에서 파생된 판정**이라 `entity`가
 아니라 `dto/view`에 둔다. 판정 규칙은 enum이 갖고 Service가 `Clock`으로 만든 시각을 넘겨 부른다 —

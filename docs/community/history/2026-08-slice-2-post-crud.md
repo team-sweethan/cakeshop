@@ -2,7 +2,8 @@
 
 > **끝난 조각의 기록이다. 지금 구속하지 않는다.**
 > 이 조각이 만든 규칙의 정본은 `../specs/community-post.md`다.
-> 조각 순서와 진행 상태, 위험과 결정 로그는 `../PLAN.md`.
+> 조각 순서와 진행 상태는 `../PLAN.md`, 발견된 문제는 `../reviews/`,
+> 방향을 고른 판단은 `../decisions/`에 있다.
 
 - 소유권 검증은 인증 사용자 기준으로 Service에서
 - 삭제 = `PUBLISHED → DELETED` 전이
@@ -16,4 +17,4 @@
 
 목업이던 `form.html`의 거짓 다섯 개를 걷어냈다(`screens/new.md`의 "이 화면에 없는 것"). 분류 선택지는 `categories` 모델로, `data-mock-form`과 목업 안내는 삭제, 사진 첨부 입력 삭제, 본문 `maxlength=5000` 추가. `SecurityConfig`의 `publicPreview` 목록에서 `/community/new`도 뺐다 — 저장 경로가 생긴 화면을 비로그인에게 열어 두면 폼을 다 채우고 등록에서야 튕긴다.
 
-`screens/edit.md`의 보류 3건은 `../PLAN.md`의 결정 로그에 남겼다.
+`screens/edit.md`의 보류 3건은 `../decisions/decision-log-1st.md`에 남겼다.
