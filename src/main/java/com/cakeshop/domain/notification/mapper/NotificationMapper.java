@@ -66,8 +66,8 @@ public interface NotificationMapper {
     // 최근 생성된 쿠폰 알림의 생성 시각 조회 (서버 재기동 시 영속 체크포인트 복구용)
     LocalDateTime findLatestCouponNotificationCreatedAt();
 
-    // 실패한 쿠폰 알림 중 재시도(2회 미만) 가능한 알림 목록 조회
-    List<Notification> findRetryableCouponNotifications(@Param("limit") int limit);
+    // 실패한 쿠폰 알림 중 재시도(2회 미만) 가능한 알림 목록 조회 (커서 페이징 지원)
+    List<Notification> findRetryableCouponNotifications(@Param("lastId") Long lastId, @Param("limit") int limit);
 
     // 수신 회원 전화번호 조회 (주문서 작성 번호 우선, 알림톡 발송용)
     String findReceiverPhone(@Param("receiverId") Long receiverId, @Param("orderId") Long orderId); 

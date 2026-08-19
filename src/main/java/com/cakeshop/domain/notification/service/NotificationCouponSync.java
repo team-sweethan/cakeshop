@@ -5,6 +5,7 @@ import com.cakeshop.domain.coupon.service.CouponNotificationQueryService;
 import com.cakeshop.domain.member.service.MemberNotificationQueryService;
 import com.cakeshop.domain.notification.dto.form.NotificationRequest;
 import com.cakeshop.domain.notification.entity.DeliveryScope;
+import com.cakeshop.domain.notification.entity.Notification;
 import com.cakeshop.domain.notification.entity.NotificationType;
 import com.cakeshop.domain.notification.mapper.NotificationMapper;
 import java.time.Clock;
@@ -24,7 +25,7 @@ import org.springframework.stereotype.Component;
  * 작성자 : 김민정
  * 담당자 : 김민정
  * 작성일 : 2026-08-19
- * 기능 : 쿠폰 발급(4초 주기) 및 만료 임박(1분 주기) 감지 & 알림 동기화 스케줄러 (알림 도메인 오케스트레이션)
+ * 기능 : 쿠폰 발급(4초 주기), 만료 임박(1분 주기), 실패 SMS 재시도(30초 주기) 감지 & 알림 동기화 스케줄러
  * 설명 : 타 도메인 코드를 직접 수정하지 않고, 쿠폰 공개 Service로부터 데이터를 조회하여
  *        사용 시작일이 도래한 신규 발급 쿠폰(COUPON) 및 만료 3일 전 쿠폰(COUPON_EXPIRING_SOON)에 대해 실시간 웹 토스트 및 문자 알림을 발송한다.
  * ******************************
@@ -40,11 +41,13 @@ public class NotificationCouponSync {
     private final NotificationCouponQueryService notificationCouponQueryService;
     private final MemberNotificationQueryService memberNotificationQueryService;
     private final NotificationService notificationService;
+    private final NotificationDeliveryService notificationDeliveryService;
     private final NotificationMapper notificationMapper;
     private final Clock clock;
 
     private final AtomicBoolean isIssuanceRunning = new AtomicBoolean(false);
     private final AtomicBoolean isExpirationRunning = new AtomicBoolean(false);
+    private final AtomicBoolean isRetryRunning = new AtomicBoolean(false);
 
     // 발급 동기화용 커서
     private LocalDateTime lastIssuanceSyncTime;
@@ -88,9 +91,6 @@ public class NotificationCouponSync {
 
             // 1-2. 사용 시작일 도래 쿠폰 처리 (idx_coupons_status_starts_expires 인덱스 기반)
             syncStartedCoupons(now);
-
-            // 1-3. 외부 SMS 실패 건 자동 재시도 (최대 2회 상한 보존)
-            retryFailedCouponSms();
 
         } catch (Exception e) {
             log.error("쿠폰 발급 알림 동기화 배치 실행 중 예외 발생 (errorType={}):", e.getClass().getSimpleName());
@@ -251,39 +251,78 @@ public class NotificationCouponSync {
     }
 
     /**
-     * 실패한 외부 SMS 발송 건을 조회하여 최대 2회 상한까지 자동으로 재시도한다.
+     * 2. 실패한 외부 SMS 발송 건 자동 재시도 (30초 주기 - 인덱스 및 커서 페이징 활용)
      */
-    private void retryFailedCouponSms() {
+    @Async
+    @Scheduled(fixedDelay = 30000)
+    public void retryFailedCouponSms() {
+        if (!isRetryRunning.compareAndSet(false, true)) {
+            return;
+        }
+
         try {
-            List<com.cakeshop.domain.notification.entity.Notification> retryableList = notificationMapper.findRetryableCouponNotifications(50);
-            if (retryableList == null || retryableList.isEmpty()) {
-                return;
-            }
+            Long lastRetryId = null;
+            final int BATCH_SIZE = 50;
 
-            for (com.cakeshop.domain.notification.entity.Notification notification : retryableList) {
-                if (notification.getId() == null || notification.getReceiverId() == null) continue;
-                if (!memberNotificationQueryService.isMemberActive(notification.getReceiverId())) continue;
-
-                // 재시도 직전 쿠폰 가용성 및 유효기간 재확인 (중간에 사용/예약/만료/비활성화된 경우 재시도 제외)
-                if (notification.getUserCouponId() != null
-                        && !couponNotificationQueryService.isMemberCouponAvailableAndUnexpired(notification.getUserCouponId(), null)) {
-                    continue;
+            for (int loop = 0; loop < 5; loop++) {
+                List<Notification> retryableList = notificationMapper.findRetryableCouponNotifications(lastRetryId, BATCH_SIZE);
+                if (retryableList == null || retryableList.isEmpty()) {
+                    break;
                 }
 
-                notificationService.retrySmsForNotification(
-                        notification.getId(),
-                        notification.getReceiverId(),
-                        notification.getTitle(),
-                        notification.getContent()
-                );
+                for (Notification notification : retryableList) {
+                    lastRetryId = notification.getId();
+                    if (notification.getId() == null || notification.getReceiverId() == null) continue;
+
+                    // 회원 비활성 시 종결 처리 (큐 차단 방지)
+                    if (!memberNotificationQueryService.isMemberActive(notification.getReceiverId())) {
+                        notificationDeliveryService.recordSkippedAttempt(notification.getId(), "MEMBER_INACTIVE");
+                        continue;
+                    }
+
+                    Long userCouponId = notification.getUserCouponId();
+                    if (userCouponId != null) {
+                        LocalDateTime targetExpiresAt = null;
+                        // 만료 임박 알림인 경우 eventKey에서 당시 만료 시각 추출하여 일치 여부 검증 (만료일 연장 시 구 알림 재전송 차단)
+                        if (notification.getNotificationType() == NotificationType.COUPON_EXPIRING_SOON
+                                && notification.getEventKey() != null) {
+                            String[] parts = notification.getEventKey().split(":");
+                            if (parts.length >= 4) {
+                                try {
+                                    targetExpiresAt = LocalDateTime.parse(parts[3], EXPIRE_KEY_FORMAT);
+                                } catch (Exception ignored) {
+                                }
+                            }
+                        }
+
+                        // 쿠폰이 사용/예약/비활성화되었거나 만료일이 연장되어 불일치하는 경우 종결 처리
+                        if (!couponNotificationQueryService.isMemberCouponAvailableAndUnexpired(userCouponId, targetExpiresAt)) {
+                            notificationDeliveryService.recordSkippedAttempt(notification.getId(), "COUPON_UNAVAILABLE_OR_EXTENDED");
+                            continue;
+                        }
+                    }
+
+                    notificationService.retrySmsForNotification(
+                            notification.getId(),
+                            notification.getReceiverId(),
+                            notification.getTitle(),
+                            notification.getContent()
+                    );
+                }
+
+                if (retryableList.size() < BATCH_SIZE) {
+                    break;
+                }
             }
         } catch (Exception e) {
             log.error("실패한 쿠폰 알림 SMS 재시도 중 예외 발생 (errorType={}):", e.getClass().getSimpleName());
+        } finally {
+            isRetryRunning.set(false);
         }
     }
 
     /**
-     * 2. 만료 3일 이내 유효 쿠폰 만료 임박 알림 발송 (1분 주기 - DB 부하 제로 최적화)
+     * 3. 만료 3일 이내 유효 쿠폰 만료 임박 알림 발송 (1분 주기 - DB 부하 제로 최적화)
      */
     @Async
     @Scheduled(fixedDelay = 60000)

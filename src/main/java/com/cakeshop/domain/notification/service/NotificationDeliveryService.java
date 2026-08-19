@@ -85,4 +85,27 @@ public class NotificationDeliveryService {
             throw e;
         }
     }
+
+    /**
+     * 회원 탈퇴, 쿠폰 사용/비활성화/만료 연장 등으로 더 이상 재발송이 불필요한 알림을 SKIPPED 상태로 종결 기록한다.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordSkippedAttempt(Long notificationId, String reason) {
+        if (notificationId == null) return;
+        try {
+            LocalDateTime now = LocalDateTime.now();
+            NotificationDelivery delivery = NotificationDelivery.builder()
+                    .notificationId(notificationId)
+                    .recipient("SKIPPED")
+                    .templateCode("DEFAULT_SMS")
+                    .status("SKIPPED")
+                    .failureReason(reason)
+                    .createdAt(now)
+                    .updatedAt(now)
+                    .build();
+            notificationMapper.saveDelivery(delivery);
+        } catch (Exception e) {
+            log.error("재시도 스킵(SKIPPED) 종결 기록 실패 (notificationId: {})", notificationId, e);
+        }
+    }
 }

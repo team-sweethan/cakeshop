@@ -3,6 +3,7 @@ package com.cakeshop.domain.notification.service;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -33,7 +34,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
  * 담당자 : 김민정
  * 작성일 : 2026-08-19
  * 기능 : 쿠폰 발급 및 만료 임박(3일 전) 알림 동기화 스케줄러 단위 테스트
- * 설명 : NotificationCouponSync가 사용 시작일이 도래한 신규 발급 쿠폰(COUPON), 만료 3일 전 쿠폰(COUPON_EXPIRING_SOON) 및 실패한 SMS 재시도를 정상 수행하는지 검증한다.
+ * 설명 : NotificationCouponSync가 신규 발급, 만료 임박 및 실패한 SMS 재시도/종결을 정상 수행하는지 검증한다.
  * ******************************
  */
 @ExtendWith(MockitoExtension.class)
@@ -50,6 +51,9 @@ class NotificationCouponSyncTest {
 
     @Mock
     private NotificationService notificationService;
+
+    @Mock
+    private NotificationDeliveryService notificationDeliveryService;
 
     @Mock
     private NotificationMapper notificationMapper;
@@ -115,8 +119,8 @@ class NotificationCouponSyncTest {
     }
 
     @Test
-    @DisplayName("실패한 외부 SMS 발송 알림이 있고 쿠폰이 여전히 유효한 경우 자동으로 retrySmsForNotification이 호출된다")
-    void syncCouponIssuance_retryFailedSms_retriesSuccessfully() {
+    @DisplayName("실패한 외부 SMS 발송 알림이 있고 쿠폰이 여전히 유효한 경우 retryFailedCouponSms에서 정상 재시도된다")
+    void retryFailedCouponSms_availableCoupon_retriesSuccessfully() {
         Notification failedNotification = Notification.builder()
                 .id(100L)
                 .receiverId(5L)
@@ -124,48 +128,48 @@ class NotificationCouponSyncTest {
                 .title("쿠폰 발급")
                 .content("웰컴 쿠폰이 발급되었습니다.")
                 .notificationType(NotificationType.COUPON)
+                .eventKey("COUPON:5:20")
                 .deliveryScope(DeliveryScope.WEB_AND_SMS)
                 .build();
 
-        given(couponNotificationQueryService.findRecentlyIssuedMemberCoupons(any(), any(), any(), anyInt()))
+        given(notificationMapper.findRetryableCouponNotifications(any(), anyInt()))
+                .willReturn(List.of(failedNotification))
                 .willReturn(List.of());
-        given(couponNotificationQueryService.findRecentlyStartedMemberCoupons(any(), any(), any(), anyInt()))
-                .willReturn(List.of());
-        given(notificationMapper.findRetryableCouponNotifications(anyInt()))
-                .willReturn(List.of(failedNotification));
         given(memberNotificationQueryService.isMemberActive(5L)).willReturn(true);
         given(couponNotificationQueryService.isMemberCouponAvailableAndUnexpired(20L, null)).willReturn(true);
 
-        notificationCouponSync.syncCouponIssuance();
+        notificationCouponSync.retryFailedCouponSms();
 
         verify(notificationService).retrySmsForNotification(100L, 5L, "쿠폰 발급", "웰컴 쿠폰이 발급되었습니다.");
     }
 
     @Test
-    @DisplayName("실패한 외부 SMS 알림의 쿠폰이 재시도 시점에 이미 사용(USED)되었으면 재시도를 스킵한다")
-    void syncCouponIssuance_retryFailedSms_couponUsed_skipsRetry() {
+    @DisplayName("만료일이 연장되어 알림 당시의 만료일시와 불일치하는 경우 재시도를 건너뛰고 SKIPPED 종결 처리한다")
+    void retryFailedCouponSms_extendedExpiration_skipsAndFinalizes() {
         Notification failedNotification = Notification.builder()
-                .id(101L)
-                .receiverId(6L)
-                .userCouponId(21L)
-                .title("쿠폰 발급")
-                .content("웰컴 쿠폰이 발급되었습니다.")
-                .notificationType(NotificationType.COUPON)
+                .id(102L)
+                .receiverId(7L)
+                .userCouponId(22L)
+                .title("쿠폰 만료 임박")
+                .content("웰컴 쿠폰의 사용 기한이 2일 남았습니다.")
+                .notificationType(NotificationType.COUPON_EXPIRING_SOON)
+                .eventKey("COUPON_EXPIRING_SOON:7:22:202608210900")
                 .deliveryScope(DeliveryScope.WEB_AND_SMS)
                 .build();
 
-        given(couponNotificationQueryService.findRecentlyIssuedMemberCoupons(any(), any(), any(), anyInt()))
+        LocalDateTime parsedOldExpiresAt = LocalDateTime.parse("2026-08-21T09:00:00");
+        given(notificationMapper.findRetryableCouponNotifications(any(), anyInt()))
+                .willReturn(List.of(failedNotification))
                 .willReturn(List.of());
-        given(couponNotificationQueryService.findRecentlyStartedMemberCoupons(any(), any(), any(), anyInt()))
-                .willReturn(List.of());
-        given(notificationMapper.findRetryableCouponNotifications(anyInt()))
-                .willReturn(List.of(failedNotification));
-        given(memberNotificationQueryService.isMemberActive(6L)).willReturn(true);
-        given(couponNotificationQueryService.isMemberCouponAvailableAndUnexpired(21L, null)).willReturn(false);
+        given(memberNotificationQueryService.isMemberActive(7L)).willReturn(true);
+        // 당시 만료일(2026-08-21 09:00)과 현재 DB 만료일이 달라 불일치(false) 반환
+        given(couponNotificationQueryService.isMemberCouponAvailableAndUnexpired(eq(22L), eq(parsedOldExpiresAt)))
+                .willReturn(false);
 
-        notificationCouponSync.syncCouponIssuance();
+        notificationCouponSync.retryFailedCouponSms();
 
         verify(notificationService, never()).retrySmsForNotification(any(), any(), any(), any());
+        verify(notificationDeliveryService).recordSkippedAttempt(102L, "COUPON_UNAVAILABLE_OR_EXTENDED");
     }
 
     @Test
@@ -193,22 +197,5 @@ class NotificationCouponSyncTest {
                 "웰컴 10% 할인 쿠폰".equals(req.getArgs()[0]) &&
                 "2일".equals(req.getArgs()[1])
         ));
-    }
-
-    @Test
-    @DisplayName("발송 직전 쿠폰이 이미 사용(USED)되어 비가용 상태가 된 경우 발급 알림 발송을 스킵한다")
-    void syncCouponIssuance_couponNotAvailable_skipsNotification() {
-        LocalDateTime now = LocalDateTime.now(clock);
-        CouponNotificationView coupon = new CouponNotificationView(10L, 1L, 2L, "웰컴 10% 할인 쿠폰", now, now, now.plusDays(30));
-        given(couponNotificationQueryService.findRecentlyIssuedMemberCoupons(any(), any(), any(), anyInt()))
-                .willReturn(List.of(coupon));
-        given(couponNotificationQueryService.findRecentlyStartedMemberCoupons(any(), any(), any(), anyInt()))
-                .willReturn(List.of());
-        given(memberNotificationQueryService.isMemberActive(2L)).willReturn(true);
-        given(couponNotificationQueryService.isMemberCouponAvailableAndUnexpired(10L, coupon.expiresAt())).willReturn(false);
-
-        notificationCouponSync.syncCouponIssuance();
-
-        verify(notificationService, never()).makeNotification(any());
     }
 }
