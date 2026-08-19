@@ -37,11 +37,6 @@ public class NotificationService {
             return;
         }
 
-        // 수신자가 비활성(탈퇴/정지) 회원이면 알림을 생성하거나 발송하지 않는다.
-        if (request.getReceiverId() != null && !memberNotificationQueryService.isMemberActive(request.getReceiverId())) {
-            return;
-        }
-
         // 제목 및 본문 템플릿 포맷팅
         String title = request.getType().getDefaultTitle();
         String content = request.getType().formatContent(request.getArgs());
