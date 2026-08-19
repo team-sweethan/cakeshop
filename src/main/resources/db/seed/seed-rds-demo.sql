@@ -18,8 +18,8 @@ CREATE TEMPORARY TABLE `_rds_demo_seed_config` (
     `admin_password_hash` VARCHAR(255) NOT NULL,
     CONSTRAINT `chk_rds_demo_admin_password_hash`
         CHECK (
-            CHAR_LENGTH(`admin_password_hash`) = 60
-            AND LEFT(`admin_password_hash`, 4) IN ('$2a$', '$2b$', '$2y$')
+            CAST(`admin_password_hash` AS BINARY) REGEXP
+                '^[$]2[aby][$](0[4-9]|[12][0-9]|3[01])[$][./A-Za-z0-9]{53}$'
         )
 );
 
@@ -490,6 +490,27 @@ WHERE c.`code` = 'CAKE'
 -- 상품명과 옵션 그룹명이 같은 데이터가 있으면 중복 등록하지 않는다.
 -- =========================================================
 
+-- 같은 카테고리에 동명 상품이 추가되어도 모든 행을 시드 대상으로 간주하지 않는다.
+-- 상품 INSERT가 기존 동명 상품을 채택하는 규칙과 맞춰 가장 먼저 생성된 한 행만 식별한다.
+CREATE TEMPORARY TABLE `_rds_demo_seed_products` (
+    `product_id` BIGINT NOT NULL PRIMARY KEY,
+    `product_name` VARCHAR(255) NOT NULL UNIQUE
+);
+
+INSERT INTO `_rds_demo_seed_products` (`product_id`, `product_name`)
+SELECT
+    MIN(p.`id`),
+    p.`name`
+FROM `products` p
+INNER JOIN `categories` c
+        ON c.`id` = p.`category_id`
+       AND c.`code` = 'CAKE'
+WHERE p.`name` IN (
+    '레터링 생크림 케이크',
+    '캐릭터 입체 주문 제작 케이크'
+)
+GROUP BY p.`name`;
+
 INSERT INTO `product_option_groups` (
     `product_id`,
     `name`,
@@ -498,15 +519,12 @@ INSERT INTO `product_option_groups` (
     `sort_order`
 )
 SELECT
-    p.`id`,
+    seed_product.`product_id`,
     sample.`group_name`,
     sample.`required`,
     sample.`selection_type`,
     sample.`sort_order`
-FROM `products` p
-INNER JOIN `categories` c
-        ON c.`id` = p.`category_id`
-       AND c.`code` = 'CAKE'
+FROM `_rds_demo_seed_products` seed_product
 INNER JOIN (
     SELECT
         '레터링 생크림 케이크' AS `product_name`,
@@ -542,11 +560,11 @@ INNER JOIN (
         'MULTIPLE',
         2
 ) sample
-        ON sample.`product_name` = p.`name`
+        ON sample.`product_name` = seed_product.`product_name`
 WHERE NOT EXISTS (
     SELECT 1
     FROM `product_option_groups` pog
-    WHERE pog.`product_id` = p.`id`
+    WHERE pog.`product_id` = seed_product.`product_id`
       AND pog.`name` = sample.`group_name`
 );
 
@@ -570,12 +588,9 @@ SELECT
     sample.`additional_price`,
     sample.`status`,
     sample.`sort_order`
-FROM `products` p
-INNER JOIN `categories` c
-        ON c.`id` = p.`category_id`
-       AND c.`code` = 'CAKE'
+FROM `_rds_demo_seed_products` seed_product
 INNER JOIN `product_option_groups` pog
-        ON pog.`product_id` = p.`id`
+        ON pog.`product_id` = seed_product.`product_id`
 INNER JOIN (
     SELECT
         '레터링 생크림 케이크' AS `product_name`,
@@ -676,7 +691,7 @@ INNER JOIN (
         'INACTIVE',
         3
 ) sample
-        ON sample.`product_name` = p.`name`
+        ON sample.`product_name` = seed_product.`product_name`
        AND sample.`group_name` = pog.`name`
 WHERE NOT EXISTS (
     SELECT 1
@@ -687,5 +702,6 @@ WHERE NOT EXISTS (
 
 COMMIT;
 
+DROP TEMPORARY TABLE `_rds_demo_seed_products`;
 DROP TEMPORARY TABLE `_rds_demo_seed_config`;
 SET @rds_demo_admin_password_hash = NULL;
