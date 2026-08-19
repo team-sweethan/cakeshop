@@ -99,8 +99,8 @@ public class ChatService {
     /**
      * 주문제작 반려 시 시스템이 반려 사유를 고객 채팅방에 자동 발송한다.
      * - 채팅방이 없으면 자동 생성 후 발송한다.
-     * - 발신자로 활성 관리자 중 첫 번째 ID를 사용한다. 활성 관리자가 없으면 발송을 중단한다.
-     * - 기존 채팅방의 상담 대기 상태(WAITING_ADMIN) 및 운영 상태(CLOSED 등)를 덮어쓰지 않고 보존한다.
+     * - 동시성 경합을 방지하기 위해 FOR UPDATE로 비관적 잠금을 획득한다.
+     * - preserveStatus=true를 사용하여 DB 최신 status 및 responseStatus를 원자적으로 보존한다.
      * - 트랜잭션 외부(이벤트 리스너 @Async)에서 호출되어야 한다.
      * @return 저장된 메시지 응답 DTO (WebSocket 브로드캐스트에 사용) 또는 발송 불가 시 null
      */
@@ -117,20 +117,16 @@ public class ChatService {
         }
         Long senderId = adminIds.get(0);
 
-        ChatRoom chatRoom = getOrMakeChatRoom(customerId);
+        // P2: 동시성 처리를 위해 FOR UPDATE로 방 행을 비관적 잠금 조회
+        ChatRoom chatRoom = chatMapper.findChatRoomByCustomerIdForUpdate(customerId);
+        if (chatRoom == null) {
+            chatRoom = getOrMakeChatRoom(customerId);
+        }
+
         String content = "[반려 안내] " + rejectReason;
 
-        // P2: 시스템 안내 메시지가 기존 상담 대기 상태(WAITING_ADMIN) 및 운영 상태(CLOSED 등)를 덮어쓰지 않도록 함
-        // 기존 메시지가 존재하는 방이면 현재 responseStatus 및 status 유지, 신규 방이면 WAITING_CUSTOMER + OPEN
-        ChatResponseStatus targetResponseStatus = (chatRoom.getLastMessageId() != null && chatRoom.getResponseStatus() != null)
-                ? chatRoom.getResponseStatus()
-                : ChatResponseStatus.WAITING_CUSTOMER;
-
-        ChatRoomStatus targetStatus = (chatRoom.getLastMessageId() != null && chatRoom.getStatus() != null)
-                ? chatRoom.getStatus()
-                : ChatRoomStatus.OPEN;
-
-        ChatMessage message = createMessage(chatRoom.getId(), senderId, true, null, content, null, targetResponseStatus, targetStatus);
+        // preserveStatus = true 로 전달하여 SQL 업데이트 시점에 DB 최신 status 및 responseStatus 원자적 보존
+        ChatMessage message = createMessage(chatRoom.getId(), senderId, true, null, content, null, null, null, true);
 
         String customerName = memberChatQueryService.getCustomerName(customerId);
 
@@ -241,12 +237,12 @@ public class ChatService {
     // 메시지 만들고 저장, 방 상태 갱신
     private ChatMessage createMessage(Long roomId, Long senderId, boolean isAdmin, Long productId, 
         String content, List<ChatMessageAttachmentRequest> attachments) {
-        return createMessage(roomId, senderId, isAdmin, productId, content, attachments, null, null);
+        return createMessage(roomId, senderId, isAdmin, productId, content, attachments, null, null, false);
     }
 
     private ChatMessage createMessage(Long roomId, Long senderId, boolean isAdmin, Long productId, 
         String content, List<ChatMessageAttachmentRequest> attachments,
-        ChatResponseStatus overrideResponseStatus, ChatRoomStatus overrideStatus) {
+        ChatResponseStatus overrideResponseStatus, ChatRoomStatus overrideStatus, Boolean preserveStatus) {
 
             // 1. 텅 빈 메시지 저장 차단, 2,000자 상한선 및 첨부파일 최대 5개 상한선 제한
             boolean hasContent = content != null && !content.trim().isEmpty();
@@ -335,7 +331,8 @@ public class ChatService {
                 message.getId(),
                 message.getCreatedAt(),
                 targetResponseStatus,
-                overrideStatus
+                overrideStatus,
+                preserveStatus
             );
 
             return message;
