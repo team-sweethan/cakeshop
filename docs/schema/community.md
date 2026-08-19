@@ -32,12 +32,12 @@
 | `title` | VARCHAR(200) |  | X | 없음 | 제목 |
 | `content` | TEXT |  | X | 없음 | 본문 |
 | `view_count` | BIGINT | INDEX | X | `0` | 조회 수 캐시 |
-| `like_count` | BIGINT |  | X | `0` | 좋아요 수 캐시 |
+| `like_count` | BIGINT | INDEX | X | `0` | 좋아요 수 캐시 |
 | `status` | VARCHAR(30) | INDEX | X | `'PUBLISHED'` | 게시글 상태 |
 | `blocked_at` | DATETIME(6) |  | O | NULL | 차단 시각 |
 | `blocked_reason` | VARCHAR(500) |  | O | NULL | 차단 사유 |
 | `blocked_by` | BIGINT | FK | O | NULL | 차단 처리 회원 식별자 |
-| `created_at` | DATETIME(6) |  | X | `CURRENT_TIMESTAMP(6)` | 생성 시각 |
+| `created_at` | DATETIME(6) | INDEX | X | `CURRENT_TIMESTAMP(6)` | 생성 시각 |
 | `updated_at` | DATETIME(6) |  | X | `CURRENT_TIMESTAMP(6)` | 수정 시각, 수정 시 자동 갱신 |
 
 - FK: `member_id`, `blocked_by` → 각각 `members.id`; `category_id` → `post_categories.id`
@@ -100,10 +100,10 @@
 | 컬럼 | 타입 | 키 | Null | 기본값 | 의미 |
 |---|---|---|---|---|---|
 | `id` | BIGINT | PK | X | AUTO_INCREMENT | 신고 식별자 |
-| `post_id` | BIGINT | FK, UK | X | 없음 | 신고 게시글 식별자 |
+| `post_id` | BIGINT | FK, UK, INDEX | X | 없음 | 신고 게시글 식별자 |
 | `reporter_id` | BIGINT | FK, UK | X | 없음 | 신고 회원 식별자 |
 | `reason` | VARCHAR(500) |  | X | 없음 | 신고 사유 |
-| `status` | VARCHAR(30) |  | X | `'PENDING'` | 신고 처리 상태 |
+| `status` | VARCHAR(30) | INDEX | X | `'PENDING'` | 신고 처리 상태 |
 | `created_at` | DATETIME(6) |  | X | `CURRENT_TIMESTAMP(6)` | 생성 시각 |
 
 - UK: `uk_post_reports_post_reporter` (`post_id`, `reporter_id`)
@@ -192,4 +192,5 @@
 - `V20260805_073107__add_daily_popular_posts.sql`
 - `V20260812_065639__add_community_notices.sql`
 - `V20260813_094912__add_statistics_additional_metrics.sql`
+- `V20260813_162742__add_dashboard_pending_report_index.sql`
 - `V20260818_234248__add_post_like_count_sort_index.sql`

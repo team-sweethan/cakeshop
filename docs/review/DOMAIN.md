@@ -12,7 +12,9 @@
 | 상태 모델·평점·권한·검증·오류 코드·표시·도메인 경계 | 이 문서 2절 |
 | 화면 인벤토리 | 이 문서 3절 |
 | 아직 안 정해진 것 | 이 문서 4절 |
-| 조각 순서, 진행 상태, 위험, 결정 로그 | `PLAN.md` |
+| 조각 순서, 진행 상태, 번호 인덱스 | `PLAN.md` |
+| 아직 닫히지 않은 위험의 본문 | `reviews/risks.md` |
+| 무엇을 언제 왜 정했나 | `decisions/decision-log.md` |
 | 왜 그렇게 정했나 — PLAN 한 줄로 재구성이 안 되는 것 | `decisions/` |
 | 머지되었고 더 이상 구속하지 않는 것 | `history/` |
 | 도메인 작업 규칙 (구현 시작 전) | `src/main/java/com/cakeshop/domain/review/CLAUDE.md` |
@@ -80,25 +82,25 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 
 | ID | 기능 | 액터 | 경로 | 현재 | 조각 | spec |
 |---|---|---|---|---|---|---|
-| **A1** | 작성할 후기 목록 | 고객 | `GET /mypage/reviews/writable` | **완료** | 1 | `review-write.md` |
-| **A2** | 후기 작성 폼 | 고객 | `GET /reviews/new?orderItemId={N}` | **완료** | 1 | `review-write.md` |
-| **A3** | 후기 등록 | 고객 | `POST /reviews` | **완료** | 1 | `review-write.md` |
-| **A4** | 후기 수정 | 고객 | `GET·POST /reviews/{id}/edit` | **완료** | 4 | `review-edit-delete.md` |
-| **A5** | 후기 삭제 | 고객 | `POST /reviews/{id}/delete` | **완료** | 4 | `review-edit-delete.md` |
-| **A6** | 이미지 첨부 | 고객 | (A2·A3에 포함) | **완료** | 8 (2차) | `review-write.md` |
-| **B1** | 상품 후기 목록 | 누구나 | 미리보기 3개(상품 상세 안) · 전체 `GET /products/{id}/reviews` | **완료** | 3 | `review-read.md` |
-| **B2** | 상품 평균 평점·후기 수 | 누구나 | (상품 상세에 포함) | **완료** | 2 | `review-read.md` |
-| **B3** | 내가 쓴 후기 목록 | 고객 | `GET /mypage/reviews` · 알림 진입 `GET /mypage/reviews/{id}` | **완료** | 3 (deep link는 9) | `review-read.md` |
-| **B4** | 후기에 달린 답글 노출 | 누구나 | (B1·B3에 포함) | **완료** | 6 | `review-reply.md` |
-| **C1** | 관리자 후기 목록 | 관리자 | `GET /admin/reviews` | **완료** | 5 | `review-admin.md` |
-| **C2** | 관리자 검색·필터 | 관리자 | (C1의 파라미터) | **완료** | 5 | `review-admin.md` |
-| **C3** | 관리자 후기 상세 | 관리자 | `GET /admin/reviews/{id}` | **완료** | 5 | `review-admin.md` |
-| **C4** | 후기 숨김·해제 | 관리자 | `POST /admin/reviews/{id}/block` · `/unblock` | **완료** | 5 | `review-admin.md` |
-| **C5** | 답글 작성 | 관리자 | `POST /admin/reviews/{id}/replies` | **완료** | 6 | `review-reply.md` |
-| **C6** | 답글 수정 | 관리자 | `POST /admin/reviews/{id}/replies/edit` | **완료** | 6 | `review-reply.md` |
-| **D1** | 상품 평점 집계 | — | (Service 계약) | **완료** | 2 (#33) | `product-rating.md` |
-| **D2** | 알림 발송 | — | (Service 계약) | **완료** | 7 | `review-notification.md` |
-| **D3** | 알림에서 후기로 가는 링크 | — | (`NotificationResponse`가 파생) | **진행 중** — 민정님 합의 대기 | 9 (2차) | `review-notification.md` |
+| **A1** | 작성할 후기 목록 | 고객 | `GET /mypage/reviews/writable` | **완료** | 1 | `specs/review-write.md` |
+| **A2** | 후기 작성 폼 | 고객 | `GET /reviews/new?orderItemId={N}` | **완료** | 1 | `specs/review-write.md` |
+| **A3** | 후기 등록 | 고객 | `POST /reviews` | **완료** | 1 | `specs/review-write.md` |
+| **A4** | 후기 수정 | 고객 | `GET·POST /reviews/{id}/edit` | **완료** | 4 | `specs/review-edit-delete.md` |
+| **A5** | 후기 삭제 | 고객 | `POST /reviews/{id}/delete` | **완료** | 4 | `specs/review-edit-delete.md` |
+| **A6** | 이미지 첨부 | 고객 | (A2·A3에 포함) | **완료** | 8 (2차) | `specs/review-write.md` |
+| **B1** | 상품 후기 목록 | 누구나 | 미리보기 3개(상품 상세 안) · 전체 `GET /products/{id}/reviews` | **완료** | 3 | `specs/review-read.md` |
+| **B2** | 상품 평균 평점·후기 수 | 누구나 | (상품 상세에 포함) | **완료** | 2 | `specs/review-read.md` |
+| **B3** | 내가 쓴 후기 목록 | 고객 | `GET /mypage/reviews` · 알림 진입 `GET /mypage/reviews/{id}` | **완료** | 3 (deep link는 9) | `specs/review-read.md` |
+| **B4** | 후기에 달린 답글 노출 | 누구나 | (B1·B3에 포함) | **완료** | 6 | `specs/review-reply.md` |
+| **C1** | 관리자 후기 목록 | 관리자 | `GET /admin/reviews` | **완료** | 5 | `specs/review-admin.md` |
+| **C2** | 관리자 검색·필터 | 관리자 | (C1의 파라미터) | **완료** | 5 | `specs/review-admin.md` |
+| **C3** | 관리자 후기 상세 | 관리자 | `GET /admin/reviews/{id}` | **완료** | 5 | `specs/review-admin.md` |
+| **C4** | 후기 숨김·해제 | 관리자 | `POST /admin/reviews/{id}/block` · `/unblock` | **완료** | 5 | `specs/review-admin.md` |
+| **C5** | 답글 작성 | 관리자 | `POST /admin/reviews/{id}/replies` | **완료** | 6 | `specs/review-reply.md` |
+| **C6** | 답글 수정 | 관리자 | `POST /admin/reviews/{id}/replies/edit` | **완료** | 6 | `specs/review-reply.md` |
+| **D1** | 상품 평점 집계 | — | (Service 계약) | **완료** | 2 (#33) | `specs/product-rating.md` |
+| **D2** | 알림 발송 | — | (Service 계약) | **완료** | 7 | `specs/review-notification.md` |
+| **D3** | 알림에서 후기로 가는 링크 | — | (`NotificationResponse`가 파생) | **완료** (PR #329) | 9 (2차) | `specs/review-notification.md` |
 | **E1** | `ReviewStatus` enum + `CHECK` | — | — | **완료** (#125) | 0 | `history/2026-08-slice-0-schema.md` |
 | **E2** | 평점 범위 `CHECK` | — | — | **완료** (#125) | 0 | `history/2026-08-slice-0-schema.md` |
 | **E3** | `Review`·`ReviewReply` 엔티티 | — | — | **완료** (#125) | 0 | `history/2026-08-slice-0-schema.md` |
@@ -197,7 +199,7 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 
 ### 2.5 오류 코드
 
-`REVIEW_001`~`REVIEW_006`이 코드에 있다(`ReviewErrorCode`). 나머지는 조각 진행에 맞춰 추가한다. 번호는 `<도메인>_NNN` 팀 규약을 따르며, **`조각` 열이 그 코드가 들어온(또는 들어올) 조각이다.**
+`REVIEW_001`~`REVIEW_012`가 전부 코드에 있다(`ReviewErrorCode`). 아래 표가 그 열둘이다. 번호는 `<도메인>_NNN` 팀 규약을 따르며, **`조각` 열이 그 코드가 들어온(또는 들어올) 조각이다.**
 
 | 코드 | 이름 | 메시지 | HTTP | 조각 |
 |---|---|---|---|---|
@@ -316,8 +318,8 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 | 관리자 숨김 사유·조치 이력 기록 여부 | 필요해지면 새 migration (C1) |
 
 **해소된 것**: 조각 7의 D2 `event_key` 규격과 `NEW_REVIEW` 수신 관리자, 조각 8의 A6 이미지 첨부.
-각 결정은 연결된 spec이 정본이고, 정한 날짜는 `PLAN.md` 결정 로그에 있다.
+각 결정은 연결된 spec이 정본이고, 정한 날짜는 `decisions/decision-log.md`에 있다.
 
 ---
 
-**결정 로그는 `PLAN.md`에 있다.** 무엇을 언제 왜 정했는지는 그쪽 한 곳에만 쌓는다. 이 문서에는 **지금 유효한 규칙과 그 근거**만 두고, 규칙을 바꾸면 해당 절을 고치고 PLAN 결정 로그에 한 줄 남긴다. 한 줄로 재구성이 안 되는 결정은 `decisions/`로 승격한다.
+**결정 로그는 `decisions/decision-log.md`에 있다.** 무엇을 언제 왜 정했는지는 그쪽 한 곳에만 쌓는다. 이 문서에는 **지금 유효한 규칙과 그 근거**만 두고, 규칙을 바꾸면 해당 절을 고치고 결정 기록에 한 줄 남긴다. 한 줄로 재구성이 안 되는 결정은 같은 폴더의 `ADR-00N-*.md`로 승격한다. **아직 닫히지 않은 위험은 `reviews/risks.md`**, `PLAN.md`에는 그 둘로 가는 번호 인덱스만 있다.

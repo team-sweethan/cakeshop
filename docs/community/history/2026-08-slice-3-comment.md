@@ -2,7 +2,8 @@
 
 > **끝난 조각의 기록이다. 지금 구속하지 않는다.**
 > 이 조각이 만든 규칙의 정본은 `../specs/community-comment.md`다.
-> 조각 순서와 진행 상태, 위험과 결정 로그는 `../PLAN.md`.
+> 조각 순서와 진행 상태는 `../PLAN.md`, 발견된 문제는 `../reviews/`,
+> 방향을 고른 판단은 `../decisions/`에 있다.
 
 - 대상 게시글이 `PUBLISHED`인지 검증 (DOMAIN.md 4.5)
 - 삭제 시 자리 표시, 개수 집계에서 제외
@@ -14,7 +15,7 @@
 
 검증은 `CommunityMapperTests`(+16), `CommunityMapperXmlTests`(+4), `CommunityServiceTests`(+19), `CommunityControllerTests`(+9), `CommunityScreenRenderingTests`(+10), `CommunityQueryCountTests`(+1), 새 `CommunityCommentScopeTests`(2)로 고정했다. 하네스 표에 H8·H9·H10·H11을 올렸다.
 
-보류 항목이던 **댓글 페이징을 "최신 20건 + `이전 댓글 더 보기`"로 결정**했다(`../PLAN.md`의 결정 로그). DOMAIN.md 6.4에 정렬·분량·경로·상한을 함께 적었고 9절의 보류 줄을 지웠다.
+보류 항목이던 **댓글 페이징을 "최신 20건 + `이전 댓글 더 보기`"로 결정**했다(`../decisions/decision-log-1st.md`). DOMAIN.md 6.4에 정렬·분량·경로·상한을 함께 적었고 9절의 보류 줄을 지웠다.
 
 구현 중 DOMAIN.md에 없던 빈칸 셋을 채우고 6.4에 반영했다: 댓글을 지울 수 있는 사람은 작성자 본인뿐이라는 것(게시글 작성자·관리자에게 권한이 없다), 댓글 작성뿐 아니라 **삭제에도** 게시글이 `PUBLISHED`여야 한다는 것, 삭제된 댓글의 본문을 조회 단계에서 `NULL`로 지운다는 것.
 

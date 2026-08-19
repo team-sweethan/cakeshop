@@ -94,8 +94,9 @@ Spring이나 Thymeleaf가 실행 중에 읽는 설정 파일은 아니며, 실�
 | `fragments/common/alert :: alert` | 없음 | `successMessage`, `errorMessage` 출력 |
 | `fragments/admin/sidebar :: sidebar` | `activeMenu` | 관리자 메뉴와 현재 메뉴 표시 |
 | `fragments/admin/header :: header` | `title` | 관리자 화면 제목과 사용자 동작 |
+| `fragments/common/head :: head` | `title` | `<title>`과 `app.css`·`app.js` |
 
-`fragments/common/head :: head`는 단순 화면에서 선택적으로 사용할 수 있다. 이 프래그먼트는
+`fragments/common/head :: head`는 단순 화면에서 선택적으로 사용할 수 있고 **제목을 인자로 받는다**(`head('쿠폰 상세 정보 | 관리자')`). 이 프래그먼트는
 `app.css`와 `app.js`까지 포함하므로 기능별 자원을 추가해야 하거나 같은 자원이 다른 프래그먼트에서
 이미 로드되는 화면에서는 중복 로드를 확인한다.
 

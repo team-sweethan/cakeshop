@@ -106,8 +106,9 @@ AND (ends_at   IS NULL OR :now <  ends_at)
 |---|---|---|---|
 | 비로그인 / 회원 | 정상 | **404** | **404** |
 | 관리자 (고객 경로) | 정상 | **404** | **404** |
-| 관리자 (`/admin/community/notices/{id}`) | 정상 | 정상 | 정상 |
+| 관리자 (`/admin/community/notices`와 `/{id}/edit`) | 정상 | 정상 | 정상 |
 
+- **관리자 공지 상세 화면은 없다.** 목록에서 바로 수정 폼(`/{id}/edit`)으로 가므로 관리자가 모든 상태의 공지를 보는 자리가 그 둘이다.
 - 403이 아니라 404인 이유는 `../DOMAIN.md` 4.3과 같다 — 403은 그 자리에 글이 있다는 사실을 흘린다.
 - **`customer/community/detail.html`을 재사용하지 않는다.** 공지 전용 템플릿을 판다. 재사용하면 댓글·좋아요 영역을 `th:if`로 가리게 되는데, 그러면 **표를 나눠 얻은 구조적 보증을 화면에서 도로 무른다** — 조건 하나가 뒤집히면 공지에 댓글창이 열린다.
 - 본문은 순수 텍스트다. `th:utext`를 쓰지 않고 줄바꿈은 `white-space: pre-wrap`으로 처리한다(`../DOMAIN.md` 7절).
@@ -136,7 +137,7 @@ AND (ends_at   IS NULL OR :now <  ends_at)
 
 ## D3. 메인 공지 계약
 
-- 메인은 `home` 도메인이라 커뮤니티의 Mapper·테이블에 직접 닿지 않고 공개 조회 계약을 거친다(`conventions.md` 12절).
+- 메인은 `home` 도메인이라 커뮤니티의 Mapper·테이블에 직접 닿지 않고 공개 조회 계약을 거친다(`docs/conventions.md` 12절).
 - 조각 13에서 만든 `CommunityHomeQueryService`에 `getNoticeSection()`을 더했다. **새 계약 클래스를 만들지 않았다** — 소비 도메인이 같으면 계약도 하나다.
 - 건수 3은 그 계약이 갖는다. **목록의 "1쪽 + 필터 없음"은 가져오지 않는다** — 메인에는 쪽도 필터도 없어 조건이 성립하지 않고, `PageRequest(1, ...)`을 지어내면 목록의 페이지 크기가 바뀔 때 메인이 함께 흔들린다(인기글에서 같은 결정을 했다).
 - `home`은 공통 협의 도메인이라 `HomeService`·`HomeController`·`main.html` 변경은 PR에서 확인을 받는다.
