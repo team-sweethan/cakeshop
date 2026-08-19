@@ -147,6 +147,15 @@
         )
     </select>
 
+    <!--이미 발송 시도 이력(SENT, FAILED, SKIPPED)이 한 번이라도 존재하는지 확인-->
+    <select id="hasAttemptedDelivery" resultType="boolean">
+        SELECT EXISTS (
+            SELECT true FROM notification_deliveries
+            WHERE notification_id = #{notificationId}
+            LIMIT 1
+        )
+    </select>
+
     <!-- 수신 전화번호 조회 (주문이 있으면 orderer_phone 우선, 없으면 members.phone) -->
     <select id="findReceiverPhone" resultType="string">
         SELECT COALESCE(o.orderer_phone, m.phone)

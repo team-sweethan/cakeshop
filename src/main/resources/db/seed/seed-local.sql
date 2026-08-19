@@ -183,24 +183,78 @@ SELECT
     sample.`status`
 FROM `categories` c
 CROSS JOIN (
-    -- 딸기 케이크: 일반적인 재고 상품
+    -- 일반 상품은 크기·색상 조합별로 독립적인 재고를 가진다.
     SELECT
-        '딸기 생크림 케이크' AS `name`,
-        '신선한 딸기와 부드러운 생크림으로 만든 케이크입니다.' AS `description`,
+        '딸기 생크림 케이크 1호' AS `name`,
+        '신선한 딸기와 부드러운 생크림으로 만든 1호 케이크입니다.' AS `description`,
         35000 AS `base_price`,
-        12 AS `stock_quantity`,
+        7 AS `stock_quantity`,
         'GENERAL' AS `product_type`,
         0 AS `preparation_days`,
         'ACTIVE' AS `status`
 
     UNION ALL
 
-    -- 초코 케이크: 일반적인 재고 상품
     SELECT
-        '초코 가나슈 케이크',
-        '진한 다크초콜릿과 부드러운 가나슈 크림으로 만든 케이크입니다.',
+        '딸기 생크림 케이크 2호',
+        '신선한 딸기와 부드러운 생크림으로 만든 2호 케이크입니다.',
+        45000,
+        5,
+        'GENERAL',
+        0,
+        'ACTIVE'
+
+    UNION ALL
+
+    SELECT
+        '딸기 생크림 케이크 3호',
+        '신선한 딸기와 부드러운 생크림으로 만든 3호 케이크입니다.',
+        55000,
+        2,
+        'GENERAL',
+        0,
+        'ACTIVE'
+
+    UNION ALL
+
+    SELECT
+        '초코 가나슈 케이크 1호 다크초코',
+        '진한 다크초콜릿 가나슈로 만든 1호 케이크입니다.',
         42000,
-        8,
+        6,
+        'GENERAL',
+        0,
+        'ACTIVE'
+
+    UNION ALL
+
+    SELECT
+        '초코 가나슈 케이크 1호 화이트',
+        '부드러운 화이트초콜릿 가나슈로 만든 1호 케이크입니다.',
+        42000,
+        4,
+        'GENERAL',
+        0,
+        'ACTIVE'
+
+    UNION ALL
+
+    SELECT
+        '초코 가나슈 케이크 2호 다크초코',
+        '진한 다크초콜릿 가나슈로 만든 2호 케이크입니다.',
+        54000,
+        3,
+        'GENERAL',
+        0,
+        'ACTIVE'
+
+    UNION ALL
+
+    SELECT
+        '초코 가나슈 케이크 2호 화이트',
+        '부드러운 화이트초콜릿 가나슈로 만든 2호 케이크입니다.',
+        54000,
+        2,
         'GENERAL',
         0,
         'ACTIVE'
@@ -535,29 +589,11 @@ SELECT
 FROM `products` p
 INNER JOIN (
     SELECT
-        '딸기 생크림 케이크' AS `product_name`,
+        '레터링 생크림 케이크' AS `product_name`,
         '케이크 크기' AS `group_name`,
         1 AS `required`,
         'SINGLE' AS `selection_type`,
         1 AS `sort_order`
-
-    UNION ALL
-
-    SELECT
-        '초코 가나슈 케이크',
-        '케이크 크기',
-        1,
-        'SINGLE',
-        1
-
-    UNION ALL
-
-    SELECT
-        '레터링 생크림 케이크',
-        '케이크 크기',
-        1,
-        'SINGLE',
-        1
 
     UNION ALL
 
@@ -619,62 +655,12 @@ INNER JOIN `product_option_groups` pog
         ON pog.`product_id` = p.`id`
 INNER JOIN (
     SELECT
-        '딸기 생크림 케이크' AS `product_name`,
+        '레터링 생크림 케이크' AS `product_name`,
         '케이크 크기' AS `group_name`,
         '1호' AS `option_name`,
         0 AS `additional_price`,
         'ACTIVE' AS `status`,
         1 AS `sort_order`
-
-    UNION ALL
-
-    SELECT
-        '딸기 생크림 케이크',
-        '케이크 크기',
-        '2호',
-        10000,
-        'ACTIVE',
-        2
-
-    UNION ALL
-
-    SELECT
-        '딸기 생크림 케이크',
-        '케이크 크기',
-        '3호',
-        20000,
-        'ACTIVE',
-        3
-
-    UNION ALL
-
-    SELECT
-        '초코 가나슈 케이크',
-        '케이크 크기',
-        '1호',
-        0,
-        'ACTIVE',
-        1
-
-    UNION ALL
-
-    SELECT
-        '초코 가나슈 케이크',
-        '케이크 크기',
-        '2호',
-        12000,
-        'ACTIVE',
-        2
-
-    UNION ALL
-
-    SELECT
-        '레터링 생크림 케이크',
-        '케이크 크기',
-        '1호',
-        0,
-        'ACTIVE',
-        1
 
     UNION ALL
 
@@ -775,38 +761,3 @@ WHERE NOT EXISTS (
     WHERE po.`option_group_id` = pog.`id`
       AND po.`name` = sample.`option_name`
 );
-
--- =========================================================
--- 인기순 정렬 확인용 후기 통계
---
--- 스크립트를 다시 실행해도 동일한 값이 유지되도록
--- 대표 상품의 평균 평점과 후기 수를 갱신한다.
--- =========================================================
-
-UPDATE `products` p
-INNER JOIN `categories` c
-        ON c.`id` = p.`category_id`
-SET
-    p.`average_rating` = CASE p.`name`
-        WHEN '딸기 생크림 케이크' THEN 4.85
-        WHEN '초코 가나슈 케이크' THEN 4.72
-        WHEN '레터링 생크림 케이크' THEN 4.91
-        WHEN '캐릭터 입체 주문 제작 케이크' THEN 4.95
-        WHEN '레몬 바스크 치즈케이크' THEN 4.68
-        WHEN '미니 도시락 케이크' THEN 4.55
-        WHEN '포토 이미지 주문 제작 케이크' THEN 4.88
-        WHEN '흑임자 인절미 케이크' THEN 4.61
-        ELSE p.`average_rating`
-    END,
-    p.`review_count` = CASE p.`name`
-        WHEN '딸기 생크림 케이크' THEN 128
-        WHEN '초코 가나슈 케이크' THEN 94
-        WHEN '레터링 생크림 케이크' THEN 76
-        WHEN '캐릭터 입체 주문 제작 케이크' THEN 52
-        WHEN '레몬 바스크 치즈케이크' THEN 47
-        WHEN '미니 도시락 케이크' THEN 39
-        WHEN '포토 이미지 주문 제작 케이크' THEN 31
-        WHEN '흑임자 인절미 케이크' THEN 18
-        ELSE p.`review_count`
-    END
-WHERE c.`code` = 'CAKE';

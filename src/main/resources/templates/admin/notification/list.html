@@ -116,7 +116,23 @@
               `;
             });
 
+            const existingUnreadRealtimeMap = new Map();
+            container.querySelectorAll(".admin-noti-row.is-unread[data-realtime='true'][data-id]").forEach(node => {
+              existingUnreadRealtimeMap.set(node.getAttribute("data-id"), node);
+            });
+
             container.innerHTML = html;
+
+            existingUnreadRealtimeMap.forEach((realtimeNode, id) => {
+              const restNode = container.querySelector(`.admin-noti-row[data-id="${id}"]`);
+              if (restNode) {
+                container.replaceChild(realtimeNode, restNode);
+              } else if (container.firstChild) {
+                container.insertBefore(realtimeNode, container.firstChild);
+              } else {
+                container.appendChild(realtimeNode);
+              }
+            });
             attachRowEvents();
           })
           .catch(error => {
@@ -193,6 +209,7 @@
         });
       }
 
+      window.loadNotifications = loadNotifications;
       loadNotifications();
     });
   </script>

@@ -256,9 +256,8 @@ class ReviewAdminMapperTests {
                 """
                 INSERT INTO order_items (
                     order_id, product_id, product_name, product_type, quantity,
-                    base_price, option_amount, total_amount, preparation_days,
-                    cancellation_limit_days
-                ) VALUES (?, ?, '후기 대상 케이크', 'GENERAL', 1, 20000, 0, 20000, 0, 0)
+                    base_price, option_amount, total_amount, preparation_days
+                ) VALUES (?, ?, '후기 대상 케이크', 'GENERAL', 1, 20000, 0, 20000, 0)
                 """,
                 orderId,
                 productId);

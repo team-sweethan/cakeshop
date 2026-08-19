@@ -106,6 +106,10 @@ public class ProductController {
 
         // 상품 목록과 페이지 정보를 화면에 전달한다.
         model.addAttribute("pageResult", pageResult);
+        model.addAttribute(
+                "productListTitle",
+                productListTitle(condition.getType())
+        );
 
         // 화면에서 상품 유형 필터를 출력할 수 있도록 전달한다.
         model.addAttribute(
@@ -126,6 +130,14 @@ public class ProductController {
         );
 
         return "customer/product/list";
+    }
+
+    private String productListTitle(ProductType productType) {
+        if (productType == null) {
+            return "상품 목록";
+        }
+
+        return "상품 목록 - " + productType.getDisplayName();
     }
 
     /**
@@ -155,9 +167,7 @@ public class ProductController {
         }
 
         if (bindingResult.hasFieldErrors("maxPrice")) {
-            condition.setMaxPrice(
-                    BigDecimal.valueOf(100_000)
-            );
+            condition.setMaxPrice(null);
         }
     }
 

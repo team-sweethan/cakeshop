@@ -14,7 +14,7 @@ import java.util.Map;
 
 import com.cakeshop.domain.community.entity.CommentStatus;
 import com.cakeshop.domain.community.entity.PostStatus;
-import com.cakeshop.domain.community.mapper.CommunityMapper;
+import com.cakeshop.domain.community.mapper.CommunityPopularPostMapper;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 
 import org.junit.jupiter.api.AfterEach;
@@ -49,7 +49,7 @@ class PopularPostBatchTests {
 
     /** INSERT 실패를 재현할 Mapper spy. */
     @MockitoSpyBean
-    private CommunityMapper communityMapper;
+    private CommunityPopularPostMapper communityPopularPostMapper;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -227,7 +227,7 @@ class PopularPostBatchTests {
         seedRankingRow(postId);
 
         doThrow(new IllegalStateException("집계 실패"))
-                .when(communityMapper).insertDailyRanking(any(LocalDate.class), anyInt());
+                .when(communityPopularPostMapper).insertDailyRanking(any(LocalDate.class), anyInt());
 
         assertThatThrownBy(() -> popularPostBatchService.createDailyRanking(RANKING_DATE))
                 .isInstanceOf(IllegalStateException.class);

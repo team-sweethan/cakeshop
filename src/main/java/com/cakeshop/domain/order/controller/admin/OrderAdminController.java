@@ -1,6 +1,6 @@
 package com.cakeshop.domain.order.controller.admin;
 
-import com.cakeshop.domain.order.dto.form.CancelForm;
+import com.cakeshop.domain.order.dto.form.OrderCancelForm;
 import com.cakeshop.domain.order.service.admin.AdminOrderService;
 import com.cakeshop.domain.order.service.admin.FulfillmentService;
 import com.cakeshop.domain.payment.service.RefundFacade;
@@ -39,7 +39,7 @@ public class OrderAdminController {
     public String detail(@PathVariable("orderId") long orderId, Model model) {
         var order = orderAdminService.getOrder(orderId);
         model.addAttribute("order", order);
-        if (order.fulfillmentManageable()) {
+        if (order.isFulfillmentManageable()) {
             model.addAttribute(
                     "fulfillmentPage",
                     fulfillmentService.getFulfillmentPage(order.orderId(), order.status())
@@ -53,7 +53,7 @@ public class OrderAdminController {
     public String cancel(
             @PathVariable("orderId") long orderId,
             @AuthenticationPrincipal MemberDetails admin,
-            @Valid @ModelAttribute CancelForm form,
+            @Valid @ModelAttribute OrderCancelForm form,
             BindingResult bindingResult,
             RedirectAttributes redirectAttributes
     ) {

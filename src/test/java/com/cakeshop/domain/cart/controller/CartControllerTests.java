@@ -70,7 +70,7 @@ class CartControllerTests {
         String viewName = cartController.addItem(
                 member, form, bindingResult, redirectAttributes);
 
-        assertThat(viewName).isEqualTo("redirect:/cart");
+        assertThat(viewName).isEqualTo("redirect:/products?type=GENERAL");
         verify(cartService).addItem(1L, form);
     }
 

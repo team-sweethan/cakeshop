@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
-/** 채팅 전용 이미지 파일 검증기 (확장자, MIME, 파일 시그니처, 5MB 크기 제한) */
+// 채팅 전용 이미지 파일 검증기 (확장자, MIME, 파일 시그니처, 5MB 크기 제한)
 @Component
 public class ChatImageValidator {
 

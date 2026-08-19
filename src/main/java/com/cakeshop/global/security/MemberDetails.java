@@ -37,4 +37,9 @@ public class MemberDetails extends User {
     private static String resolvePassword(String password) {
         return password == null ? OAUTH_SESSION_PASSWORD : password;
     }
+
+    @Override
+    public String toString() {
+        return "MemberDetails(memberId=" + memberId + ", displayName=" + displayName + ", username=" + getUsername() + ")";
+    }
 }

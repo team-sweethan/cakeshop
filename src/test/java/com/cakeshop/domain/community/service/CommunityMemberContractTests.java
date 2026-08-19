@@ -19,6 +19,7 @@ import com.cakeshop.domain.member.service.MemberCommunityQueryService;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.config.ClockConfig;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
+import com.cakeshop.global.infra.FileStorageClient;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,15 +28,21 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /** 커뮤니티와 회원 조회 계약의 실제 DB 조립 결과를 검증한다. */
 @MybatisTest
 @MariaDbIntegrationTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({
-        CommunityService.class,
+        CommunityPostService.class,
+        CommunityCommentService.class,
         CommunityAdminService.class,
         MemberCommunityQueryService.class,
+        CommunityMemberViewLoader.class,
+        CommunityPostAccessPolicy.class,
+        CommunityPostImageService.class,
+        CommunityImageValidator.class,
         PopularPostReader.class,
         ClockConfig.class})
 class CommunityMemberContractTests {
@@ -44,8 +51,14 @@ class CommunityMemberContractTests {
 
     private static final PageRequest FIRST_PAGE = new PageRequest(1, 20);
 
+    @MockitoBean
+    private FileStorageClient fileStorageClient;
+
     @Autowired
-    private CommunityService communityService;
+    private CommunityPostService communityPostService;
+
+    @Autowired
+    private CommunityCommentService communityCommentService;
 
     @Autowired
     private CommunityAdminService communityAdminService;
@@ -81,7 +94,7 @@ class CommunityMemberContractTests {
         insertPost(withdrawnMemberId, "탈퇴 회원 글");
         insertPost(activeMemberId, "활동 회원 글");
 
-        var posts = communityService.getPosts(categoryId, PostSort.LATEST, FIRST_PAGE).getContent();
+        var posts = communityPostService.getPosts(categoryId, PostSort.LATEST, FIRST_PAGE).getContent();
 
         assertThat(posts)
                 .extracting(PostListView::title, PostListView::authorName)
@@ -94,7 +107,7 @@ class CommunityMemberContractTests {
     void getVisiblePost_withdrawnAuthor_masksName() {
         long postId = insertPost(withdrawnMemberId, "탈퇴 회원 글");
 
-        PostDetailView post = communityService.getVisiblePost(postId, null);
+        PostDetailView post = communityPostService.getVisiblePost(postId, null);
 
         assertThat(post.authorName()).isEqualTo("탈퇴한 회원");
         assertThat(post.authorWithdrawn()).isTrue();
@@ -107,7 +120,7 @@ class CommunityMemberContractTests {
         insertComment(postId, withdrawnMemberId);
         insertComment(postId, activeMemberId);
 
-        CommentSectionView section = communityService.getComments(postId, null);
+        CommentSectionView section = communityCommentService.getComments(postId, null);
 
         assertThat(section.comments())
                 .extracting(CommentView::authorName)

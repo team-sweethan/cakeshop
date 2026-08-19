@@ -741,10 +741,9 @@ class PaymentMapperTests {
                     base_price,
                     option_amount,
                     total_amount,
-                    preparation_days,
-                    cancellation_limit_days
+                    preparation_days
                 )
-                VALUES (?, ?, ?, 'GENERAL', 1, 40000, 0, 40000, 0, 0)
+                VALUES (?, ?, ?, 'GENERAL', 1, 40000, 0, 40000, 0)
                 """,
                 orderId,
                 productId,

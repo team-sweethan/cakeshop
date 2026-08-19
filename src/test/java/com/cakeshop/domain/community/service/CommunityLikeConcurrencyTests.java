@@ -32,7 +32,7 @@ class CommunityLikeConcurrencyTests {
     private static final int MEMBERS = 8;
 
     @Autowired
-    private CommunityService communityService;
+    private CommunityReactionService communityReactionService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -93,7 +93,7 @@ class CommunityLikeConcurrencyTests {
     /** 서로 다른 회원의 동시 좋아요를 모두 반영한다. */
     @Test
     void addLike_concurrentLikesByDifferentMembers_countsEachWithoutDeadlock() throws Exception {
-        execute(memberIds, memberId -> communityService.addLike(postId, memberId));
+        execute(memberIds, memberId -> communityReactionService.addLike(postId, memberId));
 
         assertThat(likeCount())
                 .as("서로 다른 회원의 좋아요는 모두 세어야 한다")
@@ -113,7 +113,7 @@ class CommunityLikeConcurrencyTests {
             sameMember.add(memberId);
         }
 
-        execute(sameMember, id -> communityService.addLike(postId, id));
+        execute(sameMember, id -> communityReactionService.addLike(postId, id));
 
         assertThat(likeCount())
                 .as("멱등이므로 같은 회원이 여러 번 눌러도 1이다")
@@ -126,14 +126,14 @@ class CommunityLikeConcurrencyTests {
     void likeAndUnlike_concurrentMixed_keepsCountConsistentWithRows() throws Exception {
         // 절반은 재추가하고 절반은 취소한다.
         for (Long memberId : memberIds) {
-            communityService.addLike(postId, memberId);
+            communityReactionService.addLike(postId, memberId);
         }
 
         execute(memberIds, memberId -> {
             if (memberIds.indexOf(memberId) % 2 == 0) {
-                communityService.addLike(postId, memberId);
+                communityReactionService.addLike(postId, memberId);
             } else {
-                communityService.removeLike(postId, memberId);
+                communityReactionService.removeLike(postId, memberId);
             }
         });
 

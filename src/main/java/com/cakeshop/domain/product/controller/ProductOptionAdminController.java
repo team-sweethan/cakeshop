@@ -316,8 +316,7 @@ public class ProductOptionAdminController {
             long optionGroupId,
             RedirectAttributes redirectAttributes
     ) {
-        if (exception.getErrorCode()
-                != ProductErrorCode.REQUIRED_OPTION_GROUP_EMPTY) {
+        if (!isRequiredOptionPolicyError(exception)) {
             throw exception;
         }
 
@@ -335,8 +334,7 @@ public class ProductOptionAdminController {
             long productId,
             RedirectAttributes redirectAttributes
     ) {
-        if (exception.getErrorCode()
-                != ProductErrorCode.REQUIRED_OPTION_GROUP_EMPTY) {
+        if (!isRequiredOptionPolicyError(exception)) {
             throw exception;
         }
 
@@ -350,6 +348,16 @@ public class ProductOptionAdminController {
         );
 
         return redirectToOptions(productId);
+    }
+
+    private boolean isRequiredOptionPolicyError(
+            BusinessException exception
+    ) {
+        return exception.getErrorCode()
+                == ProductErrorCode.REQUIRED_OPTION_GROUP_EMPTY
+                || exception.getErrorCode()
+                == ProductErrorCode
+                        .GENERAL_PRODUCT_REQUIRED_OPTION_NOT_ALLOWED;
     }
 
     private void openGroup(

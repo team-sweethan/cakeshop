@@ -34,4 +34,12 @@
           AND status = 'ACTIVE'
     </select>
 
+    <!-- 활성 관리자 ID 목록 조회 (채팅 문의 알림 발송용) -->
+    <select id="findActiveAdminIds" resultType="long">
+        SELECT id
+        FROM members
+        WHERE role = 'ADMIN'
+          AND status = 'ACTIVE'
+    </select>
+
 </mapper>

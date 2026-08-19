@@ -1,4 +1,4 @@
-<aside class="admin-sidebar" th:fragment="sidebar(activeMenu)">
+<aside class="admin-sidebar" th:fragment="sidebar(activeMenu)" data-account-identity th:data-member-id="${#authentication?.principal != null and #authentication.principal.toString().contains('MemberDetails') ? #authentication.principal.memberId : null}">
   <a class="admin-sidebar__brand" th:href="@{/admin}">
     <span class="admin-sidebar__eyebrow">관리자 페이지</span>
     <span class="admin-sidebar__title">케이크 쇼핑몰</span>
@@ -36,4 +36,7 @@
       th:href="@{/admin/statistics}">통계</a>
   </nav>
   <script th:src="@{/js/app.js}"></script>
+  <script defer th:src="@{/js/lib/sockjs.min.js}"></script>
+  <script defer th:src="@{/js/lib/stomp.min.js}"></script>
+  <script defer th:src="@{/js/notification-websocket.js}"></script>
 </aside>

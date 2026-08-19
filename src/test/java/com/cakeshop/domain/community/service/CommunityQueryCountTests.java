@@ -12,6 +12,7 @@ import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.domain.member.service.MemberCommunityQueryService;
 import com.cakeshop.global.config.ClockConfig;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
+import com.cakeshop.global.infra.FileStorageClient;
 
 import org.apache.ibatis.executor.Executor;
 import org.apache.ibatis.mapping.MappedStatement;
@@ -30,15 +31,21 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /** 주요 조회의 쿼리 수가 데이터 건수에 따라 증가하지 않는지 확인한다. */
 @MybatisTest
 @MariaDbIntegrationTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({
-        CommunityService.class,
+        CommunityPostService.class,
+        CommunityCommentService.class,
         CommunityAdminService.class,
         MemberCommunityQueryService.class,
+        CommunityMemberViewLoader.class,
+        CommunityPostAccessPolicy.class,
+        CommunityPostImageService.class,
+        CommunityImageValidator.class,
         PopularPostReader.class,
         ClockConfig.class})
 class CommunityQueryCountTests {
@@ -54,8 +61,14 @@ class CommunityQueryCountTests {
     /** 관리자 목록, 개수, 작성자 조회 횟수다. */
     private static final int EXPECTED_ADMIN_QUERY_COUNT = 3;
 
+    @MockitoBean
+    private FileStorageClient fileStorageClient;
+
     @Autowired
-    private CommunityService communityService;
+    private CommunityPostService communityPostService;
+
+    @Autowired
+    private CommunityCommentService communityCommentService;
 
     @Autowired
     private CommunityAdminService communityAdminService;
@@ -104,13 +117,13 @@ class CommunityQueryCountTests {
         insertPosts(3, 2);
 
         queryCounter.reset();
-        communityService.getPosts(categoryId, PostSort.LATEST, new PageRequest(1, 20));
+        communityPostService.getPosts(categoryId, PostSort.LATEST, new PageRequest(1, 20));
         int withFewPosts = queryCounter.count();
 
         insertPosts(20, 2);
 
         queryCounter.reset();
-        communityService.getPosts(categoryId, PostSort.LATEST, new PageRequest(1, 20));
+        communityPostService.getPosts(categoryId, PostSort.LATEST, new PageRequest(1, 20));
         int withManyPosts = queryCounter.count();
 
         assertThat(withFewPosts).isEqualTo(EXPECTED_QUERY_COUNT);
@@ -122,7 +135,7 @@ class CommunityQueryCountTests {
         long postId = insertPost();
 
         queryCounter.reset();
-        communityService.getPostDetail(postId, null, "M:1");
+        communityPostService.getPostDetail(postId, null, "M:1");
 
         // 상세와 작성자를 한 번씩 조회한다.
         assertThat(queryCounter.count()).isEqualTo(2);
@@ -134,13 +147,13 @@ class CommunityQueryCountTests {
         insertComments(postId, 3);
 
         queryCounter.reset();
-        communityService.getComments(postId, null);
+        communityCommentService.getComments(postId, null);
         int withFewComments = queryCounter.count();
 
         insertComments(postId, 20);
 
         queryCounter.reset();
-        communityService.getComments(postId, null);
+        communityCommentService.getComments(postId, null);
         int withManyComments = queryCounter.count();
 
         assertThat(withFewComments).isEqualTo(EXPECTED_COMMENT_QUERY_COUNT);

@@ -12,7 +12,7 @@ import static org.mockito.Mockito.when;
 import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
 import com.cakeshop.domain.member.service.MemberCouponQueryService;
 import com.cakeshop.domain.member.service.MemberService;
-import com.cakeshop.domain.order.dto.form.customer.CustomOrderForm;
+import com.cakeshop.domain.order.dto.form.customer.OrderCustomCreateForm;
 import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.order.mapper.OrderMapper;
@@ -107,7 +107,7 @@ class CustomerCustomOrderServiceTests {
     @Test
     void createCustomOrder_couponMakesFinalAmountZero_rejectsBeforeReadyPayment() {
         stubNewOrder();
-        CustomOrderForm form = form();
+        OrderCustomCreateForm form = form();
         form.setMemberCouponId(101L);
         when(couponOrderCommandService.reserveCouponForOrder(
                 10L, 101L, 20L, BigDecimal.valueOf(55_000)
@@ -131,7 +131,7 @@ class CustomerCustomOrderServiceTests {
                 BigDecimal.valueOf(55_000), null
         ));
         when(orderOptionValidator.validate(6L, List.of())).thenReturn(List.of());
-        CustomOrderForm form = form();
+        OrderCustomCreateForm form = form();
         form.setDisplayedOriginalAmount(BigDecimal.valueOf(60_000));
 
         assertThatThrownBy(() -> service.createCustomOrder(10L, form))
@@ -169,7 +169,7 @@ class CustomerCustomOrderServiceTests {
                 BigDecimal.valueOf(55_000), null
         ));
         when(orderOptionValidator.validate(6L, List.of())).thenReturn(List.of());
-        CustomOrderForm form = form();
+        OrderCustomCreateForm form = form();
         form.setPickupAt(LocalDateTime.of(2026, 8, 11, 10, 30));
 
         assertThatThrownBy(() -> service.createCustomOrder(10L, form))
@@ -180,8 +180,8 @@ class CustomerCustomOrderServiceTests {
         verify(orderMapper, never()).insertOrder(any());
     }
 
-    private CustomOrderForm form() {
-        CustomOrderForm form = new CustomOrderForm();
+    private OrderCustomCreateForm form() {
+        OrderCustomCreateForm form = new OrderCustomCreateForm();
         form.setRequestKey(UUID.randomUUID().toString());
         form.setProductId(6L);
         form.setOptionIds(List.of());

@@ -18,9 +18,9 @@
 도메인 서비스는 저장 결과로 받은 접근 경로 또는 공개 URL만 DB에 저장한다. 저장소 구현을 바꾸기 위해
 상품·매장 같은 도메인 코드를 함께 바꾸지 않는다.
 
-후기 이미지는 `review_images` 테이블만 준비되어 있고, review 도메인에서 `FileStorageClient`를 호출하는
-업로드 흐름은 아직 구현되지 않았다. 추후 후기 이미지 기능을 만들 때 같은 저장소 계약을 연동할 예정이며,
-그전에는 `s3` 프로필을 활성화해도 후기 이미지가 업로드되지 않는다.
+후기 이미지도 `review_images`와 `FileStorageClient`를 사용한다. 작성 시 선택한 이미지는
+`FileStorageDirectory.REVIEW` 아래에 저장되며, 활성 프로필에 따라 로컬 경로 또는 S3 공개 URL이
+`review_images.image_url`에 기록된다.
 
 ## 프로필 조합
 

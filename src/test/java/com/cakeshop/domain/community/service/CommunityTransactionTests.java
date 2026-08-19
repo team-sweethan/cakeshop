@@ -2,6 +2,7 @@ package com.cakeshop.domain.community.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 
 import java.time.LocalDateTime;
@@ -28,7 +29,7 @@ class CommunityTransactionTests {
     private static final LocalDateTime CREATED_AT = LocalDateTime.of(2026, 3, 1, 10, 0);
 
     @Autowired
-    private CommunityService communityService;
+    private CommunityReactionService communityReactionService;
 
     @Autowired
     private CommunityAdminService communityAdminService;
@@ -98,30 +99,50 @@ class CommunityTransactionTests {
         assertThat(reportStatus()).isEqualTo(ReportStatus.PENDING.name());
     }
 
+    /** 카운터 +1 뒤의 행 INSERT가 죽으면 카운터 증가도 함께 되돌아간다. */
     @Test
-    void addLike_recalculationFails_rollsBackInsertedLike() {
+    void addLike_rowInsertFails_rollsBackCounterIncrement() {
         doThrow(new IllegalStateException("test failure"))
                 .when(communityMapper)
-                .recalculateLikeCount(postId);
+                .insertLike(postId, memberId);
 
-        assertThatThrownBy(() -> communityService.addLike(postId, memberId))
+        assertThatThrownBy(() -> communityReactionService.addLike(postId, memberId))
                 .isInstanceOf(IllegalStateException.class);
 
         assertThat(likeRows()).isZero();
         assertThat(likeCount()).isZero();
     }
 
+    /** 카운터 -1 뒤의 행 DELETE가 죽으면 카운터 감소도 함께 되돌아간다. */
     @Test
-    void removeLike_recalculationFails_restoresDeletedLike() {
+    void removeLike_rowDeleteFails_rollsBackCounterDecrement() {
         jdbcTemplate.update(
                 "INSERT INTO post_likes (post_id, member_id) VALUES (?, ?)", postId, memberId);
         jdbcTemplate.update(
                 "UPDATE posts SET like_count = 1, updated_at = updated_at WHERE id = ?", postId);
         doThrow(new IllegalStateException("test failure"))
                 .when(communityMapper)
-                .recalculateLikeCount(postId);
+                .deleteLike(postId, memberId);
 
-        assertThatThrownBy(() -> communityService.removeLike(postId, memberId))
+        assertThatThrownBy(() -> communityReactionService.removeLike(postId, memberId))
+                .isInstanceOf(IllegalStateException.class);
+
+        assertThat(likeRows()).isEqualTo(1);
+        assertThat(likeCount()).isEqualTo(1);
+    }
+
+    /** DELETE가 0행이면 전체를 되돌린다 — 그대로 커밋하면 카운터가 실제 행 수보다 작아진다. */
+    @Test
+    void removeLike_deleteMatchesNoRow_rollsBackCounterDecrement() {
+        jdbcTemplate.update(
+                "INSERT INTO post_likes (post_id, member_id) VALUES (?, ?)", postId, memberId);
+        jdbcTemplate.update(
+                "UPDATE posts SET like_count = 1, updated_at = updated_at WHERE id = ?", postId);
+        doReturn(0)
+                .when(communityMapper)
+                .deleteLike(postId, memberId);
+
+        assertThatThrownBy(() -> communityReactionService.removeLike(postId, memberId))
                 .isInstanceOf(IllegalStateException.class);
 
         assertThat(likeRows()).isEqualTo(1);

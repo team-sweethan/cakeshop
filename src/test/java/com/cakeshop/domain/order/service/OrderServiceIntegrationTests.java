@@ -4,7 +4,7 @@ import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
 import com.cakeshop.domain.cart.service.CartOrderQueryService;
 import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.member.service.MemberCouponQueryService;
-import com.cakeshop.domain.order.dto.form.customer.GeneralOrderForm;
+import com.cakeshop.domain.order.dto.form.customer.OrderGeneralCreateForm;
 import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.order.entity.OrderItem;
 import com.cakeshop.domain.order.entity.OrderItemOption;
@@ -132,7 +132,7 @@ class OrderServiceIntegrationTests {
     void createGeneralOrderPersistsCalculatedSnapshotsAndReadyPayment() {
         // 실제 Spring Bean이 트랜잭션 프록시로 감싸져 있어야 전체 저장이 한 트랜잭션에 참여한다.
         assertThat(AopUtils.isAopProxy(orderService)).isTrue();
-        GeneralOrderForm form = createForm();
+        OrderGeneralCreateForm form = createForm();
 
         long orderId = orderService.createGeneralOrder(memberId, form);
 
@@ -172,7 +172,7 @@ class OrderServiceIntegrationTests {
 
     @Test
     void createGeneralOrder_sameRequestKey_returnsSameOrderWithoutDuplicates() {
-        GeneralOrderForm form = createForm();
+        OrderGeneralCreateForm form = createForm();
 
         long firstOrderId = orderService.createGeneralOrder(memberId, form);
         long secondOrderId = orderService.createGeneralOrder(memberId, form);
@@ -217,8 +217,8 @@ class OrderServiceIntegrationTests {
                 )));
     }
 
-    private GeneralOrderForm createForm() {
-        GeneralOrderForm form = new GeneralOrderForm();
+    private OrderGeneralCreateForm createForm() {
+        OrderGeneralCreateForm form = new OrderGeneralCreateForm();
         form.setRequestKey(UUID.randomUUID().toString());
         form.setOrdererName("주문자");
         form.setOrdererPhone("010-1111-2222");

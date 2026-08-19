@@ -1,0 +1,148 @@
+# 조각 7 — 조회수 정렬·인기글
+
+> **끝난 조각의 기록이다. 지금 구속하지 않는다.**
+> 이 조각이 만든 규칙의 정본은 `../specs/community-popular.md`다.
+> 조각 순서와 진행 상태, 위험과 결정 로그는 `../PLAN.md`.
+
+> **한 문장**: 최근 7일 활동을 **매일 새벽 배치가 한 번** 집계해 그날의 인기글을 확정하고 날짜별 스냅샷으로 고정한다. 화면은 확정된 결과만 읽는다.
+
+> ✅ **정본은 이제 `../DOMAIN.md` 6.9다 (2026-08-05, 7b와 함께 신설).** `../PLAN.md` 조각 7 결정 표의 D1~D11은 **그 결정에 이르기까지의 근거와 대안**이고, "무엇이 규칙인가"를 물으면 6.9를 본다. 둘이 어긋나면 6.9가 옳다.
+>
+> 화면 쪽(D6·D7)도 **7c에서 6.9의 "화면" 절로 옮겼다 (2026-08-05).** 여기에 남은 것은 근거와 대안뿐이다.
+
+DOMAIN.md 9의 보류 항목 넷이 **전부 닫혔다.**
+
+| 보류 항목 | 상태 |
+|---|---|
+| `sort=likes` 추가 여부 | **닫음 (조각 7a)**. 넣지 않는다 — DOMAIN.md 6.1에 근거와 함께 반영 완료 |
+| 인기글의 기간 | **닫음 (조각 7b)**. 기간별 최근 7일 — DOMAIN.md 6.9에 근거와 함께 반영 완료 |
+| 인기글을 어디에 두나 | **닫음 (조각 7c)**. 목록 화면 상단의 영역 — DOMAIN.md 6.9와 9절, `SCREENS.md`에 반영 완료 |
+| `post_views` 보관 기간 | **닫음 (조각 7b)**. 1차에서는 정리하지 않는다 — 6.9와 R25에 반영 완료 |
+
+## 결정과 근거 (D1~D11)
+
+`../PLAN.md` 의 조각 7 결정 표는 **번호와 한 줄 요약만** 갖는다(하네스 인덱스와 같은 방식).
+근거는 여기 있고, D1·D2·D10 셋만 길어서 `../decisions/` 의 ADR 로 따로 나갔다.
+
+**무엇이 규칙인가는 `../specs/community-popular.md` 가 정본이다.** 아래는 그 결정에
+이르기까지의 근거와 대안이다.
+
+| # | 결정 | 근거 |
+|---|---|---|
+| D1 | 점수 = **최근 7일** 창의 `조회수*1 + 좋아요*25 + 댓글 쓴 서로 다른 회원 수*15` | 조회수는 비로그인 키가 세션 id라 조작 가능하고(R12) 10분 창에서 뷰어 하나가 하루 144까지 올린다. 원안의 `조회수 + 좋아요*5 + 댓글*3`은 **가장 못 믿을 신호에 가장 큰 볼륨**을 준다 — 원안 예시조차 773점 중 조회수가 530이다. 좋아요는 `UNIQUE(post_id, member_id)`라 구조적 상한이 있다. 창을 두는 이유는 기간이 없으면 초기에 쌓인 글이 인기글 영역을 영구 점유하기 때문이고, 하루가 아니라 7일인 이유는 활동이 적은 날에 좋아요 두 개짜리 글이 1위가 되어 순위가 잡음이 되기 때문이다. **댓글을 건수가 아니라 사람 수로 세는 이유는 `decisions/ADR-001-popularity-scoring.md`에 따로 적는다** |
+| D10 | 배치가 넘기는 날짜 경계를 **DB 시계 기준으로 맞춘다.** 집계 SQL이 `targetDate`를 그대로 `created_at`과 비교하지 않고, JDBC 연결의 세션 시간대를 `Asia/Seoul`로 고정한다 | `decisions/ADR-003-db-session-timezone.md` |
+| D2 | 집계 원본은 `post_views`·`post_likes`·`comments`의 `created_at`. **일일 카운터 테이블(`post_daily_metrics`)을 두지 않는다** | `decisions/ADR-002-no-counter-table.md` |
+| D3 | 배치는 `@Scheduled(cron = "0 5 0 * * *", zone = "Asia/Seoul")`, 대상은 **전날** | 선례 `OrderExpireScheduler`, `SchedulingConfig`에 `@EnableScheduling`이 이미 있다. 00시 정각이 아니라 00:05인 것은 자정 경계의 쓰기가 커밋될 여유를 두기 위해서다. **`zone`을 적는 것만으로는 부족하다** — 그건 배치가 깨어나는 시각일 뿐이고, 넘긴 날짜가 DB의 `created_at`과 같은 기준인지는 D10이 맡는다 |
+| D4 | 멱등성 = **한 트랜잭션에서 `DELETE by date` → `INSERT` → 실행 기록**. 단 **이미 기록된 날짜는 아무것도 하지 않고 끝낸다** | 스케줄러는 실패하고 다시 돌 수 있다. 같은 입력이면 같은 결과여야 하므로 동점 tiebreaker까지 SQL에 박는다. **그런데 원본이 변하면 입력이 같지 않다** — 좋아요 취소·댓글 삭제 뒤에 같은 날짜를 다시 돌리면 확정된 순위와 근거 수치가 조용히 바뀌고, 그러면 "원본이 변해도 그날 기록은 남는다"는 스냅샷의 목적이 무너진다(PR #103 Codex 리뷰). 그래서 재실행은 **실패한 날짜에만** 의미가 있다. 성공한 날짜를 건너뛰어도 잃는 것이 없는 이유는 H31이 "실패하면 아예 손대지 않음"을 보증하기 때문이다 — **기록이 있다는 것이 곧 성공했다는 뜻**이라 판단이 성립한다. **다만 이 건너뛰기가 R22를 해소하지는 않는다.** 확인(SELECT)과 기록(INSERT)이 트랜잭션의 양 끝에 있어 **날짜를 원자적으로 선점하지 않는다** — 여러 인스턴스가 같은 시각에 깨면 전부 "기록 없음"을 보고 전부 집계한 뒤, 마지막 `INSERT`에서 PK 충돌로 한쪽만 남고 나머지는 통째로 rollback된다. 즉 줄어드는 것은 **시차를 두고 도는 재시도**뿐이고, 동시 실행의 낭비와 로그에 남는 중복키 예외는 그대로다(PR #103 Codex 리뷰 4라운드). 원자적 선점은 잠금 행이나 실행 상태 컬럼을 요구하는데, 단일 서버 전제를 R22에서 이미 수용했으므로 여기서 도입하지 않는다 — **이 행이 주는 보증은 "재실행이 확정된 날짜를 덮어쓰지 않는다"까지이고, 동시 실행 조율은 R22의 몫이다** |
+| D11 | **실행 기록 테이블 `popular_post_batch_runs`를 따로 둔다.** 순위가 0건인 날도 행이 남는다 | 순위 행만으로는 **"안 돈 날"과 "돌았는데 0건인 날"이 구분되지 않는다** — 둘 다 행이 없다. 구분이 안 되면 (1) D6의 `MAX(ranking_date)`가 옛 날짜로 계속 폴백해 **7일 창 밖의 오래된 글이 무기한 노출되고**, (2) D4의 "이미 기록됐나" 판단이 매일 거짓이 되며, (3) 실패 경고가 정상 상태에서 울린다. 세 지적이 전부 같은 빈자리에서 나왔다(PR #103 Codex 리뷰 3라운드). **저장하는 것이 결과뿐이고 실행 사실이 아니었다**는 것이 원래의 누락이다. 테이블 하나가 느는 대가는 받는다 — 순위 행에 sentinel을 섞는 방법(0위 행 등)은 `PRIMARY KEY(ranking_date, ranking)`·FK·화면 쿼리를 전부 오염시킨다 |
+| D5 | 배치는 **TOP 20 저장**, 화면은 **10건 노출**. **선정 SQL도 그 시점의 `PUBLISHED`만 대상으로 삼고**, 화면이 노출 시 현재 `status`를 다시 확인한다 | 노출 판단의 유일 기준은 언제나 현재 `status`다(4.1). **두 곳 모두 걸러야 한다.** 선정에서 안 거르면 이미 지워진 글이 스냅샷의 20칸을 먹는다 — 4.5가 "게시글을 지워도 자식 행은 그대로 둔다"라서 지워진 글도 창 안의 조회·좋아요·댓글을 그대로 갖고 있고, 삭제 직전에 인기였던 글일수록 상위를 차지한다. 비노출 글이 11건을 넘으면 화면이 10건보다 적게 나오거나 통째로 빈다(PR #103 Codex 리뷰). **20−10의 여유는 그 몫이 아니라 선정 이후의 상태 변화를 흡수하는 몫이다** — 둘을 헷갈리면 여유분을 아무리 늘려도 모자란다 |
+| D6 | 화면은 **실행 기록의 최신 날짜**(`MAX(ranking_date) FROM popular_post_batch_runs`)를 읽는다. 그날의 순위가 0건이거나 확정 실행이 하나도 없으면 **인기글 영역 자체를 그리지 않는다.** 폴백은 **사용자 경험을 위한 의도된 설계**이고, 그 대가로 **최신 확정일이 어제보다 오래됐으면 경고 로그를 남긴다 — 단 서울 기준 01:00 이후에만 본다** | 첫 배포 후 첫 배치 전에는 보여 줄 것이 없고, 배치를 한 번 거른 날에도 없다. 최신 확정일로 폴백하면 거른 밤이 "빈 화면"이 아니라 "어제 목록 유지"로 degrade 된다 — 인기글은 하루 낡아도 읽을 만하지만(R24가 이미 최대 24시간 낡음을 설계로 받아들였다) 갑자기 비면 화면이 고장 난 것처럼 보인다. **대가는 폴백이 자기 일을 잘한다는 것 그 자체다** — 사용자에게 매끄러운 만큼 운영자에게도 아무 일 없어 보이고, 그래서 순위가 조용히 낡아 간다. H31이 막는 것은 애초에 폴백이 발동할 상황(재집계 중 스냅샷 소실)이고, 로그는 **그럼에도 발동했을 때 남는 유일한 흔적**이다. 둘은 경쟁하지 않는다 — 사용자에게는 매끄럽게, 운영자에게는 투명하게가 이 행의 목표다. **경고에 01:00 유예를 두는 이유**: 배치가 00:05에 도므로 00:00~00:04에는 정상 상태에서도 최신 확정일이 그제다. 유예가 없으면 매일 새벽 목록 요청마다 경고가 찍혀 **정상 운영이 장애로 오인된다**(PR #103 Codex 리뷰). 울지 않아야 할 때 우는 경고는 아무도 안 보게 되므로, 이건 로그를 붙인 목적 자체를 무너뜨리는 자리다. **기준을 00:05가 아니라 01:00으로 두는 이유는 00:05가 배치가 끝나는 시각이 아니라 시작하는 시각이기 때문이다**(4라운드). 집계가 도는 중에 들어온 요청은 아직 그제 날짜를 보므로, 크론 시각을 그대로 유예 종료로 쓰면 **실행 시간이 길어질수록 오경보 창이 도로 넓어진다.** 55분은 지금 데이터에 근거한 값이 아니라 **집계가 그보다 오래 걸리면 경고보다 먼저 다른 문제가 있다**는 판단이다 — 실행 시간을 재는 수단이 아직 없으므로 근거는 나중에 생긴다. 이 유예는 D3의 크론 시각과 한 벌이라 **한쪽을 바꾸면 다른 쪽도 바꿔야 한다.** **되돌아올 계기**: 배치 실행 시간이 실제로 수십 분대에 들어서면 유예를 늘리는 대신 **실행 중 상태를 기록해**(실행 기록에 시작 행을 먼저 남기는 식) 시각 기반 추정을 버린다 |
+| D7 | 인기글은 **목록 화면 상단 영역**. 1쪽이고 카테고리 필터가 없을 때만 | 별도 화면이면 `SCREENS.md` 인덱스와 `screens/` 파일이 함께 생기는데 얻는 것은 주소 하나다. 필터를 건 화면에 전체 인기글이 뜨면 필터가 안 먹은 것처럼 보인다 |
+| D8 | 정렬 옵션은 `latest`(기본) / `views` 둘뿐. **`sort=likes`는 넣지 않는다** | 분기마다 tiebreaker·인덱스·형태 검사가 따라붙는데, 좋아요 순으로 보고 싶은 것을 인기글 점수가 이미 대신한다(D1이 좋아요에 가장 큰 계수를 준다) |
+| D9 | `post_views`는 1차에서 **정리하지 않는다** | 지우면 `view_count == COUNT(post_views)`(H14)가 깨진다. 스냅샷이 과거 순위를 보존하므로 나중에 정리로 넘어갈 근거는 생겼다 — R25에 계기와 함께 남긴다 |
+
+## 7a — 정렬 옵션
+
+인기글과 독립이고 제일 작다. 먼저 해서 목록 쿼리의 정렬 분기를 만들어 둔다.
+
+- 목록 `?sort=` (`latest` 기본 / `views`). **허용값은 `<choose>`로 매핑하고 `${}`로 잇지 않는다**(`AGENTS.md`). 조각 5의 `AdminPostSort`가 선례다
+- 모르는 값은 오류가 아니라 기본 정렬로 떨어뜨린다 — 목록은 공개 화면이고 주소로 들어오는 값이다
+- **분기마다 `, p.id DESC` tiebreaker를 유지한다.** 조회수는 0이 흔해 최신순보다 동점이 잦고, 동점 정렬이 흔들리면 페이지 경계에서 글이 중복·누락된다
+- 새 migration: `(status, view_count, id)` 인덱스 (R8과 같은 자리)
+- `screens/list.md`에 정렬 선택지 문자열 추가
+
+**완료 (2026-08-04)**. `PostSort` enum(`AdminPostSort` 선례), `CommunityMapper.findPublishedPosts`에 `sort` 파라미터와 XML `<choose>` 분기, `CommunityService.getPosts`·`CommunityController.list` 통과, `list.html` 정렬 링크 2개, `V20260804_130038__add_post_view_count_sort_index.sql`을 추가했다. 검증은 `CommunityMapperXmlTests`(+2), `CommunityMapperTests`(+3), `CommunityServiceTests`(+1), `CommunityControllerTests`(+3), `CommunityScreenRenderingTests`(+2), `CommunitySchemaTests`(+1)로 고정하고 하네스 표에 H28·H29를 올렸다. `./gradlew clean test` 875건 통과.
+
+구현하며 계획에 없던 자리 하나를 채웠다 — **필터 링크와 정렬 링크가 서로의 현재 값을 함께 실어야 한다.** 안 실으면 분류를 고른 뒤 조회수순을 누르는 순간 분류가 조용히 풀리는데, 목록은 멀쩡히 그려지고 글만 늘어나서 사용자에게는 "정렬이 이상하다"로 보인다. 관리자 목록이 이미 같은 방식이었고(조각 5), 쪽 이동 링크도 셋을 다 싣도록 함께 고쳤다. 렌더링 검사는 **한 링크 안에** 둘 다 있는지를 본다 — 따로 찾으면 상단 필터 링크가 `categoryId`를 갖고 있어서 정렬이 그것을 잃어도 통과한다(조각 1에서 쪽 이동 링크로 배운 그대로다). **양쪽 방향을 다 본다**: 한쪽만 보면 한 방향만 값을 싣는 구현이 통과한다.
+
+인덱스는 컬럼 순서까지 스키마 검사로 고정했다(H29). `(view_count, status, id)`로 뒤집혀도 화면 결과는 똑같고 스캔량만 안 준다 — 조각 4의 `lockPost` 조인과 같은 종류로, **터지지 않고 조용히 느려지기만 하는** 자리라 형태를 직접 적어 두는 것 말고는 잡을 방법이 없다. 카테고리 필터가 붙으면 이 인덱스를 온전히 쓰지 못하는 것은 migration 주석에 남겼고, 트리거는 R8과 공유한다.
+
+## 7b — 배치
+
+**새 migration 하나** (`gradlew newMigration -Pdesc=add_daily_popular_posts`)
+
+```sql
+CREATE TABLE IF NOT EXISTS daily_popular_posts (
+    ranking_date DATE   NOT NULL,
+    ranking      INT    NOT NULL,
+    post_id      BIGINT NOT NULL,
+    popularity_score BIGINT NOT NULL,
+    view_count BIGINT NOT NULL, like_count BIGINT NOT NULL, comment_count BIGINT NOT NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (ranking_date, ranking),
+    CONSTRAINT uk_daily_popular_post UNIQUE (ranking_date, post_id),
+    CONSTRAINT fk_daily_popular_posts_post FOREIGN KEY (post_id) REFERENCES posts(id)
+);
+```
+
+선정 당시의 조회수·좋아요·댓글 수를 함께 담는 이유는 **순위가 왜 그랬는지가 사후에 설명되어야** 하기 때문이다. 원본이 나중에 변해도 그날의 기록은 그대로 남는다.
+
+같은 파일에 **실행 기록 테이블**을 함께 만든다 (D11).
+
+```sql
+CREATE TABLE IF NOT EXISTS popular_post_batch_runs (
+    ranking_date DATE   NOT NULL,
+    post_count   INT    NOT NULL,
+    executed_at  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (ranking_date)
+);
+```
+
+**순위 행과 실행 사실은 다른 것이다.** `daily_popular_posts`만 두면 "그날 배치가 돌았는가"에 답할 수 없다 — 활동이 없어 `INSERT`가 0행인 날과 배치가 아예 안 돈 날이 **둘 다 "행 없음"으로 똑같이 보인다.** 이 표에는 0건인 날도 `post_count = 0`으로 행이 남으므로 둘이 갈린다. FK는 걸지 않는다: 순위가 0건인 날에는 참조할 게 없고, 이 표가 가리키는 것은 게시글이 아니라 **실행**이다.
+
+같은 파일에 **집계용 인덱스 셋**을 함께 만든다. 없으면 배치가 세 테이블을 통째로 스캔한다 — 지금 `post_views`의 유일한 인덱스는 선두가 `post_id`(`ix_post_views_post_viewer_created`)라 `created_at` 범위로는 못 탄다.
+
+```sql
+ALTER TABLE post_views ADD INDEX IF NOT EXISTS ix_post_views_created (created_at, post_id);
+ALTER TABLE post_likes ADD INDEX IF NOT EXISTS ix_post_likes_created (created_at, post_id);
+ALTER TABLE comments   ADD INDEX IF NOT EXISTS ix_comments_created   (created_at, post_id);
+```
+
+**`IF NOT EXISTS`가 이 파일의 규칙이다.** 두 `CREATE TABLE`에도 붙인다. 이 migration은 서로 다른 다섯 테이블을 건드리므로 **한 문장으로 묶을 수가 없고**, MariaDB의 DDL은 트랜잭션이 아니라서 세 번째 문장이 잠금 시간 초과로 실패하면 앞의 테이블과 인덱스 둘만 남은 채 버전은 기록되지 않는다. 그러면 재시도가 매번 `Table already exists`로 죽는다 — 손으로 지우기 전에는 복구되지 않는다(PR #103 Codex 리뷰).
+
+**파일을 다섯으로 쪼개는 방법은 쓰지 않는다.** migration 템플릿의 규칙이 "서로 의존하는 DDL 은 파일을 나누지 말고 이 파일에 함께 담는다"이고, 이 다섯은 **함께 있어야 배치가 동작하는 한 벌**이다. 나누면 인덱스 없이 테이블만 있는 중간 버전이 정상 상태로 기록되어, 그 시점에 배치가 돌면 세 테이블을 통째로 스캔한다.
+
+`IF NOT EXISTS`는 문장 단위 재시도를 안전하게 만들어 같은 문제를 푼다 — **부분 적용이 남아도 재실행이 그 자리를 그냥 지나간다.** V20260804_102934가 세 `ALTER`를 한 문장으로 묶어 푼 것과 목적은 같고, 대상 테이블이 여럿이라 수단만 다르다.
+
+**집계 SQL의 형태**: 세 원본을 창으로 **먼저 자른 뒤** `UNION ALL` + `GROUP BY post_id`. 게시글마다 도는 스칼라 서브쿼리로 쓰면 대상이 **전체 게시글**이 되어 창의 이득이 사라진다. 조각 1의 H1a와 반대 방향의 판단인데, 이유는 "무엇에 비례하는가"가 다르기 때문이다 — 목록은 한 쪽 20건에 비례하지만 배치는 창 안의 이벤트 수에 비례한다.
+
+- 창: `created_at >= targetDate - 6일 00:00:00` **이상**, `targetDate + 1일 00:00:00` **미만** (대상일 포함 7칸). 시간대 기준은 D10
+- 댓글은 `status = 'PUBLISHED'`만 세고, **건수가 아니라 `COUNT(DISTINCT member_id)`다**(D1). 댓글 갈래만 `GROUP BY post_id, member_id`로 한 번 접는다
+- 점수 0인 글은 제외한다 — 활동 없는 글로 20칸을 채우지 않는다
+- 순위는 `ROW_NUMBER() OVER (ORDER BY score DESC, post_id DESC)`. 테스트 컨테이너가 `mariadb:11.4.10`이라 윈도 함수를 쓸 수 있다
+- **동점 tiebreaker를 SQL에 박는다.** 없으면 같은 날짜를 두 번 돌렸을 때 순위가 흔들려 D4의 멱등성이 거짓이 된다
+
+**Java**
+
+- `PopularPostBatchService.createDailyRanking(LocalDate)` — `@Transactional`. **실행 기록을 먼저 확인하고 있으면 즉시 끝낸다**(D4) → `DELETE` → `INSERT ... SELECT` → **실행 기록 `INSERT`**. 넷이 한 트랜잭션인 것이 중요하다: 순위만 들어가고 기록이 없으면 다음 실행이 그 날짜를 다시 계산하고, 기록만 들어가고 순위가 없으면 0건인 날과 구분되지 않는다. **확인과 기록이 트랜잭션의 양 끝이라 이 순서는 날짜를 선점하지 않는다** — 동시에 깬 인스턴스는 전부 집계하고 마지막에 한쪽만 남는다(D4 말미, R22)
+- `PopularPostScheduler` — 크론으로 깨어나 **전날을 계산해 서비스에 넘기는 일만** 한다. 날짜 계산과 집계를 갈라 둬야 테스트가 서비스를 직접 부를 수 있다. 시계는 `Clock` 빈으로 주입해 고정한다
+
+**완료 (2026-08-05).** `V20260805_073107__add_daily_popular_posts.sql`(테이블 둘 + 집계 인덱스 셋), `CommunityMapper`에 배치 문장 넷(`existsBatchRun`·`deleteDailyRanking`·`insertDailyRanking`·`insertBatchRun`) — **2026-08-18에 `CommunityPopularPostMapper`로 옮겼다** —, `PopularPostBatchService`, `PopularPostScheduler`, `ClockConfig`, 시드 두 곳을 추가했다. 정본은 `../DOMAIN.md` 6.9로 옮겼고 9절의 보류 둘을 닫았다. 검증은 `PopularPostBatchTests`(11), `CommunityMapperXmlTests`(+5), `CommunitySchemaTests`(+1), `CommunitySeedTests`(+2), `PopularPostSchedulerTests`(1)로 고정했다. `./gradlew test` 899건 통과.
+
+~~**배치 문장을 별도 매퍼로 빼지 않았다.**~~ **뒤집혔다 (2026-08-18, `../PLAN.md`의 결정 로그).** 인기글 문장 여섯을 `CommunityPopularPostMapper`로 뗐다. 아래 근거 셋 중 첫째는 전제가 사라졌고, 나머지 둘은 배치와 화면 조회를 **함께** 옮겨 그대로 지켜진다. 당시 문장은 아래에 남겨 둔다 — 매퍼는 고객·관리자로만 가른다는 규칙(CLAUDE.md)을 따랐고, 7c의 화면 조회도 같은 파일로 들어온다. 인기글 SQL이 두 파일로 흩어지면 **선정과 노출이 각각 `PUBLISHED`를 봐야 한다는 D5**를 한자리에서 볼 수 없다. 규칙이 든 근거(같은 `posts` 행의 잠금 순서)는 배치에 해당하지 않지만, 규칙을 좁게 해석해 예외를 만드는 것보다 한 파일에 두는 편이 이 자리에서는 더 얻는 것이 많았다.
+
+**계획에 없던 자리 하나를 채웠다 — 시간대를 이름으로 적으면 앱이 아예 안 뜬다.** D10의 서술을 그대로 옮겨 `connectionTimeZone=Asia/Seoul`로 적었더니 Flyway가 첫 연결에서 죽었다. 근거와 대안은 `../decisions/ADR-003-db-session-timezone.md`에 적었고, 값은 `+09:00`이다. **계획서에 적힌 설정 문자열이 검증된 값이 아니라는 것**이 이 조각에서 배운 것이다 — 3번 방식의 단점으로만 적어 둔 전제가 1번 방식에도 그대로 걸려 있었다.
+
+**H22의 시나리오를 D4에 맞춰 고쳐 썼다.** 원래 문장은 "같은 날짜로 두 번 돌려도 결과가 같다"인데, 3라운드에서 D4가 확정된 날짜를 건너뛰게 되면서 **두 번째 호출이 집계 SQL에 닿지도 않는다** — 그대로 구현하면 tiebreaker가 없어도 통과하는 검사가 된다. H31에서 한 번 밟은 것과 같은 종류의 자기충돌이라, 실행 기록만 지우고 부르도록 바꿨다(실패한 날의 재실행이 실제로 밟는 경로이기도 하다).
+
+## 7c — 화면
+
+- `CommunityMapper`(**2026-08-18에 `CommunityPopularPostMapper`로 옮겼다**): `findLatestRankingDate()` — **`popular_post_batch_runs`에서 읽는다**(D11), `daily_popular_posts`가 아니다 — + `findPopularPosts(rankingDate, limit)`. 후자는 `JOIN posts p ... AND p.status = 'PUBLISHED' ORDER BY ranking LIMIT 10`
+- `CommunityService.getList`가 인기글을 함께 싣는다. **1쪽 + 카테고리 필터 없음**일 때만 (D7)
+- `list.html` 상단 영역, `screens/list.md` 갱신 — 문자열 표, 확정 날짜 표기, **비었을 때 영역이 통째로 사라진다는 사실**
+
+**시드 두 곳을 함께 고친다.** `daily_popular_posts.post_id`가 `posts`를 참조하므로, 배치가 한 번이라도 돈 뒤에는 `seed-local.sql`·`seed-community.sql`의 `DELETE FROM posts`가 FK 위반으로 죽는다 — **시드 재실행이 통째로 실패한다.** `post_views`를 넣을 때 똑같이 겪은 자리이고 그때 남긴 주석 형식이 두 파일에 이미 있다(`e275bc7`). `DELETE FROM daily_popular_posts;`를 `DELETE FROM posts;`보다 위에 넣고, 실행 기록(`popular_post_batch_runs`)도 함께 지운다 — FK는 없지만 남겨 두면 **시드로 글을 새로 깔아도 배치가 "이미 돌았다"고 판단해 건너뛴다**(D4). **테이블을 만드는 커밋에서 함께 한다** — 먼저 넣으면 없는 테이블을 지우게 되어 지금 멀쩡한 시드가 깨진다. H6을 함께 넓힌다(PR #103 Codex 리뷰).
+
+**검증**: H21~H28, H31~H33. 스케줄러의 크론 표현식 자체는 테스트하지 않는다 — 시간을 기다리는 테스트가 되고, 값이 틀려도 실패까지 하루가 걸린다. 대신 스케줄러가 `LocalDate.now(서울) - 1일`을 넘기는지만 고정한 시계로 본다.
+
+**H1a는 넓혀야 한다** — 지금 H1a는 목록 SQL이 `ORDER BY p.created_at DESC, p.id DESC`인지 단언한다. 정렬 분기가 생기면 이 단언은 그대로는 깨지고, `<choose>`의 **분기마다** 형태를 고정하도록 넓혀야 한다. 넓히지 않고 지우면 tiebreaker가 사라져도 아무도 모른다.
+
+**완료 (2026-08-05).** `PopularPostView`·`PopularSectionView`, `CommunityMapper`에 조회 문장 둘(`findLatestRankingDate`·`findPopularPosts`) — **2026-08-18에 `CommunityPopularPostMapper`로 옮겼다** —, `CommunityService.getPopularSection`, `CommunityController.list`의 모델, `list.html` 상단 영역을 추가했다. 정본은 `../DOMAIN.md` 6.9의 "화면" 절로 옮겼고 9절의 마지막 보류(인기글을 어디에 두나)를 닫았다. `SCREENS.md` 17행의 유보 문단도 함께 정리했다 — 인기글은 새 화면이 아니라 목록 화면이 넓어진 것이라 `screens/list.md`가 받는다. 검증은 `CommunityServiceTests`(+8), `CommunityMapperXmlTests`(+2), `CommunityMapperTests`(+6), `CommunityScreenRenderingTests`(+2)로 고정하고 H25와 H27을 **적용**으로 올렸다. `./gradlew test` 918건 통과.
+
+**슬라이스 테스트 둘이 함께 깨졌다.** `CommunityService`가 `Clock`을 주입받게 되면서 `@Import(CommunityService.class)`만 있던 `CommunityQueryCountTests`·`CommunityViewCountTests`가 컨텍스트를 못 띄웠다. `ClockConfig`를 함께 올려 고쳤다 — **슬라이스는 필요한 빈을 스스로 다 적어야 한다**는 성질이 드러난 자리이고, 생성자에 협력자를 하나 더 붙일 때마다 이 목록을 본다.
+
+**계획에 없던 자리 셋을 채웠다.**
+
+1. **인기글 줄에 숫자를 싣지 않는다.** 계획은 "무엇을 그리는지"를 비워 두었고, 스냅샷이 조회·좋아요·댓글을 함께 보존하니 그리는 것이 자연스러워 보인다. 그런데 **같은 글이 아래 목록에도 나오고 그쪽은 현재 수치다** — 한 화면에 같은 글의 숫자가 둘이면 사용자에게는 어느 쪽도 못 믿을 값이 된다. 스냅샷의 근거 수치는 사후 설명용이지 화면용이 아니다(D5가 "왜 그랬는지가 설명되어야 한다"고 적은 대상은 운영자다).
+2. **D7의 조건(1쪽 + 필터 없음)을 Controller가 아니라 Service에 뒀다.** 계획서 문장이 "`getList`가 인기글을 함께 싣는다"여서 어느 층의 일인지가 열려 있었다. 규칙은 화면이 늘면 한 벌씩 늘고 **두 벌이 되는 순간 갈린다** — 조각 3·5에서 두 번 밟은 자리다. 검사는 결과가 비었는지가 아니라 **매퍼를 아예 안 부르는지**를 본다: 조회해 놓고 버리는 구현도 화면은 똑같고, 필터를 건 모든 공개 요청이 쿼리를 두 번 더 돌린다.
+3. **확정된 실행이 하나도 없을 때는 경고를 남기지 않는다.** D6은 "최신 확정일이 어제보다 오래되면 경고"라고만 적었는데, 확정 실행이 아예 없는 상태는 그 비교에 닿지 못한다. 첫 배포 직후에는 그것이 정상이고 배치가 몇 주째 안 돈 상태와 구분할 수단이 지금은 없다 — 조용한 쪽으로 틀렸고, 그 빈자리를 R30에 적었다.

@@ -42,8 +42,9 @@ import org.springframework.web.context.WebApplicationContext;
  * <p>이 클래스가 소유하는 것은 네 가지다. 템플릿별 대표 렌더링(템플릿명과 Model 연결), 사용자 입력
  * escaping, 화면 결과가 실질적으로 달라지는 상태, 그리고 커뮤니티 고유의 인가 거절과 그 뒤의 DB 상태다.
  *
- * <p>업무 규칙은 다른 테스트가 소유한다. 상태별 노출·인기글 판정·댓글 상한 계산은
- * {@code CommunityServiceTests}, Model 계약과 요청 파라미터 처리는 {@code CommunityControllerTests}, 조회수는
+ * <p>업무 규칙은 다른 테스트가 소유한다. 상태별 노출·인기글 판정은 {@code CommunityPostServiceTests},
+ * 댓글 상한 계산은 {@code CommunityCommentServiceTests}, Model 계약과 요청 파라미터 처리는
+ * {@code CommunityControllerTests}, 조회수는
  * {@code CommunityViewCountTests}, 탈퇴 회원 마스킹은 {@code CommunityMemberContractTests},
  * SQL 결과는 {@code CommunityMapperTests}가 본다. docs/testing.md 8절에 따라 권한별 버튼, 안내 문구,
  * 집계 포맷과 HTML 조각은 여기에서 고정하지 않는다. 다만 페이지 링크의 조건 보존과 댓글 상한 도달
@@ -172,16 +173,108 @@ class CommunityScreenRenderingTests {
     }
 
     @Test
-    void communityDetail_adminAccount_rendersWithoutCustomerActions() throws Exception {
+    void communityDetail_attachedImages_renderBelowContentInSortOrder() throws Exception {
+        long postId = insertPost(memberId, "첨부 있는 글", "본문", PostStatus.PUBLISHED);
+        insertPostImage(postId, "/uploads/community/202608/second.jpg", 1);
+        insertPostImage(postId, "/uploads/community/202608/first.jpg", 0);
+
+        String body = mockMvc.perform(get("/community/" + postId))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(body.indexOf("본문")).isLessThan(body.indexOf("first.jpg"));
+        assertThat(body.indexOf("first.jpg")).isLessThan(body.indexOf("second.jpg"));
+    }
+
+    @Test
+    void communityEditForm_existingImages_renderWithDeleteChoice() throws Exception {
+        long postId = insertPost(memberId, "첨부 있는 글", "본문", PostStatus.PUBLISHED);
+        insertPostImage(postId, "/uploads/community/202608/first.jpg", 0);
+
+        mockMvc.perform(get("/community/" + postId + "/edit")
+                        .with(authentication(authorOf(memberId))))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("multipart/form-data")))
+                .andExpect(content().string(containsString("first.jpg")))
+                .andExpect(content().string(containsString("deleteImageIds")));
+    }
+
+    /** 관리자에게 열린 것은 댓글뿐이다. 좋아요·신고는 화면에서도 없다(H50). */
+    @Test
+    void communityDetail_adminAccount_rendersCommentFormWithoutLikeAndReport() throws Exception {
         long postId = insertPost(memberId, "관리자 조회용 글", "본문", PostStatus.PUBLISHED);
 
         mockMvc.perform(get("/community/" + postId).with(authentication(admin())))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("관리자 조회용 글")))
+                .andExpect(content().string(containsString("/comments")))
+                .andExpect(content().string(containsString("댓글 작성")))
                 .andExpect(content().string(not(containsString("/likes"))))
                 .andExpect(content().string(not(containsString("/reports"))))
-                .andExpect(content().string(not(containsString("/comments"))))
                 .andExpect(content().string(not(containsString("로그인하면 댓글을 쓸 수 있습니다."))));
+    }
+
+    /** 관리자 댓글은 Security를 통과해 실제로 저장된다(H50). */
+    @Test
+    void communityComment_adminAccount_isAcceptedAndStored() throws Exception {
+        long postId = insertPost(memberId, "질문 글", "본문", PostStatus.PUBLISHED);
+        long adminId = insertAdminMember();
+
+        mockMvc.perform(post("/community/" + postId + "/comments")
+                        .param("content", "관리자 답변입니다.")
+                        .with(csrf())
+                        .with(authentication(authenticationOf(adminId, "ADMIN"))))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/community/" + postId));
+
+        assertThat(commentCountOf(postId)).isEqualTo(1);
+    }
+
+    /** 관리자도 자기 댓글은 지운다 — 작성자 본인 규칙 그대로다(H50). */
+    @Test
+    void communityCommentDelete_adminOwnComment_isAcceptedAndSoftDeleted() throws Exception {
+        long postId = insertPost(memberId, "질문 글", "본문", PostStatus.PUBLISHED);
+        long adminId = insertAdminMember();
+        long commentId =
+                insertComment(postId, adminId, "지울 답변", CommentStatus.PUBLISHED, BASE_TIME);
+
+        mockMvc.perform(post("/community/" + postId + "/comments/" + commentId + "/delete")
+                        .with(csrf())
+                        .with(authentication(authenticationOf(adminId, "ADMIN"))))
+                .andExpect(status().is3xxRedirection());
+
+        assertThat(commentStatusOf(commentId)).isEqualTo(CommentStatus.DELETED.name());
+    }
+
+    /** 열지 않은 경계가 열리지 않았다 — 좋아요는 인기 점수라 관리자에게 닫힌 채다(H50). */
+    @Test
+    void communityLike_adminAccount_isForbiddenAndWritesNothing() throws Exception {
+        long postId = insertPost(memberId, "좋아요 대상 글", "본문", PostStatus.PUBLISHED);
+        long adminId = insertAdminMember();
+
+        mockMvc.perform(post("/community/" + postId + "/likes")
+                        .with(csrf())
+                        .with(authentication(authenticationOf(adminId, "ADMIN"))))
+                .andExpect(status().isForbidden());
+
+        assertThat(likeCountOf(postId)).isZero();
+    }
+
+    /** 신고도 닫힌 채다 — 차단 권한자가 자기에게 보고할 일은 없다(H50). */
+    @Test
+    void communityReport_adminAccount_isForbiddenAndWritesNothing() throws Exception {
+        long postId = insertPost(memberId, "신고 대상 글", "본문", PostStatus.PUBLISHED);
+        long adminId = insertAdminMember();
+
+        mockMvc.perform(post("/community/" + postId + "/reports")
+                        .param("reason", "신고 사유")
+                        .with(csrf())
+                        .with(authentication(authenticationOf(adminId, "ADMIN"))))
+                .andExpect(status().isForbidden());
+
+        assertThat(reportCountOf(postId)).isZero();
     }
 
     @Test
@@ -305,6 +398,17 @@ class CommunityScreenRenderingTests {
                 .andExpect(content().string(containsString("광고성 게시물입니다")));
     }
 
+    /** 신고 사유가 이미지인 경우가 있어 차단을 판단하는 화면이 첨부를 함께 보여 준다. */
+    @Test
+    void communityAdminDetail_attachedImages_renderForAdmin() throws Exception {
+        long postId = insertPost(memberId, "첨부 신고 대상", "본문", PostStatus.BLOCKED);
+        insertPostImage(postId, "/uploads/community/202608/reported.jpg", 0);
+
+        mockMvc.perform(get("/admin/community/" + postId).with(authentication(admin())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("reported.jpg")));
+    }
+
     /** 일반 회원의 차단 요청을 Security에서 거절한다. */
     @Test
     void communityAdminBlock_normalMember_isRejected() throws Exception {
@@ -358,9 +462,9 @@ class CommunityScreenRenderingTests {
                 .andExpect(content().string(containsString("무기한")));
     }
 
-    /** 목록 상단에 공지 영역을 인기글보다 위에 그리고, 전체보기 링크를 함께 둔다. */
+    /** 공지 고정 행을 게시글 행보다 위에 그리고, 인기글은 사이드바로 뒤에 온다. */
     @Test
-    void communityList_withVisibleNotice_rendersNoticeSectionAbovePopular() throws Exception {
+    void communityList_withVisibleNotice_rendersPinnedNoticeAbovePosts() throws Exception {
         insertNotice("상단에 뜨는 공지", NoticeStatus.PUBLISHED, null, null);
 
         long postId = insertPost(memberId, "이번 주 인기 케이크", "본문", PostStatus.PUBLISHED);
@@ -375,29 +479,30 @@ class CommunityScreenRenderingTests {
                 .getResponse()
                 .getContentAsString();
 
-        assertThat(html.indexOf("공지사항")).isLessThan(html.indexOf("인기글"));
+        assertThat(html.indexOf("상단에 뜨는 공지")).isLessThan(html.indexOf("이번 주 인기 케이크"));
+        assertThat(html.indexOf("상단에 뜨는 공지")).isLessThan(html.indexOf("<h2>인기글</h2>"));
     }
 
-    /** 카테고리를 고르면 공지 영역이 통째로 사라진다. */
+    /** 카테고리를 고르면 공지 고정 행은 사라지지만 공지사항 진입점은 남는다. */
     @Test
-    void communityList_withCategoryFilter_hidesNoticeSection() throws Exception {
+    void communityList_withCategoryFilter_hidesPinnedNoticeKeepsEntryPoint() throws Exception {
         insertNotice("필터에서는 숨는 공지", NoticeStatus.PUBLISHED, null, null);
 
         mockMvc.perform(get("/community").param("categoryId", String.valueOf(categoryId)))
                 .andExpect(status().isOk())
                 .andExpect(content().string(not(containsString("필터에서는 숨는 공지"))))
-                .andExpect(content().string(not(containsString("공지사항"))));
+                .andExpect(content().string(containsString("/community/notices")));
     }
 
-    /** 노출 중인 공지가 없으면 영역이 통째로 사라진다. */
+    /** 노출 중인 공지가 없으면 고정 행은 사라지지만 공지사항 진입점은 남는다. */
     @Test
-    void communityList_withoutVisibleNotice_hidesNoticeSection() throws Exception {
+    void communityList_withoutVisibleNotice_hidesPinnedNoticeKeepsEntryPoint() throws Exception {
         insertNotice("끝난 공지", NoticeStatus.PUBLISHED, null, LocalDateTime.now().minusDays(1));
 
         mockMvc.perform(get("/community"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(not(containsString("끝난 공지"))))
-                .andExpect(content().string(not(containsString("공지사항"))));
+                .andExpect(content().string(containsString("/community/notices")));
     }
 
     /** 전체보기는 비로그인도 열 수 있고, 노출 중인 공지만 그린다. */
@@ -629,14 +734,23 @@ class CommunityScreenRenderingTests {
     }
 
     private long insertMember(String email, String nickname, String status) {
+        return insertMember(email, nickname, status, "USER");
+    }
+
+    private long insertAdminMember() {
+        return insertMember(
+                "screen-admin-" + System.nanoTime() + "@cakeshop.local", "관리자", "ACTIVE", "ADMIN");
+    }
+
+    private long insertMember(String email, String nickname, String status, String role) {
         jdbcTemplate.update(
                 """
                 INSERT INTO members (
                     email, password, nickname, phone, role, status, name, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, 'USER', ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                email, "encoded-password", nickname, "010-0000-0000", status,
+                email, "encoded-password", nickname, "010-0000-0000", role, status,
                 nickname, BASE_TIME, BASE_TIME);
 
         return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
@@ -655,6 +769,15 @@ class CommunityScreenRenderingTests {
         return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
     }
 
+    private void insertPostImage(long postId, String imageUrl, int sortOrder) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO post_images (post_id, image_url, sort_order)
+                VALUES (?, ?, ?)
+                """,
+                postId, imageUrl, sortOrder);
+    }
+
     private void insertReport(long postId, long reporterId, String status) {
         jdbcTemplate.update(
                 """
@@ -664,7 +787,7 @@ class CommunityScreenRenderingTests {
                 postId, reporterId, "광고성 게시물입니다", status, BASE_TIME);
     }
 
-    private void insertComment(
+    private long insertComment(
             long postId,
             long authorId,
             String content,
@@ -679,5 +802,27 @@ class CommunityScreenRenderingTests {
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 postId, authorId, content, status.name(), createdAt, createdAt);
+
+        return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+    }
+
+    private Integer commentCountOf(long postId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM comments WHERE post_id = ?", Integer.class, postId);
+    }
+
+    private String commentStatusOf(long commentId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT status FROM comments WHERE id = ?", String.class, commentId);
+    }
+
+    private Integer likeCountOf(long postId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM post_likes WHERE post_id = ?", Integer.class, postId);
+    }
+
+    private Integer reportCountOf(long postId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM post_reports WHERE post_id = ?", Integer.class, postId);
     }
 }

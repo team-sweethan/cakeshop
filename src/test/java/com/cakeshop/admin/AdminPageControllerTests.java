@@ -3,6 +3,7 @@ package com.cakeshop.admin;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -37,7 +38,8 @@ import com.cakeshop.domain.community.dto.view.AdminPostListView;
 import com.cakeshop.domain.community.dto.view.CommentSectionView;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.service.CommunityAdminService;
-import com.cakeshop.domain.community.service.CommunityService;
+import com.cakeshop.domain.community.service.CommunityCommentService;
+import com.cakeshop.domain.community.service.CommunityPostImageService;
 import com.cakeshop.domain.coupon.controller.CouponAdminController;
 import com.cakeshop.domain.coupon.service.CouponAdminService;
 import com.cakeshop.domain.member.controller.MemberAdminController;
@@ -113,11 +115,11 @@ class AdminPageControllerTests {
 
         AdminOrderService adminOrderService = Mockito.mock(AdminOrderService.class);
         when(adminOrderService.getOrder(1L)).thenReturn(new OrderDetailView(
-                1L, "ORD-1", 1L, OrderType.GENERAL, OrderStatus.PENDING_PAYMENT,
+                1L, "ORD-1", OrderType.GENERAL, OrderStatus.PENDING_PAYMENT,
                 "주문자", "010-1111-1111", "수령자", "010-2222-2222",
                 BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
                 LocalDateTime.of(2026, 8, 1, 10, 0), null, false,
-                null, null, null, null, LocalDateTime.of(2026, 8, 1, 9, 0), false, List.of()
+                null, LocalDateTime.of(2026, 8, 1, 9, 0), false, List.of()
         ));
 
         PaymentAdminService paymentAdminQueryService =
@@ -133,7 +135,7 @@ class AdminPageControllerTests {
         // 이 테스트는 "주소가 그 템플릿을 가리키는가"만 보므로 빈 결과로 충분하다.
         CommunityAdminService communityAdminService =
                 Mockito.mock(CommunityAdminService.class);
-        CommunityService communityService = Mockito.mock(CommunityService.class);
+        CommunityCommentService communityCommentService = Mockito.mock(CommunityCommentService.class);
         DashboardReadModelQueryService dashboardReadModelQueryService =
                 Mockito.mock(DashboardReadModelQueryService.class);
         PeriodStatisticsReadModelQueryService periodStatisticsReadModelQueryService =
@@ -150,7 +152,8 @@ class AdminPageControllerTests {
         when(reviewAdminService.getReviewDetail(anyLong()))
                 .thenReturn(new AdminReviewDetailView(
                         1L, 9L, "작성자", "상품명", "20260101-0001", 5, 5, 4, 4, "본문",
-                        LocalDateTime.now(), LocalDateTime.now(), ReviewStatus.PUBLISHED, null));
+                        LocalDateTime.now(), LocalDateTime.now(), ReviewStatus.PUBLISHED,
+                        List.of(), null));
 
         when(communityAdminService.getPosts(any(), any(), any(PageRequest.class)))
                 .thenReturn(new PageResult<AdminPostListView>(
@@ -161,7 +164,7 @@ class AdminPageControllerTests {
                         PostStatus.PUBLISHED, null, null, null, 0, 0,
                         LocalDateTime.now(), LocalDateTime.now()));
         when(communityAdminService.getReports(anyLong())).thenReturn(List.of());
-        when(communityService.getComments(anyLong(), any()))
+        when(communityCommentService.getComments(anyLong(), any()))
                 .thenReturn(new CommentSectionView(List.of(), 0, 0, 20));
         when(dashboardReadModelQueryService.getDashboard())
                 .thenReturn(new DashboardView(
@@ -213,7 +216,7 @@ class AdminPageControllerTests {
                         Mockito.mock(OrderMemberQueryService.class)),
                 new ReviewAdminController(reviewAdminService),
                 new NotificationAdminController(),
-                new CommunityAdminController(communityAdminService, communityService),
+                new CommunityAdminController(communityAdminService, communityCommentService, mock(CommunityPostImageService.class)),
                 new CouponAdminController(couponAdminService)
         ).build();
 

@@ -1,6 +1,7 @@
 package com.cakeshop.domain.review.dto.view;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import com.cakeshop.domain.member.dto.view.MemberReviewView;
 import com.cakeshop.domain.order.dto.view.OrderReviewSnapshotView;
@@ -21,6 +22,7 @@ public record AdminReviewDetailView(
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
         ReviewStatus status,
+        List<ReviewImageView> images,
         ReviewReplyView reply
 ) {
 
@@ -28,6 +30,7 @@ public record AdminReviewDetailView(
             ReviewRow row,
             MemberReviewView author,
             OrderReviewSnapshotView snapshot,
+            List<ReviewImageView> images,
             ReviewReplyView reply) {
 
         return new AdminReviewDetailView(
@@ -46,6 +49,7 @@ public record AdminReviewDetailView(
                 row.createdAt(),
                 row.updatedAt(),
                 row.status(),
+                images == null ? List.of() : List.copyOf(images),
                 reply);
     }
 

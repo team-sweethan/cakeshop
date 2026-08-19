@@ -29,9 +29,6 @@ public class ProductService {
     private static final BigDecimal DEFAULT_MIN_PRICE =
             BigDecimal.ZERO;
 
-    private static final BigDecimal DEFAULT_MAX_PRICE =
-            BigDecimal.valueOf(100_000);
-
     /** 상품 데이터 조회를 담당하는 Mapper. */
     private final ProductMapper productMapper;
 
@@ -210,14 +207,15 @@ public class ProductService {
             normalized.setMinPrice(DEFAULT_MIN_PRICE);
         }
 
-        // 최대 가격이 없거나 음수이면 기본 최대 가격인 10만원으로 변경한다.
-        if (normalized.getMaxPrice() == null
-                || normalized.getMaxPrice().signum() < 0) {
-            normalized.setMaxPrice(DEFAULT_MAX_PRICE);
+        // 음수인 최대 가격은 가격 상한이 없는 상태로 변경한다.
+        if (normalized.getMaxPrice() != null
+                && normalized.getMaxPrice().signum() < 0) {
+            normalized.setMaxPrice(null);
         }
 
-        // 최소 가격이 최대 가격보다 크면 두 값을 교환해 유효한 가격 범위로 만든다.
-        if (normalized.getMinPrice()
+        // 최대 가격이 있을 때 최소 가격보다 작으면 두 값을 교환해 유효한 범위로 만든다.
+        if (normalized.getMaxPrice() != null
+                && normalized.getMinPrice()
                 .compareTo(normalized.getMaxPrice()) > 0) {
             BigDecimal originalMinPrice =
                     normalized.getMinPrice();

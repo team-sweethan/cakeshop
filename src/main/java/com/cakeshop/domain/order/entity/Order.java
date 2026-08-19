@@ -26,7 +26,6 @@ public class Order {
     private BigDecimal finalAmount; // 최종 결제 금액
     private OrderStatus status;     // 주문 업무 상태
     private LocalDateTime pickupAt; // 픽업 예정 시각
-    private LocalDateTime cancellationBlockedAt; // 고객 취소 차단 시각
     private LocalDateTime paymentExpiresAt; // 결제 만료 시각
     private String requestMessage;          // 주문 요청 사항
     private String rejectReason;            // 주문제작 반려 사유

@@ -10,11 +10,13 @@ import com.cakeshop.domain.chat.dto.view.ChatRoomSidePanelResponse;
 import com.cakeshop.domain.chat.entity.ChatMessage;
 import com.cakeshop.domain.chat.entity.ChatResponseStatus;
 import com.cakeshop.domain.chat.entity.ChatRoom;
+import com.cakeshop.domain.chat.service.ChatNotificationSender;
 import com.cakeshop.domain.chat.service.ChatService;
 import com.cakeshop.global.security.MemberDetails;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -28,7 +30,9 @@ import java.util.List;
 public class ChatApiController {
 
     private final ChatService chatService;
+    private final ChatNotificationSender chatNotificationSender;
     private final ProductChatQueryService productChatQueryService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     // 1-1. 내 1:1 채팅방 단순 조회 (고객용, 방이 없으면 404, 생성 부작용 없음)
     @GetMapping("/api/chat/room")
@@ -102,9 +106,7 @@ public class ChatApiController {
         return ResponseEntity.ok(messages);
     }
 
-
-
-    // 3. 메시지 전송 (고객/관리자 공용)
+    // 3. 메시지 전송 (고객/관리자 공용 REST API)
     @PostMapping("/api/chat/messages")
     public ResponseEntity<ChatMessageResponse> sendMessage(
             @AuthenticationPrincipal MemberDetails memberDetails,
@@ -114,7 +116,8 @@ public class ChatApiController {
             return ResponseEntity.status(401).build();
         }
 
-        ChatMessage message = chatService.createMessage(
+        // 서비스가 DTO 생성을 전담하므로 컨트롤러는 단 1줄로 단순화됨!
+        ChatMessageResponse response = chatService.sendMessage(
                 request.getChatRoomId(),
                 memberDetails.getMemberId(),
                 memberDetails.isAdmin(),
@@ -122,29 +125,29 @@ public class ChatApiController {
                 request.getContent(),
                 request.getAttachments()
         );
-        List<String> imageUrls = (request.getAttachments() != null && !request.getAttachments().isEmpty())
-                ? request.getAttachments().stream()
-                        .map(ChatMessageAttachmentRequest::getObjectKey)
-                        .filter(java.util.Objects::nonNull)
-                        .collect(java.util.stream.Collectors.toList())
-                : java.util.Collections.emptyList();
 
-        String productName = null;
-        if (message.getProductId() != null) {
-            productName = productChatQueryService.getProductName(message.getProductId());
+        // REST Fallback 메시지 전송 시에도 웹소켓 구독자 및 관리자 대시보드로 실시간 방송!
+        try {
+            messagingTemplate.convertAndSend("/topic/chat/" + response.getChatRoomId(), response);
+            messagingTemplate.convertAndSend("/topic/admin/rooms", response);
+        } catch (Exception e) {
+            // 소켓 방송 중 예외가 발생하더라도 REST 응답은 성공 유지
         }
 
-        return ResponseEntity.ok(ChatMessageResponse.builder()
-                .id(message.getId())
-                .chatRoomId(message.getChatRoomId())
-                .senderId(message.getSenderId())
-                .senderType(memberDetails.isAdmin() ? "ADMIN" : "CUSTOMER")
-                .productId(message.getProductId())
-                .productName(productName)
-                .content(message.getContent())
-                .imageUrls(imageUrls)
-                .createdAt(message.getCreatedAt())
-                .build());
+        // 알림 발송 (트랜잭션 완료 후 호출 → afterCommit 중첩 없이 안전하게 WebSocket 전송)
+        try {
+            if (memberDetails.isAdmin()) {
+                chatNotificationSender.sendCustomerChatNotification(
+                        response.getChatRoomId(), response.getId(), response.getCustomerId(), memberDetails.getMemberId());
+            } else {
+                chatNotificationSender.sendAdminChatNotification(
+                        response.getChatRoomId(), response.getId(), memberDetails.getMemberId(), response.getCustomerName());
+            }
+        } catch (Exception e) {
+            // 알림 발송 실패가 채팅 서비스에 영향을 주지 않도록 예외 격리
+        }
+
+        return ResponseEntity.ok(response);
     }
 
     // 4. 사진 파일 업로드 API (독립 파일 업로드, 인증 및 활성 회원 검증 추가)
@@ -162,7 +165,7 @@ public class ChatApiController {
         return ResponseEntity.ok(fileUrl);
     }
 
-    // 5. 채팅방 연동 주문 내역 배너 목록 조회 (고객용)
+    // 5. 채팅방 연동 주문 내역 배너 목록 조회 (고객용) -- 웹소켓으로 전환해야하나
     @GetMapping("/api/chat/rooms/{chatRoomId}/orders")
     public ResponseEntity<List<ChatRoomOrderResponse>> getChatRoomOrders(
             @PathVariable Long chatRoomId,
@@ -178,7 +181,7 @@ public class ChatApiController {
         return ResponseEntity.ok(orders);
     }
 
-    // 6. 관리자 좌측 채팅방 목록 조회 (관리자 전용)
+    // 6. 관리자 좌측 채팅방 목록 조회 (관리자 전용) -- 웹소켓으로 전환
     @GetMapping("/api/admin/chat/rooms")
     public ResponseEntity<List<ChatRoomListResponse>> getAdminChatRooms(
             @RequestParam(required = false) ChatResponseStatus status,
@@ -195,14 +198,14 @@ public class ChatApiController {
     }
 
 
-    // 7-1. 관리자 우측 패널 조회 (고객 메모 + 주문 목록)
+    // 7-1. 관리자 우측 패널 조회 (고객 메모 + 주문 목록) -- 웹소켓 + REST API
     @GetMapping("/api/admin/chat/rooms/{chatRoomId}/side-panel")
     public ResponseEntity<ChatRoomSidePanelResponse> getAdminSidePanel(
             @PathVariable Long chatRoomId,
             @AuthenticationPrincipal MemberDetails memberDetails) {
 
         if (memberDetails == null || !memberDetails.isAdmin()) {
-            return ResponseEntity.status(403).build(); // 관리자 전용!
+            return ResponseEntity.status(403).build(); // 관리자 전용
         }
 
         ChatRoomSidePanelResponse response = chatService.getAdminSidePanel(
@@ -238,10 +241,20 @@ public class ChatApiController {
         }
 
         chatService.updateResponseStatus(chatRoomId, status, memberDetails.getMemberId(), true);
+
+        try {
+            ChatRoomListResponse fullPayload = chatService.getAdminChatRoomResponse(chatRoomId);
+            if (fullPayload != null) {
+                messagingTemplate.convertAndSend("/topic/admin/rooms", fullPayload);
+            }
+        } catch (Exception e) {
+            // 실시간 방송 실패 시에도 REST 응답 성공 유지
+        }
+
         return ResponseEntity.ok().build();
     }
 
-    // 8. 읽음 커서 갱신 (고객/관리자 공용)
+    // 8. 읽음 커서 갱신 (고객/관리자 공용) -- 웹소켓으로 전환
     @PatchMapping("/api/chat/read-cursor")
     public ResponseEntity<Void> updateReadCursor(
             @RequestParam Long chatRoomId,
@@ -252,12 +265,33 @@ public class ChatApiController {
             return ResponseEntity.status(401).build();
         }
 
-        chatService.updateReadCursor(
+        Long actualReadMessageId = chatService.updateReadCursor(
                 chatRoomId, memberDetails.getMemberId(), memberDetails.isAdmin(), lastReadMessageId);
+
+        if (actualReadMessageId != null && actualReadMessageId > 0) {
+            try {
+                String readerSide = memberDetails.isAdmin() ? "ADMIN" : "CUSTOMER";
+                Object readPayload = java.util.Map.of(
+                        "chatRoomId", chatRoomId,
+                        "readerSide", readerSide,
+                        "lastReadMessageId", actualReadMessageId
+                );
+                messagingTemplate.convertAndSend("/topic/chat/" + chatRoomId + "/read", readPayload);
+
+                if (memberDetails.isAdmin()) {
+                    ChatRoomListResponse fullPayload = chatService.getAdminChatRoomResponse(chatRoomId);
+                    if (fullPayload != null) {
+                        messagingTemplate.convertAndSend("/topic/admin/rooms", fullPayload);
+                    }
+                }
+            } catch (Exception e) {
+                // 실시간 방송 실패 시에도 REST 응답 성공 유지
+            }
+        }
         return ResponseEntity.ok().build();
     }
 
-    // 9. 채팅방에 주문 연동 (관리자 전용) (역할이 약간 애매함 필요 없으면 삭제할 것)
+    // 9. 채팅방에 주문 연동 (관리자 전용)
     @PostMapping("/api/admin/chat/orders")
     public ResponseEntity<Void> linkOrderToChatRoom(
             @RequestParam Long chatRoomId,
@@ -275,9 +309,7 @@ public class ChatApiController {
         return ResponseEntity.ok().build();
     }
 
-    // ==========================================
     // 채팅 API 전용 예외 핸들러 (REST JSON 응답 보장)
-    // ==========================================
     @ExceptionHandler(com.cakeshop.global.error.BusinessException.class)
     public ResponseEntity<java.util.Map<String, String>> handleBusinessException(com.cakeshop.global.error.BusinessException e) {
         return ResponseEntity.status(e.getErrorCode().status())

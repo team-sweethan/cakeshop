@@ -26,7 +26,7 @@
 - 근거: `blocked_by`가 `members.id` FK다. 자동 차단은 넣을 값이 없어 시스템 계정이나 암묵적 NULL 규칙이 필요하다. 스키마가 사람이 차단하는 것을 전제한다. 또한 임계값 방식은 담합 어뷰징 방어(신고자 신뢰도 등)를 불러오며 MVP를 벗어난다.
 - 차단 시 `status='BLOCKED'`, `blocked_at`, `blocked_reason`, `blocked_by`를 함께 기록한다. 차단 사유는 필수다(`../DOMAIN.md` 7절) — 작성자에게 보여 주는 값이므로(4.3) 비어 있으면 차단 화면이 아무 말도 하지 않는다.
 - 해제해도 `blocked_at`/`blocked_reason`/`blocked_by`를 NULL로 되돌리지 않는다(`../DOMAIN.md` 4.2).
-- 차단·해제는 게시글 행을 잠그고 시작한다(`SELECT ... FOR UPDATE`). `community-reaction.md` A8과 같은 자리다 — 같은 행에 쓰면서 신고 상태까지 함께 바꾸므로, 잠금 없이 하면 조회수·좋아요 경로와 잠금 순서가 엇갈린다.
+- 차단·해제는 게시글 행을 잠그고 시작한다(`SELECT ... FOR UPDATE`). 조회수·좋아요의 조건부 UPDATE가 잡는 배타 잠금과 같은 규율이다 — **`posts` 행이 먼저다.** 셋 중 차단만 SELECT 선잠금이 남은 이유는 전이 판단(`canTransitionTo`)이 **현재 상태를 읽어야** 해서다 — 좋아요·조회수는 단순 증감이라 조건을 UPDATE 안에 넣을 수 있었다(`community-reaction.md` A8, 2026-08-18 개정).
 - 차단하면 그 글의 `PENDING` 신고가 전부 `RESOLVED`가 된다. 전이 규칙은 `community-reaction.md` A9가 정본이다.
 - **관리자의 조치는 차단과 해제뿐이다.** 게시글 삭제도, 댓글 삭제도 관리자 권한이 아니다. 게시글 삭제는 작성자만(`../DOMAIN.md` 4.2, `BLOCKED → DELETED`는 금지), 댓글 삭제는 그 댓글의 작성자만 할 수 있다(`community-comment.md`). 관리자 화면에 그런 버튼을 두지 않는다.
 

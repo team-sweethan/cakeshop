@@ -31,21 +31,22 @@ public class CouponMemberIssueService {
         this.orderCouponQueryService = orderCouponQueryService;
     }
 
-    /** 자동 발급 한 건을 처리하고, FIRST_ORDER만 잠금 후 최신 주문 이력을 재검증한다. */
+    /** 자동 발급 한 건을 처리해 실제 신규 발급 여부를 반환하고, FIRST_ORDER만 최신 주문 이력을 재검증한다. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void issueAutomatically(Long couponId,
-                                   Long memberId,
-                                   boolean allowBeforeStart,
-                                   boolean firstOrderOnly) {
+    public boolean issueAutomatically(Long couponId,
+                                      Long memberId,
+                                      boolean allowBeforeStart,
+                                      boolean firstOrderOnly) {
         if (firstOrderOnly && !memberCouponQueryService.lockActiveCouponIssuableMember(memberId)) {
-            return;
+            return false;
         }
         if (firstOrderOnly && orderCouponQueryService.hasOrderHistory(memberId)) {
-            return;
+            return false;
         }
-        if (couponMapper.insertMemberCouponIfAbsent(couponId, memberId, allowBeforeStart) == 1
-                && couponMapper.increaseIssuedQuantityIfAvailable(couponId) != 1) {
+        boolean issued = couponMapper.insertMemberCouponIfAbsent(couponId, memberId, allowBeforeStart) == 1;
+        if (issued && couponMapper.increaseIssuedQuantityIfAvailable(couponId) != 1) {
             throw new BusinessException(CouponErrorCode.UPDATE_FAILED);
         }
+        return issued;
     }
 }

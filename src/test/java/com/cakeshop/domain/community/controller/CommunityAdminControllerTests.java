@@ -27,7 +27,8 @@ import com.cakeshop.domain.community.dto.view.CommentSectionView;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.entity.ReportStatus;
 import com.cakeshop.domain.community.service.CommunityAdminService;
-import com.cakeshop.domain.community.service.CommunityService;
+import com.cakeshop.domain.community.service.CommunityCommentService;
+import com.cakeshop.domain.community.service.CommunityPostImageService;
 import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
@@ -51,26 +52,26 @@ class CommunityAdminControllerTests {
     private static final LocalDateTime CREATED_AT = LocalDateTime.of(2026, 3, 1, 10, 0);
 
     private CommunityAdminService communityAdminService;
-    private CommunityService communityService;
+    private CommunityCommentService communityCommentService;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         communityAdminService = mock(CommunityAdminService.class);
-        communityService = mock(CommunityService.class);
+        communityCommentService = mock(CommunityCommentService.class);
 
         when(communityAdminService.getPosts(any(), any(), any(PageRequest.class)))
                 .thenReturn(new PageResult<AdminPostListView>(
                         List.of(), new PageRequest(1, 20), 0));
         when(communityAdminService.getPostDetail(anyLong())).thenReturn(publishedPost());
         when(communityAdminService.getReports(anyLong())).thenReturn(List.of());
-        when(communityService.getComments(anyLong(), any()))
+        when(communityCommentService.getComments(anyLong(), any()))
                 .thenReturn(new CommentSectionView(
                         List.of(), 0, 0, CommentSectionView.DEFAULT_LIMIT));
 
         mockMvc = MockMvcBuilders
                 .standaloneSetup(
-                        new CommunityAdminController(communityAdminService, communityService))
+                        new CommunityAdminController(communityAdminService, communityCommentService, mock(CommunityPostImageService.class)))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .build();
     }
@@ -132,7 +133,7 @@ class CommunityAdminControllerTests {
                         1L, "신고자", false, "사유", ReportStatus.PENDING, CREATED_AT),
                 new com.cakeshop.domain.community.dto.view.ReportView(
                         2L, "신고자", false, "사유", ReportStatus.RESOLVED, CREATED_AT)));
-        when(communityService.getComments(15L, 40)).thenReturn(comments);
+        when(communityCommentService.getComments(15L, 40)).thenReturn(comments);
 
         mockMvc.perform(get("/admin/community/15").param("comments", "40"))
                 .andExpect(status().isOk())

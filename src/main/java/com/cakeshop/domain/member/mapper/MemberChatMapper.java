@@ -18,4 +18,5 @@ import org.apache.ibatis.annotations.Param;
 public interface MemberChatMapper {
     String findCustomerNameById(@Param("customerId") Long customerId);
     List<MemberChatView> findCustomerNamesByIds(@Param("customerIds") List<Long> customerIds);
+    List<Long> findActiveAdminIds();
 }

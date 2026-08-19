@@ -1,7 +1,8 @@
 package com.cakeshop.domain.order.service;
 
-import com.cakeshop.domain.order.dto.form.customer.GeneralOrderForm;
-import com.cakeshop.domain.order.dto.form.customer.CartOrderForm;
+import com.cakeshop.domain.order.dto.form.customer.OrderCartCreateForm;
+import com.cakeshop.domain.order.dto.form.customer.OrderCreateForm;
+import com.cakeshop.domain.order.dto.form.customer.OrderGeneralCreateForm;
 import com.cakeshop.domain.cart.dto.view.CartOrderItemView;
 import com.cakeshop.domain.cart.service.CartOrderQueryService;
 import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
@@ -61,7 +62,7 @@ public class OrderService {
 
     /** 일반 상품 주문, 주문 항목 스냅샷, READY 결제를 하나의 트랜잭션으로 생성한다. */
     @Transactional
-    public long createGeneralOrder(long memberId, GeneralOrderForm form) {
+    public long createGeneralOrder(long memberId, OrderGeneralCreateForm form) {
         if (!memberCouponQueryService.lockActiveCouponIssuableMember(memberId)) {
             throw new BusinessException(CommonErrorCode.FORBIDDEN);
         }
@@ -134,7 +135,7 @@ public class OrderService {
      * 상품·옵션·재고와 총 주문 금액은 주문 생성 직전에 현재 DB 기준으로 재검증한다.
      */
     @Transactional
-    public long createCartOrder(long memberId, CartOrderForm form) {
+    public long createCartOrder(long memberId, OrderCartCreateForm form) {
         if (!memberCouponQueryService.lockActiveCouponIssuableMember(memberId)) {
             throw new BusinessException(CommonErrorCode.FORBIDDEN);
         }
@@ -227,7 +228,7 @@ public class OrderService {
         }
     }
 
-    private void validateForm(GeneralOrderForm form) {
+    private void validateForm(OrderGeneralCreateForm form) {
         if (form == null
                 || isBlank(form.getOrdererName())
                 || isBlank(form.getOrdererPhone())
@@ -243,7 +244,7 @@ public class OrderService {
         }
     }
 
-    private void validateCartForm(CartOrderForm form) {
+    private void validateCartForm(OrderCartCreateForm form) {
         if (form == null
                 || isBlank(form.getOrdererName())
                 || isBlank(form.getOrdererPhone())
@@ -268,7 +269,7 @@ public class OrderService {
     }
 
     /** 현재 상품·옵션 정보를 검증하고 주문 항목 스냅샷에 저장할 값을 계산한다. */
-    private PreparedOrderItem prepareItem(GeneralOrderForm form) {
+    private PreparedOrderItem prepareItem(OrderGeneralCreateForm form) {
         if (form.getQuantity() == null || form.getQuantity() <= 0) {
             throw new BusinessException(OrderErrorCode.INVALID_QUANTITY);
         }
@@ -311,7 +312,7 @@ public class OrderService {
     }
 
     private PreparedOrderItem prepareCartItem(CartOrderItemView item) {
-        GeneralOrderForm form = new GeneralOrderForm();
+        OrderGeneralCreateForm form = new OrderGeneralCreateForm();
         form.setProductId(item.productId());
         form.setQuantity(item.quantity());
         form.setOptionIds(item.optionIds());
@@ -342,7 +343,7 @@ public class OrderService {
     /** 결제 대기 상태와 결제 만료 시각이 설정된 일반 주문을 구성한다. */
     private Order createOrder(
             long memberId,
-            GeneralOrderForm form,
+            OrderGeneralCreateForm form,
             BigDecimal originalAmount,
             LocalDateTime now
     ) {
@@ -351,7 +352,7 @@ public class OrderService {
 
     private Order createOrder(
             long memberId,
-            com.cakeshop.domain.order.dto.form.customer.CreateOrderForm form,
+            OrderCreateForm form,
             String requestKey,
             BigDecimal originalAmount,
             LocalDateTime now
@@ -389,7 +390,6 @@ public class OrderService {
         orderItem.setTotalAmount(preparedItem.totalAmount());
         orderItem.setRequirements(preparedItem.requirements());
         orderItem.setPreparationDays(product.preparationDays());
-        orderItem.setCancellationLimitDays(0);
         requireOneRow(
                 orderMapper.insertOrderItem(orderItem),
                 OrderErrorCode.ORDER_SAVE_FAILED

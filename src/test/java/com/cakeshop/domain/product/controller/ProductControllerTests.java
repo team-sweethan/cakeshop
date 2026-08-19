@@ -64,6 +64,10 @@ class ProductControllerTests {
                         "pageResult",
                         pageResult
                 ))
+                .andExpect(model().attribute(
+                        "productListTitle",
+                        "상품 목록 - 일반 케이크"
+                ))
                 .andExpect(model().attributeExists(
                         "condition",
                         "productTypes",
@@ -131,7 +135,11 @@ class ProductControllerTests {
                         .param("page", "not-a-number")
                         .param("size", "-1"))
                 .andExpect(status().isOk())
-                .andExpect(view().name("customer/product/list"));
+                .andExpect(view().name("customer/product/list"))
+                .andExpect(model().attribute(
+                        "productListTitle",
+                        "상품 목록"
+                ));
 
         ArgumentCaptor<ProductSearchCondition> conditionCaptor =
                 ArgumentCaptor.forClass(
@@ -154,8 +162,7 @@ class ProductControllerTests {
                 .isEqualTo(ProductSort.POPULAR);
         assertThat(condition.getMinPrice())
                 .isEqualByComparingTo("0");
-        assertThat(condition.getMaxPrice())
-                .isEqualByComparingTo("100000");
+        assertThat(condition.getMaxPrice()).isNull();
 
         assertThat(pageCaptor.getValue().getPage()).isEqualTo(1);
         assertThat(pageCaptor.getValue().getSize()).isEqualTo(8);

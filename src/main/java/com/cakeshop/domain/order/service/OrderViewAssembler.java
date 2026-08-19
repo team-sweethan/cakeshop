@@ -4,7 +4,6 @@ import com.cakeshop.domain.order.dto.view.OrderDetailView;
 import com.cakeshop.domain.order.dto.view.OrderListView;
 import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.order.entity.OrderItem;
-import com.cakeshop.domain.order.entity.OrderItemImage;
 import com.cakeshop.domain.order.entity.OrderItemOption;
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.entity.OrderType;
@@ -48,7 +47,7 @@ public class OrderViewAssembler {
         List<OrderItem> items = orderMapper.findOrderItemsByOrderId(order.getId());
         String productName = items.isEmpty() ? "주문 상품 없음" : items.getFirst().getProductName();
         return new OrderListView(
-                order.getId(), order.getOrderNumber(), order.getMemberId(), order.getOrdererName(),
+                order.getId(), order.getOrderNumber(), order.getOrdererName(),
                 order.getOrderType(), order.getStatus(), productName, items.size(), order.getFinalAmount(),
                 order.getPickupAt(), order.getCreatedAt()
         );
@@ -58,19 +57,16 @@ public class OrderViewAssembler {
         List<OrderItem> items = orderMapper.findOrderItemsByOrderId(order.getId());
         Map<Long, List<OrderItemOption>> optionsByItem = orderMapper.findOrderItemOptionsByOrderId(order.getId())
                 .stream().collect(Collectors.groupingBy(OrderItemOption::getOrderItemId));
-        Map<Long, List<OrderItemImage>> imagesByItem = orderMapper.findOrderItemImagesByOrderId(order.getId())
-                .stream().collect(Collectors.groupingBy(OrderItemImage::getOrderItemId));
         List<OrderDetailView.Item> itemViews = items.stream()
-                .map(item -> toItemView(item, optionsByItem, imagesByItem))
+                .map(item -> toItemView(item, optionsByItem))
                 .toList();
         LocalDateTime now = LocalDateTime.now(clock);
         boolean cancellationRetryAvailable = orderMapper.hasRequestedRefundCancellation(order.getId());
         return new OrderDetailView(
-                order.getId(), order.getOrderNumber(), order.getMemberId(), order.getOrderType(), order.getStatus(),
+                order.getId(), order.getOrderNumber(), order.getOrderType(), order.getStatus(),
                 order.getOrdererName(), order.getOrdererPhone(), order.getPickupName(), order.getPickupPhone(),
                 order.getOriginalAmount(), order.getDiscountAmount(), order.getFinalAmount(), order.getPickupAt(),
-                order.getPaymentExpiresAt(), isPaymentPending(order, now), order.getRequestMessage(), order.getRejectReason(),
-                order.getCanceledAt(), order.getCancelReason(), order.getCreatedAt(),
+                order.getPaymentExpiresAt(), isPaymentPending(order, now), order.getRequestMessage(), order.getCreatedAt(),
                 cancellationRetryAvailable || isCancellationRequestAvailable(order, now),
                 itemViews
         );
@@ -94,19 +90,13 @@ public class OrderViewAssembler {
 
     private OrderDetailView.Item toItemView(
             OrderItem item,
-            Map<Long, List<OrderItemOption>> optionsByItem,
-            Map<Long, List<OrderItemImage>> imagesByItem
+            Map<Long, List<OrderItemOption>> optionsByItem
     ) {
         List<OrderDetailView.Option> options = optionsByItem.getOrDefault(item.getId(), List.of()).stream()
-                .map(option -> new OrderDetailView.Option(
-                        option.getOptionGroupName(), option.getOptionName(), option.getAdditionalPrice()))
-                .toList();
-        List<OrderDetailView.Image> images = imagesByItem.getOrDefault(item.getId(), List.of()).stream()
-                .map(image -> new OrderDetailView.Image(image.getImageUrl(), image.getSortOrder()))
+                .map(option -> new OrderDetailView.Option(option.getOptionGroupName(), option.getOptionName()))
                 .toList();
         return new OrderDetailView.Item(
-                item.getId(), item.getProductId(), item.getProductName(), item.getProductType(), item.getQuantity(),
-                item.getBasePrice(), item.getOptionAmount(), item.getTotalAmount(), item.getRequirements(), options, images
+                item.getProductName(), item.getQuantity(), item.getTotalAmount(), item.getRequirements(), options
         );
     }
 }

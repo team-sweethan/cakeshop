@@ -61,6 +61,9 @@ class CommunityMapperTests {
     private CommunityAdminMapper communityAdminMapper;
 
     @Autowired
+    private CommunityPopularPostMapper communityPopularPostMapper;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     private long categoryId;
@@ -91,13 +94,14 @@ class CommunityMapperTests {
     }
 
     /**
-     * 정렬 기준마다 순서가 갈리고 값이 같으면 id 내림차순으로 이어진다. 세 글은 작성 시각과
-     * 조회수 순서가 서로 반대라 두 기준이 같은 결과로 통과하지 않는다.
+     * 정렬 기준마다 순서가 갈리고 값이 같으면 id 내림차순으로 이어진다. 세 글은 작성 시각·
+     * 조회수·좋아요 순서가 서로 달라 세 기준이 같은 결과로 통과하지 않는다.
      */
     @ParameterizedTest(name = "{0} 정렬은 {1}, {2}, {3} 순서다")
     @CsvSource({
             "LATEST, 적게 본 최신 글, 많이 본 오래된 글, 적게 본 오래된 글",
-            "VIEWS, 많이 본 오래된 글, 적게 본 최신 글, 적게 본 오래된 글"
+            "VIEWS, 많이 본 오래된 글, 적게 본 최신 글, 적게 본 오래된 글",
+            "LIKES, 적게 본 오래된 글, 적게 본 최신 글, 많이 본 오래된 글"
     })
     void findPublishedPosts_sort_ordersByRequestedKeyThenIdDescending(
             PostSort sort, String first, String second, String third) {
@@ -108,6 +112,10 @@ class CommunityMapperTests {
         setViewCount(fewOld, 3);
         setViewCount(manyOld, 100);
         setViewCount(fewNew, 3);
+
+        setLikeCount(fewOld, 50);
+        setLikeCount(manyOld, 0);
+        setLikeCount(fewNew, 0);
 
         assertThat(findPage(1, 20, sort)).extracting(PostListRow::title)
                 .containsExactly(first, second, third);
@@ -447,22 +455,71 @@ class CommunityMapperTests {
     }
 
     @Test
-    void recalculateLikeCount_wrongCache_recountsRowsWithoutMarkingPostAsEdited() {
+    void increaseLikeCount_firstLike_incrementsWithoutMarkingPostAsEdited() {
         long postId = insertPost("좋아요 대상", PostStatus.PUBLISHED, BASE_TIME);
-        long otherMemberId = insertMember(
-                "liker-" + System.nanoTime() + "@cakeshop.local", "다른 회원", "ACTIVE");
-
-        communityMapper.insertLike(postId, memberId);
-        communityMapper.insertLike(postId, otherMemberId);
-        jdbcTemplate.update(
-                "UPDATE posts SET like_count = 99, updated_at = updated_at WHERE id = ?", postId);
         LocalDateTime before = updatedAtOf(postId);
 
-        communityMapper.recalculateLikeCount(postId);
+        assertThat(communityMapper.increaseLikeCount(postId, memberId)).isEqualTo(1);
 
-        assertThat(likeCountOf(postId)).isEqualTo(2);
+        assertThat(likeCountOf(postId)).isEqualTo(1);
         assertThat(updatedAtOf(postId)).isEqualTo(before);
         assertThat(communityMapper.findPostById(postId).isEdited()).isFalse();
+    }
+
+    /** 이미 눌린 회원의 재요청은 0행이다 — 멱등 판단이 카운터 UPDATE 안에 있다. */
+    @Test
+    void increaseLikeCount_alreadyLiked_changesNothing() {
+        long postId = insertPost("좋아요 대상", PostStatus.PUBLISHED, BASE_TIME);
+        communityMapper.increaseLikeCount(postId, memberId);
+        communityMapper.insertLike(postId, memberId);
+
+        assertThat(communityMapper.increaseLikeCount(postId, memberId)).isZero();
+        assertThat(likeCountOf(postId)).isEqualTo(1);
+    }
+
+    /** 노출 조건도 같은 UPDATE 안이다 — 비노출 글은 0행이라 확인과 쓰기 사이에 창이 없다. */
+    @Test
+    void increaseLikeCount_hiddenPost_changesNothing() {
+        long blocked = insertPost("차단 글", PostStatus.BLOCKED, BASE_TIME);
+        long deleted = insertPost("삭제 글", PostStatus.DELETED, BASE_TIME);
+
+        assertThat(communityMapper.increaseLikeCount(blocked, memberId)).isZero();
+        assertThat(communityMapper.increaseLikeCount(deleted, memberId)).isZero();
+        assertThat(likeCountOf(blocked)).isZero();
+        assertThat(likeCountOf(deleted)).isZero();
+    }
+
+    @Test
+    void decreaseLikeCount_likedPost_decrementsWithoutMarkingPostAsEdited() {
+        long postId = insertPost("좋아요 대상", PostStatus.PUBLISHED, BASE_TIME);
+        communityMapper.increaseLikeCount(postId, memberId);
+        communityMapper.insertLike(postId, memberId);
+        LocalDateTime before = updatedAtOf(postId);
+
+        assertThat(communityMapper.decreaseLikeCount(postId, memberId)).isEqualTo(1);
+
+        assertThat(likeCountOf(postId)).isZero();
+        assertThat(updatedAtOf(postId)).isEqualTo(before);
+        assertThat(communityMapper.findPostById(postId).isEdited()).isFalse();
+    }
+
+    /** 누른 적 없는 취소는 0행이다 — EXISTS 조건이 카운터가 음수로 가는 길을 막는다. */
+    @Test
+    void decreaseLikeCount_neverLiked_changesNothingSoCountStaysAtZero() {
+        long postId = insertPost("좋아요 대상", PostStatus.PUBLISHED, BASE_TIME);
+
+        assertThat(communityMapper.decreaseLikeCount(postId, memberId)).isZero();
+        assertThat(likeCountOf(postId)).isZero();
+    }
+
+    /** 중복 INSERT는 UNIQUE가 던진다 — 카운터 UPDATE의 NOT EXISTS가 뚫리면 울리는 경보다. */
+    @Test
+    void insertLike_duplicate_violatesUnique() {
+        long postId = insertPost("좋아요 대상", PostStatus.PUBLISHED, BASE_TIME);
+        communityMapper.insertLike(postId, memberId);
+
+        assertThatThrownBy(() -> communityMapper.insertLike(postId, memberId))
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     @Test
@@ -515,6 +572,12 @@ class CommunityMapperTests {
                 viewCount, postId);
     }
 
+    private void setLikeCount(long postId, long likeCount) {
+        jdbcTemplate.update(
+                "UPDATE posts SET like_count = ?, updated_at = updated_at WHERE id = ?",
+                likeCount, postId);
+    }
+
     private long viewCountOf(long postId) {
         return jdbcTemplate.queryForObject(
                 "SELECT view_count FROM posts WHERE id = ?", Long.class, postId);
@@ -557,7 +620,7 @@ class CommunityMapperTests {
         insertRanking(RANKING_DATE, 2, visible, 200);
         insertRanking(RANKING_DATE, 3, deleted, 100);
 
-        assertThat(communityMapper.findPopularPosts(RANKING_DATE, 10))
+        assertThat(communityPopularPostMapper.findPopularPosts(RANKING_DATE, 10))
                 .extracting(PopularPostView::postId)
                 .containsExactly(visible);
     }
@@ -574,7 +637,7 @@ class CommunityMapperTests {
         insertRanking(RANKING_DATE, 3, third, 999);
         insertRanking(RANKING_DATE.minusDays(1), 1, yesterday, 1_000);
 
-        assertThat(communityMapper.findPopularPosts(RANKING_DATE, 2))
+        assertThat(communityPopularPostMapper.findPopularPosts(RANKING_DATE, 2))
                 .satisfiesExactly(
                         popular -> {
                             assertThat(popular.ranking()).isEqualTo(1);
@@ -596,8 +659,8 @@ class CommunityMapperTests {
         insertBatchRun(RANKING_DATE.minusDays(1), 1);
         insertBatchRun(RANKING_DATE, 0);
 
-        assertThat(communityMapper.findLatestRankingDate()).isEqualTo(RANKING_DATE);
-        assertThat(communityMapper.findPopularPosts(RANKING_DATE, 10)).isEmpty();
+        assertThat(communityPopularPostMapper.findLatestRankingDate()).isEqualTo(RANKING_DATE);
+        assertThat(communityPopularPostMapper.findPopularPosts(RANKING_DATE, 10)).isEmpty();
     }
 
     private void insertRanking(LocalDate rankingDate, int ranking, long postId, long score) {
@@ -806,7 +869,6 @@ class CommunityMapperTests {
 
             assertThat(communityAdminMapper.closePendingReports(postId, ReportStatus.RESOLVED))
                     .isEqualTo(1);
-            assertThat(communityAdminMapper.countPendingReports(postId)).isZero();
             assertThat(communityAdminMapper.findReportsByPost(postId))
                     .extracting(ReportRow::status)
                     .containsExactlyInAnyOrder(ReportStatus.REJECTED, ReportStatus.RESOLVED);

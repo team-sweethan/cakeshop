@@ -20,6 +20,7 @@ import com.cakeshop.domain.product.entity.ProductOption;
 import com.cakeshop.domain.product.entity.ProductOptionGroup;
 import com.cakeshop.domain.product.entity.ProductOptionStatus;
 import com.cakeshop.domain.product.entity.ProductStatus;
+import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.error.ProductErrorCode;
 import com.cakeshop.domain.product.mapper.ProductMapper;
 import com.cakeshop.global.error.BusinessException;
@@ -56,6 +57,7 @@ public class ProductOptionAdminService {
         return new ProductOptionManagementView(
                 productId,
                 product.getName(),
+                product.getProductType(),
                 groupRows(rows)
         );
     }
@@ -148,23 +150,23 @@ public class ProductOptionAdminService {
             long optionGroupId,
             ProductOptionForm form
     ) {
-        ensureOptionGroupExists(productId, optionGroupId);
-
         if (form == null) {
             throw new BusinessException(
                     ProductErrorCode.INVALID_OPTION
             );
         }
 
-        ProductOptionGroupAdminView optionGroup =
-                findOptionGroup(
+        findProductForUpdate(productId);
+        List<ProductOptionAdminRow> rows =
+                findOptionRowsForUpdate(
                         productId,
                         optionGroupId
                 );
 
-        int sortOrder = optionGroup.options()
+        int sortOrder = rows
                 .stream()
-                .mapToInt(ProductOptionAdminView::sortOrder)
+                .filter(row -> row.optionId() != null)
+                .mapToInt(row -> row.optionSortOrder())
                 .max()
                 .orElse(0) + 1;
 
@@ -233,14 +235,14 @@ public class ProductOptionAdminService {
             long optionGroupId,
             ProductOptionMoveDirection direction
     ) {
-        ensureOptionGroupExists(productId, optionGroupId);
         Objects.requireNonNull(direction);
+        findProductForUpdate(productId);
 
         List<ProductOptionGroupAdminView> groups =
                 new ArrayList<>(
                         groupRows(
                                 productMapper
-                                        .findAdminOptionRowsByProductId(
+                                        .findAdminOptionRowsByProductIdForUpdate(
                                                 productId
                                         )
                         )
@@ -273,23 +275,22 @@ public class ProductOptionAdminService {
             long optionId,
             ProductOptionMoveDirection direction
     ) {
-        if (!productMapper.existsProductOptionById(
-                productId,
-                optionGroupId,
-                optionId
-        )) {
-            throw new BusinessException(
-                    ProductErrorCode.OPTION_NOT_FOUND
-            );
-        }
         Objects.requireNonNull(direction);
+        findProductForUpdate(productId);
+
+        List<ProductOptionAdminRow> rows =
+                findOptionRowsForUpdate(
+                        productId,
+                        optionGroupId
+                );
+
+        findOptionRow(rows, optionId);
 
         List<ProductOptionAdminView> options =
                 new ArrayList<>(
-                        findOptionGroup(
-                                productId,
-                                optionGroupId
-                        ).options()
+                        groupRows(rows)
+                                .getFirst()
+                                .options()
                 );
 
         int currentIndex = findOptionIndex(options, optionId);
@@ -401,25 +402,6 @@ public class ProductOptionAdminService {
         return option;
     }
 
-    private ProductOptionGroupAdminView findOptionGroup(
-            long productId,
-            long optionGroupId
-    ) {
-        return groupRows(
-                productMapper.findAdminOptionRowsByProductId(
-                        productId
-                )
-        ).stream()
-                .filter(group -> group.id() == optionGroupId)
-                .findFirst()
-                .orElseThrow(() ->
-                        new BusinessException(
-                                ProductErrorCode
-                                        .OPTION_GROUP_NOT_FOUND
-                        )
-                );
-    }
-
     private int findGroupIndex(
             List<ProductOptionGroupAdminView> groups,
             long optionGroupId
@@ -506,6 +488,11 @@ public class ProductOptionAdminService {
             ProductOptionGroupForm form,
             List<ProductOptionAdminRow> rows
     ) {
+        validateGeneralProductRequiredOption(
+                product,
+                form
+        );
+
         if (product.getStatus() != ProductStatus.ACTIVE) {
             return;
         }
@@ -535,11 +522,29 @@ public class ProductOptionAdminService {
             Product product,
             ProductOptionGroupForm form
     ) {
+        validateGeneralProductRequiredOption(
+                product,
+                form
+        );
+
         if (product.getStatus() == ProductStatus.ACTIVE
                 && form.isRequired()
                 && form.getStatus()
                 == ProductOptionStatus.ACTIVE) {
             throwRequiredOptionGroupEmpty();
+        }
+    }
+
+    private void validateGeneralProductRequiredOption(
+            Product product,
+            ProductOptionGroupForm form
+    ) {
+        if (product.getProductType() == ProductType.GENERAL
+                && form.isRequired()) {
+            throw new BusinessException(
+                    ProductErrorCode
+                            .GENERAL_PRODUCT_REQUIRED_OPTION_NOT_ALLOWED
+            );
         }
     }
 
@@ -585,29 +590,4 @@ public class ProductOptionAdminService {
         );
     }
 
-    private void ensureProductExists(long productId) {
-        if (productMapper.findAdminProductFormById(
-                productId
-        ) == null) {
-            throw new BusinessException(
-                    ProductErrorCode.NOT_FOUND
-            );
-        }
-    }
-
-    private void ensureOptionGroupExists(
-            long productId,
-            long optionGroupId
-    ) {
-        ensureProductExists(productId);
-
-        if (!productMapper.existsOptionGroupById(
-                productId,
-                optionGroupId
-        )) {
-            throw new BusinessException(
-                    ProductErrorCode.OPTION_GROUP_NOT_FOUND
-            );
-        }
-    }
 }

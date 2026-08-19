@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -25,6 +26,7 @@ import com.cakeshop.domain.product.entity.ProductOptionGroup;
 import com.cakeshop.domain.product.entity.ProductOptionSelectionType;
 import com.cakeshop.domain.product.entity.ProductOptionStatus;
 import com.cakeshop.domain.product.entity.ProductStatus;
+import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.error.ProductErrorCode;
 import com.cakeshop.domain.product.mapper.ProductMapper;
 import com.cakeshop.global.error.BusinessException;
@@ -33,6 +35,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -49,6 +52,7 @@ class ProductOptionAdminServiceTests {
     void getOptions_existingProduct_groupsOptionRows() {
         ProductForm product = new ProductForm();
         product.setName("레터링 케이크");
+        product.setProductType(ProductType.CUSTOM);
 
         when(productMapper.findAdminProductFormById(1L))
                 .thenReturn(product);
@@ -64,6 +68,8 @@ class ProductOptionAdminServiceTests {
         assertThat(result.productId()).isEqualTo(1L);
         assertThat(result.productName())
                 .isEqualTo("레터링 케이크");
+        assertThat(result.productType())
+                .isEqualTo(ProductType.CUSTOM);
         assertThat(result.optionGroups()).hasSize(1);
         assertThat(result.optionGroups().getFirst().options())
                 .extracting(option -> option.name())
@@ -91,7 +97,7 @@ class ProductOptionAdminServiceTests {
     }
 
     @Test
-    void createOptionGroup_validForm_insertsNormalizedGroup() {
+    void createOptionGroup_customProductRequiredForm_insertsNormalizedGroup() {
         when(productMapper.findSalesInfoByIdForUpdate(1L))
                 .thenReturn(product(ProductStatus.INACTIVE));
         doAnswer(invocation -> {
@@ -126,6 +132,68 @@ class ProductOptionAdminServiceTests {
         assertThat(saved.getStatus())
                 .isEqualTo(ProductOptionStatus.ACTIVE);
         assertThat(saved.getSortOrder()).isEqualTo(1);
+    }
+
+    @Test
+    void createOptionGroup_generalProductRequiredForm_throwsPolicyError() {
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(product(
+                        ProductStatus.INACTIVE,
+                        ProductType.GENERAL
+                ));
+
+        assertThatThrownBy(() ->
+                productOptionAdminService.createOptionGroup(
+                        1L,
+                        optionGroupForm()
+                )
+        ).isInstanceOfSatisfying(
+                BusinessException.class,
+                exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(
+                                        ProductErrorCode
+                                                .GENERAL_PRODUCT_REQUIRED_OPTION_NOT_ALLOWED
+                                )
+        );
+
+        verify(productMapper, never())
+                .insertOptionGroup(
+                        any(ProductOptionGroup.class)
+                );
+    }
+
+    @Test
+    void createOptionGroup_generalProductOptionalForm_insertsGroup() {
+        ProductOptionGroupForm form = optionGroupForm();
+        form.setRequired(false);
+
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(product(
+                        ProductStatus.INACTIVE,
+                        ProductType.GENERAL
+                ));
+        doAnswer(invocation -> {
+            ProductOptionGroup optionGroup =
+                    invocation.getArgument(0);
+            optionGroup.setId(10L);
+            return 1;
+        }).when(productMapper).insertOptionGroup(
+                any(ProductOptionGroup.class)
+        );
+
+        productOptionAdminService.createOptionGroup(
+                1L,
+                form
+        );
+
+        ArgumentCaptor<ProductOptionGroup> captor =
+                ArgumentCaptor.forClass(
+                        ProductOptionGroup.class
+                );
+        verify(productMapper)
+                .insertOptionGroup(captor.capture());
+        assertThat(captor.getValue().isRequired()).isFalse();
     }
 
     @Test
@@ -178,6 +246,52 @@ class ProductOptionAdminServiceTests {
                                 .isEqualTo(
                                         ProductErrorCode
                                                 .OPTION_GROUP_NOT_FOUND
+                                )
+        );
+
+        verify(productMapper, never())
+                .updateOptionGroup(
+                        anyLong(),
+                        any(ProductOptionGroup.class)
+                );
+    }
+
+    @Test
+    void updateOptionGroup_generalProductMadeRequired_throwsPolicyError() {
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(product(
+                        ProductStatus.INACTIVE,
+                        ProductType.GENERAL
+                ));
+        when(productMapper
+                .findAdminOptionRowsByGroupIdForUpdate(
+                        1L,
+                        10L
+                ))
+                .thenReturn(List.of(
+                        optionRow(
+                                false,
+                                ProductOptionStatus.ACTIVE,
+                                11L,
+                                "1호",
+                                ProductOptionStatus.ACTIVE,
+                                1
+                        )
+                ));
+
+        assertThatThrownBy(() ->
+                productOptionAdminService.updateOptionGroup(
+                        1L,
+                        10L,
+                        optionGroupForm()
+                )
+        ).isInstanceOfSatisfying(
+                BusinessException.class,
+                exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(
+                                        ProductErrorCode
+                                                .GENERAL_PRODUCT_REQUIRED_OPTION_NOT_ALLOWED
                                 )
         );
 
@@ -334,11 +448,12 @@ class ProductOptionAdminServiceTests {
 
     @Test
     void createOption_validForm_insertsNormalizedOption() {
-        when(productMapper.findAdminProductFormById(1L))
-                .thenReturn(new ProductForm());
-        when(productMapper.existsOptionGroupById(1L, 10L))
-                .thenReturn(true);
-        when(productMapper.findAdminOptionRowsByProductId(1L))
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(product(ProductStatus.INACTIVE));
+        when(productMapper.findAdminOptionRowsByGroupIdForUpdate(
+                1L,
+                10L
+        ))
                 .thenReturn(List.of(
                         optionRow(11L, "1호", 2)
                 ));
@@ -360,7 +475,16 @@ class ProductOptionAdminServiceTests {
         ArgumentCaptor<ProductOption> captor =
                 ArgumentCaptor.forClass(ProductOption.class);
 
-        verify(productMapper)
+        InOrder lockOrder = inOrder(productMapper);
+
+        lockOrder.verify(productMapper)
+                .findSalesInfoByIdForUpdate(1L);
+        lockOrder.verify(productMapper)
+                .findAdminOptionRowsByGroupIdForUpdate(
+                        1L,
+                        10L
+                );
+        lockOrder.verify(productMapper)
                 .insertProductOption(captor.capture());
 
         ProductOption saved = captor.getValue();
@@ -593,11 +717,9 @@ class ProductOptionAdminServiceTests {
 
     @Test
     void moveOptionGroup_down_swapsAndNormalizesSortOrder() {
-        when(productMapper.findAdminProductFormById(1L))
-                .thenReturn(new ProductForm());
-        when(productMapper.existsOptionGroupById(1L, 10L))
-                .thenReturn(true);
-        when(productMapper.findAdminOptionRowsByProductId(1L))
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(product(ProductStatus.INACTIVE));
+        when(productMapper.findAdminOptionRowsByProductIdForUpdate(1L))
                 .thenReturn(List.of(
                         groupRow(10L, "크기", 2),
                         groupRow(20L, "맛", 2)
@@ -614,7 +736,13 @@ class ProductOptionAdminServiceTests {
         ArgumentCaptor<Integer> orderCaptor =
                 ArgumentCaptor.forClass(Integer.class);
 
-        verify(productMapper, times(2))
+        InOrder lockOrder = inOrder(productMapper);
+
+        lockOrder.verify(productMapper)
+                .findSalesInfoByIdForUpdate(1L);
+        lockOrder.verify(productMapper)
+                .findAdminOptionRowsByProductIdForUpdate(1L);
+        lockOrder.verify(productMapper, times(2))
                 .updateOptionGroupSortOrder(
                         org.mockito.ArgumentMatchers.eq(1L),
                         idCaptor.capture(),
@@ -629,12 +757,12 @@ class ProductOptionAdminServiceTests {
 
     @Test
     void moveOption_up_swapsAndNormalizesSortOrder() {
-        when(productMapper.existsProductOptionById(
+        when(productMapper.findSalesInfoByIdForUpdate(1L))
+                .thenReturn(product(ProductStatus.INACTIVE));
+        when(productMapper.findAdminOptionRowsByGroupIdForUpdate(
                 1L,
-                10L,
-                12L
-        )).thenReturn(true);
-        when(productMapper.findAdminOptionRowsByProductId(1L))
+                10L
+        ))
                 .thenReturn(List.of(
                         optionRow(11L, "1호", 1),
                         optionRow(12L, "2호", 1)
@@ -652,7 +780,16 @@ class ProductOptionAdminServiceTests {
         ArgumentCaptor<Integer> orderCaptor =
                 ArgumentCaptor.forClass(Integer.class);
 
-        verify(productMapper, times(2))
+        InOrder lockOrder = inOrder(productMapper);
+
+        lockOrder.verify(productMapper)
+                .findSalesInfoByIdForUpdate(1L);
+        lockOrder.verify(productMapper)
+                .findAdminOptionRowsByGroupIdForUpdate(
+                        1L,
+                        10L
+                );
+        lockOrder.verify(productMapper, times(2))
                 .updateProductOptionSortOrder(
                         org.mockito.ArgumentMatchers.eq(1L),
                         org.mockito.ArgumentMatchers.eq(10L),
@@ -705,10 +842,18 @@ class ProductOptionAdminServiceTests {
     }
 
     private Product product(ProductStatus status) {
+        return product(status, ProductType.CUSTOM);
+    }
+
+    private Product product(
+            ProductStatus status,
+            ProductType productType
+    ) {
         Product product = new Product();
 
         product.setId(1L);
         product.setStatus(status);
+        product.setProductType(productType);
 
         return product;
     }

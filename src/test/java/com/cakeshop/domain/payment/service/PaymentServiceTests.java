@@ -9,6 +9,7 @@ import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.error.PaymentErrorCode;
 import com.cakeshop.domain.payment.infra.TossPaymentClient.ApprovalResult;
 import com.cakeshop.domain.payment.mapper.PaymentMapper;
+import com.cakeshop.domain.payment.event.CustomPaymentChatCompletedEvent;
 import com.cakeshop.domain.payment.event.GeneralPaymentCompletedEvent;
 import com.cakeshop.domain.product.service.ProductStockService;
 import com.cakeshop.global.error.BusinessException;
@@ -169,7 +170,7 @@ class PaymentServiceTests {
                 1L,
                 approval.approvedAt()
         );
-        verifyNoInteractions(eventPublisher);
+        verify(eventPublisher).publishEvent(new CustomPaymentChatCompletedEvent(1L));
     }
 
     @Test

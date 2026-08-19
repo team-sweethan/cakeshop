@@ -288,8 +288,9 @@ SELECT p.`id`, m.`id`, TIMESTAMP(@activity_day, '12:00:00')
    AND p.`id` % 3 = 0
    AND m.`email` IN ('user@cakeshop.local', 'admin@cakeshop.local');
 
--- like_count 는 증분하지 않고 매번 재계산한다(DOMAIN.md 6.5).
--- 시드도 같은 방식으로 맞춰 둔다. 값이 어긋난 채로 시작하면 조각 4에서 원인을 찾기 어렵다.
+-- 런타임의 like_count 는 조건부 원자 UPDATE 증분이다(specs/community-reaction.md A8, 2026-08-18 개정).
+-- 시드는 행을 한꺼번에 깔아 증분할 사건이 없으므로 여기서만 재계산으로 값을 맞춘다.
+-- 값이 어긋난 채로 시작하면 증분이 그 어긋남을 영영 실어 나른다(PLAN.md R34).
 --
 -- updated_at 을 자기 값으로 다시 지정하는 것이 핵심이다. posts.updated_at 은
 -- ON UPDATE CURRENT_TIMESTAMP(6) 이라 그냥 두면 like_count 가 바뀐 글마다 값이 갱신되고,

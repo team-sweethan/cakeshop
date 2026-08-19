@@ -31,7 +31,7 @@ class CommunityViewCountConcurrencyTests {
     private static final int THREADS = 8;
 
     @Autowired
-    private CommunityService communityService;
+    private CommunityPostService communityPostService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -85,7 +85,7 @@ class CommunityViewCountConcurrencyTests {
 
     @Test
     void getPostDetail_concurrentViewsBySameViewer_countOnlyOnce() throws Exception {
-        runConcurrently(() -> communityService.getPostDetail(postId, null, "S:racer"));
+        runConcurrently(() -> communityPostService.getPostDetail(postId, null, "S:racer"));
 
         assertThat(viewCount())
                 .as("같은 조회자의 동시 요청은 한 번만 세어야 한다")
@@ -113,10 +113,10 @@ class CommunityViewCountConcurrencyTests {
     /** 조회 창 이후 동시 재조회는 한 번만 추가 반영한다. */
     @Test
     void getPostDetail_concurrentViewsAfterWindow_countOnlyOnceMore() throws Exception {
-        runConcurrently(() -> communityService.getPostDetail(postId, null, "S:racer"));
+        runConcurrently(() -> communityPostService.getPostDetail(postId, null, "S:racer"));
         ageViews(11);
 
-        runConcurrently(() -> communityService.getPostDetail(postId, null, "S:racer"));
+        runConcurrently(() -> communityPostService.getPostDetail(postId, null, "S:racer"));
 
         assertThat(viewCount())
                 .as("창이 열린 순간에도 동시 요청은 한 번만 세어야 한다")
@@ -143,7 +143,7 @@ class CommunityViewCountConcurrencyTests {
     }
 
     private void runConcurrentlyWith(List<String> viewerKeys) throws Exception {
-        execute(viewerKeys, key -> communityService.getPostDetail(postId, null, key));
+        execute(viewerKeys, key -> communityPostService.getPostDetail(postId, null, key));
     }
 
     /** 모든 작업을 같은 시점에 시작한다. */

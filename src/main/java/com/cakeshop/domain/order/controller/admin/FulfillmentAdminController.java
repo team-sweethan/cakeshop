@@ -1,7 +1,7 @@
 package com.cakeshop.domain.order.controller.admin;
 
 import com.cakeshop.domain.order.dto.form.admin.FulfillmentSearchCondition;
-import com.cakeshop.domain.order.dto.form.CancelForm;
+import com.cakeshop.domain.order.dto.form.OrderCancelForm;
 import com.cakeshop.domain.order.dto.view.admin.FulfillmentListView;
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.service.admin.AdminCustomOrderService;
@@ -110,7 +110,7 @@ public class FulfillmentAdminController {
             @PathVariable("orderId") long orderId,
             @ModelAttribute FulfillmentSearchCondition condition,
             @AuthenticationPrincipal MemberDetails admin,
-            @Valid @ModelAttribute CancelForm form,
+            @Valid @ModelAttribute OrderCancelForm form,
             BindingResult bindingResult,
             RedirectAttributes redirectAttributes
     ) {

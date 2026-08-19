@@ -14,7 +14,11 @@ public enum ReviewErrorCode implements ErrorCode {
     BLOCKED_REVIEW("REVIEW_005", "숨김 처리된 후기입니다.", 403),
     INVALID_REVIEW_TRANSITION("REVIEW_006", "지금 상태에서 할 수 없는 조치입니다.", 400),
     ALREADY_REPLIED("REVIEW_007", "이미 답글이 달린 후기입니다.", 409),
-    REPLY_NOT_FOUND("REVIEW_008", "답글을 찾을 수 없습니다.", 404);
+    REPLY_NOT_FOUND("REVIEW_008", "답글을 찾을 수 없습니다.", 404),
+    INVALID_IMAGE_FILE("REVIEW_009", "JPG 또는 PNG 이미지만 첨부할 수 있습니다.", 400),
+    IMAGE_TOO_LARGE("REVIEW_010", "이미지는 한 장에 5MB까지 첨부할 수 있습니다.", 400),
+    IMAGE_LIMIT_EXCEEDED("REVIEW_011", "이미지는 후기당 3장까지 첨부할 수 있습니다.", 400),
+    IMAGE_UPLOAD_FAILED("REVIEW_012", "후기 이미지를 저장하지 못했습니다.", 500);
 
     private final String code;
     private final String message;

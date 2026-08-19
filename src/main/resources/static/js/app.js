@@ -31,12 +31,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
 document.addEventListener("cart:updated", (event) => updateCartCount(event.detail));
 
-// 안 읽은 알림 개수 DB API 호출 및 뱃지 업데이트
+// 안 읽은 알림 개수 DB API 호출 및 뱃지 업데이트 (세대 번호 관리로 지연 응답 덮어쓰기 방지)
+let unreadCountSeq = 0;
 async function updateNotificationUnreadCount() {
+  const currentSeq = ++unreadCountSeq;
   try {
     const response = await fetch('/api/notifications/unread-count');
-    if (!response.ok) return;
+    if (!response.ok || currentSeq !== unreadCountSeq) return;
     const count = await response.json();
+    if (currentSeq !== unreadCountSeq) return;
     document.querySelectorAll('[data-unread-count]').forEach((element) => {
       element.textContent = count;
       element.style.display = count > 0 ? 'inline-block' : 'none';
@@ -49,3 +52,72 @@ async function updateNotificationUnreadCount() {
 document.addEventListener('DOMContentLoaded', () => {
   updateNotificationUnreadCount();
 });
+
+// 토스트 팝업 생성 및 렌더링 헬퍼 함수
+function showToast(title, content, targetUrl, notificationId) {
+  if (!title && !content) return;
+
+  let container = document.querySelector(".toast-container");
+  if (!container) {
+    container = document.createElement("div");
+    container.className = "toast-container";
+    document.body.appendChild(container);
+  }
+
+  const toast = document.createElement("div");
+  toast.className = "toast-item";
+  toast.innerHTML = `
+    <div class="toast-title">🔔 ${escapeHtmlApp(title || "알림")}</div>
+    <div class="toast-content">${escapeHtmlApp(content || "")}</div>
+  `;
+
+  toast.addEventListener("click", () => {
+    if (notificationId) {
+      const headers = getCsrfHeadersApp();
+      fetch(`/api/notifications/${notificationId}/read`, {
+        method: "PATCH",
+        headers: headers,
+        keepalive: true
+      }).finally(() => {
+        if (targetUrl) {
+          window.location.href = targetUrl;
+        }
+      });
+    } else if (targetUrl) {
+      window.location.href = targetUrl;
+    }
+  });
+
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.classList.add("toast-item--out");
+    setTimeout(() => {
+      if (toast.parentNode) {
+        toast.parentNode.removeChild(toast);
+      }
+    }, 300);
+  }, 4000);
+}
+
+function escapeHtmlApp(text) {
+  if (!text) return "";
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function getCsrfHeadersApp() {
+  const token = document.querySelector('meta[name="_csrf"]')?.getAttribute('content')
+    || document.querySelector('input[name="_csrf"]')?.value;
+  const header = document.querySelector('meta[name="_csrf_header"]')?.getAttribute('content')
+    || 'X-CSRF-TOKEN';
+  const headers = {};
+  if (token) {
+    headers[header] = token;
+  }
+  return headers;
+}

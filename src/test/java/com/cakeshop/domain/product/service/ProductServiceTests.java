@@ -46,7 +46,6 @@ class ProductServiceTests {
 
         condition.setKeyword("   ");
         condition.setMinPrice(BigDecimal.valueOf(-1));
-        condition.setMaxPrice(BigDecimal.valueOf(-1));
         condition.setSort(null);
 
         when(productMapper.countPublicProducts(any()))
@@ -69,8 +68,7 @@ class ProductServiceTests {
         assertThat(normalized.getKeyword()).isNull();
         assertThat(normalized.getMinPrice())
                 .isEqualByComparingTo("0");
-        assertThat(normalized.getMaxPrice())
-                .isEqualByComparingTo("100000");
+        assertThat(normalized.getMaxPrice()).isNull();
         assertThat(normalized.getSort())
                 .isEqualTo(ProductSort.POPULAR);
 
@@ -87,6 +85,60 @@ class ProductServiceTests {
                 .isEqualTo(PageRequest.DEFAULT_SIZE);
         assertThat(result.getTotalElements()).isZero();
         assertThat(result.getTotalPages()).isZero();
+    }
+
+    @Test
+    void minimumPriceWithoutMaximumKeepsUpperBoundEmpty() {
+        ProductSearchCondition condition =
+                new ProductSearchCondition();
+
+        condition.setMinPrice(
+                BigDecimal.valueOf(120_000)
+        );
+
+        when(productMapper.countPublicProducts(any()))
+                .thenReturn(0L);
+
+        productService.getPublicProducts(condition, null);
+
+        ArgumentCaptor<ProductSearchCondition> conditionCaptor =
+                ArgumentCaptor.forClass(
+                        ProductSearchCondition.class
+                );
+
+        verify(productMapper)
+                .countPublicProducts(conditionCaptor.capture());
+
+        ProductSearchCondition normalized =
+                conditionCaptor.getValue();
+
+        assertThat(normalized.getMinPrice())
+                .isEqualByComparingTo("120000");
+        assertThat(normalized.getMaxPrice()).isNull();
+    }
+
+    @Test
+    void negativeMaximumPriceRemovesUpperBound() {
+        ProductSearchCondition condition =
+                new ProductSearchCondition();
+
+        condition.setMaxPrice(BigDecimal.valueOf(-1));
+
+        when(productMapper.countPublicProducts(any()))
+                .thenReturn(0L);
+
+        productService.getPublicProducts(condition, null);
+
+        ArgumentCaptor<ProductSearchCondition> conditionCaptor =
+                ArgumentCaptor.forClass(
+                        ProductSearchCondition.class
+                );
+
+        verify(productMapper)
+                .countPublicProducts(conditionCaptor.capture());
+
+        assertThat(conditionCaptor.getValue().getMaxPrice())
+                .isNull();
     }
 
     @Test

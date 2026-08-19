@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cakeshop.domain.community.mapper.CommunityPopularPostMapper">
+
+    <sql id="popularityWindow">
+        created_at &gt;= #{rankingDate} - INTERVAL 6 DAY
+        AND created_at &lt; #{rankingDate} + INTERVAL 1 DAY
+    </sql>
+
+    <select id="existsBatchRun" resultType="boolean">
+
+        SELECT EXISTS (
+        SELECT 1
+        FROM popular_post_batch_runs r
+        WHERE r.ranking_date = #{rankingDate}
+        )
+    </select>
+
+    <delete id="deleteDailyRanking">
+
+        DELETE FROM daily_popular_posts
+        WHERE ranking_date = #{rankingDate}
+    </delete>
+
+    <insert id="insertDailyRanking">
+
+        INSERT INTO daily_popular_posts
+        (ranking_date, ranking, post_id, popularity_score, view_count, like_count, comment_count)
+
+        SELECT
+        #{rankingDate},
+        ROW_NUMBER() OVER (ORDER BY s.popularity_score DESC, s.post_id DESC),
+        s.post_id,
+        s.popularity_score,
+        s.view_count,
+        s.like_count,
+        s.comment_count
+
+        FROM (
+        SELECT
+        e.post_id,
+        SUM(e.view_count) AS view_count,
+        SUM(e.like_count) AS like_count,
+        SUM(e.comment_count) AS comment_count,
+        SUM(e.view_count) * 1
+        + SUM(e.like_count) * 25
+        + SUM(e.comment_count) * 15 AS popularity_score
+
+        FROM (
+        SELECT post_id, 1 AS view_count, 0 AS like_count, 0 AS comment_count
+        FROM post_views
+        WHERE <include refid="popularityWindow"/>
+
+        UNION ALL
+
+        SELECT post_id, 0 AS view_count, 1 AS like_count, 0 AS comment_count
+        FROM post_likes
+        WHERE <include refid="popularityWindow"/>
+
+        UNION ALL
+
+        SELECT post_id, 0 AS view_count, 0 AS like_count, 1 AS comment_count
+        FROM (
+        SELECT post_id, member_id
+        FROM comments
+        WHERE status = 'PUBLISHED'
+        AND <include refid="popularityWindow"/>
+        GROUP BY post_id, member_id
+        ) commenters
+        ) e
+
+        JOIN posts p
+        ON p.id = e.post_id
+        AND p.status = 'PUBLISHED'
+
+        GROUP BY e.post_id
+        ORDER BY popularity_score DESC, e.post_id DESC
+        LIMIT #{limit}
+        ) s
+    </insert>
+
+    <insert id="insertBatchRun">
+
+        INSERT INTO popular_post_batch_runs (ranking_date, post_count)
+        VALUES (#{rankingDate}, #{postCount})
+    </insert>
+
+    <select id="findLatestRankingDate" resultType="java.time.LocalDate">
+
+        SELECT MAX(ranking_date)
+        FROM popular_post_batch_runs
+    </select>
+
+    <select id="findPopularPosts"
+            resultType="com.cakeshop.domain.community.dto.view.PopularPostView">
+
+        SELECT
+        d.ranking,
+        d.post_id,
+        pc.name AS category_name,
+        p.title
+
+        FROM daily_popular_posts d
+        JOIN posts p ON p.id = d.post_id
+        JOIN post_categories pc ON pc.id = p.category_id
+
+        WHERE d.ranking_date = #{rankingDate}
+        AND p.status = 'PUBLISHED'
+
+        ORDER BY d.ranking
+        LIMIT #{limit}
+    </select>
+
+</mapper>

@@ -90,10 +90,17 @@
 | 전체 회원 | `ALL_MEMBERS` | `NULL` (제한 없음) | 등록 직후 기존 활성 회원에게 일괄 발급 |
 | 신규 회원 | `NEW_MEMBERS` | `NULL` (제한 없음) | 유효기간 중 회원가입 완료 시 발급 |
 | 첫 주문 회원 | `FIRST_ORDER` | `NULL` (제한 없음) | 등록 시점의 미주문 기존 회원에게 일괄 발급하며, INSERT 조건과 직전 조회에서 주문 이력을 다시 확인 |
-| 생일 회원 | `BIRTHDAY` | `NULL` (제한 없음) | 매시 정각 스케줄러가 해당 월 생일 회원에게 발급(쿠폰 유효기간이 포함된 월의 생일 대상자에게 지급되므로 월초 생성을 권장) |
+| 생일 회원 | `BIRTHDAY` | `NULL` (제한 없음) | 매시 정각(Asia/Seoul) 스케줄러가 해당 월 생일 회원에게 발급 |
 | 특정 회원 | `SPECIFIC_MEMBERS` | 양의 정수 필수 | 상세 화면에서 관리자가 선택해 수동 발급 |
 
-### 3.1 수량 제약
+### 3.1 자동 발급 대상 자격 판단 시점
+
+- `ALL_MEMBERS`, `BIRTHDAY`는 `MemberCouponQueryService`가 대상 회원 목록을 조회한 시점의 회원 상태를 기준으로 발급 대상을 확정한다. 조회 후 회원 상태가 바뀌어도 회원 상태를 다시 조회하거나 회원 행을 잠그지 않는다.
+- 발급 INSERT에서는 쿠폰의 현재 상태·사용 기간·수량·중복 발급 이력은 항상 다시 검증한다. 따라서 대상 조회 후 쿠폰이 중지·만료되거나 이미 발급된 경우에는 새 발급이 생성되지 않는다.
+- `NEW_MEMBERS`는 회원가입 트랜잭션 안에서 회원 생성 직후 상태를 확인해 발급한다. 발급 실패 시 회원가입도 함께 롤백한다.
+- `FIRST_ORDER`는 주문 생성과 경합할 수 있으므로 예외적으로 회원 행 잠금 후 주문 이력을 다시 검증한다.
+
+### 3.2 수량 제약
 
 - `SPECIFIC_MEMBERS`만 `total_quantity`를 입력한다.
 - 나머지 대상은 `total_quantity = NULL`이며, 발급 수는 `issued_quantity`로 누적만 한다.
@@ -101,7 +108,7 @@
 - 특정 회원 수동 발급은 발급 수량이 총 수량에 도달하면 거부한다.
 - 화면의 `발급 수량`은 자동 대상에서 `발급 수 / 제한 없음`으로 표시한다.
 
-### 3.2 중복 발급과 동시성
+### 3.3 중복 발급과 동시성
 
 - 같은 `(coupon_id, member_id)` 조합은 이미 발급된 경우 다시 생성하지 않는다.
 - 발급 이력 생성, 발급 수량 증가, 수량 초과 검증은 하나의 공개 Service 트랜잭션에서 처리한다.
@@ -111,6 +118,8 @@
 - 대량 자동 발급은 회원별 독립 트랜잭션으로 처리한다. `ALL_MEMBERS`, `BIRTHDAY`는 회원 행 잠금을
   잡지 않고 조건부 INSERT만 수행하며, `FIRST_ORDER`만 회원 한 명의 짧은 트랜잭션에서 행 잠금 후
   주문 이력을 재검증한다.
+- 생일 쿠폰 발급에서 회원별 업무 규칙 위반은 실패 건수로 집계한 뒤 다음 회원을 계속 처리한다. 다만
+  DB·트랜잭션 등 시스템 예외는 즉시 전파해 나머지 회원 발급을 중단하고 스케줄러 실행 실패로 처리한다.
 
 ## 4. 관리자 흐름
 
@@ -166,8 +175,9 @@ NEW_MEMBERS
 회원가입 완료 -> member 도메인 -> CouponMemberCommandService.issueNewMemberCoupons(memberId)
 
 BIRTHDAY
-매시 정각 -> CouponIssueScheduler -> CouponIssueService.issueBirthdayCoupons()
+매시 정각(Asia/Seoul) -> CouponIssueScheduler -> CouponIssueService.issueBirthdayCoupons()
            -> member 도메인의 해당 월 생일 회원 조회 -> member_coupons
+           -> 쿠폰별 실제 신규 발급·제외·실패 건수를 운영 로그로 기록
 
 SPECIFIC_MEMBERS
 관리자 상세 화면 -> CouponAdminService.issueSpecificMember() -> member_coupons
@@ -309,6 +319,5 @@ FIRST_ORDER 후보 회원 조회
 
 ## 9. 후속 작업
 
-- 주문제작 주문의 쿠폰 선택, 할인 금액 계산, 사용 확정·실패 복구
-- 첫 주문 이벤트 시점 발급으로 정책을 전환할지 여부 협의
+- 부분 취소 시 쿠폰 복구 정책
 - MariaDB Testcontainers로 대상별 수량 제약·중복 발급·동시 발급 통합 테스트 추가

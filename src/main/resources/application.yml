@@ -10,8 +10,8 @@ spring:
     cache: true
   servlet:
     multipart:
-      # 매장·상품 등의 이미지 업로드 상한. 기본값(1MB)은 사진에 너무 작다.
-      max-file-size: 5MB
+      # 도메인별 5 MiB 검증까지 요청이 도달하도록 전송 계층 상한은 조금 더 크게 둔다.
+      max-file-size: 6MB
       # 상품 이미지 5장과 multipart 부가 데이터를 한 요청으로 받을 수 있게 여유를 둔다.
       max-request-size: 30MB
   flyway:

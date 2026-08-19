@@ -369,32 +369,29 @@ public class ProductAdminController {
     ) {
         // 입력값 검증에 실패하면 수정 화면에 필요한 값을 다시 전달한다.
         if (bindingResult.hasErrors()) {
-            model.addAttribute(
-                    "productId",
-                    productId
-            );
-
-            model.addAttribute(
-                    "editMode",
-                    true
-            );
-
-            model.addAttribute(
-                    "formAction",
-                    "/admin/products/" + productId
-            );
-
-            addProductFormOptions(model);
-            addProductImageModel(productId, model);
-
-            return "admin/product/form";
+            return renderUpdateForm(productId, model);
         }
 
         // 검증된 입력값으로 상품의 기본 정보를 수정한다.
-        productAdminService.updateProduct(
-                productId,
-                form
-        );
+        try {
+            productAdminService.updateProduct(
+                    productId,
+                    form
+            );
+        } catch (BusinessException exception) {
+            if (exception.getErrorCode()
+                    != ProductErrorCode
+                            .GENERAL_PRODUCT_REQUIRED_OPTION_NOT_ALLOWED) {
+                throw exception;
+            }
+
+            bindingResult.reject(
+                    "product.requiredOption",
+                    exception.getErrorCode().message()
+            );
+
+            return renderUpdateForm(productId, model);
+        }
 
         // 목록 화면에 수정 완료 메시지를 전달한다.
         redirectAttributes.addFlashAttribute(
@@ -404,6 +401,29 @@ public class ProductAdminController {
 
         // 새로고침으로 수정 요청이 반복되지 않도록 목록으로 이동한다.
         return "redirect:/admin/products";
+    }
+
+    private String renderUpdateForm(
+            long productId,
+            Model model
+    ) {
+        model.addAttribute(
+                "productId",
+                productId
+        );
+        model.addAttribute(
+                "editMode",
+                true
+        );
+        model.addAttribute(
+                "formAction",
+                "/admin/products/" + productId
+        );
+
+        addProductFormOptions(model);
+        addProductImageModel(productId, model);
+
+        return "admin/product/form";
     }
 
     /**
@@ -440,7 +460,10 @@ public class ProductAdminController {
             );
         } catch (BusinessException exception) {
             if (exception.getErrorCode()
-                    != ProductErrorCode.REQUIRED_OPTION_GROUP_EMPTY) {
+                    != ProductErrorCode.REQUIRED_OPTION_GROUP_EMPTY
+                    && exception.getErrorCode()
+                    != ProductErrorCode
+                            .GENERAL_PRODUCT_REQUIRED_OPTION_NOT_ALLOWED) {
                 throw exception;
             }
 

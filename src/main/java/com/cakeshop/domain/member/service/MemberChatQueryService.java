@@ -54,4 +54,9 @@ public class MemberChatQueryService {
                 (a, b) -> a
         ));
     }
+
+    public List<Long> findActiveAdminIds() {
+        List<Long> adminIds = memberChatMapper.findActiveAdminIds();
+        return (adminIds != null) ? adminIds : Collections.emptyList();
+    }
 }

@@ -13,12 +13,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.cakeshop.global.config.MariaDbIntegrationTest;
-import com.cakeshop.domain.order.dto.form.customer.GeneralOrderForm;
+import com.cakeshop.domain.order.dto.form.customer.OrderGeneralCreateForm;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
 import com.cakeshop.domain.order.service.OrderService;
+import com.cakeshop.domain.product.entity.ProductType;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -60,22 +63,39 @@ class ScreenRenderingTests {
     private JdbcTemplate jdbcTemplate;
 
     private MockMvc mockMvc;
+    private long generalProductId;
+    private long customProductId;
 
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.webAppContextSetup(context)
             .apply(springSecurity())
             .build();
+        generalProductId = jdbcTemplate.queryForObject(
+            "SELECT id FROM products WHERE name = '딸기 생크림 케이크 1호'",
+            Long.class
+        );
+        customProductId = jdbcTemplate.queryForObject(
+            "SELECT id FROM products WHERE name = '레터링 생크림 케이크'",
+            Long.class
+        );
     }
 
     @Test
     void publicScreensRenderWithoutAuthentication() throws Exception {
         String[] paths = {
             "/screens", "/login", "/admin/login", "/signup", "/find-email",
-            "/products", "/products/1"
+            "/products", "/products/" + generalProductId
         };
 
         assertScreensRender(paths);
+    }
+
+    @Test
+    void productList_doesNotRenderMockNotice() throws Exception {
+        mockMvc.perform(get("/products"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(not(containsString("class=\"mock-notice\""))));
     }
 
     @Test
@@ -99,7 +119,10 @@ class ScreenRenderingTests {
 
     @Test
     void productScreens_errorMessage_renderCommonAlertFragment() throws Exception {
-        for (String path : new String[] {"/products", "/products/1"}) {
+        for (String path : new String[] {
+                "/products",
+                "/products/" + generalProductId
+        }) {
             mockMvc.perform(get(path)
                     .flashAttr("errorMessage", "장바구니 오류"))
                 .andExpect(status().isOk())
@@ -199,21 +222,43 @@ class ScreenRenderingTests {
 
     @Test
     void productDetail_unauthenticatedMember_showsLoginCartLinkOnly() throws Exception {
-        mockMvc.perform(get("/products/1"))
+        mockMvc.perform(get("/products/{productId}", generalProductId))
             .andExpect(status().isOk())
             .andExpect(content().string(containsString("로그인 후 장바구니 담기")))
             .andExpect(content().string(containsString("data-login-required")))
             .andExpect(content().string(containsString("/js/product-detail-auth.js")))
             .andExpect(content().string(matchesPattern(
-                "(?s).*href=\"/chat\\?productId=1\"\\s+data-login-required.*"
+                "(?s).*href=\"/chat\\?productId="
+                    + generalProductId
+                    + "\"\\s+data-login-required.*"
             )))
             .andExpect(content().string(containsString("1:1 문의하기")))
             .andExpect(content().string(not(containsString("data-server-cart-form"))));
     }
 
+    @ParameterizedTest
+    @EnumSource(ProductType.class)
+    void productDetail_breadcrumb_linksToMatchingProductType(
+            ProductType productType
+    ) throws Exception {
+        long productId = productType == ProductType.GENERAL
+                ? generalProductId
+                : customProductId;
+
+        mockMvc.perform(get("/products/{productId}", productId))
+            .andExpect(status().isOk())
+            .andExpect(content().string(matchesPattern(
+                "(?s).*<a href=\"/products\\?type="
+                    + productType.name()
+                    + "\"[^>]*>\\s*"
+                    + productType.getDisplayName()
+                    + "\\s*</a>.*"
+            )));
+    }
+
     @Test
     void customProductDetail_unauthenticatedMember_showsLoginRequiredAction() throws Exception {
-        mockMvc.perform(get("/products/6"))
+        mockMvc.perform(get("/products/{productId}", customProductId))
             .andExpect(status().isOk())
             .andExpect(content().string(containsString("제작 옵션 선택")))
             .andExpect(content().string(containsString("/orders/custom/options")))
@@ -229,7 +274,7 @@ class ScreenRenderingTests {
 
     @Test
     void productDetail_imagesMissing_rendersPlaceholderWithoutImageTag() throws Exception {
-        mockMvc.perform(get("/products/1"))
+        mockMvc.perform(get("/products/{productId}", generalProductId))
             .andExpect(status().isOk())
             .andExpect(content().string(containsString("상품 이미지 준비 중")))
             .andExpect(content().string(containsString("등록된 상품 이미지가 없습니다.")))
@@ -240,7 +285,7 @@ class ScreenRenderingTests {
     @Transactional
     void productDetail_imagesExist_rendersMainImageAndRemainingThumbnails() throws Exception {
         Long productId = jdbcTemplate.queryForObject(
-            "SELECT id FROM products WHERE name = '딸기 생크림 케이크'",
+            "SELECT id FROM products WHERE name = '딸기 생크림 케이크 1호'",
             Long.class
         );
         jdbcTemplate.update(
@@ -276,8 +321,9 @@ class ScreenRenderingTests {
     )
     void memberScreensRenderWithSeededUser() throws Exception {
         String[] paths = {
-            "/cart", "/orders/checkout?productId=1&quantity=1&optionIds=1",
-            "/orders/custom/options?productId=6",
+            "/cart",
+            "/orders/checkout?productId=" + generalProductId + "&quantity=1",
+            "/orders/custom/options?productId=" + customProductId,
             "/mypage",
             "/orders", "/notifications", "/mypage/reviews/writable", "/mypage/coupons",
             "/mypage/profile"
@@ -285,10 +331,12 @@ class ScreenRenderingTests {
 
         assertScreensRender(paths);
 
-        mockMvc.perform(get("/products/1"))
+        mockMvc.perform(get("/products/{productId}", generalProductId))
             .andExpect(status().isOk())
             .andExpect(content().string(containsString("data-server-cart-form")))
-            .andExpect(content().string(containsString("href=\"/chat?productId=1\"")))
+            .andExpect(content().string(containsString(
+                "href=\"/chat?productId=" + generalProductId + "\""
+            )))
             .andExpect(content().string(containsString("1:1 문의하기")))
             .andExpect(content().string(not(containsString("data-login-required"))))
             .andExpect(content().string(not(containsString("로그인 후 장바구니 담기"))));
@@ -308,7 +356,7 @@ class ScreenRenderingTests {
             .andExpect(content().string(not(containsString("href=\"/notifications\""))))
             .andExpect(content().string(containsString("관리자 계정 ·")));
 
-        mockMvc.perform(get("/products/1"))
+        mockMvc.perform(get("/products/{productId}", generalProductId))
             .andExpect(status().isOk())
             .andExpect(content().string(not(containsString("주문서 작성하기"))))
             .andExpect(content().string(not(containsString("data-server-cart-form"))))
@@ -369,7 +417,7 @@ class ScreenRenderingTests {
         userDetailsServiceBeanName = "memberDetailsService"
     )
     void customProductDetail_showsCustomOptionFlowWithoutServerCartForm() throws Exception {
-        mockMvc.perform(get("/products/6"))
+        mockMvc.perform(get("/products/{productId}", customProductId))
             .andExpect(status().isOk())
             .andExpect(content().string(containsString("/orders/custom/options")))
             .andExpect(content().string(not(containsString("data-login-required"))))
@@ -384,11 +432,12 @@ class ScreenRenderingTests {
     void orderCheckout_rendersActualProductAndGeneralOrderAction()
             throws Exception {
         mockMvc.perform(get(
-                "/orders/checkout?productId=1&quantity=1&optionIds=1"
+                "/orders/checkout?productId="
+                    + generalProductId
+                    + "&quantity=1"
             ))
             .andExpect(status().isOk())
-            .andExpect(content().string(containsString("딸기 생크림 케이크")))
-            .andExpect(content().string(containsString("케이크 크기")))
+            .andExpect(content().string(containsString("딸기 생크림 케이크 1호")))
             .andExpect(content().string(containsString("action=\"/orders/general\"")))
             .andExpect(content().string(containsString("data-pickup-date")))
             .andExpect(content().string(containsString("data-pickup-time-panel")))
@@ -516,7 +565,10 @@ class ScreenRenderingTests {
             throws Exception {
         assertScreensRender(new String[] {"/admin/products"});
 
-        mockMvc.perform(get("/admin/products/1/options"))
+        mockMvc.perform(get(
+                "/admin/products/{productId}/options",
+                customProductId
+            ))
             .andExpect(status().isOk())
             .andExpect(content().contentTypeCompatibleWith("text/html"))
             .andExpect(content().string(containsString("옵션:")))
@@ -574,8 +626,10 @@ class ScreenRenderingTests {
             .andExpect(content().string(containsString(
                 pickupAt.format(java.time.format.DateTimeFormatter.ofPattern("MM.dd HH:mm"))
             )))
-            .andExpect(content().string(containsString("딸기 생크림 케이크")))
-            .andExpect(content().string(containsString("케이크 크기: 1호")))
+            .andExpect(content().string(containsString(
+                "딸기 생크림 케이크 1호 × 1"
+            )))
+            .andExpect(content().string(containsString("기본")))
             .andExpect(content().string(containsString("<details")))
             .andExpect(content().string(containsString(
                 "data-order-id=\"" + orderId + "\""
@@ -847,7 +901,10 @@ class ScreenRenderingTests {
     )
     void productEdit_imagesMissing_rendersUploadFormAndPlaceholder()
             throws Exception {
-        mockMvc.perform(get("/admin/products/1/edit"))
+        mockMvc.perform(get(
+                "/admin/products/{productId}/edit",
+                generalProductId
+            ))
             .andExpect(status().isOk())
             .andExpect(content().string(containsString(
                 "data-product-image-upload"
@@ -879,7 +936,7 @@ class ScreenRenderingTests {
     void productEdit_fiveImagesExist_rendersRepresentativeAndDisablesUpload()
             throws Exception {
         Long productId = jdbcTemplate.queryForObject(
-            "SELECT id FROM products WHERE name = '딸기 생크림 케이크'",
+            "SELECT id FROM products WHERE name = '딸기 생크림 케이크 1호'",
             Long.class
         );
         jdbcTemplate.update(
@@ -1017,10 +1074,9 @@ class ScreenRenderingTests {
                 """
                 INSERT INTO order_items (
                     order_id, product_id, product_name, product_type, quantity,
-                    base_price, option_amount, total_amount, preparation_days,
-                    cancellation_limit_days
+                    base_price, option_amount, total_amount, preparation_days
                 )
-                VALUES (?, ?, ?, ?, 1, 35000, 0, 35000, 0, 0)
+                VALUES (?, ?, ?, ?, 1, 35000, 0, 35000, 0)
                 """,
                 orderId,
                 productId,
@@ -1044,16 +1100,16 @@ class ScreenRenderingTests {
             "user@cakeshop.local"
         );
         var checkout = orderCheckoutService.getGeneralCheckout(
-            1L,
+            generalProductId,
             1,
-            List.of(1L)
+            List.of()
         );
 
-        GeneralOrderForm form = new GeneralOrderForm();
+        OrderGeneralCreateForm form = new OrderGeneralCreateForm();
         form.setRequestKey(java.util.UUID.randomUUID().toString());
-        form.setProductId(1L);
+        form.setProductId(generalProductId);
         form.setQuantity(1);
-        form.setOptionIds(List.of(1L));
+        form.setOptionIds(List.of());
         form.setOrdererName("테스트회원");
         form.setOrdererPhone("010-0000-0002");
         form.setPickupName("테스트회원");

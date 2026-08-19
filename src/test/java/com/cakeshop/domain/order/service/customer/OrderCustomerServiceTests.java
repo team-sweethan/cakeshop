@@ -10,7 +10,6 @@ import com.cakeshop.domain.order.dto.view.OrderDetailView;
 import com.cakeshop.domain.order.dto.view.OrderListView;
 import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.order.entity.OrderItem;
-import com.cakeshop.domain.order.entity.OrderItemImage;
 import com.cakeshop.domain.order.entity.OrderItemOption;
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.entity.OrderType;
@@ -83,7 +82,7 @@ class OrderCustomerServiceTests {
     }
 
     @Test
-    void getMemberOrder_ownedOrder_mapsItemsOptionsAndImages() {
+    void getMemberOrder_ownedOrder_mapsItemsAndOptions() {
         Order order = order(10L, 3L);
         OrderItem item = item(100L, "딸기 케이크");
         OrderItemOption option = new OrderItemOption();
@@ -91,24 +90,16 @@ class OrderCustomerServiceTests {
         option.setOptionGroupName("크기");
         option.setOptionName("2호");
         option.setAdditionalPrice(BigDecimal.valueOf(5_000));
-        OrderItemImage image = new OrderItemImage();
-        image.setOrderItemId(100L);
-        image.setImageUrl("/uploads/orders/reference.jpg");
-        image.setSortOrder(1);
         when(orderMapper.findOrderById(10L)).thenReturn(Optional.of(order));
         when(orderMapper.findOrderItemsByOrderId(10L)).thenReturn(List.of(item));
         when(orderMapper.findOrderItemOptionsByOrderId(10L)).thenReturn(List.of(option));
-        when(orderMapper.findOrderItemImagesByOrderId(10L)).thenReturn(List.of(image));
 
         OrderDetailView result = orderQueryService.getMemberOrder(3L, 10L);
 
-        assertThat(result.memberId()).isEqualTo(3L);
         assertThat(result.items()).singleElement().satisfies(itemView -> {
             assertThat(itemView.productName()).isEqualTo("딸기 케이크");
             assertThat(itemView.options()).singleElement().satisfies(optionView ->
                     assertThat(optionView.optionName()).isEqualTo("2호"));
-            assertThat(itemView.images()).singleElement().satisfies(imageView ->
-                    assertThat(imageView.imageUrl()).isEqualTo("/uploads/orders/reference.jpg"));
         });
     }
 
@@ -120,12 +111,11 @@ class OrderCustomerServiceTests {
         when(orderMapper.findOrderById(10L)).thenReturn(Optional.of(order));
         when(orderMapper.findOrderItemsByOrderId(10L)).thenReturn(List.of());
         when(orderMapper.findOrderItemOptionsByOrderId(10L)).thenReturn(List.of());
-        when(orderMapper.findOrderItemImagesByOrderId(10L)).thenReturn(List.of());
 
         OrderDetailView result = orderQueryService.getMemberOrder(3L, 10L);
 
         assertThat(result.cancelRequestAvailable()).isTrue();
-        assertThat(result.adminCancellationAvailable()).isFalse();
+        assertThat(result.isAdminCancellationAvailable()).isFalse();
     }
 
     @Test
@@ -136,7 +126,6 @@ class OrderCustomerServiceTests {
         when(orderMapper.findOrderById(10L)).thenReturn(Optional.of(order));
         when(orderMapper.findOrderItemsByOrderId(10L)).thenReturn(List.of());
         when(orderMapper.findOrderItemOptionsByOrderId(10L)).thenReturn(List.of());
-        when(orderMapper.findOrderItemImagesByOrderId(10L)).thenReturn(List.of());
 
         OrderDetailView result = orderQueryService.getMemberOrder(3L, 10L);
 
@@ -152,7 +141,6 @@ class OrderCustomerServiceTests {
         when(orderMapper.findOrderById(10L)).thenReturn(Optional.of(order));
         when(orderMapper.findOrderItemsByOrderId(10L)).thenReturn(List.of());
         when(orderMapper.findOrderItemOptionsByOrderId(10L)).thenReturn(List.of());
-        when(orderMapper.findOrderItemImagesByOrderId(10L)).thenReturn(List.of());
 
         OrderDetailView result = orderQueryService.getMemberOrder(3L, 10L);
 
@@ -167,7 +155,6 @@ class OrderCustomerServiceTests {
         when(orderMapper.findOrderById(10L)).thenReturn(Optional.of(order));
         when(orderMapper.findOrderItemsByOrderId(10L)).thenReturn(List.of());
         when(orderMapper.findOrderItemOptionsByOrderId(10L)).thenReturn(List.of());
-        when(orderMapper.findOrderItemImagesByOrderId(10L)).thenReturn(List.of());
 
         OrderDetailView result = orderQueryService.getMemberOrder(3L, 10L);
 
@@ -181,7 +168,6 @@ class OrderCustomerServiceTests {
         when(orderMapper.findOrderById(10L)).thenReturn(Optional.of(order));
         when(orderMapper.findOrderItemsByOrderId(10L)).thenReturn(List.of());
         when(orderMapper.findOrderItemOptionsByOrderId(10L)).thenReturn(List.of());
-        when(orderMapper.findOrderItemImagesByOrderId(10L)).thenReturn(List.of());
         when(orderMapper.hasRequestedRefundCancellation(10L)).thenReturn(true);
 
         OrderDetailView result = orderQueryService.getMemberOrder(3L, 10L);

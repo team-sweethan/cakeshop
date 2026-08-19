@@ -36,20 +36,20 @@
 | **A1** | 게시글 작성 | 고객 | `GET /community/new` · `POST /community` | **완료** | 2 | `community-post.md` |
 | **A2** | 게시글 수정 | 작성자 | `GET·POST /community/{id}/edit` | **완료** | 2 | `community-post.md` |
 | **A3** | 게시글 삭제 | 작성자 | `POST /community/{id}/delete` | **완료** | 2 | `community-post.md` |
-| **A4** | 이미지 첨부 | 고객 | (A1·A2에 포함) | **없음** | 2차 | `community-post.md` |
+| **A4** | 이미지 첨부 | 고객 | (A1·A2에 포함) | **완료** | 12 | `community-post.md` |
 | **A5** | 댓글 작성 | 고객 | `POST /community/{postId}/comments` | **완료** | 3 | `community-comment.md` |
 | **A6** | 댓글 삭제 | 댓글 작성자 | `POST /community/{postId}/comments/{commentId}/delete` | **완료** | 3 | `community-comment.md` |
 | **A7** | 대댓글 (5 depth) | 고객 | — | **없음** | 2차 | `community-comment.md` |
 | **A8** | 좋아요 추가·취소 | 고객 | `POST /community/{id}/likes` · `/likes/delete` | **완료** | 4 | `community-reaction.md` |
 | **A9** | 신고 | 고객 | `POST /community/{id}/reports` | **완료** | 5 | `community-reaction.md` |
-| **B1** | 게시글 목록 | 누구나 | `GET /community` | **완료** | 1 · 7a | `community-read.md` |
+| **B1** | 게시글 목록 | 누구나 | `GET /community` | **완료** | 1 · 7a · 16 | `community-read.md` |
 | **B2** | 게시글 상세 | 누구나 | `GET /community/{id}` | **완료** | 1 | `community-read.md` |
 | **B3** | 조회수와 중복 방지 | — | (B2에 포함) | **완료** | 6 | `community-read.md` |
 | **B4** | 댓글 정렬·분량 (`더 보기`) | 누구나 | `GET /community/{id}?comments=N` | **완료** | 3 · 6 | `community-comment.md` |
-| **B5** | 인기글 영역 | 누구나 | (B1과 메인 `GET /`에 포함) | **완료** | 7c · 13 | `community-popular.md` |
+| **B5** | 인기글 영역 | 누구나 | (B1에 포함 — 메인은 15가 제거) | **완료** | 7c · 13 · 15 | `community-popular.md` |
 | **B6** | 검색 | 누구나 | (B1의 파라미터) | **없음** | 2차 | `community-read.md` |
 | **B7** | 무한 스크롤 | 누구나 | (B1의 페이징 대체) | **없음** | 2차 | `community-read.md` |
-| **B8** | 공지 상단 영역 | 누구나 | (B1과 메인 `GET /`에 포함) | **완료** | 14b · 14c | `community-notice.md` |
+| **B8** | 공지 고정 행·상단 영역 | 누구나 | (B1과 메인 `GET /`에 포함) | **완료** | 14b · 14c · 15 | `community-notice.md` |
 | **B9** | 공지 전체보기 | 누구나 | `GET /community/notices` | **완료** | 14b | `community-notice.md` |
 | **B10** | 공지 상세 | 누구나 | `GET /community/notices/{id}` | **완료** | 14b | `community-notice.md` |
 | **C1** | 관리자 목록 | 관리자 | `GET /admin/community` | **완료** | 5 | `community-admin.md` |
@@ -60,7 +60,7 @@
 | **C6** | 공지 작성·수정 | 관리자 | `GET·POST /admin/community/notices/new` · `/{id}/edit` | **완료** | 14a | `community-notice.md` |
 | **C7** | 공지 삭제 | 관리자 | `POST /admin/community/notices/{id}/delete` | **완료** | 14a | `community-notice.md` |
 | **D1** | 작성자 표시명 | — | (Service 계약) | **완료** | 10 | 이 문서 8절 |
-| **D2** | 메인 인기글 계약 | — | (Service 계약) | **완료** | 13 | `community-popular.md` |
+| **D2** | 메인 인기글 계약 | — | (Service 계약) | **제거** — 조각 15가 메인 노출을 뺐다. 계약 클래스는 공지(D3)용으로 남는다 | 13 · 15 | `community-popular.md` |
 | **D3** | 메인 공지 계약 | — | (D2와 같은 계약에 추가) | **완료** | 14c | `community-notice.md` |
 | **E1** | 상태 enum + `CHECK` | — | — | **완료** | 0 | 이 문서 4절 |
 | **E2** | 카테고리 주입 | — | — | **완료** | 0 | 이 문서 10절 |
@@ -83,7 +83,7 @@ Cakeshop 커뮤니티는 고객이 케이크 관련 질문과 후기를 공유�
 |---|---|
 | 검색 | 2차에서 다룬다. 단순한 제목·본문 `LIKE` 검색은 데이터가 늘면 성능 부담이 될 수 있으므로, 실제 요구와 데이터 규모를 확인한 뒤 구현 방식과 인프라 도입 여부를 별도로 합의한다 |
 | 무한 스크롤 | 게시글 목록은 1차에서 쪽 번호 페이징으로 간다. **댓글의 `이전 댓글 더 보기`는 이것이 아니다** — 스크롤이 아니라 사용자가 누를 때만 늘어나고, 주소가 바뀌는 링크라 JS 없이 동작한다 (`specs/community-comment.md` B4) |
-| 이미지 첨부 | `post_images` 테이블은 V0에 있지만 1차에서는 쓰지 않는다 |
+| ~~이미지 첨부~~ | **끝났다 (조각 12).** 규칙은 `specs/community-post.md` A4가 정본이다 |
 | 대댓글 | `parent_comment_id` 컬럼은 V0에 있지만 **코드에 등장시키지 않는다** (`specs/community-comment.md` A7) |
 
 ### 범위 밖
@@ -164,10 +164,11 @@ Cakeshop 커뮤니티는 고객이 케이크 관련 질문과 후기를 공유�
 
 ### 4.5 게시글 삭제와 자식 데이터
 
-게시글을 soft delete해도 `comments`, `post_likes`, `post_reports` 행은 **그대로 둔다.**
+게시글을 soft delete해도 `comments`, `post_likes`, `post_reports`, `post_images` 행은 **그대로 둔다.**
 
 - 게시글이 `DELETED`면 상세가 404이므로 댓글이 노출될 경로가 없다. 자식까지 일괄 `DELETED`로 바꾸는 것은 중복이고, "원래 삭제돼 있던 댓글"과 "게시글 때문에 삭제된 댓글"을 구분할 수 없게 만든다.
 - **대신 댓글·좋아요·신고 Service는 대상 게시글이 `PUBLISHED`인지 반드시 검증해야 한다.** 이 검증이 없으면 삭제된 글에 API로 직접 댓글을 달 수 있다. 테스트로 고정할 항목이다.
+- **첨부 이미지는 행뿐 아니라 저장된 파일도 남고, 그 파일의 URL은 계속 열려 있다.** 정적 경로(`/uploads/**`)가 인증 없이 열려 있어서다. 알고 받아들인 구멍이고 근거와 되돌아올 계기는 `specs/community-post.md` A4와 `PLAN.md` R33에 있다.
 
 **이 검증은 불변식이 아니라 권한 판단이다.** 확인하는 SELECT와 뒤따르는 쓰기 사이에 게시글이 차단·삭제되면 그 쓰기는 그대로 통과한다. **부모 행을 잠가서 막지 않는다** — 위 첫 항목이 말하듯 "비노출 글에는 자식 행이 없다"는 불변식 자체가 없으므로 지킬 것이 없고, 댓글 쓰기마다 게시글 행을 잠그면 `specs/community-read.md` B3의 조회수 UPDATE와 같은 행을 두고 경합한다. 남는 창과 되돌아올 계기는 `PLAN.md` R14에 있다.
 
@@ -186,7 +187,11 @@ Cakeshop 커뮤니티는 고객이 케이크 관련 질문과 후기를 공유�
 `SecurityConfig`에 이미 반영되어 있다.
 
 - `GET /community`, `GET /community/{id}` → `permitAll` (비로그인 조회 허용)
-- 그 외 커뮤니티 경로 → `anyRequest().authenticated()`
+- **댓글 작성·자기 댓글 삭제 → `hasAnyRole("USER", "ADMIN")`** (2026-08-18). 관리자가 커뮤니티에
+  참여하는 유일한 경로다. 왜 댓글만인지는 `specs/community-comment.md`가 정본이다.
+- 그 외 커뮤니티 쓰기 경로 → `anyRequest().hasRole("USER")`. 2026-08-11의 관리자·고객 분리
+  (`SecurityConfig`, member 담당) 이후 `authenticated()`가 아니라 **일반 회원 전용**이다 — 관리자는
+  좋아요·신고·글쓰기를 할 수 없고, 화면 숨김이 아니라 여기서 강제된다.
 - `/admin/**` → `hasRole("ADMIN")`
 
 **커뮤니티에서 회원 상태(`ACTIVE`/`SUSPENDED`/`WITHDRAWN`)를 재검증하지 않는다.**

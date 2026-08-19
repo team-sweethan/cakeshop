@@ -7,10 +7,10 @@
       <nav th:replace="~{fragments/customer/gnb :: gnb}"></nav>
     </div>
     <div class="customer-header__actions">
-      <span class="badge" sec:authorize="hasRole('ADMIN')" data-account-identity>
+      <span class="badge" sec:authorize="hasRole('ADMIN')" data-account-identity th:data-member-id="${#authentication?.principal != null and #authentication.principal.toString().contains('MemberDetails') ? #authentication.principal.memberId : null}">
         관리자 계정 · <span sec:authentication="principal.displayName">Admin</span>님
       </span>
-      <a class="btn" sec:authorize="hasRole('USER')" th:href="@{/mypage}" data-account-identity>
+      <a class="btn" sec:authorize="hasRole('USER')" th:href="@{/mypage}" data-account-identity th:data-member-id="${#authentication?.principal != null and #authentication.principal.toString().contains('MemberDetails') ? #authentication.principal.memberId : null}">
         <span sec:authentication="principal.displayName">회원</span>님
       </a>
       <a class="btn" th:href="@{/products}">검색</a>
@@ -22,4 +22,7 @@
       </form>
     </div>
   </div>
+  <script defer th:src="@{/js/lib/sockjs.min.js}"></script>
+  <script defer th:src="@{/js/lib/stomp.min.js}"></script>
+  <script defer th:src="@{/js/notification-websocket.js}"></script>
 </header>

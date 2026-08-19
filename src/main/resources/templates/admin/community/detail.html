@@ -61,6 +61,18 @@
             </div>
           </section>
 
+          <!--/* 신고 사유가 이미지 자체일 수 있어 차단 판단 화면에도 싣는다(specs/community-post.md A4). */-->
+          <section class="section" th:if="${!#lists.isEmpty(postImages)}">
+            <h2 class="section-title"
+                th:text="'첨부 이미지 ' + ${#lists.size(postImages)}">첨부 이미지 0</h2>
+            <div class="panel stack">
+              <img th:each="image : ${postImages}"
+                   th:src="@{${image.imageUrl}}"
+                   alt="첨부 이미지"
+                   style="max-width:100%">
+            </div>
+          </section>
+
           <section class="section">
             <h2 class="section-title"
                 th:text="'댓글 ' + ${commentSection.publishedCount}">댓글 0</h2>

@@ -1,12 +1,10 @@
 package com.cakeshop.domain.community.mapper;
 
-import java.time.LocalDate;
 import java.util.List;
 
 import com.cakeshop.domain.community.dto.command.PostUpdateCommand;
 import com.cakeshop.domain.community.dto.query.CommentCountRow;
 import com.cakeshop.domain.community.dto.query.CommentRow;
-import com.cakeshop.domain.community.dto.view.PopularPostView;
 import com.cakeshop.domain.community.dto.view.PostCategoryView;
 import com.cakeshop.domain.community.dto.query.PostDetailRow;
 import com.cakeshop.domain.community.dto.query.PostListRow;
@@ -95,6 +93,16 @@ public interface CommunityMapper {
             @Param("postId") long postId
     );
 
+    int increaseLikeCount(
+            @Param("postId") long postId,
+            @Param("memberId") long memberId
+    );
+
+    int decreaseLikeCount(
+            @Param("postId") long postId,
+            @Param("memberId") long memberId
+    );
+
     int insertLike(
             @Param("postId") long postId,
             @Param("memberId") long memberId
@@ -103,10 +111,6 @@ public interface CommunityMapper {
     int deleteLike(
             @Param("postId") long postId,
             @Param("memberId") long memberId
-    );
-
-    int recalculateLikeCount(
-            @Param("postId") long postId
     );
 
     boolean existsLike(
@@ -124,32 +128,4 @@ public interface CommunityMapper {
             @Param("postId") long postId,
             @Param("reporterId") long reporterId
     );
-
-
-    boolean existsBatchRun(
-            @Param("rankingDate") LocalDate rankingDate
-    );
-
-    int deleteDailyRanking(
-            @Param("rankingDate") LocalDate rankingDate
-    );
-
-    int insertDailyRanking(
-            @Param("rankingDate") LocalDate rankingDate,
-            @Param("limit") int limit
-    );
-
-    int insertBatchRun(
-            @Param("rankingDate") LocalDate rankingDate,
-            @Param("postCount") int postCount
-    );
-
-
-    LocalDate findLatestRankingDate();
-
-    List<PopularPostView> findPopularPosts(
-            @Param("rankingDate") LocalDate rankingDate,
-            @Param("limit") int limit
-    );
-
 }

@@ -1,15 +1,18 @@
 package com.cakeshop.domain.community.controller;
 
+import java.util.List;
+import java.util.Map;
+
 import com.cakeshop.domain.community.dto.form.CommentForm;
 import com.cakeshop.domain.community.dto.form.PostForm;
 import com.cakeshop.domain.community.dto.form.ReportForm;
-import com.cakeshop.domain.community.dto.view.CommentSectionView;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
 import com.cakeshop.domain.community.dto.view.PostSort;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
 import com.cakeshop.domain.community.service.CommunityNoticeService;
-import com.cakeshop.domain.community.service.CommunityService;
+import com.cakeshop.domain.community.service.CommunityPostImageService;
+import com.cakeshop.domain.community.service.CommunityPostService;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.common.paging.PageNavigation;
 import com.cakeshop.global.common.paging.PageRequest;
@@ -45,33 +48,85 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @RequiredArgsConstructor
 public class CommunityController {
 
-    private final CommunityService communityService;
-    private final CommunityNoticeService communityNoticeService;
+    /** 폼으로 돌려보낼 거절과 그 오류가 붙을 입력 칸이다. 여기 없는 거절은 그대로 올라간다. */
+    private static final Map<CommunityErrorCode, String> FORM_ERROR_FIELDS = Map.of(
+            CommunityErrorCode.CATEGORY_NOT_FOUND, "categoryId",
+            CommunityErrorCode.INVALID_IMAGE_FILE, "images",
+            CommunityErrorCode.IMAGE_TOO_LARGE, "images",
+            CommunityErrorCode.IMAGE_LIMIT_EXCEEDED, "images",
+            CommunityErrorCode.IMAGE_NOT_FOUND, "images"
+    );
 
+    private final CommunityPostService communityPostService;
+    private final CommunityPostImageService communityPostImageService;
+    private final CommunityNoticeService communityNoticeService;
+    private final CommunityDetailPage communityDetailPage;
+
+    // 예시 요청: GET /community?categoryId=2&sort=POPULAR&page=3
     @GetMapping("/community")
     public String list(
+            // 매개변수 3개
             @RequestParam(required = false) String categoryId,
             @RequestParam(required = false) String sort,
             @RequestParam(required = false) String page,
             Model model
     ) {
-        Long selectedCategoryId = parsePositiveLong(categoryId);
+        // 사용자 입력을 프로그램이 쓰기 좋은 형태로 바꾼다
+        // 브라우저에서는 값이 전부 문자열로 들어온다
+        // 스프링부트 내부에서는 Long, PortSort, int 같은 의미 있는 타입으로 바꾸는 과정
+        Long selectedCategoryId = CommunityRequestParams.positiveLong(categoryId);
         PostSort selectedSort = PostSort.from(sort);
 
+        // PageRequest는 "몇 페이지 정보를 몇 개씩 조회할지"에 대한 정보를 담은 객체
         PageRequest pageRequest = new PageRequest(
-                parsePositiveInteger(page),
+                CommunityRequestParams.positiveInteger(page),
                 PageRequest.DEFAULT_SIZE
         );
 
+        // PageResult<PostListView>: PostListView 여러 개와 페이지 정보를 한 번에 담는 상자
+            /*
+                public class PageResult<T> {
+                    private final List<T> content;
+                    ...
+                }
+            */
+        // T는 정해지지 않은 타입: 어떤 타입이든 넣을 수 있는 페이징 결과 상자
+        // 아래 구문에서는 T = PostListView -> private final List<PostListView> content
+        // PostListView 목록을 담고 있는 PageResult 타입의 변수 pageResult
+        /*
+            PageResult<PostListView>
+            ├─ content : List<PostListView>
+            │
+            │   ├─ PostListView
+            │   │    ├─ id
+            │   │    ├─ categoryName
+            │   │    ├─ title
+            │   │    ├─ authorNickname
+            │   │    ├─ viewCount
+            │   │    ├─ likeCount
+            │   │    └─ createdAt
+            │   │
+            │   ├─ PostListView
+            │   ├─ PostListView
+            │   └─ ...
+            │
+            ├─ page : 현재 페이지
+            ├─ size : 한 페이지 크기
+            ├─ totalElements : 전체 게시글 수
+            └─ totalPages : 전체 페이지 수
+        */
         PageResult<PostListView> pageResult =
-                communityService.getPosts(selectedCategoryId, selectedSort, pageRequest);
+                // public PageResult<PostListView> getPosts(categoryId, sort, pageRequest)
+                communityPostService.getPosts(selectedCategoryId, selectedSort, pageRequest);
 
+        // Model에 화면 재료 담기
+        // model.addAttribute("타임리프에서 쓰일 변수 이름", controller에서 사용되는 객체 이름)
         model.addAttribute("pageResult", pageResult);
         model.addAttribute(
                 "pageNavigation",
                 PageNavigation.of(pageResult.getPage(), pageResult.getTotalPages())
         );
-        model.addAttribute("categories", communityService.getActiveCategories());
+        model.addAttribute("categories", communityPostService.getActiveCategories());
         model.addAttribute("selectedCategoryId", selectedCategoryId);
         model.addAttribute("selectedSort", selectedSort);
         model.addAttribute("sortOptions", PostSort.values());
@@ -82,29 +137,69 @@ public class CommunityController {
         );
         model.addAttribute(
                 "popularSection",
-                communityService.getPopularSection(selectedCategoryId, pageRequest)
+                communityPostService.getPopularSection(selectedCategoryId, pageRequest)
         );
 
+        // Thymeleaf HTML 반환
         return "customer/community/list";
     }
 
+    // 게시글 상세 조회
+    // postId: \\d+ 는 {postId}가 만족해야 하는 정규식 조건
+    // \d+: 숫자 한 자리 이상이라는 뜻
     @GetMapping("/community/{postId:\\d+}")
     public String detail(
+            // {postId} = "37" 을 잡고 long 으로 변환해서 postId = 37L로 넘긴다
             @PathVariable("postId") long postId,
             @RequestParam(name = "comments", required = false) String comments,
+
+            // CommentForm: 사용자가 댓글을 입력할 때 사용할 폼 데이터 객체
+            // 즉, 상세 페이지에서 댓글 입력 폼이 사용할 객체를 준비한다
             @ModelAttribute("commentForm") CommentForm commentForm,
+
+            // ReportForm: 신고 폼
             @ModelAttribute("reportForm") ReportForm reportForm,
+
+            /*
+                1. 로그인 성공
+                2. Spring Security
+                3. Authentication 생성
+                4. SecurityContext에 저장
+                5. principal 에 MemberDetails 존재
+                6. @AuthenticationPrincipal: Spring Security가 현재 인증 객체의 Principal을 꺼내서 넣어준다
+            */
+            // MemberDetails는 memberId, displayName을 추가로 요구함
+            // 즉, Spring Security User에서 상속하는
+                // username = "abc@test.com"
+                // password = "..."
+                // authorities = [ROLE_USER]
+            // 외에
+                // memberId = 37
+                // displayName = "현규"
+            // 가 추가된다
             @AuthenticationPrincipal MemberDetails memberDetails,
+
+            // 현재 들어온 HTTP 요청 자체를 표현하는 객체
+            // 브라우저가 보낸 요청과 관련된 여러 정보를 가짐
+                // request.getSession()
+                // request.getHeader(...)
+                // request.getRequestURI()
+                // request.getMethod()
+                // request.getCookies()
+            // 실제로 viewerKeyOf(viewerId, request) 에서 request.getSession().getId()로 세션 ID를 가져온다
+            // 따라서 request를 받는 이유: 비로그인 사용자를 구분할 세션ID가 필요하기 때문이다
             HttpServletRequest request,
             Model model
     ) {
+        // 로그인하지 않은 사용자는: viewerId = null
         Long viewerId = memberDetails == null ? null : memberDetails.getMemberId();
 
         PostDetailView post = comments == null
-                ? communityService.getPostDetail(postId, viewerId, viewerKeyOf(viewerId, request))
-                : communityService.getVisiblePost(postId, viewerId);
+                ? communityPostService.getPostDetail(postId, viewerId, viewerKeyOf(viewerId, request))
+                : communityPostService.getVisiblePost(postId, viewerId);
 
-        return prepareDetail(model, post, viewerId, comments);
+        // prepareDetail 안에서 model.addAttribute(...) 가 여러개 있음
+        return communityDetailPage.render(model, post, viewerId, comments);
     }
 
     private String viewerKeyOf(Long viewerId, HttpServletRequest request) {
@@ -115,134 +210,7 @@ public class CommunityController {
         return "S:" + request.getSession().getId();
     }
 
-    @PostMapping("/community/{postId:\\d+}/comments")
-    public String addComment(
-            @PathVariable("postId") long postId,
-            @RequestParam(name = "comments", required = false) String comments,
-            @Valid @ModelAttribute("commentForm") CommentForm commentForm,
-            BindingResult bindingResult,
-            @ModelAttribute("reportForm") ReportForm reportForm,
-            @AuthenticationPrincipal MemberDetails memberDetails,
-            Model model
-    ) {
-        long memberId = memberDetails.getMemberId();
-
-        PostDetailView post = communityService.getCommentablePost(postId, memberId);
-
-        if (bindingResult.hasErrors()) {
-            return prepareDetail(model, post, memberId, comments);
-        }
-
-        communityService.addComment(postId, commentForm, memberId);
-
-        return "redirect:/community/" + postId;
-    }
-
-    @PostMapping("/community/{postId:\\d+}/comments/{commentId:\\d+}/delete")
-    public String deleteComment(
-            @PathVariable("postId") long postId,
-            @PathVariable("commentId") long commentId,
-            @RequestParam(name = "comments", required = false) String comments,
-            @AuthenticationPrincipal MemberDetails memberDetails
-    ) {
-        communityService.deleteComment(postId, commentId, memberDetails.getMemberId());
-
-        return redirectToDetail(postId, comments);
-    }
-
-    @PostMapping("/community/{postId:\\d+}/likes")
-    public String addLike(
-            @PathVariable("postId") long postId,
-            @RequestParam(name = "comments", required = false) String comments,
-            @AuthenticationPrincipal MemberDetails memberDetails
-    ) {
-        communityService.addLike(postId, memberDetails.getMemberId());
-
-        return redirectToDetail(postId, comments);
-    }
-
-    @PostMapping("/community/{postId:\\d+}/reports")
-    public String report(
-            @PathVariable("postId") long postId,
-            @RequestParam(name = "comments", required = false) String comments,
-            @Valid @ModelAttribute("reportForm") ReportForm reportForm,
-            BindingResult bindingResult,
-            @ModelAttribute("commentForm") CommentForm commentForm,
-            @AuthenticationPrincipal MemberDetails memberDetails,
-            Model model,
-            RedirectAttributes redirectAttributes
-    ) {
-        long memberId = memberDetails.getMemberId();
-
-        PostDetailView post = communityService.getReportablePost(postId, memberId);
-
-        if (bindingResult.hasErrors()) {
-            return prepareDetail(model, post, memberId, comments);
-        }
-
-        communityService.reportPost(postId, reportForm, memberId);
-
-        redirectAttributes.addFlashAttribute("successMessage", "신고를 접수했습니다.");
-
-        return redirectToDetail(postId, comments);
-    }
-
-    @PostMapping("/community/{postId:\\d+}/likes/delete")
-    public String removeLike(
-            @PathVariable("postId") long postId,
-            @RequestParam(name = "comments", required = false) String comments,
-            @AuthenticationPrincipal MemberDetails memberDetails
-    ) {
-        communityService.removeLike(postId, memberDetails.getMemberId());
-
-        return redirectToDetail(postId, comments);
-    }
-
-    private String redirectToDetail(long postId, String comments) {
-        int limit = CommentSectionView.clampLimit(parsePositiveInteger(comments));
-
-        if (limit == CommentSectionView.DEFAULT_LIMIT) {
-            return "redirect:/community/" + postId;
-        }
-
-        return "redirect:/community/" + postId + "?comments=" + limit;
-    }
-
-    private String prepareDetail(
-            Model model, PostDetailView post, Long viewerId, String comments) {
-        model.addAttribute("post", post);
-        model.addAttribute("viewerId", viewerId);
-        model.addAttribute(
-                "canEdit",
-                viewerId != null && viewerId.equals(post.memberId()) && !post.isBlocked()
-        );
-
-        boolean canWrite = viewerId != null && !post.isBlocked();
-        model.addAttribute("canComment", canWrite);
-        model.addAttribute("canLike", canWrite);
-
-        model.addAttribute(
-                "likedByViewer",
-                canWrite && communityService.isLikedBy(post.id(), viewerId)
-        );
-
-        boolean canReport =
-                viewerId != null && !viewerId.equals(post.memberId()) && !post.isBlocked();
-        model.addAttribute("canReport", canReport);
-
-        model.addAttribute(
-                "alreadyReported",
-                canReport && communityService.isReportedBy(post.id(), viewerId)
-        );
-
-        model.addAttribute(
-                "commentSection",
-                communityService.getComments(post.id(), parsePositiveInteger(comments))
-        );
-
-        return "customer/community/detail";
-    }
-
+    // 새로운 포스트 작성
     @GetMapping("/community/new")
     public String createForm(@ModelAttribute("form") PostForm form, Model model) {
         return prepareForm(model, null);
@@ -262,9 +230,9 @@ public class CommunityController {
         long postId;
 
         try {
-            postId = communityService.createPost(form, memberDetails.getMemberId());
+            postId = communityPostService.createPost(form, memberDetails.getMemberId());
         } catch (BusinessException e) {
-            return rejectCategoryOrRethrow(e, bindingResult, model, null);
+            return rejectFormErrorOrRethrow(e, bindingResult, model, null);
         }
 
         return "redirect:/community/" + postId;
@@ -278,7 +246,7 @@ public class CommunityController {
             Model model
     ) {
         PostDetailView post =
-                communityService.getEditablePost(postId, memberDetails.getMemberId());
+                communityPostService.getEditablePost(postId, memberDetails.getMemberId());
 
         form.setCategoryId(post.categoryId());
         form.setTitle(post.title());
@@ -295,16 +263,16 @@ public class CommunityController {
             @AuthenticationPrincipal MemberDetails memberDetails,
             Model model
     ) {
-        communityService.getEditablePost(postId, memberDetails.getMemberId());
+        communityPostService.getEditablePost(postId, memberDetails.getMemberId());
 
         if (bindingResult.hasErrors()) {
             return prepareForm(model, postId);
         }
 
         try {
-            communityService.updatePost(postId, form, memberDetails.getMemberId());
+            communityPostService.updatePost(postId, form, memberDetails.getMemberId());
         } catch (BusinessException e) {
-            return rejectCategoryOrRethrow(e, bindingResult, model, postId);
+            return rejectFormErrorOrRethrow(e, bindingResult, model, postId);
         }
 
         return "redirect:/community/" + postId;
@@ -316,52 +284,42 @@ public class CommunityController {
             @AuthenticationPrincipal MemberDetails memberDetails,
             RedirectAttributes redirectAttributes
     ) {
-        communityService.deletePost(postId, memberDetails.getMemberId());
+        communityPostService.deletePost(postId, memberDetails.getMemberId());
 
         redirectAttributes.addFlashAttribute("successMessage", "게시글을 삭제했습니다.");
 
         return "redirect:/community";
     }
 
-    private String rejectCategoryOrRethrow(
+    /*
+     * 폼에서 고칠 수 있는 거절은 폼으로 돌려보내고 나머지는 그대로 올린다.
+     *
+     * <p>첨부 오류가 여기 있는 이유는 장수 상한이 폼 혼자 알 수 없는 값이기 때문이다 — 이미
+     * 붙어 있는 장수와 함께 세야 해서 Service 가 판단하고, 그 결과가 오류 화면이 아니라 입력한
+     * 제목·본문이 살아 있는 폼으로 돌아와야 한다.
+     */
+    private String rejectFormErrorOrRethrow(
             BusinessException e, BindingResult bindingResult, Model model, Long postId) {
-        if (e.getErrorCode() != CommunityErrorCode.CATEGORY_NOT_FOUND) {
+        String field = FORM_ERROR_FIELDS.get(e.getErrorCode());
+
+        if (field == null) {
             throw e;
         }
 
-        bindingResult.rejectValue(
-                "categoryId", "categoryNotFound", e.getErrorCode().message());
+        bindingResult.rejectValue(field, e.getErrorCode().code(), e.getErrorCode().message());
 
         return prepareForm(model, postId);
     }
 
     private String prepareForm(Model model, Long postId) {
-        model.addAttribute("categories", communityService.getActiveCategories());
+        model.addAttribute("categories", communityPostService.getActiveCategories());
         model.addAttribute("editingPostId", postId);
+        model.addAttribute(
+                "postImages",
+                postId == null ? List.of() : communityPostImageService.getImages(postId)
+        );
 
         return "customer/community/form";
     }
 
-    private Integer parsePositiveInteger(String value) {
-        Long parsed = parsePositiveLong(value);
-
-        if (parsed == null || parsed > Integer.MAX_VALUE) {
-            return null;
-        }
-
-        return parsed.intValue();
-    }
-
-    private Long parsePositiveLong(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-
-        try {
-            long parsed = Long.parseLong(value.trim());
-            return parsed > 0 ? parsed : null;
-        } catch (NumberFormatException ignored) {
-            return null;
-        }
-    }
 }

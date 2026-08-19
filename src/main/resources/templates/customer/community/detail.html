@@ -16,6 +16,7 @@
   <title>게시글 | 케이크 쇼핑몰</title>
   <link rel="stylesheet" th:href="@{/css/app.css}">
   <link rel="stylesheet" th:href="@{/css/customer-mockup.css}">
+  <link rel="stylesheet" th:href="@{/css/community.css}">
   <script defer th:src="@{/js/app.js}"></script>
   <script defer th:src="@{/js/customer-mockup.js}"></script>
 </head>
@@ -23,16 +24,13 @@
   <header th:replace="~{fragments/common/header :: header}"></header>
   <main class="page-container page-container--narrow">
 
-    <div class="cluster cluster--between">
-      <a class="btn" th:href="@{/community}">← 목록</a>
-
-      <div class="cluster" sec:authorize="!hasRole('ADMIN')" th:if="${canEdit}">
-        <a class="btn" th:href="@{/community/{postId}/edit(postId=${post.id})}">수정</a>
-        <form method="post" th:action="@{/community/{postId}/delete(postId=${post.id})}"
-              onsubmit="return confirm('게시글을 삭제할까요? 되돌릴 수 없습니다.');">
-          <button class="btn btn--danger" type="submit">삭제</button>
-        </form>
-      </div>
+    <div class="cluster section" style="justify-content:flex-end"
+         sec:authorize="!hasRole('ADMIN')" th:if="${canEdit}">
+      <a class="btn" th:href="@{/community/{postId}/edit(postId=${post.id})}">수정</a>
+      <form method="post" th:action="@{/community/{postId}/delete(postId=${post.id})}"
+            onsubmit="return confirm('게시글을 삭제할까요? 되돌릴 수 없습니다.');">
+        <button class="btn btn--danger" type="submit">삭제</button>
+      </form>
     </div>
 
     <div th:replace="~{fragments/common/alert :: alert}"></div>
@@ -56,6 +54,14 @@
 
       <div class="stack">
         <p th:text="${post.content}" style="white-space:pre-wrap">본문</p>
+      </div>
+
+      <!--/* 첨부는 본문 아래 목록으로 붙는다(specs/community-post.md A4). */-->
+      <div class="stack section" th:if="${!#lists.isEmpty(postImages)}">
+        <img th:each="image : ${postImages}"
+             th:src="@{${image.imageUrl}}"
+             alt="첨부 이미지"
+             style="max-width:100%">
       </div>
 
       <div class="cluster section" sec:authorize="!hasRole('ADMIN')">
@@ -124,8 +130,8 @@
         오래된 댓글 일부는 표시하지 않습니다.
       </p>
 
-      <div class="stack">
-        <article class="panel" th:each="comment : ${commentSection.comments}">
+      <div>
+        <article class="comment-item" th:each="comment : ${commentSection.comments}">
 
           <p class="text-muted" th:if="${comment.deleted}">삭제된 댓글입니다.</p>
 
@@ -137,7 +143,6 @@
               </span>
 
               <form method="post"
-                    sec:authorize="!hasRole('ADMIN')"
                     th:if="${canComment and viewerId == comment.memberId}"
                     th:action="@{/community/{postId}/comments/{commentId}/delete(
                         postId=${post.id},
@@ -160,8 +165,8 @@
         </div>
       </div>
 
+      <!--/* 댓글은 관리자도 단다. 좋아요·신고 블록의 숨김은 그대로다(community-comment.md). */-->
       <form class="section" method="post"
-            sec:authorize="!hasRole('ADMIN')"
             th:if="${canComment}"
             th:object="${commentForm}"
             th:action="@{/community/{postId}/comments(postId=${post.id})}">
@@ -184,6 +189,10 @@
         <a th:href="@{/login}">로그인하면 댓글을 쓸 수 있습니다.</a>
       </p>
     </section>
+
+    <div class="cluster section">
+      <a class="btn" th:href="@{/community}">← 목록</a>
+    </div>
   </main>
   <footer th:replace="~{fragments/common/footer :: footer(${store})}"></footer>
 </body>

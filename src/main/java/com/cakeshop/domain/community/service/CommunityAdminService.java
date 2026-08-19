@@ -23,7 +23,6 @@ import com.cakeshop.domain.community.error.CommunityErrorCode;
 import com.cakeshop.domain.community.mapper.CommunityAdminMapper;
 import com.cakeshop.domain.community.mapper.CommunityMapper;
 import com.cakeshop.domain.member.dto.view.MemberCommunityView;
-import com.cakeshop.domain.member.service.MemberCommunityQueryService;
 import com.cakeshop.global.common.paging.PageRequest;
 import com.cakeshop.global.common.paging.PageResult;
 import com.cakeshop.global.error.BusinessException;
@@ -48,7 +47,7 @@ public class CommunityAdminService {
 
     private final CommunityMapper communityMapper;
 
-    private final MemberCommunityQueryService memberCommunityQueryService;
+    private final CommunityMemberViewLoader communityMemberViewLoader;
 
     @Transactional(readOnly = true)
     public PageResult<AdminPostListView> getPosts(
@@ -64,7 +63,7 @@ public class CommunityAdminService {
         long totalElements = communityAdminMapper.countPostsForAdmin(status);
 
         Map<Long, MemberCommunityView> authors =
-                findMembers(rows.stream().map(AdminPostListRow::memberId));
+                communityMemberViewLoader.findByIds(rows.stream().map(AdminPostListRow::memberId));
 
         List<AdminPostListView> posts = rows.stream()
                 .map(row -> AdminPostListView.of(row, authors.get(row.memberId())))
@@ -84,7 +83,7 @@ public class CommunityAdminService {
         // 작성자와 차단 관리자를 한 번에 받는다. 차단 기록이 없으면 blockedBy 가 null 이라
         // 조회 대상에서 빠지고, 화면의 차단 관리자 자리도 그대로 빈다(LEFT JOIN 이던 때와 같다).
         Map<Long, MemberCommunityView> members =
-                findMembers(Stream.of(post.memberId(), post.blockedBy()));
+                communityMemberViewLoader.findByIds(Stream.of(post.memberId(), post.blockedBy()));
 
         return AdminPostDetailView.of(
                 post,
@@ -98,27 +97,11 @@ public class CommunityAdminService {
         List<ReportRow> rows = communityAdminMapper.findReportsByPost(postId);
 
         Map<Long, MemberCommunityView> reporters =
-                findMembers(rows.stream().map(ReportRow::reporterId));
+                communityMemberViewLoader.findByIds(rows.stream().map(ReportRow::reporterId));
 
         return rows.stream()
                 .map(row -> ReportView.of(row, reporters.get(row.reporterId())))
                 .toList();
-    }
-
-    /**
-     * 회원 ID 들로 표기에 필요한 정보를 한 번에 조회해 ID로 찾을 수 있게 담는다.
-     *
-     * <p>행마다 따로 조회하면 N+1이 된다. 없는 회원은 Map에서 빠지고, 그 자리는 각 View의
-     * {@code of}가 탈퇴로 처리한다.</p>
-     */
-    private Map<Long, MemberCommunityView> findMembers(Stream<Long> memberIds) {
-        List<Long> distinctIds = memberIds
-                .filter(Objects::nonNull)
-                .distinct()
-                .toList();
-
-        return memberCommunityQueryService.getMembersByIds(distinctIds).stream()
-                .collect(Collectors.toMap(MemberCommunityView::id, Function.identity()));
     }
 
     @Transactional

@@ -179,6 +179,17 @@ class ReviewAdminScreenRenderingTests {
     }
 
     @Test
+    void detail_rendersAttachedImagesForModeration() throws Exception {
+        long reviewId = insertReview("이미지가 있는 후기입니다.", "PUBLISHED", 5);
+        insertReviewImage(reviewId, "/uploads/review/admin-detail.jpg", 0);
+
+        mockMvc.perform(get("/admin/reviews/{id}", reviewId).with(authentication(admin())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("첨부 이미지 1")))
+                .andExpect(content().string(containsString("/uploads/review/admin-detail.jpg")));
+    }
+
+    @Test
     void detail_missingReview_isNotFound() throws Exception {
         mockMvc.perform(get("/admin/reviews/{id}", 99999999L).with(authentication(admin())))
                 .andExpect(status().isNotFound());
@@ -356,6 +367,14 @@ class ReviewAdminScreenRenderingTests {
                 content);
     }
 
+    private void insertReviewImage(long reviewId, String imageUrl, int sortOrder) {
+        jdbcTemplate.update(
+                "INSERT INTO review_images (review_id, image_url, sort_order) VALUES (?, ?, ?)",
+                reviewId,
+                imageUrl,
+                sortOrder);
+    }
+
     private String replyContentOf(long reviewId) {
         return jdbcTemplate.queryForObject(
                 "SELECT content FROM review_replies WHERE review_id = ?", String.class, reviewId);
@@ -463,9 +482,8 @@ class ReviewAdminScreenRenderingTests {
                 """
                 INSERT INTO order_items (
                     order_id, product_id, product_name, product_type, quantity,
-                    base_price, option_amount, total_amount, preparation_days,
-                    cancellation_limit_days
-                ) VALUES (?, ?, ?, 'GENERAL', 1, 20000, 0, 20000, 0, 0)
+                    base_price, option_amount, total_amount, preparation_days
+                ) VALUES (?, ?, ?, 'GENERAL', 1, 20000, 0, 20000, 0)
                 """,
                 orderId,
                 productId,

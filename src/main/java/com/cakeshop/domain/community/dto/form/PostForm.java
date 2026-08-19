@@ -1,11 +1,16 @@
 package com.cakeshop.domain.community.dto.form;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
+
+import org.springframework.web.multipart.MultipartFile;
 
 @Getter
 @Setter
@@ -31,6 +36,15 @@ public class PostForm {
     @NotBlank(message = "내용을 입력해 주세요.")
     @Size(max = 5000, message = "내용은 5000자 이하여야 합니다.")
     private String content;
+
+    /**
+     * 새로 첨부할 이미지다. 장수·형식·용량은 여기서 보지 않는다 — 상한은 이미 붙어 있는 장수와
+     * 함께 세야 하고(`specs/community-post.md` A4) 그 값은 폼이 모른다.
+     */
+    private List<MultipartFile> images = new ArrayList<>();
+
+    /** 수정 화면에서 지우기로 표시한 기존 첨부의 식별자다. */
+    private List<Long> deleteImageIds = new ArrayList<>();
 
     public void setTitle(String title) {
         this.title = strip(title);

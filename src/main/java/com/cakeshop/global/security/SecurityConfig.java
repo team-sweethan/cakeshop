@@ -47,7 +47,7 @@ public class SecurityConfig {
         HttpSessionRequestCache requestCache = new HttpSessionRequestCache();
         requestCache.setRequestMatcher(request -> {
             String path = request.getRequestURI().substring(request.getContextPath().length());
-            return !"/cart/count".equals(path) && !path.startsWith("/api/");
+            return !"/cart/count".equals(path) && !path.startsWith("/api/") && !"/ws".equals(path) && !path.startsWith("/ws/");
         });
         LoginUrlAuthenticationEntryPoint customerLoginEntryPoint =
                 new LoginUrlAuthenticationEntryPoint("/login");
@@ -82,8 +82,8 @@ public class SecurityConfig {
         };
 
         http
-            // 웹훅 경로만 CSRF 제외 — 전체 비활성화 금지
-                .csrf(csrf -> csrf.ignoringRequestMatchers("/webhooks/toss"))
+            // 웹훅 경로 및 웹소켓 SockJS 폴백 경로만 CSRF 제외 — 전체 비활성화 금지
+                .csrf(csrf -> csrf.ignoringRequestMatchers("/webhooks/toss", "/ws/**"))
             .requestCache(cache -> cache.requestCache(requestCache))
             .authorizeHttpRequests(auth -> {
                 // ① 공개 GET을 먼저 선언 (matcher 순서 = 우선순위)
@@ -133,7 +133,15 @@ public class SecurityConfig {
                 // ② 관리자. 모든 관리자 화면 및 관리자 API는 관리자 로그인을 요구한다.
                 auth.requestMatchers("/admin", "/admin/**", "/api/admin/**").hasRole("ADMIN");
                 // 고객과 관리자가 각자 받은 채팅/알림을 같은 API에서 조회하고 읽음 처리한다.
-                auth.requestMatchers("/api/chat", "/api/chat/**", "/api/notifications", "/api/notifications/**")
+                auth.requestMatchers("/ws", "/ws/**", "/api/chat", "/api/chat/**", "/api/notifications", "/api/notifications/**")
+                        .hasAnyRole("USER", "ADMIN");
+                // 커뮤니티 댓글은 관리자도 단다 — 질문 분류에 답할 사람이 가게 쪽에 없어서다.
+                // 여는 것은 댓글 작성·자기 댓글 삭제 둘뿐이다. 좋아요는 인기 점수(좋아요=25점)를
+                // 운영자가 움직이는 경로가 되고, 신고는 차단 권한자가 자기에게 보고하는 일이라 열지 않는다
+                // (docs/community/specs/community-comment.md).
+                auth.requestMatchers(HttpMethod.POST,
+                                "/community/{postId:\\d+}/comments",
+                                "/community/{postId:\\d+}/comments/{commentId:\\d+}/delete")
                         .hasAnyRole("USER", "ADMIN");
                 // ③ 나머지 회원 전용 기능은 일반 회원만 사용한다.
                 auth.anyRequest().hasRole("USER");

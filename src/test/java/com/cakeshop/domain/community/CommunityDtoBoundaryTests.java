@@ -41,9 +41,17 @@ class CommunityDtoBoundaryTests {
     }
 
     private List<Path> javaFiles(Path directory) throws IOException {
-        try (Stream<Path> paths = Files.list(directory)) {
-            return paths.filter(path -> path.toString().endsWith(".java")).sorted().toList();
+        List<Path> sources;
+
+        try (Stream<Path> paths = Files.walk(directory)) {
+            sources = paths.filter(path -> path.toString().endsWith(".java")).sorted().toList();
         }
+
+        assertThat(sources)
+                .as("DTO 소스를 하나도 못 읽었다면 경로가 바뀐 것이다: %s", directory)
+                .isNotEmpty();
+
+        return sources;
     }
 
     private boolean referencesViewPackage(Path path) {
