@@ -36,6 +36,12 @@ public class NotificationDeliveryService {
             if (maxAttempts < Integer.MAX_VALUE && notificationMapper.hasSentDelivery(notificationId)) {
                 return null;
             }
+
+            // 현재 외부 전송이 진행 중인(최근 1분 이내 생성된) 활성 PENDING 건이 있으면 동시 중복 발송 차단
+            if (notificationMapper.hasActivePendingDelivery(notificationId)) {
+                return null;
+            }
+
             if (notificationMapper.countDeliveryAttempts(notificationId) >= maxAttempts) {
                 return null;
             }

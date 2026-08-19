@@ -54,6 +54,9 @@ public interface NotificationMapper {
     // 이미 SENT 성공 발송 이력이 있는지 확인
     boolean hasSentDelivery(@Param("notificationId") Long notificationId);
 
+    // 현재 진행 중인(최근 1분 이내) PENDING 예약이 존재하는지 확인 (동시 발송 레이스 차단)
+    boolean hasActivePendingDelivery(@Param("notificationId") Long notificationId);
+
     // 이미 발송 시도 이력(SENT, FAILED, SKIPPED)이 한 번이라도 존재하는지 확인
     boolean hasAttemptedDelivery(@Param("notificationId") Long notificationId);
 

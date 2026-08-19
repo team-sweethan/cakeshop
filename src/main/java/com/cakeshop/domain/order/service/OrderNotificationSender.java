@@ -17,6 +17,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * ******************************
@@ -58,7 +60,20 @@ public class OrderNotificationSender {
 
         sendToActiveAdmins(orderId, customerId, adminType, adminType.name() + ":ALL_ADMINS:" + orderId, new Object[0]);
 
-        // 익일(내일) 픽업 주문인 경우 주간 발송 가능 시간대(09시~21시) 결제 시점에 D-1 리마인더 알림을 즉시 함께 발송 (야간/새벽 결제는 다음 날 9시 스케줄러에서 안전하게 안내)
+        // 결제 알림 트랜잭션이 안전하게 커밋된 후(afterCommit), 익일 픽업 건에 대한 D-1 리마인더를 독립적으로 안전하게 발송
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    triggerInstantPickupReminderTomorrowIfEligible(orderId, customerId);
+                }
+            });
+        } else {
+            triggerInstantPickupReminderTomorrowIfEligible(orderId, customerId);
+        }
+    }
+
+    private void triggerInstantPickupReminderTomorrowIfEligible(long orderId, long customerId) {
         try {
             OrderChatView orderView = orderChatMapper.findOrderById(orderId);
             if (orderView != null && orderView.pickupAt() != null) {
