@@ -113,18 +113,22 @@ class CommunityMemberContractTests {
         assertThat(post.authorWithdrawn()).isTrue();
     }
 
-    /** 탈퇴 회원의 댓글도 표시명만 가린다. */
+    /** 탈퇴 회원의 댓글도 표시명만 가린다. 펼친 답글의 작성자도 같은 배치로 채워진다. */
     @Test
     void getComments_withdrawnAuthor_keepsCommentAndMasksName() {
         long postId = insertPost(activeMemberId, "댓글 달린 글");
-        insertComment(postId, withdrawnMemberId);
+        long rootId = insertComment(postId, withdrawnMemberId);
         insertComment(postId, activeMemberId);
+        insertReply(postId, rootId, withdrawnMemberId);
 
-        CommentSectionView section = communityCommentService.getComments(postId, null);
+        CommentSectionView section = communityCommentService.getComments(postId, null, rootId);
 
-        assertThat(section.comments())
-                .extracting(CommentView::authorName)
+        assertThat(section.threads())
+                .extracting(thread -> thread.root().authorName())
                 .containsExactly("탈퇴한 회원", "활동회원");
+        assertThat(section.threads().getFirst().replies())
+                .extracting(CommentView::authorName)
+                .containsExactly("탈퇴한 회원");
     }
 
     @Test
@@ -190,12 +194,23 @@ class CommunityMemberContractTests {
         return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
     }
 
-    private void insertComment(long postId, long memberId) {
+    private long insertComment(long postId, long memberId) {
         jdbcTemplate.update(
                 """
                 INSERT INTO comments (post_id, member_id, content, status, created_at)
                 VALUES (?, ?, '댓글', ?, ?)
                 """,
                 postId, memberId, CommentStatus.PUBLISHED.name(), BASE_TIME);
+
+        return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+    }
+
+    private void insertReply(long postId, long parentId, long memberId) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO comments (post_id, member_id, parent_comment_id, content, status, created_at)
+                VALUES (?, ?, ?, '답글', ?, ?)
+                """,
+                postId, memberId, parentId, CommentStatus.PUBLISHED.name(), BASE_TIME);
     }
 }

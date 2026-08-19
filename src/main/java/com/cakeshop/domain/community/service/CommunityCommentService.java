@@ -2,18 +2,22 @@ package com.cakeshop.domain.community.service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import lombok.RequiredArgsConstructor;
 
 import com.cakeshop.domain.community.dto.form.CommentForm;
 import com.cakeshop.domain.community.dto.query.CommentCountRow;
 import com.cakeshop.domain.community.dto.query.CommentRow;
+import com.cakeshop.domain.community.dto.query.ReplyCountRow;
 import com.cakeshop.domain.community.dto.view.CommentSectionView;
+import com.cakeshop.domain.community.dto.view.CommentThreadView;
 import com.cakeshop.domain.community.dto.view.CommentView;
 import com.cakeshop.domain.community.entity.Comment;
 import com.cakeshop.domain.community.entity.CommentStatus;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
-import com.cakeshop.domain.community.mapper.CommunityMapper;
+import com.cakeshop.domain.community.mapper.CommunityCommentMapper;
 import com.cakeshop.domain.member.dto.view.MemberCommunityView;
 import com.cakeshop.global.error.BusinessException;
 
@@ -33,7 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class CommunityCommentService {
 
-    private final CommunityMapper communityMapper;
+    private final CommunityCommentMapper communityCommentMapper;
     private final CommunityMemberViewLoader communityMemberViewLoader;
 
     /*
@@ -43,33 +47,89 @@ public class CommunityCommentService {
     private final CommunityPostService communityPostService;
 
     @Transactional(readOnly = true)
-    public CommentSectionView getComments(long postId, Integer requestedLimit) {
+    public CommentSectionView getComments(long postId, Integer requestedLimit, Long expandedRootId) {
         int limit = CommentSectionView.clampLimit(requestedLimit);
 
-        List<CommentRow> rows = communityMapper.findRecentComments(postId, limit);
-        CommentCountRow counts = communityMapper.countComments(postId);
+        List<CommentRow> roots = communityCommentMapper.findRecentRootComments(postId, limit);
+        CommentCountRow counts = communityCommentMapper.countComments(postId);
+        Map<Long, Long> replyCounts = countReplies(roots);
 
-        Map<Long, MemberCommunityView> authors =
-                communityMemberViewLoader.findByIds(rows.stream().map(CommentRow::memberId));
+        /*
+         * 창 밖의 뿌리는 펼치지 않는다 — 주소로 임의의 id가 들어와도 화면에 없는 묶음을
+         * 조회하지 않는다. 답글 상한이 뿌리 상한과 같은 값인 이유도 같다(주소 하나로
+         * 전부 메모리에 올릴 수 없어야 한다).
+         */
+        Long expanded = roots.stream()
+                .map(CommentRow::id)
+                .filter(id -> id.equals(expandedRootId))
+                .findFirst()
+                .orElse(null);
 
-        List<CommentView> recent = rows.stream()
+        List<CommentRow> replies = expanded == null
+                ? List.of()
+                : communityCommentMapper.findRepliesByParentId(
+                        expanded, postId, CommentSectionView.MAX_LIMIT);
+
+        Map<Long, MemberCommunityView> authors = communityMemberViewLoader.findByIds(
+                Stream.concat(roots.stream(), replies.stream()).map(CommentRow::memberId));
+
+        // 답글도 뿌리처럼 최신 쪽을 남기고 화면은 오래된 순이다 — 그래서 여기서 뒤집는다
+        List<CommentView> replyViews = replies.reversed().stream()
                 .map(row -> CommentView.of(row, authors.get(row.memberId())))
                 .toList();
 
+        List<CommentThreadView> threads = roots.reversed().stream()
+                .map(row -> {
+                    CommentView root = CommentView.of(row, authors.get(row.memberId()));
+                    long replyCount = replyCounts.getOrDefault(row.id(), 0L);
+
+                    return row.id().equals(expanded)
+                            ? CommentThreadView.expanded(root, replyCount, replyViews)
+                            : CommentThreadView.collapsed(root, replyCount);
+                })
+                .toList();
+
         return new CommentSectionView(
-                List.copyOf(recent.reversed()),
+                threads,
                 counts.publishedCount(),
-                counts.rowCount(),
+                counts.rootRowCount(),
                 limit
         );
+    }
+
+    private Map<Long, Long> countReplies(List<CommentRow> roots) {
+        if (roots.isEmpty()) {
+            return Map.of();
+        }
+
+        return communityCommentMapper
+                .countRepliesByParentIds(roots.stream().map(CommentRow::id).toList())
+                .stream()
+                .collect(Collectors.toMap(ReplyCountRow::parentId, ReplyCountRow::replyCount));
     }
 
     @Transactional
     public void addComment(long postId, CommentForm form, long authorId) {
         communityPostService.getCommentablePost(postId, authorId);
 
-        communityMapper.insertComment(
+        communityCommentMapper.insertComment(
                 Comment.create(postId, authorId, form.getContent()));
+    }
+
+    /*
+     * 답글의 깊이·같은 글·부모 노출 조건은 insertReply 한 문장이 지킨다(0행이면 거절).
+     * 부모를 먼저 읽고 조건문으로 거르면 읽기와 쓰기 사이에 부모가 삭제될 수 있다.
+     */
+    @Transactional
+    public void addReply(long postId, long parentCommentId, CommentForm form, long authorId) {
+        communityPostService.getCommentablePost(postId, authorId);
+
+        int inserted = communityCommentMapper.insertReply(
+                postId, parentCommentId, authorId, form.getContent());
+
+        if (inserted == 0) {
+            throw new BusinessException(CommunityErrorCode.COMMENT_NOT_FOUND);
+        }
     }
 
     @Transactional
@@ -79,7 +139,7 @@ public class CommunityCommentService {
                 postId, commentId, memberId, CommentStatus.DELETED);
 
         requireCommentApplied(
-                communityMapper.deleteComment(commentId, postId, memberId),
+                communityCommentMapper.deleteComment(commentId, postId, memberId),
                 postId,
                 commentId,
                 memberId
@@ -105,7 +165,7 @@ public class CommunityCommentService {
             long memberId,
             CommentStatus next) {
         // 소유권 판단에만 쓰므로 작성자 표기가 필요 없고, 그래서 회원 조회도 붙지 않는다.
-        CommentRow comment = communityMapper.findCommentById(commentId);
+        CommentRow comment = communityCommentMapper.findCommentById(commentId);
 
         if (comment == null
                 || !comment.postId().equals(postId)

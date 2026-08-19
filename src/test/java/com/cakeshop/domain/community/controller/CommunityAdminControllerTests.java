@@ -65,7 +65,7 @@ class CommunityAdminControllerTests {
                         List.of(), new PageRequest(1, 20), 0));
         when(communityAdminService.getPostDetail(anyLong())).thenReturn(publishedPost());
         when(communityAdminService.getReports(anyLong())).thenReturn(List.of());
-        when(communityCommentService.getComments(anyLong(), any()))
+        when(communityCommentService.getComments(anyLong(), any(), any()))
                 .thenReturn(new CommentSectionView(
                         List.of(), 0, 0, CommentSectionView.DEFAULT_LIMIT));
 
@@ -133,7 +133,7 @@ class CommunityAdminControllerTests {
                         1L, "신고자", false, "사유", ReportStatus.PENDING, CREATED_AT),
                 new com.cakeshop.domain.community.dto.view.ReportView(
                         2L, "신고자", false, "사유", ReportStatus.RESOLVED, CREATED_AT)));
-        when(communityCommentService.getComments(15L, 40)).thenReturn(comments);
+        when(communityCommentService.getComments(15L, 40, null)).thenReturn(comments);
 
         mockMvc.perform(get("/admin/community/15").param("comments", "40"))
                 .andExpect(status().isOk())

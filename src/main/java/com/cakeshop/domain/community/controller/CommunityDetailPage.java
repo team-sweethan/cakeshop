@@ -34,8 +34,14 @@ class CommunityDetailPage {
     private final CommunityPostImageService communityPostImageService;
 
     /** 상세 화면을 그린다. 진입점마다 이 한 줄만 부르면 Model 이 같아진다. */
-    String render(Model model, PostDetailView post, Long viewerId, String comments) {
-        assemble(model, post, viewerId, CommunityRequestParams.positiveInteger(comments));
+    String render(Model model, PostDetailView post, Long viewerId, String comments, String replies) {
+        assemble(
+                model,
+                post,
+                viewerId,
+                CommunityRequestParams.positiveInteger(comments),
+                CommunityRequestParams.positiveLong(replies)
+        );
 
         return VIEW_NAME;
     }
@@ -43,20 +49,30 @@ class CommunityDetailPage {
     /*
      * 상세 화면으로 되돌아가는 주소를 만든다.
      *
-     * <p>댓글을 더 펼친 상태에서 좋아요를 누르면 다시 접히면 안 된다. 그래서 요청에 실려 온 댓글
-     * 상한을 주소에 보존하되, 기본값이면 붙이지 않아 주소가 지저분해지지 않게 한다.
+     * <p>댓글을 더 펼친 상태에서 좋아요를 누르면 다시 접히면 안 된다. 답글을 펼쳐 둔 묶음도
+     * 같다. 그래서 요청에 실려 온 두 값을 주소에 보존하되, 기본값이면 붙이지 않아 주소가
+     * 지저분해지지 않게 한다.
      */
-    String redirect(long postId, String comments) {
+    String redirect(long postId, String comments, String replies) {
         int limit = CommentSectionView.clampLimit(CommunityRequestParams.positiveInteger(comments));
+        Long expandedRootId = CommunityRequestParams.positiveLong(replies);
 
-        if (limit == CommentSectionView.DEFAULT_LIMIT) {
-            return "redirect:/community/" + postId;
+        StringBuilder url = new StringBuilder("redirect:/community/").append(postId);
+        String separator = "?";
+
+        if (limit != CommentSectionView.DEFAULT_LIMIT) {
+            url.append(separator).append("comments=").append(limit);
+            separator = "&";
         }
 
-        return "redirect:/community/" + postId + "?comments=" + limit;
+        if (expandedRootId != null) {
+            url.append(separator).append("replies=").append(expandedRootId);
+        }
+
+        return url.toString();
     }
 
-    void assemble(Model model, PostDetailView post, Long viewerId, Integer commentLimit) {
+    void assemble(Model model, PostDetailView post, Long viewerId, Integer commentLimit, Long expandedRootId) {
         model.addAttribute("post", post);
         model.addAttribute("viewerId", viewerId);
         model.addAttribute(
@@ -86,7 +102,8 @@ class CommunityDetailPage {
 
         model.addAttribute(
                 "commentSection",
-                communityCommentService.getComments(post.id(), commentLimit)
+                communityCommentService.getComments(post.id(), commentLimit, expandedRootId)
         );
+        model.addAttribute("expandedRootId", expandedRootId);
     }
 }

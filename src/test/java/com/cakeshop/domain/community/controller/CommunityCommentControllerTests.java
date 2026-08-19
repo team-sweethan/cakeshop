@@ -55,7 +55,7 @@ class CommunityCommentControllerTests {
         communityCommentService = mock(CommunityCommentService.class);
         communityReactionService = mock(CommunityReactionService.class);
 
-        when(communityCommentService.getComments(anyLong(), any()))
+        when(communityCommentService.getComments(anyLong(), any(), any()))
                 .thenReturn(new CommentSectionView(
                         List.of(), 0, 0, CommentSectionView.DEFAULT_LIMIT));
 
@@ -131,7 +131,71 @@ class CommunityCommentControllerTests {
                         .param("comments", "40"))
                 .andExpect(status().isOk());
 
-        verify(communityCommentService).getComments(15L, 40);
+        verify(communityCommentService).getComments(15L, 40, null);
+    }
+
+    /** 답글은 방금 쓴 것이 보여야 하므로 그 묶음을 펼친 채로 돌아간다. */
+    @Test
+    void addComment_withReplyTo_addsReplyAndReturnsWithThreadExpanded() throws Exception {
+        authenticateAs(7L);
+        when(communityPostService.getCommentablePost(15L, 7L)).thenReturn(publishedPost());
+
+        mockMvc.perform(post("/community/15/comments")
+                        .param("content", "답글 본문")
+                        .param("replyTo", "8")
+                        .param("comments", "40"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/community/15?comments=40&replies=8"));
+
+        verify(communityCommentService).addReply(eq(15L), eq(8L), any(), eq(7L));
+        verify(communityCommentService, never()).addComment(anyLong(), any(), anyLong());
+    }
+
+    /** 망가진 replyTo 는 뿌리 댓글로 강등하지 않고 거절한다. */
+    @Test
+    void addComment_malformedReplyTo_isRejected() {
+        authenticateAs(7L);
+
+        assertThatThrownBy(() -> mockMvc.perform(post("/community/15/comments")
+                        .param("content", "답글 본문")
+                        .param("replyTo", "abc")))
+                .hasRootCauseInstanceOf(BusinessException.class);
+
+        verify(communityCommentService, never()).addComment(anyLong(), any(), anyLong());
+        verify(communityCommentService, never())
+                .addReply(anyLong(), anyLong(), any(), anyLong());
+    }
+
+    /** 빈 replyTo 도 부재가 아니라 망가진 값이다 — 뿌리 댓글로 강등하지 않고 거절한다. */
+    @Test
+    void addComment_blankReplyTo_isRejected() {
+        authenticateAs(7L);
+
+        assertThatThrownBy(() -> mockMvc.perform(post("/community/15/comments")
+                        .param("content", "답글 본문")
+                        .param("replyTo", "   ")))
+                .hasRootCauseInstanceOf(BusinessException.class);
+
+        verify(communityCommentService, never()).addComment(anyLong(), any(), anyLong());
+        verify(communityCommentService, never())
+                .addReply(anyLong(), anyLong(), any(), anyLong());
+    }
+
+    /** 답글 검증 실패는 실패한 폼이 어느 묶음인지 화면에 알린다. */
+    @Test
+    void addComment_blankReply_marksFailedThread() throws Exception {
+        authenticateAs(7L);
+        when(communityPostService.getCommentablePost(15L, 7L)).thenReturn(publishedPost());
+
+        mockMvc.perform(post("/community/15/comments")
+                        .param("content", "   ")
+                        .param("replyTo", "8")
+                        .param("replies", "8"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("failedReplyTo", 8L));
+
+        verify(communityCommentService, never())
+                .addReply(anyLong(), anyLong(), any(), anyLong());
     }
 
     @Test
@@ -143,6 +207,17 @@ class CommunityCommentControllerTests {
                 .andExpect(redirectedUrl("/community/15"));
 
         verify(communityCommentService).deleteComment(15L, 8L, 7L);
+    }
+
+    /** 펼친 묶음 안에서 답글을 지워도 그 묶음이 접히지 않는다. */
+    @Test
+    void deleteComment_keepsExpandedThread() throws Exception {
+        authenticateAs(7L);
+
+        mockMvc.perform(post("/community/15/comments/9/delete")
+                        .param("replies", "8"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/community/15?replies=8"));
     }
 
     private void authenticateAs(long memberId) {

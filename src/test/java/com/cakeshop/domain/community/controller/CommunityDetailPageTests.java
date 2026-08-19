@@ -49,7 +49,7 @@ class CommunityDetailPageTests {
         communityCommentService = mock(CommunityCommentService.class);
         communityReactionService = mock(CommunityReactionService.class);
 
-        when(communityCommentService.getComments(anyLong(), any()))
+        when(communityCommentService.getComments(anyLong(), any(), any()))
                 .thenReturn(new CommentSectionView(
                         List.of(), 0, 0, CommentSectionView.DEFAULT_LIMIT));
 
@@ -69,7 +69,7 @@ class CommunityDetailPageTests {
             PostStatus status, Boolean asAuthor, boolean expected) {
         Model model = new ConcurrentModel();
 
-        detailPage.assemble(model, postOf(status), viewerOf(asAuthor), null);
+        detailPage.assemble(model, postOf(status), viewerOf(asAuthor), null, null);
 
         assertThat(model.getAttribute("canEdit")).isEqualTo(expected);
     }
@@ -86,7 +86,7 @@ class CommunityDetailPageTests {
             PostStatus status, Boolean asAuthor, boolean expected) {
         Model model = new ConcurrentModel();
 
-        detailPage.assemble(model, postOf(status), viewerOf(asAuthor), null);
+        detailPage.assemble(model, postOf(status), viewerOf(asAuthor), null, null);
 
         assertThat(model.getAttribute("canReport")).isEqualTo(expected);
     }
@@ -97,7 +97,7 @@ class CommunityDetailPageTests {
         when(communityReactionService.isReportedBy(POST_ID, OTHER_MEMBER_ID)).thenReturn(true);
         Model model = new ConcurrentModel();
 
-        detailPage.assemble(model, postOf(PostStatus.PUBLISHED), OTHER_MEMBER_ID, null);
+        detailPage.assemble(model, postOf(PostStatus.PUBLISHED), OTHER_MEMBER_ID, null, null);
 
         assertThat(model.getAttribute("alreadyReported")).isEqualTo(true);
     }
@@ -107,7 +107,7 @@ class CommunityDetailPageTests {
     void alreadyReported_ownPost_doesNotQuery() {
         Model model = new ConcurrentModel();
 
-        detailPage.assemble(model, postOf(PostStatus.PUBLISHED), AUTHOR_ID, null);
+        detailPage.assemble(model, postOf(PostStatus.PUBLISHED), AUTHOR_ID, null, null);
 
         assertThat(model.getAttribute("alreadyReported")).isEqualTo(false);
         verify(communityReactionService, never()).isReportedBy(anyLong(), anyLong());
@@ -125,7 +125,7 @@ class CommunityDetailPageTests {
     void viewerId_loggedIn_isBound() {
         Model model = new ConcurrentModel();
 
-        detailPage.assemble(model, postOf(PostStatus.PUBLISHED), OTHER_MEMBER_ID, null);
+        detailPage.assemble(model, postOf(PostStatus.PUBLISHED), OTHER_MEMBER_ID, null, null);
 
         assertThat(model.getAttribute("viewerId")).isEqualTo(OTHER_MEMBER_ID);
     }
@@ -135,7 +135,7 @@ class CommunityDetailPageTests {
     void viewerId_anonymous_staysNull() {
         Model model = new ConcurrentModel();
 
-        detailPage.assemble(model, postOf(PostStatus.PUBLISHED), null, null);
+        detailPage.assemble(model, postOf(PostStatus.PUBLISHED), null, null, null);
 
         assertThat(model.getAttribute("viewerId")).isNull();
         assertThat(model.getAttribute("canEdit")).isEqualTo(false);
@@ -147,9 +147,9 @@ class CommunityDetailPageTests {
     void commentLimit_isPassedThrough() {
         Model model = new ConcurrentModel();
 
-        detailPage.assemble(model, postOf(PostStatus.PUBLISHED), AUTHOR_ID, 40);
+        detailPage.assemble(model, postOf(PostStatus.PUBLISHED), AUTHOR_ID, 40, null);
 
-        verify(communityCommentService).getComments(POST_ID, 40);
+        verify(communityCommentService).getComments(POST_ID, 40, null);
     }
 
     private Long viewerOf(Boolean asAuthor) {

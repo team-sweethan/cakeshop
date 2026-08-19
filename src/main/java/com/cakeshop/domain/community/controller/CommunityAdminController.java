@@ -81,11 +81,16 @@ public class CommunityAdminController {
     public String detail(
             @PathVariable("postId") long postId,
             @RequestParam(required = false) String comments,
+            @RequestParam(required = false) String replies,
             @ModelAttribute("blockForm") BlockForm blockForm,
             Model model
     ) {
         return prepareDetail(
-                model, communityAdminService.getPostDetail(postId), parsePositiveInteger(comments));
+                model,
+                communityAdminService.getPostDetail(postId),
+                parsePositiveInteger(comments),
+                parsePositiveLong(replies)
+        );
     }
 
     @PostMapping("/admin/community/{postId:\\d+}/block")
@@ -98,7 +103,7 @@ public class CommunityAdminController {
             RedirectAttributes redirectAttributes
     ) {
         if (bindingResult.hasErrors()) {
-            return prepareDetail(model, communityAdminService.getPostDetail(postId), null);
+            return prepareDetail(model, communityAdminService.getPostDetail(postId), null, null);
         }
 
         communityAdminService.blockPost(
@@ -134,7 +139,7 @@ public class CommunityAdminController {
     }
 
     private String prepareDetail(
-            Model model, AdminPostDetailView post, Integer commentLimit) {
+            Model model, AdminPostDetailView post, Integer commentLimit, Long expandedRootId) {
         List<ReportView> reports = communityAdminService.getReports(post.id());
 
         model.addAttribute("post", post);
@@ -143,7 +148,9 @@ public class CommunityAdminController {
         model.addAttribute("postImages", communityPostImageService.getImages(post.id()));
         model.addAttribute("pendingReportCount", reports.stream().filter(ReportView::isPending).count());
         model.addAttribute(
-                "commentSection", communityCommentService.getComments(post.id(), commentLimit));
+                "commentSection",
+                communityCommentService.getComments(post.id(), commentLimit, expandedRootId));
+        model.addAttribute("expandedRootId", expandedRootId);
 
         return "admin/community/detail";
     }
@@ -170,6 +177,19 @@ public class CommunityAdminController {
         try {
             long parsed = Long.parseLong(value.trim());
             return parsed > 0 && parsed <= Integer.MAX_VALUE ? (int) parsed : null;
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private Long parsePositiveLong(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+
+        try {
+            long parsed = Long.parseLong(value.trim());
+            return parsed > 0 ? parsed : null;
         } catch (NumberFormatException ignored) {
             return null;
         }

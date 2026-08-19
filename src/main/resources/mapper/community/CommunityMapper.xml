@@ -157,68 +157,6 @@
         AND status = 'PUBLISHED'
     </update>
 
-    <select id="findRecentComments"
-            resultType="com.cakeshop.domain.community.dto.query.CommentRow">
-
-        SELECT
-        c.id,
-        c.post_id,
-        c.member_id,
-        CASE WHEN c.status = 'PUBLISHED' THEN c.content END AS content,
-        c.status,
-        c.created_at
-
-        FROM comments c
-
-        WHERE c.post_id = #{postId}
-
-        ORDER BY c.created_at DESC, c.id DESC
-        LIMIT #{limit}
-    </select>
-
-    <select id="countComments"
-            resultType="com.cakeshop.domain.community.dto.query.CommentCountRow">
-
-        SELECT
-        COUNT(*) AS row_count,
-        COALESCE(SUM(c.status = 'PUBLISHED'), 0) AS published_count
-
-        FROM comments c
-        WHERE c.post_id = #{postId}
-    </select>
-
-    <select id="findCommentById"
-            resultType="com.cakeshop.domain.community.dto.query.CommentRow">
-
-        SELECT
-        c.id,
-        c.post_id,
-        c.member_id,
-        CASE WHEN c.status = 'PUBLISHED' THEN c.content END AS content,
-        c.status,
-        c.created_at
-
-        FROM comments c
-
-        WHERE c.id = #{commentId}
-    </select>
-
-    <insert id="insertComment" useGeneratedKeys="true" keyProperty="id">
-
-        INSERT INTO comments (post_id, member_id, content, status)
-        VALUES (#{postId}, #{memberId}, #{content}, 'PUBLISHED')
-    </insert>
-
-    <update id="deleteComment">
-
-        UPDATE comments
-        SET status = 'DELETED'
-        WHERE id = #{commentId}
-        AND post_id = #{postId}
-        AND member_id = #{memberId}
-        AND status = 'PUBLISHED'
-    </update>
-
     <select id="lockPost"
             resultType="com.cakeshop.domain.community.dto.query.PostLockRow">
 

@@ -39,7 +39,7 @@
 | **A4** | 이미지 첨부 | 고객 | (A1·A2에 포함) | **완료** | 12 | `community-post.md` |
 | **A5** | 댓글 작성 | 고객 | `POST /community/{postId}/comments` | **완료** | 3 | `community-comment.md` |
 | **A6** | 댓글 삭제 | 댓글 작성자 | `POST /community/{postId}/comments/{commentId}/delete` | **완료** | 3 | `community-comment.md` |
-| **A7** | 대댓글 (5 depth) | 고객 | — | **없음** | 2차 | `community-comment.md` |
+| **A7** | 답글 (2단계) | 고객 | (A5 경로의 `replyTo`) | **완료** | 8 | `community-comment.md` |
 | **A8** | 좋아요 추가·취소 | 고객 | `POST /community/{id}/likes` · `/likes/delete` | **완료** | 4 | `community-reaction.md` |
 | **A9** | 신고 | 고객 | `POST /community/{id}/reports` | **완료** | 5 | `community-reaction.md` |
 | **B1** | 게시글 목록 | 누구나 | `GET /community` | **완료** | 1 · 7a · 16 | `community-read.md` |
@@ -48,7 +48,7 @@
 | **B4** | 댓글 정렬·분량 (`더 보기`) | 누구나 | `GET /community/{id}?comments=N` | **완료** | 3 · 6 | `community-comment.md` |
 | **B5** | 인기글 영역 | 누구나 | (B1에 포함 — 메인은 15가 제거) | **완료** | 7c · 13 · 15 | `community-popular.md` |
 | **B6** | 검색 | 누구나 | (B1의 파라미터) | **없음** | 2차 | `community-read.md` |
-| **B7** | 무한 스크롤 | 누구나 | (B1의 페이징 대체) | **없음** | 2차 | `community-read.md` |
+| **B7** | 무한 스크롤 | 누구나 | (댓글 구역 부분 로드로 재정의 — 게시글 목록은 쪽 번호 유지) | **없음** | 2차 (조각 9) | `community-read.md` |
 | **B8** | 공지 고정 행·상단 영역 | 누구나 | (B1과 메인 `GET /`에 포함) | **완료** | 14b · 14c · 15 | `community-notice.md` |
 | **B9** | 공지 전체보기 | 누구나 | `GET /community/notices` | **완료** | 14b | `community-notice.md` |
 | **B10** | 공지 상세 | 누구나 | `GET /community/notices/{id}` | **완료** | 14b | `community-notice.md` |
@@ -73,7 +73,7 @@ Cakeshop 커뮤니티는 고객이 케이크 관련 질문과 후기를 공유�
 
 ## 2. MVP 범위
 
-**포함**: 게시글 목록·상세, 게시글 CRUD, 댓글(1단계) 작성·삭제, 좋아요, 신고, 관리자 차단, 페이지 번호 페이징, **조회수 정렬 옵션·인기글**, **관리자 공지사항**
+**포함**: 게시글 목록·상세, 게시글 CRUD, 댓글 작성·삭제(2단계 답글 포함 — 조각 8), 좋아요, 신고, 관리자 차단, 페이지 번호 페이징, **조회수 정렬 옵션·인기글**, **관리자 공지사항**
 
 ### 2차로 미룬 것
 
@@ -84,7 +84,7 @@ Cakeshop 커뮤니티는 고객이 케이크 관련 질문과 후기를 공유�
 | 검색 | 2차에서 다룬다. 단순한 제목·본문 `LIKE` 검색은 데이터가 늘면 성능 부담이 될 수 있으므로, 실제 요구와 데이터 규모를 확인한 뒤 구현 방식과 인프라 도입 여부를 별도로 합의한다 |
 | 무한 스크롤 | 게시글 목록은 1차에서 쪽 번호 페이징으로 간다. **댓글의 `이전 댓글 더 보기`는 이것이 아니다** — 스크롤이 아니라 사용자가 누를 때만 늘어나고, 주소가 바뀌는 링크라 JS 없이 동작한다 (`specs/community-comment.md` B4) |
 | ~~이미지 첨부~~ | **끝났다 (조각 12).** 규칙은 `specs/community-post.md` A4가 정본이다 |
-| 대댓글 | `parent_comment_id` 컬럼은 V0에 있지만 **코드에 등장시키지 않는다** (`specs/community-comment.md` A7) |
+| ~~대댓글~~ | **끝났다 (조각 8).** 2단계 답글로 확정하고 V0의 `parent_comment_id`를 그대로 쓴다. 규칙은 `specs/community-comment.md` A7이 정본이다 |
 
 ### 범위 밖
 
