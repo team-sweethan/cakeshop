@@ -88,7 +88,7 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 | **A6** | 이미지 첨부 | 고객 | (A2·A3에 포함) | **완료** | 8 (2차) | `review-write.md` |
 | **B1** | 상품 후기 목록 | 누구나 | 미리보기 3개(상품 상세 안) · 전체 `GET /products/{id}/reviews` | **완료** | 3 | `review-read.md` |
 | **B2** | 상품 평균 평점·후기 수 | 누구나 | (상품 상세에 포함) | **완료** | 2 | `review-read.md` |
-| **B3** | 내가 쓴 후기 목록 | 고객 | `GET /mypage/reviews` | **완료** | 3 | `review-read.md` |
+| **B3** | 내가 쓴 후기 목록 | 고객 | `GET /mypage/reviews` · 알림 진입 `GET /mypage/reviews/{id}` | **완료** | 3 (deep link는 9) | `review-read.md` |
 | **B4** | 후기에 달린 답글 노출 | 누구나 | (B1·B3에 포함) | **완료** | 6 | `review-reply.md` |
 | **C1** | 관리자 후기 목록 | 관리자 | `GET /admin/reviews` | **완료** | 5 | `review-admin.md` |
 | **C2** | 관리자 검색·필터 | 관리자 | (C1의 파라미터) | **완료** | 5 | `review-admin.md` |
@@ -98,6 +98,7 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 | **C6** | 답글 수정 | 관리자 | `POST /admin/reviews/{id}/replies/edit` | **완료** | 6 | `review-reply.md` |
 | **D1** | 상품 평점 집계 | — | (Service 계약) | **완료** | 2 (#33) | `product-rating.md` |
 | **D2** | 알림 발송 | — | (Service 계약) | **완료** | 7 | `review-notification.md` |
+| **D3** | 알림에서 후기로 가는 링크 | — | (`NotificationResponse`가 파생) | **진행 중** — 민정님 합의 대기 | 9 (2차) | `review-notification.md` |
 | **E1** | `ReviewStatus` enum + `CHECK` | — | — | **완료** (#125) | 0 | `history/2026-08-slice-0-schema.md` |
 | **E2** | 평점 범위 `CHECK` | — | — | **완료** (#125) | 0 | `history/2026-08-slice-0-schema.md` |
 | **E3** | `Review`·`ReviewReply` 엔티티 | — | — | **완료** (#125) | 0 | `history/2026-08-slice-0-schema.md` |
@@ -292,7 +293,7 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 | 작성할 후기 목록 (A1) | `customer/review/writable.html` | 완료 (조각 1) |
 | 후기 작성 폼 (A2·A6) | `customer/review/form.html` | 완료 (조각 1. 이미지 입력은 조각 8) |
 | 후기 수정 폼 (A4) | `customer/review/edit.html` | 완료 (조각 4) |
-| 내 후기 목록 (B3) | `customer/review/my.html` | 완료 (조각 3. 조각 4에서 수정·삭제 버튼, 조각 8에서 이미지) |
+| 내 후기 목록 (B3) | `customer/review/my.html` | 완료 (조각 3. 조각 4에서 수정·삭제 버튼, 조각 8에서 이미지, 조각 9에서 알림 진입 경로와 `review.css`의 `:target` 앵커) |
 | 상품 후기 미리보기 3개 (B1·B2·B4) | `customer/product/detail.html` | 후기 영역 교체 + `전체 리뷰 확인` 버튼 완료 (조각 3. 답글은 조각 6, 이미지는 조각 8) |
 | 상품 후기 전체 목록 (B1·B4) | `customer/review/product.html` | 완료 (조각 3. 답글은 조각 6, 이미지는 조각 8) |
 | 관리자 목록 (C1·C2) | `admin/review/list.html` | 완료 (조각 5. `삭제` 제거, 상태 필터 추가) |

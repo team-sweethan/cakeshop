@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -208,6 +209,87 @@ class ReviewServiceTests {
                     .isEqualTo(PRODUCT_ID);
             assertThat(review.content()).isEqualTo("맛있게 잘 먹었습니다.");
         });
+    }
+
+    @Test
+    void getFocusedMyReviews_reviewOutsideTheFirstPage_takesTheOldestRowsPlace() {
+        List<ReviewRow> firstPage = new ArrayList<>();
+        for (int i = 0; i < PageRequest.DEFAULT_SIZE; i++) {
+            firstPage.add(rowAt(100L + i, WRITTEN_AT.minusDays(i)));
+        }
+        long oldestOnFirstPage = 100L + PageRequest.DEFAULT_SIZE - 1;
+
+        when(reviewMapper.countByMemberId(MEMBER_ID)).thenReturn(80L);
+        when(reviewMapper.findByMemberId(MEMBER_ID, 0, PageRequest.DEFAULT_SIZE))
+                .thenReturn(firstPage);
+        when(reviewMapper.findById(REVIEW_ID))
+                .thenReturn(rowAt(REVIEW_ID, WRITTEN_AT.minusYears(1)));
+
+        PageResult<MyReviewView> reviews = reviewService.getFocusedMyReviews(MEMBER_ID, REVIEW_ID);
+
+        assertThat(reviews.getContent())
+                .hasSize(PageRequest.DEFAULT_SIZE)
+                .extracting(MyReviewView::id)
+                .contains(REVIEW_ID)
+                .doesNotContain(oldestOnFirstPage);
+        assertThat(reviews.getContent().getLast().id())
+                .as("창 밖에서 끌어온 후기도 최신순 자리에 들어간다")
+                .isEqualTo(REVIEW_ID);
+        assertThat(reviews.getTotalElements()).isEqualTo(80L);
+    }
+
+    @Test
+    void getFocusedMyReviews_reviewAlreadyOnTheFirstPage_leavesTheWindowUntouched() {
+        ReviewRow focused = rowAt(REVIEW_ID, WRITTEN_AT);
+        when(reviewMapper.countByMemberId(MEMBER_ID)).thenReturn(1L);
+        when(reviewMapper.findByMemberId(MEMBER_ID, 0, PageRequest.DEFAULT_SIZE))
+                .thenReturn(List.of(focused));
+        when(reviewMapper.findById(REVIEW_ID)).thenReturn(focused);
+
+        assertThat(reviewService.getFocusedMyReviews(MEMBER_ID, REVIEW_ID).getContent())
+                .extracting(MyReviewView::id)
+                .containsExactly(REVIEW_ID);
+    }
+
+    @Test
+    void getFocusedMyReviews_blockedReview_isStillOpenedByItsAuthor() {
+        when(reviewMapper.countByMemberId(MEMBER_ID)).thenReturn(1L);
+        when(reviewMapper.findByMemberId(MEMBER_ID, 0, PageRequest.DEFAULT_SIZE))
+                .thenReturn(List.of(row(ReviewStatus.BLOCKED)));
+        when(reviewMapper.findById(REVIEW_ID)).thenReturn(row(ReviewStatus.BLOCKED));
+
+        assertThat(reviewService.getFocusedMyReviews(MEMBER_ID, REVIEW_ID).getContent())
+                .singleElement()
+                .satisfies(review -> assertThat(review.isBlocked()).isTrue());
+    }
+
+    @Test
+    void getFocusedMyReviews_deletedReview_throwsReviewNotFound() {
+        when(reviewMapper.findById(REVIEW_ID)).thenReturn(row(ReviewStatus.DELETED));
+
+        assertThatThrownBy(() -> reviewService.getFocusedMyReviews(MEMBER_ID, REVIEW_ID))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ReviewErrorCode.REVIEW_NOT_FOUND));
+
+        verify(reviewMapper, never()).findByMemberId(anyLong(), anyInt(), anyInt());
+    }
+
+    @Test
+    void getFocusedMyReviews_reviewOfAnotherMember_throwsReviewNotFound() {
+        when(reviewMapper.findById(REVIEW_ID))
+                .thenReturn(rowOf(MEMBER_ID + 1, ReviewStatus.PUBLISHED));
+
+        assertThatThrownBy(() -> reviewService.getFocusedMyReviews(MEMBER_ID, REVIEW_ID))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ReviewErrorCode.REVIEW_NOT_FOUND));
+    }
+
+    private ReviewRow rowAt(long reviewId, LocalDateTime createdAt) {
+        return new ReviewRow(
+                reviewId, ORDER_ITEM_ID, PRODUCT_ID, MEMBER_ID,
+                5, 5, 4, 4, "맛있게 잘 먹었습니다.", ReviewStatus.PUBLISHED, createdAt, createdAt);
     }
 
     @Test
