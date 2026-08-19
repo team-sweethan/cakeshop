@@ -152,7 +152,8 @@ class AdminPageControllerTests {
         when(reviewAdminService.getReviewDetail(anyLong()))
                 .thenReturn(new AdminReviewDetailView(
                         1L, 9L, "작성자", "상품명", "20260101-0001", 5, 5, 4, 4, "본문",
-                        LocalDateTime.now(), LocalDateTime.now(), ReviewStatus.PUBLISHED, null));
+                        LocalDateTime.now(), LocalDateTime.now(), ReviewStatus.PUBLISHED,
+                        List.of(), null));
 
         when(communityAdminService.getPosts(any(), any(), any(PageRequest.class)))
                 .thenReturn(new PageResult<AdminPostListView>(
@@ -163,7 +164,7 @@ class AdminPageControllerTests {
                         PostStatus.PUBLISHED, null, null, null, 0, 0,
                         LocalDateTime.now(), LocalDateTime.now()));
         when(communityAdminService.getReports(anyLong())).thenReturn(List.of());
-        when(communityCommentService.getComments(anyLong(), any()))
+        when(communityCommentService.getComments(anyLong(), any(), any()))
                 .thenReturn(new CommentSectionView(List.of(), 0, 0, 20));
         when(dashboardReadModelQueryService.getDashboard())
                 .thenReturn(new DashboardView(

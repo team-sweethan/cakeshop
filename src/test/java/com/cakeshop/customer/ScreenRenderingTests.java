@@ -15,7 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 import com.cakeshop.domain.order.dto.form.customer.OrderGeneralCreateForm;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
-import com.cakeshop.domain.order.service.OrderServiceImpl;
+import com.cakeshop.domain.order.service.OrderService;
 import com.cakeshop.domain.product.entity.ProductType;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -54,7 +54,7 @@ class ScreenRenderingTests {
     private WebApplicationContext context;
 
     @Autowired
-    private OrderServiceImpl orderService;
+    private OrderService orderService;
 
     @Autowired
     private OrderCheckoutService orderCheckoutService;
@@ -105,6 +105,18 @@ class ScreenRenderingTests {
             .andExpect(status().isOk())
             .andExpect(content().string(containsString("data-common-alert-popup")))
             .andExpect(content().string(containsString("window.alert(")));
+    }
+
+    @Test
+    void login_footer_rendersPublicStoreInformation() throws Exception {
+        mockMvc.perform(get("/login"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("케이크 공방")))
+            .andExpect(content().string(containsString("서울특별시 강남구 테헤란로 1")))
+            .andExpect(content().string(containsString("02-000-0000")))
+            .andExpect(content().string(containsString("평일 10:00 ~ 20:00 / 주말 11:00 ~ 21:00")))
+            .andExpect(content().string(containsString("매장 1층 픽업 데스크")))
+            .andExpect(content().string(not(containsString("매장 정보를 준비 중입니다."))));
     }
 
     @Test
@@ -1118,6 +1130,6 @@ class ScreenRenderingTests {
             checkout.pickupDates().getFirst().times().getFirst().value()
         );
 
-        return orderService.createGeneralOrder(memberId, form);
+        return orderService.createGeneralOrder(memberId, form).orderId();
     }
 }

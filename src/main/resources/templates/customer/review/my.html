@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>내 후기 | 케이크 쇼핑몰</title>
   <link rel="stylesheet" th:href="@{/css/app.css}">
+  <link rel="stylesheet" th:href="@{/css/review.css}">
   <script defer th:src="@{/js/app.js}"></script>
 </head>
 <body data-page-title="내 후기">
@@ -23,7 +24,9 @@
       </p>
 
       <div class="stack" th:unless="${reviews.content.isEmpty()}">
-        <div class="panel stack" th:each="review : ${reviews.content}">
+        <div class="panel stack review-row"
+             th:each="review : ${reviews.content}"
+             th:id="'review-' + ${review.id}">
           <div class="cluster" style="justify-content:space-between">
             <div>
               <a th:href="@{/products/{id}/reviews(id=${review.productId})}"
@@ -46,6 +49,8 @@
           </p>
 
           <p style="white-space:pre-wrap" th:text="${review.content}">후기 본문</p>
+
+          <div th:replace="~{fragments/customer/product-review :: images(${review.images})}"></div>
 
           <div th:replace="~{fragments/customer/product-review :: reply(${review.reply})}"></div>
 

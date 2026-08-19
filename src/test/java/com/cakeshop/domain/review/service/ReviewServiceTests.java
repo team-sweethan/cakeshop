@@ -13,7 +13,9 @@ import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -21,6 +23,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.cakeshop.domain.member.dto.view.MemberReviewView;
 import com.cakeshop.domain.member.service.MemberReviewQueryService;
@@ -61,6 +65,7 @@ class ReviewServiceTests {
     private ProductReviewCommandService productReviewCommandService;
     private ProductQueryService productQueryService;
     private MemberReviewQueryService memberReviewQueryService;
+    private ReviewImageService reviewImageService;
     private ReviewService reviewService;
 
     @BeforeEach
@@ -72,6 +77,7 @@ class ReviewServiceTests {
         productReviewCommandService = mock(ProductReviewCommandService.class);
         productQueryService = mock(ProductQueryService.class);
         memberReviewQueryService = mock(MemberReviewQueryService.class);
+        reviewImageService = mock(ReviewImageService.class);
         reviewService = new ReviewService(
                 reviewMapper,
                 reviewReplyMapper,
@@ -79,7 +85,11 @@ class ReviewServiceTests {
                 productReviewCommandService,
                 productQueryService,
                 memberReviewQueryService,
+                reviewImageService,
                 reviewNotificationService);
+
+        when(reviewImageService.getImagesByReviewIds(any())).thenReturn(Map.of());
+        when(reviewImageService.store(any())).thenReturn(List.of());
     }
 
     @Test
@@ -202,6 +212,87 @@ class ReviewServiceTests {
     }
 
     @Test
+    void getFocusedMyReviews_reviewOutsideTheFirstPage_takesTheOldestRowsPlace() {
+        List<ReviewRow> firstPage = new ArrayList<>();
+        for (int i = 0; i < PageRequest.DEFAULT_SIZE; i++) {
+            firstPage.add(rowAt(100L + i, WRITTEN_AT.minusDays(i)));
+        }
+        long oldestOnFirstPage = 100L + PageRequest.DEFAULT_SIZE - 1;
+
+        when(reviewMapper.countByMemberId(MEMBER_ID)).thenReturn(80L);
+        when(reviewMapper.findByMemberId(MEMBER_ID, 0, PageRequest.DEFAULT_SIZE))
+                .thenReturn(firstPage);
+        when(reviewMapper.findById(REVIEW_ID))
+                .thenReturn(rowAt(REVIEW_ID, WRITTEN_AT.minusYears(1)));
+
+        PageResult<MyReviewView> reviews = reviewService.getFocusedMyReviews(MEMBER_ID, REVIEW_ID);
+
+        assertThat(reviews.getContent())
+                .hasSize(PageRequest.DEFAULT_SIZE)
+                .extracting(MyReviewView::id)
+                .contains(REVIEW_ID)
+                .doesNotContain(oldestOnFirstPage);
+        assertThat(reviews.getContent().getLast().id())
+                .as("창 밖에서 끌어온 후기도 최신순 자리에 들어간다")
+                .isEqualTo(REVIEW_ID);
+        assertThat(reviews.getTotalElements()).isEqualTo(80L);
+    }
+
+    @Test
+    void getFocusedMyReviews_reviewAlreadyOnTheFirstPage_leavesTheWindowUntouched() {
+        ReviewRow focused = rowAt(REVIEW_ID, WRITTEN_AT);
+        when(reviewMapper.countByMemberId(MEMBER_ID)).thenReturn(1L);
+        when(reviewMapper.findByMemberId(MEMBER_ID, 0, PageRequest.DEFAULT_SIZE))
+                .thenReturn(List.of(focused));
+        when(reviewMapper.findById(REVIEW_ID)).thenReturn(focused);
+
+        assertThat(reviewService.getFocusedMyReviews(MEMBER_ID, REVIEW_ID).getContent())
+                .extracting(MyReviewView::id)
+                .containsExactly(REVIEW_ID);
+    }
+
+    @Test
+    void getFocusedMyReviews_blockedReview_isStillOpenedByItsAuthor() {
+        when(reviewMapper.countByMemberId(MEMBER_ID)).thenReturn(1L);
+        when(reviewMapper.findByMemberId(MEMBER_ID, 0, PageRequest.DEFAULT_SIZE))
+                .thenReturn(List.of(row(ReviewStatus.BLOCKED)));
+        when(reviewMapper.findById(REVIEW_ID)).thenReturn(row(ReviewStatus.BLOCKED));
+
+        assertThat(reviewService.getFocusedMyReviews(MEMBER_ID, REVIEW_ID).getContent())
+                .singleElement()
+                .satisfies(review -> assertThat(review.isBlocked()).isTrue());
+    }
+
+    @Test
+    void getFocusedMyReviews_deletedReview_throwsReviewNotFound() {
+        when(reviewMapper.findById(REVIEW_ID)).thenReturn(row(ReviewStatus.DELETED));
+
+        assertThatThrownBy(() -> reviewService.getFocusedMyReviews(MEMBER_ID, REVIEW_ID))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ReviewErrorCode.REVIEW_NOT_FOUND));
+
+        verify(reviewMapper, never()).findByMemberId(anyLong(), anyInt(), anyInt());
+    }
+
+    @Test
+    void getFocusedMyReviews_reviewOfAnotherMember_throwsReviewNotFound() {
+        when(reviewMapper.findById(REVIEW_ID))
+                .thenReturn(rowOf(MEMBER_ID + 1, ReviewStatus.PUBLISHED));
+
+        assertThatThrownBy(() -> reviewService.getFocusedMyReviews(MEMBER_ID, REVIEW_ID))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ReviewErrorCode.REVIEW_NOT_FOUND));
+    }
+
+    private ReviewRow rowAt(long reviewId, LocalDateTime createdAt) {
+        return new ReviewRow(
+                reviewId, ORDER_ITEM_ID, PRODUCT_ID, MEMBER_ID,
+                5, 5, 4, 4, "맛있게 잘 먹었습니다.", ReviewStatus.PUBLISHED, createdAt, createdAt);
+    }
+
+    @Test
     void getMyReviews_neverAsksTheMemberContractForItsOwnAuthor() {
         when(reviewMapper.countByMemberId(MEMBER_ID)).thenReturn(1L);
         when(reviewMapper.findByMemberId(MEMBER_ID, 0, PageRequest.DEFAULT_SIZE))
@@ -313,6 +404,27 @@ class ReviewServiceTests {
         order.verify(reviewMapper).aggregateForUpdate(PRODUCT_ID);
         order.verify(productReviewCommandService)
                 .applyReviewAggregate(PRODUCT_ID, new BigDecimal("4.50"), 2L);
+    }
+
+    @Test
+    void write_imagesAreStoredBeforeLockAndAttachedBeforeAggregation() {
+        givenWritableTarget();
+        List<MultipartFile> uploads = List.of(new MockMultipartFile(
+                "images", "review.jpg", "image/jpeg",
+                new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF}));
+        ReviewWriteForm form = form();
+        form.setImages(uploads);
+        List<String> imageUrls = List.of("/uploads/review/review.jpg");
+        when(reviewImageService.store(uploads)).thenReturn(imageUrls);
+
+        reviewService.write(form, MEMBER_ID);
+
+        InOrder order = inOrder(reviewMapper, reviewImageService, productReviewCommandService);
+        order.verify(reviewImageService).store(uploads);
+        order.verify(productReviewCommandService).lockForRating(PRODUCT_ID);
+        order.verify(reviewMapper).insert(any());
+        order.verify(reviewImageService).attach(REVIEW_ID, imageUrls);
+        order.verify(reviewMapper).aggregateForUpdate(PRODUCT_ID);
     }
 
     @Test

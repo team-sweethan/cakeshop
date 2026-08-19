@@ -18,7 +18,12 @@ public interface StoreMapper {
 
     List<StoreHoliday> findHolidays(@Param("storeId") Long storeId);
 
-    int updateStore(Store store);
+    int updateBasicInfo(Store store);
+
+    int clearImageUrl(@Param("storeId") Long storeId,
+                      @Param("expectedImageUrl") String expectedImageUrl);
+
+    int updatePickupInfo(Store store);
 
     int upsertBusinessHour(StoreBusinessHour businessHour);
 

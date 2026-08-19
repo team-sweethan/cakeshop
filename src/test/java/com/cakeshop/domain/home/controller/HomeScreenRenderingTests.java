@@ -29,8 +29,8 @@ import org.springframework.web.context.WebApplicationContext;
 /**
  * 메인 화면을 실제 Thymeleaf로 렌더링한다.
  *
- * <p>공지 영역이 <b>없을 때 통째로 빠지는지</b>가 이 클래스의 요점이다. 날짜와 제목만 남고 안이
- * 빈 칸은 사용자에게 고장으로 보이지만 서버에는 오류가 없어 로그에도 안 남는다
+ * <p>공지가 <b>없을 때도 영역과 빈 상태 안내가 남는지</b>가 이 클래스의 요점이다. 제목만 남고 안이
+ * 빈 칸이거나 영역 자체가 사라지면 사용자에게 고장으로 보이지만 서버에는 오류가 없어 로그에도 안 남는다
  * (docs/community/specs/community-notice.md H45).
  *
  * <p>영역의 존재는 낱말이 아니라 {@code id}로 본다. 템플릿의 내부 설명은 Thymeleaf parser-level
@@ -71,6 +71,14 @@ class HomeScreenRenderingTests {
     }
 
     @Test
+    void home_storeImage_usesDedicatedResponsiveMediaArea() throws Exception {
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("href=\"/css/home.css\"")))
+                .andExpect(content().string(containsString("class=\"store-media\"")));
+    }
+
+    @Test
     void home_visibleNotice_showsNoticeSectionWithFullListLink() throws Exception {
         when(communityHomeQueryService.getNoticeSection()).thenReturn(
                 new NoticeSectionView(List.of(
@@ -87,10 +95,33 @@ class HomeScreenRenderingTests {
     }
 
     @Test
-    void home_noVisibleNotice_dropsNoticeSectionEntirely() throws Exception {
+    void home_multipleNotices_serverKeepsFirstVisibleAsNoScriptFallback() throws Exception {
+        when(communityHomeQueryService.getNoticeSection()).thenReturn(
+                new NoticeSectionView(List.of(
+                        new NoticeView(7L, "첫 공지", NOTICE_DATE),
+                        new NoticeView(8L, "둘째 공지", NOTICE_DATE.minusDays(1)),
+                        new NoticeView(9L, "셋째 공지", NOTICE_DATE.minusDays(2)))));
+
+        String html = mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(html)
+                .contains("data-notice-rotation=\"true\"")
+                .contains("/js/home-notice-rotation.js");
+        assertThat(noticeOpeningTag(html, 7L)).doesNotContain("hidden");
+        assertThat(noticeOpeningTag(html, 8L)).contains("hidden");
+        assertThat(noticeOpeningTag(html, 9L)).contains("hidden");
+    }
+
+    @Test
+    void home_noVisibleNotice_showsEmptyNoticeMessage() throws Exception {
         mockMvc.perform(get("/"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(not(containsString(NOTICE_SECTION))));
+                .andExpect(content().string(containsString(NOTICE_SECTION)))
+                .andExpect(content().string(containsString("등록된 공지가 없습니다.")));
     }
 
     /** 공지는 서비스 안내와 카테고리 사이에 둔다. */
@@ -116,5 +147,17 @@ class HomeScreenRenderingTests {
         assertThat(categoryIndex).isNotNegative();
         assertThat(serviceIndex).isLessThan(noticeIndex);
         assertThat(noticeIndex).isLessThan(categoryIndex);
+    }
+
+    private String noticeOpeningTag(String html, long noticeId) {
+        String href = "href=\"/community/notices/" + noticeId + "\"";
+        int hrefIndex = html.indexOf(href);
+        int tagStart = html.lastIndexOf("<a", hrefIndex);
+        int tagEnd = html.indexOf('>', hrefIndex);
+
+        assertThat(hrefIndex).isNotNegative();
+        assertThat(tagStart).isNotNegative();
+        assertThat(tagEnd).isGreaterThan(tagStart);
+        return html.substring(tagStart, tagEnd + 1);
     }
 }

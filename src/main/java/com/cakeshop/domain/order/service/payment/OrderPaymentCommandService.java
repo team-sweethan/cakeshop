@@ -1,4 +1,4 @@
-package com.cakeshop.domain.order.service;
+package com.cakeshop.domain.order.service.payment;
 
 import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.order.entity.OrderStatus;

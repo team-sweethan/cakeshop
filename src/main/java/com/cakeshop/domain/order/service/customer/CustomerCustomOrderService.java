@@ -4,6 +4,7 @@ import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
 import com.cakeshop.domain.member.service.MemberCouponQueryService;
 import com.cakeshop.domain.member.service.MemberService;
 import com.cakeshop.domain.order.dto.form.customer.OrderCustomCreateForm;
+import com.cakeshop.domain.order.dto.view.customer.OrderCreationResult;
 import com.cakeshop.domain.order.entity.Order;
 import com.cakeshop.domain.order.entity.OrderItem;
 import com.cakeshop.domain.order.entity.OrderItemOption;
@@ -11,10 +12,10 @@ import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.order.mapper.OrderMapper;
-import com.cakeshop.domain.order.service.OrderAmountCalculator;
-import com.cakeshop.domain.order.service.OrderOptionValidator;
-import com.cakeshop.domain.order.service.OrderOptionValidator.ValidatedOption;
-import com.cakeshop.domain.order.service.PickupAvailabilityPolicy;
+import com.cakeshop.domain.order.service.checkout.OrderAmountCalculator;
+import com.cakeshop.domain.order.service.checkout.OrderOptionValidator;
+import com.cakeshop.domain.order.service.checkout.OrderOptionValidator.ValidatedOption;
+import com.cakeshop.domain.order.service.checkout.PickupAvailabilityPolicy;
 import com.cakeshop.domain.payment.service.PaymentOrderPreparationCommandService;
 import com.cakeshop.domain.product.dto.view.ProductSalesInfo;
 import com.cakeshop.domain.product.entity.ProductType;
@@ -51,7 +52,24 @@ public class CustomerCustomOrderService {
 
     /** 수제 주문과 스냅샷, 쿠폰 예약, READY 결제를 한 트랜잭션으로 생성한다. */
     @Transactional
-    public long createCustomOrder(long memberId, OrderCustomCreateForm form) {
+    public OrderCreationResult createCustomOrder(long memberId, OrderCustomCreateForm form) {
+        return createCustomOrder(memberId, form, false);
+    }
+
+    /** 안내 화면에서 서버가 발급한 1회성 새 주문 의도로만 기존 미결제 주문 검사를 건너뛴다. */
+    @Transactional
+    public OrderCreationResult createCustomOrderAfterPendingPaymentGuide(
+            long memberId,
+            OrderCustomCreateForm form
+    ) {
+        return createCustomOrder(memberId, form, true);
+    }
+
+    private OrderCreationResult createCustomOrder(
+            long memberId,
+            OrderCustomCreateForm form,
+            boolean skipPendingPaymentCheck
+    ) {
         if (!memberCouponQueryService.lockActiveCouponIssuableMember(memberId)) {
             throw new BusinessException(CommonErrorCode.FORBIDDEN);
         }
@@ -63,10 +81,17 @@ public class CustomerCustomOrderService {
                 form.getRequestKey()
         ).orElse(null);
         if (existingOrder != null) {
-            return existingOrder.getId();
+            return OrderCreationResult.paymentReady(existingOrder.getId());
         }
 
         LocalDateTime now = LocalDateTime.now(clock);
+        if (!skipPendingPaymentCheck) {
+            Order pendingPaymentOrder = orderMapper.findPendingPaymentOrderByMemberId(memberId, now)
+                    .orElse(null);
+            if (pendingPaymentOrder != null) {
+                return OrderCreationResult.pendingPaymentGuide(pendingPaymentOrder);
+            }
+        }
         PreparedCustomItem preparedItem = prepareCustomItem(form);
         validateDisplayedOriginalAmount(form, preparedItem.totalAmount());
         // 관리자 검토가 지연돼도 결제 완료 주문이 고착되지 않도록, 결제 가능 마지막 시각을 기준으로 확정한다.
@@ -87,7 +112,7 @@ public class CustomerCustomOrderService {
                     .orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_SAVE_FAILED));
             if (Long.valueOf(memberId).equals(persistedOrder.getMemberId())
                     && form.getRequestKey().equals(persistedOrder.getRequestKey())) {
-                return order.getId();
+                return OrderCreationResult.paymentReady(order.getId());
             }
             throw new BusinessException(OrderErrorCode.ORDER_SAVE_FAILED);
         }
@@ -120,7 +145,7 @@ public class CustomerCustomOrderService {
                 order.getOrderNumber(),
                 order.getFinalAmount()
         );
-        return order.getId();
+        return OrderCreationResult.paymentReady(order.getId());
     }
 
     private void validateActiveMember(long memberId) {

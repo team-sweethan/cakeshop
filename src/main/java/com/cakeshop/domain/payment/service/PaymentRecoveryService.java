@@ -1,6 +1,6 @@
 package com.cakeshop.domain.payment.service;
 
-import com.cakeshop.domain.order.service.OrderPaymentRecoveryService;
+import com.cakeshop.domain.order.service.payment.OrderPaymentRecoveryService;
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.entity.PaymentCancellation;
 import com.cakeshop.domain.payment.entity.PaymentCancellationStatus;

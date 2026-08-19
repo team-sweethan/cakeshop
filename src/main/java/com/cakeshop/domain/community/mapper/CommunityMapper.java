@@ -3,14 +3,11 @@ package com.cakeshop.domain.community.mapper;
 import java.util.List;
 
 import com.cakeshop.domain.community.dto.command.PostUpdateCommand;
-import com.cakeshop.domain.community.dto.query.CommentCountRow;
-import com.cakeshop.domain.community.dto.query.CommentRow;
 import com.cakeshop.domain.community.dto.view.PostCategoryView;
 import com.cakeshop.domain.community.dto.query.PostDetailRow;
 import com.cakeshop.domain.community.dto.query.PostListRow;
 import com.cakeshop.domain.community.dto.query.PostLockRow;
 import com.cakeshop.domain.community.dto.view.PostSort;
-import com.cakeshop.domain.community.entity.Comment;
 import com.cakeshop.domain.community.entity.Post;
 
 import org.apache.ibatis.annotations.Mapper;
@@ -64,27 +61,6 @@ public interface CommunityMapper {
     int updatePost(PostUpdateCommand command);
 
     int deletePost(
-            @Param("postId") long postId,
-            @Param("memberId") long memberId
-    );
-
-    List<CommentRow> findRecentComments(
-            @Param("postId") long postId,
-            @Param("limit") int limit
-    );
-
-    CommentCountRow countComments(
-            @Param("postId") long postId
-    );
-
-    CommentRow findCommentById(
-            @Param("commentId") long commentId
-    );
-
-    int insertComment(Comment comment);
-
-    int deleteComment(
-            @Param("commentId") long commentId,
             @Param("postId") long postId,
             @Param("memberId") long memberId
     );

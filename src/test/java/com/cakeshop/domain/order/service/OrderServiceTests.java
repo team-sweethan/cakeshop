@@ -2,6 +2,7 @@ package com.cakeshop.domain.order.service;
 
 import com.cakeshop.domain.order.dto.form.customer.OrderCartCreateForm;
 import com.cakeshop.domain.order.dto.form.customer.OrderGeneralCreateForm;
+import com.cakeshop.domain.order.dto.view.customer.OrderCreationResult;
 import com.cakeshop.domain.coupon.service.CouponOrderCommandService;
 import com.cakeshop.domain.cart.service.CartOrderQueryService;
 import com.cakeshop.domain.cart.dto.view.CartOrderItemView;
@@ -16,7 +17,9 @@ import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.order.mapper.OrderCartMapper;
 import com.cakeshop.domain.order.dto.view.OrderCartItemLink;
 import com.cakeshop.domain.order.mapper.OrderMapper;
-import com.cakeshop.domain.order.service.OrderOptionValidator.ValidatedOption;
+import com.cakeshop.domain.order.service.checkout.OrderOptionValidator;
+import com.cakeshop.domain.order.service.checkout.OrderOptionValidator.ValidatedOption;
+import com.cakeshop.domain.order.service.checkout.PickupAvailabilityPolicy;
 import com.cakeshop.domain.payment.service.PaymentOrderPreparationCommandService;
 import com.cakeshop.domain.product.dto.view.ProductSalesInfo;
 import com.cakeshop.domain.product.entity.ProductType;
@@ -106,7 +109,7 @@ class OrderServiceTests {
         lenient().when(storeService.getStoreView()).thenReturn(storeView());
         lenient().when(memberService.isActiveMember(anyLong())).thenReturn(true);
         lenient().when(memberCouponQueryService.lockActiveCouponIssuableMember(anyLong())).thenReturn(true);
-        orderService = new OrderServiceImpl(
+        orderService = new OrderService(
                 new PickupAvailabilityPolicy(storeService),
                 productQueryService,
                 orderOptionValidator,
@@ -151,9 +154,10 @@ class OrderServiceTests {
         when(orderMapper.insertOrderItemOption(any(OrderItemOption.class))).thenReturn(1);
         OrderGeneralCreateForm form = form(1L, 2, List.of(101L));
 
-        long orderId = orderService.createGeneralOrder(memberId, form);
+        OrderCreationResult result = orderService.createGeneralOrder(memberId, form);
 
-        assertThat(orderId).isEqualTo(100L);
+        assertThat(result.orderId()).isEqualTo(100L);
+        assertThat(result.requiresPendingPaymentGuide()).isFalse();
 
         ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
         verify(orderMapper).insertOrder(orderCaptor.capture());
@@ -245,9 +249,10 @@ class OrderServiceTests {
         form.setPickupAt(FIXED_NOW.plusHours(1));
         form.setDisplayedOriginalAmount(BigDecimal.valueOf(50_000));
 
-        long orderId = orderService.createCartOrder(10L, form);
+        OrderCreationResult result = orderService.createCartOrder(10L, form);
 
-        assertThat(orderId).isEqualTo(100L);
+        assertThat(result.orderId()).isEqualTo(100L);
+        assertThat(result.requiresPendingPaymentGuide()).isFalse();
         verify(cartOrderQueryService).getSelectedOrderItems(10L, List.of(11L, 12L));
         verify(orderCartMapper).insertOrderCartItems(100L, List.of(
                 new OrderCartItemLink(11L, 1),
@@ -309,11 +314,69 @@ class OrderServiceTests {
                 form.getRequestKey()
         )).thenReturn(Optional.of(existingOrder));
 
-        assertThat(orderService.createGeneralOrder(10L, form)).isEqualTo(77L);
+        assertThat(orderService.createGeneralOrder(10L, form).orderId()).isEqualTo(77L);
 
         verify(productQueryService, never()).getSalesInfo(anyLong());
         verify(orderMapper, never()).insertOrder(any(Order.class));
         verifyNoInteractions(paymentPreparationService);
+    }
+
+    @Test
+    void createGeneralOrder_otherRequestKeyWithPendingPayment_returnsGuideWithoutDuplicateWrites() {
+        Order pendingOrder = pendingPaymentOrder(77L, "ORD-PENDING", FIXED_NOW.plusMinutes(5));
+        when(orderMapper.findPendingPaymentOrderByMemberId(10L, FIXED_NOW))
+                .thenReturn(Optional.of(pendingOrder));
+        OrderGeneralCreateForm form = form(1L, 1, List.of());
+
+        OrderCreationResult result = orderService.createGeneralOrder(10L, form);
+
+        assertThat(result.requiresPendingPaymentGuide()).isTrue();
+        assertThat(result.pendingPaymentOrder())
+                .isEqualTo(new OrderCreationResult.PendingPaymentOrder(
+                        77L, "ORD-PENDING", FIXED_NOW.plusMinutes(5)
+                ));
+        verify(orderMapper, never()).insertOrder(any(Order.class));
+        verifyNoInteractions(paymentPreparationService);
+    }
+
+    @Test
+    void createGeneralOrderAfterPendingPaymentGuide_skipsPendingPaymentLookupOnce() {
+        when(productQueryService.getSalesInfo(1L))
+                .thenReturn(product(1L, ProductType.GENERAL, "새 주문 케이크", 30_000, 2));
+        when(orderOptionValidator.validate(1L, List.of())).thenReturn(List.of());
+        when(orderMapper.insertOrder(any(Order.class))).thenAnswer(invocation -> {
+            invocation.<Order>getArgument(0).setId(100L);
+            return 1;
+        });
+        when(orderMapper.existsOrderItemByOrderId(100L)).thenReturn(false);
+        when(orderMapper.insertOrderItem(any(OrderItem.class))).thenAnswer(invocation -> {
+            invocation.<OrderItem>getArgument(0).setId(200L);
+            return 1;
+        });
+
+        OrderCreationResult result = orderService.createGeneralOrderAfterPendingPaymentGuide(
+                10L,
+                form(1L, 1, List.of())
+        );
+
+        assertThat(result.orderId()).isEqualTo(100L);
+        assertThat(result.requiresPendingPaymentGuide()).isFalse();
+        verify(orderMapper, never()).findPendingPaymentOrderByMemberId(anyLong(), any());
+        verify(paymentPreparationService).prepareReadyPayment(anyLong(), any(), any());
+    }
+
+    @Test
+    void createCartOrder_otherRequestKeyWithPendingPayment_returnsGuideWithoutCartWrites() {
+        OrderCartCreateForm form = cartForm();
+        when(orderMapper.findPendingPaymentOrderByMemberId(10L, FIXED_NOW))
+                .thenReturn(Optional.of(pendingPaymentOrder(78L, "ORD-CART-PENDING", FIXED_NOW.plusMinutes(4))));
+
+        OrderCreationResult result = orderService.createCartOrder(10L, form);
+
+        assertThat(result.requiresPendingPaymentGuide()).isTrue();
+        assertThat(result.orderId()).isEqualTo(78L);
+        verifyNoInteractions(cartOrderQueryService, orderCartMapper, paymentPreparationService);
+        verify(orderMapper, never()).insertOrder(any(Order.class));
     }
 
     @Test
@@ -517,7 +580,7 @@ class OrderServiceTests {
 
     @Test
     void createGeneralOrderIsTransactional() throws NoSuchMethodException {
-        Transactional transactional = OrderServiceImpl.class
+        Transactional transactional = OrderService.class
                 .getMethod(
                         "createGeneralOrder",
                         long.class,
@@ -604,6 +667,27 @@ class OrderServiceTests {
         form.setQuantity(quantity);
         form.setOptionIds(optionIds);
         return form;
+    }
+
+    private OrderCartCreateForm cartForm() {
+        OrderCartCreateForm form = new OrderCartCreateForm();
+        form.setRequestKey(UUID.randomUUID().toString());
+        form.setCartItemIds(List.of(11L));
+        form.setOrdererName("주문자");
+        form.setOrdererPhone("010-1234-5678");
+        form.setPickupName("픽업자");
+        form.setPickupPhone("010-9876-5432");
+        form.setPickupAt(FIXED_NOW.plusDays(3));
+        form.setDisplayedOriginalAmount(BigDecimal.valueOf(10_000));
+        return form;
+    }
+
+    private Order pendingPaymentOrder(long orderId, String orderNumber, LocalDateTime paymentExpiresAt) {
+        Order order = new Order();
+        order.setId(orderId);
+        order.setOrderNumber(orderNumber);
+        order.setPaymentExpiresAt(paymentExpiresAt);
+        return order;
     }
 
     private StoreView storeView() {

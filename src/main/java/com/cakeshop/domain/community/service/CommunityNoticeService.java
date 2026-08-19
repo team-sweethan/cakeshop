@@ -33,31 +33,11 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class CommunityNoticeService {
 
-    /* 커뮤니티 목록 고정 행이 쓰는 건수. 메인은 다른 값을 쓴다(`CommunityHomeQueryService`). */
-    private static final int LIST_SECTION_LIMIT = 3;
-
-    private static final int FIRST_PAGE = 1;
-
     private static final int SECTION_OFFSET = 0;
 
     private final CommunityNoticeMapper communityNoticeMapper;
 
     private final Clock clock;
-
-    /**
-     * 커뮤니티 목록의 공지 고정 행 영역.
-     *
-     * <p>1쪽이고 카테고리 필터가 없을 때만 싣는다. 이 조건은 인기글과 같은 이유로 Controller가
-     * 아니라 여기 있다 — 화면이 늘 때마다 한 벌씩 늘고, 두 벌이 되는 순간 갈린다.</p>
-     */
-    @Transactional(readOnly = true)
-    public NoticeSectionView getListSection(Long categoryId, PageRequest pageRequest) {
-        if (categoryId != null || pageRequest.getPage() != FIRST_PAGE) {
-            return NoticeSectionView.empty();
-        }
-
-        return readSection(LIST_SECTION_LIMIT);
-    }
 
     @Transactional(readOnly = true)
     public PageResult<NoticeView> getNotices(PageRequest pageRequest) {
@@ -90,7 +70,7 @@ public class CommunityNoticeService {
         return NoticeDetailView.of(row);
     }
 
-    /** 자리별 건수는 부르는 쪽이 아니라 커뮤니티가 갖는다. 인기글 D2와 같은 이유다. */
+    /** 메인 공지 건수는 공개 계약인 {@link CommunityHomeQueryService}가 정해 넘긴다. */
     NoticeSectionView readSection(int limit) {
         List<NoticeListRow> rows = communityNoticeMapper.selectVisibleNotices(
                 LocalDateTime.now(clock), limit, SECTION_OFFSET);

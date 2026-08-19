@@ -1,9 +1,9 @@
 package com.cakeshop.domain.payment.service;
 
-import com.cakeshop.domain.order.service.OrderPaymentQueryService;
-import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentOrder;
-import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentExecutionOrder;
-import com.cakeshop.domain.order.service.OrderPaymentQueryService.PaymentProduct;
+import com.cakeshop.domain.order.service.payment.OrderPaymentQueryService;
+import com.cakeshop.domain.order.service.payment.OrderPaymentQueryService.PaymentOrder;
+import com.cakeshop.domain.order.service.payment.OrderPaymentQueryService.PaymentExecutionOrder;
+import com.cakeshop.domain.order.service.payment.OrderPaymentQueryService.PaymentProduct;
 import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.payment.dto.form.PaymentConfirmForm;
 import com.cakeshop.domain.payment.entity.Payment;

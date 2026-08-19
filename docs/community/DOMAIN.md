@@ -39,18 +39,18 @@
 | **A4** | 이미지 첨부 | 고객 | (A1·A2에 포함) | **완료** | 12 | `community-post.md` |
 | **A5** | 댓글 작성 | 고객 | `POST /community/{postId}/comments` | **완료** | 3 | `community-comment.md` |
 | **A6** | 댓글 삭제 | 댓글 작성자 | `POST /community/{postId}/comments/{commentId}/delete` | **완료** | 3 | `community-comment.md` |
-| **A7** | 대댓글 (5 depth) | 고객 | — | **없음** | 2차 | `community-comment.md` |
+| **A7** | 답글 (2단계) | 고객 | (A5 경로의 `replyTo`) | **완료** | 8 | `community-comment.md` |
 | **A8** | 좋아요 추가·취소 | 고객 | `POST /community/{id}/likes` · `/likes/delete` | **완료** | 4 | `community-reaction.md` |
 | **A9** | 신고 | 고객 | `POST /community/{id}/reports` | **완료** | 5 | `community-reaction.md` |
-| **B1** | 게시글 목록 | 누구나 | `GET /community` | **완료** | 1 · 7a | `community-read.md` |
+| **B1** | 게시글 목록 | 누구나 | `GET /community` | **완료** | 1 · 7a · 16 | `community-read.md` |
 | **B2** | 게시글 상세 | 누구나 | `GET /community/{id}` | **완료** | 1 | `community-read.md` |
 | **B3** | 조회수와 중복 방지 | — | (B2에 포함) | **완료** | 6 | `community-read.md` |
 | **B4** | 댓글 정렬·분량 (`더 보기`) | 누구나 | `GET /community/{id}?comments=N` | **완료** | 3 · 6 | `community-comment.md` |
 | **B5** | 인기글 영역 | 누구나 | (B1에 포함 — 메인은 15가 제거) | **완료** | 7c · 13 · 15 | `community-popular.md` |
 | **B6** | 검색 | 누구나 | (B1의 파라미터) | **없음** | 2차 | `community-read.md` |
-| **B7** | 무한 스크롤 | 누구나 | (B1의 페이징 대체) | **없음** | 2차 | `community-read.md` |
-| **B8** | 공지 고정 행·상단 영역 | 누구나 | (B1과 메인 `GET /`에 포함) | **완료** | 14b · 14c · 15 | `community-notice.md` |
-| **B9** | 공지 전체보기 | 누구나 | `GET /community/notices` | **완료** | 14b | `community-notice.md` |
+| **B7** | 무한 스크롤 | 누구나 | (댓글 구역 부분 로드로 재정의 — 게시글 목록은 쪽 번호 유지) | **없음** | 2차 (조각 9) | `community-read.md` |
+| **B8** | 메인 공지 상단 영역·롤링 | 누구나 | (메인 `GET /`에 포함) | **완료** | 14c · 18 · 19 | `community-notice.md` |
+| **B9** | 공지 전체보기·GNB 진입점 | 누구나 | `GET /community/notices` | **완료** | 14b · 18 | `community-notice.md` |
 | **B10** | 공지 상세 | 누구나 | `GET /community/notices/{id}` | **완료** | 14b | `community-notice.md` |
 | **C1** | 관리자 목록 | 관리자 | `GET /admin/community` | **완료** | 5 | `community-admin.md` |
 | **C2** | 관리자 상세 | 관리자 | `GET /admin/community/{id}` | **완료** | 5 | `community-admin.md` |
@@ -62,9 +62,10 @@
 | **D1** | 작성자 표시명 | — | (Service 계약) | **완료** | 10 | 이 문서 8절 |
 | **D2** | 메인 인기글 계약 | — | (Service 계약) | **제거** — 조각 15가 메인 노출을 뺐다. 계약 클래스는 공지(D3)용으로 남는다 | 13 · 15 | `community-popular.md` |
 | **D3** | 메인 공지 계약 | — | (D2와 같은 계약에 추가) | **완료** | 14c | `community-notice.md` |
+| **D4** | 댓글·답글 알림 | — | 알림 발송 + `GET /community/{postId}/comments/{commentId}` | **완료** | 17 | `community-comment.md` |
 | **E1** | 상태 enum + `CHECK` | — | — | **완료** | 0 | 이 문서 4절 |
 | **E2** | 카테고리 주입 | — | — | **완료** | 0 | 이 문서 10절 |
-| **E3** | 인기글 집계 배치 | — | (스케줄러) | **완료** | 7b | `community-popular.md` |
+| **E3** | 인기글 집계 배치 | — | (스케줄러) | **완료** | 7b · 20 | `community-popular.md` |
 | **E4** | 공지 표 + 상태·기간 `CHECK` | — | — | **완료** | 14a | `community-notice.md` |
 
 ## 1. 한 문장 정의
@@ -73,7 +74,7 @@ Cakeshop 커뮤니티는 고객이 케이크 관련 질문과 후기를 공유�
 
 ## 2. MVP 범위
 
-**포함**: 게시글 목록·상세, 게시글 CRUD, 댓글(1단계) 작성·삭제, 좋아요, 신고, 관리자 차단, 페이지 번호 페이징, **조회수 정렬 옵션·인기글**, **관리자 공지사항**
+**포함**: 게시글 목록·상세, 게시글 CRUD, 댓글 작성·삭제(2단계 답글 포함 — 조각 8), 좋아요, 신고, 관리자 차단, 페이지 번호 페이징, **조회수 정렬 옵션·인기글**, **관리자 공지사항**
 
 ### 2차로 미룬 것
 
@@ -84,7 +85,7 @@ Cakeshop 커뮤니티는 고객이 케이크 관련 질문과 후기를 공유�
 | 검색 | 2차에서 다룬다. 단순한 제목·본문 `LIKE` 검색은 데이터가 늘면 성능 부담이 될 수 있으므로, 실제 요구와 데이터 규모를 확인한 뒤 구현 방식과 인프라 도입 여부를 별도로 합의한다 |
 | 무한 스크롤 | 게시글 목록은 1차에서 쪽 번호 페이징으로 간다. **댓글의 `이전 댓글 더 보기`는 이것이 아니다** — 스크롤이 아니라 사용자가 누를 때만 늘어나고, 주소가 바뀌는 링크라 JS 없이 동작한다 (`specs/community-comment.md` B4) |
 | ~~이미지 첨부~~ | **끝났다 (조각 12).** 규칙은 `specs/community-post.md` A4가 정본이다 |
-| 대댓글 | `parent_comment_id` 컬럼은 V0에 있지만 **코드에 등장시키지 않는다** (`specs/community-comment.md` A7) |
+| ~~대댓글~~ | **끝났다 (조각 8).** 2단계 답글로 확정하고 V0의 `parent_comment_id`를 그대로 쓴다. 규칙은 `specs/community-comment.md` A7이 정본이다 |
 
 ### 범위 밖
 
@@ -256,7 +257,7 @@ Cakeshop 커뮤니티는 고객이 케이크 관련 질문과 후기를 공유�
 | ~~`post_reports.status` 전이 (`PENDING` → ?)~~ | **결정됨 (조각 5)**. `PENDING → RESOLVED`(차단) / `PENDING → REJECTED`(기각), 둘 다 종착. 게시글 단위로 바꾼다. 근거는 6.6 |
 | ~~관리자 목록 화면의 필터·정렬~~ | **결정됨 (조각 5)**. 상태 필터 + 최신순/미처리 신고 많은 순. 작성자·제목 검색은 넣지 않는다. 근거는 6.7 |
 | ~~좋아요 기준 정렬(`sort=likes`) 추가 여부~~ | **결정됨 (조각 7a)**. 넣지 않는다. 근거는 6.1 — 분기를 하나 더 여는 값이 크지 않고, 좋아요로 줄을 세우는 것은 인기글이 대신한다 |
-| ~~**인기글의 기간** — 누적(`posts.view_count`)인가 기간별(`post_views`를 `created_at`으로 집계)인가~~ | **결정됨 (조각 7b)**. 기간별, 최근 7일(대상일 포함). 매일 새벽 배치가 확정하고 화면은 스냅샷만 읽는다. 근거와 점수식은 6.9 |
+| ~~**인기글의 기간** — 누적(`posts.view_count`)인가 기간별(`post_views`를 `created_at`으로 집계)인가~~ | **결정됨 (조각 7b)**. 기간별. 매일 새벽 배치가 확정하고 화면은 스냅샷만 읽는다. **폭은 최근 7일이었다가 조각 20(2026-08-19)이 대상일 하루로 좁혔다.** 근거와 점수식은 6.9 |
 | ~~**인기글을 어디에 두나** — 목록 화면 상단 영역인가 별도 화면인가~~ | **결정됨 (조각 7c)**. 목록 화면 상단의 영역이고 별도 화면을 만들지 않는다. 근거와 노출 조건은 6.9 |
 | ~~**`post_views` 보관 기간** — 무한히 쌓인다~~ | **결정됨 (조각 7b)**. 1차에서는 정리하지 않는다. 지우면 `view_count == COUNT(post_views)`(H14)가 깨진다. 스냅샷이 과거 순위를 보존하므로 나중에 정리로 넘어갈 근거는 생겼다 — 되돌아올 계기는 `PLAN.md` R25 |
 | ~~댓글 페이징~~ | **결정됨 (조각 3)**. 전체 로드가 아니라 최신 20건 + `이전 댓글 더 보기`. 근거는 6.4 |

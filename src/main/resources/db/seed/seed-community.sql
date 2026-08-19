@@ -24,7 +24,7 @@
 --   /admin/community/notices  공지 5건 — 배지 네 종류(예정·노출 중·종료·삭제됨)와
 --                             `즉시`/`무기한` 표시
 --   /community/notices        위 5건 중 **2건만** 보인다. 나머지 셋(예정·종료·삭제됨)이
---                             빠지는 것이 정상이고, 목록 최상단 공지 영역도 그 2건이다
+--                             빠지는 것이 정상이다
 --
 -- id 가 1..36 사이에서 띄엄띄엄한 것은 정상이다. InnoDB 는 INSERT ... SELECT 처럼
 -- 행 수를 미리 모르는 삽입에서 auto_increment 를 넉넉히 잡아 두어 빈 번호가 생긴다.
@@ -34,10 +34,15 @@
 -- 기준 시각 — 아래 모든 시각은 실행한 날에서 거꾸로 센다.
 --
 -- 고정 날짜를 박아 두면 인기글이 **시드를 고치지 않는 한 언젠가 반드시 사라진다.**
--- 배치는 대상일 기준 7일 창만 집계하므로(DOMAIN.md 6.9), 박아 둔 날짜가 창을 벗어난
--- 다음 날부터 로컬의 인기글 영역이 통째로 비고 — 그런데 화면은 "활동이 없는 정상 상태"
--- 와 똑같이 생겨서(그릴 것이 없으면 영역이 통째로 사라진다, 6.9) 시드가 낡은 것인지
--- 기능이 깨진 것인지 구분되지 않는다.
+-- 배치는 대상일 하루만 집계하므로(specs/community-popular.md E3), 박아 둔 날짜가 창을
+-- 벗어난 다음 날부터 로컬의 인기글 영역이 통째로 비고 — 그런데 화면은 "활동이 없는
+-- 정상 상태"와 똑같이 생겨서(그릴 것이 없으면 영역이 통째로 사라진다) 시드가 낡은
+-- 것인지 기능이 깨진 것인지 구분되지 않는다.
+--
+-- **창이 하루가 된 뒤로는 이 시드가 하루짜리다**(PLAN.md R35). 7일 창일 때는 다음 날
+-- 배치가 대상일을 옮겨도 어제치 활동이 창에 엿새 더 걸렸지만, 지금은 하루만 지나면
+-- 그날의 순위가 0건으로 확정되어 영역이 사라진다. 로컬에서 인기글을 다시 보려면
+-- 시드를 다시 실행한다.
 --
 -- 활동을 어제에 두는 이유: 배치의 대상일은 언제나 **전날**이다(PLAN.md D3). 활동을
 -- 오늘에 두면 오늘 밤 배치가 도는 대상일(오늘)에는 들어가지만, 아래 8절이 미리 확정해
@@ -81,6 +86,9 @@ DELETE FROM `daily_popular_posts`;
 -- "이미 확정한 날짜" 로 판단해 건너뛰어서(D4) 인기글이 채워지지 않는다.
 -- 지운 자리는 8절이 어제치로 다시 채운다.
 DELETE FROM `popular_post_batch_runs`;
+-- 답글이 뿌리를 참조하므로(fk_comments_parent, ON DELETE 없음) 답글을 먼저 지운다.
+-- 한 문장으로 전부 지우면 삭제 순서에 따라 FK 위반이 난다.
+DELETE FROM `comments` WHERE `parent_comment_id` IS NOT NULL;
 DELETE FROM `comments`;
 DELETE FROM `posts`;
 -- 공지는 posts 와 아무 관계가 없다(별도 표, 자식 표 없음). 순서에 걸리는 것이 없어
@@ -231,7 +239,7 @@ VALUES (@member_id, @free_id,
 --
 -- 삭제된 댓글은 자리 표시로 남기되 개수 집계에서는 제외한다(DOMAIN.md 4.4).
 -- 목록의 "댓글 N"이 삭제된 것을 빼고 세는지 확인할 수 있다.
--- 1차에는 대댓글이 없으므로 parent_comment_id 를 넣지 않는다(6.4).
+-- 답글(2단계)은 조각 8부터 있다 — 아래 6절이 첫 댓글 밑에 심는다.
 -- ---------------------------------------------------------------------------
 
 SET @escaped_post_id := (SELECT `id` FROM `posts` WHERE `title` = 'HTML 이스케이프 확인용 글');
@@ -272,6 +280,27 @@ SELECT @many_comment_post_id,
         UNION ALL SELECT 21 UNION ALL SELECT 22 UNION ALL SELECT 23 UNION ALL SELECT 24
         UNION ALL SELECT 25
        ) comment_seqs;
+
+-- ---------------------------------------------------------------------------
+-- 4-1. 답글 (조각 8)
+--
+-- 접힌 "답글 n개 보기"와 펼친 화면, 삭제된 답글의 자리 표시를 로컬에서 볼 수 있게
+-- 첫 번째 댓글 밑에 셋을 심는다. 삭제된 뿌리("지워진 댓글") 밑에는 심지 않는다 —
+-- 그 뿌리에는 새 답글도 달 수 없다(specs/community-comment.md A7).
+-- ---------------------------------------------------------------------------
+
+SET @reply_root_id := (SELECT `id` FROM `comments`
+                        WHERE `post_id` = @escaped_post_id
+                          AND `content` = '첫 번째 댓글입니다.');
+
+INSERT INTO `comments`
+       (`post_id`, `member_id`, `parent_comment_id`, `content`, `status`, `created_at`, `updated_at`)
+VALUES (@escaped_post_id, @admin_id, @reply_root_id, '첫 번째 답글입니다.', 'PUBLISHED',
+        TIMESTAMP(@activity_day, '10:05:00'), TIMESTAMP(@activity_day, '10:05:00')),
+       (@escaped_post_id, @member_id, @reply_root_id, '지워진 답글의 본문입니다.', 'DELETED',
+        TIMESTAMP(@activity_day, '10:06:00'), TIMESTAMP(@activity_day, '10:06:00')),
+       (@escaped_post_id, @member_id, @reply_root_id, '두 번째 답글입니다.', 'PUBLISHED',
+        TIMESTAMP(@activity_day, '10:07:00'), TIMESTAMP(@activity_day, '10:07:00'));
 
 -- ---------------------------------------------------------------------------
 -- 5. 좋아요
@@ -427,14 +456,14 @@ SELECT @activity_day,
           FROM (
                 SELECT `post_id`, 1 AS `view_count`, 0 AS `like_count`, 0 AS `comment_count`
                   FROM `post_views`
-                 WHERE `created_at` >= @activity_day - INTERVAL 6 DAY
+                 WHERE `created_at` >= @activity_day
                    AND `created_at` <  @activity_day + INTERVAL 1 DAY
 
                 UNION ALL
 
                 SELECT `post_id`, 0, 1, 0
                   FROM `post_likes`
-                 WHERE `created_at` >= @activity_day - INTERVAL 6 DAY
+                 WHERE `created_at` >= @activity_day
                    AND `created_at` <  @activity_day + INTERVAL 1 DAY
 
                 UNION ALL
@@ -446,7 +475,7 @@ SELECT @activity_day,
                         SELECT `post_id`, `member_id`
                           FROM `comments`
                          WHERE `status` = 'PUBLISHED'
-                           AND `created_at` >= @activity_day - INTERVAL 6 DAY
+                           AND `created_at` >= @activity_day
                            AND `created_at` <  @activity_day + INTERVAL 1 DAY
                          GROUP BY `post_id`, `member_id`
                        ) commenters

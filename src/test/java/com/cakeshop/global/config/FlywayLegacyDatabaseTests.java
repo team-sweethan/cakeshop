@@ -11,6 +11,7 @@ import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.FlywayException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.flyway.autoconfigure.FlywayMigrationStrategy;
 import org.testcontainers.mariadb.MariaDBContainer;
@@ -23,6 +24,7 @@ import org.testcontainers.utility.DockerImageName;
  * "테이블은 있는데 이력 테이블이 없어 기동이 실패하는 DB"라서 {@code @MariaDbIntegrationTest}로는
  * 만들 수 없다. Flyway가 실제로 어떤 error code를 내는지 확인하는 것이 목적이다.
  */
+@Tag("mariadb")
 class FlywayLegacyDatabaseTests {
 
     private static final DockerImageName MARIA_DB_IMAGE = DockerImageName.parse("mariadb:11.4.10");

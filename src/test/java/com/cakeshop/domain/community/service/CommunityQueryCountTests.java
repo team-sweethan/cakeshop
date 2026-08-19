@@ -55,14 +55,21 @@ class CommunityQueryCountTests {
     /** 목록, 개수, 작성자 조회 횟수다. */
     private static final int EXPECTED_QUERY_COUNT = 3;
 
-    /** 댓글 목록, 개수, 작성자 조회 횟수다. */
-    private static final int EXPECTED_COMMENT_QUERY_COUNT = 3;
+    /** 뿌리 목록, 전체 개수, 뿌리별 답글 수, 작성자 조회 횟수다. */
+    private static final int EXPECTED_COMMENT_QUERY_COUNT = 4;
+
+    /** 위 넷에 펼친 묶음의 답글 목록 조회 하나가 더해진다. */
+    private static final int EXPECTED_EXPANDED_COMMENT_QUERY_COUNT = 5;
 
     /** 관리자 목록, 개수, 작성자 조회 횟수다. */
     private static final int EXPECTED_ADMIN_QUERY_COUNT = 3;
 
     @MockitoBean
     private FileStorageClient fileStorageClient;
+
+    /* 알림은 커밋 이후 별도 트랜잭션이라 여기서 세는 조회 쿼리에 끼지 않는다. */
+    @MockitoBean
+    private CommunityCommentNotificationService communityCommentNotificationService;
 
     @Autowired
     private CommunityPostService communityPostService;
@@ -147,17 +154,38 @@ class CommunityQueryCountTests {
         insertComments(postId, 3);
 
         queryCounter.reset();
-        communityCommentService.getComments(postId, null);
+        communityCommentService.getComments(postId, null, null);
         int withFewComments = queryCounter.count();
 
         insertComments(postId, 20);
 
         queryCounter.reset();
-        communityCommentService.getComments(postId, null);
+        communityCommentService.getComments(postId, null, null);
         int withManyComments = queryCounter.count();
 
         assertThat(withFewComments).isEqualTo(EXPECTED_COMMENT_QUERY_COUNT);
         assertThat(withManyComments).isEqualTo(EXPECTED_COMMENT_QUERY_COUNT);
+    }
+
+    /** 묶음을 펼쳐도 조회는 한 번만 늘고, 답글 수와는 무관하다. */
+    @Test
+    void getComments_expandedThread_addsSingleQueryRegardlessOfReplyCount() {
+        long postId = insertPost();
+        long rootId = insertRootComment(postId);
+        insertReplies(postId, rootId, 3);
+
+        queryCounter.reset();
+        communityCommentService.getComments(postId, null, rootId);
+        int withFewReplies = queryCounter.count();
+
+        insertReplies(postId, rootId, 20);
+
+        queryCounter.reset();
+        communityCommentService.getComments(postId, null, rootId);
+        int withManyReplies = queryCounter.count();
+
+        assertThat(withFewReplies).isEqualTo(EXPECTED_EXPANDED_COMMENT_QUERY_COUNT);
+        assertThat(withManyReplies).isEqualTo(EXPECTED_EXPANDED_COMMENT_QUERY_COUNT);
     }
 
     @Test
@@ -176,6 +204,28 @@ class CommunityQueryCountTests {
 
         assertThat(withFewPosts).isEqualTo(EXPECTED_ADMIN_QUERY_COUNT);
         assertThat(withManyPosts).isEqualTo(EXPECTED_ADMIN_QUERY_COUNT);
+    }
+
+    private long insertRootComment(long postId) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO comments (post_id, member_id, content, status)
+                VALUES (?, ?, '뿌리 댓글', 'PUBLISHED')
+                """,
+                postId, newMember());
+
+        return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+    }
+
+    private void insertReplies(long postId, long parentId, int count) {
+        for (int i = 0; i < count; i++) {
+            jdbcTemplate.update(
+                    """
+                    INSERT INTO comments (post_id, member_id, parent_comment_id, content, status)
+                    VALUES (?, ?, ?, '답글', 'PUBLISHED')
+                    """,
+                    postId, newMember(), parentId);
+        }
     }
 
     private void insertComments(long postId, int count) {

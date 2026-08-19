@@ -52,6 +52,7 @@
 - INDEX: `idx_orders_status` (`status`)
 - INDEX: `idx_orders_pickup_at` (`pickup_at`)
 - INDEX: `idx_orders_payment_expires_at` (`payment_expires_at`)
+- INDEX: `idx_orders_member_pending_payment_expires_at` (`member_id`, `status`, `payment_expires_at`, `id`)
 - INDEX: `idx_orders_created_at_status` (`created_at`, `status`)
 - INDEX: `idx_orders_updated_at_created_at` (`updated_at`, `created_at`)
 - INDEX: `idx_orders_custom_production_due` (`order_type`, `status`, `approved_at`)
@@ -142,6 +143,7 @@
 - `V20260812_115115__add_order_cart_item_links.sql`
 - `V20260812_155402__add_order_cart_item_snapshot_quantity.sql`
 - `V20260818_104741__remove_unused_order_schema.sql`
+- `V20260819_115236__add_order_pending_payment_lookup_index.sql`
 
 > `order_cart_items.snapshot_quantity`는 주문 생성 당시 장바구니 수량이다. 결제 후 정리 시 현재 수량과 비교하여, 수량이 변경된 장바구니 항목은 삭제하지 않는다.
 

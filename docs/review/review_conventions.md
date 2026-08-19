@@ -51,11 +51,11 @@ Validation에 사용하지 않으며 불변 `record`를 기본으로 한다. Ent
 
 | 역할 | 타입 |
 |---|---|
-| Entity | `Review`, `ReviewReply`, `ReviewStatus` |
+| Entity | `Review`, `ReviewImage`, `ReviewReply`, `ReviewStatus` |
 | Form | `ReviewWriteForm`, `ReviewEditForm`, `ReviewReplyForm` |
 | Command | `ReviewUpdateCommand` |
-| Query | `ReviewRow`, `ReviewReplyRow`, `ProductRatingAggregate`, `AdminReviewFilter` |
-| View | `ProductReviewView`, `MyReviewView`, `ReviewReplyView`, 관리자 `*View`, `AdminReviewRating` |
+| Query | `ReviewRow`, `ReviewImageRow`, `ReviewReplyRow`, `ProductRatingAggregate`, `AdminReviewFilter` |
+| View | `ProductReviewView`, `MyReviewView`, `ReviewImageView`, `ReviewReplyView`, 관리자 `*View`, `AdminReviewRating` |
 
 `AdminReviewRating`은 요청 허용값이면서 화면 선택 목록이고 SQL의 평점 범위이기도 하다. 사용자 입력을 그대로
 SQL에 연결하지 않는 제한된 enum이라는 성격을 유지하며 `dto/view`에서 파라미터·라벨·범위를 제공한다.

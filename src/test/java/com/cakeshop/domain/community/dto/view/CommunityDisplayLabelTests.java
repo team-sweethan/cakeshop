@@ -29,7 +29,8 @@ class CommunityDisplayLabelTests {
                 .extracting(PostSort::getParameter, PostSort::getLabel)
                 .containsExactly(
                         assertThatTuple("LATEST", "최신순"),
-                        assertThatTuple("VIEWS", "조회수순"));
+                        assertThatTuple("VIEWS", "조회수순"),
+                        assertThatTuple("LIKES", "좋아요순"));
     }
 
     @Test

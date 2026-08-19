@@ -192,9 +192,12 @@ Google·카카오 소셜 로그인은 `.env`에 각 서비스의 Client ID와 Cl
 ```sql
 SOURCE src/main/resources/db/seed/seed-local.sql;
 SOURCE src/main/resources/db/seed/seed-community.sql;
+SOURCE src/main/resources/db/seed/seed-review.sql;
 ```
 
-`seed-local.sql`이 회원과 게시글 카테고리를 먼저 준비하므로 실행 순서를 바꾸지 않습니다. 경로는 MariaDB 클라이언트를 시작한 위치에 맞게 절대 경로로 바꿔도 됩니다.
+`seed-local.sql`이 회원·상품을 먼저 준비하므로 실행 순서를 바꾸지 않습니다. `seed-community.sql`과
+`seed-review.sql`은 각각 커뮤니티와 후기 확인용 데이터가 필요할 때만 실행해도 됩니다. 경로는 MariaDB
+클라이언트를 시작한 위치에 맞게 절대 경로로 바꿔도 됩니다.
 
 ### 6. 빌드와 테스트
 
@@ -202,15 +205,22 @@ SOURCE src/main/resources/db/seed/seed-community.sql;
 # Windows
 .\gradlew.bat build
 .\gradlew.bat test
+.\gradlew.bat unitTest
+.\gradlew.bat mariaDbTest
 ```
 
 ```bash
 # macOS / Linux
 ./gradlew build
 ./gradlew test
+./gradlew unitTest
+./gradlew mariaDbTest
 ```
 
-전체 테스트에는 MariaDB Testcontainers 테스트가 포함되므로 Docker가 실행 중이어야 합니다.
+`test`는 전체 테스트, `unitTest`는 MariaDB Testcontainers 제외, `mariaDbTest`는 MariaDB 통합 테스트만
+실행합니다. `test`와 `mariaDbTest`에는 Testcontainers 테스트가 포함되므로 Docker가 실행 중이어야
+합니다. CI는 `unitTest`와 `mariaDbTest`를 서로 다른 러너에서 병렬 실행한 뒤 기존 필수 체크 `Test`로
+결과를 합칩니다.
 
 ### 실행 프로필
 

@@ -1,0 +1,104 @@
+/* 매장 관리 폼 공통 너비 */
+.store-admin-content {
+    max-width: 720px
+}
+
+.store-admin-content > .admin-form + .admin-form {
+    margin-top: var(--space-6)
+}
+
+/* 영업시간·픽업시간 입력 */
+.time-range {
+    align-items: center;
+    display: grid;
+    gap: var(--space-2);
+    grid-template-columns: 1fr auto 1fr;
+    margin-top: var(--space-1)
+}
+
+.time-input-with-picker {
+    display: grid;
+    gap: var(--space-2);
+    grid-template-columns: minmax(0, 1fr) auto;
+    position: relative
+}
+
+.time-input-with-picker .btn {
+    white-space: nowrap
+}
+
+.btn--icon {
+    line-height: 1;
+    padding-left: 10px;
+    padding-right: 10px
+}
+
+.time-picker-proxy {
+    height: 1px;
+    left: 0;
+    opacity: 0;
+    pointer-events: none;
+    position: absolute;
+    top: 100%;
+    width: 1px
+}
+
+/* 특정 휴무일 */
+.holiday-section {
+    margin-top: var(--space-6)
+}
+
+.holiday-form {
+    align-items: start;
+    display: grid;
+    gap: var(--space-3);
+    grid-template-columns: 180px minmax(0, 1fr) auto
+}
+
+.holiday-form .btn {
+    margin-top: 22px
+}
+
+.holiday-list {
+    border-top: 1px solid var(--color-border-light)
+}
+
+.holiday-item {
+    align-items: center;
+    border-bottom: 1px solid var(--color-border-light);
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0
+}
+
+.holiday-item strong {
+    margin-right: var(--space-2)
+}
+
+/* 매장 사진 첨부 */
+.store-image-field {
+    align-items: flex-start;
+    display: flex;
+    gap: var(--space-3)
+}
+
+.store-image-field .form-control {
+    flex: 1
+}
+
+.store-image-current {
+    display: grid;
+    flex: 0 0 84px;
+    gap: var(--space-1)
+}
+
+.store-image-current .btn {
+    width: 100%
+}
+
+.store-image-preview {
+    border: 1px solid var(--color-border);
+    height: 64px;
+    object-fit: cover;
+    width: 84px
+}

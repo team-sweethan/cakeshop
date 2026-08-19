@@ -11,6 +11,8 @@ import com.cakeshop.domain.order.entity.OrderItemOption;
 import com.cakeshop.domain.order.entity.OrderStatus;
 import com.cakeshop.domain.order.entity.OrderType;
 import com.cakeshop.domain.order.mapper.OrderMapper;
+import com.cakeshop.domain.order.service.checkout.OrderOptionValidator;
+import com.cakeshop.domain.order.service.checkout.PickupAvailabilityPolicy;
 import com.cakeshop.domain.payment.entity.Payment;
 import com.cakeshop.domain.payment.entity.PaymentStatus;
 import com.cakeshop.domain.payment.mapper.PaymentMapper;
@@ -50,7 +52,7 @@ import static org.mockito.Mockito.when;
 
 @MybatisTest
 @Import({
-        OrderServiceImpl.class,
+        OrderService.class,
         PickupAvailabilityPolicy.class,
         OrderOptionValidator.class,
         PaymentOrderPreparationCommandServiceImpl.class
@@ -132,7 +134,7 @@ class OrderServiceIntegrationTests {
         assertThat(AopUtils.isAopProxy(orderService)).isTrue();
         OrderGeneralCreateForm form = createForm();
 
-        long orderId = orderService.createGeneralOrder(memberId, form);
+        long orderId = orderService.createGeneralOrder(memberId, form).orderId();
 
         Order order = orderMapper.findOrderById(orderId).orElseThrow();
         assertThat(order.getMemberId()).isEqualTo(memberId);
@@ -172,8 +174,8 @@ class OrderServiceIntegrationTests {
     void createGeneralOrder_sameRequestKey_returnsSameOrderWithoutDuplicates() {
         OrderGeneralCreateForm form = createForm();
 
-        long firstOrderId = orderService.createGeneralOrder(memberId, form);
-        long secondOrderId = orderService.createGeneralOrder(memberId, form);
+        long firstOrderId = orderService.createGeneralOrder(memberId, form).orderId();
+        long secondOrderId = orderService.createGeneralOrder(memberId, form).orderId();
 
         assertThat(secondOrderId).isEqualTo(firstOrderId);
         assertThat(jdbcTemplate.queryForObject(

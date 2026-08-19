@@ -1,0 +1,42 @@
+/* 공지 링크의 flex 표시보다 hidden 상태를 우선한다. */
+[data-notice-item][hidden] {
+    display: none !important
+}
+
+/* 매장 정보 높이를 기준으로 사진 영역을 맞추고 넘치는 부분은 중앙에서 자른다. */
+.store-media {
+    min-height: 170px;
+    overflow: hidden;
+    position: relative
+}
+
+.store-photo,
+.store-map {
+    height: 100%;
+    inset: 0;
+    position: absolute;
+    width: 100%
+}
+
+.store-photo {
+    border: 1px solid var(--color-border);
+    display: block;
+    object-fit: cover
+}
+
+.store-map {
+    align-items: center;
+    background: var(--color-background-soft);
+    border: 1px solid var(--color-border);
+    color: var(--color-muted);
+    display: flex;
+    font-size: var(--font-xs);
+    justify-content: center
+}
+
+@media (max-width: 767px) {
+    .store-media {
+        aspect-ratio: 16 / 9;
+        min-height: 0
+    }
+}

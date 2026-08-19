@@ -26,14 +26,12 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import com.cakeshop.domain.community.dto.view.CommentSectionView;
-import com.cakeshop.domain.community.dto.view.NoticeSectionView;
 import com.cakeshop.domain.community.dto.view.PostCategoryView;
 import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
 import com.cakeshop.domain.community.dto.view.PostSort;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
-import com.cakeshop.domain.community.service.CommunityNoticeService;
 import com.cakeshop.domain.community.service.CommunityPostImageService;
 import com.cakeshop.domain.community.service.CommunityReactionService;
 import com.cakeshop.domain.community.service.CommunityCommentService;
@@ -63,7 +61,6 @@ class CommunityControllerTests {
 
     private CommunityPostService communityPostService;
     private CommunityCommentService communityCommentService;
-    private CommunityNoticeService communityNoticeService;
     private CommunityReactionService communityReactionService;
     private MockMvc mockMvc;
 
@@ -71,17 +68,16 @@ class CommunityControllerTests {
     void setUp() {
         communityPostService = mock(CommunityPostService.class);
         communityCommentService = mock(CommunityCommentService.class);
-        communityNoticeService = mock(CommunityNoticeService.class);
         communityReactionService = mock(CommunityReactionService.class);
-
-        when(communityNoticeService.getListSection(any(), any()))
-                .thenReturn(NoticeSectionView.empty());
 
         when(communityPostService.getPosts(any(), any(), any()))
                 .thenReturn(new PageResult<>(List.of(), new PageRequest(1, 20), 0));
         when(communityPostService.getActiveCategories())
                 .thenReturn(List.of(new PostCategoryView(1L, "QNA", "질문")));
-        when(communityCommentService.getComments(anyLong(), any()))
+        when(communityCommentService.getComments(anyLong(), any(), any()))
+                .thenReturn(new CommentSectionView(
+                        List.of(), 0, 0, CommentSectionView.DEFAULT_LIMIT));
+        when(communityCommentService.getFocusedComments(anyLong(), anyLong()))
                 .thenReturn(new CommentSectionView(
                         List.of(), 0, 0, CommentSectionView.DEFAULT_LIMIT));
 
@@ -90,7 +86,6 @@ class CommunityControllerTests {
                         new CommunityController(
                                 communityPostService,
                                 mock(CommunityPostImageService.class),
-                                communityNoticeService,
                                 // 상세 화면을 목으로 갈면 아래 Model 속성 검사가 전부 빈 값을 본다.
                                 new CommunityDetailPage(
                                         communityCommentService, communityReactionService, mock(CommunityPostImageService.class))))
@@ -111,6 +106,7 @@ class CommunityControllerTests {
                 .andExpect(model().attributeExists("pageResult"))
                 .andExpect(model().attributeExists("pageNavigation"))
                 .andExpect(model().attributeExists("categories"))
+                .andExpect(model().attributeDoesNotExist("noticeSection"))
                 .andExpect(model().attribute("selectedCategoryId", (Object) null));
     }
 
@@ -124,6 +120,8 @@ class CommunityControllerTests {
             "전체, -, -, -, LATEST, 1",
             "-, VIEWS, -, -, VIEWS, 1",
             "-, views, -, -, VIEWS, 1",
+            "-, LIKES, -, -, LIKES, 1",
+            "-, likes, -, -, LIKES, 1",
             "-, 'id; DROP TABLE posts', -, -, LATEST, 1",
             "-, -, abc, -, LATEST, 1"
     })
@@ -218,6 +216,43 @@ class CommunityControllerTests {
 
         verify(communityPostService).getVisiblePost(eq(15L), isNull());
         verify(communityPostService, never()).getPostDetail(anyLong(), any(), anyString());
+    }
+
+    /** 답글 펼치기도 이미 보고 있는 글 안에서의 이동이라 조회수를 올리지 않는다. */
+    @Test
+    void detail_expandingReplies_doesNotCountAsView() throws Exception {
+        when(communityPostService.getVisiblePost(eq(15L), isNull())).thenReturn(publishedPost());
+
+        mockMvc.perform(get("/community/15").param("replies", "8"))
+                .andExpect(status().isOk());
+
+        verify(communityCommentService).getComments(15L, null, 8L);
+        verify(communityPostService, never()).getPostDetail(anyLong(), any(), anyString());
+    }
+
+    /** 알림 deep link는 댓글 id를 서버 렌더링에 넘기고 조회수를 올리지 않는다. */
+    @Test
+    void commentDetail_rendersFocusedCommentWithoutCountingView() throws Exception {
+        when(communityPostService.getVisiblePost(eq(15L), isNull())).thenReturn(publishedPost());
+
+        mockMvc.perform(get("/community/15/comments/8"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("customer/community/detail"));
+
+        verify(communityCommentService).getFocusedComments(15L, 8L);
+        verify(communityPostService).getVisiblePost(eq(15L), isNull());
+        verify(communityPostService, never()).getPostDetail(anyLong(), any(), anyString());
+    }
+
+    /** 잘못된 replies 값은 펼침 없음으로 떨어진다. */
+    @Test
+    void detail_invalidRepliesParameter_fallsBackToCollapsed() throws Exception {
+        when(communityPostService.getVisiblePost(eq(15L), isNull())).thenReturn(publishedPost());
+
+        mockMvc.perform(get("/community/15").param("replies", "전체"))
+                .andExpect(status().isOk());
+
+        verify(communityCommentService).getComments(15L, null, null);
     }
 
     /** 직접 상세 진입은 조회수를 반영한다. */
@@ -464,7 +499,7 @@ class CommunityControllerTests {
         mockMvc.perform(get("/community/15").param("comments", "40"))
                 .andExpect(status().isOk());
 
-        verify(communityCommentService).getComments(15L, 40);
+        verify(communityCommentService).getComments(15L, 40, null);
     }
 
     /** 잘못된 댓글 조회 수에는 기본값을 사용한다. */
@@ -476,7 +511,7 @@ class CommunityControllerTests {
         mockMvc.perform(get("/community/15").param("comments", "전체"))
                 .andExpect(status().isOk());
 
-        verify(communityCommentService).getComments(15L, null);
+        verify(communityCommentService).getComments(15L, null, null);
     }
 
     /** 비로그인은 좋아요 여부를 조회하지 않는다. */

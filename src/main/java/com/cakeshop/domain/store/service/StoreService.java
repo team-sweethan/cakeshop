@@ -1,7 +1,9 @@
 package com.cakeshop.domain.store.service;
 
 import com.cakeshop.domain.store.dto.form.StoreHolidayForm;
-import com.cakeshop.domain.store.dto.form.StoreUpdateForm;
+import com.cakeshop.domain.store.dto.form.StoreBasicInfoForm;
+import com.cakeshop.domain.store.dto.form.StoreBusinessHoursForm;
+import com.cakeshop.domain.store.dto.form.StorePickupInfoForm;
 import com.cakeshop.domain.store.dto.view.StorePublicView;
 import com.cakeshop.domain.store.dto.view.StoreView;
 import com.cakeshop.domain.store.error.StoreErrorCode;
@@ -95,18 +97,69 @@ public class StoreService {
         );
     }
 
-    /** 기본 정보와 7개 요일을 한 트랜잭션으로 저장해 일부만 반영되는 상태를 막는다. */
     @Transactional
-    public void updateStore(StoreUpdateForm form, MultipartFile image) {
+    public void updateBasicInfo(StoreBasicInfoForm form, MultipartFile image) {
         Store store = findDefaultStore();
-        store.setName(form.getName().trim());
-        store.setDescription(trimToNull(form.getDescription()));
-        store.setAddress(form.getAddress().trim());
-        store.setPhone(form.getPhone().trim());
-        store.setPickupPlace(form.getPickupPlace().trim());
-        store.setPickupStartTime(form.getPickupStartTime());
-        store.setPickupEndTime(form.getPickupEndTime());
-        store.setPickupIntervalMinutes(form.getPickupIntervalMinutes());
+        updateBasicInfo(
+            store,
+            form.getName(),
+            form.getDescription(),
+            form.getAddress(),
+            form.getPhone(),
+            image
+        );
+    }
+
+    @Transactional
+    public void deleteImage() {
+        Store store = findDefaultStore();
+        String imageUrl = store.getImageUrl();
+        if (imageUrl == null || imageUrl.isBlank()) {
+            return;
+        }
+
+        if (storeMapper.clearImageUrl(DEFAULT_STORE_ID, imageUrl) != 1) {
+            throw new BusinessException(StoreErrorCode.UPDATE_FAILED);
+        }
+
+        // DB가 기존 URL을 제거한 뒤 커밋된 경우에만 저장 파일을 정리한다.
+        registerCommitFileDeletion(imageUrl);
+    }
+
+    @Transactional
+    public void updateBusinessHours(StoreBusinessHoursForm form) {
+        findDefaultStore();
+        updateBusinessHours(
+            form.getWeekdayOpenTime(),
+            form.getWeekdayCloseTime(),
+            form.getWeekendOpenTime(),
+            form.getWeekendCloseTime(),
+            form.getClosedDays()
+        );
+    }
+
+    @Transactional
+    public void updatePickupInfo(StorePickupInfoForm form) {
+        Store store = findDefaultStore();
+        updatePickupInfo(
+            store,
+            form.getPickupPlace(),
+            form.getPickupStartTime(),
+            form.getPickupEndTime(),
+            form.getPickupIntervalMinutes()
+        );
+    }
+
+    private void updateBasicInfo(Store store,
+                                 String name,
+                                 String description,
+                                 String address,
+                                 String phone,
+                                 MultipartFile image) {
+        store.setName(name.trim());
+        store.setDescription(trimToNull(description));
+        store.setAddress(address.trim());
+        store.setPhone(phone.trim());
 
         // 새 이미지가 올라온 경우에만 교체한다. 첨부가 없으면 기존 이미지를 그대로 유지한다.
         String previousImageUrl = store.getImageUrl();
@@ -118,7 +171,7 @@ public class StoreService {
             registerRollbackCleanup(newImageUrl);
         }
 
-        if (storeMapper.updateStore(store) != 1) {
+        if (storeMapper.updateBasicInfo(store) != 1) {
             throw new BusinessException(StoreErrorCode.UPDATE_FAILED);
         }
 
@@ -126,17 +179,38 @@ public class StoreService {
         if (imageReplaced && previousImageUrl != null) {
             registerCommitFileDeletion(previousImageUrl);
         }
+    }
 
+    private void updatePickupInfo(Store store,
+                                  String pickupPlace,
+                                  LocalTime pickupStartTime,
+                                  LocalTime pickupEndTime,
+                                  Integer pickupIntervalMinutes) {
+        store.setPickupPlace(pickupPlace.trim());
+        store.setPickupStartTime(pickupStartTime);
+        store.setPickupEndTime(pickupEndTime);
+        store.setPickupIntervalMinutes(pickupIntervalMinutes);
+
+        if (storeMapper.updatePickupInfo(store) != 1) {
+            throw new BusinessException(StoreErrorCode.UPDATE_FAILED);
+        }
+    }
+
+    private void updateBusinessHours(LocalTime weekdayOpenTime,
+                                     LocalTime weekdayCloseTime,
+                                     LocalTime weekendOpenTime,
+                                     LocalTime weekendCloseTime,
+                                     Set<DayOfWeek> closedDays) {
         for (DayOfWeek day : DayOfWeek.values()) {
             boolean weekend = day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY;
-            boolean closed = form.getClosedDays().contains(day);
+            boolean closed = closedDays.contains(day);
             StoreBusinessHour hour = new StoreBusinessHour();
             hour.setStoreId(DEFAULT_STORE_ID);
             hour.setDayOfWeek(day);
             hour.setClosed(closed);
             // DB 제약(chk_store_business_hour_time): 휴무일은 영업시간이 NULL 이어야 한다.
-            hour.setOpenTime(closed ? null : (weekend ? form.getWeekendOpenTime() : form.getWeekdayOpenTime()));
-            hour.setCloseTime(closed ? null : (weekend ? form.getWeekendCloseTime() : form.getWeekdayCloseTime()));
+            hour.setOpenTime(closed ? null : (weekend ? weekendOpenTime : weekdayOpenTime));
+            hour.setCloseTime(closed ? null : (weekend ? weekendCloseTime : weekdayCloseTime));
             storeMapper.upsertBusinessHour(hour);
         }
     }

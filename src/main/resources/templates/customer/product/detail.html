@@ -597,13 +597,6 @@
   </section>
 </main>
 
-<!-- 공통 푸터 -->
-<!--
-  상품 상세에서는 아직 매장 정보를 조회하지 않으므로 null을 전달한다.
-  Footer 내부에서 null일 경우 기본 매장 정보를 표시한다.
--->
-<footer
-        th:replace="~{fragments/common/footer :: footer(null)}"
-></footer>
+<footer th:replace="~{fragments/common/footer :: footer(${store})}"></footer>
 </body>
 </html>

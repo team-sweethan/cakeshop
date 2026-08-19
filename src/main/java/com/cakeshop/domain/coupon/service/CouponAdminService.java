@@ -128,14 +128,14 @@ public class CouponAdminService {
         Coupon coupon = findCouponForUpdate(couponId);
         if (coupon.getTargetType() != CouponTargetType.SPECIFIC_MEMBERS
                 || coupon.getStatus() != CouponStatus.ACTIVE
-                || coupon.getStartsAt().isAfter(now())
                 || !coupon.getExpiresAt().isAfter(now())) {
             throw new BusinessException(CouponErrorCode.UPDATE_FAILED);
         }
         if (coupon.getTotalQuantity() == null || coupon.getIssuedQuantity() >= coupon.getTotalQuantity()) {
             throw new BusinessException(CouponErrorCode.ISSUED_QUANTITY_EXCEEDED);
         }
-        if (couponMapper.insertMemberCouponIfAbsent(couponId, memberId, false) != 1) {
+        // 특정 회원 쿠폰은 시작 전에도 미리 발급할 수 있지만, 실제 사용 가능 여부는 startsAt부터 판단한다.
+        if (couponMapper.insertMemberCouponIfAbsent(couponId, memberId, true) != 1) {
             // 조회 시점 이후 회원 상태나 발급 이력이 달라졌으면 성공으로 처리하지 않는다.
             throw new BusinessException(CouponErrorCode.ISSUE_TARGET_UNAVAILABLE);
         }

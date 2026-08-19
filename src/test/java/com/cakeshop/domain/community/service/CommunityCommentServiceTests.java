@@ -22,12 +22,14 @@ import com.cakeshop.domain.community.dto.form.CommentForm;
 import com.cakeshop.domain.community.dto.query.CommentCountRow;
 import com.cakeshop.domain.community.dto.query.CommentRow;
 import com.cakeshop.domain.community.dto.query.PostDetailRow;
+import com.cakeshop.domain.community.dto.query.ReplyCountRow;
 import com.cakeshop.domain.community.dto.view.CommentSectionView;
 import com.cakeshop.domain.community.dto.view.CommentView;
 import com.cakeshop.domain.community.entity.Comment;
 import com.cakeshop.domain.community.entity.CommentStatus;
 import com.cakeshop.domain.community.entity.PostStatus;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
+import com.cakeshop.domain.community.mapper.CommunityCommentMapper;
 import com.cakeshop.domain.community.mapper.CommunityMapper;
 import com.cakeshop.domain.community.mapper.CommunityPopularPostMapper;
 import com.cakeshop.domain.member.dto.view.MemberCommunityView;
@@ -47,6 +49,8 @@ class CommunityCommentServiceTests {
 
     private static final long POST_ID = 42L;
     private static final long COMMENT_ID = 314L;
+    /** 매퍼가 생성 키로 돌려주는 새 댓글·답글의 id. */
+    private static final long NEW_COMMENT_ID = 315L;
     private static final long AUTHOR_ID = 7L;
     private static final long OTHER_MEMBER_ID = 99L;
     /** 요청 대상이 아닌 다른 글. */
@@ -56,22 +60,27 @@ class CommunityCommentServiceTests {
     private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
 
     private CommunityMapper communityMapper;
+    private CommunityCommentMapper communityCommentMapper;
     private MemberCommunityQueryService memberCommunityQueryService;
+    private CommunityCommentNotificationService communityCommentNotificationService;
     private CommunityCommentService communityCommentService;
 
     @BeforeEach
     void setUp() {
         communityMapper = mock(CommunityMapper.class);
+        communityCommentMapper = mock(CommunityCommentMapper.class);
         memberCommunityQueryService = mock(MemberCommunityQueryService.class);
+        communityCommentNotificationService = mock(CommunityCommentNotificationService.class);
         when(memberCommunityQueryService.getMembersByIds(anyList())).thenReturn(List.of());
 
         CommunityMemberViewLoader memberViewLoader =
                 new CommunityMemberViewLoader(memberCommunityQueryService);
 
         communityCommentService = new CommunityCommentService(
-                communityMapper,
+                communityCommentMapper,
                 memberViewLoader,
-                postService(memberViewLoader));
+                postService(memberViewLoader),
+                communityCommentNotificationService);
     }
 
     /*
@@ -95,10 +104,10 @@ class CommunityCommentServiceTests {
         givenComments(commentOf(1L, CommentStatus.PUBLISHED));
         givenAuthors(new MemberCommunityView(AUTHOR_ID, "글쓴이", false));
 
-        CommentSectionView section = communityCommentService.getComments(POST_ID, null);
+        CommentSectionView section = communityCommentService.getComments(POST_ID, null, null);
 
-        assertThat(section.comments()).singleElement()
-                .satisfies(comment -> assertThat(comment.authorName()).isEqualTo("글쓴이"));
+        assertThat(section.threads()).singleElement()
+                .satisfies(thread -> assertThat(thread.root().authorName()).isEqualTo("글쓴이"));
     }
 
     /** 탈퇴 회원의 댓글 작성자명을 가린다. */
@@ -107,23 +116,23 @@ class CommunityCommentServiceTests {
         givenComments(commentOf(1L, CommentStatus.PUBLISHED));
         givenAuthors(new MemberCommunityView(AUTHOR_ID, "글쓴이", true));
 
-        CommentSectionView section = communityCommentService.getComments(POST_ID, null);
+        CommentSectionView section = communityCommentService.getComments(POST_ID, null, null);
 
-        assertThat(section.comments()).singleElement()
-                .satisfies(comment -> assertThat(comment.authorName()).isEqualTo("탈퇴한 회원"));
+        assertThat(section.threads()).singleElement()
+                .satisfies(thread -> assertThat(thread.root().authorName()).isEqualTo("탈퇴한 회원"));
     }
 
-    /** 최신 댓글을 오래된 순으로 보여 준다. */
+    /** 최신 뿌리를 오래된 순으로 보여 준다. */
     @Test
-    void getComments_returnsCommentsOldestFirst() {
+    void getComments_returnsRootsOldestFirst() {
         givenComments(
                 commentOf(3L, CommentStatus.PUBLISHED),
                 commentOf(2L, CommentStatus.PUBLISHED),
                 commentOf(1L, CommentStatus.PUBLISHED));
 
-        CommentSectionView section = communityCommentService.getComments(POST_ID, null);
+        CommentSectionView section = communityCommentService.getComments(POST_ID, null, null);
 
-        assertThat(section.comments()).extracting(CommentView::id)
+        assertThat(section.threads()).extracting(thread -> thread.root().id())
                 .containsExactly(1L, 2L, 3L);
     }
 
@@ -133,9 +142,9 @@ class CommunityCommentServiceTests {
     void getComments_requestedLimit_isClampedToAllowedRange(Integer requested, int expected) {
         givenComments();
 
-        communityCommentService.getComments(POST_ID, requested);
+        communityCommentService.getComments(POST_ID, requested, null);
 
-        verify(communityMapper).findRecentComments(POST_ID, expected);
+        verify(communityCommentMapper).findRecentRootComments(POST_ID, expected);
     }
 
     private static Stream<Arguments> requestedCommentLimits() {
@@ -145,23 +154,202 @@ class CommunityCommentServiceTests {
                 arguments(Integer.MAX_VALUE, CommentSectionView.MAX_LIMIT));
     }
 
-    /** 표시 댓글 수와 전체 행 수를 구분한다. */
+    /** 표시 댓글 수와 더 보기 판단을 구분한다 — 앞은 노출 중 전체, 뒤는 뿌리 행 수다. */
     @Test
     void getComments_countsPlaceholdersForLoadMoreButNotForDisplayedCount() {
-        when(communityMapper.findRecentComments(anyLong(), anyInt()))
+        when(communityCommentMapper.findRecentRootComments(anyLong(), anyInt()))
                 .thenReturn(List.of(commentOf(1L, CommentStatus.DELETED)));
-        when(communityMapper.countComments(POST_ID)).thenReturn(new CommentCountRow(5L, 3L));
+        when(communityCommentMapper.countComments(POST_ID)).thenReturn(new CommentCountRow(5L, 3L));
 
-        CommentSectionView section = communityCommentService.getComments(POST_ID, null);
+        CommentSectionView section = communityCommentService.getComments(POST_ID, null, null);
 
         assertThat(section.publishedCount()).isEqualTo(3L);
         assertThat(section.hasMore()).isTrue();
         assertThat(section.hiddenCount()).isEqualTo(4L);
     }
 
+    /** 뿌리별 답글 수를 접힌 채로 싣는다. 자리 표시도 센다 — 펼치는 길이 사라지면 안 된다. */
+    @Test
+    void getComments_carriesReplyCountPerRootWithoutLoadingReplies() {
+        givenComments(commentOf(1L, CommentStatus.PUBLISHED));
+        when(communityCommentMapper.countRepliesByParentIds(List.of(1L)))
+                .thenReturn(List.of(new ReplyCountRow(1L, 3L)));
+
+        CommentSectionView section = communityCommentService.getComments(POST_ID, null, null);
+
+        assertThat(section.threads()).singleElement().satisfies(thread -> {
+            assertThat(thread.replyCount()).isEqualTo(3L);
+            assertThat(thread.expanded()).isFalse();
+            assertThat(thread.replies()).isEmpty();
+        });
+        verify(communityCommentMapper, never())
+                .findRepliesByParentId(anyLong(), anyLong(), anyInt());
+    }
+
+    /** 요청한 뿌리만 펼치고, 최신 쪽으로 받은 답글을 오래된 순으로 뒤집어 싣는다. */
+    @Test
+    void getComments_expandedRoot_loadsRepliesOldestFirst() {
+        givenComments(
+                commentOf(2L, CommentStatus.PUBLISHED),
+                commentOf(1L, CommentStatus.PUBLISHED));
+        when(communityCommentMapper.countRepliesByParentIds(List.of(2L, 1L)))
+                .thenReturn(List.of(new ReplyCountRow(1L, 2L)));
+        when(communityCommentMapper.findRepliesByParentId(
+                1L, POST_ID, CommentSectionView.MAX_LIMIT))
+                .thenReturn(List.of(
+                        commentOf(11L, CommentStatus.DELETED),
+                        commentOf(10L, CommentStatus.PUBLISHED)));
+
+        CommentSectionView section = communityCommentService.getComments(POST_ID, null, 1L);
+
+        assertThat(section.threads()).hasSize(2);
+        assertThat(section.threads().get(0).expanded()).isTrue();
+        assertThat(section.threads().get(0).replies()).extracting(CommentView::id)
+                .containsExactly(10L, 11L);
+        assertThat(section.threads().get(1).expanded()).isFalse();
+    }
+
+    /** 창 밖의 뿌리는 펼치지 않는다 — 주소로 임의 id가 들어와도 조회하지 않는다. */
+    @Test
+    void getComments_expandedRootOutsideWindow_isIgnored() {
+        givenComments(commentOf(1L, CommentStatus.PUBLISHED));
+
+        CommentSectionView section = communityCommentService.getComments(POST_ID, null, 99L);
+
+        assertThat(section.threads()).singleElement()
+                .satisfies(thread -> assertThat(thread.expanded()).isFalse());
+        verify(communityCommentMapper, never())
+                .findRepliesByParentId(anyLong(), anyLong(), anyInt());
+    }
+
+    /** 알림 대상 뿌리가 기본 창 밖이어도 최신 목록과 함께 제한 안에서 싣는다. */
+    @Test
+    void getFocusedComments_rootOutsideWindow_isIncluded() {
+        CommentRow recent = commentOf(20L, CommentStatus.PUBLISHED);
+        CommentRow focused = commentOf(1L, CommentStatus.PUBLISHED);
+        givenComments(recent);
+        when(communityCommentMapper.findCommentById(1L)).thenReturn(focused);
+        when(communityCommentMapper.countComments(POST_ID)).thenReturn(new CommentCountRow(2L, 2L));
+
+        CommentSectionView section = communityCommentService.getFocusedComments(POST_ID, 1L);
+
+        assertThat(section.threads()).extracting(thread -> thread.root().id())
+                .containsExactly(1L, 20L);
+    }
+
+    /** 알림 대상 답글이면 창 밖 뿌리를 포함하고 그 묶음을 서버에서 펼친다. */
+    @Test
+    void getFocusedComments_reply_expandsItsRootAndIncludesTarget() {
+        CommentRow recent = commentOf(20L, CommentStatus.PUBLISHED);
+        CommentRow root = commentOf(1L, CommentStatus.PUBLISHED);
+        CommentRow reply = replyOf(11L, 1L, CommentStatus.PUBLISHED);
+        givenComments(recent);
+        when(communityCommentMapper.findCommentById(11L)).thenReturn(reply);
+        when(communityCommentMapper.findCommentById(1L)).thenReturn(root);
+        when(communityCommentMapper.countComments(POST_ID)).thenReturn(new CommentCountRow(2L, 3L));
+        when(communityCommentMapper.countRepliesByParentIds(List.of(20L, 1L)))
+                .thenReturn(List.of(new ReplyCountRow(1L, 1L)));
+        when(communityCommentMapper.findRepliesByParentId(
+                1L, POST_ID, CommentSectionView.MAX_LIMIT))
+                .thenReturn(List.of());
+
+        CommentSectionView section = communityCommentService.getFocusedComments(POST_ID, 11L);
+
+        assertThat(section.threads()).first().satisfies(thread -> {
+            assertThat(thread.root().id()).isEqualTo(1L);
+            assertThat(thread.expanded()).isTrue();
+            assertThat(thread.replies()).extracting(CommentView::id).containsExactly(11L);
+        });
+    }
+
+    /** 다른 글의 댓글 id를 섞은 deep link는 대상 댓글을 숨겨 404로 보낸다. */
+    @Test
+    void getFocusedComments_commentFromAnotherPost_isRejected() {
+        when(communityCommentMapper.findCommentById(COMMENT_ID))
+                .thenReturn(commentOf(
+                        COMMENT_ID, OTHER_POST_ID, AUTHOR_ID, CommentStatus.PUBLISHED));
+
+        assertThatThrownBy(() -> communityCommentService.getFocusedComments(POST_ID, COMMENT_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(CommunityErrorCode.COMMENT_NOT_FOUND);
+    }
+
+    @Test
+    void addReply_savesThroughConditionalInsert() {
+        givenPost(PostStatus.PUBLISHED);
+        givenInsertedReply();
+
+        communityCommentService.addReply(
+                POST_ID, COMMENT_ID, commentFormOf("답글 본문"), AUTHOR_ID);
+
+        Comment saved = capturedReply();
+        assertThat(saved.getPostId()).isEqualTo(POST_ID);
+        assertThat(saved.getParentCommentId()).isEqualTo(COMMENT_ID);
+        assertThat(saved.getMemberId()).isEqualTo(AUTHOR_ID);
+        assertThat(saved.getContent()).isEqualTo("답글 본문");
+    }
+
+    /** 0행이면 거절이다 — 부모 없음·다른 글·답글의 답글·삭제된 부모가 전부 이 한 자리로 모인다. */
+    @Test
+    void addReply_zeroRows_isRejected() {
+        givenPost(PostStatus.PUBLISHED);
+        when(communityCommentMapper.insertReply(any())).thenReturn(0);
+
+        assertThatThrownBy(() -> communityCommentService.addReply(
+                POST_ID, COMMENT_ID, commentFormOf("답글 본문"), AUTHOR_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(CommunityErrorCode.COMMENT_NOT_FOUND);
+    }
+
+    /** 거절된 답글은 부모를 읽지도 않는다 — 그 읽기는 알림 수신자를 고르는 것뿐이다. */
+    @Test
+    void addReply_zeroRows_notifiesNobody() {
+        givenPost(PostStatus.PUBLISHED);
+        when(communityCommentMapper.insertReply(any())).thenReturn(0);
+
+        assertThatThrownBy(() -> communityCommentService.addReply(
+                POST_ID, COMMENT_ID, commentFormOf("답글 본문"), AUTHOR_ID))
+                .isInstanceOf(BusinessException.class);
+
+        verify(communityCommentNotificationService, never())
+                .notifyNewReply(anyLong(), anyLong(), anyLong(), anyLong());
+    }
+
+    /** 댓글 알림은 글 작성자에게 가고, 수신자를 글 조회 결과에서 가져온다. */
+    @Test
+    void addComment_notifiesPostAuthorWithNewCommentId() {
+        givenPost(PostStatus.PUBLISHED);
+        givenInsertedComment(NEW_COMMENT_ID);
+
+        communityCommentService.addComment(POST_ID, commentFormOf("댓글 본문"), OTHER_MEMBER_ID);
+
+        verify(communityCommentNotificationService)
+                .notifyNewComment(POST_ID, NEW_COMMENT_ID, AUTHOR_ID, OTHER_MEMBER_ID);
+    }
+
+    /**
+     * 받는 사람이 아니라 부모의 id 를 넘긴다. 여기서 부모를 읽으면 알림 때문에 하는 조회 하나가
+     * 답글을 되돌린다 — 부모 읽기는 커밋 뒤에 도는 발송 쪽에 있다.
+     */
+    @Test
+    void addReply_handsParentCommentIdToNotificationWithoutReadingIt() {
+        givenPost(PostStatus.PUBLISHED);
+        givenInsertedReply();
+
+        communityCommentService.addReply(
+                POST_ID, COMMENT_ID, commentFormOf("답글 본문"), AUTHOR_ID);
+
+        verify(communityCommentNotificationService)
+                .notifyNewReply(POST_ID, NEW_COMMENT_ID, COMMENT_ID, AUTHOR_ID);
+        verify(communityCommentMapper, never()).findCommentById(anyLong());
+    }
+
     @Test
     void addComment_savesContentWithAuthenticatedAuthor() {
         givenPost(PostStatus.PUBLISHED);
+        givenInsertedComment(NEW_COMMENT_ID);
 
         communityCommentService.addComment(POST_ID, commentFormOf("댓글 본문"), AUTHOR_ID);
 
@@ -189,18 +377,18 @@ class CommunityCommentServiceTests {
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(expected);
 
-        verify(communityMapper, never()).insertComment(any());
+        verify(communityCommentMapper, never()).insertComment(any());
     }
 
     @Test
     void deleteComment_author_softDeletesComment() {
         givenPost(PostStatus.PUBLISHED);
         givenComment(AUTHOR_ID, CommentStatus.PUBLISHED);
-        when(communityMapper.deleteComment(COMMENT_ID, POST_ID, AUTHOR_ID)).thenReturn(1);
+        when(communityCommentMapper.deleteComment(COMMENT_ID, POST_ID, AUTHOR_ID)).thenReturn(1);
 
         communityCommentService.deleteComment(POST_ID, COMMENT_ID, AUTHOR_ID);
 
-        verify(communityMapper).deleteComment(COMMENT_ID, POST_ID, AUTHOR_ID);
+        verify(communityCommentMapper).deleteComment(COMMENT_ID, POST_ID, AUTHOR_ID);
     }
 
     /** 다른 작성자의 댓글, 다른 글의 댓글과 이미 삭제된 댓글은 모두 같은 오류로 숨긴다. */
@@ -213,7 +401,7 @@ class CommunityCommentServiceTests {
     void deleteComment_notOwnDeletableComment_isNotFound(
             boolean onSamePost, boolean ownComment, CommentStatus status) {
         givenPost(PostStatus.PUBLISHED);
-        when(communityMapper.findCommentById(COMMENT_ID)).thenReturn(commentOf(
+        when(communityCommentMapper.findCommentById(COMMENT_ID)).thenReturn(commentOf(
                 COMMENT_ID,
                 onSamePost ? POST_ID : OTHER_POST_ID,
                 memberIdOf(ownComment),
@@ -225,7 +413,7 @@ class CommunityCommentServiceTests {
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(CommunityErrorCode.COMMENT_NOT_FOUND);
 
-        verify(communityMapper, never()).deleteComment(anyLong(), anyLong(), anyLong());
+        verify(communityCommentMapper, never()).deleteComment(anyLong(), anyLong(), anyLong());
     }
 
     /** 조건부 댓글 삭제가 0행이면 성공으로 처리하지 않고, 경합 시점의 글 상태로 실패를 구분한다. */
@@ -238,7 +426,7 @@ class CommunityCommentServiceTests {
             PostStatus statusAfterDelete, CommunityErrorCode expected) {
         givenPost(PostStatus.PUBLISHED);
         givenComment(AUTHOR_ID, CommentStatus.PUBLISHED);
-        when(communityMapper.deleteComment(COMMENT_ID, POST_ID, AUTHOR_ID))
+        when(communityCommentMapper.deleteComment(COMMENT_ID, POST_ID, AUTHOR_ID))
                 .thenAnswer(invocation -> {
                     givenPost(statusAfterDelete);
                     return 0;
@@ -265,20 +453,44 @@ class CommunityCommentServiceTests {
 
     private Comment capturedComment() {
         ArgumentCaptor<Comment> captor = ArgumentCaptor.forClass(Comment.class);
-        verify(communityMapper).insertComment(captor.capture());
+        verify(communityCommentMapper).insertComment(captor.capture());
 
         return captor.getValue();
     }
 
+    private Comment capturedReply() {
+        ArgumentCaptor<Comment> captor = ArgumentCaptor.forClass(Comment.class);
+        verify(communityCommentMapper).insertReply(captor.capture());
+
+        return captor.getValue();
+    }
+
+    /** 매퍼가 생성 키를 채우는 것을 흉내 낸다 — 알림이 그 id 로 간다. */
+    private void givenInsertedComment(long newId) {
+        when(communityCommentMapper.insertComment(any())).thenAnswer(invocation -> {
+            invocation.getArgument(0, Comment.class).setId(newId);
+
+            return 1;
+        });
+    }
+
+    private void givenInsertedReply() {
+        when(communityCommentMapper.insertReply(any())).thenAnswer(invocation -> {
+            invocation.getArgument(0, Comment.class).setId(NEW_COMMENT_ID);
+
+            return 1;
+        });
+    }
+
     private void givenComments(CommentRow... comments) {
-        when(communityMapper.findRecentComments(anyLong(), anyInt()))
+        when(communityCommentMapper.findRecentRootComments(anyLong(), anyInt()))
                 .thenReturn(List.of(comments));
-        when(communityMapper.countComments(POST_ID))
+        when(communityCommentMapper.countComments(POST_ID))
                 .thenReturn(new CommentCountRow(comments.length, comments.length));
     }
 
     private void givenComment(long authorId, CommentStatus status) {
-        when(communityMapper.findCommentById(COMMENT_ID))
+        when(communityCommentMapper.findCommentById(COMMENT_ID))
                 .thenReturn(commentOf(COMMENT_ID, POST_ID, authorId, status));
     }
 
@@ -293,6 +505,18 @@ class CommunityCommentServiceTests {
                 postId,
                 authorId,
                 status == CommentStatus.DELETED ? null : "댓글 본문",
+                status,
+                CREATED_AT
+        );
+    }
+
+    private CommentRow replyOf(long commentId, long parentCommentId, CommentStatus status) {
+        return new CommentRow(
+                commentId,
+                POST_ID,
+                AUTHOR_ID,
+                parentCommentId,
+                status == CommentStatus.DELETED ? null : "답글 본문",
                 status,
                 CREATED_AT
         );

@@ -15,6 +15,7 @@ import com.cakeshop.domain.review.dto.view.AdminReviewDetailView;
 import com.cakeshop.domain.review.dto.view.AdminReviewListView;
 import com.cakeshop.domain.review.dto.view.MyReviewView;
 import com.cakeshop.domain.review.dto.view.ProductReviewView;
+import com.cakeshop.domain.review.dto.view.ReviewImageView;
 import com.cakeshop.domain.review.dto.view.ReviewReplyView;
 
 /** review_conventions.md에서 정한 로컬 DTO 경계를 고정한다. */
@@ -54,6 +55,7 @@ class ReviewDtoBoundaryTests {
                 AdminReviewListView.class,
                 MyReviewView.class,
                 ProductReviewView.class,
+                ReviewImageView.class,
                 ReviewReplyView.class))
                 .allMatch(Class::isRecord);
     }

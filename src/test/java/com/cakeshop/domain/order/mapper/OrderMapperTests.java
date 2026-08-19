@@ -202,6 +202,33 @@ class OrderMapperTests {
     }
 
     @Test
+    void findPendingPaymentOrderByMemberId_returnsEarliestUnexpiredPendingOrderOnly() {
+        LocalDateTime now = LocalDateTime.of(2026, 8, 1, 12, 0);
+        Order later = newOrder();
+        later.setOrderNumber("PENDING-LATER-" + suffix);
+        later.setPaymentExpiresAt(now.plusMinutes(9));
+        orderMapper.insertOrder(later);
+
+        Order earliest = newOrder();
+        earliest.setOrderNumber("PENDING-EARLIEST-" + suffix);
+        earliest.setPaymentExpiresAt(now.plusMinutes(3));
+        orderMapper.insertOrder(earliest);
+
+        Order expired = newOrder();
+        expired.setOrderNumber("PENDING-EXPIRED-" + suffix);
+        expired.setPaymentExpiresAt(now);
+        orderMapper.insertOrder(expired);
+
+        assertThat(orderMapper.findPendingPaymentOrderByMemberId(memberId, now))
+                .hasValueSatisfying(order -> {
+                    assertThat(order.getId()).isEqualTo(earliest.getId());
+                    assertThat(order.getOrderNumber()).isEqualTo(earliest.getOrderNumber());
+                    assertThat(order.getPaymentExpiresAt()).isEqualTo(earliest.getPaymentExpiresAt());
+                });
+        assertThat(orderMapper.findPendingPaymentOrderByMemberId(memberId + 1, now)).isEmpty();
+    }
+
+    @Test
     void insertOrder_sameMemberRequestKey_returnsExistingOrderId() {
         String requestKey = java.util.UUID.randomUUID().toString();
         Order first = newOrder();

@@ -1,5 +1,7 @@
 package com.cakeshop.domain.order.service;
 
+import com.cakeshop.domain.order.service.payment.OrderExpirationService;
+import com.cakeshop.domain.order.service.payment.OrderExpireScheduler;
 import org.junit.jupiter.api.Test;
 
 import static org.mockito.Mockito.mock;

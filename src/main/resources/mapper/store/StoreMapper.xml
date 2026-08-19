@@ -69,14 +69,27 @@
          ORDER BY holiday_date
     </select>
 
-    <update id="updateStore">
+    <update id="updateBasicInfo">
         UPDATE store
            SET name = #{name},
                description = #{description},
                image_url = #{imageUrl},
                address = #{address},
-               phone = #{phone},
-               pickup_place = #{pickupPlace},
+               phone = #{phone}
+         WHERE id = #{id}
+    </update>
+
+    <!-- 조회 이후 사진이 교체됐다면 새 URL을 지우지 않도록 기존 URL까지 조건으로 확인한다. -->
+    <update id="clearImageUrl">
+        UPDATE store
+           SET image_url = NULL
+         WHERE id = #{storeId}
+           AND image_url = #{expectedImageUrl}
+    </update>
+
+    <update id="updatePickupInfo">
+        UPDATE store
+           SET pickup_place = #{pickupPlace},
                pickup_start_time = #{pickupStartTime},
                pickup_end_time = #{pickupEndTime},
                pickup_interval_minutes = #{pickupIntervalMinutes}

@@ -1,0 +1,10 @@
+/* 서버가 렌더링한 deep link 목적지. 브라우저 기본 앵커 이동과 :target만 사용한다. */
+.review-row {
+    scroll-margin-top: var(--space-8);
+}
+
+.review-row:target {
+    background: var(--color-background-soft);
+    outline: 2px solid var(--color-info);
+    outline-offset: var(--space-1);
+}

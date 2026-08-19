@@ -70,12 +70,14 @@
         <form method="post" th:if="${canLike and likedByViewer}"
               th:action="@{/community/{postId}/likes/delete(postId=${post.id})}">
           <input type="hidden" name="comments" th:value="${commentSection.limit}">
+          <input type="hidden" name="replies" th:value="${expandedRootId}">
           <button class="btn" type="submit">좋아요 취소</button>
         </form>
 
         <form method="post" th:if="${canLike and !likedByViewer}"
               th:action="@{/community/{postId}/likes(postId=${post.id})}">
           <input type="hidden" name="comments" th:value="${commentSection.limit}">
+          <input type="hidden" name="replies" th:value="${expandedRootId}">
           <button class="btn btn--primary" type="submit">좋아요</button>
         </form>
       </div>
@@ -89,6 +91,7 @@
         <form method="post"
               th:action="@{/community/{postId}/reports(postId=${post.id})}">
           <input type="hidden" name="comments" th:value="${commentSection.limit}">
+          <input type="hidden" name="replies" th:value="${expandedRootId}">
           <div class="form-group">
             <label class="form-label" for="reportReason">신고 사유</label>
             <textarea class="form-control form-control--textarea" id="reportReason"
@@ -131,35 +134,74 @@
       </p>
 
       <div>
-        <article class="comment-item" th:each="comment : ${commentSection.comments}">
+        <article class="comment-item" th:each="thread : ${commentSection.threads}">
 
-          <p class="text-muted" th:if="${comment.deleted}">삭제된 댓글입니다.</p>
+          <div th:replace="~{:: commentRow(${thread.root})}"></div>
 
-          <div th:unless="${comment.deleted}">
-            <div class="cluster cluster--between">
-              <span class="text-muted">
-                <span th:text="${comment.authorName()}">작성자</span> ·
-                <span th:text="${#temporals.format(comment.createdAt, 'yyyy.MM.dd')}">2026.01.01</span>
-              </span>
+          <!--/* 답글은 접어 두고 묶음 단위로 펼친다. 펼치기는 주소가 바뀌는 링크다
+                 (specs/community-comment.md A7). 삭제된 뿌리에는 새 답글을 달 수 없다. */-->
+          <div class="cluster" th:if="${!thread.expanded}">
+            <a class="btn" th:if="${thread.replyCount > 0}"
+               th:href="@{/community/{postId}(
+                   postId=${post.id},
+                   comments=${commentSection.limitParam()},
+                   replies=${thread.root.id}
+               )}"
+               th:text="'답글 ' + ${thread.replyCount} + '개 보기'">답글 보기</a>
 
-              <form method="post"
-                    th:if="${canComment and viewerId == comment.memberId}"
-                    th:action="@{/community/{postId}/comments/{commentId}/delete(
-                        postId=${post.id},
-                        commentId=${comment.id}
-                    )}"
-                    onsubmit="return confirm('댓글을 삭제할까요? 되돌릴 수 없습니다.');">
-                <input type="hidden" name="comments" th:value="${commentSection.limit}">
-                <button class="btn btn--danger" type="submit">댓글 삭제</button>
-              </form>
+            <a class="btn" th:if="${thread.replyCount == 0 and canComment and !thread.root.deleted}"
+               th:href="@{/community/{postId}(
+                   postId=${post.id},
+                   comments=${commentSection.limitParam()},
+                   replies=${thread.root.id}
+               )}">답글 쓰기</a>
+          </div>
+
+          <div th:if="${thread.expanded}" style="margin-left:32px">
+            <div class="cluster">
+              <a class="btn"
+                 th:href="@{/community/{postId}(
+                     postId=${post.id},
+                     comments=${commentSection.limitParam()}
+                 )}">답글 접기</a>
             </div>
 
-            <p th:text="${comment.content}" style="white-space:pre-wrap">댓글 본문</p>
+            <article class="comment-item" th:each="reply : ${thread.replies}">
+              <div th:replace="~{:: commentRow(${reply})}"></div>
+            </article>
+
+            <p class="note" th:if="${thread.cappedReplies()}"
+               th:text="'답글 ' + ${thread.hiddenReplyCount()} + '개는 표시하지 않습니다.'">
+              답글 일부는 표시하지 않습니다.
+            </p>
+
+            <form method="post" th:if="${canComment and !thread.root.deleted}"
+                  th:action="@{/community/{postId}/comments(postId=${post.id})}">
+              <input type="hidden" name="comments" th:value="${commentSection.limit}">
+              <input type="hidden" name="replies" th:value="${thread.root.id}">
+              <input type="hidden" name="replyTo" th:value="${thread.root.id}">
+              <div class="form-group">
+                <label class="form-label" th:for="'replyContent-' + ${thread.root.id}">답글 작성</label>
+                <!--/* 검증 실패가 이 묶음의 답글에서 났을 때만 입력값과 오류를 이 폼에 되살린다.
+                       안 가르면 실패한 답글 본문이 아래 뿌리 댓글 폼에 나타난다. */-->
+                <textarea class="form-control form-control--textarea"
+                          th:id="'replyContent-' + ${thread.root.id}" name="content"
+                          style="min-height:72px" placeholder="답글을 입력하세요"
+                          maxlength="500" required
+                          th:text="${failedReplyTo == thread.root.id ? commentForm.content : ''}"></textarea>
+                <p class="field-error" th:if="${failedReplyTo == thread.root.id}"
+                   th:errors="${commentForm.content}"></p>
+              </div>
+              <div class="cluster cluster--between">
+                <span class="text-muted">등록한 답글은 수정할 수 없습니다.</span>
+                <button class="btn btn--primary" type="submit">답글 등록</button>
+              </div>
+            </form>
           </div>
         </article>
 
         <div class="panel panel--dashed text-muted"
-             th:if="${commentSection.comments.isEmpty()}"
+             th:if="${commentSection.threads.isEmpty()}"
              style="text-align:center">
           아직 댓글이 없습니다.
         </div>
@@ -171,12 +213,20 @@
             th:object="${commentForm}"
             th:action="@{/community/{postId}/comments(postId=${post.id})}">
         <input type="hidden" name="comments" th:value="${commentSection.limit}">
+        <input type="hidden" name="replies" th:value="${expandedRootId}">
         <div class="form-group">
           <label class="form-label" for="commentContent">댓글 작성</label>
+          <!--/* 실패한 폼이 답글 쪽이면 여기엔 입력값도 오류도 되살리지 않는다 — 그 묶음의
+                 답글 폼이 가져간다. */-->
           <textarea class="form-control form-control--textarea" id="commentContent"
+                    th:if="${failedReplyTo == null}"
                     th:field="*{content}" style="min-height:96px"
                     placeholder="댓글을 입력하세요" maxlength="500" required></textarea>
-          <p class="field-error" th:errors="*{content}"></p>
+          <textarea class="form-control form-control--textarea" id="commentContent"
+                    th:unless="${failedReplyTo == null}"
+                    name="content" style="min-height:96px"
+                    placeholder="댓글을 입력하세요" maxlength="500" required></textarea>
+          <p class="field-error" th:if="${failedReplyTo == null}" th:errors="*{content}"></p>
         </div>
         <div class="cluster cluster--between">
           <span class="text-muted">등록한 댓글은 수정할 수 없습니다.</span>
@@ -193,6 +243,40 @@
     <div class="cluster section">
       <a class="btn" th:href="@{/community}">← 목록</a>
     </div>
+
+    <!--/* 댓글 한 줄. 뿌리와 답글이 같은 모양을 쓰므로 한 벌만 둔다.
+           th:if="false" 는 정의 자리에서의 렌더링을 막는 것이고, th:replace 의 조각 탐색은
+           처리 전 템플릿 구조에서 찾으므로 영향받지 않는다. */-->
+    <th:block th:if="${false}">
+    <div class="comment-row"
+         th:fragment="commentRow(comment)"
+         th:id="'comment-' + ${comment.id}">
+      <p class="text-muted" th:if="${comment.deleted}">삭제된 댓글입니다.</p>
+
+      <div th:unless="${comment.deleted}">
+        <div class="cluster cluster--between">
+          <span class="text-muted">
+            <span th:text="${comment.authorName()}">작성자</span> ·
+            <span th:text="${#temporals.format(comment.createdAt, 'yyyy.MM.dd')}">2026.01.01</span>
+          </span>
+
+          <form method="post"
+                th:if="${canComment and viewerId == comment.memberId}"
+                th:action="@{/community/{postId}/comments/{commentId}/delete(
+                    postId=${post.id},
+                    commentId=${comment.id}
+                )}"
+                onsubmit="return confirm('댓글을 삭제할까요? 되돌릴 수 없습니다.');">
+            <input type="hidden" name="comments" th:value="${commentSection.limit}">
+            <input type="hidden" name="replies" th:value="${expandedRootId}">
+            <button class="btn btn--danger" type="submit">댓글 삭제</button>
+          </form>
+        </div>
+
+        <p th:text="${comment.content}" style="white-space:pre-wrap">댓글 본문</p>
+      </div>
+    </div>
+    </th:block>
   </main>
   <footer th:replace="~{fragments/common/footer :: footer(${store})}"></footer>
 </body>

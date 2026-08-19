@@ -8,9 +8,9 @@ import com.cakeshop.domain.order.dto.view.customer.common.CheckoutOptionView;
 import com.cakeshop.domain.order.dto.view.customer.common.PickupDateView;
 import com.cakeshop.domain.order.dto.view.customer.common.PickupTimeView;
 import com.cakeshop.domain.order.error.OrderErrorCode;
-import com.cakeshop.domain.order.service.OrderAmountCalculator;
-import com.cakeshop.domain.order.service.OrderOptionValidator;
-import com.cakeshop.domain.order.service.OrderOptionValidator.ValidatedOption;
+import com.cakeshop.domain.order.service.checkout.OrderAmountCalculator;
+import com.cakeshop.domain.order.service.checkout.OrderOptionValidator;
+import com.cakeshop.domain.order.service.checkout.OrderOptionValidator.ValidatedOption;
 import com.cakeshop.domain.product.dto.view.ProductSalesInfo;
 import com.cakeshop.domain.product.dto.view.ProductOptionGroupView;
 import com.cakeshop.domain.product.entity.ProductType;
@@ -158,12 +158,15 @@ public class OrderCheckoutService {
             throw new BusinessException(CommonErrorCode.INTERNAL_ERROR);
         }
 
+        // 프론트에서 아무 옵션 ID나 보내도 해당 상품의 유효한 옵션인지 서버가 다시 확인한다.
         List<ValidatedOption> selectedOptions = orderOptionValidator.validate(productId, optionIds);
         OrderAmountCalculator.OrderAmounts amounts = OrderAmountCalculator.calculate(
                 product.basePrice(),
                 1,
                 selectedOptions
         );
+
+        // 총 계산 결과가 0 이하면 주문서 생성 X
         if (amounts.totalAmount().signum() <= 0) {
             throw new BusinessException(OrderErrorCode.INVALID_ORDER_AMOUNT);
         }
@@ -199,7 +202,7 @@ public class OrderCheckoutService {
             throw new BusinessException(ProductErrorCode.INSUFFICIENT_STOCK);
         }
         return productService.getPublicOptionGroups(productId);
-    }
+}
 
     private void validateProduct(ProductSalesInfo product, int quantity) {
         if (product.productType() != ProductType.GENERAL) {

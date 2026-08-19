@@ -7,7 +7,6 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.time.Clock;
@@ -26,12 +25,10 @@ import com.cakeshop.global.error.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/** 고객 공지 조회의 자리별 조건과 노출 판단을 검증한다. */
+/** 고객 공지 목록·상세 조회와 노출 판단을 검증한다. */
 class CommunityNoticeServiceTests {
 
     private static final long NOTICE_ID = 42L;
-
-    private static final int LIST_SECTION_LIMIT = 3;
 
     private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 3, 1, 10, 0);
@@ -47,49 +44,6 @@ class CommunityNoticeServiceTests {
         communityNoticeService = new CommunityNoticeService(
                 communityNoticeMapper,
                 Clock.fixed(NOW.atZone(SEOUL).toInstant(), SEOUL));
-    }
-
-    @Test
-    void getListSection_firstPageWithoutFilter_readsItsOwnLimit() {
-        when(communityNoticeMapper.selectVisibleNotices(NOW, LIST_SECTION_LIMIT, 0))
-                .thenReturn(List.of(row(NOTICE_ID, "공지", null)));
-
-        assertThat(communityNoticeService
-                .getListSection(null, new PageRequest(1, PageRequest.DEFAULT_SIZE))
-                .notices())
-                .extracting(NoticeView::id)
-                .containsExactly(NOTICE_ID);
-    }
-
-    @Test
-    void getListSection_withCategoryFilter_doesNotQueryAtAll() {
-        assertThat(communityNoticeService
-                .getListSection(7L, new PageRequest(1, PageRequest.DEFAULT_SIZE))
-                .isEmpty())
-                .isTrue();
-
-        verifyNoInteractions(communityNoticeMapper);
-    }
-
-    @Test
-    void getListSection_beyondFirstPage_doesNotQueryAtAll() {
-        assertThat(communityNoticeService
-                .getListSection(null, new PageRequest(2, PageRequest.DEFAULT_SIZE))
-                .isEmpty())
-                .isTrue();
-
-        verifyNoInteractions(communityNoticeMapper);
-    }
-
-    @Test
-    void getListSection_withoutVisibleNotices_isEmpty() {
-        when(communityNoticeMapper.selectVisibleNotices(any(), anyInt(), anyInt()))
-                .thenReturn(List.of());
-
-        assertThat(communityNoticeService
-                .getListSection(null, new PageRequest(1, PageRequest.DEFAULT_SIZE))
-                .isEmpty())
-                .isTrue();
     }
 
     @Test

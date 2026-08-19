@@ -1,9 +1,12 @@
 package com.cakeshop.domain.store.controller;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
@@ -15,6 +18,8 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -71,36 +76,92 @@ class StoreAdminControllerSecurityTests {
 
         mockMvc.perform(get("/admin/store"))
             .andExpect(status().isOk())
-            .andExpect(view().name("admin/store/form"));
+            .andExpect(view().name("admin/store/form"))
+            .andExpect(content().string(containsString("form=\"storeImageDeleteForm\"")))
+            .andExpect(content().string(containsString("action=\"/admin/store/image/delete\"")));
     }
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void updateStore_isForbidden_whenCsrfTokenIsMissing() throws Exception {
+    void adminStore_withoutImage_hidesDeleteImageControl() throws Exception {
+        when(storeService.getStoreView()).thenReturn(storeView(null));
+
+        mockMvc.perform(get("/admin/store"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(not(containsString("storeImageDeleteForm"))));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "/admin/store/basic-info",
+        "/admin/store/business-hours",
+        "/admin/store/pickup-info",
+        "/admin/store/image/delete"
+    })
+    @WithMockUser(roles = "ADMIN")
+    void updateSection_isForbidden_whenCsrfTokenIsMissing(String endpoint) throws Exception {
         // 상태를 변경하는 POST는 CSRF 토큰이 없으면 Controller에 도달하지 못한다.
-        mockMvc.perform(post("/admin/store").params(validStoreParams()))
+        mockMvc.perform(post(endpoint))
             .andExpect(status().isForbidden());
     }
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void updateStore_succeeds_whenCsrfTokenIsPresent() throws Exception {
-        mockMvc.perform(post("/admin/store").params(validStoreParams()).with(csrf()))
+    void updateBasicInfo_succeeds_whenCsrfTokenIsPresent() throws Exception {
+        mockMvc.perform(post("/admin/store/basic-info").params(validBasicInfoParams()).with(csrf()))
             .andExpect(status().is3xxRedirection())
             .andExpect(redirectedUrl("/admin/store"));
     }
 
-    private org.springframework.util.MultiValueMap<String, String> validStoreParams() {
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void updateBusinessHours_succeeds_whenCsrfTokenIsPresent() throws Exception {
+        mockMvc.perform(post("/admin/store/business-hours")
+                .params(validBusinessHoursParams())
+                .with(csrf()))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/admin/store"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void updatePickupInfo_succeeds_whenCsrfTokenIsPresent() throws Exception {
+        mockMvc.perform(post("/admin/store/pickup-info")
+                .params(validPickupInfoParams())
+                .with(csrf()))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/admin/store"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void deleteImage_succeeds_whenCsrfTokenIsPresent() throws Exception {
+        mockMvc.perform(post("/admin/store/image/delete").with(csrf()))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/admin/store"));
+    }
+
+    private org.springframework.util.MultiValueMap<String, String> validBasicInfoParams() {
         var params = new org.springframework.util.LinkedMultiValueMap<String, String>();
         params.add("name", "스위트온 케이크");
         params.add("description", "예약 케이크 전문점");
         params.add("address", "서울시 OO구");
         params.add("phone", "02-0000-0000");
+        return params;
+    }
+
+    private org.springframework.util.MultiValueMap<String, String> validBusinessHoursParams() {
+        var params = new org.springframework.util.LinkedMultiValueMap<String, String>();
         params.add("weekdayOpenTime", "10:00");
         params.add("weekdayCloseTime", "20:00");
         params.add("weekendOpenTime", "11:00");
         params.add("weekendCloseTime", "18:00");
         params.add("closedDays", "SUNDAY");
+        return params;
+    }
+
+    private org.springframework.util.MultiValueMap<String, String> validPickupInfoParams() {
+        var params = new org.springframework.util.LinkedMultiValueMap<String, String>();
         params.add("pickupPlace", "1층 카운터");
         params.add("pickupStartTime", "10:00");
         params.add("pickupEndTime", "19:00");
@@ -109,8 +170,12 @@ class StoreAdminControllerSecurityTests {
     }
 
     private StoreView storeView() {
+        return storeView("/uploads/store/202607/photo.jpg");
+    }
+
+    private StoreView storeView(String imageUrl) {
         return new StoreView(
-            1L, "스위트온 케이크", "소개", "/uploads/store/202607/photo.jpg", "서울시", "02-0000-0000",
+            1L, "스위트온 케이크", "소개", imageUrl, "서울시", "02-0000-0000",
             LocalTime.of(10, 0), LocalTime.of(20, 0), LocalTime.of(11, 0), LocalTime.of(18, 0),
             Set.of(), "1층 카운터", LocalTime.of(10, 0), LocalTime.of(19, 0), 60, List.of()
         );

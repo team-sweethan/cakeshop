@@ -85,10 +85,10 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 | **A3** | 후기 등록 | 고객 | `POST /reviews` | **완료** | 1 | `review-write.md` |
 | **A4** | 후기 수정 | 고객 | `GET·POST /reviews/{id}/edit` | **완료** | 4 | `review-edit-delete.md` |
 | **A5** | 후기 삭제 | 고객 | `POST /reviews/{id}/delete` | **완료** | 4 | `review-edit-delete.md` |
-| **A6** | 이미지 첨부 | 고객 | (A2·A3에 포함) | **없음** — 목업 입력은 조각 1에서 걷어냈다 | 8 (2차) | `review-write.md` |
+| **A6** | 이미지 첨부 | 고객 | (A2·A3에 포함) | **완료** | 8 (2차) | `review-write.md` |
 | **B1** | 상품 후기 목록 | 누구나 | 미리보기 3개(상품 상세 안) · 전체 `GET /products/{id}/reviews` | **완료** | 3 | `review-read.md` |
 | **B2** | 상품 평균 평점·후기 수 | 누구나 | (상품 상세에 포함) | **완료** | 2 | `review-read.md` |
-| **B3** | 내가 쓴 후기 목록 | 고객 | `GET /mypage/reviews` | **완료** | 3 | `review-read.md` |
+| **B3** | 내가 쓴 후기 목록 | 고객 | `GET /mypage/reviews` · 알림 진입 `GET /mypage/reviews/{id}` | **완료** | 3 (deep link는 9) | `review-read.md` |
 | **B4** | 후기에 달린 답글 노출 | 누구나 | (B1·B3에 포함) | **완료** | 6 | `review-reply.md` |
 | **C1** | 관리자 후기 목록 | 관리자 | `GET /admin/reviews` | **완료** | 5 | `review-admin.md` |
 | **C2** | 관리자 검색·필터 | 관리자 | (C1의 파라미터) | **완료** | 5 | `review-admin.md` |
@@ -98,6 +98,7 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 | **C6** | 답글 수정 | 관리자 | `POST /admin/reviews/{id}/replies/edit` | **완료** | 6 | `review-reply.md` |
 | **D1** | 상품 평점 집계 | — | (Service 계약) | **완료** | 2 (#33) | `product-rating.md` |
 | **D2** | 알림 발송 | — | (Service 계약) | **완료** | 7 | `review-notification.md` |
+| **D3** | 알림에서 후기로 가는 링크 | — | (`NotificationResponse`가 파생) | **진행 중** — 민정님 합의 대기 | 9 (2차) | `review-notification.md` |
 | **E1** | `ReviewStatus` enum + `CHECK` | — | — | **완료** (#125) | 0 | `history/2026-08-slice-0-schema.md` |
 | **E2** | 평점 범위 `CHECK` | — | — | **완료** (#125) | 0 | `history/2026-08-slice-0-schema.md` |
 | **E3** | `Review`·`ReviewReply` 엔티티 | — | — | **완료** (#125) | 0 | `history/2026-08-slice-0-schema.md` |
@@ -187,6 +188,7 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 | 평점 4종 | 필수, 1~5 정수 | `TINYINT UNSIGNED` |
 | 후기 본문 | 필수, 10~2000자 | `TEXT` |
 | 답글 본문 | 필수, 1~1000자 | `TEXT` |
+| 후기 이미지 | 선택, 최대 3장, 장당 5MB 이하 JPEG·PNG | `review_images.image_url` |
 
 - 본문 하한 10자는 목업(`minlength="10"`)을 따른다. 상한 2000자는 새로 정한다 — `TEXT`를 그대로 쓰면 정책을 정한 게 아니라 안 정한 것이다.
 - **trim 후 검증**한다. 공백만 입력은 거부. 저장 시 앞뒤만 trim하고 중간 줄바꿈은 보존한다.
@@ -207,6 +209,10 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 | `REVIEW_006` | `INVALID_REVIEW_TRANSITION` | 지금 상태에서 할 수 없는 조치입니다. | 400 | 4 |
 | `REVIEW_007` | `ALREADY_REPLIED` | 이미 답글이 달린 후기입니다. | 409 | 6 |
 | `REVIEW_008` | `REPLY_NOT_FOUND` | 답글을 찾을 수 없습니다. | 404 | 6 |
+| `REVIEW_009` | `INVALID_IMAGE_FILE` | JPG 또는 PNG 이미지만 첨부할 수 있습니다. | 400 | 8 |
+| `REVIEW_010` | `IMAGE_TOO_LARGE` | 이미지는 한 장에 5MB까지 첨부할 수 있습니다. | 400 | 8 |
+| `REVIEW_011` | `IMAGE_LIMIT_EXCEEDED` | 이미지는 후기당 3장까지 첨부할 수 있습니다. | 400 | 8 |
+| `REVIEW_012` | `IMAGE_UPLOAD_FAILED` | 후기 이미지를 저장하지 못했습니다. | 500 | 8 |
 
 **소유권 위반에 별도 코드를 두지 않는다.** 남의 후기를 수정·삭제하려 하면 `REVIEW_NOT_FOUND`(404)다.
 
@@ -285,13 +291,13 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 | 화면 | 파일 | 상태 |
 |---|---|---|
 | 작성할 후기 목록 (A1) | `customer/review/writable.html` | 완료 (조각 1) |
-| 후기 작성 폼 (A2) | `customer/review/form.html` | 완료 (조각 1) |
+| 후기 작성 폼 (A2·A6) | `customer/review/form.html` | 완료 (조각 1. 이미지 입력은 조각 8) |
 | 후기 수정 폼 (A4) | `customer/review/edit.html` | 완료 (조각 4) |
-| 내 후기 목록 (B3) | `customer/review/my.html` | 완료 (조각 3. 조각 4에서 수정·삭제 버튼) |
-| 상품 후기 미리보기 3개 (B1·B2·B4) | `customer/product/detail.html` | 후기 영역 교체 + `전체 리뷰 확인` 버튼 완료 (조각 3. 답글은 조각 6) |
-| 상품 후기 전체 목록 (B1·B4) | `customer/review/product.html` | 완료 (조각 3. 답글은 조각 6) |
+| 내 후기 목록 (B3) | `customer/review/my.html` | 완료 (조각 3. 조각 4에서 수정·삭제 버튼, 조각 8에서 이미지, 조각 9에서 알림 진입 경로와 `review.css`의 `:target` 앵커) |
+| 상품 후기 미리보기 3개 (B1·B2·B4) | `customer/product/detail.html` | 후기 영역 교체 + `전체 리뷰 확인` 버튼 완료 (조각 3. 답글은 조각 6, 이미지는 조각 8) |
+| 상품 후기 전체 목록 (B1·B4) | `customer/review/product.html` | 완료 (조각 3. 답글은 조각 6, 이미지는 조각 8) |
 | 관리자 목록 (C1·C2) | `admin/review/list.html` | 완료 (조각 5. `삭제` 제거, 상태 필터 추가) |
-| 관리자 상세 (C3) | `admin/review/detail.html` | 완료 (조각 5. C5·C6 답글 영역은 조각 6) |
+| 관리자 상세 (C3) | `admin/review/detail.html` | 완료 (조각 5. C5·C6 답글 영역은 조각 6, 이미지는 조각 8) |
 
 진입점 수정: `customer/member/mypage.html`(A1·B3 링크 2개 — 완료), `customer/product/detail.html`(작성 버튼 → A1, `전체 리뷰 확인` → B1 — 완료), `home/screens.html`(화면 카탈로그 C16·C22·C23·C24와 관리자 A11·A15 — 완료), `customer/order/detail.html`(`orderItemId` 전달 — **아직 안 함**. 지금 작성 진입은 A1 목록 하나뿐이다)
 
@@ -308,9 +314,9 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 | 항목 | 결정 시점 |
 |---|---|
 | 관리자 숨김 사유·조치 이력 기록 여부 | 필요해지면 새 migration (C1) |
-| A6 이미지 첨부 | 2차 |
 
-**조각 7에서 해소된 것**: D2 `event_key` 규격과 `NEW_REVIEW` 수신 관리자. 둘 다 `specs/review-notification.md` D2가 정본이고, 정한 날짜는 `PLAN.md` 결정 로그에 있다.
+**해소된 것**: 조각 7의 D2 `event_key` 규격과 `NEW_REVIEW` 수신 관리자, 조각 8의 A6 이미지 첨부.
+각 결정은 연결된 spec이 정본이고, 정한 날짜는 `PLAN.md` 결정 로그에 있다.
 
 ---
 

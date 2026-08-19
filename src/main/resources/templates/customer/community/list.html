@@ -27,11 +27,8 @@
 
     <div class="cluster cluster--between">
       <h1>커뮤니티</h1>
-      <div class="cluster">
-        <a class="btn" th:href="@{/community/notices}">공지사항</a>
-        <a class="btn btn--primary" sec:authorize="!hasRole('ADMIN')"
-           th:href="@{/community/new}">글쓰기</a>
-      </div>
+      <a class="btn btn--primary" sec:authorize="!hasRole('ADMIN')"
+         th:href="@{/community/new}">글쓰기</a>
     </div>
 
     <div class="section" th:classappend="${!popularSection.isEmpty()} ? 'layout-main-aside'">
@@ -58,19 +55,6 @@
         </div>
 
         <div class="stack section">
-          <!--/* 공지는 별도 영역이 아니라 목록의 고정 행이다(specs/community-notice.md B8).
-                 진입점은 위의 공지사항 버튼이 공지 유무와 무관하게 항상 갖는다. */-->
-          <a class="panel cluster cluster--between"
-             th:each="notice : ${noticeSection.notices}"
-             th:href="@{/community/notices/{noticeId}(noticeId=${notice.id})}">
-            <span class="cluster">
-              <span class="badge">공지</span>
-              <strong th:text="${notice.title}">제목</strong>
-            </span>
-            <span class="text-muted"
-                  th:text="${#temporals.format(notice.displayedAt, 'yyyy.MM.dd')}">2026.01.01</span>
-          </a>
-
           <article class="panel" th:each="post : ${pageResult.content}">
             <div class="cluster cluster--between">
               <div class="cluster">

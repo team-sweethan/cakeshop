@@ -10,7 +10,6 @@ import com.cakeshop.domain.community.dto.view.PostDetailView;
 import com.cakeshop.domain.community.dto.view.PostListView;
 import com.cakeshop.domain.community.dto.view.PostSort;
 import com.cakeshop.domain.community.error.CommunityErrorCode;
-import com.cakeshop.domain.community.service.CommunityNoticeService;
 import com.cakeshop.domain.community.service.CommunityPostImageService;
 import com.cakeshop.domain.community.service.CommunityPostService;
 import com.cakeshop.global.error.BusinessException;
@@ -59,7 +58,6 @@ public class CommunityController {
 
     private final CommunityPostService communityPostService;
     private final CommunityPostImageService communityPostImageService;
-    private final CommunityNoticeService communityNoticeService;
     private final CommunityDetailPage communityDetailPage;
 
     // 예시 요청: GET /community?categoryId=2&sort=POPULAR&page=3
@@ -132,10 +130,6 @@ public class CommunityController {
         model.addAttribute("sortOptions", PostSort.values());
 
         model.addAttribute(
-                "noticeSection",
-                communityNoticeService.getListSection(selectedCategoryId, pageRequest)
-        );
-        model.addAttribute(
                 "popularSection",
                 communityPostService.getPopularSection(selectedCategoryId, pageRequest)
         );
@@ -152,6 +146,7 @@ public class CommunityController {
             // {postId} = "37" 을 잡고 long 으로 변환해서 postId = 37L로 넘긴다
             @PathVariable("postId") long postId,
             @RequestParam(name = "comments", required = false) String comments,
+            @RequestParam(name = "replies", required = false) String replies,
 
             // CommentForm: 사용자가 댓글을 입력할 때 사용할 폼 데이터 객체
             // 즉, 상세 페이지에서 댓글 입력 폼이 사용할 객체를 준비한다
@@ -194,12 +189,32 @@ public class CommunityController {
         // 로그인하지 않은 사용자는: viewerId = null
         Long viewerId = memberDetails == null ? null : memberDetails.getMemberId();
 
-        PostDetailView post = comments == null
+        // 댓글 더 보기처럼 답글 펼치기도 이미 보고 있는 글 안에서의 이동이라 조회로 세지 않는다
+        PostDetailView post = comments == null && replies == null
                 ? communityPostService.getPostDetail(postId, viewerId, viewerKeyOf(viewerId, request))
                 : communityPostService.getVisiblePost(postId, viewerId);
 
         // prepareDetail 안에서 model.addAttribute(...) 가 여러개 있음
-        return communityDetailPage.render(model, post, viewerId, comments);
+        return communityDetailPage.render(model, post, viewerId, comments, replies);
+    }
+
+    /*
+     * 알림이 가리키는 댓글을 여는 서버 렌더링 경로다. 일반 GET 한 번으로 상세 전체를 만들고,
+     * 답글이면 Service가 부모 묶음을 펼친다. 이미 보고 있는 글 안의 이동이라 조회수는 올리지 않는다.
+     */
+    @GetMapping("/community/{postId:\\d+}/comments/{commentId:\\d+}")
+    public String commentDetail(
+            @PathVariable("postId") long postId,
+            @PathVariable("commentId") long commentId,
+            @ModelAttribute("commentForm") CommentForm commentForm,
+            @ModelAttribute("reportForm") ReportForm reportForm,
+            @AuthenticationPrincipal MemberDetails memberDetails,
+            Model model
+    ) {
+        Long viewerId = memberDetails == null ? null : memberDetails.getMemberId();
+        PostDetailView post = communityPostService.getVisiblePost(postId, viewerId);
+
+        return communityDetailPage.renderFocused(model, post, viewerId, commentId);
     }
 
     private String viewerKeyOf(Long viewerId, HttpServletRequest request) {

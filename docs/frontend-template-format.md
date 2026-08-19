@@ -28,7 +28,7 @@ Spring이나 Thymeleaf가 실행 중에 읽는 설정 파일은 아니며, 실�
 ## 3. 고객 화면 골격
 
 고객 기능 화면은 공통 header와 `page-container`를 사용한다. footer는 화면에 필요한 경우 사용하며,
-`store`가 없으면 `null`을 전달해 기본 매장 정보를 표시할 수 있다.
+`store`가 없으면 `null`을 전달해 매장 정보 준비 문구를 표시할 수 있다.
 
 ```html
 <!doctype html>
@@ -90,7 +90,7 @@ Spring이나 Thymeleaf가 실행 중에 읽는 설정 파일은 아니며, 실�
 | 프래그먼트 | 인자 | 역할 |
 |---|---|---|
 | `fragments/common/header :: header` | 없음 | 고객 header와 고객 GNB |
-| `fragments/common/footer :: footer` | `store` | 매장 정보 footer. `null`이면 기본 문구 사용 |
+| `fragments/common/footer :: footer` | `store` | 매장 정보 footer. `null`이면 준비 문구 사용 |
 | `fragments/common/alert :: alert` | 없음 | `successMessage`, `errorMessage` 출력 |
 | `fragments/admin/sidebar :: sidebar` | `activeMenu` | 관리자 메뉴와 현재 메뉴 표시 |
 | `fragments/admin/header :: header` | `title` | 관리자 화면 제목과 사용자 동작 |

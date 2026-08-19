@@ -44,6 +44,8 @@ DELETE FROM `popular_post_batch_runs`;
 DELETE FROM `post_views`;
 DELETE FROM `post_images`;
 DELETE FROM `post_likes`;
+-- 답글이 뿌리를 참조하므로(fk_comments_parent) 답글을 먼저 지운다.
+DELETE FROM `comments` WHERE `parent_comment_id` IS NOT NULL;
 DELETE FROM `comments`;
 DELETE FROM `posts`;
 DELETE FROM `post_categories`;

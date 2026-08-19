@@ -15,6 +15,7 @@ import com.cakeshop.domain.community.dto.query.AdminPostListRow;
 import com.cakeshop.domain.community.dto.view.AdminPostSort;
 import com.cakeshop.domain.community.dto.query.CommentCountRow;
 import com.cakeshop.domain.community.dto.query.CommentRow;
+import com.cakeshop.domain.community.dto.query.ReplyCountRow;
 import com.cakeshop.domain.community.dto.query.ReportRow;
 import com.cakeshop.domain.community.dto.view.PopularPostView;
 import com.cakeshop.domain.community.dto.view.PostCategoryView;
@@ -56,6 +57,9 @@ class CommunityMapperTests {
     @Autowired
     private CommunityMapper communityMapper;
 
+    @Autowired
+    private CommunityCommentMapper communityCommentMapper;
+
     /** 관리자 Mapper도 같은 게시글 픽스처로 확인한다. */
     @Autowired
     private CommunityAdminMapper communityAdminMapper;
@@ -94,13 +98,14 @@ class CommunityMapperTests {
     }
 
     /**
-     * 정렬 기준마다 순서가 갈리고 값이 같으면 id 내림차순으로 이어진다. 세 글은 작성 시각과
-     * 조회수 순서가 서로 반대라 두 기준이 같은 결과로 통과하지 않는다.
+     * 정렬 기준마다 순서가 갈리고 값이 같으면 id 내림차순으로 이어진다. 세 글은 작성 시각·
+     * 조회수·좋아요 순서가 서로 달라 세 기준이 같은 결과로 통과하지 않는다.
      */
     @ParameterizedTest(name = "{0} 정렬은 {1}, {2}, {3} 순서다")
     @CsvSource({
             "LATEST, 적게 본 최신 글, 많이 본 오래된 글, 적게 본 오래된 글",
-            "VIEWS, 많이 본 오래된 글, 적게 본 최신 글, 적게 본 오래된 글"
+            "VIEWS, 많이 본 오래된 글, 적게 본 최신 글, 적게 본 오래된 글",
+            "LIKES, 적게 본 오래된 글, 적게 본 최신 글, 많이 본 오래된 글"
     })
     void findPublishedPosts_sort_ordersByRequestedKeyThenIdDescending(
             PostSort sort, String first, String second, String third) {
@@ -111,6 +116,10 @@ class CommunityMapperTests {
         setViewCount(fewOld, 3);
         setViewCount(manyOld, 100);
         setViewCount(fewNew, 3);
+
+        setLikeCount(fewOld, 50);
+        setLikeCount(manyOld, 0);
+        setLikeCount(fewNew, 0);
 
         assertThat(findPage(1, 20, sort)).extracting(PostListRow::title)
                 .containsExactly(first, second, third);
@@ -313,7 +322,7 @@ class CommunityMapperTests {
     }
 
     @Test
-    void findRecentComments_filtersAndOrdersNewestWithinLimit() {
+    void findRecentRootComments_filtersAndOrdersNewestWithinLimit() {
         long postId = insertPost("이 글", PostStatus.PUBLISHED, BASE_TIME);
         long otherPostId = insertPost("다른 글", PostStatus.PUBLISHED, BASE_TIME);
         long first = insertComment(postId, "첫 번째", CommentStatus.PUBLISHED, BASE_TIME);
@@ -321,22 +330,123 @@ class CommunityMapperTests {
         long newest = insertComment(
                 postId, "최신", CommentStatus.PUBLISHED, BASE_TIME.plusMinutes(1));
         insertComment(otherPostId, "다른 글의 댓글", CommentStatus.PUBLISHED, BASE_TIME.plusDays(1));
+        // 답글은 가장 최신이어도 뿌리 목록에 나오지 않는다
+        insertReply(postId, newest, "답글", CommentStatus.PUBLISHED, BASE_TIME.plusDays(2));
 
-        assertThat(communityMapper.findRecentComments(postId, 2))
+        assertThat(communityCommentMapper.findRecentRootComments(postId, 2))
                 .extracting(CommentRow::id)
                 .containsExactly(newest, second)
                 .doesNotContain(first);
     }
 
     @Test
-    void findRecentComments_deletedComment_staysWithoutContent() {
+    void findRecentRootComments_deletedComment_staysWithoutContent() {
         long postId = insertPost("삭제 댓글", PostStatus.PUBLISHED, BASE_TIME);
         insertComment(postId, "지워진 본문", CommentStatus.DELETED, BASE_TIME);
 
-        CommentRow comment = communityMapper.findRecentComments(postId, 20).getFirst();
+        CommentRow comment = communityCommentMapper.findRecentRootComments(postId, 20).getFirst();
 
         assertThat(comment.isDeleted()).isTrue();
         assertThat(comment.content()).isNull();
+    }
+
+    /** 답글도 최신 쪽을 남기고(상한 대비), 같은 글의 다른 뿌리·다른 글의 답글은 나오지 않는다. */
+    @Test
+    void findRepliesByParentId_keepsNewestWithinLimitAndStaysInsideThread() {
+        long postId = insertPost("이 글", PostStatus.PUBLISHED, BASE_TIME);
+        long rootId = insertComment(postId, "뿌리", CommentStatus.PUBLISHED, BASE_TIME);
+        long otherRootId = insertComment(postId, "다른 뿌리", CommentStatus.PUBLISHED, BASE_TIME);
+        long older = insertReply(postId, rootId, "먼저 단 답글", CommentStatus.PUBLISHED, BASE_TIME);
+        long newer = insertReply(
+                postId, rootId, "나중 답글", CommentStatus.DELETED, BASE_TIME.plusMinutes(1));
+        insertReply(postId, otherRootId, "다른 묶음", CommentStatus.PUBLISHED, BASE_TIME);
+
+        assertThat(communityCommentMapper.findRepliesByParentId(rootId, postId, 200))
+                .extracting(CommentRow::id)
+                .containsExactly(newer, older);
+        // 상한에 걸리면 남는 것은 최신 쪽이다 — 방금 쓴 답글이 화면 밖에 남으면 안 된다
+        assertThat(communityCommentMapper.findRepliesByParentId(rootId, postId, 1))
+                .extracting(CommentRow::id)
+                .containsExactly(newer);
+    }
+
+    /** 뿌리별 답글 수는 자리 표시까지 센다 — 펼치는 길이 사라지면 안 된다. */
+    @Test
+    void countRepliesByParentIds_countsPlaceholdersPerRoot() {
+        long postId = insertPost("이 글", PostStatus.PUBLISHED, BASE_TIME);
+        long rootId = insertComment(postId, "뿌리", CommentStatus.PUBLISHED, BASE_TIME);
+        long emptyRootId = insertComment(postId, "답글 없는 뿌리", CommentStatus.PUBLISHED, BASE_TIME);
+        insertReply(postId, rootId, "답글", CommentStatus.PUBLISHED, BASE_TIME);
+        insertReply(postId, rootId, "지워진 답글", CommentStatus.DELETED, BASE_TIME);
+
+        List<ReplyCountRow> counts =
+                communityCommentMapper.countRepliesByParentIds(List.of(rootId, emptyRootId));
+
+        assertThat(counts).singleElement().satisfies(row -> {
+            assertThat(row.parentId()).isEqualTo(rootId);
+            assertThat(row.replyCount()).isEqualTo(2);
+        });
+    }
+
+    @Test
+    void insertReply_publishedRootOfSamePost_isSaved() {
+        long postId = insertPost("이 글", PostStatus.PUBLISHED, BASE_TIME);
+        long rootId = insertComment(postId, "뿌리", CommentStatus.PUBLISHED, BASE_TIME);
+        Comment reply = Comment.createReply(postId, rootId, memberId, "답글");
+
+        assertThat(communityCommentMapper.insertReply(reply)).isEqualTo(1);
+
+        assertThat(communityCommentMapper.findRepliesByParentId(rootId, postId, 200))
+                .singleElement()
+                .satisfies(saved -> {
+                    assertThat(saved.content()).isEqualTo("답글");
+                    assertThat(saved.status()).isEqualTo(CommentStatus.PUBLISHED);
+                    // 알림이 이 id 로 간다. INSERT ... SELECT 도 생성 키를 돌려주는지 함께 본다
+                    assertThat(saved.id()).isEqualTo(reply.getId());
+                });
+    }
+
+    /** 깊이 2단계·같은 글·부모 노출·게시글 노출을 전부 이 한 문장이 지킨다. 조건마다 0행을 확인한다. */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({
+            "없는 부모에는 달 수 없다, MISSING",
+            "다른 글의 댓글에는 달 수 없다, OTHER_POST",
+            "답글에는 답글을 달 수 없다, REPLY_PARENT",
+            "삭제된 부모에는 달 수 없다, DELETED_PARENT",
+            "차단된 글에는 달 수 없다, BLOCKED_POST"
+    })
+    void insertReply_invalidParent_insertsNothing(String caseName, String parentCase) {
+        long postId = insertPost("이 글", PostStatus.PUBLISHED, BASE_TIME);
+        long otherPostId = insertPost("다른 글", PostStatus.PUBLISHED, BASE_TIME);
+        long parentId = switch (parentCase) {
+            case "MISSING" -> 999_999_999L;
+            case "OTHER_POST" -> insertComment(
+                    otherPostId, "다른 글 댓글", CommentStatus.PUBLISHED, BASE_TIME);
+            case "REPLY_PARENT" -> {
+                long rootId = insertComment(postId, "뿌리", CommentStatus.PUBLISHED, BASE_TIME);
+                yield insertReply(postId, rootId, "답글", CommentStatus.PUBLISHED, BASE_TIME);
+            }
+            case "DELETED_PARENT" -> insertComment(
+                    postId, "지워진 뿌리", CommentStatus.DELETED, BASE_TIME);
+            // Service 확인과 INSERT 사이에 차단되는 경합의 축소판 — 부모는 멀쩡해도 글이 막힌다
+            case "BLOCKED_POST" -> {
+                long rootId = insertComment(postId, "뿌리", CommentStatus.PUBLISHED, BASE_TIME);
+                jdbcTemplate.update(
+                        "UPDATE posts SET status = 'BLOCKED' WHERE id = ?", postId);
+                yield rootId;
+            }
+            default -> throw new IllegalArgumentException(parentCase);
+        };
+
+        Comment reply = Comment.createReply(postId, parentId, memberId, "답글");
+
+        assertThat(communityCommentMapper.insertReply(reply)).isZero();
+
+        Long replies = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM comments WHERE parent_comment_id = ?", Long.class, parentId);
+        assertThat(replies).isZero();
+        // 거절된 답글에는 id 가 없다 — 알림이 남의 행을 가리키면 안 된다
+        assertThat(reply.getId()).isNull();
     }
 
     @Test
@@ -347,12 +457,16 @@ class CommunityMapperTests {
         insertComment(postId, CommentStatus.PUBLISHED);
         insertComment(postId, CommentStatus.DELETED);
 
-        CommentCountRow counts = communityMapper.countComments(postId);
-        CommentCountRow emptyCounts = communityMapper.countComments(emptyPostId);
+        long rootId = insertComment(postId, "뿌리", CommentStatus.PUBLISHED, BASE_TIME);
+        insertReply(postId, rootId, "답글", CommentStatus.PUBLISHED, BASE_TIME);
 
-        assertThat(counts.rowCount()).isEqualTo(3);
-        assertThat(counts.publishedCount()).isEqualTo(2);
-        assertThat(emptyCounts.rowCount()).isZero();
+        CommentCountRow counts = communityCommentMapper.countComments(postId);
+        CommentCountRow emptyCounts = communityCommentMapper.countComments(emptyPostId);
+
+        // 더 보기 판단은 뿌리 행 수로, 화면의 댓글 수는 답글 포함 노출 중으로 센다
+        assertThat(counts.rootRowCount()).isEqualTo(4);
+        assertThat(counts.publishedCount()).isEqualTo(4);
+        assertThat(emptyCounts.rootRowCount()).isZero();
         assertThat(emptyCounts.publishedCount()).isZero();
     }
 
@@ -361,7 +475,7 @@ class CommunityMapperTests {
         long postId = insertPost("글", PostStatus.PUBLISHED, BASE_TIME);
         long commentId = insertComment(postId, "지워진 본문", CommentStatus.DELETED, BASE_TIME);
 
-        CommentRow comment = communityMapper.findCommentById(commentId);
+        CommentRow comment = communityCommentMapper.findCommentById(commentId);
 
         assertThat(comment).isNotNull();
         assertThat(comment.isDeleted()).isTrue();
@@ -373,10 +487,10 @@ class CommunityMapperTests {
         long postId = insertPost("글", PostStatus.PUBLISHED, BASE_TIME);
         Comment comment = Comment.create(postId, memberId, "새 댓글");
 
-        communityMapper.insertComment(comment);
+        communityCommentMapper.insertComment(comment);
 
         assertThat(comment.getId()).isNotNull();
-        CommentRow saved = communityMapper.findCommentById(comment.getId());
+        CommentRow saved = communityCommentMapper.findCommentById(comment.getId());
         assertThat(saved.content()).isEqualTo("새 댓글");
         assertThat(saved.status()).isEqualTo(CommentStatus.PUBLISHED);
         Long parents = jdbcTemplate.queryForObject(
@@ -390,8 +504,8 @@ class CommunityMapperTests {
         long postId = insertPost("글", PostStatus.PUBLISHED, BASE_TIME);
         long commentId = insertComment(postId, "지울 댓글", CommentStatus.PUBLISHED, BASE_TIME);
 
-        assertThat(communityMapper.deleteComment(commentId, postId, memberId)).isEqualTo(1);
-        assertThat(communityMapper.findCommentById(commentId).isDeleted()).isTrue();
+        assertThat(communityCommentMapper.deleteComment(commentId, postId, memberId)).isEqualTo(1);
+        assertThat(communityCommentMapper.findCommentById(commentId).isDeleted()).isTrue();
     }
 
     /** 댓글·글·작성자와 상태가 모두 맞아야 하므로 조건마다 갱신 행 수를 확인한다. */
@@ -412,9 +526,9 @@ class CommunityMapperTests {
         long requesterId = asAuthor ? memberId : withdrawnMemberId;
         long requestedPostId = fromOtherPost ? otherPostId : postId;
 
-        assertThat(communityMapper.deleteComment(commentId, requestedPostId, requesterId))
+        assertThat(communityCommentMapper.deleteComment(commentId, requestedPostId, requesterId))
                 .isZero();
-        assertThat(communityMapper.findCommentById(commentId).isDeleted())
+        assertThat(communityCommentMapper.findCommentById(commentId).isDeleted())
                 .isEqualTo(status == CommentStatus.DELETED);
     }
 
@@ -565,6 +679,12 @@ class CommunityMapperTests {
         jdbcTemplate.update(
                 "UPDATE posts SET view_count = ?, updated_at = updated_at WHERE id = ?",
                 viewCount, postId);
+    }
+
+    private void setLikeCount(long postId, long likeCount) {
+        jdbcTemplate.update(
+                "UPDATE posts SET like_count = ?, updated_at = updated_at WHERE id = ?",
+                likeCount, postId);
     }
 
     private long viewCountOf(long postId) {
@@ -752,6 +872,21 @@ class CommunityMapperTests {
     private long insertComment(
             long postId, String content, CommentStatus status, LocalDateTime createdAt) {
         return insertComment(postId, memberId, content, status, createdAt);
+    }
+
+    private long insertReply(
+            long postId, long parentId, String content, CommentStatus status,
+            LocalDateTime createdAt) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO comments (
+                    post_id, member_id, parent_comment_id, content, status, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                postId, memberId, parentId, content, status.name(), createdAt, createdAt);
+
+        return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
     }
 
     private long insertComment(

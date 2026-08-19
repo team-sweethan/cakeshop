@@ -1,5 +1,6 @@
 package com.cakeshop.domain.order.service;
 
+import com.cakeshop.domain.order.service.checkout.PickupAvailabilityPolicy;
 import com.cakeshop.domain.store.dto.view.StoreView;
 import com.cakeshop.domain.store.entity.StoreHoliday;
 import com.cakeshop.domain.store.service.StoreService;

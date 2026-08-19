@@ -18,9 +18,11 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.cakeshop.domain.review.dto.query.ProductRatingAggregate;
+import com.cakeshop.domain.review.dto.query.ReviewImageRow;
 import com.cakeshop.domain.review.dto.query.ReviewRow;
 import com.cakeshop.domain.review.dto.command.ReviewUpdateCommand;
 import com.cakeshop.domain.review.entity.Review;
+import com.cakeshop.domain.review.entity.ReviewImage;
 import com.cakeshop.domain.review.entity.ReviewStatus;
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 
@@ -34,6 +36,9 @@ class ReviewMapperTests {
 
     @Autowired
     private ReviewMapper reviewMapper;
+
+    @Autowired
+    private ReviewImageMapper reviewImageMapper;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -61,6 +66,23 @@ class ReviewMapperTests {
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT status FROM reviews WHERE id = ?", String.class, review.getId()))
                 .isEqualTo("PUBLISHED");
+    }
+
+    @Test
+    void reviewImages_insertAndRead_inDisplayOrder() {
+        long reviewId = insertReviewWithStatus(5, "PUBLISHED");
+
+        ReviewImage second = ReviewImage.create(reviewId, "/uploads/review/b.jpg", 1);
+        ReviewImage first = ReviewImage.create(reviewId, "/uploads/review/a.jpg", 0);
+
+        assertThat(reviewImageMapper.insert(second)).isEqualTo(1);
+        assertThat(reviewImageMapper.insert(first)).isEqualTo(1);
+        assertThat(first.getId()).isNotNull();
+        assertThat(second.getId()).isNotNull();
+
+        assertThat(reviewImageMapper.findByReviewIds(List.of(reviewId)))
+                .extracting(ReviewImageRow::imageUrl)
+                .containsExactly("/uploads/review/a.jpg", "/uploads/review/b.jpg");
     }
 
     @Test

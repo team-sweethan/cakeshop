@@ -1,4 +1,4 @@
-package com.cakeshop.domain.order.service;
+package com.cakeshop.domain.order.service.checkout;
 
 import java.math.BigDecimal;
 import java.util.HashMap;

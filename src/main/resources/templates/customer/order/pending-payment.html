@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>진행 중인 결제 | 케이크 쇼핑몰</title>
+  <link rel="stylesheet" th:href="@{/css/app.css}">
+  <link rel="stylesheet" th:href="@{/css/customer-mockup.css}">
+  <script defer th:src="@{/js/app.js}"></script>
+</head>
+<body data-page-title="진행 중인 결제">
+  <header th:replace="~{fragments/common/header :: header}"></header>
+  <main class="page-container page-container--form">
+    <section class="panel" style="padding:32px;text-align:center">
+      <h1 style="font-size:20px">진행 중인 결제가 있습니다.</h1>
+      <p class="text-muted section">
+        기존 주문의 결제를 계속하거나 새 주문서를 작성해 주세요.
+      </p>
+
+      <div style="text-align:left">
+        <div class="data-row">
+          <span class="data-row__label">주문번호</span>
+          <strong th:text="${pendingOrder.orderNumber}">ORD-000000</strong>
+        </div>
+        <div class="data-row">
+          <span class="data-row__label">결제 기한</span>
+          <span th:text="${#temporals.format(pendingOrder.paymentExpiresAt, 'yyyy.MM.dd (E) HH:mm')}">
+            2026.08.19 (수) 12:00
+          </span>
+        </div>
+      </div>
+
+      <div class="cluster" style="justify-content:center;margin-top:24px">
+        <form method="post"
+              th:action="@{/orders/{orderId}/pending-payment/new-order(orderId=${pendingOrder.orderId})}">
+          <input type="hidden" name="newOrderUrl" th:value="${newOrderUrl}">
+          <button class="btn" type="submit">새 주문 작성</button>
+        </form>
+        <a class="btn btn--primary"
+           th:href="@{/orders/{orderId}/payment(orderId=${pendingOrder.orderId})}">
+          계속 결제
+        </a>
+      </div>
+    </section>
+  </main>
+  <footer th:replace="~{fragments/common/footer :: footer(${store})}"></footer>
+</body>
+</html>

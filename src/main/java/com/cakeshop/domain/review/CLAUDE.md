@@ -10,6 +10,7 @@
 - `src/main/resources/mapper/review/**`
 - `src/main/resources/templates/{customer,admin}/review/**`
 - `src/test/java/com/cakeshop/domain/review/**`
+- `src/main/resources/db/seed/seed-review.sql`
 - 새 Flyway migration
 
 상품·주문·회원·알림 도메인의 파일이 필요하면 `docs/conventions.md` 12절과 담당 경계를 먼저 확인한다.

@@ -187,6 +187,20 @@
            AND request_key = #{requestKey}
     </select>
 
+    <select id="findPendingPaymentOrderByMemberId"
+            resultType="com.cakeshop.domain.order.entity.Order">
+        SELECT id,
+               order_number,
+               payment_expires_at
+          FROM orders
+         WHERE member_id = #{memberId}
+           AND status = 'PENDING_PAYMENT'
+           AND payment_expires_at IS NOT NULL
+           AND payment_expires_at &gt; #{now}
+         ORDER BY payment_expires_at, id
+         LIMIT 1
+    </select>
+
     <select id="findOrdersByMemberId" resultType="com.cakeshop.domain.order.entity.Order">
         SELECT
             id,

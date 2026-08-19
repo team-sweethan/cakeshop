@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cakeshop.domain.community.mapper.CommunityCommentMapper">
+
+    <select id="findRecentRootComments"
+            resultType="com.cakeshop.domain.community.dto.query.CommentRow">
+
+        SELECT
+        c.id,
+        c.post_id,
+        c.member_id,
+        c.parent_comment_id,
+        CASE WHEN c.status = 'PUBLISHED' THEN c.content END AS content,
+        c.status,
+        c.created_at
+
+        FROM comments c
+
+        WHERE c.post_id = #{postId}
+        AND c.parent_comment_id IS NULL
+
+        ORDER BY c.created_at DESC, c.id DESC
+        LIMIT #{limit}
+    </select>
+
+    <!--
+        뿌리 목록과 같은 방향으로 자른다 — 최신 쪽을 남기고 화면은 Service 가 뒤집어
+        오래된 순으로 낸다. 오래된 순으로 자르면 상한에 닿은 묶음에서 방금 쓴 답글이
+        화면 밖에 남아 등록 실패와 구분되지 않는다(B4가 뿌리에서 막은 그 자리다).
+    -->
+    <select id="findRepliesByParentId"
+            resultType="com.cakeshop.domain.community.dto.query.CommentRow">
+
+        SELECT
+        c.id,
+        c.post_id,
+        c.member_id,
+        c.parent_comment_id,
+        CASE WHEN c.status = 'PUBLISHED' THEN c.content END AS content,
+        c.status,
+        c.created_at
+
+        FROM comments c
+
+        WHERE c.parent_comment_id = #{parentCommentId}
+        AND c.post_id = #{postId}
+
+        ORDER BY c.created_at DESC, c.id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="countRepliesByParentIds"
+            resultType="com.cakeshop.domain.community.dto.query.ReplyCountRow">
+
+        SELECT
+        c.parent_comment_id AS parent_id,
+        COUNT(*) AS reply_count
+
+        FROM comments c
+
+        WHERE c.parent_comment_id IN
+        <foreach collection="parentIds" item="parentId" open="(" separator="," close=")">
+            #{parentId}
+        </foreach>
+
+        GROUP BY c.parent_comment_id
+    </select>
+
+    <select id="countComments"
+            resultType="com.cakeshop.domain.community.dto.query.CommentCountRow">
+
+        SELECT
+        COALESCE(SUM(c.parent_comment_id IS NULL), 0) AS root_row_count,
+        COALESCE(SUM(c.status = 'PUBLISHED'), 0) AS published_count
+
+        FROM comments c
+        WHERE c.post_id = #{postId}
+    </select>
+
+    <select id="findCommentById"
+            resultType="com.cakeshop.domain.community.dto.query.CommentRow">
+
+        SELECT
+        c.id,
+        c.post_id,
+        c.member_id,
+        c.parent_comment_id,
+        CASE WHEN c.status = 'PUBLISHED' THEN c.content END AS content,
+        c.status,
+        c.created_at
+
+        FROM comments c
+
+        WHERE c.id = #{commentId}
+    </select>
+
+    <insert id="insertComment" useGeneratedKeys="true" keyProperty="id">
+
+        INSERT INTO comments (post_id, member_id, content, status)
+        VALUES (#{postId}, #{memberId}, #{content}, 'PUBLISHED')
+    </insert>
+
+    <!--
+        답글의 깊이(2단계)·같은 글·부모 노출·게시글 노출을 이 한 문장이 지킨다. 부모가 없거나,
+        다른 글이거나, 이미 답글이거나(부모의 부모가 있음), 부모나 게시글이 노출 중이 아니면
+        0행이고 0행은 성공으로 넘기지 않는다. 게시글 상태를 여기서 다시 보는 이유는 Service 의
+        사전 확인과 이 쓰기 사이에 관리자가 글을 차단할 수 있어서다 — 좋아요의 조건부 UPDATE 가
+        같은 경합을 같은 방식으로 막는다. post_id 는 부모 행에서 가져와 다른 글에 붙을 수 없다.
+    -->
+    <insert id="insertReply" useGeneratedKeys="true" keyProperty="id">
+
+        INSERT INTO comments (post_id, member_id, parent_comment_id, content, status)
+        SELECT parent.post_id, #{memberId}, parent.id, #{content}, 'PUBLISHED'
+        FROM comments parent
+        JOIN posts p ON p.id = parent.post_id AND p.status = 'PUBLISHED'
+        WHERE parent.id = #{parentCommentId}
+        AND parent.post_id = #{postId}
+        AND parent.parent_comment_id IS NULL
+        AND parent.status = 'PUBLISHED'
+    </insert>
+
+    <update id="deleteComment">
+
+        UPDATE comments
+        SET status = 'DELETED'
+        WHERE id = #{commentId}
+        AND post_id = #{postId}
+        AND member_id = #{memberId}
+        AND status = 'PUBLISHED'
+    </update>
+</mapper>
