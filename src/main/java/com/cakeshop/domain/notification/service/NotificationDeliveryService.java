@@ -108,4 +108,17 @@ public class NotificationDeliveryService {
             log.error("재시도 스킵(SKIPPED) 종결 기록 실패 (notificationId: {})", notificationId, e);
         }
     }
+
+    /**
+     * 서버 비정상 종료 등으로 방치된 오래된 PENDING 발송 이력을 FAILED로 안전하게 복구 확정한다.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int recoverStalePendingDeliveries(int thresholdMinutes) {
+        try {
+            return notificationMapper.updateStalePendingDeliveriesToFailed(thresholdMinutes);
+        } catch (Exception e) {
+            log.error("오래된 PENDING 발송 이력 복구 처리 중 예외 발생:", e);
+            return 0;
+        }
+    }
 }

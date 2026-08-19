@@ -81,4 +81,7 @@ public interface NotificationMapper {
                               @Param("providerMessageId") String providerMessageId,
                               @Param("failureReason") String failureReason,
                               @Param("sentAt") LocalDateTime sentAt);
+
+    // 프로세스 중단 등으로 방치된 오래된 PENDING 발송 이력을 FAILED로 안전하게 확정 종결 (복구 경로)
+    int updateStalePendingDeliveriesToFailed(@Param("thresholdMinutes") int thresholdMinutes);
 }

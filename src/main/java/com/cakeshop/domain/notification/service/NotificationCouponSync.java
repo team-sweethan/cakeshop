@@ -272,6 +272,9 @@ public class NotificationCouponSync {
         }
 
         try {
+            // 서버 비정상 종료 등으로 5분 이상 방치된 오래된 PENDING 건을 FAILED로 안전하게 복구 확정
+            notificationDeliveryService.recoverStalePendingDeliveries(5);
+
             Long lastRetryId = null;
             final int BATCH_SIZE = 50;
 

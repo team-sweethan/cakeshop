@@ -258,9 +258,19 @@
           ) &lt; 2
           AND NOT EXISTS (
               SELECT 1 FROM notification_deliveries nd3
-              WHERE nd3.notification_id = n.id AND nd3.status = 'PENDING'
+              WHERE nd3.notification_id = n.id AND nd3.status = 'PENDING' AND nd3.created_at &gt;= DATE_SUB(NOW(), INTERVAL 5 MINUTE)
           )
         ORDER BY n.id ASC
         LIMIT #{limit}
     </select>
+
+    <!-- 프로세스 중단 등으로 방치된 오래된 PENDING 발송 이력을 FAILED로 안전하게 확정 종결 (복구 경로) -->
+    <update id="updateStalePendingDeliveriesToFailed">
+        UPDATE notification_deliveries
+        SET status = 'FAILED',
+            failure_reason = 'DELIVERY_TIMEOUT_STALE_PENDING',
+            updated_at = NOW()
+        WHERE status = 'PENDING'
+          AND created_at &lt; DATE_SUB(NOW(), INTERVAL #{thresholdMinutes} MINUTE)
+    </update>
 </mapper>
