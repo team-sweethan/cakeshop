@@ -292,7 +292,7 @@ Cakeshop 후기는 **케이크를 실제로 받아 간 고객이 그 주문 상�
 |---|---|---|
 | 작성할 후기 목록 (A1) | `customer/review/writable.html` | 완료 (조각 1) |
 | 후기 작성 폼 (A2·A6) | `customer/review/form.html` | 완료 (조각 1. 이미지 입력은 조각 8) |
-| 후기 수정 폼 (A4) | `customer/review/edit.html` | 완료 (조각 4) |
+| 후기 수정 폼 (A4·A6) | `customer/review/edit.html` | 완료 (조각 4. 첨부 이미지 읽기 전용 표시는 08-20) |
 | 내 후기 목록 (B3) | `customer/review/my.html` | 완료 (조각 3. 조각 4에서 수정·삭제 버튼, 조각 8에서 이미지, 조각 9에서 알림 진입 경로와 `review.css`의 `:target` 앵커) |
 | 상품 후기 미리보기 3개 (B1·B2·B4) | `customer/product/detail.html` | 후기 영역 교체 + `전체 리뷰 확인` 버튼 완료 (조각 3. 답글은 조각 6, 이미지는 조각 8) |
 | 상품 후기 전체 목록 (B1·B4) | `customer/review/product.html` | 완료 (조각 3. 답글은 조각 6, 이미지는 조각 8) |

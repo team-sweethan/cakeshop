@@ -107,6 +107,19 @@
         </div>
       </section>
 
+      <section class="section">
+        <h2 class="section-title">첨부 이미지</h2>
+        <div class="panel stack">
+          <div th:replace="~{fragments/customer/product-review :: images(${review.images})}"></div>
+          <p class="text-muted" th:if="${#lists.isEmpty(review.images)}">
+            첨부한 이미지가 없습니다.
+          </p>
+          <p class="note">
+            이미지는 등록할 때 올린 그대로 유지됩니다. 수정 화면에서는 바꿀 수 없습니다.
+          </p>
+        </div>
+      </section>
+
       <div class="cluster">
         <button class="btn btn--primary" type="submit">후기 수정</button>
         <a class="btn" th:href="@{/mypage/reviews}">취소</a>
