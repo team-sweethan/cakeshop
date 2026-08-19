@@ -1,5 +1,6 @@
 package com.cakeshop.domain.order.service;
 
+import com.cakeshop.domain.member.service.MemberOrderNotificationQueryService;
 import com.cakeshop.domain.notification.service.NotificationOrderQueryService;
 import com.cakeshop.domain.order.dto.view.OrderChatView;
 import com.cakeshop.domain.order.mapper.OrderChatMapper;
@@ -19,7 +20,7 @@ import org.springframework.stereotype.Component;
  * 담당자 : 주환
  * 작성일 : 2026-08-18
  * 기능 : 주문 상태 변경 독립 감지 및 알림 동기화 스케줄러
- * 설명 : 타 도메인 코드를 직접 수정하지 않고, 서울 시각 Clock, 과거 1일 복구 탐색, AtomicBoolean 직렬화, 비동기 스레드 풀(@Async), 시간 커서 페이징(since) 및 NotificationOrderQueryService 멱등성 검사를 통해 제작 승인, 반려, 취소 알림을 발송한다.
+ * 설명 : 타 도메인 코드를 직접 수정하지 않고, 서울 시각 Clock, 과거 1일 복구 탐색, AtomicBoolean 직렬화, 비동기 스레드 풀(@Async), 시간 커서 페이징(since) 및 NotificationOrderQueryService 멱등성 검사를 통해 제작 승인, 반려, 취소, 픽업 완료 알림을 발송한다.
  * ******************************
  */
 @Slf4j
@@ -30,6 +31,7 @@ public class OrderNotificationStatusSync {
     private final OrderChatMapper orderChatMapper;
     private final OrderNotificationSender orderNotificationSender;
     private final NotificationOrderQueryService notificationOrderQueryService;
+    private final MemberOrderNotificationQueryService memberOrderNotificationQueryService;
     private final Clock clock;
 
     private final AtomicBoolean isRunning = new AtomicBoolean(false);
@@ -45,8 +47,8 @@ public class OrderNotificationStatusSync {
 
         try {
             if (lastSyncTime == null) {
-                // 재시작 시 다운타임(10분 초과) 동안의 미처리 알림 복구를 위해 최근 1일 전부터 탐색
-                lastSyncTime = LocalDateTime.now(clock).minusDays(1);
+                // 재시작 시 장기 다운타임 동안의 미처리 알림(픽업 완료 등) 완벽 복구를 위해 최근 30일 전부터 탐색
+                lastSyncTime = LocalDateTime.now(clock).minusDays(30);
             }
 
             List<OrderChatView> recentOrders = orderChatMapper.findRecentStatusChangedOrders(lastSyncTime);
@@ -54,6 +56,7 @@ public class OrderNotificationStatusSync {
                 return;
             }
 
+            List<Long> adminIds = memberOrderNotificationQueryService.findActiveAdminIds();
             LocalDateTime maxProcessedTime = lastSyncTime;
 
             for (OrderChatView order : recentOrders) {
@@ -67,24 +70,58 @@ public class OrderNotificationStatusSync {
                 String orderNumber = order.orderNumber();
 
                 try {
+                    boolean orderFullyHandled = true;
+
                     if ("IN_PRODUCTION".equalsIgnoreCase(statusStr)) {
-                        String eventKey = "CUSTOM_ORDER_IN_PRODUCTION:" + memberId + ":" + orderId;
-                        if (!notificationOrderQueryService.isNotificationFullySent(memberId, eventKey)) {
+                        if (!notificationOrderQueryService.isCustomOrderInProductionSent(memberId, orderId)) {
                             orderNotificationSender.sendCustomOrderInProduction(orderId, memberId);
                         }
+                        orderFullyHandled = notificationOrderQueryService.isCustomOrderInProductionSent(memberId, orderId);
                     } else if ("REJECTED".equalsIgnoreCase(statusStr)) {
-                        String eventKey = "CUSTOM_ORDER_REJECTED:" + memberId + ":" + orderId;
-                        if (!notificationOrderQueryService.isNotificationFullySent(memberId, eventKey)) {
+                        if (!notificationOrderQueryService.isCustomOrderRejectedSent(memberId, orderId)) {
                             orderNotificationSender.sendCustomOrderRejected(orderId, memberId);
                         }
+                        orderFullyHandled = notificationOrderQueryService.isCustomOrderRejectedSent(memberId, orderId);
                     } else if ("CANCELED".equalsIgnoreCase(statusStr)) {
                         // 고객 취소 알림 체크 및 전송
-                        String customerEventKey = "ORDER_CANCELED:" + memberId + ":" + orderId;
-                        if (!notificationOrderQueryService.isNotificationFullySent(memberId, customerEventKey)) {
+                        if (!notificationOrderQueryService.isOrderCanceledSent(memberId, orderId)) {
                             orderNotificationSender.sendOrderCanceledToCustomer(orderId, memberId);
                         }
-                        // 관리자 취소 알림 전송 (주문번호 포함)
-                        orderNotificationSender.sendOrderCanceledToAdmins(orderId, memberId, orderNumber);
+                        // 관리자 취소 알림 체크 및 전송
+                        if (adminIds != null && !adminIds.isEmpty()) {
+                            boolean hasUnsentAdmin = adminIds.stream().anyMatch(adminId ->
+                                    !notificationOrderQueryService.isAdminOrderCanceledSent(adminId, orderId));
+                            if (hasUnsentAdmin) {
+                                orderNotificationSender.sendOrderCanceledToAdmins(orderId, memberId, orderNumber);
+                            }
+                        }
+                        boolean customerSent = notificationOrderQueryService.isOrderCanceledSent(memberId, orderId);
+                        boolean adminSent = adminIds == null || adminIds.stream().allMatch(adminId ->
+                                notificationOrderQueryService.isAdminOrderCanceledSent(adminId, orderId));
+                        orderFullyHandled = customerSent && adminSent;
+                    } else if ("PICKED_UP".equalsIgnoreCase(statusStr)) {
+                        // 픽업 완료 고객 알림 독립 체크 및 전송
+                        if (!notificationOrderQueryService.isCustomerOrderPickedUpSent(memberId, orderId)) {
+                            orderNotificationSender.sendOrderPickedUpToCustomer(orderId, memberId);
+                        }
+                        // 픽업 완료 관리자 알림 독립 체크 및 전송
+                        if (adminIds != null && !adminIds.isEmpty()) {
+                            boolean hasUnsentAdmin = adminIds.stream().anyMatch(adminId ->
+                                    !notificationOrderQueryService.isAdminOrderPickedUpSent(adminId, orderId));
+                            if (hasUnsentAdmin) {
+                                orderNotificationSender.sendOrderPickedUpToAdmins(orderId, memberId, orderNumber);
+                            }
+                        }
+                        boolean customerSent = notificationOrderQueryService.isCustomerOrderPickedUpSent(memberId, orderId);
+                        boolean adminSent = adminIds == null || adminIds.stream().allMatch(adminId ->
+                                notificationOrderQueryService.isAdminOrderPickedUpSent(adminId, orderId));
+                        orderFullyHandled = customerSent && adminSent;
+                    }
+
+                    // 실패 건이 남아있으면 커서를 전진시키지 않고 다음 스케줄에서 재시도하도록 중단
+                    if (!orderFullyHandled) {
+                        log.debug("주문(orderId={})의 알림 발송이 미완료 상태이므로 커서 전진을 보류합니다.", orderId);
+                        break;
                     }
 
                     if (order.orderUpdatedAt() != null && order.orderUpdatedAt().isAfter(maxProcessedTime)) {

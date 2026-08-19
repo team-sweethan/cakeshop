@@ -138,22 +138,48 @@
         LIMIT 1
     </select>
 
-    <!--이미 SENT 성공 발송 이력이 있는지 확인-->
+    <!--알림 ID 기반 비관적 잠금 조회 (FOR UPDATE)-->
+    <select id="findNotificationByIdForUpdate" resultType="long">
+        SELECT id FROM notifications
+        WHERE id = #{id}
+        LIMIT 1
+        FOR UPDATE
+    </select>
+
+    <!--이미 SENT 또는 DELIVERED 성공 발송 이력이 있는지 확인-->
     <select id="hasSentDelivery" resultType="boolean">
         SELECT EXISTS (
             SELECT true FROM notification_deliveries
-            WHERE notification_id = #{notificationId} AND status = 'SENT'
+            WHERE notification_id = #{notificationId} AND status IN ('SENT', 'DELIVERED')
             LIMIT 1
         )
     </select>
 
-    <!--이미 발송 시도 이력(SENT, FAILED, SKIPPED)이 한 번이라도 존재하는지 확인-->
+    <!--현재 진행 중인(최근 1분 이내) PENDING 예약이 존재하는지 확인 (동시 발송 레이스 차단)-->
+    <select id="hasActivePendingDelivery" resultType="boolean">
+        SELECT EXISTS (
+            SELECT true FROM notification_deliveries
+            WHERE notification_id = #{notificationId}
+              AND status = 'PENDING'
+              AND created_at &gt;= DATE_SUB(NOW(), INTERVAL 1 MINUTE)
+            LIMIT 1
+        )
+    </select>
+
+    <!--이미 발송 시도 이력(SENT, DELIVERED, FAILED, SKIPPED)이 한 번이라도 존재하는지 확인-->
     <select id="hasAttemptedDelivery" resultType="boolean">
         SELECT EXISTS (
             SELECT true FROM notification_deliveries
             WHERE notification_id = #{notificationId}
             LIMIT 1
         )
+    </select>
+
+    <!--발송 시도 총 횟수 조회 (최대 재시도 2회 제한 보존)-->
+    <select id="countDeliveryAttempts" resultType="int">
+        SELECT COUNT(*)
+        FROM notification_deliveries
+        WHERE notification_id = #{notificationId}
     </select>
 
     <!-- 수신 전화번호 조회 (주문이 있으면 orderer_phone 우선, 없으면 members.phone) -->
@@ -189,7 +215,18 @@
             #{failureReason},
             #{sentAt},
             #{deliveredAt},
-            #{createdAt},
-            #{updatedAt})
+            NOW(),
+            NOW())
     </insert>
+
+    <!-- 발송 결과 업데이트 (상태, 프로바이더 메시지 ID, 실패 사유, 발송 시각) -->
+    <update id="updateDeliveryResult">
+        UPDATE notification_deliveries
+        SET status = #{status},
+            provider_message_id = #{providerMessageId},
+            failure_reason = #{failureReason},
+            sent_at = #{sentAt},
+            updated_at = NOW()
+        WHERE id = #{deliveryId}
+    </update>
 </mapper>
