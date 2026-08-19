@@ -1,7 +1,9 @@
 package com.cakeshop.domain.store.controller;
 
+import com.cakeshop.domain.store.dto.form.StoreBasicInfoForm;
+import com.cakeshop.domain.store.dto.form.StoreBusinessHoursForm;
 import com.cakeshop.domain.store.dto.form.StoreHolidayForm;
-import com.cakeshop.domain.store.dto.form.StoreUpdateForm;
+import com.cakeshop.domain.store.dto.form.StorePickupInfoForm;
 import com.cakeshop.domain.store.dto.view.StoreView;
 import com.cakeshop.domain.store.error.StoreErrorCode;
 import com.cakeshop.domain.store.service.StoreService;
@@ -43,27 +45,56 @@ public class StoreAdminController {
     @GetMapping
     public String form(Model model) {
         StoreView store = storeService.getStoreView();
-        model.addAttribute("storeForm", StoreUpdateForm.from(store));
-        model.addAttribute("holidayForm", new StoreHolidayForm());
-        addReferenceData(model, store);
+        addFormData(model, store);
         return "admin/store/form";
     }
 
-    @PostMapping
-    public String update(@Valid @ModelAttribute("storeForm") StoreUpdateForm form,
-                         BindingResult bindingResult,
-                         @RequestParam(name = "image", required = false) MultipartFile image,
-                         Model model,
-                         RedirectAttributes redirectAttributes) {
+    @PostMapping("/basic-info")
+    public String updateBasicInfo(
+            @Valid @ModelAttribute("basicInfoForm") StoreBasicInfoForm form,
+            BindingResult bindingResult,
+            @RequestParam(name = "image", required = false) MultipartFile image,
+            Model model,
+            RedirectAttributes redirectAttributes) {
         if (bindingResult.hasErrors()) {
-            // PRG 전 검증 실패는 사용자가 입력한 form을 그대로 재렌더한다.
-            model.addAttribute("holidayForm", new StoreHolidayForm());
-            addReferenceData(model, storeService.getStoreView());
+            addFormData(model, storeService.getStoreView());
             return "admin/store/form";
         }
 
-        storeService.updateStore(form, image);
-        redirectAttributes.addFlashAttribute("successMessage", "매장 정보를 저장했습니다.");
+        storeService.updateBasicInfo(form, image);
+        redirectAttributes.addFlashAttribute("successMessage", "기본 정보를 저장했습니다.");
+        return "redirect:/admin/store";
+    }
+
+    @PostMapping("/business-hours")
+    public String updateBusinessHours(
+            @Valid @ModelAttribute("businessHoursForm") StoreBusinessHoursForm form,
+            BindingResult bindingResult,
+            Model model,
+            RedirectAttributes redirectAttributes) {
+        if (bindingResult.hasErrors()) {
+            addFormData(model, storeService.getStoreView());
+            return "admin/store/form";
+        }
+
+        storeService.updateBusinessHours(form);
+        redirectAttributes.addFlashAttribute("successMessage", "영업시간을 저장했습니다.");
+        return "redirect:/admin/store";
+    }
+
+    @PostMapping("/pickup-info")
+    public String updatePickupInfo(
+            @Valid @ModelAttribute("pickupInfoForm") StorePickupInfoForm form,
+            BindingResult bindingResult,
+            Model model,
+            RedirectAttributes redirectAttributes) {
+        if (bindingResult.hasErrors()) {
+            addFormData(model, storeService.getStoreView());
+            return "admin/store/form";
+        }
+
+        storeService.updatePickupInfo(form);
+        redirectAttributes.addFlashAttribute("successMessage", "픽업 정보를 저장했습니다.");
         return "redirect:/admin/store";
     }
 
@@ -87,8 +118,7 @@ public class StoreAdminController {
 
         if (bindingResult.hasErrors()) {
             StoreView store = storeService.getStoreView();
-            model.addAttribute("storeForm", StoreUpdateForm.from(store));
-            addReferenceData(model, store);
+            addFormData(model, store);
             return "admin/store/form";
         }
 
@@ -101,6 +131,22 @@ public class StoreAdminController {
         storeService.deleteHoliday(holidayId);
         redirectAttributes.addFlashAttribute("successMessage", "특정 휴무일을 삭제했습니다.");
         return "redirect:/admin/store";
+    }
+
+    private void addFormData(Model model, StoreView store) {
+        if (!model.containsAttribute("basicInfoForm")) {
+            model.addAttribute("basicInfoForm", StoreBasicInfoForm.from(store));
+        }
+        if (!model.containsAttribute("businessHoursForm")) {
+            model.addAttribute("businessHoursForm", StoreBusinessHoursForm.from(store));
+        }
+        if (!model.containsAttribute("pickupInfoForm")) {
+            model.addAttribute("pickupInfoForm", StorePickupInfoForm.from(store));
+        }
+        if (!model.containsAttribute("holidayForm")) {
+            model.addAttribute("holidayForm", new StoreHolidayForm());
+        }
+        addReferenceData(model, store);
     }
 
     private void addReferenceData(Model model, StoreView store) {

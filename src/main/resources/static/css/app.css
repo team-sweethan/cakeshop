@@ -2004,7 +2004,15 @@ body > main {
     width: 1px
 }
 
-/* 매장 폼: 특정 휴무일 목록 */
+/* 매장 관리 폼 공통 너비와 특정 휴무일 목록 */
+.store-admin-content {
+    max-width: 720px
+}
+
+.store-admin-content > .admin-form + .admin-form {
+    margin-top: var(--space-6)
+}
+
 .holiday-section {
     margin-top: var(--space-6)
 }

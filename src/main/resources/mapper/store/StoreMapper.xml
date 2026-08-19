@@ -69,14 +69,19 @@
          ORDER BY holiday_date
     </select>
 
-    <update id="updateStore">
+    <update id="updateBasicInfo">
         UPDATE store
            SET name = #{name},
                description = #{description},
                image_url = #{imageUrl},
                address = #{address},
-               phone = #{phone},
-               pickup_place = #{pickupPlace},
+               phone = #{phone}
+         WHERE id = #{id}
+    </update>
+
+    <update id="updatePickupInfo">
+        UPDATE store
+           SET pickup_place = #{pickupPlace},
                pickup_start_time = #{pickupStartTime},
                pickup_end_time = #{pickupEndTime},
                pickup_interval_minutes = #{pickupIntervalMinutes}

@@ -15,6 +15,8 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -74,33 +76,68 @@ class StoreAdminControllerSecurityTests {
             .andExpect(view().name("admin/store/form"));
     }
 
-    @Test
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "/admin/store/basic-info",
+        "/admin/store/business-hours",
+        "/admin/store/pickup-info"
+    })
     @WithMockUser(roles = "ADMIN")
-    void updateStore_isForbidden_whenCsrfTokenIsMissing() throws Exception {
+    void updateSection_isForbidden_whenCsrfTokenIsMissing(String endpoint) throws Exception {
         // 상태를 변경하는 POST는 CSRF 토큰이 없으면 Controller에 도달하지 못한다.
-        mockMvc.perform(post("/admin/store").params(validStoreParams()))
+        mockMvc.perform(post(endpoint))
             .andExpect(status().isForbidden());
     }
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void updateStore_succeeds_whenCsrfTokenIsPresent() throws Exception {
-        mockMvc.perform(post("/admin/store").params(validStoreParams()).with(csrf()))
+    void updateBasicInfo_succeeds_whenCsrfTokenIsPresent() throws Exception {
+        mockMvc.perform(post("/admin/store/basic-info").params(validBasicInfoParams()).with(csrf()))
             .andExpect(status().is3xxRedirection())
             .andExpect(redirectedUrl("/admin/store"));
     }
 
-    private org.springframework.util.MultiValueMap<String, String> validStoreParams() {
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void updateBusinessHours_succeeds_whenCsrfTokenIsPresent() throws Exception {
+        mockMvc.perform(post("/admin/store/business-hours")
+                .params(validBusinessHoursParams())
+                .with(csrf()))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/admin/store"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void updatePickupInfo_succeeds_whenCsrfTokenIsPresent() throws Exception {
+        mockMvc.perform(post("/admin/store/pickup-info")
+                .params(validPickupInfoParams())
+                .with(csrf()))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/admin/store"));
+    }
+
+    private org.springframework.util.MultiValueMap<String, String> validBasicInfoParams() {
         var params = new org.springframework.util.LinkedMultiValueMap<String, String>();
         params.add("name", "스위트온 케이크");
         params.add("description", "예약 케이크 전문점");
         params.add("address", "서울시 OO구");
         params.add("phone", "02-0000-0000");
+        return params;
+    }
+
+    private org.springframework.util.MultiValueMap<String, String> validBusinessHoursParams() {
+        var params = new org.springframework.util.LinkedMultiValueMap<String, String>();
         params.add("weekdayOpenTime", "10:00");
         params.add("weekdayCloseTime", "20:00");
         params.add("weekendOpenTime", "11:00");
         params.add("weekendCloseTime", "18:00");
         params.add("closedDays", "SUNDAY");
+        return params;
+    }
+
+    private org.springframework.util.MultiValueMap<String, String> validPickupInfoParams() {
+        var params = new org.springframework.util.LinkedMultiValueMap<String, String>();
         params.add("pickupPlace", "1층 카운터");
         params.add("pickupStartTime", "10:00");
         params.add("pickupEndTime", "19:00");
