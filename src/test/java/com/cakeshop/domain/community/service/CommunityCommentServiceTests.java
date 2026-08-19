@@ -49,6 +49,8 @@ class CommunityCommentServiceTests {
 
     private static final long POST_ID = 42L;
     private static final long COMMENT_ID = 314L;
+    /** 매퍼가 생성 키로 돌려주는 새 댓글·답글의 id. */
+    private static final long NEW_COMMENT_ID = 315L;
     private static final long AUTHOR_ID = 7L;
     private static final long OTHER_MEMBER_ID = 99L;
     /** 요청 대상이 아닌 다른 글. */
@@ -60,6 +62,7 @@ class CommunityCommentServiceTests {
     private CommunityMapper communityMapper;
     private CommunityCommentMapper communityCommentMapper;
     private MemberCommunityQueryService memberCommunityQueryService;
+    private CommunityCommentNotificationService communityCommentNotificationService;
     private CommunityCommentService communityCommentService;
 
     @BeforeEach
@@ -67,6 +70,7 @@ class CommunityCommentServiceTests {
         communityMapper = mock(CommunityMapper.class);
         communityCommentMapper = mock(CommunityCommentMapper.class);
         memberCommunityQueryService = mock(MemberCommunityQueryService.class);
+        communityCommentNotificationService = mock(CommunityCommentNotificationService.class);
         when(memberCommunityQueryService.getMembersByIds(anyList())).thenReturn(List.of());
 
         CommunityMemberViewLoader memberViewLoader =
@@ -75,7 +79,8 @@ class CommunityCommentServiceTests {
         communityCommentService = new CommunityCommentService(
                 communityCommentMapper,
                 memberViewLoader,
-                postService(memberViewLoader));
+                postService(memberViewLoader),
+                communityCommentNotificationService);
     }
 
     /*
@@ -220,21 +225,23 @@ class CommunityCommentServiceTests {
     @Test
     void addReply_savesThroughConditionalInsert() {
         givenPost(PostStatus.PUBLISHED);
-        when(communityCommentMapper.insertReply(POST_ID, COMMENT_ID, AUTHOR_ID, "답글 본문"))
-                .thenReturn(1);
+        givenInsertedReply();
 
         communityCommentService.addReply(
                 POST_ID, COMMENT_ID, commentFormOf("답글 본문"), AUTHOR_ID);
 
-        verify(communityCommentMapper).insertReply(POST_ID, COMMENT_ID, AUTHOR_ID, "답글 본문");
+        Comment saved = capturedReply();
+        assertThat(saved.getPostId()).isEqualTo(POST_ID);
+        assertThat(saved.getParentCommentId()).isEqualTo(COMMENT_ID);
+        assertThat(saved.getMemberId()).isEqualTo(AUTHOR_ID);
+        assertThat(saved.getContent()).isEqualTo("답글 본문");
     }
 
     /** 0행이면 거절이다 — 부모 없음·다른 글·답글의 답글·삭제된 부모가 전부 이 한 자리로 모인다. */
     @Test
     void addReply_zeroRows_isRejected() {
         givenPost(PostStatus.PUBLISHED);
-        when(communityCommentMapper.insertReply(anyLong(), anyLong(), anyLong(), any()))
-                .thenReturn(0);
+        when(communityCommentMapper.insertReply(any())).thenReturn(0);
 
         assertThatThrownBy(() -> communityCommentService.addReply(
                 POST_ID, COMMENT_ID, commentFormOf("답글 본문"), AUTHOR_ID))
@@ -243,9 +250,51 @@ class CommunityCommentServiceTests {
                 .isEqualTo(CommunityErrorCode.COMMENT_NOT_FOUND);
     }
 
+    /** 거절된 답글은 부모를 읽지도 않는다 — 그 읽기는 알림 수신자를 고르는 것뿐이다. */
+    @Test
+    void addReply_zeroRows_notifiesNobody() {
+        givenPost(PostStatus.PUBLISHED);
+        when(communityCommentMapper.insertReply(any())).thenReturn(0);
+
+        assertThatThrownBy(() -> communityCommentService.addReply(
+                POST_ID, COMMENT_ID, commentFormOf("답글 본문"), AUTHOR_ID))
+                .isInstanceOf(BusinessException.class);
+
+        verify(communityCommentNotificationService, never())
+                .notifyNewReply(anyLong(), anyLong(), anyLong(), anyLong());
+    }
+
+    /** 댓글 알림은 글 작성자에게 가고, 수신자를 글 조회 결과에서 가져온다. */
+    @Test
+    void addComment_notifiesPostAuthorWithNewCommentId() {
+        givenPost(PostStatus.PUBLISHED);
+        givenInsertedComment(NEW_COMMENT_ID);
+
+        communityCommentService.addComment(POST_ID, commentFormOf("댓글 본문"), OTHER_MEMBER_ID);
+
+        verify(communityCommentNotificationService)
+                .notifyNewComment(POST_ID, NEW_COMMENT_ID, AUTHOR_ID, OTHER_MEMBER_ID);
+    }
+
+    /** 답글 알림은 부모 댓글 작성자에게 간다 — 글 작성자가 아니다. */
+    @Test
+    void addReply_notifiesParentCommentAuthor() {
+        givenPost(PostStatus.PUBLISHED);
+        givenInsertedReply();
+        when(communityCommentMapper.findCommentById(COMMENT_ID))
+                .thenReturn(commentOf(COMMENT_ID, POST_ID, OTHER_MEMBER_ID, CommentStatus.PUBLISHED));
+
+        communityCommentService.addReply(
+                POST_ID, COMMENT_ID, commentFormOf("답글 본문"), AUTHOR_ID);
+
+        verify(communityCommentNotificationService)
+                .notifyNewReply(POST_ID, NEW_COMMENT_ID, OTHER_MEMBER_ID, AUTHOR_ID);
+    }
+
     @Test
     void addComment_savesContentWithAuthenticatedAuthor() {
         givenPost(PostStatus.PUBLISHED);
+        givenInsertedComment(NEW_COMMENT_ID);
 
         communityCommentService.addComment(POST_ID, commentFormOf("댓글 본문"), AUTHOR_ID);
 
@@ -352,6 +401,32 @@ class CommunityCommentServiceTests {
         verify(communityCommentMapper).insertComment(captor.capture());
 
         return captor.getValue();
+    }
+
+    private Comment capturedReply() {
+        ArgumentCaptor<Comment> captor = ArgumentCaptor.forClass(Comment.class);
+        verify(communityCommentMapper).insertReply(captor.capture());
+
+        return captor.getValue();
+    }
+
+    /** 매퍼가 생성 키를 채우는 것을 흉내 낸다 — 알림이 그 id 로 간다. */
+    private void givenInsertedComment(long newId) {
+        when(communityCommentMapper.insertComment(any())).thenAnswer(invocation -> {
+            invocation.getArgument(0, Comment.class).setId(newId);
+
+            return 1;
+        });
+    }
+
+    private void givenInsertedReply() {
+        when(communityCommentMapper.insertReply(any())).thenAnswer(invocation -> {
+            invocation.getArgument(0, Comment.class).setId(NEW_COMMENT_ID);
+
+            return 1;
+        });
+        when(communityCommentMapper.findCommentById(COMMENT_ID))
+                .thenReturn(commentOf(COMMENT_ID, CommentStatus.PUBLISHED));
     }
 
     private void givenComments(CommentRow... comments) {

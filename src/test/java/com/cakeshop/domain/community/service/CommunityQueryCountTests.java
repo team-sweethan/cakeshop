@@ -67,6 +67,10 @@ class CommunityQueryCountTests {
     @MockitoBean
     private FileStorageClient fileStorageClient;
 
+    /* 알림은 커밋 이후 별도 트랜잭션이라 여기서 세는 조회 쿼리에 끼지 않는다. */
+    @MockitoBean
+    private CommunityCommentNotificationService communityCommentNotificationService;
+
     @Autowired
     private CommunityPostService communityPostService;
 

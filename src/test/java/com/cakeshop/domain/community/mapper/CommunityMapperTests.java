@@ -392,15 +392,17 @@ class CommunityMapperTests {
     void insertReply_publishedRootOfSamePost_isSaved() {
         long postId = insertPost("이 글", PostStatus.PUBLISHED, BASE_TIME);
         long rootId = insertComment(postId, "뿌리", CommentStatus.PUBLISHED, BASE_TIME);
+        Comment reply = Comment.createReply(postId, rootId, memberId, "답글");
 
-        assertThat(communityCommentMapper.insertReply(postId, rootId, memberId, "답글"))
-                .isEqualTo(1);
+        assertThat(communityCommentMapper.insertReply(reply)).isEqualTo(1);
 
         assertThat(communityCommentMapper.findRepliesByParentId(rootId, postId, 200))
                 .singleElement()
-                .satisfies(reply -> {
-                    assertThat(reply.content()).isEqualTo("답글");
-                    assertThat(reply.status()).isEqualTo(CommentStatus.PUBLISHED);
+                .satisfies(saved -> {
+                    assertThat(saved.content()).isEqualTo("답글");
+                    assertThat(saved.status()).isEqualTo(CommentStatus.PUBLISHED);
+                    // 알림이 이 id 로 간다. INSERT ... SELECT 도 생성 키를 돌려주는지 함께 본다
+                    assertThat(saved.id()).isEqualTo(reply.getId());
                 });
     }
 
@@ -436,11 +438,15 @@ class CommunityMapperTests {
             default -> throw new IllegalArgumentException(parentCase);
         };
 
-        assertThat(communityCommentMapper.insertReply(postId, parentId, memberId, "답글"))
-                .isZero();
+        Comment reply = Comment.createReply(postId, parentId, memberId, "답글");
+
+        assertThat(communityCommentMapper.insertReply(reply)).isZero();
+
         Long replies = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM comments WHERE parent_comment_id = ?", Long.class, parentId);
         assertThat(replies).isZero();
+        // 거절된 답글에는 id 가 없다 — 알림이 남의 행을 가리키면 안 된다
+        assertThat(reply.getId()).isNull();
     }
 
     @Test
