@@ -14,6 +14,10 @@
   let currentIndex = 0;
 
   window.setInterval(() => {
+    if (rotation.matches(":hover") || rotation.contains(document.activeElement)) {
+      return;
+    }
+
     notices[currentIndex].hidden = true;
     currentIndex = (currentIndex + 1) % notices.length;
     notices[currentIndex].hidden = false;
