@@ -6,6 +6,8 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 
+import java.sql.PreparedStatement;
+import java.sql.Statement;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -22,7 +24,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.ArgumentPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 /** 인기글 배치 계약을 실제 MariaDB로 확인한다. */
@@ -353,7 +358,7 @@ class PopularPostBatchTests {
     }
 
     private long newPost(String title, PostStatus status) {
-        jdbcTemplate.update(
+        long postId = insertAndReturnId(
                 """
                 INSERT INTO posts (
                     member_id, category_id, title, content, status, created_at, updated_at
@@ -362,7 +367,6 @@ class PopularPostBatchTests {
                 """,
                 memberId, categoryId, title, status.name(), INSIDE, INSIDE);
 
-        long postId = jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
         postIds.add(postId);
 
         return postId;
@@ -414,7 +418,7 @@ class PopularPostBatchTests {
     }
 
     private long insertMember(String email) {
-        jdbcTemplate.update(
+        long id = insertAndReturnId(
                 """
                 INSERT INTO members (
                     email, password, nickname, phone, role, status, name, created_at, updated_at
@@ -423,20 +427,31 @@ class PopularPostBatchTests {
                 """,
                 email, "인기글테스터", "인기글테스터", INSIDE, INSIDE);
 
-        long id = jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
         memberIds.add(id);
 
         return id;
     }
 
     private long insertCategory(String code) {
-        jdbcTemplate.update(
+        return insertAndReturnId(
                 """
                 INSERT INTO post_categories (code, name, is_active, sort_order)
                 VALUES (?, '인기글 테스트', 1, 999)
                 """,
                 code);
+    }
 
-        return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+    private long insertAndReturnId(String sql, Object... params) {
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+
+        jdbcTemplate.update(connection -> {
+            PreparedStatement statement =
+                    connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+            new ArgumentPreparedStatementSetter(params).setValues(statement);
+
+            return statement;
+        }, keyHolder);
+
+        return keyHolder.getKey().longValue();
     }
 }
