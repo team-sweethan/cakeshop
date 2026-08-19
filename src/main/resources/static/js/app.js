@@ -52,18 +52,11 @@ async function updateNotificationUnreadCount() {
 document.addEventListener('DOMContentLoaded', () => {
   updateNotificationUnreadCount();
 
-  // 화면에 렌더링된 성공/에러 플래시 배너를 토스트 팝업으로도 부드럽게 띄운다.
+  // 장바구니 담기 성공 플래시 메시지가 있는 경우 토스트 팝업 렌더링
   const successAlert = document.querySelector('.alert.alert--success');
-  if (successAlert && successAlert.textContent && successAlert.textContent.trim()) {
+  if (successAlert && successAlert.textContent && successAlert.textContent.includes('장바구니')) {
     const text = successAlert.textContent.trim();
-    const targetUrl = text.includes('장바구니') ? '/cart' : null;
-    showToast(text.includes('장바구니') ? '장바구니' : '알림', text, targetUrl);
-  }
-
-  const errorAlert = document.querySelector('.alert.alert--error');
-  if (errorAlert && errorAlert.textContent && errorAlert.textContent.trim()) {
-    const errText = errorAlert.textContent.trim();
-    showToast('안내', errText);
+    showToast('장바구니', text, '/cart');
   }
 });
 
