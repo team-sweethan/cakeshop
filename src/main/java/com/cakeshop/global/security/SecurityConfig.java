@@ -103,8 +103,11 @@ public class SecurityConfig {
                 auth.requestMatchers("/actuator/health", "/actuator/health/**").permitAll();
                 // 공지는 비로그인도 읽어야 하는 안내다. /community/{id:\d+}가 숫자만 받으므로
                 // "notices"는 그 규칙에 걸리지 않아 여기에 따로 적어야 한다.
+                // 댓글 구역 조각(GET .../comments)은 상세 화면의 일부라 상세와 같은 권한이다 —
+                // 같은 주소의 POST(작성)는 아래 ②에서 회원·관리자로 따로 막는다(조각 9).
                 auth.requestMatchers(HttpMethod.GET,
                                 "/community", "/community/{id:\\d+}",
+                                "/community/{postId:\\d+}/comments",
                                 "/community/notices", "/community/notices/{id:\\d+}")
                         .permitAll();
                 auth.requestMatchers(HttpMethod.POST, "/webhooks/toss").permitAll();

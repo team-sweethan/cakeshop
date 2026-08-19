@@ -33,6 +33,17 @@ class CommunityDetailPage {
     private final CommunityReactionService communityReactionService;
     private final CommunityPostImageService communityPostImageService;
 
+    /*
+     * 댓글 구역만 그린다(조각 9). 전체 화면과 같은 Model 조립을 거쳐 같은 프래그먼트를 내므로,
+     * 스크립트가 갈아끼운 화면과 링크로 다시 연 화면이 어긋날 수 없다.
+     */
+    String renderCommentSection(
+            Model model, PostDetailView post, Long viewerId, String comments, String replies) {
+        render(model, post, viewerId, comments, replies);
+
+        return VIEW_NAME + " :: commentSection";
+    }
+
     /** 상세 화면을 그린다. 진입점마다 이 한 줄만 부르면 Model 이 같아진다. */
     String render(Model model, PostDetailView post, Long viewerId, String comments, String replies) {
         assemble(

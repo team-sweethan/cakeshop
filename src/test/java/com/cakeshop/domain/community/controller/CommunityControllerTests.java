@@ -234,6 +234,31 @@ class CommunityControllerTests {
         verify(communityPostService, never()).getPostDetail(anyLong(), any(), anyString());
     }
 
+    /** 댓글 구역 조각은 프래그먼트만 돌려주고, 상세와 같은 Model 을 조립한다. */
+    @Test
+    void commentSection_returnsFragmentWithSameModel() throws Exception {
+        when(communityPostService.getVisiblePost(eq(15L), isNull())).thenReturn(publishedPost());
+
+        mockMvc.perform(get("/community/15/comments").param("comments", "40").param("replies", "8"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("customer/community/detail :: commentSection"))
+                .andExpect(model().attributeExists("post", "commentSection", "commentForm"));
+
+        verify(communityCommentService).getComments(15L, 40, 8L);
+    }
+
+    /** 조각 요청에는 조회수를 올리는 경로가 아예 없다. */
+    @Test
+    void commentSection_neverCountsAsView() throws Exception {
+        when(communityPostService.getVisiblePost(eq(15L), isNull())).thenReturn(publishedPost());
+
+        mockMvc.perform(get("/community/15/comments"))
+                .andExpect(status().isOk());
+
+        verify(communityPostService).getVisiblePost(eq(15L), isNull());
+        verify(communityPostService, never()).getPostDetail(anyLong(), any(), anyString());
+    }
+
     /** 잘못된 replies 값은 펼침 없음으로 떨어진다. */
     @Test
     void detail_invalidRepliesParameter_fallsBackToCollapsed() throws Exception {

@@ -204,6 +204,31 @@ public class CommunityController {
         return communityDetailPage.render(model, post, viewerId, comments, replies);
     }
 
+    /*
+     * 댓글 구역만 그려 돌려준다(조각 9). 화면의 스크립트가 펼치기·더 보기 링크를 가로채 이 응답으로
+     * 그 자리를 갈아끼운다.
+     *
+     * <p>쓰기 경로(POST)와 주소가 같고 메서드만 다르다. 조각을 별도 주소로 빼지 않는 이유는 이것이
+     * 상세 화면의 일부라서다 — 노출 규칙도 조회수 규칙도 상세와 같아야 하고, 갈라 두면 그 규칙이
+     * 두 벌이 된다. <b>조회로 세지 않는 것은 여기서는 분기가 아니라 성질이다</b> — 이미 보고 있는
+     * 글 안에서의 이동이므로 조회수를 올리는 경로 자체가 없다(specs/community-read.md B3).
+     */
+    @GetMapping("/community/{postId:\\d+}/comments")
+    public String commentSection(
+            @PathVariable("postId") long postId,
+            @RequestParam(name = "comments", required = false) String comments,
+            @RequestParam(name = "replies", required = false) String replies,
+            @ModelAttribute("commentForm") CommentForm commentForm,
+            @AuthenticationPrincipal MemberDetails memberDetails,
+            Model model
+    ) {
+        Long viewerId = memberDetails == null ? null : memberDetails.getMemberId();
+
+        PostDetailView post = communityPostService.getVisiblePost(postId, viewerId);
+
+        return communityDetailPage.renderCommentSection(model, post, viewerId, comments, replies);
+    }
+
     private String viewerKeyOf(Long viewerId, HttpServletRequest request) {
         if (viewerId != null) {
             return "M:" + viewerId;

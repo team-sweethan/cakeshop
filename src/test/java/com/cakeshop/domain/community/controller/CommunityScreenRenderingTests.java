@@ -388,6 +388,39 @@ class CommunityScreenRenderingTests {
                 .andExpect(content().string(containsString("name=\"replyTo\"")));
     }
 
+    /*
+     * 댓글 구역 조각이 비로그인에게도 열리고 그 구역만 나온다(조각 9).
+     *
+     * <p>화면 전체가 아니라 조각이라는 것은 여기서만 드러난다 — Controller 테스트는 프래그먼트
+     * 이름만 보고, Security 규칙은 같은 주소의 POST(작성)와 갈라져 있어 한쪽만 열려도 통과한다.
+     */
+    @Test
+    void commentSectionFragment_anonymous_rendersSectionOnly() throws Exception {
+        long postId = insertPost(memberId, "조각으로 볼 글", "본문", PostStatus.PUBLISHED);
+        long rootId = insertComment(postId, memberId, "뿌리 댓글",
+                CommentStatus.PUBLISHED, BASE_TIME);
+        insertReply(postId, rootId, "펼친 답글", CommentStatus.PUBLISHED);
+
+        mockMvc.perform(get("/community/" + postId + "/comments")
+                        .param("replies", String.valueOf(rootId)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("뿌리 댓글")))
+                .andExpect(content().string(containsString("펼친 답글")))
+                .andExpect(content().string(containsString("data-comment-section")))
+                .andExpect(content().string(not(containsString("<html"))))
+                .andExpect(content().string(not(containsString("조각으로 볼 글"))));
+    }
+
+    /** 노출되지 않는 글의 댓글은 조각으로도 새어 나가지 않는다. */
+    @Test
+    void commentSectionFragment_blockedPost_isRejectedForOthers() throws Exception {
+        long postId = insertPost(memberId, "차단된 글", "본문", PostStatus.BLOCKED);
+        insertComment(postId, memberId, "숨어야 할 댓글", CommentStatus.PUBLISHED, BASE_TIME);
+
+        mockMvc.perform(get("/community/" + postId + "/comments"))
+                .andExpect(status().isNotFound());
+    }
+
     /** 답글 작성이 Security 를 통과해 실제로 부모에 연결되어 저장된다. */
     @Test
     void communityReply_authenticated_isStoredUnderParent() throws Exception {

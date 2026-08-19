@@ -19,6 +19,7 @@
   <link rel="stylesheet" th:href="@{/css/community.css}">
   <script defer th:src="@{/js/app.js}"></script>
   <script defer th:src="@{/js/customer-mockup.js}"></script>
+  <script defer th:src="@{/js/community-comments.js}"></script>
 </head>
 <body data-page-title="게시글 상세">
   <header th:replace="~{fragments/common/header :: header}"></header>
@@ -113,12 +114,16 @@
 
     <hr class="divider">
 
-    <section class="section">
+    <!--/* 이 구역 하나가 부분 로드의 교체 단위다(조각 9). 전체 화면과 조각 응답이 같은
+           마크업을 쓰므로 스크립트가 갈아끼운 화면과 링크로 다시 연 화면이 어긋날 수 없다. */-->
+    <section class="section" th:fragment="commentSection" id="comment-section"
+             data-comment-section
+             th:attr="data-section-url=@{/community/{postId}/comments(postId=${post.id})}">
       <h2 class="section-title"
           th:text="'댓글 ' + ${commentSection.publishedCount}">댓글 0</h2>
 
       <div class="cluster" th:if="${commentSection.canLoadMore()}">
-        <a class="btn"
+        <a class="btn" data-comment-link data-comment-more
            th:href="@{/community/{postId}(
                postId=${post.id},
                comments=${commentSection.nextLimit()}
@@ -141,7 +146,7 @@
           <!--/* 답글은 접어 두고 묶음 단위로 펼친다. 펼치기는 주소가 바뀌는 링크다
                  (specs/community-comment.md A7). 삭제된 뿌리에는 새 답글을 달 수 없다. */-->
           <div class="cluster" th:if="${!thread.expanded}">
-            <a class="btn" th:if="${thread.replyCount > 0}"
+            <a class="btn" data-comment-link th:if="${thread.replyCount > 0}"
                th:href="@{/community/{postId}(
                    postId=${post.id},
                    comments=${commentSection.limitParam()},
@@ -149,7 +154,8 @@
                )}"
                th:text="'답글 ' + ${thread.replyCount} + '개 보기'">답글 보기</a>
 
-            <a class="btn" th:if="${thread.replyCount == 0 and canComment and !thread.root.deleted}"
+            <a class="btn" data-comment-link
+               th:if="${thread.replyCount == 0 and canComment and !thread.root.deleted}"
                th:href="@{/community/{postId}(
                    postId=${post.id},
                    comments=${commentSection.limitParam()},
@@ -159,7 +165,7 @@
 
           <div th:if="${thread.expanded}" style="margin-left:32px">
             <div class="cluster">
-              <a class="btn"
+              <a class="btn" data-comment-link
                  th:href="@{/community/{postId}(
                      postId=${post.id},
                      comments=${commentSection.limitParam()}
