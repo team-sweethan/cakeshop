@@ -94,6 +94,21 @@ public class ChatService {
         return room != null ? room.getId() : null;
     }
 
+    /**
+     * 주문제작 반려 시 시스템이 반려 사유를 고객 채팅방에 자동 발송한다.
+     * - 채팅방이 없으면 자동 생성 후 발송한다.
+     * - 트랜잭션 외부(이벤트 리스너 @Async)에서 호출되어야 한다.
+     */
+    @Transactional
+    public void sendSystemRejectionMessage(Long customerId, String rejectReason, Long systemSenderId) {
+        if (customerId == null || customerId <= 0) return;
+        if (rejectReason == null || rejectReason.isBlank()) return;
+
+        ChatRoom chatRoom = getOrMakeChatRoom(customerId);
+        String content = "[반려 안내] " + rejectReason;
+        sendMessage(chatRoom.getId(), systemSenderId, true, null, content, null);
+    }
+
     // 고객 존재 및 활성 회원 상태 검증 계약 (인터셉터 전용)
     @Transactional(readOnly = true)
     public boolean existsCustomer(Long customerId) {

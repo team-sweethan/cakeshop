@@ -22,6 +22,7 @@ public record OrderChatView(
         LocalDateTime pickupAt,
         LocalDateTime orderCreatedAt,
         LocalDateTime orderUpdatedAt,
-        String representativeProductName
+        String representativeProductName,
+        String rejectReason
 ) {
 }

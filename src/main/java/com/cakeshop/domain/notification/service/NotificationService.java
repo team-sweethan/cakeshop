@@ -5,6 +5,8 @@ import com.cakeshop.domain.notification.dto.form.NotificationRequest;
 import com.cakeshop.domain.notification.dto.view.NotificationResponse;
 import com.cakeshop.domain.notification.entity.DeliveryScope;
 import com.cakeshop.domain.notification.entity.Notification;
+import com.cakeshop.domain.notification.entity.NotificationType;
+import com.cakeshop.domain.notification.event.CustomOrderRejectedChatEvent;
 import com.cakeshop.domain.notification.mapper.NotificationMapper;
 import com.cakeshop.global.infra.kakao.SolapiKakaoAlimtalkClient;
 import java.time.Duration;
@@ -12,6 +14,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -29,6 +32,7 @@ public class NotificationService {
     private final NotificationDeliveryService notificationDeliveryService;
     private final SolapiKakaoAlimtalkClient solapiKakaoAlimtalkClient;
     private final SimpMessagingTemplate messagingTemplate;
+    private final ApplicationEventPublisher eventPublisher;
 
     // 알림 생성 메인 로직 (신규 생성, 동시성 멱등 제어, 묶음 갱신, 웹소켓/SMS 독립 후처리)
     @Transactional
@@ -182,6 +186,14 @@ public class NotificationService {
         if (scope == DeliveryScope.WEB_AND_SMS && request.getReceiverId() != null) {
             String receiverPhone = notificationMapper.findReceiverPhone(request.getReceiverId(), request.getOrderId());
             registerSmsSending(notification.getId(), receiverPhone, title, content);
+        }
+
+        // 3. 주문제작 반려 시 반려 사유 채팅 메시지 자동 발송 이벤트 발행 (AFTER_COMMIT 후 ChatEventListener 처리)
+        if (NotificationType.CUSTOM_ORDER_REJECTED.equals(request.getType())
+                && request.getOrderId() != null
+                && request.getReceiverId() != null) {
+            eventPublisher.publishEvent(
+                    new CustomOrderRejectedChatEvent(request.getOrderId(), request.getReceiverId()));
         }
     }
 
