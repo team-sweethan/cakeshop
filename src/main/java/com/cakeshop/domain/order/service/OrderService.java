@@ -64,6 +64,23 @@ public class OrderService {
     /** 일반 상품 주문, 주문 항목 스냅샷, READY 결제를 하나의 트랜잭션으로 생성한다. */
     @Transactional
     public OrderCreationResult createGeneralOrder(long memberId, OrderGeneralCreateForm form) {
+        return createGeneralOrder(memberId, form, false);
+    }
+
+    /** 안내 화면에서 서버가 발급한 1회성 새 주문 의도로만 기존 미결제 주문 검사를 건너뛴다. */
+    @Transactional
+    public OrderCreationResult createGeneralOrderAfterPendingPaymentGuide(
+            long memberId,
+            OrderGeneralCreateForm form
+    ) {
+        return createGeneralOrder(memberId, form, true);
+    }
+
+    private OrderCreationResult createGeneralOrder(
+            long memberId,
+            OrderGeneralCreateForm form,
+            boolean skipPendingPaymentCheck
+    ) {
         if (!memberCouponQueryService.lockActiveCouponIssuableMember(memberId)) {
             throw new BusinessException(CommonErrorCode.FORBIDDEN);
         }
@@ -81,10 +98,12 @@ public class OrderService {
         }
 
         LocalDateTime now = LocalDateTime.now(clock);
-        Order pendingPaymentOrder = orderMapper.findPendingPaymentOrderByMemberId(memberId, now)
-                .orElse(null);
-        if (pendingPaymentOrder != null) {
-            return OrderCreationResult.pendingPaymentGuide(pendingPaymentOrder);
+        if (!skipPendingPaymentCheck) {
+            Order pendingPaymentOrder = orderMapper.findPendingPaymentOrderByMemberId(memberId, now)
+                    .orElse(null);
+            if (pendingPaymentOrder != null) {
+                return OrderCreationResult.pendingPaymentGuide(pendingPaymentOrder);
+            }
         }
         validatePickupAt(form.getPickupAt(), now);
 
@@ -142,6 +161,23 @@ public class OrderService {
      */
     @Transactional
     public OrderCreationResult createCartOrder(long memberId, OrderCartCreateForm form) {
+        return createCartOrder(memberId, form, false);
+    }
+
+    /** 안내 화면에서 서버가 발급한 1회성 새 주문 의도로만 기존 미결제 주문 검사를 건너뛴다. */
+    @Transactional
+    public OrderCreationResult createCartOrderAfterPendingPaymentGuide(
+            long memberId,
+            OrderCartCreateForm form
+    ) {
+        return createCartOrder(memberId, form, true);
+    }
+
+    private OrderCreationResult createCartOrder(
+            long memberId,
+            OrderCartCreateForm form,
+            boolean skipPendingPaymentCheck
+    ) {
         if (!memberCouponQueryService.lockActiveCouponIssuableMember(memberId)) {
             throw new BusinessException(CommonErrorCode.FORBIDDEN);
         }
@@ -155,10 +191,12 @@ public class OrderService {
         }
 
         LocalDateTime now = LocalDateTime.now(clock);
-        Order pendingPaymentOrder = orderMapper.findPendingPaymentOrderByMemberId(memberId, now)
-                .orElse(null);
-        if (pendingPaymentOrder != null) {
-            return OrderCreationResult.pendingPaymentGuide(pendingPaymentOrder);
+        if (!skipPendingPaymentCheck) {
+            Order pendingPaymentOrder = orderMapper.findPendingPaymentOrderByMemberId(memberId, now)
+                    .orElse(null);
+            if (pendingPaymentOrder != null) {
+                return OrderCreationResult.pendingPaymentGuide(pendingPaymentOrder);
+            }
         }
         validatePickupAt(form.getPickupAt(), now);
 

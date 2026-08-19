@@ -30,6 +30,7 @@ import com.cakeshop.domain.order.dto.view.OrderDetailView;
 import com.cakeshop.domain.order.dto.view.OrderMemberSummaryView;
 import com.cakeshop.domain.order.dto.view.customer.GeneralOrderCheckoutView;
 import com.cakeshop.domain.order.service.OrderMemberQueryService;
+import com.cakeshop.domain.order.service.PendingPaymentOrderGuideService;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
 import com.cakeshop.domain.order.service.customer.OrderCustomerService;
 import com.cakeshop.domain.order.service.OrderService;
@@ -133,7 +134,8 @@ class CustomerPageControllerTests {
                                 couponOrderQueryService,
                                 mock(CustomerCustomOrderService.class),
                                 mock(ProductQueryService.class),
-                                mock(CartOrderQueryService.class)
+                                mock(CartOrderQueryService.class),
+                                mock(PendingPaymentOrderGuideService.class)
                         ),
                         new PaymentController(
                                 mock(PaymentFacade.class),

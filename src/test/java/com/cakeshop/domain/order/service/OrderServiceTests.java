@@ -340,6 +340,32 @@ class OrderServiceTests {
     }
 
     @Test
+    void createGeneralOrderAfterPendingPaymentGuide_skipsPendingPaymentLookupOnce() {
+        when(productQueryService.getSalesInfo(1L))
+                .thenReturn(product(1L, ProductType.GENERAL, "새 주문 케이크", 30_000, 2));
+        when(orderOptionValidator.validate(1L, List.of())).thenReturn(List.of());
+        when(orderMapper.insertOrder(any(Order.class))).thenAnswer(invocation -> {
+            invocation.<Order>getArgument(0).setId(100L);
+            return 1;
+        });
+        when(orderMapper.existsOrderItemByOrderId(100L)).thenReturn(false);
+        when(orderMapper.insertOrderItem(any(OrderItem.class))).thenAnswer(invocation -> {
+            invocation.<OrderItem>getArgument(0).setId(200L);
+            return 1;
+        });
+
+        OrderCreationResult result = orderService.createGeneralOrderAfterPendingPaymentGuide(
+                10L,
+                form(1L, 1, List.of())
+        );
+
+        assertThat(result.orderId()).isEqualTo(100L);
+        assertThat(result.requiresPendingPaymentGuide()).isFalse();
+        verify(orderMapper, never()).findPendingPaymentOrderByMemberId(anyLong(), any());
+        verify(paymentPreparationService).prepareReadyPayment(anyLong(), any(), any());
+    }
+
+    @Test
     void createCartOrder_otherRequestKeyWithPendingPayment_returnsGuideWithoutCartWrites() {
         OrderCartCreateForm form = cartForm();
         when(orderMapper.findPendingPaymentOrderByMemberId(10L, FIXED_NOW))

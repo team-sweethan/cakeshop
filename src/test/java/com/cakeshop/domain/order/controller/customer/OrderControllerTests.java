@@ -13,6 +13,7 @@ import com.cakeshop.domain.order.service.customer.CustomerCustomOrderService;
 import com.cakeshop.domain.order.controller.customer.OrderController;
 import com.cakeshop.domain.order.service.customer.OrderCustomerService;
 import com.cakeshop.domain.order.service.OrderService;
+import com.cakeshop.domain.order.service.PendingPaymentOrderGuideService;
 import com.cakeshop.domain.payment.service.RefundFacade;
 import com.cakeshop.domain.product.service.ProductQueryService;
 import com.cakeshop.domain.cart.service.CartOrderQueryService;
@@ -26,6 +27,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -82,6 +84,9 @@ class OrderControllerTests {
     @Mock
     private CartOrderQueryService cartOrderQueryService;
 
+    @Mock
+    private PendingPaymentOrderGuideService pendingPaymentOrderGuideService;
+
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -96,7 +101,8 @@ class OrderControllerTests {
                                 couponOrderQueryService,
                                 customerCustomOrderService,
                                 productQueryService,
-                                cartOrderQueryService
+                                cartOrderQueryService,
+                                pendingPaymentOrderGuideService
                         )
                 )
                 .setCustomArgumentResolvers(
@@ -268,6 +274,56 @@ class OrderControllerTests {
                         "newOrderUrl",
                         "/orders/checkout?productId=1&quantity=2&optionIds=101"
                 ));
+    }
+
+    @Test
+    void startNewOrderAfterPendingPaymentGuide_issuesOneTimeIntentAndUsesItForNextCreation()
+            throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        when(orderService.createGeneralOrderAfterPendingPaymentGuide(eq(10L), any()))
+                .thenReturn(OrderCreationResult.paymentReady(43L));
+        when(orderService.createGeneralOrder(eq(10L), any()))
+                .thenReturn(OrderCreationResult.paymentReady(44L));
+
+        mockMvc.perform(post("/orders/42/pending-payment/new-order")
+                        .session(session)
+                        .param("newOrderUrl", "/orders/checkout?productId=1&quantity=2&optionIds=101"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/orders/checkout?productId=1&quantity=2&optionIds=101"));
+
+        mockMvc.perform(post("/orders/general")
+                        .session(session)
+                        .param("requestKey", UUID.randomUUID().toString())
+                        .param("productId", "1")
+                        .param("quantity", "2")
+                        .param("optionIds", "101")
+                        .param("displayedOriginalAmount", "40000")
+                        .param("ordererName", "홍길동")
+                        .param("ordererPhone", "010-1111-2222")
+                        .param("pickupName", "홍길동")
+                        .param("pickupPhone", "010-1111-2222")
+                        .param("pickupAt", "2099-08-05T14:00"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/orders/43/payment"));
+
+        mockMvc.perform(post("/orders/general")
+                        .session(session)
+                        .param("requestKey", UUID.randomUUID().toString())
+                        .param("productId", "1")
+                        .param("quantity", "2")
+                        .param("optionIds", "101")
+                        .param("displayedOriginalAmount", "40000")
+                        .param("ordererName", "홍길동")
+                        .param("ordererPhone", "010-1111-2222")
+                        .param("pickupName", "홍길동")
+                        .param("pickupPhone", "010-1111-2222")
+                        .param("pickupAt", "2099-08-05T14:00"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/orders/44/payment"));
+
+        verify(pendingPaymentOrderGuideService).verifyNewOrderIntentTarget(10L, 42L);
+        verify(orderService).createGeneralOrderAfterPendingPaymentGuide(eq(10L), any());
+        verify(orderService).createGeneralOrder(eq(10L), any());
     }
 
     @Test

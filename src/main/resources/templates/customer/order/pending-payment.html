@@ -31,7 +31,11 @@
       </div>
 
       <div class="cluster" style="justify-content:center;margin-top:24px">
-        <a class="btn" th:href="${newOrderUrl}">새 주문 작성</a>
+        <form method="post"
+              th:action="@{/orders/{orderId}/pending-payment/new-order(orderId=${pendingOrder.orderId})}">
+          <input type="hidden" name="newOrderUrl" th:value="${newOrderUrl}">
+          <button class="btn" type="submit">새 주문 작성</button>
+        </form>
         <a class="btn btn--primary"
            th:href="@{/orders/{orderId}/payment(orderId=${pendingOrder.orderId})}">
           계속 결제
