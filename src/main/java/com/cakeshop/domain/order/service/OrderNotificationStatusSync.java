@@ -1,7 +1,6 @@
 package com.cakeshop.domain.order.service;
 
 import com.cakeshop.domain.member.service.MemberOrderNotificationQueryService;
-import com.cakeshop.domain.notification.entity.NotificationType;
 import com.cakeshop.domain.notification.service.NotificationOrderQueryService;
 import com.cakeshop.domain.order.dto.view.OrderChatView;
 import com.cakeshop.domain.order.mapper.OrderChatMapper;
@@ -74,56 +73,48 @@ public class OrderNotificationStatusSync {
                     boolean orderFullyHandled = true;
 
                     if ("IN_PRODUCTION".equalsIgnoreCase(statusStr)) {
-                        String eventKey = "CUSTOM_ORDER_IN_PRODUCTION:" + memberId + ":" + orderId;
-                        if (!notificationOrderQueryService.isNotificationFullySent(memberId, eventKey)) {
+                        if (!notificationOrderQueryService.isCustomOrderInProductionSent(memberId, orderId)) {
                             orderNotificationSender.sendCustomOrderInProduction(orderId, memberId);
                         }
-                        orderFullyHandled = notificationOrderQueryService.isNotificationFullySent(memberId, eventKey);
+                        orderFullyHandled = notificationOrderQueryService.isCustomOrderInProductionSent(memberId, orderId);
                     } else if ("REJECTED".equalsIgnoreCase(statusStr)) {
-                        String eventKey = "CUSTOM_ORDER_REJECTED:" + memberId + ":" + orderId;
-                        if (!notificationOrderQueryService.isNotificationFullySent(memberId, eventKey)) {
+                        if (!notificationOrderQueryService.isCustomOrderRejectedSent(memberId, orderId)) {
                             orderNotificationSender.sendCustomOrderRejected(orderId, memberId);
                         }
-                        orderFullyHandled = notificationOrderQueryService.isNotificationFullySent(memberId, eventKey);
+                        orderFullyHandled = notificationOrderQueryService.isCustomOrderRejectedSent(memberId, orderId);
                     } else if ("CANCELED".equalsIgnoreCase(statusStr)) {
                         // 고객 취소 알림 체크 및 전송
-                        String customerEventKey = "ORDER_CANCELED:" + memberId + ":" + orderId;
-                        if (!notificationOrderQueryService.isNotificationFullySent(memberId, customerEventKey)) {
+                        if (!notificationOrderQueryService.isOrderCanceledSent(memberId, orderId)) {
                             orderNotificationSender.sendOrderCanceledToCustomer(orderId, memberId);
                         }
                         // 관리자 취소 알림 체크 및 전송
                         if (adminIds != null && !adminIds.isEmpty()) {
                             boolean hasUnsentAdmin = adminIds.stream().anyMatch(adminId ->
-                                    !notificationOrderQueryService.isNotificationFullySent(adminId,
-                                            NotificationType.ORDER_CANCEL_REQUEST.name() + ":" + adminId + ":" + orderId));
+                                    !notificationOrderQueryService.isAdminOrderCanceledSent(adminId, orderId));
                             if (hasUnsentAdmin) {
                                 orderNotificationSender.sendOrderCanceledToAdmins(orderId, memberId, orderNumber);
                             }
                         }
-                        boolean customerSent = notificationOrderQueryService.isNotificationFullySent(memberId, customerEventKey);
+                        boolean customerSent = notificationOrderQueryService.isOrderCanceledSent(memberId, orderId);
                         boolean adminSent = adminIds == null || adminIds.stream().allMatch(adminId ->
-                                notificationOrderQueryService.isNotificationFullySent(adminId,
-                                        NotificationType.ORDER_CANCEL_REQUEST.name() + ":" + adminId + ":" + orderId));
+                                notificationOrderQueryService.isAdminOrderCanceledSent(adminId, orderId));
                         orderFullyHandled = customerSent && adminSent;
                     } else if ("PICKED_UP".equalsIgnoreCase(statusStr)) {
                         // 픽업 완료 고객 알림 독립 체크 및 전송
-                        String customerEventKey = NotificationType.CUSTOMER_ORDER_PICKED_UP.name() + ":" + memberId + ":" + orderId;
-                        if (!notificationOrderQueryService.isNotificationFullySent(memberId, customerEventKey)) {
+                        if (!notificationOrderQueryService.isCustomerOrderPickedUpSent(memberId, orderId)) {
                             orderNotificationSender.sendOrderPickedUpToCustomer(orderId, memberId);
                         }
                         // 픽업 완료 관리자 알림 독립 체크 및 전송
                         if (adminIds != null && !adminIds.isEmpty()) {
                             boolean hasUnsentAdmin = adminIds.stream().anyMatch(adminId ->
-                                    !notificationOrderQueryService.isNotificationFullySent(adminId,
-                                            NotificationType.ADMIN_PICKEDUP.name() + ":" + adminId + ":" + orderId));
+                                    !notificationOrderQueryService.isAdminOrderPickedUpSent(adminId, orderId));
                             if (hasUnsentAdmin) {
                                 orderNotificationSender.sendOrderPickedUpToAdmins(orderId, memberId, orderNumber);
                             }
                         }
-                        boolean customerSent = notificationOrderQueryService.isNotificationFullySent(memberId, customerEventKey);
+                        boolean customerSent = notificationOrderQueryService.isCustomerOrderPickedUpSent(memberId, orderId);
                         boolean adminSent = adminIds == null || adminIds.stream().allMatch(adminId ->
-                                notificationOrderQueryService.isNotificationFullySent(adminId,
-                                        NotificationType.ADMIN_PICKEDUP.name() + ":" + adminId + ":" + orderId));
+                                notificationOrderQueryService.isAdminOrderPickedUpSent(adminId, orderId));
                         orderFullyHandled = customerSent && adminSent;
                     }
 

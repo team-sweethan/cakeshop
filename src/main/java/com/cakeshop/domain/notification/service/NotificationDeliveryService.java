@@ -62,7 +62,7 @@ public class NotificationDeliveryService {
     public void updateDeliveryResult(Long deliveryId, String status, String providerMessageId, String failureReason, LocalDateTime sentAt) {
         if (deliveryId == null) return;
         try {
-            notificationMapper.updateDeliveryResult(deliveryId, status, providerMessageId, failureReason, sentAt, LocalDateTime.now());
+            notificationMapper.updateDeliveryResult(deliveryId, status, providerMessageId, failureReason, sentAt);
         } catch (Exception e) {
             log.error("SMS 발송 결과 업데이트 실패 (deliveryId: {})", deliveryId, e);
         }

@@ -1,7 +1,6 @@
 package com.cakeshop.domain.order.service;
 
 import com.cakeshop.domain.member.service.MemberOrderNotificationQueryService;
-import com.cakeshop.domain.notification.entity.NotificationType;
 import com.cakeshop.domain.notification.service.NotificationOrderQueryService;
 import com.cakeshop.domain.order.dto.view.OrderChatView;
 import com.cakeshop.domain.order.mapper.OrderPickupNotificationMapper;
@@ -56,16 +55,14 @@ public class OrderPickupNotificationSync {
                     String orderNumber = order.orderNumber();
 
                     // 고객 알림 독립 체크 및 전송
-                    String customerEventKey = NotificationType.CUSTOMER_PICKUP_REMINDER_TOMORROW.name() + ":" + memberId + ":" + orderId;
-                    if (!notificationOrderQueryService.isNotificationFullySent(memberId, customerEventKey)) {
+                    if (!notificationOrderQueryService.isCustomerPickupReminderSent(memberId, orderId, true)) {
                         orderNotificationSender.sendPickupReminderTomorrowToCustomer(orderId, memberId);
                     }
 
                     // 관리자들 알림 독립 체크 및 전송 (미완료 관리자가 있으면 관리자 발송 수행)
                     if (adminIds != null && !adminIds.isEmpty()) {
                         boolean hasUnsentAdmin = adminIds.stream().anyMatch(adminId ->
-                                !notificationOrderQueryService.isNotificationFullySent(adminId,
-                                        NotificationType.ADMIN_PICKUP_REMINDER_TOMORROW.name() + ":" + adminId + ":" + orderId));
+                                !notificationOrderQueryService.isAdminPickupReminderSent(adminId, orderId, true));
                         if (hasUnsentAdmin) {
                             orderNotificationSender.sendPickupReminderTomorrowToAdmins(orderId, memberId, orderNumber);
                         }
@@ -83,16 +80,14 @@ public class OrderPickupNotificationSync {
                     String orderNumber = order.orderNumber();
 
                     // 고객 알림 독립 체크 및 전송
-                    String customerEventKey = NotificationType.CUSTOMER_PICKUP_REMINDER_TODAY.name() + ":" + memberId + ":" + orderId;
-                    if (!notificationOrderQueryService.isNotificationFullySent(memberId, customerEventKey)) {
+                    if (!notificationOrderQueryService.isCustomerPickupReminderSent(memberId, orderId, false)) {
                         orderNotificationSender.sendPickupReminderTodayToCustomer(orderId, memberId);
                     }
 
                     // 관리자들 알림 독립 체크 및 전송 (미완료 관리자가 있으면 관리자 발송 수행)
                     if (adminIds != null && !adminIds.isEmpty()) {
                         boolean hasUnsentAdmin = adminIds.stream().anyMatch(adminId ->
-                                !notificationOrderQueryService.isNotificationFullySent(adminId,
-                                        NotificationType.ADMIN_PICKUP_REMINDER_TODAY.name() + ":" + adminId + ":" + orderId));
+                                !notificationOrderQueryService.isAdminPickupReminderSent(adminId, orderId, false));
                         if (hasUnsentAdmin) {
                             orderNotificationSender.sendPickupReminderTodayToAdmins(orderId, memberId, orderNumber);
                         }

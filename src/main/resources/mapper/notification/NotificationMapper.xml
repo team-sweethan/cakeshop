@@ -208,18 +208,18 @@
             #{failureReason},
             #{sentAt},
             #{deliveredAt},
-            #{createdAt},
-            #{updatedAt})
+            NOW(),
+            NOW())
     </insert>
 
-    <!-- 발송 결과 업데이트 -->
+    <!-- 발송 결과 업데이트 (상태, 프로바이더 메시지 ID, 실패 사유, 발송 시각) -->
     <update id="updateDeliveryResult">
         UPDATE notification_deliveries
         SET status = #{status},
             provider_message_id = #{providerMessageId},
             failure_reason = #{failureReason},
             sent_at = #{sentAt},
-            updated_at = #{updatedAt}
-        WHERE id = #{id}
+            updated_at = NOW()
+        WHERE id = #{deliveryId}
     </update>
 </mapper>
