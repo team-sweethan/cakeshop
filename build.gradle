@@ -67,6 +67,34 @@ tasks.named('test') {
             .withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
+tasks.register('unitTest', Test) {
+    group = 'verification'
+    description = 'MariaDB Testcontainers 테스트를 제외한 테스트를 실행한다.'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+
+    useJUnitPlatform { excludeTags 'mariadb' }
+
+    // DB 테스트는 저장소 규칙상 병렬 실행하지 않는다. 이 태스크에 남은 테스트만 두 JVM으로 나눠
+    // GitHub Actions의 2코어 러너를 사용한다.
+    maxParallelForks = Math.max(1, Math.min(2, Runtime.runtime.availableProcessors()))
+
+    // 기본 test 태스크와 같은 원문 경계 검사가 로컬에서도 UP-TO-DATE로 잘못 생략되지 않게 한다.
+    inputs.files(fileTree('src/main/java'))
+            .withPropertyName('mainSources')
+            .withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
+tasks.register('mariaDbTest', Test) {
+    group = 'verification'
+    description = 'mariadb 태그가 붙은 Testcontainers 통합 테스트를 순차 실행한다.'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+
+    useJUnitPlatform { includeTags 'mariadb' }
+    maxParallelForks = 1
+}
+
 // 마이그레이션 파일명을 사람이 정하면 여러 브랜치에서 같은 버전이 나온다.
 // 버전은 생성 시각으로 찍고, 개발자는 설명만 넘긴다.
 //   gradlew newMigration -Pdesc=add_coupon_table
