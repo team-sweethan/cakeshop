@@ -95,6 +95,28 @@ class HomeScreenRenderingTests {
     }
 
     @Test
+    void home_multipleNotices_serverKeepsFirstVisibleAsNoScriptFallback() throws Exception {
+        when(communityHomeQueryService.getNoticeSection()).thenReturn(
+                new NoticeSectionView(List.of(
+                        new NoticeView(7L, "첫 공지", NOTICE_DATE),
+                        new NoticeView(8L, "둘째 공지", NOTICE_DATE.minusDays(1)),
+                        new NoticeView(9L, "셋째 공지", NOTICE_DATE.minusDays(2)))));
+
+        String html = mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(html)
+                .contains("data-notice-rotation=\"true\"")
+                .contains("/js/home-notice-rotation.js");
+        assertThat(noticeOpeningTag(html, 7L)).doesNotContain("hidden");
+        assertThat(noticeOpeningTag(html, 8L)).contains("hidden");
+        assertThat(noticeOpeningTag(html, 9L)).contains("hidden");
+    }
+
+    @Test
     void home_noVisibleNotice_dropsNoticeSectionEntirely() throws Exception {
         mockMvc.perform(get("/"))
                 .andExpect(status().isOk())
@@ -124,5 +146,17 @@ class HomeScreenRenderingTests {
         assertThat(categoryIndex).isNotNegative();
         assertThat(serviceIndex).isLessThan(noticeIndex);
         assertThat(noticeIndex).isLessThan(categoryIndex);
+    }
+
+    private String noticeOpeningTag(String html, long noticeId) {
+        String href = "href=\"/community/notices/" + noticeId + "\"";
+        int hrefIndex = html.indexOf(href);
+        int tagStart = html.lastIndexOf("<a", hrefIndex);
+        int tagEnd = html.indexOf('>', hrefIndex);
+
+        assertThat(hrefIndex).isNotNegative();
+        assertThat(tagStart).isNotNegative();
+        assertThat(tagEnd).isGreaterThan(tagStart);
+        return html.substring(tagStart, tagEnd + 1);
     }
 }
