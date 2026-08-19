@@ -108,13 +108,13 @@ public class NotificationCouponSync {
 
                     try {
                         if (!memberNotificationQueryService.isMemberActive(memberId)) {
-                            currentCursorTime = coupon.issuedAt();
+                            currentCursorTime = coupon.effectiveAt();
                             currentCursorId = memberCouponId;
                             continue;
                         }
 
                         if (!couponNotificationQueryService.isMemberCouponAvailableAndUnexpired(memberCouponId, expiresAt)) {
-                            currentCursorTime = coupon.issuedAt();
+                            currentCursorTime = coupon.effectiveAt();
                             currentCursorId = memberCouponId;
                             continue;
                         }
@@ -130,7 +130,7 @@ public class NotificationCouponSync {
                                     .build());
                         }
 
-                        currentCursorTime = coupon.issuedAt();
+                        currentCursorTime = coupon.effectiveAt();
                         currentCursorId = memberCouponId;
 
                     } catch (Exception e) {

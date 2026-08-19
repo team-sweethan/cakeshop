@@ -12,7 +12,7 @@
  */-->
 <mapper namespace="com.cakeshop.domain.coupon.mapper.CouponNotificationMapper">
 
-    <!-- 1. 사용 시작일이 도래한 유효 발급 쿠폰 조회 -->
+    <!-- 1. 사용 시작일이 도래한 유효 발급 쿠폰 조회 (FIRST_ORDER 제외 및 시작 시각 이벤트 반영) -->
     <select id="findRecentlyIssuedOrStartedMemberCoupons" resultType="com.cakeshop.domain.coupon.dto.view.CouponNotificationView">
         SELECT 
             mc.id AS memberCouponId,
@@ -28,16 +28,17 @@
           AND c.status = 'ACTIVE'
           AND c.starts_at &lt;= NOW(6)
           AND c.expires_at &gt; NOW(6)
+          AND c.target_type IN ('ALL_MEMBERS', 'NEW_MEMBERS', 'BIRTHDAY', 'SPECIFIC_MEMBERS')
           <if test="lastIssuedAt != null and lastMemberCouponId != null">
               AND (
-                  mc.issued_at &gt; #{lastIssuedAt}
-                  OR (mc.issued_at = #{lastIssuedAt} AND mc.id &gt; #{lastMemberCouponId})
+                  GREATEST(mc.issued_at, c.starts_at) &gt; #{lastIssuedAt}
+                  OR (GREATEST(mc.issued_at, c.starts_at) = #{lastIssuedAt} AND mc.id &gt; #{lastMemberCouponId})
               )
           </if>
-          <if test="lastIssuedAt == null and since != null">
-              AND (mc.issued_at &gt;= #{since} OR c.starts_at &gt;= #{since})
+          <if test="lastMemberCouponId == null and since != null">
+              AND GREATEST(mc.issued_at, c.starts_at) &gt;= #{since}
           </if>
-        ORDER BY mc.issued_at ASC, mc.id ASC
+        ORDER BY GREATEST(mc.issued_at, c.starts_at) ASC, mc.id ASC
         LIMIT #{limit}
     </select>
 
