@@ -62,10 +62,11 @@ public class CommunityCommentController {
         Long parentCommentId = CommunityRequestParams.positiveLong(replyTo);
 
         /*
-         * replyTo 가 실려 왔는데 값이 망가졌으면 거절한다. 부재와 파싱 실패를 구분하지 않으면
-         * 변조된 답글 요청이 조용히 뿌리 댓글로 강등되어 저장된다.
+         * replyTo 가 실려 왔는데 값이 망가졌으면 빈 값까지 거절한다. 부재와 파싱 실패를 구분하지
+         * 않으면 변조된 답글 요청이 조용히 뿌리 댓글로 강등되어 저장된다. 답글 폼은 항상 값을
+         * 싣고 뿌리 폼은 파라미터 자체가 없으므로, 빈 값도 정상 경로가 아니다.
          */
-        if (replyTo != null && !replyTo.isBlank() && parentCommentId == null) {
+        if (replyTo != null && parentCommentId == null) {
             throw new BusinessException(CommunityErrorCode.COMMENT_NOT_FOUND);
         }
 

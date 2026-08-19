@@ -166,6 +166,21 @@ class CommunityCommentControllerTests {
                 .addReply(anyLong(), anyLong(), any(), anyLong());
     }
 
+    /** 빈 replyTo 도 부재가 아니라 망가진 값이다 — 뿌리 댓글로 강등하지 않고 거절한다. */
+    @Test
+    void addComment_blankReplyTo_isRejected() {
+        authenticateAs(7L);
+
+        assertThatThrownBy(() -> mockMvc.perform(post("/community/15/comments")
+                        .param("content", "답글 본문")
+                        .param("replyTo", "   ")))
+                .hasRootCauseInstanceOf(BusinessException.class);
+
+        verify(communityCommentService, never()).addComment(anyLong(), any(), anyLong());
+        verify(communityCommentService, never())
+                .addReply(anyLong(), anyLong(), any(), anyLong());
+    }
+
     /** 답글 검증 실패는 실패한 폼이 어느 묶음인지 화면에 알린다. */
     @Test
     void addComment_blankReply_marksFailedThread() throws Exception {
