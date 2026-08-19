@@ -269,6 +269,7 @@ CREATE DATABASE `cakeshop`
 ```sql
 SOURCE src/main/resources/db/seed/seed-local.sql;
 SOURCE src/main/resources/db/seed/seed-community.sql;
+SOURCE src/main/resources/db/seed/seed-review.sql;
 ```
 
 아직 공유하지 않은 migration을 작성 중이었다면 SQL을 고친 뒤 이 과정을 반복할 수 있다. 이미 공유된

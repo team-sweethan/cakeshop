@@ -192,9 +192,12 @@ Google·카카오 소셜 로그인은 `.env`에 각 서비스의 Client ID와 Cl
 ```sql
 SOURCE src/main/resources/db/seed/seed-local.sql;
 SOURCE src/main/resources/db/seed/seed-community.sql;
+SOURCE src/main/resources/db/seed/seed-review.sql;
 ```
 
-`seed-local.sql`이 회원과 게시글 카테고리를 먼저 준비하므로 실행 순서를 바꾸지 않습니다. 경로는 MariaDB 클라이언트를 시작한 위치에 맞게 절대 경로로 바꿔도 됩니다.
+`seed-local.sql`이 회원·상품을 먼저 준비하므로 실행 순서를 바꾸지 않습니다. `seed-community.sql`과
+`seed-review.sql`은 각각 커뮤니티와 후기 확인용 데이터가 필요할 때만 실행해도 됩니다. 경로는 MariaDB
+클라이언트를 시작한 위치에 맞게 절대 경로로 바꿔도 됩니다.
 
 ### 6. 빌드와 테스트
 
