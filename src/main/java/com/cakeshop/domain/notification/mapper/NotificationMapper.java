@@ -63,6 +63,9 @@ public interface NotificationMapper {
     // 발송 시도 총 횟수 조회 (최대 재시도 횟수 제한용)
     int countDeliveryAttempts(@Param("notificationId") Long notificationId);
 
+    // 최근 생성된 쿠폰 알림의 생성 시각 조회 (서버 재기동 시 영속 체크포인트 복구용)
+    LocalDateTime findLatestCouponNotificationCreatedAt();
+
     // 수신 회원 전화번호 조회 (주문서 작성 번호 우선, 알림톡 발송용)
     String findReceiverPhone(@Param("receiverId") Long receiverId, @Param("orderId") Long orderId); 
 

@@ -229,4 +229,13 @@
             updated_at = NOW()
         WHERE id = #{deliveryId}
     </update>
+
+    <!-- 최근 생성된 쿠폰 알림의 생성 시각 조회 (서버 재기동 시 영속 체크포인트 복구용) -->
+    <select id="findLatestCouponNotificationCreatedAt" resultType="java.time.LocalDateTime">
+        SELECT created_at
+        FROM notifications
+        WHERE notification_type = 'COUPON'
+        ORDER BY id DESC
+        LIMIT 1
+    </select>
 </mapper>
