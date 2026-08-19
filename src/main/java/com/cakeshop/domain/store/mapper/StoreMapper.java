@@ -18,7 +18,9 @@ public interface StoreMapper {
 
     List<StoreHoliday> findHolidays(@Param("storeId") Long storeId);
 
-    int updateStore(Store store);
+    int updateBasicInfo(Store store);
+
+    int updatePickupInfo(Store store);
 
     int upsertBusinessHour(StoreBusinessHour businessHour);
 

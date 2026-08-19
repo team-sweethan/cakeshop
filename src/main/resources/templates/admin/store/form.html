@@ -6,6 +6,7 @@
   <title>매장 정보 관리 | 관리자</title>
   <link rel="icon" th:href="@{/favicon.ico}" sizes="any">
   <link rel="stylesheet" th:href="@{/css/app.css}">
+  <link rel="stylesheet" th:href="@{/css/store-admin.css}">
   <script defer th:src="@{/js/store-admin.js}"></script>
 </head>
 <body>
@@ -19,8 +20,9 @@
 
     <div th:replace="~{fragments/common/alert :: alert}"></div>
 
-    <!-- 작업 흐름 1: @Valid 오류는 redirect하지 않고 같은 form 객체를 다시 렌더한다. -->
-    <form class="admin-form" th:action="@{/admin/store}" th:object="${storeForm}" method="post"
+    <div class="store-admin-content">
+    <!-- 각 영역은 독립적으로 검증하고 저장한다. -->
+    <form class="admin-form" th:action="@{/admin/store/basic-info}" th:object="${basicInfoForm}" method="post"
           enctype="multipart/form-data">
       <div class="alert alert--error" th:if="${#fields.hasAnyErrors()}">
         <strong>입력 내용을 확인해 주세요.</strong>
@@ -67,6 +69,17 @@
         </div>
       </section>
 
+      <button class="btn btn--primary" type="submit">기본 정보 저장</button>
+    </form>
+
+    <form class="admin-form" th:action="@{/admin/store/business-hours}"
+          th:object="${businessHoursForm}" method="post">
+      <div class="alert alert--error" th:if="${#fields.hasAnyErrors()}">
+        <strong>입력 내용을 확인해 주세요.</strong>
+        <ul>
+          <li th:each="error : ${#fields.allErrors()}" th:text="${error}"></li>
+        </ul>
+      </div>
       <section class="section">
         <h2 class="section-title">영업시간</h2>
         <div class="panel form-stack">
@@ -124,6 +137,17 @@
         </div>
       </section>
 
+      <button class="btn btn--primary" type="submit">영업시간 저장</button>
+    </form>
+
+    <form class="admin-form" th:action="@{/admin/store/pickup-info}"
+          th:object="${pickupInfoForm}" method="post">
+      <div class="alert alert--error" th:if="${#fields.hasAnyErrors()}">
+        <strong>입력 내용을 확인해 주세요.</strong>
+        <ul>
+          <li th:each="error : ${#fields.allErrors()}" th:text="${error}"></li>
+        </ul>
+      </div>
       <section class="section">
         <h2 class="section-title">픽업 정보</h2>
         <div class="panel form-stack">
@@ -167,10 +191,10 @@
         </div>
       </section>
 
-      <button class="btn btn--primary" type="submit">매장 정보 저장</button>
+      <button class="btn btn--primary" type="submit">픽업 정보 저장</button>
     </form>
 
-    <!-- 작업 흐름 2: 반복 가능한 특정 휴무일은 매장 수정과 별도 명령으로 관리한다. -->
+    <!-- 반복 가능한 특정 휴무일은 매장 수정과 별도 명령으로 관리한다. -->
     <section class="section holiday-section">
       <h2 class="section-title">특정 휴무일</h2>
       <div class="panel form-stack">
@@ -187,7 +211,7 @@
                    placeholder="예: 설 연휴">
             <p class="field-error" th:errors="*{reason}"></p>
           </div>
-          <button class="btn" type="submit">휴무일 추가</button>
+          <button class="btn btn--primary" type="submit">휴무일 추가</button>
         </form>
 
         <div class="empty-state" th:if="${#lists.isEmpty(holidays)}">등록된 향후 특정 휴무일이 없습니다.</div>
@@ -204,6 +228,7 @@
         </div>
       </div>
     </section>
+    </div>
     </main>
   </div>
 </div>
