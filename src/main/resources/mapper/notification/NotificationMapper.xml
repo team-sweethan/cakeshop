@@ -258,7 +258,7 @@
           ) &lt; 2
           AND NOT EXISTS (
               SELECT 1 FROM notification_deliveries nd3
-              WHERE nd3.notification_id = n.id AND nd3.status = 'PENDING' AND nd3.created_at &gt;= DATE_SUB(NOW(), INTERVAL 1 MINUTE)
+              WHERE nd3.notification_id = n.id AND nd3.status = 'PENDING'
           )
         ORDER BY n.id ASC
         LIMIT #{limit}

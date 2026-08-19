@@ -121,6 +121,9 @@ public class SolapiKakaoAlimtalkClient {
             message.put("from", sender);                  // 발신자 번호
             message.put("text", "[" + title + "]\n" + content); // 발송할 문자 내용
             message.put("type", "LMS");                   // 장문 문자(LMS) 타입 고정
+            if (notificationId != null) {
+                message.put("customFields", Map.of("notificationId", String.valueOf(notificationId)));
+            }
 
             body.put("message", message);
 
