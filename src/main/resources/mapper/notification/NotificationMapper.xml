@@ -238,4 +238,27 @@
         ORDER BY id DESC
         LIMIT 1
     </select>
+
+    <!-- 실패한 쿠폰 알림 중 재시도(2회 미만) 가능한 알림 목록 조회 -->
+    <select id="findRetryableCouponNotifications" resultType="Notification">
+        SELECT *
+        FROM notifications n
+        WHERE n.notification_type IN ('COUPON', 'COUPON_EXPIRING_SOON')
+          AND n.delivery_scope = 'WEB_AND_SMS'
+          AND n.created_at &gt;= DATE_SUB(NOW(), INTERVAL 2 HOUR)
+          AND NOT EXISTS (
+              SELECT 1 FROM notification_deliveries nd
+              WHERE nd.notification_id = n.id AND nd.status IN ('SENT', 'DELIVERED')
+          )
+          AND (
+              SELECT COUNT(*) FROM notification_deliveries nd2
+              WHERE nd2.notification_id = n.id
+          ) &lt; 2
+          AND NOT EXISTS (
+              SELECT 1 FROM notification_deliveries nd3
+              WHERE nd3.notification_id = n.id AND nd3.status = 'PENDING' AND nd3.created_at &gt;= DATE_SUB(NOW(), INTERVAL 1 MINUTE)
+          )
+        ORDER BY n.id ASC
+        LIMIT #{limit}
+    </select>
 </mapper>

@@ -11,6 +11,7 @@ import com.cakeshop.domain.coupon.dto.view.CouponNotificationView;
 import com.cakeshop.domain.coupon.service.CouponNotificationQueryService;
 import com.cakeshop.domain.member.service.MemberNotificationQueryService;
 import com.cakeshop.domain.notification.entity.DeliveryScope;
+import com.cakeshop.domain.notification.entity.Notification;
 import com.cakeshop.domain.notification.entity.NotificationType;
 import com.cakeshop.domain.notification.mapper.NotificationMapper;
 import java.time.Clock;
@@ -32,7 +33,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
  * 담당자 : 김민정
  * 작성일 : 2026-08-19
  * 기능 : 쿠폰 발급 및 만료 임박(3일 전) 알림 동기화 스케줄러 단위 테스트
- * 설명 : NotificationCouponSync가 사용 시작일이 도래한 신규 발급 쿠폰(COUPON) 및 만료 3일 전 쿠폰(COUPON_EXPIRING_SOON)을 정상 발송하는지 검증한다.
+ * 설명 : NotificationCouponSync가 사용 시작일이 도래한 신규 발급 쿠폰(COUPON), 만료 3일 전 쿠폰(COUPON_EXPIRING_SOON) 및 실패한 SMS 재시도를 정상 수행하는지 검증한다.
  * ******************************
  */
 @ExtendWith(MockitoExtension.class)
@@ -111,6 +112,31 @@ class NotificationCouponSyncTest {
                 req.getArgs() != null &&
                 "오픈 기념 쿠폰".equals(req.getArgs()[0])
         ));
+    }
+
+    @Test
+    @DisplayName("실패한 외부 SMS 발송 알림이 있는 경우 자동으로 retrySmsForNotification이 호출된다")
+    void syncCouponIssuance_retryFailedSms_retriesSuccessfully() {
+        Notification failedNotification = Notification.builder()
+                .id(100L)
+                .receiverId(5L)
+                .title("쿠폰 발급")
+                .content("웰컴 쿠폰이 발급되었습니다.")
+                .notificationType(NotificationType.COUPON)
+                .deliveryScope(DeliveryScope.WEB_AND_SMS)
+                .build();
+
+        given(couponNotificationQueryService.findRecentlyIssuedMemberCoupons(any(), any(), any(), anyInt()))
+                .willReturn(List.of());
+        given(couponNotificationQueryService.findRecentlyStartedMemberCoupons(any(), any(), any(), anyInt()))
+                .willReturn(List.of());
+        given(notificationMapper.findRetryableCouponNotifications(anyInt()))
+                .willReturn(List.of(failedNotification));
+        given(memberNotificationQueryService.isMemberActive(5L)).willReturn(true);
+
+        notificationCouponSync.syncCouponIssuance();
+
+        verify(notificationService).retrySmsForNotification(100L, 5L, "쿠폰 발급", "웰컴 쿠폰이 발급되었습니다.");
     }
 
     @Test

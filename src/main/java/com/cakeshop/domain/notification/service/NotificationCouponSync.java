@@ -89,6 +89,9 @@ public class NotificationCouponSync {
             // 1-2. 사용 시작일 도래 쿠폰 처리 (idx_coupons_status_starts_expires 인덱스 기반)
             syncStartedCoupons(now);
 
+            // 1-3. 외부 SMS 실패 건 자동 재시도 (최대 2회 상한 보존)
+            retryFailedCouponSms();
+
         } catch (Exception e) {
             log.error("쿠폰 발급 알림 동기화 배치 실행 중 예외 발생 (errorType={}):", e.getClass().getSimpleName());
         } finally {
@@ -245,6 +248,32 @@ public class NotificationCouponSync {
 
         this.lastStartsSyncTime = currentCursorTime;
         this.lastStartsProcessedMemberCouponId = currentCursorId;
+    }
+
+    /**
+     * 실패한 외부 SMS 발송 건을 조회하여 최대 2회 상한까지 자동으로 재시도한다.
+     */
+    private void retryFailedCouponSms() {
+        try {
+            List<com.cakeshop.domain.notification.entity.Notification> retryableList = notificationMapper.findRetryableCouponNotifications(50);
+            if (retryableList == null || retryableList.isEmpty()) {
+                return;
+            }
+
+            for (com.cakeshop.domain.notification.entity.Notification notification : retryableList) {
+                if (notification.getId() == null || notification.getReceiverId() == null) continue;
+                if (!memberNotificationQueryService.isMemberActive(notification.getReceiverId())) continue;
+
+                notificationService.retrySmsForNotification(
+                        notification.getId(),
+                        notification.getReceiverId(),
+                        notification.getTitle(),
+                        notification.getContent()
+                );
+            }
+        } catch (Exception e) {
+            log.error("실패한 쿠폰 알림 SMS 재시도 중 예외 발생 (errorType={}):", e.getClass().getSimpleName());
+        }
     }
 
     /**
