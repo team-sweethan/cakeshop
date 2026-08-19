@@ -152,7 +152,10 @@
             headers: headers
           })
           .then(response => {
-            if (response.ok) loadNotifications();
+            if (response.ok) {
+              loadNotifications();
+              if (typeof updateNotificationUnreadCount === "function") updateNotificationUnreadCount();
+            }
           })
           .catch(err => console.error("전체 읽음 실패:", err));
         });
@@ -201,7 +204,10 @@
               headers: headers
             })
             .then(res => {
-              if (res.ok) loadNotifications();
+              if (res.ok) {
+                loadNotifications();
+                if (typeof updateNotificationUnreadCount === "function") updateNotificationUnreadCount();
+              }
             });
           });
         });
