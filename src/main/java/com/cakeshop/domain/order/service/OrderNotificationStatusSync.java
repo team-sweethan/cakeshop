@@ -47,8 +47,8 @@ public class OrderNotificationStatusSync {
 
         try {
             if (lastSyncTime == null) {
-                // 재시작 시 다운타임(10분 초과) 동안의 미처리 알림 복구를 위해 최근 1일 전부터 탐색
-                lastSyncTime = LocalDateTime.now(clock).minusDays(1);
+                // 재시작 시 장기 다운타임 동안의 미처리 알림(픽업 완료 등) 완벽 복구를 위해 최근 30일 전부터 탐색
+                lastSyncTime = LocalDateTime.now(clock).minusDays(30);
             }
 
             List<OrderChatView> recentOrders = orderChatMapper.findRecentStatusChangedOrders(lastSyncTime);
