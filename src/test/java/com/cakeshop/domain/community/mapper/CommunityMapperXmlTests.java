@@ -194,8 +194,8 @@ class CommunityMapperXmlTests {
     void insertDailyRanking_appliesWindowToEverySource() {
         String sql = normalizedSql("insertDailyRanking");
 
-        assertThat(countOccurrences(sql, "CREATED_AT >= ? - INTERVAL 6 DAY")).isEqualTo(3);
-        assertThat(countOccurrences(sql, "CREATED_AT < ? + INTERVAL 1 DAY")).isEqualTo(3);
+        assertThat(countOccurrences(
+                sql, "CREATED_AT >= ? AND CREATED_AT < ? + INTERVAL 1 DAY")).isEqualTo(3);
         assertThat(sql).contains("FROM POST_VIEWS", "FROM POST_LIKES", "FROM COMMENTS");
     }
 

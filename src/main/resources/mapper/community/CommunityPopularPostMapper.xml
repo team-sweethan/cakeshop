@@ -3,7 +3,7 @@
 <mapper namespace="com.cakeshop.domain.community.mapper.CommunityPopularPostMapper">
 
     <sql id="popularityWindow">
-        created_at &gt;= #{rankingDate} - INTERVAL 6 DAY
+        created_at &gt;= #{rankingDate}
         AND created_at &lt; #{rankingDate} + INTERVAL 1 DAY
     </sql>
 
