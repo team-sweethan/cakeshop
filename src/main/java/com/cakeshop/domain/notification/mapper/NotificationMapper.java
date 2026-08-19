@@ -10,24 +10,24 @@ import com.cakeshop.domain.notification.entity.NotificationDelivery;
 
 @Mapper
 public interface NotificationMapper {
-    // TODO: 조회·저장 메서드 — LIMIT #{size} OFFSET #{offset} 페이징 규칙 준수
-    
-    // 알림 DB에 저장
+
+    // 알림 DB 저장하기
     void save(Notification notification);
 
-    // 특정 회원 알림 목록 조회 (페이징 적용)
-    List<NotificationResponse> findUserNotificationList(@Param("receiverId") Long receiverId,
-                                                        @Param("size") int size,
-                                                        @Param("offset") int offset);
+    // 단일 알림 조회하기 (상세 조회용)
+    Notification findById(@Param("id") Long id);
 
-    // 특정 회원 알림 1건 읽음 처리
+    // 알림 단건 읽음 처리
     void markAsRead(@Param("id") Long id, @Param("receiverId") Long receiverId);
 
-    // 특정 회원 알림 전체 읽음 처리
-    void markAllAsRead(Long receiverId);
+    // 알림 전체 읽음 처리
+    void markAllAsRead(@Param("receiverId") Long receiverId);
 
-    // 특정 회원의 안 읽은 알림 개수 조회
-    int countUnreadNotifications(Long receiverId);
+    // 특정 회원 알림 목록 최신순 페이징 조회
+    List<NotificationResponse> findUserNotificationList(@Param("receiverId") Long receiverId, @Param("size") int size, @Param("offset") int offset);
+
+    // 미확인 알림 개수 조회
+    int countUnreadNotifications(@Param("receiverId") Long receiverId);
 
     // 중복 event_key 존재 여부
     boolean existsByReceiverIdAndEventKey(@Param("receiverId") Long receiverId, @Param("eventKey") String eventKey);
@@ -57,7 +57,7 @@ public interface NotificationMapper {
     // 현재 진행 중인(최근 1분 이내) PENDING 예약이 존재하는지 확인 (동시 발송 레이스 차단)
     boolean hasActivePendingDelivery(@Param("notificationId") Long notificationId);
 
-    // 이미 발송 시도 이력(SENT, FAILED, SKIPPED)이 한 번이라도 존재하는지 확인
+    // 이미 발송 시도 이력(SENT, DELIVERED, FAILED, SKIPPED)이 한 번이라도 존재하는지 확인
     boolean hasAttemptedDelivery(@Param("notificationId") Long notificationId);
 
     // 발송 시도 총 횟수 조회 (최대 재시도 횟수 제한용)
@@ -65,6 +65,9 @@ public interface NotificationMapper {
 
     // 최근 생성된 쿠폰 알림의 생성 시각 조회 (서버 재기동 시 영속 체크포인트 복구용)
     LocalDateTime findLatestCouponNotificationCreatedAt();
+
+    // 실패한 쿠폰 알림 중 재시도(2회 미만) 가능한 알림 목록 조회 (커서 페이징 지원)
+    List<Notification> findRetryableCouponNotifications(@Param("lastId") Long lastId, @Param("limit") int limit);
 
     // 수신 회원 전화번호 조회 (주문서 작성 번호 우선, 알림톡 발송용)
     String findReceiverPhone(@Param("receiverId") Long receiverId, @Param("orderId") Long orderId); 
@@ -78,4 +81,7 @@ public interface NotificationMapper {
                               @Param("providerMessageId") String providerMessageId,
                               @Param("failureReason") String failureReason,
                               @Param("sentAt") LocalDateTime sentAt);
+
+    // 프로세스 중단 등으로 방치된 오래된 PENDING 발송 이력을 FAILED로 안전하게 확정 종결 (복구 경로)
+    int updateStalePendingDeliveriesToFailed(@Param("thresholdMinutes") int thresholdMinutes);
 }

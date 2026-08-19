@@ -14,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 담당자 : 이정후
  * 작성일 : 2026-08-19
  * 기능 : 알림 연동 전용 쿠폰 조회 서비스
- * 설명 : 알림 도메인에 만료 임박(3일 이내) 유효 쿠폰 목록 조회 및 발송 직전 상태 재검증 기능을 제공하는 공개 계약 Service이다.
+ * 설명 : 알림 도메인에 신규 발급 쿠폰, 시작 도래 쿠폰, 만료 임박 쿠폰을 인덱스 기반으로 제공하는 공개 계약 Service이다.
  * ******************************
  */
 @Service
@@ -23,6 +23,30 @@ import org.springframework.transaction.annotation.Transactional;
 public class CouponNotificationQueryService {
 
     private final CouponNotificationMapper couponNotificationMapper;
+
+    /**
+     * 특정 시점(since) 이후 발급된 유효 쿠폰 목록을 (issued_at, id) 복합 커서로 조회한다.
+     */
+    public List<CouponNotificationView> findRecentlyIssuedMemberCoupons(
+            LocalDateTime since,
+            LocalDateTime lastIssuedAt,
+            Long lastMemberCouponId,
+            int limit) {
+        int fetchLimit = limit > 0 ? limit : 100;
+        return couponNotificationMapper.findRecentlyIssuedMemberCoupons(since, lastIssuedAt, lastMemberCouponId, fetchLimit);
+    }
+
+    /**
+     * 특정 시점(since) 이후 사용 시작일이 도래한 유효 쿠폰 목록을 (starts_at, id) 복합 커서로 조회한다.
+     */
+    public List<CouponNotificationView> findRecentlyStartedMemberCoupons(
+            LocalDateTime since,
+            LocalDateTime lastStartsAt,
+            Long lastMemberCouponId,
+            int limit) {
+        int fetchLimit = limit > 0 ? limit : 100;
+        return couponNotificationMapper.findRecentlyStartedMemberCoupons(since, lastStartsAt, lastMemberCouponId, fetchLimit);
+    }
 
     /**
      * 지정된 일수(days) 이내에 만료 예정인 유효 쿠폰 목록을 복합 커서(lastExpiresAt, lastMemberCouponId)로 조회한다.
@@ -41,7 +65,7 @@ public class CouponNotificationQueryService {
      * 발송 직전 해당 회원 쿠폰이 여전히 사용 가능(AVAILABLE)하고 활성(ACTIVE) 상태이며 만료되지 않았는지 재확인한다.
      */
     public boolean isMemberCouponAvailableAndUnexpired(Long memberCouponId, LocalDateTime expiresAt) {
-        if (memberCouponId == null || expiresAt == null) {
+        if (memberCouponId == null) {
             return false;
         }
         return couponNotificationMapper.isMemberCouponAvailableAndUnexpired(memberCouponId, expiresAt);

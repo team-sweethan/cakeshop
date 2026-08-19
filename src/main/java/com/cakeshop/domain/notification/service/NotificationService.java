@@ -185,6 +185,15 @@ public class NotificationService {
         }
     }
 
+    /**
+     * 실패한 외부 SMS 발송에 대한 재시도를 수행한다. (최대 2회 상한 보존)
+     */
+    public void retrySmsForNotification(Long notificationId, Long receiverId, String title, String content) {
+        if (notificationId == null || receiverId == null) return;
+        String receiverPhone = notificationMapper.findReceiverPhone(receiverId, null);
+        registerSmsSending(notificationId, receiverPhone, title, content, 2);
+    }
+
     private void registerSmsSending(Long notificationId, String receiverPhone, String title, String content) {
         registerSmsSending(notificationId, receiverPhone, title, content, 2);
     }
