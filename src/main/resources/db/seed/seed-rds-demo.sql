@@ -2,8 +2,10 @@
 --
 -- 적용 대상: Flyway migration을 모두 적용한 빈 공용 개발·시연 RDS
 -- 운영 DB에는 실행하지 않는다.
--- Flyway migration을 모두 적용한 뒤 MariaDB 클라이언트의
--- --abort-source-on-error 옵션과 함께 수동 실행한다.
+-- Flyway migration을 모두 적용한 뒤 MariaDB 클라이언트의 일회성 batch로 수동 실행한다.
+-- 대화형 접속에서 SOURCE만 실행하면 오류 후 미커밋 트랜잭션이 세션에 남으므로 금지한다.
+-- 관리자 해시 설정과 SOURCE를 하나의 --execute 입력으로 전달하고,
+-- --abort-source-on-error를 사용해 성공 또는 실패 직후 클라이언트 연결이 종료되게 한다.
 -- 실행 전 같은 DB 세션의 @rds_demo_admin_password_hash 변수에
 -- 이 환경에서만 사용하는 BCrypt 해시를 설정해야 한다.
 -- 비밀번호 원문과 해시는 저장소에 커밋하지 않는다.
@@ -18,7 +20,8 @@ CREATE TEMPORARY TABLE `_rds_demo_seed_config` (
     `admin_password_hash` VARCHAR(255) NOT NULL,
     CONSTRAINT `chk_rds_demo_admin_password_hash`
         CHECK (
-            CAST(`admin_password_hash` AS BINARY) REGEXP
+            CHAR_LENGTH(`admin_password_hash`) = 60
+            AND CAST(`admin_password_hash` AS BINARY) REGEXP
                 '^[$]2[aby][$](0[4-9]|[12][0-9]|3[01])[$][./A-Za-z0-9]{53}$'
         )
 );

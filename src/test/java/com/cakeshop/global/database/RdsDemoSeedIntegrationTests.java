@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.cakeshop.global.config.MariaDbIntegrationTest;
 import java.sql.PreparedStatement;
+import java.sql.Statement;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -124,13 +125,8 @@ class RdsDemoSeedIntegrationTests {
                 """
         )).isZero();
 
-        long memberCount = count("SELECT COUNT(*) FROM members");
-        long productCount = count("SELECT COUNT(*) FROM products");
-
-        assertThatThrownBy(() -> runSeed(INVALID_ADMIN_HASH))
-                .isInstanceOf(ScriptException.class);
-        assertThat(count("SELECT COUNT(*) FROM members")).isEqualTo(memberCount);
-        assertThat(count("SELECT COUNT(*) FROM products")).isEqualTo(productCount);
+        assertInvalidAdminHashIsRejected(INVALID_ADMIN_HASH);
+        assertInvalidAdminHashIsRejected(TEST_ADMIN_HASH + "\n");
     }
 
     private void runSeed() {
@@ -144,9 +140,30 @@ class RdsDemoSeedIntegrationTests {
                 statement.setString(1, adminHash);
                 statement.executeUpdate();
             }
-            ScriptUtils.executeSqlScript(connection, new ClassPathResource(RDS_DEMO_SEED));
+            try {
+                ScriptUtils.executeSqlScript(connection, new ClassPathResource(RDS_DEMO_SEED));
+            } catch (ScriptException exception) {
+                try (Statement cleanup = connection.createStatement()) {
+                    cleanup.execute("ROLLBACK");
+                    cleanup.execute("DROP TEMPORARY TABLE IF EXISTS _rds_demo_seed_option_groups");
+                    cleanup.execute("DROP TEMPORARY TABLE IF EXISTS _rds_demo_seed_products");
+                    cleanup.execute("DROP TEMPORARY TABLE IF EXISTS _rds_demo_seed_config");
+                    cleanup.execute("SET @rds_demo_admin_password_hash = NULL");
+                }
+                throw exception;
+            }
             return null;
         });
+    }
+
+    private void assertInvalidAdminHashIsRejected(String invalidHash) {
+        long memberCount = count("SELECT COUNT(*) FROM members");
+        long productCount = count("SELECT COUNT(*) FROM products");
+
+        assertThatThrownBy(() -> runSeed(invalidHash))
+                .isInstanceOf(ScriptException.class);
+        assertThat(count("SELECT COUNT(*) FROM members")).isEqualTo(memberCount);
+        assertThat(count("SELECT COUNT(*) FROM products")).isEqualTo(productCount);
     }
 
     private void insertSameNamedProductsOutsideSeedIdentity() {
