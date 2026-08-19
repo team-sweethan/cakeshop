@@ -40,9 +40,17 @@ fi
 files=$(printf '%s' "$comparison" | jq -r '.files[] | .filename, (.previous_filename // empty)')
 
 echo "변경된 파일:"
-printf '%s\n' "$files" | sed 's/^/  /'
+sed 's/^/  /' <<< "$files"
 
-if printf '%s\n' "$files" | grep -qvE '^docs/|\.md$|^\.gitignore$'; then
+# 확장자만 보지 않고 위치까지 고정한다. src/main/resources 아래의 .md 는 jar 에 실려
+# 정적 자원으로 응답되므로 문서가 아니다.
+#
+# grep 에 파이프를 쓰지 않는 이유는 -q 가 첫 매치에서 즉시 끝나기 때문이다. 목록이 파이프
+# 버퍼(64KB)보다 크면 앞을 쓰던 쪽이 SIGPIPE 로 죽고, pipefail 이 그 파이프라인을 실패로
+# 보는 바람에 '비문서 파일을 찾았다' 가 '못 찾았다' 로 뒤집힌다. 그 방향이 하필 생략이다.
+skippable='^docs/|^[^/]+\.md$|^\.github/[^/]+\.md$|^src/main/java/.+/CLAUDE\.md$|^\.gitignore$'
+
+if grep -qvE "$skippable" <<< "$files"; then
     run_tests "테스트에 영향을 주는 변경이 있어 실행한다."
 fi
 
