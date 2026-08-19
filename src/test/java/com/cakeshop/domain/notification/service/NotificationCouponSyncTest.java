@@ -60,12 +60,14 @@ class NotificationCouponSyncTest {
     private NotificationCouponSync notificationCouponSync;
 
     @Test
-    @DisplayName("사용 시작일이 도래한 유효 발급 쿠폰이 있는 경우 COUPON 발급 알림이 정상 발송된다")
-    void syncCouponIssuance_issuedCoupon_sendsIssuanceNotification() {
+    @DisplayName("신규 발급된 유효 쿠폰이 있는 경우 COUPON 발급 알림이 정상 발송된다")
+    void syncCouponIssuance_newlyIssuedCoupon_sendsIssuanceNotification() {
         LocalDateTime now = LocalDateTime.now(clock);
         CouponNotificationView coupon = new CouponNotificationView(10L, 1L, 2L, "웰컴 10% 할인 쿠폰", now, now, now.plusDays(30));
-        given(couponNotificationQueryService.findRecentlyIssuedOrStartedMemberCoupons(any(), any(), any(), anyInt()))
+        given(couponNotificationQueryService.findRecentlyIssuedMemberCoupons(any(), any(), any(), anyInt()))
                 .willReturn(List.of(coupon));
+        given(couponNotificationQueryService.findRecentlyStartedMemberCoupons(any(), any(), any(), anyInt()))
+                .willReturn(List.of());
         given(memberNotificationQueryService.isMemberActive(2L)).willReturn(true);
         given(couponNotificationQueryService.isMemberCouponAvailableAndUnexpired(10L, coupon.expiresAt())).willReturn(true);
         given(notificationCouponQueryService.isCouponIssuedNotificationCompletedOrInactive(2L, 10L))
@@ -81,6 +83,33 @@ class NotificationCouponSyncTest {
                 "COUPON:2:10".equals(req.getEventKey()) &&
                 req.getArgs() != null &&
                 "웰컴 10% 할인 쿠폰".equals(req.getArgs()[0])
+        ));
+    }
+
+    @Test
+    @DisplayName("사용 시작일이 도래한 미래 시작 쿠폰이 있는 경우 COUPON 발급 알림이 정상 발송된다")
+    void syncCouponIssuance_startedCoupon_sendsIssuanceNotification() {
+        LocalDateTime now = LocalDateTime.now(clock);
+        CouponNotificationView coupon = new CouponNotificationView(11L, 2L, 3L, "오픈 기념 쿠폰", now.minusDays(5), now, now.plusDays(25));
+        given(couponNotificationQueryService.findRecentlyIssuedMemberCoupons(any(), any(), any(), anyInt()))
+                .willReturn(List.of());
+        given(couponNotificationQueryService.findRecentlyStartedMemberCoupons(any(), any(), any(), anyInt()))
+                .willReturn(List.of(coupon));
+        given(memberNotificationQueryService.isMemberActive(3L)).willReturn(true);
+        given(couponNotificationQueryService.isMemberCouponAvailableAndUnexpired(11L, coupon.expiresAt())).willReturn(true);
+        given(notificationCouponQueryService.isCouponIssuedNotificationCompletedOrInactive(3L, 11L))
+                .willReturn(false);
+
+        notificationCouponSync.syncCouponIssuance();
+
+        verify(notificationService).makeNotification(argThat(req ->
+                req.getReceiverId() == 3L &&
+                req.getUserCouponId() == 11L &&
+                req.getType() == NotificationType.COUPON &&
+                req.getDeliveryScope() == DeliveryScope.WEB_AND_SMS &&
+                "COUPON:3:11".equals(req.getEventKey()) &&
+                req.getArgs() != null &&
+                "오픈 기념 쿠폰".equals(req.getArgs()[0])
         ));
     }
 
@@ -116,8 +145,10 @@ class NotificationCouponSyncTest {
     void syncCouponIssuance_couponNotAvailable_skipsNotification() {
         LocalDateTime now = LocalDateTime.now(clock);
         CouponNotificationView coupon = new CouponNotificationView(10L, 1L, 2L, "웰컴 10% 할인 쿠폰", now, now, now.plusDays(30));
-        given(couponNotificationQueryService.findRecentlyIssuedOrStartedMemberCoupons(any(), any(), any(), anyInt()))
+        given(couponNotificationQueryService.findRecentlyIssuedMemberCoupons(any(), any(), any(), anyInt()))
                 .willReturn(List.of(coupon));
+        given(couponNotificationQueryService.findRecentlyStartedMemberCoupons(any(), any(), any(), anyInt()))
+                .willReturn(List.of());
         given(memberNotificationQueryService.isMemberActive(2L)).willReturn(true);
         given(couponNotificationQueryService.isMemberCouponAvailableAndUnexpired(10L, coupon.expiresAt())).willReturn(false);
 

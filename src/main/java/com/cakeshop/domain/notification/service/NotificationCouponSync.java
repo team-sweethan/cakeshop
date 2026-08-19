@@ -50,6 +50,10 @@ public class NotificationCouponSync {
     private LocalDateTime lastIssuanceSyncTime;
     private Long lastIssuanceProcessedMemberCouponId;
 
+    // 시작일 도래 동기화용 커서
+    private LocalDateTime lastStartsSyncTime;
+    private Long lastStartsProcessedMemberCouponId;
+
     // 만료 동기화용 실행 간 커서
     private LocalDateTime persistentCursorExpiresAt;
     private Long persistentCursorMemberCouponId;
@@ -66,93 +70,181 @@ public class NotificationCouponSync {
         }
 
         try {
+            LocalDateTime now = LocalDateTime.now(clock);
             if (lastIssuanceSyncTime == null) {
                 LocalDateTime latestNotificationTime = notificationMapper.findLatestCouponNotificationCreatedAt();
                 if (latestNotificationTime != null) {
                     lastIssuanceSyncTime = latestNotificationTime.minusSeconds(10);
                 } else {
-                    lastIssuanceSyncTime = LocalDateTime.now(clock);
+                    lastIssuanceSyncTime = now;
                 }
             }
-
-            int loopCount = 0;
-            final int MAX_LOOPS_PER_RUN = 10;
-            final int PAGE_SIZE = 100;
-
-            LocalDateTime querySince = lastIssuanceSyncTime.minusSeconds(10);
-            LocalDateTime currentCursorTime = lastIssuanceSyncTime;
-            Long currentCursorId = lastIssuanceProcessedMemberCouponId;
-
-            while (loopCount < MAX_LOOPS_PER_RUN) {
-                loopCount++;
-
-                List<CouponNotificationView> issuedCoupons = couponNotificationQueryService.findRecentlyIssuedOrStartedMemberCoupons(
-                        querySince, currentCursorTime, currentCursorId, PAGE_SIZE
-                );
-
-                if (issuedCoupons == null || issuedCoupons.isEmpty()) {
-                    break;
-                }
-
-                boolean hadErrorInBatch = false;
-
-                for (CouponNotificationView coupon : issuedCoupons) {
-                    if (coupon.memberCouponId() == null || coupon.memberId() == null) {
-                        continue;
-                    }
-
-                    Long memberId = coupon.memberId();
-                    Long memberCouponId = coupon.memberCouponId();
-                    LocalDateTime expiresAt = coupon.expiresAt();
-                    String couponName = (coupon.couponName() != null && !coupon.couponName().isBlank()) ? coupon.couponName() : "할인";
-
-                    try {
-                        if (!memberNotificationQueryService.isMemberActive(memberId)) {
-                            currentCursorTime = coupon.effectiveAt();
-                            currentCursorId = memberCouponId;
-                            continue;
-                        }
-
-                        if (!couponNotificationQueryService.isMemberCouponAvailableAndUnexpired(memberCouponId, expiresAt)) {
-                            currentCursorTime = coupon.effectiveAt();
-                            currentCursorId = memberCouponId;
-                            continue;
-                        }
-
-                        if (!notificationCouponQueryService.isCouponIssuedNotificationCompletedOrInactive(memberId, memberCouponId)) {
-                            notificationService.makeNotification(NotificationRequest.builder()
-                                    .receiverId(memberId)
-                                    .userCouponId(memberCouponId)
-                                    .type(NotificationType.COUPON)
-                                    .eventKey(NotificationType.COUPON.name() + ":" + memberId + ":" + memberCouponId)
-                                    .deliveryScope(DeliveryScope.WEB_AND_SMS)
-                                    .args(new Object[]{couponName})
-                                    .build());
-                        }
-
-                        currentCursorTime = coupon.effectiveAt();
-                        currentCursorId = memberCouponId;
-
-                    } catch (Exception e) {
-                        log.error("쿠폰 발급 알림 발송 중 오류 발생 (errorType={}):", e.getClass().getSimpleName());
-                        hadErrorInBatch = true;
-                        break;
-                    }
-                }
-
-                if (hadErrorInBatch || issuedCoupons.size() < PAGE_SIZE) {
-                    break;
-                }
+            if (lastStartsSyncTime == null) {
+                lastStartsSyncTime = lastIssuanceSyncTime;
             }
 
-            this.lastIssuanceSyncTime = currentCursorTime;
-            this.lastIssuanceProcessedMemberCouponId = currentCursorId;
+            // 1-1. 신규 발급 쿠폰 처리 (idx_member_coupons_issued_at_id 인덱스 기반)
+            syncNewlyIssuedCoupons(now);
+
+            // 1-2. 사용 시작일 도래 쿠폰 처리 (idx_coupons_status_starts_expires 인덱스 기반)
+            syncStartedCoupons(now);
 
         } catch (Exception e) {
             log.error("쿠폰 발급 알림 동기화 배치 실행 중 예외 발생 (errorType={}):", e.getClass().getSimpleName());
         } finally {
             isIssuanceRunning.set(false);
         }
+    }
+
+    private void syncNewlyIssuedCoupons(LocalDateTime now) {
+        int loopCount = 0;
+        final int MAX_LOOPS_PER_RUN = 10;
+        final int PAGE_SIZE = 100;
+
+        // 지연 커밋(Out-of-order) 트랜잭션을 포괄하기 위한 10초 안전 윈도우
+        LocalDateTime querySince = lastIssuanceSyncTime.minusSeconds(10);
+        LocalDateTime currentCursorTime = lastIssuanceSyncTime;
+        Long currentCursorId = lastIssuanceProcessedMemberCouponId;
+
+        while (loopCount < MAX_LOOPS_PER_RUN) {
+            loopCount++;
+
+            List<CouponNotificationView> issuedCoupons = couponNotificationQueryService.findRecentlyIssuedMemberCoupons(
+                    querySince, currentCursorTime, currentCursorId, PAGE_SIZE
+            );
+
+            if (issuedCoupons == null || issuedCoupons.isEmpty()) {
+                break;
+            }
+
+            boolean hadErrorInBatch = false;
+
+            for (CouponNotificationView coupon : issuedCoupons) {
+                if (coupon.memberCouponId() == null || coupon.memberId() == null) {
+                    continue;
+                }
+
+                Long memberId = coupon.memberId();
+                Long memberCouponId = coupon.memberCouponId();
+                LocalDateTime expiresAt = coupon.expiresAt();
+                String couponName = (coupon.couponName() != null && !coupon.couponName().isBlank()) ? coupon.couponName() : "할인";
+
+                try {
+                    if (!memberNotificationQueryService.isMemberActive(memberId)) {
+                        currentCursorTime = coupon.issuedAt();
+                        currentCursorId = memberCouponId;
+                        continue;
+                    }
+
+                    if (!couponNotificationQueryService.isMemberCouponAvailableAndUnexpired(memberCouponId, expiresAt)) {
+                        currentCursorTime = coupon.issuedAt();
+                        currentCursorId = memberCouponId;
+                        continue;
+                    }
+
+                    if (!notificationCouponQueryService.isCouponIssuedNotificationCompletedOrInactive(memberId, memberCouponId)) {
+                        notificationService.makeNotification(NotificationRequest.builder()
+                                .receiverId(memberId)
+                                .userCouponId(memberCouponId)
+                                .type(NotificationType.COUPON)
+                                .eventKey(NotificationType.COUPON.name() + ":" + memberId + ":" + memberCouponId)
+                                .deliveryScope(DeliveryScope.WEB_AND_SMS)
+                                .args(new Object[]{couponName})
+                                .build());
+                    }
+
+                    currentCursorTime = coupon.issuedAt();
+                    currentCursorId = memberCouponId;
+
+                } catch (Exception e) {
+                    log.error("신규 쿠폰 발급 알림 발송 중 오류 발생 (errorType={}):", e.getClass().getSimpleName());
+                    hadErrorInBatch = true;
+                    break;
+                }
+            }
+
+            if (hadErrorInBatch || issuedCoupons.size() < PAGE_SIZE) {
+                break;
+            }
+        }
+
+        this.lastIssuanceSyncTime = currentCursorTime;
+        this.lastIssuanceProcessedMemberCouponId = currentCursorId;
+    }
+
+    private void syncStartedCoupons(LocalDateTime now) {
+        int loopCount = 0;
+        final int MAX_LOOPS_PER_RUN = 10;
+        final int PAGE_SIZE = 100;
+
+        LocalDateTime querySince = lastStartsSyncTime.minusSeconds(10);
+        LocalDateTime currentCursorTime = lastStartsSyncTime;
+        Long currentCursorId = lastStartsProcessedMemberCouponId;
+
+        while (loopCount < MAX_LOOPS_PER_RUN) {
+            loopCount++;
+
+            List<CouponNotificationView> startedCoupons = couponNotificationQueryService.findRecentlyStartedMemberCoupons(
+                    querySince, currentCursorTime, currentCursorId, PAGE_SIZE
+            );
+
+            if (startedCoupons == null || startedCoupons.isEmpty()) {
+                break;
+            }
+
+            boolean hadErrorInBatch = false;
+
+            for (CouponNotificationView coupon : startedCoupons) {
+                if (coupon.memberCouponId() == null || coupon.memberId() == null) {
+                    continue;
+                }
+
+                Long memberId = coupon.memberId();
+                Long memberCouponId = coupon.memberCouponId();
+                LocalDateTime expiresAt = coupon.expiresAt();
+                String couponName = (coupon.couponName() != null && !coupon.couponName().isBlank()) ? coupon.couponName() : "할인";
+
+                try {
+                    if (!memberNotificationQueryService.isMemberActive(memberId)) {
+                        currentCursorTime = coupon.startsAt();
+                        currentCursorId = memberCouponId;
+                        continue;
+                    }
+
+                    if (!couponNotificationQueryService.isMemberCouponAvailableAndUnexpired(memberCouponId, expiresAt)) {
+                        currentCursorTime = coupon.startsAt();
+                        currentCursorId = memberCouponId;
+                        continue;
+                    }
+
+                    if (!notificationCouponQueryService.isCouponIssuedNotificationCompletedOrInactive(memberId, memberCouponId)) {
+                        notificationService.makeNotification(NotificationRequest.builder()
+                                .receiverId(memberId)
+                                .userCouponId(memberCouponId)
+                                .type(NotificationType.COUPON)
+                                .eventKey(NotificationType.COUPON.name() + ":" + memberId + ":" + memberCouponId)
+                                .deliveryScope(DeliveryScope.WEB_AND_SMS)
+                                .args(new Object[]{couponName})
+                                .build());
+                    }
+
+                    currentCursorTime = coupon.startsAt();
+                    currentCursorId = memberCouponId;
+
+                } catch (Exception e) {
+                    log.error("쿠폰 시작 도래 알림 발송 중 오류 발생 (errorType={}):", e.getClass().getSimpleName());
+                    hadErrorInBatch = true;
+                    break;
+                }
+            }
+
+            if (hadErrorInBatch || startedCoupons.size() < PAGE_SIZE) {
+                break;
+            }
+        }
+
+        this.lastStartsSyncTime = currentCursorTime;
+        this.lastStartsProcessedMemberCouponId = currentCursorId;
     }
 
     /**

@@ -14,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 담당자 : 이정후
  * 작성일 : 2026-08-19
  * 기능 : 알림 연동 전용 쿠폰 조회 서비스
- * 설명 : 알림 도메인에 사용 시작일이 도래한 발급 쿠폰 및 만료 임박(3일 이내) 유효 쿠폰 목록 조회 기능을 제공하는 공개 계약 Service이다.
+ * 설명 : 알림 도메인에 신규 발급 쿠폰, 시작 도래 쿠폰, 만료 임박 쿠폰을 인덱스 기반으로 제공하는 공개 계약 Service이다.
  * ******************************
  */
 @Service
@@ -25,18 +25,27 @@ public class CouponNotificationQueryService {
     private final CouponNotificationMapper couponNotificationMapper;
 
     /**
-     * 특정 시각(since) 또는 복합 커서 이후에 발급/시작된 유효 쿠폰 목록을 조회한다.
+     * 특정 시점(since) 이후 발급된 유효 쿠폰 목록을 (issued_at, id) 복합 커서로 조회한다.
      */
-    public List<CouponNotificationView> findRecentlyIssuedOrStartedMemberCoupons(
+    public List<CouponNotificationView> findRecentlyIssuedMemberCoupons(
             LocalDateTime since,
             LocalDateTime lastIssuedAt,
             Long lastMemberCouponId,
             int limit) {
-        if (since == null && lastIssuedAt == null) {
-            return List.of();
-        }
         int fetchLimit = limit > 0 ? limit : 100;
-        return couponNotificationMapper.findRecentlyIssuedOrStartedMemberCoupons(since, lastIssuedAt, lastMemberCouponId, fetchLimit);
+        return couponNotificationMapper.findRecentlyIssuedMemberCoupons(since, lastIssuedAt, lastMemberCouponId, fetchLimit);
+    }
+
+    /**
+     * 특정 시점(since) 이후 사용 시작일이 도래한 유효 쿠폰 목록을 (starts_at, id) 복합 커서로 조회한다.
+     */
+    public List<CouponNotificationView> findRecentlyStartedMemberCoupons(
+            LocalDateTime since,
+            LocalDateTime lastStartsAt,
+            Long lastMemberCouponId,
+            int limit) {
+        int fetchLimit = limit > 0 ? limit : 100;
+        return couponNotificationMapper.findRecentlyStartedMemberCoupons(since, lastStartsAt, lastMemberCouponId, fetchLimit);
     }
 
     /**

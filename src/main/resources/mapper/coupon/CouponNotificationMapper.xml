@@ -7,13 +7,13 @@
  * 담당자 : 이정후
  * 작성일 : 2026-08-19
  * 기능 : 쿠폰 알림용 연동 SQL 매퍼
- * 설명 : member_coupons 테이블과 coupons 테이블을 조인하여 사용 시작일이 도래한 발급 쿠폰 및 만료 임박 유효 쿠폰 목록을 복합 커서로 조회한다.
+ * 설명 : member_coupons 테이블과 coupons 테이블을 인덱스 기반으로 조회하여 발급 알림, 시작 알림, 만료 임박 알림을 제공한다.
  * ******************************
  */-->
 <mapper namespace="com.cakeshop.domain.coupon.mapper.CouponNotificationMapper">
 
-    <!-- 1. 사용 시작일이 도래한 유효 발급 쿠폰 조회 (FIRST_ORDER 제외 및 시작 시각 이벤트 반영) -->
-    <select id="findRecentlyIssuedOrStartedMemberCoupons" resultType="com.cakeshop.domain.coupon.dto.view.CouponNotificationView">
+    <!-- 1. 신규 발급된 유효 쿠폰 조회 (idx_member_coupons_issued_at_id 인덱스 100% 활용) -->
+    <select id="findRecentlyIssuedMemberCoupons" resultType="com.cakeshop.domain.coupon.dto.view.CouponNotificationView">
         SELECT 
             mc.id AS memberCouponId,
             mc.coupon_id AS couponId,
@@ -29,20 +29,50 @@
           AND c.starts_at &lt;= NOW(6)
           AND c.expires_at &gt; NOW(6)
           AND c.target_type IN ('ALL_MEMBERS', 'NEW_MEMBERS', 'BIRTHDAY', 'SPECIFIC_MEMBERS')
+          <if test="since != null">
+              AND mc.issued_at &gt;= #{since}
+          </if>
           <if test="lastIssuedAt != null and lastMemberCouponId != null">
               AND (
-                  GREATEST(mc.issued_at, c.starts_at) &gt; #{lastIssuedAt}
-                  OR (GREATEST(mc.issued_at, c.starts_at) = #{lastIssuedAt} AND mc.id &gt; #{lastMemberCouponId})
+                  mc.issued_at &gt; #{lastIssuedAt}
+                  OR (mc.issued_at = #{lastIssuedAt} AND mc.id &gt; #{lastMemberCouponId})
               )
           </if>
-          <if test="lastMemberCouponId == null and since != null">
-              AND GREATEST(mc.issued_at, c.starts_at) &gt;= #{since}
-          </if>
-        ORDER BY GREATEST(mc.issued_at, c.starts_at) ASC, mc.id ASC
+        ORDER BY mc.issued_at ASC, mc.id ASC
         LIMIT #{limit}
     </select>
 
-    <!-- 2. 만료 임박(3일 이내) 유효 쿠폰 조회 -->
+    <!-- 2. 사용 시작일(starts_at)이 도래한 유효 쿠폰 조회 (idx_coupons_status_starts_expires 인덱스 100% 활용) -->
+    <select id="findRecentlyStartedMemberCoupons" resultType="com.cakeshop.domain.coupon.dto.view.CouponNotificationView">
+        SELECT 
+            mc.id AS memberCouponId,
+            mc.coupon_id AS couponId,
+            mc.member_id AS memberId,
+            c.name AS couponName,
+            mc.issued_at AS issuedAt,
+            c.starts_at AS startsAt,
+            c.expires_at AS expiresAt
+        FROM coupons c
+        INNER JOIN member_coupons mc ON mc.coupon_id = c.id
+        WHERE c.status = 'ACTIVE'
+          AND mc.status = 'AVAILABLE'
+          AND c.starts_at &lt;= NOW(6)
+          AND c.expires_at &gt; NOW(6)
+          AND c.target_type IN ('ALL_MEMBERS', 'NEW_MEMBERS', 'BIRTHDAY', 'SPECIFIC_MEMBERS')
+          <if test="since != null">
+              AND c.starts_at &gt;= #{since}
+          </if>
+          <if test="lastStartsAt != null and lastMemberCouponId != null">
+              AND (
+                  c.starts_at &gt; #{lastStartsAt}
+                  OR (c.starts_at = #{lastStartsAt} AND mc.id &gt; #{lastMemberCouponId})
+              )
+          </if>
+        ORDER BY c.starts_at ASC, mc.id ASC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 3. 만료 임박(3일 이내) 유효 쿠폰 조회 (idx_coupons_status_starts_expires 인덱스 100% 활용) -->
     <select id="findExpiringMemberCoupons" resultType="com.cakeshop.domain.coupon.dto.view.CouponNotificationView">
         SELECT 
             mc.id AS memberCouponId,
@@ -69,7 +99,7 @@
         LIMIT #{limit}
     </select>
 
-    <!-- 3. 발송 직전 쿠폰 사용 가능(AVAILABLE), 쿠폰 활성(ACTIVE), 유효 기간 일치 여부 재검증 -->
+    <!-- 4. 발송 직전 쿠폰 사용 가능(AVAILABLE), 쿠폰 활성(ACTIVE), 유효 기간 일치 여부 재검증 -->
     <select id="isMemberCouponAvailableAndUnexpired" resultType="boolean">
         SELECT COUNT(1) > 0
         FROM member_coupons mc
