@@ -568,6 +568,51 @@ WHERE NOT EXISTS (
       AND pog.`name` = sample.`group_name`
 );
 
+-- 같은 상품에 동명 옵션 그룹이 추가되어도 모든 그룹을 시드 대상으로 간주하지 않는다.
+-- 옵션 그룹 INSERT가 기존 동명 그룹을 채택하는 규칙과 맞춰 가장 먼저 생성된 한 행만 식별한다.
+CREATE TEMPORARY TABLE `_rds_demo_seed_option_groups` (
+    `option_group_id` BIGINT NOT NULL PRIMARY KEY,
+    `product_name` VARCHAR(150) NOT NULL,
+    `group_name` VARCHAR(100) NOT NULL,
+    UNIQUE (`product_name`, `group_name`)
+);
+
+INSERT INTO `_rds_demo_seed_option_groups`
+    (`option_group_id`, `product_name`, `group_name`)
+SELECT
+    MIN(pog.`id`),
+    seed_product.`product_name`,
+    pog.`name`
+FROM `_rds_demo_seed_products` seed_product
+INNER JOIN `product_option_groups` pog
+        ON pog.`product_id` = seed_product.`product_id`
+INNER JOIN (
+    SELECT
+        '레터링 생크림 케이크' AS `product_name`,
+        '케이크 크기' AS `group_name`
+
+    UNION ALL
+
+    SELECT
+        '레터링 생크림 케이크',
+        '크림 색상'
+
+    UNION ALL
+
+    SELECT
+        '캐릭터 입체 주문 제작 케이크',
+        '케이크 크기'
+
+    UNION ALL
+
+    SELECT
+        '캐릭터 입체 주문 제작 케이크',
+        '추가 장식'
+) seed_group
+        ON seed_group.`product_name` = seed_product.`product_name`
+       AND seed_group.`group_name` = pog.`name`
+GROUP BY seed_product.`product_name`, pog.`name`;
+
 
 -- =========================================================
 -- 상품 상세 화면 개별 옵션
@@ -583,14 +628,12 @@ INSERT INTO `product_options` (
     `sort_order`
 )
 SELECT
-    pog.`id`,
+    seed_option_group.`option_group_id`,
     sample.`option_name`,
     sample.`additional_price`,
     sample.`status`,
     sample.`sort_order`
-FROM `_rds_demo_seed_products` seed_product
-INNER JOIN `product_option_groups` pog
-        ON pog.`product_id` = seed_product.`product_id`
+FROM `_rds_demo_seed_option_groups` seed_option_group
 INNER JOIN (
     SELECT
         '레터링 생크림 케이크' AS `product_name`,
@@ -691,17 +734,18 @@ INNER JOIN (
         'INACTIVE',
         3
 ) sample
-        ON sample.`product_name` = seed_product.`product_name`
-       AND sample.`group_name` = pog.`name`
+        ON sample.`product_name` = seed_option_group.`product_name`
+       AND sample.`group_name` = seed_option_group.`group_name`
 WHERE NOT EXISTS (
     SELECT 1
     FROM `product_options` po
-    WHERE po.`option_group_id` = pog.`id`
+    WHERE po.`option_group_id` = seed_option_group.`option_group_id`
       AND po.`name` = sample.`option_name`
 );
 
 COMMIT;
 
+DROP TEMPORARY TABLE `_rds_demo_seed_option_groups`;
 DROP TEMPORARY TABLE `_rds_demo_seed_products`;
 DROP TEMPORARY TABLE `_rds_demo_seed_config`;
 SET @rds_demo_admin_password_hash = NULL;

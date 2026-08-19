@@ -68,6 +68,51 @@ class RdsDemoSeedIntegrationTests {
                 INNER JOIN categories c ON c.id = p.category_id
                 WHERE c.code = 'CAKE'
                   AND p.name = '레터링 생크림 케이크'
+                  AND p.id = (
+                      SELECT MIN(seed_product.id)
+                      FROM products seed_product
+                      INNER JOIN categories seed_category
+                              ON seed_category.id = seed_product.category_id
+                      WHERE seed_category.code = 'CAKE'
+                        AND seed_product.name = '레터링 생크림 케이크'
+                  )
+                  AND pog.name = '케이크 크기'
+                """
+        )).isEqualTo(2);
+        assertThat(count(
+                """
+                SELECT COUNT(*)
+                FROM product_options po
+                INNER JOIN product_option_groups pog ON pog.id = po.option_group_id
+                INNER JOIN products p ON p.id = pog.product_id
+                INNER JOIN categories c ON c.id = p.category_id
+                WHERE c.code = 'CAKE'
+                  AND p.name = '레터링 생크림 케이크'
+                  AND p.id = (
+                      SELECT MIN(seed_product.id)
+                      FROM products seed_product
+                      INNER JOIN categories seed_category
+                              ON seed_category.id = seed_product.category_id
+                      WHERE seed_category.code = 'CAKE'
+                        AND seed_product.name = '레터링 생크림 케이크'
+                  )
+                  AND pog.name = '케이크 크기'
+                  AND pog.id <> (
+                      SELECT MIN(seed_group.id)
+                      FROM product_option_groups seed_group
+                      WHERE seed_group.product_id = p.id
+                        AND seed_group.name = pog.name
+                  )
+                """
+        )).isZero();
+        assertThat(count(
+                """
+                SELECT COUNT(*)
+                FROM product_option_groups pog
+                INNER JOIN products p ON p.id = pog.product_id
+                INNER JOIN categories c ON c.id = p.category_id
+                WHERE c.code = 'CAKE'
+                  AND p.name = '레터링 생크림 케이크'
                   AND p.id <> (
                       SELECT MIN(seed_product.id)
                       FROM products seed_product
@@ -155,6 +200,19 @@ class RdsDemoSeedIntegrationTests {
                 INNER JOIN categories c ON c.id = p.category_id
                 WHERE c.code = 'OTHER'
                   AND p.name = '레터링 생크림 케이크'
+                """);
+        jdbcTemplate.update(
+                """
+                INSERT INTO product_option_groups (
+                    product_id, name, required, selection_type, sort_order
+                )
+                SELECT p.id, '케이크 크기', 1, 'SINGLE', 99
+                FROM products p
+                INNER JOIN categories c ON c.id = p.category_id
+                WHERE c.code = 'CAKE'
+                  AND p.name = '레터링 생크림 케이크'
+                ORDER BY p.id
+                LIMIT 1
                 """);
     }
 
