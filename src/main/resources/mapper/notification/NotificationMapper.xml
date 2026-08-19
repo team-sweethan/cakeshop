@@ -164,15 +164,11 @@
         )
     </select>
 
-    <!--발송 시도 총 횟수 조회 (종료된 상태 또는 최근 5분 이내 PENDING만 카운트하여 중단된 오래된 PENDING 만료 회수)-->
+    <!--발송 시도 총 횟수 조회 (최대 재시도 2회 제한 보존)-->
     <select id="countDeliveryAttempts" resultType="int">
         SELECT COUNT(*)
         FROM notification_deliveries
         WHERE notification_id = #{notificationId}
-          AND (
-            status IN ('SENT', 'DELIVERED', 'FAILED', 'SKIPPED')
-            OR (status = 'PENDING' AND created_at &gt;= DATE_SUB(NOW(), INTERVAL 5 MINUTE))
-          )
     </select>
 
     <!-- 수신 전화번호 조회 (주문이 있으면 orderer_phone 우선, 없으면 members.phone) -->

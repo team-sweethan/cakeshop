@@ -6,6 +6,10 @@ import com.cakeshop.domain.notification.dto.form.NotificationRequest;
 import com.cakeshop.domain.notification.entity.DeliveryScope;
 import com.cakeshop.domain.notification.entity.NotificationType;
 import com.cakeshop.domain.notification.service.NotificationService;
+import com.cakeshop.domain.order.dto.view.OrderChatView;
+import com.cakeshop.domain.order.mapper.OrderChatMapper;
+import java.time.Clock;
+import java.time.LocalDate;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +34,8 @@ public class OrderNotificationSender {
     private final NotificationService notificationService;
     private final MemberNotificationQueryService memberNotificationQueryService;
     private final MemberOrderNotificationQueryService memberOrderNotificationQueryService;
+    private final OrderChatMapper orderChatMapper;
+    private final Clock clock;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void sendOrderPaid(long orderId, long customerId, String orderType) {
@@ -50,6 +56,21 @@ public class OrderNotificationSender {
         }
 
         sendToActiveAdmins(orderId, customerId, adminType, adminType.name() + ":ALL_ADMINS:" + orderId, new Object[0]);
+
+        // 익일(내일) 픽업 주문인 경우 결제 완료 시점에 D-1 리마인더 알림을 즉시 함께 발송 (오후 21시 이후 야간 주문 포함 안내 보장)
+        try {
+            OrderChatView orderView = orderChatMapper.findOrderById(orderId);
+            if (orderView != null && orderView.pickupAt() != null) {
+                LocalDate today = LocalDate.now(clock);
+                LocalDate pickupDate = orderView.pickupAt().toLocalDate();
+                if (pickupDate.isEqual(today.plusDays(1))) {
+                    sendPickupReminderTomorrowToCustomer(orderId, customerId);
+                    sendPickupReminderTomorrowToAdmins(orderId, customerId, orderView.orderNumber());
+                }
+            }
+        } catch (Exception e) {
+            log.warn("결제 완료 시점 픽업 D-1 리마인더 체크 오류 (orderId={}):", orderId, e);
+        }
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
