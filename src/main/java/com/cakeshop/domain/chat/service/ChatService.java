@@ -29,6 +29,7 @@ import com.cakeshop.global.error.CommonErrorCode;
 import com.cakeshop.global.infra.FileStorageClient;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -46,6 +47,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ChatService {
@@ -92,6 +94,57 @@ public class ChatService {
         }
         ChatRoom room = chatMapper.findChatRoomByCustomerId(customerId);
         return room != null ? room.getId() : null;
+    }
+
+    /**
+     * 주문제작 반려 시 시스템이 반려 사유를 고객 채팅방에 자동 발송한다.
+     * - 채팅방이 없으면 자동 생성 후 발송한다.
+     * - 동시성 경합을 방지하기 위해 FOR UPDATE로 비관적 잠금을 획득한다.
+     * - preserveStatus=true를 사용하여 DB 최신 status 및 responseStatus를 원자적으로 보존한다.
+     * - 트랜잭션 외부(이벤트 리스너 @Async)에서 호출되어야 한다.
+     * @return 저장된 메시지 응답 DTO (WebSocket 브로드캐스트에 사용) 또는 발송 불가 시 null
+     */
+    @Transactional
+    public ChatMessageResponse sendSystemRejectionMessage(Long customerId, String rejectReason) {
+        if (customerId == null || customerId <= 0) return null;
+        if (rejectReason == null || rejectReason.isBlank()) return null;
+
+        // P1: 하드코딩 대신 활성 관리자를 동적 조회하여 유효한 발신자 보장
+        List<Long> adminIds = memberChatQueryService.findActiveAdminIds();
+        if (adminIds == null || adminIds.isEmpty()) {
+            log.warn("주문제작 반려 사유 채팅 발송 스킵: 활성 관리자 없음 (customerId={})", customerId);
+            return null;
+        }
+        Long senderId = adminIds.get(0);
+
+        // P2: 동시성 처리를 위해 FOR UPDATE로 방 행을 비관적 잠금 조회
+        ChatRoom chatRoom = chatMapper.findChatRoomByCustomerIdForUpdate(customerId);
+        if (chatRoom == null) {
+            chatRoom = getOrMakeChatRoom(customerId);
+        }
+
+        String content = "[반려 안내] " + rejectReason;
+
+        // preserveStatus = true 로 전달하여 SQL 업데이트 시점에 DB 최신 status 및 responseStatus 원자적 보존
+        ChatMessage message = createMessage(chatRoom.getId(), senderId, true, null, content, null, null, null, true);
+
+        String customerName = memberChatQueryService.getCustomerName(customerId);
+
+        return ChatMessageResponse.builder()
+                .id(message.getId())
+                .chatRoomId(message.getChatRoomId())
+                .customerId(customerId)
+                .customerName(customerName != null ? customerName : "고객")
+                .senderId(message.getSenderId())
+                .senderName("관리자")
+                .senderType("ADMIN")
+                .productId(null)
+                .productName(null)
+                .content(message.getContent())
+                .imageUrls(Collections.emptyList())
+                .isRead(false)
+                .createdAt(message.getCreatedAt())
+                .build();
     }
 
     // 고객 존재 및 활성 회원 상태 검증 계약 (인터셉터 전용)
@@ -184,6 +237,12 @@ public class ChatService {
     // 메시지 만들고 저장, 방 상태 갱신
     private ChatMessage createMessage(Long roomId, Long senderId, boolean isAdmin, Long productId, 
         String content, List<ChatMessageAttachmentRequest> attachments) {
+        return createMessage(roomId, senderId, isAdmin, productId, content, attachments, null, null, false);
+    }
+
+    private ChatMessage createMessage(Long roomId, Long senderId, boolean isAdmin, Long productId, 
+        String content, List<ChatMessageAttachmentRequest> attachments,
+        ChatResponseStatus overrideResponseStatus, ChatRoomStatus overrideStatus, Boolean preserveStatus) {
 
             // 1. 텅 빈 메시지 저장 차단, 2,000자 상한선 및 첨부파일 최대 5개 상한선 제한
             boolean hasContent = content != null && !content.trim().isEmpty();
@@ -263,11 +322,17 @@ public class ChatService {
                 }
             }
 
+            ChatResponseStatus targetResponseStatus = overrideResponseStatus != null
+                    ? overrideResponseStatus
+                    : (isAdmin ? ChatResponseStatus.WAITING_CUSTOMER : ChatResponseStatus.WAITING_ADMIN);
+
             chatMapper.updateChatRoomLastMessage(
                 roomId,
                 message.getId(),
                 message.getCreatedAt(),
-                isAdmin ? ChatResponseStatus.WAITING_CUSTOMER : ChatResponseStatus.WAITING_ADMIN
+                targetResponseStatus,
+                overrideStatus,
+                preserveStatus
             );
 
             return message;

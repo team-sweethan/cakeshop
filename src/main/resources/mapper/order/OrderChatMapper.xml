@@ -33,7 +33,8 @@
                     END
                 FROM order_items oi
                 WHERE oi.order_id = o.id
-            ) AS representativeProductName
+            ) AS representativeProductName,
+            o.reject_reason AS rejectReason
         FROM orders o
         WHERE o.id = #{orderId}
     </select>
@@ -59,7 +60,8 @@
                     END
                 FROM order_items oi
                 WHERE oi.order_id = o.id
-            ) AS representativeProductName
+            ) AS representativeProductName,
+            o.reject_reason AS rejectReason
         FROM orders o
         WHERE o.member_id = #{customerId}
         ORDER BY o.created_at DESC
@@ -78,7 +80,8 @@
             o.pickup_at AS pickupAt,
             o.created_at AS orderCreatedAt,
             o.updated_at AS orderUpdatedAt,
-            '주문 케이크' AS representativeProductName
+            '주문 케이크' AS representativeProductName,
+            o.reject_reason AS rejectReason
         FROM orders o
         WHERE o.status IN ('IN_PRODUCTION', 'REJECTED', 'CANCELED', 'PICKED_UP')
           AND o.updated_at >= #{since}

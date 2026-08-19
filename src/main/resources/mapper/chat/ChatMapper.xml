@@ -41,6 +41,14 @@
         WHERE customer_id = #{customerId}
     </select>
     
+    <!-- 특정 고객의 채팅방 비관적 잠금 조회 (FOR UPDATE) -->
+    <select id="findChatRoomByCustomerIdForUpdate" resultType="ChatRoom">
+        SELECT *
+        FROM chat_rooms
+        WHERE customer_id = #{customerId}
+        FOR UPDATE
+    </select>
+
     <!-- 채팅방 상태 (status, response_status) 수동 갱신 -->
     <update id="updateChatRoomStatus">
         UPDATE chat_rooms
@@ -51,14 +59,20 @@
         WHERE id = #{chatRoomId}
     </update>
 
-    <!-- 메시지 발송 시 최신 메시지 ID, 시각, 답변 상태 (response_status) 갱신 (CLOSED 방 시 자동 OPEN 재오픈) -->
+    <!-- 메시지 발송 시 최신 메시지 ID, 시각, 답변 상태 (response_status) 및 운영 상태 (status) 갱신 (preserveStatus=true 시 DB 최신 상태 원자적 보존) -->
     <update id="updateChatRoomLastMessage">
         UPDATE chat_rooms
         SET
-            status = 'OPEN',
+            status = CASE
+                WHEN #{preserveStatus} = TRUE AND last_message_id IS NOT NULL THEN status
+                ELSE COALESCE(#{status}, 'OPEN')
+            END,
             last_message_id = #{lastMessageId},
             last_message_at = #{lastMessageAt},
-            response_status = #{responseStatus},
+            response_status = CASE
+                WHEN #{preserveStatus} = TRUE AND last_message_id IS NOT NULL THEN response_status
+                ELSE COALESCE(#{responseStatus}, 'WAITING_CUSTOMER')
+            END,
             updated_at = CURRENT_TIMESTAMP(6)
         WHERE id = #{chatRoomId} AND (last_message_id IS NULL OR last_message_id &lt;= #{lastMessageId})
     </update>
