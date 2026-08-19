@@ -197,22 +197,6 @@ public class ChatApiController {
         return ResponseEntity.ok(rooms);
     }
 
-    @GetMapping("/api/admin/chat/rooms/{chatRoomId}")
-    public ResponseEntity<ChatRoomListResponse> getAdminChatRoom(
-            @PathVariable("chatRoomId") Long chatRoomId,
-            @AuthenticationPrincipal MemberDetails memberDetails) {
-
-        if (memberDetails == null || !memberDetails.isAdmin()) {
-            return ResponseEntity.status(403).build();
-        }
-
-        ChatRoomListResponse room = chatService.getAdminChatRoomResponse(chatRoomId);
-        if (room == null) {
-            return ResponseEntity.notFound().build();
-        }
-        return ResponseEntity.ok(room);
-    }
-
 
     // 7-1. 관리자 우측 패널 조회 (고객 메모 + 주문 목록) -- 웹소켓 + REST API
     @GetMapping("/api/admin/chat/rooms/{chatRoomId}/side-panel")

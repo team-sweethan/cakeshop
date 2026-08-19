@@ -8,7 +8,6 @@ document.addEventListener("DOMContentLoaded", () => {
   let adminRoomsData = [];
   let pendingAttachment = null;
   let lastFetchedMessageId = 0;
-  let keepSelectedEmptyDeepLinkRoom = false;
 
   let stompClient = null;
   let roomSub = null;
@@ -82,17 +81,6 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error("주문 고객 채팅방 열기 실패:", err);
       alert("채팅방을 열지 못했습니다. 잠시 후 다시 시도해주세요.");
       return false;
-    }
-  }
-
-  async function getAdminChatRoom(roomId) {
-    try {
-      const response = await fetch(`/api/admin/chat/rooms/${roomId}`);
-      if (!response.ok) return null;
-      return await response.json();
-    } catch (err) {
-      console.error("관리자 채팅방 조회 실패:", err);
-      return null;
     }
   }
 
@@ -215,15 +203,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const customerId = targetRoom.customerId || targetRoom.memberId;
             selectChatRoom(initialRoomId, customerId);
           }
-        } else if (!selectedChatRoomId) {
-          const deepLinkedRoom = await getAdminChatRoom(initialRoomId);
-          if (deepLinkedRoom && reqFilter === currentFilter && currentGen === adminRoomsFetchGen) {
-            keepSelectedEmptyDeepLinkRoom = true;
-            selectChatRoom(deepLinkedRoom.chatRoomId, deepLinkedRoom.customerId, true);
-          } else if (!isReconnect) {
-            clearMainAndSidePanel();
-          }
-        } else if (!isReconnect && !keepSelectedEmptyDeepLinkRoom) {
+        } else if (!isReconnect) {
           clearMainAndSidePanel();
         }
       } else if (!isReconnect) {
@@ -419,7 +399,6 @@ document.addEventListener("DOMContentLoaded", () => {
   function clearMainAndSidePanel() {
     selectedChatRoomId = null;
     selectedCustomerId = null;
-    keepSelectedEmptyDeepLinkRoom = false;
 
     try {
       const currentUrl = new URL(window.location.href);
@@ -538,9 +517,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // 방 선택 조작
-  async function selectChatRoom(roomId, customerId, keepWhenMissingFromList = false) {
+  async function selectChatRoom(roomId, customerId) {
     if (!roomId) return;
-    keepSelectedEmptyDeepLinkRoom = keepWhenMissingFromList;
 
     if (selectedChatRoomId !== roomId) {
       isAdminUploadingAttachment = false;
@@ -1336,9 +1314,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // 주문 목록의 customerId 딥링크는 방을 생성·조회한 뒤 목록에 없어도 바로 선택한다.
   openCustomerRoomFromUrl().then(async (deepLinkedRoom) => {
-    if (deepLinkedRoom) {
-      await selectChatRoom(deepLinkedRoom.roomId, deepLinkedRoom.customerId, true);
-    }
     await loadAdminRooms();
+    if (deepLinkedRoom) {
+      await selectChatRoom(deepLinkedRoom.roomId, deepLinkedRoom.customerId);
+    }
   });
 });
