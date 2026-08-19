@@ -137,14 +137,10 @@ public class CommunityCommentService {
             throw new BusinessException(CommunityErrorCode.COMMENT_NOT_FOUND);
         }
 
-        /*
-         * 부모를 여기서 읽는 것은 위 조건과 무관하다 — 알림 수신자를 고르는 읽기이고, 삽입이
-         * 성공한 뒤라 부모가 있었다는 것은 이미 정해져 있다. 판단은 계속 SQL 이 한다.
-         */
-        CommentRow parent = communityCommentMapper.findCommentById(parentCommentId);
-
+        // 받는 사람(부모 작성자)은 발송 쪽이 커밋 뒤에 읽는다. 여기서 읽으면 알림 때문에 하는
+        // 조회 하나가 답글을 되돌릴 수 있다
         communityCommentNotificationService.notifyNewReply(
-                postId, reply.getId(), parent.memberId(), authorId);
+                postId, reply.getId(), parentCommentId, authorId);
     }
 
     @Transactional

@@ -18,7 +18,7 @@ public class CommunityCommentNotificationService {
     private final CommunityCommentNotificationSender communityCommentNotificationSender;
 
     public void notifyNewComment(long postId, Long commentId, long postAuthorId, long actorId) {
-        if (skips(commentId, postAuthorId, actorId, "댓글")) {
+        if (skipsKnownReceiver(commentId, postAuthorId, actorId, "댓글")) {
             return;
         }
 
@@ -32,34 +32,40 @@ public class CommunityCommentNotificationService {
     /*
      * 답글은 부모 댓글 작성자에게만 간다. 글 작성자는 그 뿌리 댓글에서 이미 받았고, 함께 보내면
      * 자기 글의 한 스레드에서 답글 수만큼 알림이 쌓인다 (specs/community-comment.md D4).
+     *
+     * 받는 사람이 아니라 부모의 id 를 넘긴다 — 부모를 읽는 것은 알림의 일이고, 답글 트랜잭션
+     * 안에서 읽으면 그 조회 하나가 실패할 때 답글이 함께 사라진다.
      */
-    public void notifyNewReply(long postId, Long replyId, long parentAuthorId, long actorId) {
-        if (skips(replyId, parentAuthorId, actorId, "답글")) {
+    public void notifyNewReply(long postId, Long replyId, long parentCommentId, long actorId) {
+        if (hasNoId(replyId, "답글", actorId)) {
             return;
         }
 
         afterCommit(
                 () -> communityCommentNotificationSender.sendNewReply(
-                        postId, replyId, parentAuthorId, actorId),
+                        postId, replyId, parentCommentId, actorId),
                 "답글",
                 replyId);
     }
 
-    /*
-     * 자기 행위에 자기 알림은 보내지 않는다 (specs/community-comment.md D4).
-     *
-     * commentId 가 없는 경우도 여기서 접는다. 생성 키가 돌아오지 않으면 언박싱에서 죽는데,
-     * 그 자리는 이미 커밋을 마친 뒤라 댓글은 저장됐는데 화면만 500 이 된다 — 이 클래스가
-     * 발송 예외를 삼키는 이유 그대로다.
-     */
-    private boolean skips(Long commentId, long receiverId, long actorId, String what) {
-        if (commentId == null) {
-            log.warn("{} 알림을 보낼 수 없다 — 생성된 id 가 없다 (actorId: {})", what, actorId);
+    /** 받는 사람이 이미 정해진 댓글은 커밋 후 작업을 등록하기 전에 자기 행위를 접는다. */
+    private boolean skipsKnownReceiver(
+            Long commentId, long receiverId, long actorId, String what) {
+        return hasNoId(commentId, what, actorId) || receiverId == actorId;
+    }
 
-            return true;
+    /*
+     * 생성 키가 돌아오지 않으면 언박싱에서 죽는데, 그 자리는 이미 커밋을 마친 뒤라 댓글은
+     * 저장됐는데 화면만 500 이 된다 — 이 클래스가 발송 예외를 삼키는 이유 그대로다.
+     */
+    private boolean hasNoId(Long commentId, String what, long actorId) {
+        if (commentId != null) {
+            return false;
         }
 
-        return receiverId == actorId;
+        log.warn("{} 알림을 보낼 수 없다 — 생성된 id 가 없다 (actorId: {})", what, actorId);
+
+        return true;
     }
 
     private void afterCommit(Runnable send, String what, long commentId) {
