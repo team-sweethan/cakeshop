@@ -98,7 +98,7 @@ class CommunityMemberContractTests {
         insertPost(withdrawnMemberId, "탈퇴 회원 글");
         insertPost(activeMemberId, "활동 회원 글");
 
-        var posts = communityPostService.getPosts(categoryId, PostSort.LATEST, FIRST_PAGE).getContent();
+        var posts = communityPostService.getPosts(categoryId, null, PostSort.LATEST, FIRST_PAGE).getContent();
 
         assertThat(posts)
                 .extracting(PostListView::title, PostListView::authorName)

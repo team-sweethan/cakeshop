@@ -115,7 +115,60 @@ class CommunityScreenRenderingTests {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString(
                         "/community?categoryId=" + categoryId
-                                + "&amp;sort=VIEWS&amp;page=2")));
+                                + "&amp;keyword=&amp;sort=VIEWS&amp;page=2")));
+    }
+
+    /** 쪽을 옮겨도 검색어를 잃지 않는다. 잃으면 검색이 풀리는데 화면은 정상으로 보인다. */
+    @Test
+    void communityList_paginationLink_preservesKeyword() throws Exception {
+        for (int i = 0; i < PageRequest.DEFAULT_SIZE + 1; i++) {
+            insertPost(memberId, "케이크 " + i, "본문", PostStatus.PUBLISHED);
+        }
+
+        mockMvc.perform(get("/community")
+                        .param("categoryId", String.valueOf(categoryId))
+                        .param("keyword", "케이크"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("keyword=%EC%BC%80%EC%9D%B4%ED%81%AC")));
+    }
+
+    /** 검색칸에 방금 친 말이 남아 있어야 다음 조건을 이어 걸 수 있다. */
+    @Test
+    void communityList_searching_keepsKeywordInSearchBox() throws Exception {
+        insertPost(memberId, "딸기 케이크 후기", "본문", PostStatus.PUBLISHED);
+
+        mockMvc.perform(get("/community").param("keyword", "딸기"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("value=\"딸기\"")))
+                .andExpect(content().string(containsString("딸기 케이크 후기")));
+    }
+
+    /** 검색 결과가 없을 때와 글이 아예 없을 때는 다른 문구다. */
+    @Test
+    void communityList_searchWithNoMatch_rendersSearchEmptyMessage() throws Exception {
+        insertPost(memberId, "초코 타르트", "본문", PostStatus.PUBLISHED);
+
+        mockMvc.perform(get("/community").param("keyword", "없는낱말"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("로 찾은 글이 없습니다")))
+                .andExpect(content().string(not(containsString("아직 등록된 글이 없습니다."))));
+    }
+
+    /** 검색 중에는 인기글 사이드바를 그리지 않는다. */
+    @Test
+    void communityList_searching_hidesPopularSection() throws Exception {
+        long postId = insertPost(memberId, "이번 주 인기 케이크", "본문", PostStatus.PUBLISHED);
+        insertRanking(1, postId);
+        insertBatchRun(1);
+
+        // 검색어가 없으면 그대로 그린다.
+        mockMvc.perform(get("/community"))
+                .andExpect(content().string(containsString("<h2>인기글</h2>")));
+
+        mockMvc.perform(get("/community").param("keyword", "케이크"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("<h2>인기글</h2>"))))
+                .andExpect(content().string(containsString("이번 주 인기 케이크")));
     }
 
     /** 확정된 인기글이 있으면 목록 위에 별도 영역을 렌더링한다. */

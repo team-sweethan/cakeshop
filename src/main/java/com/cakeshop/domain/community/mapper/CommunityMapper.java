@@ -27,13 +27,15 @@ public interface CommunityMapper {
 
     List<PostListRow> findPublishedPosts(
             @Param("categoryId") Long categoryId,
+            @Param("keyword") String keyword,
             @Param("sort") PostSort sort,
             @Param("size") int size,
             @Param("offset") int offset
     );
 
     long countPublishedPosts(
-            @Param("categoryId") Long categoryId
+            @Param("categoryId") Long categoryId,
+            @Param("keyword") String keyword
     );
 
     PostDetailRow findPostById(

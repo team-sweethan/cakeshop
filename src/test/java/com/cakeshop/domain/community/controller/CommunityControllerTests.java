@@ -70,7 +70,7 @@ class CommunityControllerTests {
         communityCommentService = mock(CommunityCommentService.class);
         communityReactionService = mock(CommunityReactionService.class);
 
-        when(communityPostService.getPosts(any(), any(), any()))
+        when(communityPostService.getPosts(any(), any(), any(), any()))
                 .thenReturn(new PageResult<>(List.of(), new PageRequest(1, 20), 0));
         when(communityPostService.getActiveCategories())
                 .thenReturn(List.of(new PostCategoryView(1L, "QNA", "질문")));
@@ -151,7 +151,7 @@ class CommunityControllerTests {
                 .andExpect(model().attribute("selectedSort", expectedSort))
                 .andExpect(model().attributeExists("sortOptions"));
 
-        verify(communityPostService).getPosts(eq(expectedCategoryId), eq(expectedSort), any());
+        verify(communityPostService).getPosts(eq(expectedCategoryId), any(), eq(expectedSort), any());
         assertThat(capturedPageRequest().getPage()).isEqualTo(expectedPage);
     }
 
@@ -570,7 +570,7 @@ class CommunityControllerTests {
 
     private PageRequest capturedPageRequest() {
         ArgumentCaptor<PageRequest> captor = ArgumentCaptor.forClass(PageRequest.class);
-        verify(communityPostService).getPosts(any(), any(), captor.capture());
+        verify(communityPostService).getPosts(any(), any(), any(), captor.capture());
         return captor.getValue();
     }
 
