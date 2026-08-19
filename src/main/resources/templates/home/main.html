@@ -10,6 +10,7 @@
         th:href="@{/css/app.css(v='home-product-square')}">
   <link rel="stylesheet" th:href="@{/css/home.css}">
   <script defer th:src="@{/js/app.js}"></script>
+  <script defer th:src="@{/js/home-notice-rotation.js}"></script>
 </head>
 
 <body>
@@ -31,28 +32,36 @@
       공지는 서비스 안내 다음, 카테고리 앞에 둔다
       (docs/community/specs/community-notice.md B8).
 
-      인기글과 마찬가지로 그릴 것이 없으면 제목만 남기지 않고 영역을 통째로 뺀다.
+      공지가 없으면 영역과 전체보기 링크를 유지하고 빈 상태 문구를 보여 준다.
       등록 개수에는 제한이 없고 화면 건수에만 있으므로 전체보기 링크가 반드시 함께 있어야
       한다 — 없으면 4번째부터는 접근 경로가 사라진다.
     */-->
     <section id="notices"
              class="section"
-             aria-labelledby="notices-title"
-             th:if="${!noticeSection.isEmpty()}">
+             aria-labelledby="notices-title">
 
       <div class="cluster cluster--between">
         <h2 id="notices-title" class="section-title">공지사항</h2>
         <a class="btn" th:href="@{/community/notices}">전체보기</a>
       </div>
 
-      <div class="stack">
+      <div class="stack"
+           data-notice-rotation="true">
         <a class="panel cluster cluster--between"
-           th:each="notice : ${noticeSection.notices}"
+           data-notice-item="true"
+           th:each="notice, noticeStat : ${noticeSection.notices}"
+           th:hidden="${!noticeStat.first}"
            th:href="@{/community/notices/{noticeId}(noticeId=${notice.id})}">
           <strong th:text="${notice.title}">제목</strong>
           <span class="text-muted"
                 th:text="${#temporals.format(notice.displayedAt, 'yyyy.MM.dd')}">2026.01.01</span>
         </a>
+
+        <div class="panel panel--dashed text-muted"
+             th:if="${noticeSection.isEmpty()}"
+             style="text-align:center">
+          등록된 공지가 없습니다.
+        </div>
       </div>
     </section>
 

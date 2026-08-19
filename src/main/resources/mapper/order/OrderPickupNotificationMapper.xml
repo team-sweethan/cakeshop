@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--/**
+ * ******************************
+ * 작성자 : 김민정
+ * 담당자 : 주환
+ * 작성일 : 2026-08-18
+ * 기능 : 픽업 안내 알림용 주문 조회 SQL
+ * 설명 : idx_orders_pickup_at 인덱스 범위를 활용하도록 pickup_at 반개구간 조건으로 내일 픽업 및 오늘 픽업 대상 주문 목록을 조회한다.
+ * ******************************
+ */-->
+<mapper namespace="com.cakeshop.domain.order.mapper.OrderPickupNotificationMapper">
+
+    <!-- 픽업 하루 전(내일) 예정 주문 목록 조회 (인덱스 범위 탐색, 승인 대기 UNDER_REVIEW 포함) -->
+    <select id="findOrdersForPickupTomorrow" resultType="com.cakeshop.domain.order.dto.view.OrderChatView">
+        SELECT 
+            o.id AS id,
+            o.order_number AS orderNumber,
+            o.member_id AS memberId,
+            o.order_type AS orderType,
+            o.status AS status,
+            o.final_amount AS finalAmount,
+            o.pickup_at AS pickupAt,
+            o.created_at AS orderCreatedAt,
+            o.updated_at AS orderUpdatedAt,
+            '주문 케이크' AS representativeProductName
+        FROM orders o
+        WHERE o.status IN ('READY_FOR_PICKUP', 'IN_PRODUCTION', 'UNDER_REVIEW')
+          AND o.pickup_at &gt;= DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+          AND o.pickup_at &lt; DATE_ADD(CURDATE(), INTERVAL 2 DAY)
+        ORDER BY o.pickup_at ASC
+    </select>
+
+    <!-- 픽업 당일(오늘) 예정 주문 목록 조회 (인덱스 범위 탐색, 승인 대기 UNDER_REVIEW 포함) -->
+    <select id="findOrdersForPickupToday" resultType="com.cakeshop.domain.order.dto.view.OrderChatView">
+        SELECT 
+            o.id AS id,
+            o.order_number AS orderNumber,
+            o.member_id AS memberId,
+            o.order_type AS orderType,
+            o.status AS status,
+            o.final_amount AS finalAmount,
+            o.pickup_at AS pickupAt,
+            o.created_at AS orderCreatedAt,
+            o.updated_at AS orderUpdatedAt,
+            '주문 케이크' AS representativeProductName
+        FROM orders o
+        WHERE o.status IN ('READY_FOR_PICKUP', 'IN_PRODUCTION', 'UNDER_REVIEW')
+          AND o.pickup_at &gt;= CURDATE()
+          AND o.pickup_at &lt; DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+        ORDER BY o.pickup_at ASC
+    </select>
+
+</mapper>

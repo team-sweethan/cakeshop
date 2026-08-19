@@ -22,7 +22,7 @@ import static org.mockito.Mockito.verify;
  * 담당자 : 주환
  * 작성일 : 2026-08-18
  * 기능 : 주문 알림 발송 서비스 단위 테스트
- * 설명 : OrderNotificationSender가 결제 완료, 제작 승인, 반려, 취소, 환불 실패 알림을 알맞은 수신자와 타입으로 발송하는지 검증한다.
+ * 설명 : OrderNotificationSender가 결제 완료, 제작 승인, 반려, 취소, 환불 실패, 픽업 리마인더 및 픽업 완료 알림을 알맞은 수신자와 타입으로 발송하는지 검증한다.
  * ******************************
  */
 @ExtendWith(MockitoExtension.class)
@@ -36,6 +36,9 @@ class OrderNotificationSenderTest {
 
     @Mock
     private MemberOrderNotificationQueryService memberOrderNotificationQueryService;
+
+    @Mock
+    private OrderPickupNotificationSender orderPickupNotificationSender;
 
     @InjectMocks
     private OrderNotificationSender orderNotificationSender;
@@ -57,6 +60,7 @@ class OrderNotificationSenderTest {
         verify(notificationService).makeNotification(argThat(req ->
                 req.getReceiverId() == adminId && req.getType() == NotificationType.NEW_ORDER
         ));
+        verify(orderPickupNotificationSender).sendInstantPickupReminderTomorrowIfEligible(orderId, customerId);
     }
 
     @Test
@@ -76,6 +80,7 @@ class OrderNotificationSenderTest {
         verify(notificationService).makeNotification(argThat(req ->
                 req.getReceiverId() == adminId && req.getType() == NotificationType.NEW_CUSTOM_ORDER
         ));
+        verify(orderPickupNotificationSender).sendInstantPickupReminderTomorrowIfEligible(orderId, customerId);
     }
 
     @Test
@@ -127,6 +132,54 @@ class OrderNotificationSenderTest {
 
         verify(notificationService).makeNotification(argThat(req ->
                 req.getReceiverId() == 1L && req.getType() == NotificationType.REFUND_FAILED
+        ));
+    }
+
+    @Test
+    @DisplayName("픽업 하루 전 알림 시 고객 및 관리자 알림이 전송된다")
+    void sendPickupReminderTomorrow_dispatchesNotifications() {
+        given(memberNotificationQueryService.isMemberActive(2L)).willReturn(true);
+        given(memberOrderNotificationQueryService.findActiveAdminIds()).willReturn(List.of(1L));
+
+        orderNotificationSender.sendPickupReminderTomorrow(400L, 2L, "ORD-20260818-0002");
+
+        verify(notificationService).makeNotification(argThat(req ->
+                req.getReceiverId() == 2L && req.getType() == NotificationType.CUSTOMER_PICKUP_REMINDER_TOMORROW
+        ));
+        verify(notificationService).makeNotification(argThat(req ->
+                req.getReceiverId() == 1L && req.getType() == NotificationType.ADMIN_PICKUP_REMINDER_TOMORROW
+        ));
+    }
+
+    @Test
+    @DisplayName("픽업 당일 알림 시 고객 및 관리자 알림이 전송된다")
+    void sendPickupReminderToday_dispatchesNotifications() {
+        given(memberNotificationQueryService.isMemberActive(2L)).willReturn(true);
+        given(memberOrderNotificationQueryService.findActiveAdminIds()).willReturn(List.of(1L));
+
+        orderNotificationSender.sendPickupReminderToday(401L, 2L, "ORD-20260818-0003");
+
+        verify(notificationService).makeNotification(argThat(req ->
+                req.getReceiverId() == 2L && req.getType() == NotificationType.CUSTOMER_PICKUP_REMINDER_TODAY
+        ));
+        verify(notificationService).makeNotification(argThat(req ->
+                req.getReceiverId() == 1L && req.getType() == NotificationType.ADMIN_PICKUP_REMINDER_TODAY
+        ));
+    }
+
+    @Test
+    @DisplayName("픽업 완료 시 고객 및 관리자 알림이 전송된다")
+    void sendOrderPickedUp_dispatchesNotifications() {
+        given(memberNotificationQueryService.isMemberActive(2L)).willReturn(true);
+        given(memberOrderNotificationQueryService.findActiveAdminIds()).willReturn(List.of(1L));
+
+        orderNotificationSender.sendOrderPickedUp(402L, 2L, "ORD-20260818-0004");
+
+        verify(notificationService).makeNotification(argThat(req ->
+                req.getReceiverId() == 2L && req.getType() == NotificationType.CUSTOMER_ORDER_PICKED_UP
+        ));
+        verify(notificationService).makeNotification(argThat(req ->
+                req.getReceiverId() == 1L && req.getType() == NotificationType.ADMIN_PICKEDUP
         ));
     }
 }

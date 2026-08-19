@@ -48,15 +48,31 @@ public interface NotificationMapper {
     // 중복 event_key 기반 기존 알림 ID 조회
     Long findIdByReceiverIdAndEventKey(@Param("receiverId") Long receiverId, @Param("eventKey") String eventKey);
 
+    // 알림 ID 기반 비관적 잠금 조회 (FOR UPDATE - 발송 시도 원자적 예약 직렬화용)
+    Long findNotificationByIdForUpdate(@Param("id") Long id);
+
     // 이미 SENT 성공 발송 이력이 있는지 확인
     boolean hasSentDelivery(@Param("notificationId") Long notificationId);
 
+    // 현재 진행 중인(최근 1분 이내) PENDING 예약이 존재하는지 확인 (동시 발송 레이스 차단)
+    boolean hasActivePendingDelivery(@Param("notificationId") Long notificationId);
+
     // 이미 발송 시도 이력(SENT, FAILED, SKIPPED)이 한 번이라도 존재하는지 확인
     boolean hasAttemptedDelivery(@Param("notificationId") Long notificationId);
+
+    // 발송 시도 총 횟수 조회 (최대 재시도 횟수 제한용)
+    int countDeliveryAttempts(@Param("notificationId") Long notificationId);
 
     // 수신 회원 전화번호 조회 (주문서 작성 번호 우선, 알림톡 발송용)
     String findReceiverPhone(@Param("receiverId") Long receiverId, @Param("orderId") Long orderId); 
 
     // 문자로도 알림 보내기
     void saveDelivery(NotificationDelivery delivery);
+
+    // 발송 결과 업데이트 (상태, 프로바이더 메시지 ID, 실패 사유, 발송 시각)
+    void updateDeliveryResult(@Param("deliveryId") Long deliveryId,
+                              @Param("status") String status,
+                              @Param("providerMessageId") String providerMessageId,
+                              @Param("failureReason") String failureReason,
+                              @Param("sentAt") LocalDateTime sentAt);
 }

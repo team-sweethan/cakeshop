@@ -53,8 +53,40 @@ jobs:
           fi
           echo "머지된 migration 변경 없음"
 
-  test:
-    name: Test
+  unit_test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Run unit tests
+        run: ./gradlew unitTest
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unit-test-results-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            build/reports/tests/unitTest/
+            build/test-results/unitTest/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  mariadb_test:
+    name: MariaDB tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -74,16 +106,38 @@ jobs:
       - name: Verify Docker
         run: docker info
 
-      - name: Run tests
-        run: ./gradlew test
+      - name: Run MariaDB tests
+        run: ./gradlew mariaDbTest
 
       - name: Upload test results
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: test-results-${{ github.run_id }}-${{ github.run_attempt }}
+          name: mariadb-test-results-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            build/reports/tests/test/
-            build/test-results/test/
+            build/reports/tests/mariaDbTest/
+            build/test-results/mariaDbTest/
           if-no-files-found: ignore
           retention-days: 7
+
+  # dev branch protection이 요구하는 기존 `Test` 체크 이름을 유지하면서 두 병렬 잡의 결과를 합친다.
+  test:
+    name: Test
+    if: always()
+    needs:
+      - unit_test
+      - mariadb_test
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Verify split test jobs
+        env:
+          UNIT_TEST_RESULT: ${{ needs.unit_test.result }}
+          MARIADB_TEST_RESULT: ${{ needs.mariadb_test.result }}
+        run: |
+          if [ "$UNIT_TEST_RESULT" != "success" ] || [ "$MARIADB_TEST_RESULT" != "success" ]; then
+            echo "::error::Unit tests=$UNIT_TEST_RESULT, MariaDB tests=$MARIADB_TEST_RESULT"
+            exit 1
+          fi
+          echo "Unit tests and MariaDB tests succeeded"

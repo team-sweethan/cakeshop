@@ -1,3 +1,8 @@
+/* 공지 링크의 flex 표시보다 hidden 상태를 우선한다. */
+[data-notice-item][hidden] {
+    display: none !important
+}
+
 /* 매장 정보 높이를 기준으로 사진 영역을 맞추고 넘치는 부분은 중앙에서 자른다. */
 .store-media {
     min-height: 170px;

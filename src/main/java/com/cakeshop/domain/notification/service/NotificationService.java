@@ -78,7 +78,7 @@ public class NotificationService {
                 if (minutesGap >= 30 && scope == DeliveryScope.WEB_AND_SMS && request.getReceiverId() != null) {
                     Long existingId = existing != null ? existing.getId() : notificationMapper.findIdByReceiverIdAndEventKey(request.getReceiverId(), eventKey);
                     String receiverPhone = notificationMapper.findReceiverPhone(request.getReceiverId(), request.getOrderId());
-                    registerSmsSending(existingId, receiverPhone, title, content);
+                    registerSmsSending(existingId, receiverPhone, title, content, Integer.MAX_VALUE);
                 }
 
                 Long bundleId = existing != null ? existing.getId() : notificationMapper.findIdByReceiverIdAndEventKey(request.getReceiverId(), eventKey);
@@ -99,12 +99,13 @@ public class NotificationService {
                         .build();
                 registerWebSocketSending(request.getReceiverId(), bundleResponse);
             } else {
-                // 일반 알림(주문 등) 중복 시 발송 시도 이력(SENT, FAILED, SKIPPED)이 없는 미처리 건에 한해 1회 SMS를 발송한다. (무한 3초 재발송 차단)
+                // 일반 알림(주문 등) 중복 시 기존 SMS 전송이 완료(SENT/DELIVERED)되지 않았고 최대 시도(2회) 미만인 경우에만 SMS를 재발송한다.
                 if (scope == DeliveryScope.WEB_AND_SMS && request.getReceiverId() != null) {
                     Long existingId = notificationMapper.findIdByReceiverIdAndEventKey(request.getReceiverId(), eventKey);
-                    if (existingId != null && !notificationMapper.hasAttemptedDelivery(existingId)) {
+                    if (existingId != null && !notificationMapper.hasSentDelivery(existingId)
+                            && notificationMapper.countDeliveryAttempts(existingId) < 2) {
                         String receiverPhone = notificationMapper.findReceiverPhone(request.getReceiverId(), request.getOrderId());
-                        registerSmsSending(existingId, receiverPhone, title, content);
+                        registerSmsSending(existingId, receiverPhone, title, content, 2);
                     }
                 }
             }
@@ -150,7 +151,7 @@ public class NotificationService {
                 if (minutesGap >= 30 && scope == DeliveryScope.WEB_AND_SMS && request.getReceiverId() != null) {
                     Long existingId = existing != null ? existing.getId() : notificationMapper.findIdByReceiverIdAndEventKey(request.getReceiverId(), eventKey);
                     String receiverPhone = notificationMapper.findReceiverPhone(request.getReceiverId(), request.getOrderId());
-                    registerSmsSending(existingId, receiverPhone, title, content);
+                    registerSmsSending(existingId, receiverPhone, title, content, Integer.MAX_VALUE);
                 }
 
                 Long bundleId = existing != null ? existing.getId() : notificationMapper.findIdByReceiverIdAndEventKey(request.getReceiverId(), eventKey);
@@ -200,50 +201,67 @@ public class NotificationService {
     }
 
     private void registerSmsSending(Long notificationId, String receiverPhone, String title, String content) {
+        registerSmsSending(notificationId, receiverPhone, title, content, 2);
+    }
+
+    private void registerSmsSending(Long notificationId, String receiverPhone, String title, String content, int maxAttempts) {
         if (notificationId == null) return;
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    executeSmsSending(notificationId, receiverPhone, title, content);
+                    executeSmsSending(notificationId, receiverPhone, title, content, maxAttempts);
                 }
             });
         } else {
-            executeSmsSending(notificationId, receiverPhone, title, content);
+            executeSmsSending(notificationId, receiverPhone, title, content, maxAttempts);
         }
     }
 
-    private void executeSmsSending(Long notificationId, String receiverPhone, String title, String content) {
+    private void executeSmsSending(Long notificationId, String receiverPhone, String title, String content, int maxAttempts) {
         if (receiverPhone == null || receiverPhone.trim().isEmpty()) {
-            com.cakeshop.domain.notification.entity.NotificationDelivery delivery = com.cakeshop.domain.notification.entity.NotificationDelivery.builder()
-                    .notificationId(notificationId)
-                    .recipient("NO_PHONE")
-                    .templateCode("DEFAULT_SMS")
-                    .providerMessageId(null)
-                    .status("FAILED")
-                    .failureReason("No receiver phone number")
-                    .createdAt(LocalDateTime.now())
-                    .updatedAt(LocalDateTime.now())
-                    .build();
-            notificationDeliveryService.recordDelivery(delivery);
+            Long deliveryId = notificationDeliveryService.reserveDeliveryAttempt(notificationId, "NO_PHONE", maxAttempts);
+            if (deliveryId != null) {
+                notificationDeliveryService.updateDeliveryResult(deliveryId, "FAILED", null, "No receiver phone number", null);
+            }
             return;
         }
 
-        SolapiKakaoAlimtalkClient.SmsResult result = solapiKakaoAlimtalkClient.sendAlimtalk(notificationId, receiverPhone, title, content);
-        if (result != null) {
-            LocalDateTime sentAt = "SENT".equals(result.getStatus()) ? LocalDateTime.now() : null;
-            com.cakeshop.domain.notification.entity.NotificationDelivery delivery = com.cakeshop.domain.notification.entity.NotificationDelivery.builder()
-                    .notificationId(notificationId)
-                    .recipient(receiverPhone)
-                    .templateCode("DEFAULT_SMS")
-                    .providerMessageId(result.getProviderMessageId())
-                    .status(result.getStatus())
-                    .failureReason(result.getFailureReason())
-                    .sentAt(sentAt)
-                    .createdAt(LocalDateTime.now())
-                    .updatedAt(LocalDateTime.now())
-                    .build();
-            notificationDeliveryService.recordDelivery(delivery);
+        // 외부 SMS 발송 전 시도 횟수를 원자적으로 예약(PENDING)하여 중복 발송 및 한도 초과 방지
+        Long deliveryId = notificationDeliveryService.reserveDeliveryAttempt(notificationId, receiverPhone, maxAttempts);
+        if (deliveryId == null) {
+            // 이미 SENT/DELIVERED 성공했거나 최대 시도 횟수에 도달한 경우
+            return;
+        }
+
+        try {
+            SolapiKakaoAlimtalkClient.SmsResult result = solapiKakaoAlimtalkClient.sendAlimtalk(notificationId, receiverPhone, title, content);
+            if (result != null) {
+                LocalDateTime sentAt = "SENT".equals(result.getStatus()) ? LocalDateTime.now() : null;
+                notificationDeliveryService.updateDeliveryResult(
+                        deliveryId,
+                        result.getStatus(),
+                        result.getProviderMessageId(),
+                        result.getFailureReason(),
+                        sentAt
+                );
+            } else {
+                notificationDeliveryService.updateDeliveryResult(
+                        deliveryId,
+                        "FAILED",
+                        null,
+                        "Null response from SMS provider",
+                        null
+                );
+            }
+        } catch (Exception e) {
+            notificationDeliveryService.updateDeliveryResult(
+                    deliveryId,
+                    "FAILED",
+                    null,
+                    "Exception during SMS sending: " + e.getMessage(),
+                    null
+            );
         }
     }
 
