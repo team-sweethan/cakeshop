@@ -3,7 +3,8 @@
 
   const SECTION = "[data-comment-section]";
 
-  let loading = false;
+  let pending = null;
+  let generation = 0;
   let autoLoadArmed = false;
   let observer = null;
 
@@ -56,7 +57,7 @@
   function load(pageUrl, options) {
     const current = section();
 
-    if (loading || !current) {
+    if (!current) {
       return;
     }
 
@@ -70,9 +71,24 @@
     const queryAt = pageUrl.indexOf("?");
     const query = queryAt < 0 ? "" : pageUrl.slice(queryAt);
 
-    loading = true;
+    /*
+     * 나중에 시작한 탐색이 이긴다. 진행 중인 요청을 끊지 않고 새 요청을 막으면, 뒤로가기 도중
+     * 도착한 옛 응답이 화면과 주소를 되돌려 놓아 뒤로가기가 취소된 것처럼 보인다.
+     */
+    if (pending) {
+      pending.abort();
+    }
 
-    window.fetch(sectionUrl + query, { credentials: "same-origin" })
+    const controller = window.AbortController ? new window.AbortController() : null;
+    const ticket = generation + 1;
+
+    generation = ticket;
+    pending = controller;
+
+    window.fetch(sectionUrl + query, {
+      credentials: "same-origin",
+      signal: controller ? controller.signal : undefined
+    })
         .then(function (response) {
           if (!response.ok) {
             throw new Error("comment section request failed");
@@ -81,6 +97,11 @@
           return response.text();
         })
         .then(function (html) {
+          /* 끊지 못한 옛 응답도 여기서 버린다 — AbortController 가 없는 브라우저의 안전망이다. */
+          if (ticket !== generation) {
+            return;
+          }
+
           if (!swap(html, pageUrl, options.preserveScroll)) {
             return;
           }
@@ -91,12 +112,35 @@
 
           observeMore();
         })
-        .catch(function () {
+        .catch(function (error) {
+          if (ticket !== generation || (error && error.name === "AbortError")) {
+            return;
+          }
+
           fallback(pageUrl);
-        })
-        .finally(function () {
-          loading = false;
         });
+  }
+
+  /*
+   * 쓰다 만 댓글·답글이 있으면 자동 로드는 하지 않는다. 구역을 통째로 갈아끼우므로 입력 칸도
+   * 함께 새 것이 되는데, 스크롤만 했을 뿐인 사용자에게 그것은 예고 없는 삭제다.
+   *
+   * <p>링크를 직접 누르는 경우는 막지 않는다 — 스크립트가 없었어도 그 링크는 페이지를 옮겨
+   * 같은 내용을 지웠다. 자동 로드만 <b>링크에 없던 새 손실</b>이라 여기서만 멈춘다.
+   */
+  function hasDraft() {
+    const current = section();
+
+    if (!current) {
+      return false;
+    }
+
+    return Array.prototype.some.call(
+        current.querySelectorAll("textarea"),
+        function (field) {
+          return field.value.trim() !== "";
+        }
+    );
   }
 
   /*
@@ -118,7 +162,8 @@
   if (window.IntersectionObserver) {
     observer = new window.IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {
-        if (!entry.isIntersecting) {
+        /* 관찰은 놓지 않는다 — 입력을 비우고 다시 지나가면 그때 이어 붙는다. */
+        if (!entry.isIntersecting || hasDraft()) {
           return;
         }
 
