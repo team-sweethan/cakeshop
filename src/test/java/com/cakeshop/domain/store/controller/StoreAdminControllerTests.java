@@ -81,6 +81,16 @@ class StoreAdminControllerTests {
     }
 
     @Test
+    void deleteImage_redirectsWithFlashMessage() throws Exception {
+        mockMvc.perform(post("/admin/store/image/delete"))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/admin/store"))
+            .andExpect(flash().attribute("successMessage", "매장 사진을 삭제했습니다."));
+
+        verify(storeService).deleteImage();
+    }
+
+    @Test
     void invalidBusinessHours_rendersSameFormWithoutCallingService() throws Exception {
         when(storeService.getStoreView()).thenReturn(storeView());
 

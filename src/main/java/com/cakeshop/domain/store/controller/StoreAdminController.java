@@ -66,6 +66,13 @@ public class StoreAdminController {
         return "redirect:/admin/store";
     }
 
+    @PostMapping("/image/delete")
+    public String deleteImage(RedirectAttributes redirectAttributes) {
+        storeService.deleteImage();
+        redirectAttributes.addFlashAttribute("successMessage", "매장 사진을 삭제했습니다.");
+        return "redirect:/admin/store";
+    }
+
     @PostMapping("/business-hours")
     public String updateBusinessHours(
             @Valid @ModelAttribute("businessHoursForm") StoreBusinessHoursForm form,

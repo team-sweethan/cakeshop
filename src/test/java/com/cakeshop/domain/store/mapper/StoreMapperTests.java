@@ -77,6 +77,34 @@ class StoreMapperTests {
     }
 
     @Test
+    void clearImageUrl_matchingCurrentUrl_clearsOnlyImageUrl() {
+        assertThat(storeMapper.clearImageUrl(STORE_ID, "/uploads/store/original.jpg"))
+            .isEqualTo(1);
+
+        Store updated = storeMapper.findStoreById(STORE_ID).orElseThrow();
+        assertThat(updated).satisfies(store -> {
+            assertThat(store.getImageUrl()).isNull();
+            assertThat(store.getName()).isEqualTo("기존 매장");
+            assertThat(store.getDescription()).isEqualTo("기존 소개");
+            assertThat(store.getAddress()).isEqualTo("기존 주소");
+            assertThat(store.getPhone()).isEqualTo("02-1111-2222");
+            assertThat(store.getPickupPlace()).isEqualTo("기존 픽업 장소");
+            assertThat(store.getPickupStartTime()).isEqualTo(LocalTime.of(10, 0));
+            assertThat(store.getPickupEndTime()).isEqualTo(LocalTime.of(19, 0));
+            assertThat(store.getPickupIntervalMinutes()).isEqualTo(60);
+        });
+    }
+
+    @Test
+    void clearImageUrl_differentCurrentUrl_doesNotUpdateStore() {
+        assertThat(storeMapper.clearImageUrl(STORE_ID, "/uploads/store/stale.jpg"))
+            .isZero();
+
+        assertThat(storeMapper.findStoreById(STORE_ID).orElseThrow().getImageUrl())
+            .isEqualTo("/uploads/store/original.jpg");
+    }
+
+    @Test
     void updatePickupInfo_validStore_updatesOnlyPickupColumns() {
         Store command = new Store();
         command.setId(STORE_ID);

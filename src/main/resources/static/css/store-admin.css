@@ -86,6 +86,16 @@
     flex: 1
 }
 
+.store-image-current {
+    display: grid;
+    flex: 0 0 84px;
+    gap: var(--space-1)
+}
+
+.store-image-current .btn {
+    width: 100%
+}
+
 .store-image-preview {
     border: 1px solid var(--color-border);
     height: 64px;

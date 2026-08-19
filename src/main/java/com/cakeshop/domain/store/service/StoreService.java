@@ -111,6 +111,22 @@ public class StoreService {
     }
 
     @Transactional
+    public void deleteImage() {
+        Store store = findDefaultStore();
+        String imageUrl = store.getImageUrl();
+        if (imageUrl == null || imageUrl.isBlank()) {
+            return;
+        }
+
+        if (storeMapper.clearImageUrl(DEFAULT_STORE_ID, imageUrl) != 1) {
+            throw new BusinessException(StoreErrorCode.UPDATE_FAILED);
+        }
+
+        // DB가 기존 URL을 제거한 뒤 커밋된 경우에만 저장 파일을 정리한다.
+        registerCommitFileDeletion(imageUrl);
+    }
+
+    @Transactional
     public void updateBusinessHours(StoreBusinessHoursForm form) {
         findDefaultStore();
         updateBusinessHours(
