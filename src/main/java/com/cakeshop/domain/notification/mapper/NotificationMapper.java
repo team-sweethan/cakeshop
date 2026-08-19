@@ -62,4 +62,12 @@ public interface NotificationMapper {
 
     // 문자로도 알림 보내기
     void saveDelivery(NotificationDelivery delivery);
+
+    // 발송 결과 업데이트 (상태, 프로바이더 메시지 ID, 실패 사유, 발송 시각)
+    void updateDeliveryResult(@Param("id") Long id,
+                              @Param("status") String status,
+                              @Param("providerMessageId") String providerMessageId,
+                              @Param("failureReason") String failureReason,
+                              @Param("sentAt") LocalDateTime sentAt,
+                              @Param("updatedAt") LocalDateTime updatedAt);
 }

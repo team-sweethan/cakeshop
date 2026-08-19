@@ -216,35 +216,48 @@ public class NotificationService {
 
     private void executeSmsSending(Long notificationId, String receiverPhone, String title, String content) {
         if (receiverPhone == null || receiverPhone.trim().isEmpty()) {
-            com.cakeshop.domain.notification.entity.NotificationDelivery delivery = com.cakeshop.domain.notification.entity.NotificationDelivery.builder()
-                    .notificationId(notificationId)
-                    .recipient("NO_PHONE")
-                    .templateCode("DEFAULT_SMS")
-                    .providerMessageId(null)
-                    .status("FAILED")
-                    .failureReason("No receiver phone number")
-                    .createdAt(LocalDateTime.now())
-                    .updatedAt(LocalDateTime.now())
-                    .build();
-            notificationDeliveryService.recordDelivery(delivery);
+            Long deliveryId = notificationDeliveryService.reserveDeliveryAttempt(notificationId, "NO_PHONE", 2);
+            if (deliveryId != null) {
+                notificationDeliveryService.updateDeliveryResult(deliveryId, "FAILED", null, "No receiver phone number", null);
+            }
             return;
         }
 
-        SolapiKakaoAlimtalkClient.SmsResult result = solapiKakaoAlimtalkClient.sendAlimtalk(notificationId, receiverPhone, title, content);
-        if (result != null) {
-            LocalDateTime sentAt = "SENT".equals(result.getStatus()) ? LocalDateTime.now() : null;
-            com.cakeshop.domain.notification.entity.NotificationDelivery delivery = com.cakeshop.domain.notification.entity.NotificationDelivery.builder()
-                    .notificationId(notificationId)
-                    .recipient(receiverPhone)
-                    .templateCode("DEFAULT_SMS")
-                    .providerMessageId(result.getProviderMessageId())
-                    .status(result.getStatus())
-                    .failureReason(result.getFailureReason())
-                    .sentAt(sentAt)
-                    .createdAt(LocalDateTime.now())
-                    .updatedAt(LocalDateTime.now())
-                    .build();
-            notificationDeliveryService.recordDelivery(delivery);
+        // 외부 SMS 발송 전 시도 횟수를 원자적으로 예약(PENDING)하여 중복 발송 및 2회 초과 방지
+        Long deliveryId = notificationDeliveryService.reserveDeliveryAttempt(notificationId, receiverPhone, 2);
+        if (deliveryId == null) {
+            // 이미 SENT 성공했거나 최대 시도 횟수(2회)에 도달한 경우
+            return;
+        }
+
+        try {
+            SolapiKakaoAlimtalkClient.SmsResult result = solapiKakaoAlimtalkClient.sendAlimtalk(notificationId, receiverPhone, title, content);
+            if (result != null) {
+                LocalDateTime sentAt = "SENT".equals(result.getStatus()) ? LocalDateTime.now() : null;
+                notificationDeliveryService.updateDeliveryResult(
+                        deliveryId,
+                        result.getStatus(),
+                        result.getProviderMessageId(),
+                        result.getFailureReason(),
+                        sentAt
+                );
+            } else {
+                notificationDeliveryService.updateDeliveryResult(
+                        deliveryId,
+                        "FAILED",
+                        null,
+                        "Null response from SMS provider",
+                        null
+                );
+            }
+        } catch (Exception e) {
+            notificationDeliveryService.updateDeliveryResult(
+                    deliveryId,
+                    "FAILED",
+                    null,
+                    "Exception during SMS sending: " + e.getMessage(),
+                    null
+            );
         }
     }
 

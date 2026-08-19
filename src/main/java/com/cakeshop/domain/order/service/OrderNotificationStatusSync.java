@@ -1,5 +1,6 @@
 package com.cakeshop.domain.order.service;
 
+import com.cakeshop.domain.member.service.MemberOrderNotificationQueryService;
 import com.cakeshop.domain.notification.entity.NotificationType;
 import com.cakeshop.domain.notification.service.NotificationOrderQueryService;
 import com.cakeshop.domain.order.dto.view.OrderChatView;
@@ -31,6 +32,7 @@ public class OrderNotificationStatusSync {
     private final OrderChatMapper orderChatMapper;
     private final OrderNotificationSender orderNotificationSender;
     private final NotificationOrderQueryService notificationOrderQueryService;
+    private final MemberOrderNotificationQueryService memberOrderNotificationQueryService;
     private final Clock clock;
 
     private final AtomicBoolean isRunning = new AtomicBoolean(false);
@@ -55,6 +57,7 @@ public class OrderNotificationStatusSync {
                 return;
             }
 
+            List<Long> adminIds = memberOrderNotificationQueryService.findActiveAdminIds();
             LocalDateTime maxProcessedTime = lastSyncTime;
 
             for (OrderChatView order : recentOrders) {
@@ -68,30 +71,66 @@ public class OrderNotificationStatusSync {
                 String orderNumber = order.orderNumber();
 
                 try {
+                    boolean orderFullyHandled = true;
+
                     if ("IN_PRODUCTION".equalsIgnoreCase(statusStr)) {
                         String eventKey = "CUSTOM_ORDER_IN_PRODUCTION:" + memberId + ":" + orderId;
                         if (!notificationOrderQueryService.isNotificationFullySent(memberId, eventKey)) {
                             orderNotificationSender.sendCustomOrderInProduction(orderId, memberId);
                         }
+                        orderFullyHandled = notificationOrderQueryService.isNotificationFullySent(memberId, eventKey);
                     } else if ("REJECTED".equalsIgnoreCase(statusStr)) {
                         String eventKey = "CUSTOM_ORDER_REJECTED:" + memberId + ":" + orderId;
                         if (!notificationOrderQueryService.isNotificationFullySent(memberId, eventKey)) {
                             orderNotificationSender.sendCustomOrderRejected(orderId, memberId);
                         }
+                        orderFullyHandled = notificationOrderQueryService.isNotificationFullySent(memberId, eventKey);
                     } else if ("CANCELED".equalsIgnoreCase(statusStr)) {
                         // 고객 취소 알림 체크 및 전송
                         String customerEventKey = "ORDER_CANCELED:" + memberId + ":" + orderId;
                         if (!notificationOrderQueryService.isNotificationFullySent(memberId, customerEventKey)) {
                             orderNotificationSender.sendOrderCanceledToCustomer(orderId, memberId);
                         }
-                        // 관리자 취소 알림 전송 (주문번호 포함)
-                        orderNotificationSender.sendOrderCanceledToAdmins(orderId, memberId, orderNumber);
+                        // 관리자 취소 알림 체크 및 전송
+                        if (adminIds != null && !adminIds.isEmpty()) {
+                            boolean hasUnsentAdmin = adminIds.stream().anyMatch(adminId ->
+                                    !notificationOrderQueryService.isNotificationFullySent(adminId,
+                                            NotificationType.ORDER_CANCEL_REQUEST.name() + ":" + adminId + ":" + orderId));
+                            if (hasUnsentAdmin) {
+                                orderNotificationSender.sendOrderCanceledToAdmins(orderId, memberId, orderNumber);
+                            }
+                        }
+                        boolean customerSent = notificationOrderQueryService.isNotificationFullySent(memberId, customerEventKey);
+                        boolean adminSent = adminIds == null || adminIds.stream().allMatch(adminId ->
+                                notificationOrderQueryService.isNotificationFullySent(adminId,
+                                        NotificationType.ORDER_CANCEL_REQUEST.name() + ":" + adminId + ":" + orderId));
+                        orderFullyHandled = customerSent && adminSent;
                     } else if ("PICKED_UP".equalsIgnoreCase(statusStr)) {
-                        // 픽업 완료 알림 체크 및 전송
+                        // 픽업 완료 고객 알림 독립 체크 및 전송
                         String customerEventKey = NotificationType.CUSTOMER_ORDER_PICKED_UP.name() + ":" + memberId + ":" + orderId;
                         if (!notificationOrderQueryService.isNotificationFullySent(memberId, customerEventKey)) {
-                            orderNotificationSender.sendOrderPickedUp(orderId, memberId, orderNumber);
+                            orderNotificationSender.sendOrderPickedUpToCustomer(orderId, memberId);
                         }
+                        // 픽업 완료 관리자 알림 독립 체크 및 전송
+                        if (adminIds != null && !adminIds.isEmpty()) {
+                            boolean hasUnsentAdmin = adminIds.stream().anyMatch(adminId ->
+                                    !notificationOrderQueryService.isNotificationFullySent(adminId,
+                                            NotificationType.ADMIN_PICKEDUP.name() + ":" + adminId + ":" + orderId));
+                            if (hasUnsentAdmin) {
+                                orderNotificationSender.sendOrderPickedUpToAdmins(orderId, memberId, orderNumber);
+                            }
+                        }
+                        boolean customerSent = notificationOrderQueryService.isNotificationFullySent(memberId, customerEventKey);
+                        boolean adminSent = adminIds == null || adminIds.stream().allMatch(adminId ->
+                                notificationOrderQueryService.isNotificationFullySent(adminId,
+                                        NotificationType.ADMIN_PICKEDUP.name() + ":" + adminId + ":" + orderId));
+                        orderFullyHandled = customerSent && adminSent;
+                    }
+
+                    // 실패 건이 남아있으면 커서를 전진시키지 않고 다음 스케줄에서 재시도하도록 중단
+                    if (!orderFullyHandled) {
+                        log.debug("주문(orderId={})의 알림 발송이 미완료 상태이므로 커서 전진을 보류합니다.", orderId);
+                        break;
                     }
 
                     if (order.orderUpdatedAt() != null && order.orderUpdatedAt().isAfter(maxProcessedTime)) {

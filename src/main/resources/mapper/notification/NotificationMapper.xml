@@ -199,4 +199,15 @@
             #{createdAt},
             #{updatedAt})
     </insert>
+
+    <!-- 발송 결과 업데이트 -->
+    <update id="updateDeliveryResult">
+        UPDATE notification_deliveries
+        SET status = #{status},
+            provider_message_id = #{providerMessageId},
+            failure_reason = #{failureReason},
+            sent_at = #{sentAt},
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+    </update>
 </mapper>
