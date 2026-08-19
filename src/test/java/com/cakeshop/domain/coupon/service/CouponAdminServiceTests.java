@@ -186,18 +186,18 @@ class CouponAdminServiceTests {
     }
 
     @Test
-    void issueSpecificMemberRejectsCouponBeforeStart() {
+    void issueSpecificMemberAllowsCouponBeforeStartButKeepsItsUseStartTime() {
         Coupon coupon = coupon(CouponStatus.ACTIVE, 10, 0, LocalDateTime.now().plusDays(1));
         coupon.setStartsAt(LocalDateTime.now().plusHours(1));
         when(memberCouponQueryService.lockActiveCouponIssuableMember(2L)).thenReturn(true);
         when(couponMapper.findCouponByIdForUpdate(1L)).thenReturn(Optional.of(coupon));
+        when(couponMapper.insertMemberCouponIfAbsent(1L, 2L, true)).thenReturn(1);
+        when(couponMapper.increaseIssuedQuantityIfAvailable(1L)).thenReturn(1);
 
-        assertThatThrownBy(() -> couponAdminService.issueSpecificMember(1L, 2L))
-                .isInstanceOf(BusinessException.class)
-                .extracting(exception -> ((BusinessException) exception).getErrorCode())
-                .isEqualTo(CouponErrorCode.UPDATE_FAILED);
+        couponAdminService.issueSpecificMember(1L, 2L);
 
-        verify(couponMapper, never()).insertMemberCouponIfAbsent(1L, 2L, false);
+        verify(couponMapper).insertMemberCouponIfAbsent(1L, 2L, true);
+        verify(couponMapper).increaseIssuedQuantityIfAvailable(1L);
     }
 
     @Test
@@ -205,7 +205,7 @@ class CouponAdminServiceTests {
         Coupon coupon = coupon(CouponStatus.ACTIVE, 10, 0, LocalDateTime.now().plusDays(1));
         when(couponMapper.findCouponByIdForUpdate(1L)).thenReturn(Optional.of(coupon));
         when(memberCouponQueryService.lockActiveCouponIssuableMember(2L)).thenReturn(true);
-        when(couponMapper.insertMemberCouponIfAbsent(1L, 2L, false)).thenReturn(0);
+        when(couponMapper.insertMemberCouponIfAbsent(1L, 2L, true)).thenReturn(0);
 
         assertThatThrownBy(() -> couponAdminService.issueSpecificMember(1L, 2L))
                 .isInstanceOf(BusinessException.class)

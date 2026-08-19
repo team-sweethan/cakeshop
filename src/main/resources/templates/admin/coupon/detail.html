@@ -75,6 +75,7 @@
             <div class="panel" style="margin-top: 24px;"
                  th:if="${couponDetail.targetType.name() == 'SPECIFIC_MEMBERS'}">
                 <h2 class="section-title" style="margin: 0 0 16px; font-size: 1.25rem;">쿠폰 개별 발급</h2>
+                <p class="form-help">발급 예정 쿠폰도 미리 지급할 수 있으며, 회원은 시작 일시 이후부터 사용할 수 있습니다.</p>
                 <div class="cluster" style="gap: 8px; margin-top: 8px;">
                     <select id="targetMemberSearchType" class="form-select" style="max-width: 130px;height: 37px;">
                     <option value="MEMBER_ID">회원 ID</option>
