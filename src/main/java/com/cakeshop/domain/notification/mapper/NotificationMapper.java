@@ -48,6 +48,9 @@ public interface NotificationMapper {
     // 중복 event_key 기반 기존 알림 ID 조회
     Long findIdByReceiverIdAndEventKey(@Param("receiverId") Long receiverId, @Param("eventKey") String eventKey);
 
+    // 알림 ID 기반 비관적 잠금 조회 (FOR UPDATE - 발송 시도 원자적 예약 직렬화용)
+    Long findNotificationByIdForUpdate(@Param("id") Long id);
+
     // 이미 SENT 성공 발송 이력이 있는지 확인
     boolean hasSentDelivery(@Param("notificationId") Long notificationId);
 

@@ -28,6 +28,9 @@ public class NotificationDeliveryService {
     public Long reserveDeliveryAttempt(Long notificationId, String recipient, int maxAttempts) {
         if (notificationId == null) return null;
         try {
+            // 동일 알림에 대한 발송 시도 검사 및 삽입을 비관적 락(FOR UPDATE)으로 완벽하게 직렬화
+            notificationMapper.findNotificationByIdForUpdate(notificationId);
+
             if (notificationMapper.hasSentDelivery(notificationId)) {
                 return null;
             }

@@ -1,5 +1,6 @@
 package com.cakeshop.domain.notification.service;
 
+import com.cakeshop.domain.member.service.MemberNotificationQueryService;
 import com.cakeshop.domain.notification.mapper.NotificationMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class NotificationOrderQueryService {
 
     private final NotificationMapper notificationMapper;
+    private final MemberNotificationQueryService memberNotificationQueryService;
 
     /** 수신자와 이벤트 키 기반 알림 존재 여부 조회 */
     @Transactional(readOnly = true)
@@ -29,11 +31,15 @@ public class NotificationOrderQueryService {
         return notificationMapper.existsByReceiverIdAndEventKey(receiverId, eventKey);
     }
 
-    /** 수신자와 이벤트 키 기반 알림 생성 및 SMS 정상 발송 완료(또는 최대 재시도 2회 초과) 여부 조회 */
+    /** 수신자와 이벤트 키 기반 알림 생성 및 SMS 정상 발송 완료(또는 최대 재시도 2회 초과/비활성 회원) 여부 조회 */
     @Transactional(readOnly = true)
     public boolean isNotificationFullySent(Long receiverId, String eventKey) {
         if (receiverId == null || eventKey == null || eventKey.isBlank()) {
             return false;
+        }
+        // 탈퇴/정지 등 비활성 회원은 알림 발송 대상이 아니므로 완결(스킵)로 처리하여 커서 블로킹 방지
+        if (!memberNotificationQueryService.isMemberActive(receiverId)) {
+            return true;
         }
         Long notificationId = notificationMapper.findIdByReceiverIdAndEventKey(receiverId, eventKey);
         if (notificationId == null) {
