@@ -66,6 +66,13 @@ class StorePublicModelInterceptorTests {
     }
 
     @Test
+    void paymentSuccessView_withoutFooter_doesNotQueryStore() throws Exception {
+        postHandle(new ModelAndView("customer/payment/success"));
+
+        verify(storeService, never()).getPublicStore();
+    }
+
+    @Test
     void customerView_withoutDefaultStore_keepsOriginalViewRenderable() throws Exception {
         when(storeService.getPublicStore())
             .thenThrow(new BusinessException(StoreErrorCode.NOT_FOUND));

@@ -5,6 +5,7 @@ import com.cakeshop.domain.store.service.StoreService;
 import com.cakeshop.global.error.BusinessException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.util.Set;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.ModelAndView;
 
@@ -12,6 +13,41 @@ import org.springframework.web.servlet.ModelAndView;
 public class StorePublicModelInterceptor implements HandlerInterceptor {
 
     private static final String STORE_MODEL_ATTRIBUTE = "store";
+    private static final Set<String> STORE_FOOTER_VIEWS = Set.of(
+        "auth/login",
+        "auth/oauth-signup",
+        "customer/cart/list",
+        "customer/chat/room",
+        "customer/community/detail",
+        "customer/community/form",
+        "customer/community/list",
+        "customer/community/notice/detail",
+        "customer/community/notice/list",
+        "customer/coupon/list",
+        "customer/member/find-email",
+        "customer/member/find-password",
+        "customer/member/mypage",
+        "customer/member/profile-edit",
+        "customer/member/reset-password",
+        "customer/member/signup",
+        "customer/notification/list",
+        "customer/order/cart-form",
+        "customer/order/complete",
+        "customer/order/custom-option",
+        "customer/order/custom-request",
+        "customer/order/detail",
+        "customer/order/form",
+        "customer/order/pickup-setting",
+        "customer/payment/form",
+        "customer/product/detail",
+        "customer/product/list",
+        "customer/review/edit",
+        "customer/review/form",
+        "customer/review/my",
+        "customer/review/product",
+        "customer/review/writable",
+        "home/main"
+    );
 
     private final StoreService storeService;
 
@@ -43,9 +79,6 @@ public class StorePublicModelInterceptor implements HandlerInterceptor {
             return false;
         }
 
-        String viewName = modelAndView.getViewName();
-        return viewName.startsWith("customer/")
-            || viewName.startsWith("auth/")
-            || viewName.startsWith("home/");
+        return STORE_FOOTER_VIEWS.contains(modelAndView.getViewName());
     }
 }
