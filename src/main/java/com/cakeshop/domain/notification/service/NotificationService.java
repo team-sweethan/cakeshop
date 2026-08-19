@@ -1,85 +1,80 @@
 package com.cakeshop.domain.notification.service;
 
-import java.util.List;
-import java.time.Duration;
-import java.time.LocalDateTime;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import lombok.RequiredArgsConstructor;
-
-import com.cakeshop.domain.notification.mapper.NotificationMapper;
-import com.cakeshop.global.infra.kakao.SolapiKakaoAlimtalkClient;
-import com.cakeshop.domain.notification.dto.view.NotificationResponse;
+import com.cakeshop.domain.member.service.MemberNotificationQueryService;
 import com.cakeshop.domain.notification.dto.form.NotificationRequest;
+import com.cakeshop.domain.notification.dto.view.NotificationResponse;
 import com.cakeshop.domain.notification.entity.DeliveryScope;
 import com.cakeshop.domain.notification.entity.Notification;
-import com.cakeshop.domain.notification.entity.NotificationType;
-
-import org.springframework.messaging.simp.SimpMessagingTemplate;
-
+import com.cakeshop.domain.notification.mapper.NotificationMapper;
+import com.cakeshop.global.infra.kakao.SolapiKakaoAlimtalkClient;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.List;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-import com.cakeshop.domain.member.service.MemberNotificationQueryService;
-
+/**
+ * ******************************
+ * 작성자 : 김민정
+ * 담당자 : 김민정
+ * 작성일 : 2026-08-04
+ * 기능 : 알림 생성, 조회, 읽음 처리 및 웹소켓/SMS 발송 서비스
+ * 설명 : 다양한 도메인 이벤트에 대응하여 알림을 생성하고, 웹소켓 토스트 및 문자(SMS) 알림을 안전하게 전송한다.
+ * ******************************
+ */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class NotificationService {
 
     private final NotificationMapper notificationMapper;
-    private final SolapiKakaoAlimtalkClient solapiKakaoAlimtalkClient;
-    private final NotificationDeliveryService notificationDeliveryService;
-    private final SimpMessagingTemplate messagingTemplate;
     private final MemberNotificationQueryService memberNotificationQueryService;
+    private final NotificationDeliveryService notificationDeliveryService;
+    private final SolapiKakaoAlimtalkClient solapiKakaoAlimtalkClient;
+    private final SimpMessagingTemplate messagingTemplate;
 
-    // 알림 생성
+    // 알림 생성 메인 로직 (신규 생성, 동시성 멱등 제어, 묶음 갱신, 웹소켓/SMS 독립 후처리)
     @Transactional
     public void makeNotification(NotificationRequest request) {
-
-        // 알림 제목, 내용 만들기
-        String title = request.getType().getDefaultTitle();
-        String content = request.getType().formatContent(request.getArgs());
-
-        // 알림 발송 범위 결정
-        DeliveryScope scope = request.getDeliveryScope() != null ? request.getDeliveryScope() : DeliveryScope.WEB_ONLY;
-
-        // 이벤트 키 결정 (누락 시 수신자, 타입, 가장 세밀한 연관ID 조합으로 결정론적 고유 키 생성)
-        String eventKey = request.getEventKey();
-        if (eventKey == null || eventKey.trim().isEmpty()) {
-            Object targetId = request.getCommentId() != null ? request.getCommentId()
-                    : request.getReviewReplyId() != null ? request.getReviewReplyId()
-                    : request.getChatMessageId() != null ? request.getChatMessageId()
-                    : request.getOrderId() != null ? request.getOrderId()
-                    : request.getPostId() != null ? request.getPostId()
-                    : request.getReviewId() != null ? request.getReviewId()
-                    : request.getUserCouponId() != null ? request.getUserCouponId()
-                    : request.getChatRoomId() != null ? "ROOM_" + request.getChatRoomId()
-                    : java.util.UUID.randomUUID().toString();
-            eventKey = request.getType().name() + ":" + request.getReceiverId() + ":" + targetId;
+        if (request == null || request.getType() == null) {
+            return;
         }
 
-        // 방 단위 묶음 알림(ROOM_...) 여부 확인 (메시지 ID 단위 단건 알림 키는 멱등 처리)
-        boolean isBundleNotification = request.getChatRoomId() != null
-            || (eventKey != null && eventKey.contains("ROOM_"));
+        // 수신자가 비활성(탈퇴/정지) 회원이면 알림을 생성하거나 발송하지 않는다.
+        if (request.getReceiverId() != null && !memberNotificationQueryService.isMemberActive(request.getReceiverId())) {
+            return;
+        }
 
-        // 중복 eventKey가 존재하는 경우 처리
+        // 제목 및 본문 템플릿 포맷팅
+        String title = request.getType().getDefaultTitle();
+        String content = request.getType().formatContent(request.getArgs());
+        DeliveryScope scope = request.getDeliveryScope() != null ? request.getDeliveryScope() : DeliveryScope.WEB_ONLY;
+
+        // 알림 고유 이벤트 키 결정
+        String eventKey = request.getEventKey();
+        if (eventKey == null || eventKey.trim().isEmpty()) {
+            eventKey = request.getType().name() + ":" + request.getReceiverId() + ":" + System.currentTimeMillis();
+        }
+
+        boolean isBundleNotification = eventKey.startsWith("ROOM_")
+                || eventKey.startsWith("COMMENT_POST_")
+                || eventKey.startsWith("REPLY_COMMENT_");
+
+        // 멱등성 사전 검사: 이미 동일 eventKey의 알림이 존재하는 경우
         if (notificationMapper.existsByReceiverIdAndEventKey(request.getReceiverId(), eventKey)) {
             if (isBundleNotification) {
-                // 비관적 잠금(FOR UPDATE) 획득 후 최신 시각(now) 측정하여 0.001초 동시성 덮어쓰기 방지
                 Notification existing = notificationMapper.findNotificationByReceiverAndEventKeyForUpdate(request.getReceiverId(), eventKey);
                 LocalDateTime now = LocalDateTime.now();
                 notificationMapper.updateLastEventAtAndUnread(request.getReceiverId(), eventKey, title, content, now);
 
-                // 30분 쿨타임 체크: 직전 메시지 시각(last_event_at) 대비 30분 이상 경과했으면 새 묶음으로 간주해 SMS 재발송
                 long minutesGap = (existing != null && existing.getLastEventAt() != null)
                     ? Duration.between(existing.getLastEventAt(), now).toMinutes() : 999;
-
-                if (minutesGap >= 30 && scope == DeliveryScope.WEB_AND_SMS && request.getReceiverId() != null) {
-                    Long existingId = existing != null ? existing.getId() : notificationMapper.findIdByReceiverIdAndEventKey(request.getReceiverId(), eventKey);
-                    String receiverPhone = notificationMapper.findReceiverPhone(request.getReceiverId(), request.getOrderId());
-                    registerSmsSending(existingId, receiverPhone, title, content, Integer.MAX_VALUE);
-                }
 
                 Long bundleId = existing != null ? existing.getId() : notificationMapper.findIdByReceiverIdAndEventKey(request.getReceiverId(), eventKey);
                 NotificationResponse bundleResponse = NotificationResponse.builder()
@@ -98,11 +93,35 @@ public class NotificationService {
                         .lastEventAt(now)
                         .build();
                 registerWebSocketSending(request.getReceiverId(), bundleResponse);
+
+                if (minutesGap >= 30 && scope == DeliveryScope.WEB_AND_SMS && request.getReceiverId() != null) {
+                    String receiverPhone = notificationMapper.findReceiverPhone(request.getReceiverId(), request.getOrderId());
+                    registerSmsSending(bundleId, receiverPhone, title, content, Integer.MAX_VALUE);
+                }
             } else {
-                // 일반 알림(주문 등) 중복 시 기존 SMS 전송이 완료(SENT/DELIVERED)되지 않았고 최대 시도(2회) 미만인 경우에만 SMS를 재발송한다.
-                if (scope == DeliveryScope.WEB_AND_SMS && request.getReceiverId() != null) {
-                    Long existingId = notificationMapper.findIdByReceiverIdAndEventKey(request.getReceiverId(), eventKey);
-                    if (existingId != null && !notificationMapper.hasSentDelivery(existingId)
+                // 일반 알림(주문/쿠폰 등) 중복 시에도 웹소켓 전파 복구 및 기존 SMS 미완료 시 재발송
+                Long existingId = notificationMapper.findIdByReceiverIdAndEventKey(request.getReceiverId(), eventKey);
+                if (existingId != null) {
+                    LocalDateTime now = LocalDateTime.now();
+                    NotificationResponse retryResponse = NotificationResponse.builder()
+                            .id(existingId)
+                            .type(request.getType())
+                            .title(title)
+                            .content(content)
+                            .isRead(false)
+                            .createdAt(now)
+                            .orderId(request.getOrderId())
+                            .chatRoomId(request.getChatRoomId())
+                            .commentId(request.getCommentId())
+                            .postId(request.getPostId())
+                            .reviewId(request.getReviewId())
+                            .userCouponId(request.getUserCouponId())
+                            .lastEventAt(now)
+                            .build();
+                    registerWebSocketSending(request.getReceiverId(), retryResponse);
+
+                    if (scope == DeliveryScope.WEB_AND_SMS && request.getReceiverId() != null
+                            && !notificationMapper.hasSentDelivery(existingId)
                             && notificationMapper.countDeliveryAttempts(existingId) < 2) {
                         String receiverPhone = notificationMapper.findReceiverPhone(request.getReceiverId(), request.getOrderId());
                         registerSmsSending(existingId, receiverPhone, title, content, 2);
@@ -148,12 +167,6 @@ public class NotificationService {
                 long minutesGap = (existing != null && existing.getLastEventAt() != null)
                     ? Duration.between(existing.getLastEventAt(), updateNow).toMinutes() : 999;
 
-                if (minutesGap >= 30 && scope == DeliveryScope.WEB_AND_SMS && request.getReceiverId() != null) {
-                    Long existingId = existing != null ? existing.getId() : notificationMapper.findIdByReceiverIdAndEventKey(request.getReceiverId(), eventKey);
-                    String receiverPhone = notificationMapper.findReceiverPhone(request.getReceiverId(), request.getOrderId());
-                    registerSmsSending(existingId, receiverPhone, title, content, Integer.MAX_VALUE);
-                }
-
                 Long bundleId = existing != null ? existing.getId() : notificationMapper.findIdByReceiverIdAndEventKey(request.getReceiverId(), eventKey);
                 NotificationResponse bundleResponse = NotificationResponse.builder()
                         .id(bundleId)
@@ -171,17 +184,16 @@ public class NotificationService {
                         .lastEventAt(updateNow)
                         .build();
                 registerWebSocketSending(request.getReceiverId(), bundleResponse);
+
+                if (minutesGap >= 30 && scope == DeliveryScope.WEB_AND_SMS && request.getReceiverId() != null) {
+                    String receiverPhone = notificationMapper.findReceiverPhone(request.getReceiverId(), request.getOrderId());
+                    registerSmsSending(bundleId, receiverPhone, title, content, Integer.MAX_VALUE);
+                }
             }
             return;
         }
 
-        // 알림톡 / SMS 외부 발송 연동 (DB 트랜잭션 커밋 완료 후 안전하게 발송)
-        if (scope == DeliveryScope.WEB_AND_SMS && request.getReceiverId() != null) {
-            String receiverPhone = notificationMapper.findReceiverPhone(request.getReceiverId(), request.getOrderId());
-            registerSmsSending(notification.getId(), receiverPhone, title, content);
-        }
-
-        // 알림 실시간 웹소켓(STOMP) 전파 (DB 트랜잭션 커밋 완료 후 안전하게 방송)
+        // 1. 알림 실시간 웹소켓(STOMP) 전파를 먼저 등록하여 SMS 예약 실패와 독립적으로 전파 보장
         NotificationResponse responseDTO = NotificationResponse.builder()
                 .id(notification.getId())
                 .type(notification.getNotificationType())
@@ -198,6 +210,12 @@ public class NotificationService {
                 .lastEventAt(notification.getLastEventAt())
                 .build();
         registerWebSocketSending(request.getReceiverId(), responseDTO);
+
+        // 2. 알림톡 / SMS 외부 발송 연동 (DB 트랜잭션 커밋 완료 후 안전하게 발송)
+        if (scope == DeliveryScope.WEB_AND_SMS && request.getReceiverId() != null) {
+            String receiverPhone = notificationMapper.findReceiverPhone(request.getReceiverId(), request.getOrderId());
+            registerSmsSending(notification.getId(), receiverPhone, title, content);
+        }
     }
 
     private void registerSmsSending(Long notificationId, String receiverPhone, String title, String content) {
@@ -219,49 +237,53 @@ public class NotificationService {
     }
 
     private void executeSmsSending(Long notificationId, String receiverPhone, String title, String content, int maxAttempts) {
-        if (receiverPhone == null || receiverPhone.trim().isEmpty()) {
-            Long deliveryId = notificationDeliveryService.reserveDeliveryAttempt(notificationId, "NO_PHONE", maxAttempts);
-            if (deliveryId != null) {
-                notificationDeliveryService.updateDeliveryResult(deliveryId, "FAILED", null, "No receiver phone number", null);
-            }
-            return;
-        }
-
-        // 외부 SMS 발송 전 시도 횟수를 원자적으로 예약(PENDING)하여 중복 발송 및 한도 초과 방지
-        Long deliveryId = notificationDeliveryService.reserveDeliveryAttempt(notificationId, receiverPhone, maxAttempts);
-        if (deliveryId == null) {
-            // 이미 SENT/DELIVERED 성공했거나 최대 시도 횟수에 도달한 경우
-            return;
-        }
-
         try {
-            SolapiKakaoAlimtalkClient.SmsResult result = solapiKakaoAlimtalkClient.sendAlimtalk(notificationId, receiverPhone, title, content);
-            if (result != null) {
-                LocalDateTime sentAt = "SENT".equals(result.getStatus()) ? LocalDateTime.now() : null;
-                notificationDeliveryService.updateDeliveryResult(
-                        deliveryId,
-                        result.getStatus(),
-                        result.getProviderMessageId(),
-                        result.getFailureReason(),
-                        sentAt
-                );
-            } else {
+            if (receiverPhone == null || receiverPhone.trim().isEmpty()) {
+                Long deliveryId = notificationDeliveryService.reserveDeliveryAttempt(notificationId, "NO_PHONE", maxAttempts);
+                if (deliveryId != null) {
+                    notificationDeliveryService.updateDeliveryResult(deliveryId, "FAILED", null, "No receiver phone number", null);
+                }
+                return;
+            }
+
+            // 외부 SMS 발송 전 시도 횟수를 원자적으로 예약(PENDING)하여 중복 발송 및 한도 초과 방지
+            Long deliveryId = notificationDeliveryService.reserveDeliveryAttempt(notificationId, receiverPhone, maxAttempts);
+            if (deliveryId == null) {
+                // 이미 SENT/DELIVERED 성공했거나 최대 시도 횟수에 도달한 경우
+                return;
+            }
+
+            try {
+                SolapiKakaoAlimtalkClient.SmsResult result = solapiKakaoAlimtalkClient.sendAlimtalk(notificationId, receiverPhone, title, content);
+                if (result != null) {
+                    LocalDateTime sentAt = "SENT".equals(result.getStatus()) ? LocalDateTime.now() : null;
+                    notificationDeliveryService.updateDeliveryResult(
+                            deliveryId,
+                            result.getStatus(),
+                            result.getProviderMessageId(),
+                            result.getFailureReason(),
+                            sentAt
+                    );
+                } else {
+                    notificationDeliveryService.updateDeliveryResult(
+                            deliveryId,
+                            "FAILED",
+                            null,
+                            "Null response from SMS provider",
+                            null
+                    );
+                }
+            } catch (Exception e) {
                 notificationDeliveryService.updateDeliveryResult(
                         deliveryId,
                         "FAILED",
                         null,
-                        "Null response from SMS provider",
+                        "Exception during SMS sending: " + e.getMessage(),
                         null
                 );
             }
         } catch (Exception e) {
-            notificationDeliveryService.updateDeliveryResult(
-                    deliveryId,
-                    "FAILED",
-                    null,
-                    "Exception during SMS sending: " + e.getMessage(),
-                    null
-            );
+            log.warn("SMS 발송 예약/실행 중 예외 발생 (notificationId={}): {}", notificationId, e.getMessage());
         }
     }
 
