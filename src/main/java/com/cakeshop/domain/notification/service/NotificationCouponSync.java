@@ -36,6 +36,7 @@ import org.springframework.stereotype.Component;
 public class NotificationCouponSync {
 
     private static final DateTimeFormatter EXPIRE_KEY_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHHmm");
+    private static final DateTimeFormatter EXPIRE_KEY_FULL_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
     private final CouponNotificationQueryService couponNotificationQueryService;
     private final NotificationCouponQueryService notificationCouponQueryService;
@@ -303,8 +304,12 @@ public class NotificationCouponSync {
                             String[] parts = notification.getEventKey().split(":");
                             if (parts.length >= 4) {
                                 try {
-                                    targetExpiresAt = LocalDateTime.parse(parts[3], EXPIRE_KEY_FORMAT);
+                                    targetExpiresAt = LocalDateTime.parse(parts[3], EXPIRE_KEY_FULL_FORMAT);
                                 } catch (Exception ignored) {
+                                    try {
+                                        targetExpiresAt = LocalDateTime.parse(parts[3], EXPIRE_KEY_FORMAT);
+                                    } catch (Exception ignored2) {
+                                    }
                                 }
                             }
                         }

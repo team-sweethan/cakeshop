@@ -111,7 +111,7 @@
           AND c.starts_at &lt;= NOW(6)
           AND c.expires_at &gt; NOW(6)
           <if test="expiresAt != null">
-              AND c.expires_at = #{expiresAt}
+              AND DATE_FORMAT(c.expires_at, '%Y%m%d%H%i') = DATE_FORMAT(#{expiresAt}, '%Y%m%d%H%i')
           </if>
     </select>
 
