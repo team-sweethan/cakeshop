@@ -1,3 +1,2 @@
--- 쿠폰 만료 임박 알림 동기화 조회 성능 최적화를 위한 인덱스 추가
-CREATE INDEX idx_coupons_status_starts_expires ON coupons (status, starts_at, expires_at);
-CREATE INDEX idx_member_coupons_status_member_coupon ON member_coupons (status, member_id, coupon_id);
+-- member_coupons 테이블에 쿠폰 발급 알림 동기화용 복합 인덱스 (issued_at, id) 추가
+CREATE INDEX idx_member_coupons_issued_at_id ON member_coupons (issued_at, id);
