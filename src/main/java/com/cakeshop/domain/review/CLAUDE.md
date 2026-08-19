@@ -41,7 +41,6 @@ Entity·Form·Query·Command·View의 로컬 패키지 경계는 `docs/review/re
 | 언제 무엇을 정했는지 | `docs/review/decisions/decision-log.md`의 해당 날짜 행 |
 | 결정의 이유가 구현 선택을 바꾸는 경우 | 관련 `docs/review/decisions/ADR-*.md` 한 파일 |
 | 완료된 조각의 회귀를 추적해야 하는 경우 | 관련 `docs/review/history/*` 한 파일만 |
-| 성능·부하·계측을 다루는 작업 | `docs/review/MONITORING.md` |
 
 `DOMAIN.md`, 모든 spec, reviews, decisions, history를 한꺼번에 읽지 않는다. 현재 기능과 연결된 참조만
 따라간다. **`reviews/`·`decisions/`·`history/`는 기본으로 읽지 않는다** — `PLAN.md`에는 그 셋으로 가는
