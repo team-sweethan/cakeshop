@@ -65,6 +65,9 @@ public class ChatEventListener {
             // P2 수정: 저장된 메시지를 채팅 토픽에 브로드캐스트하여 고객 화면 실시간 갱신
             messagingTemplate.convertAndSend("/topic/chat/" + response.getChatRoomId(), response);
 
+            // P2 수정: 고객 채팅 화면 연동 주문 목록 사이드바 실시간 갱신 (UNDER_REVIEW -> REJECTED 반영)
+            broadcastOrderUpdate(event.orderId());
+
             // 관리자 방 목록 갱신 (미답변 탭 카운트 등 반영) - chat-admin.js가 구독하는 /topic/admin/rooms 로 전송
             ChatRoomListResponse roomResponse = chatService.getAdminChatRoomResponse(response.getChatRoomId());
             if (roomResponse != null) {

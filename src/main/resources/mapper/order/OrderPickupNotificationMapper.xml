@@ -24,7 +24,8 @@
             o.pickup_at AS pickupAt,
             o.created_at AS orderCreatedAt,
             o.updated_at AS orderUpdatedAt,
-            '주문 케이크' AS representativeProductName
+            '주문 케이크' AS representativeProductName,
+            o.reject_reason AS rejectReason
         FROM orders o
         WHERE o.status IN ('READY_FOR_PICKUP', 'IN_PRODUCTION', 'UNDER_REVIEW')
           AND o.pickup_at &gt;= DATE_ADD(CURDATE(), INTERVAL 1 DAY)
@@ -44,7 +45,8 @@
             o.pickup_at AS pickupAt,
             o.created_at AS orderCreatedAt,
             o.updated_at AS orderUpdatedAt,
-            '주문 케이크' AS representativeProductName
+            '주문 케이크' AS representativeProductName,
+            o.reject_reason AS rejectReason
         FROM orders o
         WHERE o.status IN ('READY_FOR_PICKUP', 'IN_PRODUCTION', 'UNDER_REVIEW')
           AND o.pickup_at &gt;= CURDATE()

@@ -51,11 +51,11 @@
         WHERE id = #{chatRoomId}
     </update>
 
-    <!-- 메시지 발송 시 최신 메시지 ID, 시각, 답변 상태 (response_status) 갱신 (CLOSED 방 시 자동 OPEN 재오픈) -->
+    <!-- 메시지 발송 시 최신 메시지 ID, 시각, 답변 상태 (response_status) 및 운영 상태 (status) 갱신 -->
     <update id="updateChatRoomLastMessage">
         UPDATE chat_rooms
         SET
-            status = 'OPEN',
+            status = COALESCE(#{status}, 'OPEN'),
             last_message_id = #{lastMessageId},
             last_message_at = #{lastMessageAt},
             response_status = #{responseStatus},

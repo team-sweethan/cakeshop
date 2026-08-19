@@ -33,12 +33,13 @@ public interface ChatMapper {
         @Param("responseStatus") ChatResponseStatus responseStatus
     );
 
-    // 메시지 발송 시 최신 메시지 ID, 시각, 답변 상태 (response_status) 갱신
+    // 메시지 발송 시 최신 메시지 ID, 시각, 답변 상태 (response_status) 및 운영 상태 (status) 갱신
     void updateChatRoomLastMessage(
         @Param("chatRoomId") Long chatRoomId,
         @Param("lastMessageId") Long lastMessageId,
         @Param("lastMessageAt") LocalDateTime lastMessageAt,
-        @Param("responseStatus") ChatResponseStatus responseStatus
+        @Param("responseStatus") ChatResponseStatus responseStatus,
+        @Param("status") ChatRoomStatus status
     );
 
     // 관리자 좌측 배너 목록 조회
