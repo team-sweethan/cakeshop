@@ -25,26 +25,15 @@
 
     <div th:replace="~{fragments/common/alert :: alert}"></div>
 
-    <div class="cluster cluster--between">
-      <h1>커뮤니티</h1>
-      <a class="btn btn--primary" sec:authorize="!hasRole('ADMIN')"
-         th:href="@{/community/new}">글쓰기</a>
-    </div>
+    <h1>커뮤니티</h1>
 
     <div class="section" th:classappend="${!popularSection.isEmpty()} ? 'layout-main-aside'">
       <div>
-        <form class="cluster section" method="get" th:action="@{/community}" role="search">
-          <input type="hidden" name="categoryId" th:if="${selectedCategoryId != null}"
-                 th:value="${selectedCategoryId}">
-          <input type="hidden" name="sort" th:value="${selectedSort}">
-          <label class="visually-hidden" for="keyword">게시글 검색</label>
-          <input class="input" type="search" id="keyword" name="keyword"
-                 placeholder="제목과 내용에서 찾기"
-                 th:value="${selectedKeyword}">
-          <button class="btn btn--primary" type="submit">검색</button>
-          <a class="btn" th:if="${selectedKeyword != null}"
+        <div class="cluster section" th:if="${selectedKeyword != null}">
+          <span class="text-muted" th:text="|'${selectedKeyword}' 검색 결과|">검색 결과</span>
+          <a class="btn"
              th:href="@{/community(categoryId=${selectedCategoryId}, sort=${selectedSort})}">검색 해제</a>
-        </form>
+        </div>
 
         <div class="cluster section">
           <a class="btn"
@@ -149,6 +138,24 @@
             다음
           </span>
         </nav>
+
+        <!--/* 검색과 글쓰기는 목록 끝에 둔다. 훑어보다 못 찾았을 때 손이 닿는 자리다
+               (specs/community-read.md B6). */-->
+        <div class="cluster cluster--between section">
+          <form class="cluster" method="get" th:action="@{/community}" role="search">
+            <input type="hidden" name="categoryId" th:if="${selectedCategoryId != null}"
+                   th:value="${selectedCategoryId}">
+            <input type="hidden" name="sort" th:value="${selectedSort}">
+            <label class="visually-hidden" for="keyword">게시글 검색</label>
+            <input class="input" type="search" id="keyword" name="keyword"
+                   placeholder="제목과 내용에서 찾기"
+                   th:value="${selectedKeyword}">
+            <button class="btn btn--primary" type="submit">검색</button>
+          </form>
+
+          <a class="btn btn--primary" sec:authorize="!hasRole('ADMIN')"
+             th:href="@{/community/new}">글쓰기</a>
+        </div>
       </div>
 
       <aside class="stack" th:if="${!popularSection.isEmpty()}">
