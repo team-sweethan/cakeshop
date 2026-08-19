@@ -12,11 +12,21 @@ import org.apache.ibatis.annotations.Param;
  * 담당자 : 이정후
  * 작성일 : 2026-08-19
  * 기능 : 쿠폰 알림용 연동 Mapper 인터페이스
- * 설명 : member_coupons 테이블에서 만료 임박(3일 이내) 유효 쿠폰 목록 조회 및 발송 직전 상태 재검증을 수행한다.
+ * 설명 : member_coupons 테이블에서 사용 시작일이 도래한 발급 쿠폰 및 만료 임박 쿠폰을 조회하고 가용 상태를 검증한다.
  * ******************************
  */
 @Mapper
 public interface CouponNotificationMapper {
+
+    /**
+     * 사용 시작일이 도래한 유효 회원 쿠폰 목록을 복합 커서(lastIssuedAt, lastMemberCouponId) 또는 시각(since) 기준으로 조회한다.
+     */
+    List<CouponNotificationView> findRecentlyIssuedOrStartedMemberCoupons(
+            @Param("since") LocalDateTime since,
+            @Param("lastIssuedAt") LocalDateTime lastIssuedAt,
+            @Param("lastMemberCouponId") Long lastMemberCouponId,
+            @Param("limit") int limit
+    );
 
     /**
      * 현재 사용 가능하고 지정된 일수(days) 이내에 만료 예정인 회원 쿠폰 목록을 복합 커서(lastExpiresAt, lastMemberCouponId)로 조회한다.

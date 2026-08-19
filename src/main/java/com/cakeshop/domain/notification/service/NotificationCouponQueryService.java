@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 담당자 : 김민정
  * 작성일 : 2026-08-19
  * 기능 : 쿠폰 알림 전용 멱등성 및 상태 확인 서비스
- * 설명 : 쿠폰 만료 임박 알림이 이미 성공적으로 완료되었는지 또는 수신 회원이 비활성 상태인지 검증한다. (SMS 재시도 허용 및 만료일 연장 지원)
+ * 설명 : 쿠폰 발급 알림 및 만료 임박 알림의 전송 완료 여부를 검증한다. (SMS 재시도 및 만료일 연장 지원)
  * ******************************
  */
 @Service
@@ -29,15 +29,37 @@ public class NotificationCouponQueryService {
     private final MemberNotificationQueryService memberNotificationQueryService;
 
     /**
+     * 특정 회원에게 해당 쿠폰 발급 알림(COUPON)이 이미 성공적으로 완료(SENT/DELIVERED 또는 2회 상한 도달)되었거나 비활성 회원인지 검사한다.
+     */
+    public boolean isCouponIssuedNotificationCompletedOrInactive(Long memberId, Long memberCouponId) {
+        if (memberId == null || memberCouponId == null) {
+            return true;
+        }
+
+        if (!memberNotificationQueryService.isMemberActive(memberId)) {
+            return true;
+        }
+
+        String eventKey = NotificationType.COUPON.name() + ":" + memberId + ":" + memberCouponId;
+        Long notificationId = notificationMapper.findIdByReceiverIdAndEventKey(memberId, eventKey);
+        if (notificationId == null) {
+            return false;
+        }
+
+        if (notificationMapper.hasSentDelivery(notificationId)) {
+            return true;
+        }
+        return notificationMapper.countDeliveryAttempts(notificationId) >= 2;
+    }
+
+    /**
      * 특정 회원에게 해당 쿠폰 만료 임박 알림이 이미 성공적으로 완료(SENT/DELIVERED 또는 2회 상한 도달)되었거나 비활성 회원인지 검사한다.
-     * (SMS 발송 실패 건으로 재시도가 필요한 경우 false를 반환하여 재발송 분기로 전달)
      */
     public boolean isCouponExpiringNotificationCompletedOrInactive(Long memberId, Long memberCouponId, LocalDateTime expiresAt) {
         if (memberId == null || memberCouponId == null || expiresAt == null) {
             return true;
         }
 
-        // 비활성(탈퇴/정지) 회원이면 알림 발송 불필요하므로 완료 처리
         if (!memberNotificationQueryService.isMemberActive(memberId)) {
             return true;
         }
@@ -49,7 +71,6 @@ public class NotificationCouponQueryService {
             return false;
         }
 
-        // 이미 외부 SMS가 성공(SENT/DELIVERED)했거나 2회 상한에 도달했으면 완료 처리
         if (notificationMapper.hasSentDelivery(notificationId)) {
             return true;
         }
