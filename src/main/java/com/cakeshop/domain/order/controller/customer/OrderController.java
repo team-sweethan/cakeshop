@@ -7,6 +7,7 @@ import com.cakeshop.domain.order.dto.form.OrderCancelForm;
 import com.cakeshop.domain.order.dto.form.customer.OrderCartCreateForm;
 import com.cakeshop.domain.order.dto.form.customer.OrderCustomCreateForm;
 import com.cakeshop.domain.order.dto.form.customer.OrderGeneralCreateForm;
+import com.cakeshop.domain.order.dto.view.customer.OrderCreationResult;
 import com.cakeshop.domain.cart.service.CartOrderQueryService;
 import com.cakeshop.domain.order.error.OrderErrorCode;
 import com.cakeshop.domain.order.service.customer.OrderCheckoutService;
@@ -14,10 +15,12 @@ import com.cakeshop.domain.order.service.customer.CustomerCustomOrderService;
 import com.cakeshop.domain.product.service.ProductQueryService;
 import com.cakeshop.domain.order.service.customer.OrderCustomerService;
 import com.cakeshop.domain.order.service.OrderService;
+import com.cakeshop.domain.order.service.PendingPaymentOrderGuideService;
 import com.cakeshop.domain.payment.service.RefundFacade;
 import com.cakeshop.global.error.BusinessException;
 import com.cakeshop.global.error.CommonErrorCode;
 import com.cakeshop.global.security.MemberDetails;
+import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -31,14 +34,23 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 
 @Controller
 @RequestMapping("/orders")
 @RequiredArgsConstructor
 public class OrderController {
+
+    private static final Set<String> NEW_ORDER_FORM_PATHS = Set.of(
+            "/orders/checkout",
+            "/orders/checkout/cart",
+            "/orders/custom/request"
+    );
 
     private final OrderCheckoutService orderCheckoutService;
     private final OrderService orderService;
@@ -49,6 +61,7 @@ public class OrderController {
     private final CustomerCustomOrderService customerCustomOrderService;
     private final ProductQueryService productQueryService;
     private final CartOrderQueryService cartOrderQueryService;
+    private final PendingPaymentOrderGuideService pendingPaymentOrderGuideService;
 
     /** 장바구니 항목의 픽업 일시 수정용 목업 경로다. 일반 주문은 checkout에서 선택한다. */
     @GetMapping(value = "/pickup", params = "intent=cart-edit")
@@ -82,15 +95,26 @@ public class OrderController {
             @AuthenticationPrincipal MemberDetails member,
             @Valid @ModelAttribute("orderForm") OrderCustomCreateForm form,
             BindingResult bindingResult,
-            Model model
+            Model model,
+            HttpSession session
     ) {
         long memberId = requireMemberId(member);
         if (bindingResult.hasErrors()) {
             return renderCustomOrderForm(form, model, memberId);
         }
         try {
-            long orderId = customerCustomOrderService.createCustomOrder(memberId, form);
-            return "redirect:/orders/" + orderId + "/payment";
+            OrderCreationResult result = createWithNewOrderIntent(
+                    session,
+                    memberId,
+                    useNewOrderIntent -> useNewOrderIntent
+                            ? customerCustomOrderService.createCustomOrderAfterPendingPaymentGuide(memberId, form)
+                            : customerCustomOrderService.createCustomOrder(memberId, form)
+            );
+            return paymentRedirectOrPendingGuide(
+                    result,
+                    model,
+                    customOrderFormUrl(form)
+            );
         } catch (BusinessException exception) {
             if (exception.getErrorCode() != OrderErrorCode.ORDER_AMOUNT_CHANGED) {
                 throw exception;
@@ -139,7 +163,8 @@ public class OrderController {
             @AuthenticationPrincipal MemberDetails member,
             @Valid @ModelAttribute("orderForm") OrderGeneralCreateForm form,
             BindingResult bindingResult,
-            Model model
+            Model model,
+            HttpSession session
     ) {
         if (bindingResult.hasErrors()) {
             if (hasInvalidOrderItem(bindingResult)) {
@@ -150,8 +175,18 @@ public class OrderController {
         long memberId = requireMemberId(member);
 
         try {
-            long orderId = orderService.createGeneralOrder(memberId, form);
-            return "redirect:/orders/" + orderId + "/payment";
+            OrderCreationResult result = createWithNewOrderIntent(
+                    session,
+                    memberId,
+                    useNewOrderIntent -> useNewOrderIntent
+                            ? orderService.createGeneralOrderAfterPendingPaymentGuide(memberId, form)
+                            : orderService.createGeneralOrder(memberId, form)
+            );
+            return paymentRedirectOrPendingGuide(
+                    result,
+                    model,
+                    generalOrderFormUrl(form)
+            );
         } catch (BusinessException exception) {
             if (exception.getErrorCode() != OrderErrorCode.ORDER_AMOUNT_CHANGED) {
                 throw exception;
@@ -167,15 +202,26 @@ public class OrderController {
             @AuthenticationPrincipal MemberDetails member,
             @Valid @ModelAttribute("orderForm") OrderCartCreateForm form,
             BindingResult bindingResult,
-            Model model
+            Model model,
+            HttpSession session
     ) {
         long memberId = requireMemberId(member);
         if (bindingResult.hasErrors()) {
             return renderCartOrderForm(form, model, memberId);
         }
         try {
-            long orderId = orderService.createCartOrder(memberId, form);
-            return "redirect:/orders/" + orderId + "/payment";
+            OrderCreationResult result = createWithNewOrderIntent(
+                    session,
+                    memberId,
+                    useNewOrderIntent -> useNewOrderIntent
+                            ? orderService.createCartOrderAfterPendingPaymentGuide(memberId, form)
+                            : orderService.createCartOrder(memberId, form)
+            );
+            return paymentRedirectOrPendingGuide(
+                    result,
+                    model,
+                    cartOrderFormUrl(form)
+            );
         } catch (BusinessException exception) {
             if (exception.getErrorCode() != OrderErrorCode.ORDER_AMOUNT_CHANGED) {
                 throw exception;
@@ -183,6 +229,21 @@ public class OrderController {
             bindingResult.reject("orderAmountChanged", exception.getErrorCode().message());
             return renderCartOrderForm(form, model, memberId);
         }
+    }
+
+    /** 안내 대상 주문을 서버에서 재검증한 뒤, 다음 주문 생성 한 번에만 사용할 의도를 세션에 저장한다. */
+    @PostMapping("/{orderId}/pending-payment/new-order")
+    public String startNewOrderAfterPendingPaymentGuide(
+            @PathVariable("orderId") long orderId,
+            @RequestParam("newOrderUrl") String newOrderUrl,
+            @AuthenticationPrincipal MemberDetails member,
+            HttpSession session
+    ) {
+        long memberId = requireMemberId(member);
+        String targetUrl = validatedNewOrderUrl(newOrderUrl);
+        pendingPaymentOrderGuideService.verifyNewOrderIntentTarget(memberId, orderId);
+        PendingPaymentNewOrderIntentSession.issue(session, memberId);
+        return "redirect:" + targetUrl;
     }
 
     // 로그인 회원의 주문 취소
@@ -274,6 +335,87 @@ public class OrderController {
         return "customer/order/cart-form";
     }
 
+    private String paymentRedirectOrPendingGuide(
+            OrderCreationResult result,
+            Model model,
+            String newOrderUrl
+    ) {
+        if (!result.requiresPendingPaymentGuide()) {
+            return "redirect:/orders/" + result.orderId() + "/payment";
+        }
+        model.addAttribute("pendingOrder", result.pendingPaymentOrder());
+        model.addAttribute("newOrderUrl", newOrderUrl);
+        return "customer/order/pending-payment";
+    }
+
+    private String generalOrderFormUrl(OrderGeneralCreateForm form) {
+        return UriComponentsBuilder.fromPath("/orders/checkout")
+                .queryParam("productId", form.getProductId())
+                .queryParam("quantity", form.getQuantity())
+                .queryParam("optionIds", form.getOptionIds())
+                .build()
+                .encode()
+                .toUriString();
+    }
+
+    private String cartOrderFormUrl(OrderCartCreateForm form) {
+        return UriComponentsBuilder.fromPath("/orders/checkout/cart")
+                .queryParam("itemIds", form.getCartItemIds())
+                .build()
+                .encode()
+                .toUriString();
+    }
+
+    private String customOrderFormUrl(OrderCustomCreateForm form) {
+        return UriComponentsBuilder.fromPath("/orders/custom/request")
+                .queryParam("productId", form.getProductId())
+                .queryParam("optionIds", form.getOptionIds())
+                .build()
+                .encode()
+                .toUriString();
+    }
+
+    /** 새 주문 의도는 한 요청만 예약하고, 주문 생성 성공 때만 세션에서 소비한다. */
+    private OrderCreationResult createWithNewOrderIntent(
+            HttpSession session,
+            long memberId,
+            Function<Boolean, OrderCreationResult> orderCreator
+    ) {
+        PendingPaymentNewOrderIntentSession.Reservation reservation =
+                PendingPaymentNewOrderIntentSession.reserve(session, memberId);
+        try {
+            OrderCreationResult result = orderCreator.apply(reservation != null);
+            if (reservation != null) {
+                if (result.requiresPendingPaymentGuide()) {
+                    PendingPaymentNewOrderIntentSession.release(session, reservation);
+                } else {
+                    PendingPaymentNewOrderIntentSession.complete(session, reservation);
+                }
+            }
+            return result;
+        } catch (RuntimeException exception) {
+            if (reservation != null) {
+                PendingPaymentNewOrderIntentSession.release(session, reservation);
+            }
+            throw exception;
+        }
+    }
+
+    /** 주문서 GET 경로만 허용해 새 주문 의도 발급 경로를 외부 리다이렉트에 사용하지 못하게 한다. */
+    private String validatedNewOrderUrl(String newOrderUrl) {
+        if (newOrderUrl == null || newOrderUrl.isBlank()) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+        var components = UriComponentsBuilder.fromUriString(newOrderUrl).build();
+        if (components.getScheme() != null
+                || components.getHost() != null
+                || components.getPort() != -1
+                || !NEW_ORDER_FORM_PATHS.contains(components.getPath())) {
+            throw new BusinessException(CommonErrorCode.INVALID_INPUT);
+        }
+        return newOrderUrl;
+    }
+
     /** 유효한 아이템인지 확인. **/
     private boolean hasInvalidOrderItem(BindingResult bindingResult) {
         return bindingResult.hasFieldErrors("productId")
@@ -322,4 +464,5 @@ public class OrderController {
         }
         return member.getMemberId();
     }
+
 }
