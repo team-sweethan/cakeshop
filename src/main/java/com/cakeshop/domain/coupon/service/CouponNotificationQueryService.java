@@ -65,7 +65,7 @@ public class CouponNotificationQueryService {
      * 발송 직전 해당 회원 쿠폰이 여전히 사용 가능(AVAILABLE)하고 활성(ACTIVE) 상태이며 만료되지 않았는지 재확인한다.
      */
     public boolean isMemberCouponAvailableAndUnexpired(Long memberCouponId, LocalDateTime expiresAt) {
-        if (memberCouponId == null || expiresAt == null) {
+        if (memberCouponId == null) {
             return false;
         }
         return couponNotificationMapper.isMemberCouponAvailableAndUnexpired(memberCouponId, expiresAt);

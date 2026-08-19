@@ -115,11 +115,12 @@ class NotificationCouponSyncTest {
     }
 
     @Test
-    @DisplayName("실패한 외부 SMS 발송 알림이 있는 경우 자동으로 retrySmsForNotification이 호출된다")
+    @DisplayName("실패한 외부 SMS 발송 알림이 있고 쿠폰이 여전히 유효한 경우 자동으로 retrySmsForNotification이 호출된다")
     void syncCouponIssuance_retryFailedSms_retriesSuccessfully() {
         Notification failedNotification = Notification.builder()
                 .id(100L)
                 .receiverId(5L)
+                .userCouponId(20L)
                 .title("쿠폰 발급")
                 .content("웰컴 쿠폰이 발급되었습니다.")
                 .notificationType(NotificationType.COUPON)
@@ -133,10 +134,38 @@ class NotificationCouponSyncTest {
         given(notificationMapper.findRetryableCouponNotifications(anyInt()))
                 .willReturn(List.of(failedNotification));
         given(memberNotificationQueryService.isMemberActive(5L)).willReturn(true);
+        given(couponNotificationQueryService.isMemberCouponAvailableAndUnexpired(20L, null)).willReturn(true);
 
         notificationCouponSync.syncCouponIssuance();
 
         verify(notificationService).retrySmsForNotification(100L, 5L, "쿠폰 발급", "웰컴 쿠폰이 발급되었습니다.");
+    }
+
+    @Test
+    @DisplayName("실패한 외부 SMS 알림의 쿠폰이 재시도 시점에 이미 사용(USED)되었으면 재시도를 스킵한다")
+    void syncCouponIssuance_retryFailedSms_couponUsed_skipsRetry() {
+        Notification failedNotification = Notification.builder()
+                .id(101L)
+                .receiverId(6L)
+                .userCouponId(21L)
+                .title("쿠폰 발급")
+                .content("웰컴 쿠폰이 발급되었습니다.")
+                .notificationType(NotificationType.COUPON)
+                .deliveryScope(DeliveryScope.WEB_AND_SMS)
+                .build();
+
+        given(couponNotificationQueryService.findRecentlyIssuedMemberCoupons(any(), any(), any(), anyInt()))
+                .willReturn(List.of());
+        given(couponNotificationQueryService.findRecentlyStartedMemberCoupons(any(), any(), any(), anyInt()))
+                .willReturn(List.of());
+        given(notificationMapper.findRetryableCouponNotifications(anyInt()))
+                .willReturn(List.of(failedNotification));
+        given(memberNotificationQueryService.isMemberActive(6L)).willReturn(true);
+        given(couponNotificationQueryService.isMemberCouponAvailableAndUnexpired(21L, null)).willReturn(false);
+
+        notificationCouponSync.syncCouponIssuance();
+
+        verify(notificationService, never()).retrySmsForNotification(any(), any(), any(), any());
     }
 
     @Test

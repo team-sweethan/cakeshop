@@ -264,6 +264,12 @@ public class NotificationCouponSync {
                 if (notification.getId() == null || notification.getReceiverId() == null) continue;
                 if (!memberNotificationQueryService.isMemberActive(notification.getReceiverId())) continue;
 
+                // 재시도 직전 쿠폰 가용성 및 유효기간 재확인 (중간에 사용/예약/만료/비활성화된 경우 재시도 제외)
+                if (notification.getUserCouponId() != null
+                        && !couponNotificationQueryService.isMemberCouponAvailableAndUnexpired(notification.getUserCouponId(), null)) {
+                    continue;
+                }
+
                 notificationService.retrySmsForNotification(
                         notification.getId(),
                         notification.getReceiverId(),
