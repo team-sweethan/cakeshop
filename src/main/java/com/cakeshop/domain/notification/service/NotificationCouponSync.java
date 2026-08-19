@@ -8,10 +8,8 @@ import com.cakeshop.domain.notification.entity.DeliveryScope;
 import com.cakeshop.domain.notification.entity.NotificationType;
 import java.time.Clock;
 import java.time.Duration;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +43,10 @@ public class NotificationCouponSync {
 
     private final AtomicBoolean isRunning = new AtomicBoolean(false);
 
+    // 1,000건 초과 대량 대상 발생 시에도 다음 실행에서 이어서 처리하기 위한 실행 간 커서
+    private LocalDateTime persistentCursorExpiresAt;
+    private Long persistentCursorMemberCouponId;
+
     @Async
     @Scheduled(fixedDelay = 5000)
     public void syncCouponExpiringNotifications() {
@@ -58,18 +60,20 @@ public class NotificationCouponSync {
             final int MAX_LOOPS_PER_RUN = 10; // 1회 스케줄당 최대 1,000건까지 순회
             final int PAGE_SIZE = 100;
 
-            LocalDateTime currentCursorTime = null;
-            Long currentCursorId = null;
+            LocalDateTime currentCursorTime = this.persistentCursorExpiresAt;
+            Long currentCursorId = this.persistentCursorMemberCouponId;
+            boolean reachedEnd = false;
 
             while (loopCount < MAX_LOOPS_PER_RUN) {
                 loopCount++;
 
-                // 만료 3일 이내인 유효 쿠폰 중 미발송 대상 목록 복합 커서 조회
+                // 만료 3일 이내인 유효 쿠폰 목록 복합 커서 조회
                 List<CouponNotificationView> expiringCoupons = couponNotificationQueryService.findExpiringMemberCoupons(
                         3, currentCursorTime, currentCursorId, PAGE_SIZE
                 );
 
                 if (expiringCoupons == null || expiringCoupons.isEmpty()) {
+                    reachedEnd = true;
                     break;
                 }
 
@@ -93,12 +97,12 @@ public class NotificationCouponSync {
                             continue;
                         }
 
-                        // 이미 만료 알림이 발송 완료되었거나 2회 상한에 도달한 건이면 스킵 (연장 시 새 키 발송)
-                        if (!notificationCouponQueryService.isCouponExpiringNotificationSentOrInactive(memberId, memberCouponId, expiresAt)) {
+                        // 이미 전송 완료(SENT/DELIVERED 또는 2회 상한)되었으면 스킵하고, 신규 또는 SMS 실패 재시도 대상은 발송
+                        if (!notificationCouponQueryService.isCouponExpiringNotificationCompletedOrInactive(memberId, memberCouponId, expiresAt)) {
                             String expireKey = EXPIRE_KEY_FORMAT.format(expiresAt);
                             String eventKey = NotificationType.COUPON_EXPIRING_SOON.name() + ":" + memberId + ":" + memberCouponId + ":" + expireKey;
 
-                            // 실제 남은 기간에 맞게 동적 포맷팅
+                            // 실제 남은 기간(Duration)에 맞게 정밀 포맷팅
                             String remainingText = calculateRemainingText(expiresAt);
 
                             notificationService.makeNotification(NotificationRequest.builder()
@@ -126,8 +130,19 @@ public class NotificationCouponSync {
                 }
 
                 if (expiringCoupons.size() < PAGE_SIZE) {
+                    reachedEnd = true;
                     break;
                 }
+            }
+
+            if (reachedEnd) {
+                // 모든 대상을 한 바퀴 다 순회했으면 다음 실행을 위해 커서를 처음으로 리셋
+                this.persistentCursorExpiresAt = null;
+                this.persistentCursorMemberCouponId = null;
+            } else {
+                // 1,000건 상한으로 끊긴 경우 다음 실행에서 이어서 처리하도록 커서 저장
+                this.persistentCursorExpiresAt = currentCursorTime;
+                this.persistentCursorMemberCouponId = currentCursorId;
             }
 
         } catch (Exception e) {
@@ -139,18 +154,20 @@ public class NotificationCouponSync {
 
     private String calculateRemainingText(LocalDateTime expiresAt) {
         LocalDateTime now = LocalDateTime.now(clock);
-        LocalDate today = now.toLocalDate();
-        LocalDate expireDate = expiresAt.toLocalDate();
-        long daysBetween = ChronoUnit.DAYS.between(today, expireDate);
+        Duration duration = Duration.between(now, expiresAt);
+        long totalHours = duration.toHours();
 
-        if (daysBetween >= 1) {
-            return daysBetween + "일";
+        if (totalHours >= 48) {
+            long days = totalHours / 24;
+            return days + "일";
+        } else if (totalHours >= 24) {
+            return "1일";
+        } else if (totalHours >= 1) {
+            return totalHours + "시간";
+        } else if (duration.toMinutes() >= 1) {
+            return duration.toMinutes() + "분";
+        } else {
+            return "곧";
         }
-
-        long hoursBetween = Duration.between(now, expiresAt).toHours();
-        if (hoursBetween >= 1) {
-            return hoursBetween + "시간";
-        }
-        return "곧";
     }
 }

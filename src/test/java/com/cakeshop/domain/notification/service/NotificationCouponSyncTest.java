@@ -58,12 +58,12 @@ class NotificationCouponSyncTest {
     @Test
     @DisplayName("만료 3일 이내인 유효 쿠폰이 있고 활성 회원인 경우 COUPON_EXPIRING_SOON 알림이 정상 발송된다")
     void syncCouponExpiringNotifications_expiringCoupon_sendsNotification() {
-        LocalDateTime expiresAt = LocalDateTime.now(clock).plusDays(2);
+        LocalDateTime expiresAt = LocalDateTime.now(clock).plusHours(50); // 50시간 = 2일
         CouponNotificationView coupon = new CouponNotificationView(10L, 1L, 2L, "웰컴 10% 할인 쿠폰", expiresAt);
         given(couponNotificationQueryService.findExpiringMemberCoupons(anyInt(), any(), any(), anyInt()))
                 .willReturn(List.of(coupon));
         given(memberNotificationQueryService.isMemberActive(2L)).willReturn(true);
-        given(notificationCouponQueryService.isCouponExpiringNotificationSentOrInactive(2L, 10L, expiresAt))
+        given(notificationCouponQueryService.isCouponExpiringNotificationCompletedOrInactive(2L, 10L, expiresAt))
                 .willReturn(false);
 
         notificationCouponSync.syncCouponExpiringNotifications();
@@ -81,14 +81,33 @@ class NotificationCouponSyncTest {
     }
 
     @Test
-    @DisplayName("이미 만료 임박 알림이 전송된 경우 알림 발송을 스킵한다")
-    void syncCouponExpiringNotifications_alreadySent_skipsNotification() {
-        LocalDateTime expiresAt = LocalDateTime.now(clock).plusDays(2);
+    @DisplayName("2시간 남은 쿠폰인 경우 '2시간'으로 정확하게 안내 문구가 포맷팅된다")
+    void syncCouponExpiringNotifications_twoHoursLeft_formatsHours() {
+        LocalDateTime expiresAt = LocalDateTime.now(clock).plusHours(2);
+        CouponNotificationView coupon = new CouponNotificationView(12L, 1L, 5L, "반짝 쿠폰", expiresAt);
+        given(couponNotificationQueryService.findExpiringMemberCoupons(anyInt(), any(), any(), anyInt()))
+                .willReturn(List.of(coupon));
+        given(memberNotificationQueryService.isMemberActive(5L)).willReturn(true);
+        given(notificationCouponQueryService.isCouponExpiringNotificationCompletedOrInactive(5L, 12L, expiresAt))
+                .willReturn(false);
+
+        notificationCouponSync.syncCouponExpiringNotifications();
+
+        verify(notificationService).makeNotification(argThat(req ->
+                "반짝 쿠폰".equals(req.getArgs()[0]) &&
+                "2시간".equals(req.getArgs()[1])
+        ));
+    }
+
+    @Test
+    @DisplayName("이미 만료 임박 알림이 전송 완료된 경우 알림 발송을 스킵한다")
+    void syncCouponExpiringNotifications_alreadyCompleted_skipsNotification() {
+        LocalDateTime expiresAt = LocalDateTime.now(clock).plusHours(40);
         CouponNotificationView coupon = new CouponNotificationView(11L, 1L, 3L, "생일 축하 쿠폰", expiresAt);
         given(couponNotificationQueryService.findExpiringMemberCoupons(anyInt(), any(), any(), anyInt()))
                 .willReturn(List.of(coupon));
         given(memberNotificationQueryService.isMemberActive(3L)).willReturn(true);
-        given(notificationCouponQueryService.isCouponExpiringNotificationSentOrInactive(3L, 11L, expiresAt))
+        given(notificationCouponQueryService.isCouponExpiringNotificationCompletedOrInactive(3L, 11L, expiresAt))
                 .willReturn(true);
 
         notificationCouponSync.syncCouponExpiringNotifications();
