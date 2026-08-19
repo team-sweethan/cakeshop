@@ -10,6 +10,7 @@ import com.cakeshop.domain.order.dto.view.OrderChatView;
 import com.cakeshop.domain.order.mapper.OrderChatMapper;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -57,13 +58,15 @@ public class OrderNotificationSender {
 
         sendToActiveAdmins(orderId, customerId, adminType, adminType.name() + ":ALL_ADMINS:" + orderId, new Object[0]);
 
-        // 익일(내일) 픽업 주문인 경우 결제 완료 시점에 D-1 리마인더 알림을 즉시 함께 발송 (오후 21시 이후 야간 주문 포함 안내 보장)
+        // 익일(내일) 픽업 주문인 경우 주간 발송 가능 시간대(09시~21시) 결제 시점에 D-1 리마인더 알림을 즉시 함께 발송 (야간/새벽 결제는 다음 날 9시 스케줄러에서 안전하게 안내)
         try {
             OrderChatView orderView = orderChatMapper.findOrderById(orderId);
             if (orderView != null && orderView.pickupAt() != null) {
                 LocalDate today = LocalDate.now(clock);
+                LocalTime nowTime = LocalTime.now(clock);
                 LocalDate pickupDate = orderView.pickupAt().toLocalDate();
-                if (pickupDate.isEqual(today.plusDays(1))) {
+                boolean isDaytime = nowTime.getHour() >= 9 && nowTime.getHour() < 21;
+                if (isDaytime && pickupDate.isEqual(today.plusDays(1))) {
                     sendPickupReminderTomorrowToCustomer(orderId, customerId);
                     sendPickupReminderTomorrowToAdmins(orderId, customerId, orderView.orderNumber());
                 }

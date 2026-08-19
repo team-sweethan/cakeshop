@@ -31,7 +31,9 @@ public class NotificationDeliveryService {
             // 동일 알림에 대한 발송 시도 검사 및 삽입을 비관적 락(FOR UPDATE)으로 완벽하게 직렬화
             notificationMapper.findNotificationByIdForUpdate(notificationId);
 
-            if (notificationMapper.hasSentDelivery(notificationId)) {
+            // 단건 이벤트(주문 등)는 이미 성공(SENT/DELIVERED) 이력이 있으면 중복 발송 차단.
+            // 단, 30분 쿨다운마다 새 문자가 지속 발송되어야 하는 채팅 묶음 알림(maxAttempts == Integer.MAX_VALUE)은 성공 단축 검사에서 제외.
+            if (maxAttempts < Integer.MAX_VALUE && notificationMapper.hasSentDelivery(notificationId)) {
                 return null;
             }
             if (notificationMapper.countDeliveryAttempts(notificationId) >= maxAttempts) {
