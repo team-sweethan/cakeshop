@@ -4,6 +4,9 @@
 -- 운영 DB에는 실행하지 않는다.
 -- Flyway migration을 모두 적용한 뒤 MariaDB 클라이언트의
 -- --abort-source-on-error 옵션과 함께 수동 실행한다.
+-- 실행 전 같은 DB 세션의 @rds_demo_admin_password_hash 변수에
+-- 이 환경에서만 사용하는 BCrypt 해시를 설정해야 한다.
+-- 비밀번호 원문과 해시는 저장소에 커밋하지 않는다.
 --
 -- 기존 업무 데이터를 삭제하거나 AUTO_INCREMENT를 초기화하지 않는다.
 -- 같은 관리자 이메일과 상품·옵션 데이터가 이미 있으면 중복 생성하지 않는다.
@@ -11,21 +14,34 @@
 
 SET time_zone = '+09:00';
 
+CREATE TEMPORARY TABLE `_rds_demo_seed_config` (
+    `admin_password_hash` VARCHAR(255) NOT NULL,
+    CONSTRAINT `chk_rds_demo_admin_password_hash`
+        CHECK (
+            CHAR_LENGTH(`admin_password_hash`) = 60
+            AND LEFT(`admin_password_hash`, 4) IN ('$2a$', '$2b$', '$2y$')
+        )
+);
+
+-- 변수가 없거나 BCrypt 해시 형식이 아니면 본 데이터 변경 전에 실패한다.
+INSERT INTO `_rds_demo_seed_config` (`admin_password_hash`)
+VALUES (@rds_demo_admin_password_hash);
+
 START TRANSACTION;
 
 -- 관리자 로그인용 계정
 -- 이메일 인증 이력은 일반 회원가입 절차용이므로 생성하지 않는다.
--- 로그인: admin@cakeshop.local / Admin1234!
 INSERT INTO `members`
     (`email`, `password`, `name`, `nickname`, `phone`, `role`, `status`)
 SELECT
     'admin@cakeshop.local',
-    '$2a$10$wRIE78x8sm..uLtbp9LHde7l6wUWQD3NjPvThQaXvZ3PpXfW6wwX.',
+    config.`admin_password_hash`,
     '관리자',
     '관리자',
     '010-0000-0001',
     'ADMIN',
     'ACTIVE'
+FROM `_rds_demo_seed_config` config
 WHERE NOT EXISTS (
     SELECT 1
       FROM `members`
@@ -488,6 +504,9 @@ SELECT
     sample.`selection_type`,
     sample.`sort_order`
 FROM `products` p
+INNER JOIN `categories` c
+        ON c.`id` = p.`category_id`
+       AND c.`code` = 'CAKE'
 INNER JOIN (
     SELECT
         '레터링 생크림 케이크' AS `product_name`,
@@ -552,6 +571,9 @@ SELECT
     sample.`status`,
     sample.`sort_order`
 FROM `products` p
+INNER JOIN `categories` c
+        ON c.`id` = p.`category_id`
+       AND c.`code` = 'CAKE'
 INNER JOIN `product_option_groups` pog
         ON pog.`product_id` = p.`id`
 INNER JOIN (
@@ -664,3 +686,6 @@ WHERE NOT EXISTS (
 );
 
 COMMIT;
+
+DROP TEMPORARY TABLE `_rds_demo_seed_config`;
+SET @rds_demo_admin_password_hash = NULL;
