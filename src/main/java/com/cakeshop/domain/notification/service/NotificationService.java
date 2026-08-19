@@ -53,9 +53,9 @@ public class NotificationService {
             eventKey = request.getType().name() + ":" + request.getReceiverId() + ":" + System.currentTimeMillis();
         }
 
-        boolean isBundleNotification = eventKey.startsWith("ROOM_")
-                || eventKey.startsWith("COMMENT_POST_")
-                || eventKey.startsWith("REPLY_COMMENT_");
+        boolean isBundleNotification = request.getChatRoomId() != null
+                || (eventKey != null && (eventKey.contains(":ROOM_") || eventKey.contains("ROOM_")
+                || eventKey.startsWith("COMMENT_POST_") || eventKey.startsWith("REPLY_COMMENT_")));
 
         // 멱등성 사전 검사: 이미 동일 eventKey의 알림이 존재하는 경우
         if (notificationMapper.existsByReceiverIdAndEventKey(request.getReceiverId(), eventKey)) {

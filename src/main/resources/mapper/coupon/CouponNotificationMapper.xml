@@ -6,27 +6,35 @@
  * 작성자 : 김민정
  * 담당자 : 이정후
  * 작성일 : 2026-08-19
- * 기능 : 쿠폰 알림용 연동 SQL 매퍼
- * 설명 : member_coupons 테이블과 coupons 테이블을 조인하여 만료 임박(3일 이내) 유효 쿠폰 목록을 조회한다.
+ * 기능 : 쿠폰 발급 알림용 연동 SQL 매퍼
+ * 설명 : member_coupons 테이블과 coupons 테이블을 조인하여 사용 시작일이 도래한 유효 쿠폰 목록을 복합 커서로 조회한다.
  * ******************************
  */-->
 <mapper namespace="com.cakeshop.domain.coupon.mapper.CouponNotificationMapper">
 
-    <select id="findExpiringMemberCouponsWithinDays" resultType="com.cakeshop.domain.coupon.dto.view.CouponNotificationView">
+    <select id="findRecentlyIssuedMemberCoupons" resultType="com.cakeshop.domain.coupon.dto.view.CouponNotificationView">
         SELECT 
             mc.id AS memberCouponId,
             mc.coupon_id AS couponId,
             mc.member_id AS memberId,
             c.name AS couponName,
-            c.expires_at AS expiresAt
+            mc.issued_at AS issuedAt
         FROM member_coupons mc
         INNER JOIN coupons c ON c.id = mc.coupon_id
         WHERE mc.status = 'AVAILABLE'
           AND c.status = 'ACTIVE'
           AND c.starts_at &lt;= NOW(6)
           AND c.expires_at &gt; NOW(6)
-          AND c.expires_at &lt;= DATE_ADD(NOW(6), INTERVAL #{days} DAY)
-        ORDER BY c.expires_at ASC, mc.id ASC
+          <if test="lastIssuedAt != null and lastMemberCouponId != null">
+              AND (
+                  mc.issued_at &gt; #{lastIssuedAt}
+                  OR (mc.issued_at = #{lastIssuedAt} AND mc.id &gt; #{lastMemberCouponId})
+              )
+          </if>
+          <if test="lastIssuedAt == null and since != null">
+              AND (mc.issued_at &gt;= #{since} OR c.starts_at &gt;= #{since})
+          </if>
+        ORDER BY mc.issued_at ASC, mc.id ASC
         LIMIT #{limit}
     </select>
 
