@@ -112,5 +112,6 @@
 | "이 문제는 이미 알고 있나?" | **`reviews/`** — `reviews/risks.md`는 아직 안 닫힌 위험, `reviews/findings.md`는 리뷰 지적과 그 처리 |
 | "이 결정은 왜 이렇게 됐지?" | **`decisions/`** — `decisions/decision-log-1st.md`·`decisions/decision-log-2nd.md`가 날짜순 기록, `ADR-00N-*.md`는 한 줄로 재구성이 안 되는 결정 |
 | "끝난 조각은 어떻게 만들었지?" | **`history/`** — 끝난 조각의 기록. 지금 규칙은 아니다 |
+| "느려지고 있는지 어떻게 알지?" | **`MONITORING.md`** — 무엇을 계속 지켜볼지 정한 계획. 아직 계측은 안 붙어 있다 |
 
 `DOMAIN.md`와 `PLAN.md`는 개발자용이라 길고 어렵다. **"왜 이렇게 만들었나"가 대부분인데, 그 이유를 지우면 다음 사람이 반대로 만들어도 아무도 모르기 때문에** 일부러 길게 적어 둔 것이다.
