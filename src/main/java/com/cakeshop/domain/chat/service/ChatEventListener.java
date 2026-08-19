@@ -68,10 +68,22 @@ public class ChatEventListener {
             // P2 수정: 고객 채팅 화면 연동 주문 목록 사이드바 실시간 갱신 (UNDER_REVIEW -> REJECTED 반영)
             broadcastOrderUpdate(event.orderId());
 
-            // 관리자 방 목록 갱신 (미답변 탭 카운트 등 반영) - chat-admin.js가 구독하는 /topic/admin/rooms 로 전송
+            // 관리자 방 목록 갱신 및 최상단 정렬 전파 (chat-admin.js의 isNewMessageEvent 조건인 content, senderType 포함)
             ChatRoomListResponse roomResponse = chatService.getAdminChatRoomResponse(response.getChatRoomId());
             if (roomResponse != null) {
-                messagingTemplate.convertAndSend("/topic/admin/rooms", roomResponse);
+                java.util.Map<String, Object> adminPayload = new java.util.HashMap<>();
+                adminPayload.put("chatRoomId", roomResponse.getChatRoomId());
+                adminPayload.put("customerId", roomResponse.getCustomerId());
+                adminPayload.put("customerName", roomResponse.getCustomerName() != null ? roomResponse.getCustomerName() : "고객");
+                adminPayload.put("responseStatus", roomResponse.getResponseStatus());
+                adminPayload.put("lastMessageContent", roomResponse.getLastMessageContent());
+                adminPayload.put("lastMessageCreatedAt", roomResponse.getLastMessageCreatedAt());
+                adminPayload.put("lastMessageId", roomResponse.getLastMessageId());
+                adminPayload.put("unreadCount", roomResponse.getUnreadCount());
+                adminPayload.put("content", roomResponse.getLastMessageContent());
+                adminPayload.put("senderType", "ADMIN");
+
+                messagingTemplate.convertAndSend("/topic/admin/rooms", (Object) adminPayload);
             }
 
             log.info("주문제작 반려 사유 채팅 메시지 발송 완료 (orderId={}, customerId={}, roomId={})",
