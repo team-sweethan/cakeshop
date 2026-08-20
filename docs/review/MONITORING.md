@@ -228,6 +228,28 @@ M1과 **같은 인덱스 하나로 같이 풀린다.** `(product_id, status, cre
 - 알림 발송에 걸린 시간이 후기 쓰기 응답 시간에 얼마나 얹히는가
   (커밋 뒤라도 사용자 요청은 아직 안 끝났다)
 
+```sql
+SELECT r.id AS review_id, r.product_id, r.created_at
+FROM reviews r
+JOIN order_items oi ON oi.id = r.order_item_id
+JOIN orders o ON o.id = oi.order_id
+WHERE r.status = 'PUBLISHED'
+  -- 시드가 SQL 로 직접 넣은 후기 둘은 애플리케이션을 거치지 않아 알림이 없다. 아래 참고.
+  AND o.order_number NOT IN ('SEED-REVIEW-GENERAL-REVIEWED', 'SEED-REVIEW-CUSTOM-REVIEWED')
+  AND NOT EXISTS (
+      SELECT 1 FROM notifications n
+      WHERE n.review_id = r.id AND n.notification_type = 'NEW_REVIEW')
+ORDER BY r.id;
+```
+
+**시드가 넣은 후기 둘은 세지 않는다.** `seed-review.sql`은 `INSERT ... SELECT`로 `reviews`에 직접
+행을 넣는다. 애플리케이션을 거치지 않으므로 `afterCommit` 훅이 돌 일이 없고, 따라서 알림도 없다.
+**정상이다.** 위 조건으로 빼지 않으면 이 검사는 **영원히 2건이 어긋난 것으로 나오고**, 그러면 사람이
+결과를 무시하게 되어 검사가 죽는다. 시드가 후기를 더 심게 되면 이 목록도 함께 늘려야 한다.
+
+반대로 `SEED-REVIEW-*-WRITABLE` 주문은 시드가 **후기를 안 붙인 채로** 남겨 둔 것이라
+화면에서 사람이 직접 쓴다. 그렇게 생긴 후기는 알림이 있어야 한다.
+
 **어느 선을 넘으면 손을 대나**
 후기 수와 알림 수가 **하나라도 어긋나면** 원인을 본다.
 이건 느려지는 문제가 아니라 **조용히 어긋나는 문제**라, 기준선을 느슨하게 두면 의미가 없다.
