@@ -40,6 +40,7 @@ public class MemberService {
         if (memberMapper.findByEmail(email).isPresent()) {
             throw new BusinessException(MemberErrorCode.DUPLICATE_EMAIL);
         }
+        validateNickname(form.getNickname());
         if (verification == null || !email.equals(verification.email())) {
             return false;
         }
@@ -124,6 +125,7 @@ public class MemberService {
     public void updateMemberInfo(String email, ProfileUpdateForm form) {
         Member member = memberMapper.findByEmail(email)
                 .orElseThrow(() -> new BusinessException(MemberErrorCode.NOT_FOUND));
+        validateNickname(form.getNickname());
 
         if (form.isPasswordChangeRequested()) {
             if (member.getPassword() == null) {
@@ -202,6 +204,12 @@ public class MemberService {
         return localPart.substring(0, visibleLength)
                 + "*".repeat(localPart.length() - visibleLength)
                 + domainPart;
+    }
+
+    private void validateNickname(String nickname) {
+        if (!NicknamePolicy.isAllowed(nickname)) {
+            throw new BusinessException(MemberErrorCode.RESERVED_NICKNAME);
+        }
     }
 
 }

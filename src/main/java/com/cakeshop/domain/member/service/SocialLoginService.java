@@ -49,12 +49,15 @@ public class SocialLoginService {
                 || memberMapper.findByEmail(email).isPresent()) {
             throw new BusinessException(MemberErrorCode.OAUTH_SIGNUP_UNAVAILABLE);
         }
+        if (!NicknamePolicy.isAllowed(form.getNickname())) {
+            throw new BusinessException(MemberErrorCode.RESERVED_NICKNAME);
+        }
 
         Member member = Member.builder()
                 .email(email)
                 .password(null)
                 .name(form.getName().trim())
-                .nickname(form.getNickname().trim())
+                .nickname(form.getNickname())
                 .phone(form.getPhone().trim())
                 .birthDate(form.getBirthDate())
                 .role("USER")

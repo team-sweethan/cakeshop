@@ -1,5 +1,7 @@
 package com.cakeshop.domain.member.dto.form;
 
+import com.cakeshop.domain.member.service.NicknamePolicy;
+
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Past;
@@ -20,7 +22,12 @@ public class OAuthSignupForm {
 
     @NotBlank(message = "닉네임을 입력해 주세요.")
     @Size(max = 50, message = "닉네임은 50자 이하여야 합니다.")
+    @Pattern(regexp = "^(?!\\s*관리자\\s*$).*$", message = "관리자는 닉네임으로 사용할 수 없습니다.")
     private String nickname;
+
+    public void setNickname(String nickname) {
+        this.nickname = NicknamePolicy.normalize(nickname);
+    }
 
     @NotBlank(message = "전화번호를 입력해 주세요.")
     @Pattern(regexp = "^01[016789]-?\\d{3,4}-?\\d{4}$", message = "전화번호 형식을 확인해 주세요.")
