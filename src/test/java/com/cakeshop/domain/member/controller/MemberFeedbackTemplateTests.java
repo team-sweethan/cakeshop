@@ -76,7 +76,9 @@ class MemberFeedbackTemplateTests {
                 .contains("aria-live=\"polite\"")
                 .contains("th:if=\"${param.error}\"")
                 .contains("role=\"alert\"")
-                .contains("aria-live=\"assertive\"");
+                .contains("aria-live=\"assertive\"")
+                .contains("th:src=\"@{/js/feedback.js}\"")
+                .contains("data-feedback-message");
     }
 
     private String read(String location) throws IOException {
