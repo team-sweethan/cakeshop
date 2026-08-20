@@ -5,13 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>주문 내역 | 케이크 쇼핑몰</title>
   <link rel="stylesheet" th:href="@{/css/app.css}">
-  <link rel="stylesheet" th:href="@{/css/customer-mockup.css}">
   <script defer th:src="@{/js/app.js}"></script>
 </head>
 <body data-page-title="주문 내역">
   <header th:replace="~{fragments/common/header :: header}"></header>
   <main class="page-container">
-    <h1>주문 내역</h1>
+    <div class="page-heading cluster cluster--between">
+      <h1>주문 내역</h1>
+      <a class="btn" th:href="@{/mypage}">마이페이지로 돌아가기</a>
+    </div>
     <div class="grid grid--3">
       <aside>
         <h2 class="section-title">주문 목록</h2>

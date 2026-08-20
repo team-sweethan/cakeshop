@@ -276,6 +276,14 @@ h2.section-title {
     width: 100%
 }
 
+.page-heading {
+    margin-bottom: var(--space-4)
+}
+
+.page-heading h1 {
+    margin-bottom: 0
+}
+
 .badge {
     border: 1px solid var(--color-border);
     display: inline-block;
@@ -766,10 +774,47 @@ h2.section-title {
 }
 
 .customer-header__brand {
-    border: 1px solid #6b7280;
-    font-size: 14px;
+    align-items: center;
+    display: inline-flex;
+    gap: 8px;
+    min-width: max-content
+}
+
+.customer-header__brand-mark {
+    align-items: center;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    border-radius: 10px;
+    display: inline-flex;
+    font-size: 18px;
+    height: 36px;
+    justify-content: center;
+    width: 36px
+}
+
+.customer-header__brand-copy {
+    display: grid;
+    line-height: 1.15
+}
+
+.customer-header__brand-copy strong {
+    color: var(--color-dark);
+    font-size: 15px;
+    letter-spacing: -.02em
+}
+
+.customer-header__brand-copy small {
+    color: var(--color-muted);
+    font-size: 9px;
     font-weight: 700;
-    padding: 2px 8px
+    letter-spacing: .12em;
+    margin-top: 3px
+}
+
+.customer-header__brand:focus-visible {
+    border-radius: 10px;
+    outline: 2px solid #2563eb;
+    outline-offset: 3px
 }
 
 .customer-header__left, .customer-header__nav, .customer-header__actions {
@@ -2157,6 +2202,189 @@ body > main {
     .fulfillment-order__body {
         grid-template-columns: 1fr
     }
+}
+
+/* ---------- 공통 버튼 시각 정돈 ---------- */
+.btn {
+    border-radius: 6px;
+    font-weight: 600;
+    min-height: 34px;
+    padding: 7px 14px;
+    transition: background-color .15s ease, border-color .15s ease,
+                box-shadow .15s ease, transform .15s ease
+}
+
+.btn:hover:not(:disabled):not(.btn--disabled) {
+    border-color: #4b5563;
+    box-shadow: 0 1px 3px rgba(31, 41, 55, .14)
+}
+
+.btn:active:not(:disabled):not(.btn--disabled) {
+    box-shadow: none;
+    transform: translateY(1px)
+}
+
+.btn--outline {
+    background: #fff;
+    border-color: var(--color-border);
+    color: var(--color-text)
+}
+
+.btn--danger:hover:not(:disabled),
+.btn--danger.is-active {
+    background: var(--color-danger-soft);
+    border-color: var(--color-danger)
+}
+
+.btn--success:hover:not(:disabled),
+.btn--success.is-active {
+    background: var(--color-success-soft);
+    border-color: var(--color-success)
+}
+
+.btn--sm {
+    min-height: 30px;
+    padding: 5px 10px
+}
+
+.btn--xs {
+    min-height: 26px;
+    padding: 3px 8px
+}
+
+.btn--disabled,
+.btn:disabled {
+    box-shadow: none;
+    opacity: .72;
+    pointer-events: none
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .btn {
+        transition: none
+    }
+}
+
+/* ---------- 소셜 로그인 ---------- */
+.oauth-login-actions {
+    display: grid;
+    gap: 8px;
+    margin-top: var(--space-3);
+    width: 100%
+}
+
+.oauth-login-button {
+    align-items: center;
+    border-radius: 4px;
+    display: flex;
+    font-size: 14px;
+    font-weight: 600;
+    height: 45px;
+    justify-content: center;
+    overflow: hidden;
+    transition: box-shadow .15s ease, transform .15s ease
+}
+
+.auth-login-submit {
+    height: 45px
+}
+
+.oauth-login-button--google {
+    background: #fff;
+    border: 1px solid #747775;
+    color: #1f1f1f;
+    width: 100%
+}
+
+.oauth-login-button__content {
+    align-items: center;
+    display: inline-flex;
+    gap: 10px;
+    justify-content: center
+}
+
+.oauth-login-button__icon {
+    display: block;
+    flex: 0 0 24px;
+    height: 24px;
+    overflow: hidden;
+    width: 24px
+}
+
+.oauth-login-button__icon--google img {
+    display: block;
+    height: 40px;
+    margin: -8px;
+    max-width: none;
+    width: 40px
+}
+
+.oauth-login-button--kakao {
+    background: #fee500;
+    color: rgba(0, 0, 0, .85);
+    width: 100%
+}
+
+.oauth-login-button__icon--kakao img {
+    height: 45px;
+    max-width: none;
+    transform: translate(-11px, -10px);
+    width: 183px
+}
+
+.oauth-login-button:hover {
+    box-shadow: 0 2px 6px rgba(31, 41, 55, .18)
+}
+
+.oauth-login-button:active {
+    transform: translateY(1px)
+}
+
+.oauth-login-button:focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 3px
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .oauth-login-button {
+        transition: none
+    }
+}
+
+/* ---------- 장바구니 수량 조절기 ---------- */
+.cart-item [data-cart-quantity-form] {
+    align-items: center;
+    display: inline-grid;
+    gap: 6px;
+    grid-template-columns: 34px 56px 34px
+}
+
+.cart-item [data-cart-quantity-form] .btn {
+    font-size: 14px;
+    height: 34px;
+    min-height: 34px;
+    padding: 0;
+    width: 34px
+}
+
+.cart-item [data-cart-quantity-form] .form-control {
+    font-size: 13px;
+    font-weight: 600;
+    height: 34px;
+    min-height: 34px;
+    padding: 0 4px;
+    text-align: center;
+    width: 56px
+}
+
+.cart-item [data-cart-quantity-form] input[type="number"] {
+    -moz-appearance: textfield
+}
+
+.cart-item [data-cart-quantity-form] input[type="number"]::-webkit-inner-spin-button,
+.cart-item [data-cart-quantity-form] input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0
 }
 
 /* ---------- Toast Notification Styles ---------- */

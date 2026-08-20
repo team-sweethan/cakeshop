@@ -99,12 +99,15 @@ class ScreenRenderingTests {
     }
 
     @Test
-    void login_successMessage_rendersCommonPopupFragment() throws Exception {
+    void login_successMessage_rendersCommonMessageArea() throws Exception {
         mockMvc.perform(get("/login")
                 .flashAttr("successMessage", "회원가입이 완료되었습니다!"))
             .andExpect(status().isOk())
-            .andExpect(content().string(containsString("data-common-alert-popup")))
-            .andExpect(content().string(containsString("window.alert(")));
+            .andExpect(content().string(containsString("class=\"flash-stack\"")))
+            .andExpect(content().string(containsString("aria-live=\"polite\"")))
+            .andExpect(content().string(containsString("회원가입이 완료되었습니다!")))
+            .andExpect(content().string(not(containsString("data-common-alert-popup"))))
+            .andExpect(content().string(not(containsString("window.alert("))));
     }
 
     @Test
@@ -144,6 +147,23 @@ class ScreenRenderingTests {
     }
 
     @Test
+    @WithUserDetails(
+        value = "user@cakeshop.local",
+        userDetailsServiceBeanName = "memberDetailsService"
+    )
+    void cart_successMessage_rendersMessageAreaWithoutToastTrigger() throws Exception {
+        mockMvc.perform(get("/cart")
+                .flashAttr("successMessage", "장바구니를 비웠습니다."))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("class=\"flash-stack\"")))
+            .andExpect(content().string(containsString("role=\"status\"")))
+            .andExpect(content().string(containsString("aria-live=\"polite\"")))
+            .andExpect(content().string(containsString("장바구니를 비웠습니다.")))
+            .andExpect(content().string(not(containsString("data-common-alert-popup"))))
+            .andExpect(content().string(not(containsString("showToast('장바구니'"))));
+    }
+
+    @Test
     void login_recoveredEmail_prefillsEmailInput() throws Exception {
         mockMvc.perform(get("/login")
                 .flashAttr("recoveredEmail", "member@example.com"))
@@ -163,12 +183,15 @@ class ScreenRenderingTests {
         value = "user@cakeshop.local",
         userDetailsServiceBeanName = "memberDetailsService"
     )
-    void myPage_successMessage_rendersCommonPopupFragment() throws Exception {
+    void myPage_successMessage_rendersCommonMessageArea() throws Exception {
         mockMvc.perform(get("/mypage")
                 .flashAttr("successMessage", "회원정보가 수정되었습니다."))
             .andExpect(status().isOk())
-            .andExpect(content().string(containsString("data-common-alert-popup")))
-            .andExpect(content().string(containsString("window.alert(")))
+            .andExpect(content().string(containsString("class=\"flash-stack\"")))
+            .andExpect(content().string(containsString("aria-live=\"polite\"")))
+            .andExpect(content().string(containsString("회원정보가 수정되었습니다.")))
+            .andExpect(content().string(not(containsString("data-common-alert-popup"))))
+            .andExpect(content().string(not(containsString("window.alert("))))
             .andExpect(content().string(containsString("진행 중인 주문")))
             .andExpect(content().string(containsString("완료된 주문")))
             .andExpect(content().string(containsString("href=\"/orders\"")));

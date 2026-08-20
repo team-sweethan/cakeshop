@@ -177,7 +177,13 @@ class MemberAdminControllerSecurityTests {
                 .andExpect(content().string(
                         not(containsString("member@example.com"))))
                 .andExpect(content().string(
-                        containsString("data-common-alert-popup")))
+                        containsString("class=\"flash-stack\"")))
+                .andExpect(content().string(
+                        containsString("aria-live=\"polite\"")))
+                .andExpect(content().string(
+                        containsString("회원 이용을 정지했습니다.")))
+                .andExpect(content().string(
+                        not(containsString("data-common-alert-popup"))))
                 .andExpect(content().string(
                         containsString(
                                 "/admin/members/1/suspend")))

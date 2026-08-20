@@ -99,12 +99,13 @@ class MemberLogoutSecurityTests {
     }
 
     @Test
-    void home_logoutUsesCommonPopup() throws Exception {
+    void home_logoutUsesCommonMessageArea() throws Exception {
         String template =
                 new ClassPathResource("templates/home/main.html")
                         .getContentAsString(StandardCharsets.UTF_8);
 
         assertThat(template)
-                .contains("fragments/common/alert :: popup");
+                .contains("fragments/common/alert :: alert")
+                .doesNotContain("fragments/common/alert :: popup");
     }
 }

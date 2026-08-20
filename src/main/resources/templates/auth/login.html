@@ -5,16 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>로그인 | 케이크 쇼핑몰</title>
   <link rel="stylesheet" th:href="@{/css/app.css}">
-  <link rel="stylesheet" th:href="@{/css/customer-mockup.css}">
   <script defer th:src="@{/js/app.js}"></script>
   <script defer th:src="@{/js/customer-mockup.js}"></script>
 </head>
 <body>
 <header th:replace="~{fragments/common/header :: header}"></header>
-<th:block th:replace="~{fragments/common/alert :: popup}"></th:block>
 <main class="page-container page-container--narrow">
   <section class="panel auth-card section">
     <h1>로그인</h1>
+    <div th:replace="~{fragments/common/alert :: alert}"></div>
     <p class="alert alert--error" th:if="${param.error}"
        role="alert" tabindex="-1" data-login-error>
       이메일 또는 비밀번호가 올바르지 않습니다.
@@ -37,7 +36,7 @@
         <input id="remember-email" type="checkbox">
         <span>이메일 기억하기</span>
       </label>
-      <button class="btn btn--primary btn--block" type="submit">로그인</button>
+      <button class="btn btn--primary btn--block auth-login-submit" type="submit">로그인</button>
     </form>
     <p class="alert alert--error" th:if="${param.oauthError}"
        role="alert" tabindex="-1" data-login-error>
@@ -47,10 +46,34 @@
        role="alert" tabindex="-1" data-login-error>
       이미 가입된 이메일입니다. 일반 로그인을 이용해 주세요.
     </p>
-    <a class="btn btn--block" th:if="${@environment.getProperty('app.member.oauth.google-enabled', false)}"
-       th:href="@{/oauth2/authorization/google(prompt=select_account)}">Google로 로그인</a>
-    <a class="btn btn--block" th:if="${@environment.getProperty('app.member.oauth.kakao-enabled', false)}"
-       th:href="@{/oauth2/authorization/kakao(prompt=select_account)}">카카오로 로그인</a>
+    <div class="oauth-login-actions"
+         th:if="${@environment.getProperty('app.member.oauth.google-enabled', false)
+                  or @environment.getProperty('app.member.oauth.kakao-enabled', false)}"
+         role="group"
+         aria-label="소셜 로그인">
+      <a class="oauth-login-button oauth-login-button--google"
+         th:if="${@environment.getProperty('app.member.oauth.google-enabled', false)}"
+         th:href="@{/oauth2/authorization/google(prompt=select_account)}"
+         aria-label="Google 계정으로 로그인">
+        <span class="oauth-login-button__content">
+          <span class="oauth-login-button__icon oauth-login-button__icon--google" aria-hidden="true">
+            <img th:src="@{/images/oauth/google-signin-icon.png}" alt="">
+          </span>
+          <span>Google로 로그인</span>
+        </span>
+      </a>
+      <a class="oauth-login-button oauth-login-button--kakao"
+         th:if="${@environment.getProperty('app.member.oauth.kakao-enabled', false)}"
+         th:href="@{/oauth2/authorization/kakao(prompt=select_account)}"
+         aria-label="카카오 계정으로 로그인">
+        <span class="oauth-login-button__content">
+          <span class="oauth-login-button__icon oauth-login-button__icon--kakao" aria-hidden="true">
+            <img th:src="@{/images/oauth/kakao-login.png}" alt="">
+          </span>
+          <span>카카오 로그인</span>
+        </span>
+      </a>
+    </div>
     <hr class="divider">
     <div class="cluster cluster--between">
       <a class="btn" th:href="@{/signup}">회원가입</a>
