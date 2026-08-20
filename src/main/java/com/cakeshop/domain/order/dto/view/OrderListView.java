@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 /** 주문 목록에 필요한 주문·첫 상품 스냅샷이다. */
 public record OrderListView(
         long orderId,
+        long memberId,
         String orderNumber,
         String ordererName,
         OrderType orderType,

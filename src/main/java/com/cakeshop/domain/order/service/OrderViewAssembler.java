@@ -47,7 +47,7 @@ public class OrderViewAssembler {
         List<OrderItem> items = orderMapper.findOrderItemsByOrderId(order.getId());
         String productName = items.isEmpty() ? "주문 상품 없음" : items.getFirst().getProductName();
         return new OrderListView(
-                order.getId(), order.getOrderNumber(), order.getOrdererName(),
+                order.getId(), order.getMemberId(), order.getOrderNumber(), order.getOrdererName(),
                 order.getOrderType(), order.getStatus(), productName, items.size(), order.getFinalAmount(),
                 order.getPickupAt(), order.getCreatedAt()
         );

@@ -32,7 +32,10 @@
             <td th:text="${#numbers.formatInteger(order.finalAmount, 1, 'COMMA') + '원'}">0원</td>
             <td><span class="badge" th:text="${order.statusLabel}">결제 대기</span></td>
             <td th:text="${#temporals.format(order.pickupAt, 'yyyy.MM.dd HH:mm')}">2026.08.03</td>
-            <td><a class="btn" th:href="@{/admin/orders/{id}(id=${order.orderId})}">상세</a></td>
+            <td>
+              <a class="btn" th:href="@{/admin/orders/{id}(id=${order.orderId})}">상세</a>
+              <a class="btn" th:href="@{/admin/chat(customerId=${order.memberId})}">채팅하기</a>
+            </td>
           </tr>
           </tbody>
         </table>
