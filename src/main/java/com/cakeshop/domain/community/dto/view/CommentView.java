@@ -15,6 +15,8 @@ import java.time.LocalDateTime;
  * 설명 : CommentView 화면에 전달할 데이터를 정의한다.
  * ******************************
  */
+// 댓글 한 줄(답글도 같은 타입이다). 상세 화면의 댓글 영역이 쓰고, 알림 문구도 여기 이름 규칙을 빌려 쓴다.
+// 삭제된 댓글도 지우지 않고 status = DELETED 로 실어 보낸다 — 답글이 매달린 자리 표시가 필요해서다.
 public record CommentView(
         Long id,
         Long postId,
@@ -26,28 +28,8 @@ public record CommentView(
         LocalDateTime createdAt
 ) {
 
-    public String authorName() {
-        return authorNameOf(authorNickname, authorWithdrawn);
-    }
-
-    /**
-     * 회원 한 명의 표시명을 고른다. 알림 문구처럼 {@code CommentView} 를 만들지 않는 자리가 쓴다.
-     *
-     * <p>회원 행을 못 찾은 경우({@code null})도 탈퇴와 같이 다룬다 — {@link #of} 가 채우는
-     * {@code authorWithdrawn} 이 그 규칙이고, 여기서 갈리면 같은 사람이 화면과 알림에서 다른
-     * 이름으로 나온다.</p>
-     */
-    public static String authorNameOf(MemberCommunityView author) {
-        return author == null
-                ? authorNameOf(null, true)
-                : authorNameOf(author.nickname(), author.withdrawn());
-    }
-
-    private static String authorNameOf(String nickname, boolean withdrawn) {
-        return withdrawn ? PostListView.WITHDRAWN_AUTHOR_NAME : nickname;
-    }
-
-    /** 댓글 한 줄과 작성자를 합쳐 화면용 DTO를 만든다. 근거는 {@link PostListView#of}. */
+    // CommentRow(댓글 테이블에서 읽은 한 줄) + 작성자 -> 화면용 한 줄로 합치는 정적 팩토리다.
+    // author = null 을 탈퇴로 보는 처리는 PostListView.of 와 같다.
     public static CommentView of(CommentRow row, MemberCommunityView author) {
         return new CommentView(
                 row.id(),
@@ -61,7 +43,25 @@ public record CommentView(
         );
     }
 
+    // CommentView 를 만들지 않는 자리(알림 문구 등)가 이름만 필요할 때 부르는 입구다.
+    // 회원 행을 못 찾은 경우(null)도 탈퇴와 똑같이 다뤄야 같은 사람이 화면과 알림에서 같은 이름으로 나온다.
+    public static String authorNameOf(MemberCommunityView author) {
+        return author == null
+                ? authorNameOf(null, true)
+                : authorNameOf(author.nickname(), author.withdrawn());
+    }
+
+    public String authorName() {
+        return authorNameOf(authorNickname, authorWithdrawn);
+    }
+
+    // 화면이 "삭제된 댓글입니다" 자리 표시로 바꿔 그릴지 판단한다.
     public boolean isDeleted() {
         return status == CommentStatus.DELETED;
+    }
+
+    // 위의 두 입구가 공통으로 쓰는 실제 규칙 한 줄. 매개변수 목록이 달라 이름은 같아도 다른 메서드다(오버로딩).
+    private static String authorNameOf(String nickname, boolean withdrawn) {
+        return withdrawn ? PostListView.WITHDRAWN_AUTHOR_NAME : nickname;
     }
 }

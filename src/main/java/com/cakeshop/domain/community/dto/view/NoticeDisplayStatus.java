@@ -13,6 +13,9 @@ import com.cakeshop.domain.community.entity.NoticeStatus;
  * 설명 : 관리자 화면에 보여 줄 공지의 노출 상태를 판정한다.
  * ******************************
  */
+// DB에 저장된 값이 아니라 화면에서만 쓰는 파생 상태다.
+// 테이블에는 NoticeStatus(ACTIVE/DELETED)와 기간 두 칸만 있고,
+// "예정 / 노출 중 / 종료 / 삭제됨"은 of()가 현재 시각과 대조해 그때그때 계산한다.
 public enum NoticeDisplayStatus {
     SCHEDULED("예정"),
     VISIBLE("노출 중"),
@@ -25,17 +28,14 @@ public enum NoticeDisplayStatus {
         this.label = label;
     }
 
-    public String getLabel() {
-        return label;
-    }
-
-    /**
-     * 저장된 상태와 노출 기간을 합쳐 지금 어떻게 보이는지를 판정한다.
-     *
-     * <p>경계는 고객 조회의 {@code visibleNotice}와 같은 규칙이다 — 시작은 이상, 종료는
-     * 미만이다. 두 곳이 갈리면 <b>목록에 `노출 중`인데 고객 화면에는 없는</b> 공지가 생기고,
-     * 그 어긋남은 화면만 봐서는 드러나지 않는다.</p>
-     */
+    // 위에서부터 걸리는 것이 답이 되는 계단식 판정이다.
+    // 1. 삭제됐으면 기간과 상관없이 DELETED
+    // 2. 시작일이 있고 아직 그 앞이면 SCHEDULED
+    // 3. 종료일이 있고 이미 그 시각에 닿았으면 ENDED
+    // 4. 셋 다 아니면 VISIBLE
+    //
+    // 경계: 시작은 이상(now == startsAt 이면 노출), 종료는 미만(now == endsAt 이면 종료).
+    // !now.isBefore(endsAt) 가 "같거나 뒤"를 뜻해서 종료 시각 정각이 ENDED 로 떨어진다.
     public static NoticeDisplayStatus of(
             NoticeStatus status,
             LocalDateTime startsAt,
@@ -52,5 +52,10 @@ public enum NoticeDisplayStatus {
             return ENDED;
         }
         return VISIBLE;
+    }
+
+    // 화면에는 상수 이름(SCHEDULED) 대신 이 한글 label 을 보여 준다.
+    public String getLabel() {
+        return label;
     }
 }

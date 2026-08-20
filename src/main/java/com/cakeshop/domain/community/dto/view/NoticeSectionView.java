@@ -2,19 +2,15 @@ package com.cakeshop.domain.community.dto.view;
 
 import java.util.List;
 
-/**
- * 다른 화면 안에 실리는 공지 영역 전체(docs/community/specs/community-notice.md B8).
- *
- * <p>인기글 영역과 같은 모양이다({@link PopularSectionView}). 비어 있으면 화면은 영역을
- * <b>통째로</b> 그리지 않는다 — 제목만 남기고 안을 비우지 않는다.
- *
- * <p>영역에 싣는 건수에는 제한이 있지만 등록 개수에는 없다. 그래서 <b>전체보기 링크가 반드시
- * 함께 있어야 한다</b> — 링크가 없으면 오래된 공지는 접근 경로가 통째로 사라진다.
- */
+// 메인 화면처럼 다른 화면 안에 끼워 넣는 "공지 영역" 한 덩어리다.
+// NoticeView 여러 개를 List 하나로 감싸기만 한 상자이고, 화면은 이걸 통째로 받아 영역을 그린다.
+// 화면 쪽 조건: th:if="${!noticeSection.isEmpty()}" 로 영역 전체를 그릴지 말지 정한다.
 public record NoticeSectionView(
         List<NoticeView> notices
 ) {
 
+    // 보여 줄 공지가 없을 때 null 대신 쓰는 빈 영역이다.
+    // List.of()는 요소가 없는 불변 리스트라 화면에서 그대로 반복해도 안전하다.
     public static NoticeSectionView empty() {
         return new NoticeSectionView(List.of());
     }

@@ -35,16 +35,16 @@ import org.springframework.web.bind.annotation.RequestParam;
 @RequiredArgsConstructor
 public class CommunityCommentController {
 
-    /*
-     * 댓글을 달 수 있는 글인지는 게시글 쪽이 판단한다. 검증 실패로 상세를 다시 그릴 때 그 글이
-     * 필요해서 여기서도 부른다 — 판단이 두 벌이 되지 않게 읽기만 한다.
-     */
+    // @RequiredArgsConstructor: final 필드 셋을 받는 생성자를 롬복이 대신 만들어 준다
+    // communityPostService 는 글을 읽기만 한다 (댓글 가능한 글인지 확인 + 화면 다시 그릴 재료)
     private final CommunityPostService communityPostService;
-
     private final CommunityCommentService communityCommentService;
     private final CommunityDetailPage communityDetailPage;
 
     // 댓글·답글 작성. 답글은 replyTo 가 실려 온다
+    // 예시 요청: POST /community/37/comments              -> parentCommentId = null (뿌리 댓글)
+    //            POST /community/37/comments?replyTo=128  -> parentCommentId = 128L (답글)
+    // 1. replyTo 파싱 -> 2. 글 확인 -> 3. 형식 검증 -> 4. 저장 -> 5. 그 댓글 자리로 redirect
     @PostMapping("/community/{postId:\\d+}/comments")
     public String addComment(
             @PathVariable("postId") long postId,
@@ -59,13 +59,12 @@ public class CommunityCommentController {
     ) {
         long memberId = memberDetails.getMemberId();
 
+        // parentCommentId 가 null 이 되는 경우는 둘이다
+        //   replyTo 자체가 안 왔다 (replyTo == null)      -> 뿌리 댓글, 정상
+        //   replyTo 는 왔는데 값이 이상하다 ("", "abc")     -> 아래 if 가 잡는다
         Long parentCommentId = CommunityRequestParams.positiveLong(replyTo);
 
-        /*
-         * replyTo 가 실려 왔는데 값이 망가졌으면 빈 값까지 거절한다. 부재와 파싱 실패를 구분하지
-         * 않으면 변조된 답글 요청이 조용히 뿌리 댓글로 강등되어 저장된다. 답글 폼은 항상 값을
-         * 싣고 뿌리 폼은 파라미터 자체가 없으므로, 빈 값도 정상 경로가 아니다.
-         */
+        // 두 번째 경우를 여기서 끊는다. 안 끊으면 답글 요청이 조용히 뿌리 댓글로 저장된다
         if (replyTo != null && parentCommentId == null) {
             throw new BusinessException(CommunityErrorCode.COMMENT_NOT_FOUND);
         }
@@ -89,14 +88,16 @@ public class CommunityCommentController {
         long newReplyId =
                 communityCommentService.addReply(postId, parentCommentId, commentForm, memberId);
 
-        /*
-         * 묶음을 펼친 채로, 방금 쓴 답글 그 줄로 돌아간다. 뿌리를 앵커로 삼으면 답글이 열 개만
-         * 넘어가도 새 답글이 화면 아래에 남는다 — 답글은 묶음 맨 아래에 붙기 때문이다.
-         */
+        // redirectToComment(postId, comments, replies, anchor) 로 만들어지는 주소:
+        //   redirect:/community/37?replies=128#comment-131
+        // 세 번째 인자에 String.valueOf(parentCommentId) 를 넣어 그 묶음을 펼친 채로 돌아간다
         return communityDetailPage.redirectToComment(
                 postId, comments, String.valueOf(parentCommentId), newReplyId);
     }
 
+    // 예시 요청: POST /community/37/comments/128/delete
+    // 삭제는 폼 입력이 없으니 @Valid·BindingResult 도 없고 Model 도 안 받는다
+    // 화면을 그리지 않고 주소만 돌려주기 때문이다
     @PostMapping("/community/{postId:\\d+}/comments/{commentId:\\d+}/delete")
     public String deleteComment(
             @PathVariable("postId") long postId,

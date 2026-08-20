@@ -11,18 +11,11 @@ import com.cakeshop.domain.community.service.CommunityReactionService;
 import org.springframework.stereotype.Component;
 import org.springframework.ui.Model;
 
-/*
- * 상세 화면 하나를 통째로 맡는다 — Model 조립, 화면 이름, 그리고 그 화면으로 돌아가는 주소.
- *
- * <p>이 화면은 진입점이 여럿이다(상세 조회, 댓글 작성 실패, 신고 작성 실패, 그리고 댓글·좋아요·
- * 신고 뒤의 되돌아가기). 조립이나 주소가 흩어지면 <b>한 경로에만 빠져도 그 경로에서만</b> 버튼이
- * 사라지거나 댓글 구간이 첫 쪽으로 튄다. 진입점이 늘 때 여기만 보면 되도록 모아 둔다.
- *
- * <p><b>화면 이름을 여기에 둔 것은 조각 9의 판단을 뒤집은 것이다.</b> 그때는 Controller 가 하나뿐이라
- * "어느 화면으로 갈지는 Controller 의 몫"이 성립했다. 조각 10에서 Controller 가 셋이 되면서 같은
- * 이름과 같은 되돌아가기 규칙을 세 곳에 복제해야 하는 상황이 되어, 화면이 자기 이름을 갖는 편이
- * 싸졌다.
- */
+// 상세 화면 한 장을 만드는 담당. Controller 가 아니라 @Component 다 (URL 을 직접 받지 않는다)
+// 하는 일은 두 가지
+//   1. render/renderFocused : Model 에 화면 재료를 담고 화면 이름("customer/community/detail")을 돌려준다
+//   2. redirect/redirectToComment : 이 화면으로 되돌아갈 주소 문자열을 만든다
+// class 앞에 public 이 없다 = 같은 패키지(controller) 안에서만 쓸 수 있다
 @Component
 @RequiredArgsConstructor
 class CommunityDetailPage {
@@ -33,7 +26,11 @@ class CommunityDetailPage {
     private final CommunityReactionService communityReactionService;
     private final CommunityPostImageService communityPostImageService;
 
-    /** 상세 화면을 그린다. 진입점마다 이 한 줄만 부르면 Model 이 같아진다. */
+    // 상세 화면을 그린다
+    // comments·replies 는 주소에서 온 String 이라 여기서 숫자로 바꿔 넘긴다
+    //   comments = "40" -> Integer 40 (댓글을 40개까지 펼친 상태)
+    //   replies  = "128" -> Long 128L (128번 댓글의 답글 묶음이 열린 상태)
+    // 반환값 String 이 화면 이름이다. 스프링이 이 이름으로 템플릿 파일을 찾는다
     String render(Model model, PostDetailView post, Long viewerId, String comments, String replies) {
         assemble(
                 model,
@@ -46,7 +43,8 @@ class CommunityDetailPage {
         return VIEW_NAME;
     }
 
-    /** 알림 대상 댓글을 포함한 상세 화면 전체를 렌더링한다. */
+    // 위 render 와 화면 이름은 같고, 재료 담는 방법만 다르다 (assembleFocused)
+    // focusedCommentId 가 long(래퍼가 아닌 기본형)인 것은 "반드시 있다"는 뜻이다
     String renderFocused(
             Model model, PostDetailView post, Long viewerId, long focusedCommentId) {
         assembleFocused(model, post, viewerId, focusedCommentId);
@@ -54,31 +52,40 @@ class CommunityDetailPage {
         return VIEW_NAME;
     }
 
-    /*
-     * 상세 화면으로 되돌아가는 주소를 만든다.
-     *
-     * <p>댓글을 더 펼친 상태에서 좋아요를 누르면 다시 접히면 안 된다. 답글을 펼쳐 둔 묶음도
-     * 같다. 그래서 요청에 실려 온 두 값을 주소에 보존하되, 기본값이면 붙이지 않아 주소가
-     * 지저분해지지 않게 한다.
-     */
+    // 상세 화면으로 되돌아가는 주소를 만든다 (앵커 없음)
+    // 결과 예시: "redirect:/community/37?comments=40&replies=128"
+    // "redirect:" 접두사가 붙은 문자열을 돌려주면 스프링은 화면을 그리지 않고 재요청을 시킨다
     String redirect(long postId, String comments, String replies) {
         return redirect(postId, comments, replies, null);
     }
 
-    /*
-     * 댓글 구역에서 한 일은 그 댓글 자리로 돌아간다.
-     *
-     * <p>앵커가 없으면 브라우저는 문서 맨 위에 착지한다. 그런데 확인해야 할 결과 — 방금 쓴 답글,
-     * "삭제된 댓글입니다"로 바뀐 줄 — 은 <b>눌린 그 자리에 그대로 생긴다.</b> 화면은 멀쩡하고
-     * 사용자만 20~200개 댓글을 다시 훑어 내려가야 하므로 고장으로 보이지도 않는다.
-     *
-     * <p>앵커 이름은 알림 딥링크가 이미 쓰는 {@code comment-{id}} 규약 그대로다
-     * (specs/community-comment.md D4). 화면에 앵커 규약을 두 벌 두지 않는다.
-     */
+    // 위 redirect 와 같은 주소 끝에 #comment-{id} 앵커를 붙인다
+    // 결과 예시: "redirect:/community/37?replies=128#comment-131"
+    // 앵커가 있으면 브라우저가 그 위치까지 스크롤해서 착지한다
     String redirectToComment(long postId, String comments, String replies, long anchorCommentId) {
         return redirect(postId, comments, replies, anchorCommentId);
     }
 
+    // 화면 재료를 Model 에 담는다. private 이 아닌 이유는 다른 Controller 도 직접 부르기 때문
+    // model.addAttribute("이름", 값) -> 템플릿에서 ${이름} 으로 꺼내 쓴다
+    void assemble(Model model, PostDetailView post, Long viewerId, Integer commentLimit, Long expandedRootId) {
+        assembleCommon(model, post, viewerId);
+
+        model.addAttribute(
+                "commentSection",
+                communityCommentService.getComments(post.id(), commentLimit, expandedRootId)
+        );
+        model.addAttribute("expandedRootId", expandedRootId);
+
+        // 이 경로에서는 강조할 댓글이 없다. null 을 담아 두면 화면이 강조 표시를 건너뛴다
+        model.addAttribute("focusedCommentId", null);
+    }
+
+    // 여기부터는 private 헬퍼다
+
+    // 주소 문자열을 조각조각 붙인다. 위의 redirect·redirectToComment 둘이 함께 쓴다
+    // StringBuilder: String 을 + 로 여러 번 잇는 대신 한 통에 쌓았다가 마지막에 toString()
+    // separator 변수가 하는 일: 첫 파라미터는 "?", 그다음부터는 "&"
     private String redirect(long postId, String comments, String replies, Long anchorCommentId) {
         int limit = CommentSectionView.clampLimit(CommunityRequestParams.positiveInteger(comments));
         Long expandedRootId = CommunityRequestParams.positiveLong(replies);
@@ -103,22 +110,9 @@ class CommunityDetailPage {
         return url.toString();
     }
 
-    void assemble(Model model, PostDetailView post, Long viewerId, Integer commentLimit, Long expandedRootId) {
-        assembleCommon(model, post, viewerId);
-
-        model.addAttribute(
-                "commentSection",
-                communityCommentService.getComments(post.id(), commentLimit, expandedRootId)
-        );
-        model.addAttribute("expandedRootId", expandedRootId);
-
-        /*
-         * 강조할 댓글이 없는 경로다. 펼치기·작성·삭제로 온 사람은 어느 댓글인지 이미 알고
-         * 눌렀으므로 강조가 답이 아니라 소음이다. 강조는 알림에서 온 경로만 갖는다.
-         */
-        model.addAttribute("focusedCommentId", null);
-    }
-
+    // 강조할 댓글이 정해진 경로. 그 댓글이 속한 묶음을 찾아 펼친 상태로 만든다
+    // stream() 4단계: filter(펼쳐진 것만) -> map(뿌리 댓글 id 로) -> findFirst(첫 개) -> orElse(없으면 null)
+    // findFirst 는 Optional<Long> 을 주므로 orElse(null) 로 값을 꺼낸다
     private void assembleFocused(
             Model model, PostDetailView post, Long viewerId, long focusedCommentId) {
         assembleCommon(model, post, viewerId);
@@ -138,6 +132,9 @@ class CommunityDetailPage {
         model.addAttribute("focusedCommentId", focusedCommentId);
     }
 
+    // 두 경로가 똑같이 담는 재료. 대부분은 "이 버튼을 보여줄까" 하는 true/false 다
+    // canEdit / canComment / canLike / canReport 를 화면이 th:if 로 읽는다
+    // 화면에서 감추는 것과 별개로 실제 차단은 Service 가 다시 검사한다
     private void assembleCommon(Model model, PostDetailView post, Long viewerId) {
         model.addAttribute("post", post);
         model.addAttribute("viewerId", viewerId);
@@ -146,15 +143,18 @@ class CommunityDetailPage {
                 post.isAuthoredBy(viewerId) && !post.isBlocked()
         );
 
+        // 로그인했고 차단된 글이 아니면 댓글·좋아요 둘 다 열린다
         boolean canWrite = viewerId != null && !post.isBlocked();
         model.addAttribute("canComment", canWrite);
         model.addAttribute("canLike", canWrite);
 
+        // && 는 앞이 false 면 뒤를 아예 실행하지 않는다 -> 비로그인일 때 조회 쿼리가 안 나간다
         model.addAttribute(
                 "likedByViewer",
                 canWrite && communityReactionService.isLikedBy(post.id(), viewerId)
         );
 
+        // 신고만 조건이 하나 더 붙는다 — 내 글은 신고 대상이 아니다
         boolean canReport =
                 viewerId != null && !post.isAuthoredBy(viewerId) && !post.isBlocked();
         model.addAttribute("canReport", canReport);
@@ -165,6 +165,5 @@ class CommunityDetailPage {
         );
 
         model.addAttribute("postImages", communityPostImageService.getImages(post.id()));
-
     }
 }
