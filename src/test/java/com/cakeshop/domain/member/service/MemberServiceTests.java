@@ -78,6 +78,23 @@ class MemberServiceTests {
     }
 
     @Test
+    void join_reservedNicknameWithNonBreakingSpaces_rejectsBeforeConsumingVerification() {
+        SignupForm form = new SignupForm();
+        form.setEmail("member@cakeshop.local");
+        form.setNickname("\u00A0관리자\u202F");
+        when(memberMapper.findByEmail(form.getEmail())).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> memberService.join(
+                form, new SignupEmailVerification(7L, form.getEmail())))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(MemberErrorCode.RESERVED_NICKNAME);
+
+        verify(emailVerificationService, never()).consumeSignupVerification(any(), any());
+        verify(memberMapper, never()).join(any(Member.class));
+    }
+
+    @Test
     void join_verifiedInDifferentSession_rejectsSignup() {
         SignupForm form = new SignupForm();
         form.setEmail("member@cakeshop.local");

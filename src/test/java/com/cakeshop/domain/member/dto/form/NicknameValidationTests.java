@@ -17,8 +17,8 @@ class NicknameValidationTests {
         ProfileUpdateForm profileUpdateForm = new ProfileUpdateForm();
         OAuthSignupForm oauthSignupForm = new OAuthSignupForm();
 
-        signupForm.setNickname(" 관리자 ");
-        profileUpdateForm.setNickname(" 관리자 ");
+        signupForm.setNickname("\u00A0관리자\u00A0");
+        profileUpdateForm.setNickname("\u202F관리자\u202F");
         oauthSignupForm.setNickname(" 관리자 ");
 
         assertNicknameIsRejected(signupForm, signupForm.getNickname());

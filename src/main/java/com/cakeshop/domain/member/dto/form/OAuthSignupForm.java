@@ -1,6 +1,6 @@
 package com.cakeshop.domain.member.dto.form;
 
-import com.cakeshop.domain.member.service.NicknamePolicy;
+import com.cakeshop.domain.member.NicknamePolicy;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

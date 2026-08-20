@@ -1,6 +1,7 @@
 package com.cakeshop.domain.member.service;
 
 import com.cakeshop.domain.coupon.service.CouponMemberCommandService;
+import com.cakeshop.domain.member.NicknamePolicy;
 import com.cakeshop.domain.member.dto.form.OAuthSignupForm;
 import com.cakeshop.domain.member.dto.form.SignupForm;
 import com.cakeshop.domain.member.dto.view.MemberAuthenticationView;
