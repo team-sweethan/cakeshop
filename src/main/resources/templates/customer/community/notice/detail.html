@@ -17,6 +17,7 @@ th:if 로 가리게 되는데, 그러면 표를 나눠 얻은 구조적 보증�
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title th:text="${notice.title} + ' | 케이크 쇼핑몰'">공지사항 | 케이크 쇼핑몰</title>
   <link rel="stylesheet" th:href="@{/css/app.css}">
+  <link rel="stylesheet" th:href="@{/css/community.css}">
   <script defer th:src="@{/js/app.js}"></script>
   <script defer th:src="@{/js/customer-mockup.js}"></script>
 </head>
@@ -35,7 +36,9 @@ th:if 로 가리게 되는데, 그러면 표를 나눠 얻은 구조적 보증�
       <h2 th:text="${notice.title}">제목</h2>
       <p class="text-muted"
          th:text="${#temporals.format(notice.displayedAt, 'yyyy.MM.dd')}">2026.01.01</p>
-      <p th:text="${notice.content}" style="white-space:pre-wrap">본문</p>
+      <div class="post-body">
+        <p th:text="${notice.content}">본문</p>
+      </div>
     </article>
   </main>
   <footer th:replace="~{fragments/common/footer :: footer(${store})}"></footer>

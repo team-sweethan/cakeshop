@@ -1,4 +1,18 @@
-/* 커뮤니티 고객 화면 전용. 댓글은 상자가 아니라 구분선 목록으로 그린다 —
+/* 커뮤니티 화면 전용. 고객 게시글 상세·공지 상세와 관리자 게시글 상세가 함께 쓴다. */
+
+/* 본문 영역. 한 줄짜리 본문이 제목과 다음 블록 사이에 끼면 글이 아니라 메모처럼 보여서 최소
+   높이를 준다. 긴 본문은 이 높이를 넘겨 그대로 늘어나므로 짧은 글에만 영향이 있다. */
+.post-body {
+    min-height: 140px;
+    padding: var(--space-4) 0;
+}
+
+.post-body p {
+    line-height: 1.8;
+    white-space: pre-wrap;
+}
+
+/* 댓글은 상자가 아니라 구분선 목록으로 그린다 —
    댓글마다 panel 테두리를 두르면 한 줄짜리 댓글도 본문보다 무거워 보인다. */
 .comment-item {
     border-bottom: 1px solid var(--color-border-light);

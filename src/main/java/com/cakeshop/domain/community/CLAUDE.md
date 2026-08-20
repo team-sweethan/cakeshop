@@ -10,7 +10,7 @@
 - `src/main/resources/templates/{customer,admin}/community/**`
 - `src/test/java/com/cakeshop/domain/community/**`
 - `src/main/resources/db/seed/seed-community.sql`
-- `src/main/resources/static/css/community.css` (커뮤니티 상세만 참조)
+- `src/main/resources/static/css/community.css` (고객 게시글 상세·공지 상세와 관리자 게시글 상세가 참조)
 - `src/main/resources/static/js/home-notice-rotation.js` (조각 19가 만들었다. **부르는 곳은 아래의 공유 화면 하나뿐이다**)
 
 **공유 파일이라 범위가 아니지만 커뮤니티 조각이 실제로 고치는 자리**: 메인 화면(`templates/home/**`)의 공지
