@@ -4,6 +4,7 @@
 document.addEventListener("DOMContentLoaded", () => {
   let selectedChatRoomId = null;
   let selectedCustomerId = null;
+  let preservedDeepLinkedRoomId = null;
   let currentFilter = "all";
   let adminRoomsData = [];
   let pendingAttachment = null;
@@ -59,13 +60,14 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     try {
-      const response = await fetch(
-        `/api/admin/chat/room?customerId=${encodeURIComponent(customerId)}`,
-        {
+      const roomUrl = `/api/admin/chat/room?customerId=${encodeURIComponent(customerId)}`;
+      let response = await fetch(roomUrl);
+      if (response.status === 404) {
+        response = await fetch(roomUrl, {
           method: "POST",
           headers: getCsrfHeaders()
-        }
-      );
+        });
+      }
       if (!response.ok) {
         throw new Error(`채팅방 생성 또는 조회 실패: ${response.status}`);
       }
@@ -225,11 +227,14 @@ document.addEventListener("DOMContentLoaded", () => {
         if (initialRoomId) {
           const targetRoom = adminRoomsData.find(r => (r.chatRoomId || r.id) === initialRoomId);
           if (targetRoom) {
+            if (preservedDeepLinkedRoomId === initialRoomId) {
+              preservedDeepLinkedRoomId = null;
+            }
             if (!selectedChatRoomId) {
               const customerId = targetRoom.customerId || targetRoom.memberId;
               selectChatRoom(initialRoomId, customerId);
             }
-          } else if (!isReconnect) {
+          } else if (!isReconnect && preservedDeepLinkedRoomId !== initialRoomId) {
             clearMainAndSidePanel();
           }
         } else if (!isReconnect) {
@@ -426,6 +431,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function clearMainAndSidePanel() {
     selectedChatRoomId = null;
     selectedCustomerId = null;
+    preservedDeepLinkedRoomId = null;
 
     try {
       const currentUrl = new URL(window.location.href);
@@ -551,8 +557,11 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // 방 선택 조작
-  async function selectChatRoom(roomId, customerId) {
+  async function selectChatRoom(roomId, customerId, preserveWhenMissing = false) {
     if (!roomId) return;
+
+    const targetRoom = adminRoomsData.find((r) => (r.chatRoomId || r.id) === roomId);
+    preservedDeepLinkedRoomId = preserveWhenMissing && !targetRoom ? roomId : null;
 
     if (selectedChatRoomId !== roomId) {
       isAdminUploadingAttachment = false;
@@ -580,7 +589,6 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (e) {}
 
     const headerTitle = document.querySelector(".admin-chat-main-room .chat-room__header strong");
-    const targetRoom = adminRoomsData.find((r) => (r.chatRoomId || r.id) === roomId);
     if (headerTitle) {
       const cName = targetRoom ? targetRoom.customerName : `고객 #${customerId}`;
       headerTitle.textContent = `${cName} 님과의 1:1 상담`;
@@ -1350,7 +1358,7 @@ document.addEventListener("DOMContentLoaded", () => {
   resolveRoomFromUrl().then(async (deepLinkedRoom) => {
     await loadAdminRooms(1, false, false, Boolean(deepLinkedRoom));
     if (deepLinkedRoom) {
-      await selectChatRoom(deepLinkedRoom.roomId, deepLinkedRoom.customerId);
+      await selectChatRoom(deepLinkedRoom.roomId, deepLinkedRoom.customerId, true);
     }
   });
 });
