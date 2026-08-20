@@ -43,7 +43,7 @@ H45·H51·H58이 그 결과를 고정한다. `home`은 공통 협의 도메인�
 | 결정 배경이 실제로 필요한 경우 | `docs/community/decisions/decision-log-1st.md`(1차)·`-2nd.md`(2차)의 해당 날짜 행 |
 | 그 한 줄로 재구성이 안 되는 결정 | `docs/community/decisions/`의 해당 ADR 하나 |
 | 끝난 조각이 **왜** 그렇게 됐는지 | `docs/community/history/`의 해당 조각 파일 하나 |
-| 성능·부하·계측을 다루는 작업 | `docs/community/MONITORING.md` |
+| 성능·부하·계측을 다루는 작업 | 저장소에 정본이 없다 — 측정 도구·관측 스택·계획 모두 각자 로컬에 둔다 |
 
 `DOMAIN.md` 전체, 모든 spec, `PLAN.md` 전체를 한꺼번에 읽지 않는다. 현재 기능과 연결된 참조만 따라간다.
 **`reviews/`·`decisions/`·`history/`는 기본으로 읽지 않는다** — 발견된 문제, 결정 배경, 끝난 조각의

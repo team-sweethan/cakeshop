@@ -193,7 +193,7 @@ app:
     # 화면 선이관 기간에만 조회 화면을 로그인 없이 확인한다. rds에서는 false다.
     public-preview: true
   monitoring:
-    # 로컬 측정용. Prometheus 컨테이너가 인증 없이 긁어 간다 (docs/community/MONITORING.md 1절).
+    # 로컬 측정용. 수집기는 로그인하지 않으므로 인증 없이 연다.
     metrics-public: true
 
 ---
