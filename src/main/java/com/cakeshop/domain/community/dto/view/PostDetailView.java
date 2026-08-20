@@ -15,6 +15,8 @@ import java.time.LocalDateTime;
  * 설명 : PostDetailView 화면에 전달할 데이터를 정의한다.
  * ******************************
  */
+// 상세 화면(customer/community/detail) 한 건이 쓰는 값 묶음이다.
+// 목록(PostListView) 과 달리 본문 content, 상태 status/blockedReason, 수정 시각 updatedAt 까지 들고 간다.
 public record PostDetailView(
         Long id,
         Long memberId,
@@ -32,11 +34,8 @@ public record PostDetailView(
         LocalDateTime updatedAt
 ) {
 
-    public String authorName() {
-        return authorWithdrawn ? PostListView.WITHDRAWN_AUTHOR_NAME : authorNickname;
-    }
-
-    /** 상세 한 줄과 작성자를 합쳐 화면용 DTO를 만든다. 근거는 {@link PostListView#of}. */
+    // PostDetailRow(상세 조회 한 줄) + 작성자 -> 화면용 한 건으로 합친다.
+    // author = null 을 탈퇴로 보는 처리는 PostListView.of 와 같다.
     public static PostDetailView of(PostDetailRow row, MemberCommunityView author) {
         return new PostDetailView(
                 row.id(),
@@ -56,6 +55,14 @@ public record PostDetailView(
         );
     }
 
+    // 아래 넷은 화면(Thymeleaf) 이 ${post.authorName}, th:if="${post.blocked}" 처럼 그대로 부르는 값이다.
+    // 조건식을 템플릿에 흩어 두지 않고 이름을 붙여 여기 모아 둔다.
+
+    public String authorName() {
+        return authorWithdrawn ? PostListView.WITHDRAWN_AUTHOR_NAME : authorNickname;
+    }
+
+    // "수정됨" 표시용. 작성 시각보다 수정 시각이 뒤면 한 번이라도 고친 글이다.
     public boolean isEdited() {
         return createdAt != null && updatedAt != null && updatedAt.isAfter(createdAt);
     }
@@ -64,15 +71,8 @@ public record PostDetailView(
         return status == PostStatus.BLOCKED;
     }
 
-    /**
-     * 이 글을 쓴 사람인지 본다. 비로그인({@code null})은 언제나 아니다.
-     *
-     * <p>화면이 수정·신고 버튼을 가릴 때 쓴다. 같은 판단을 Service 쪽에서는
-     * {@code CommunityPostAccessPolicy.isAuthor}가 하는데, 그쪽은 매퍼가 읽어 온 행의 원시 ID를
-     * 다루고 이 record 는 화면에 나가는 값을 다룬다. <b>두 계층이 각자의 표현으로 같은 규칙을
-     * 갖되, 양쪽 다 이름이 붙은 자리에서만 판단한다</b> — 조건식을 직접 쓰면 한쪽이 바뀔 때
-     * 버튼과 실제 권한이 어긋나고, 사용자는 눌러 봐야 거절을 안다.
-     */
+    // 수정·삭제 버튼을 보일지 정한다. viewerId = null(비로그인) 이면 언제나 false.
+    // equals 로 비교하는 이유: Long 은 객체라 == 는 값이 아니라 주소를 본다.
     public boolean isAuthoredBy(Long viewerId) {
         return viewerId != null && viewerId.equals(memberId);
     }

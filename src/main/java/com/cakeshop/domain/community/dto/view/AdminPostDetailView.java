@@ -15,6 +15,8 @@ import java.time.LocalDateTime;
  * 설명 : AdminPostDetailView 화면에 전달할 데이터를 정의한다.
  * ******************************
  */
+// 관리자 게시글 상세 화면 한 건을 담는 상자다. 본문·차단 기록·집계를 한 번에 싣는다.
+// AdminPostDetailRow(게시글) + MemberCommunityView 둘(작성자, 차단한 관리자)을 of()에서 합친다.
 public record AdminPostDetailView(
         Long id,
         Long memberId,
@@ -33,13 +35,9 @@ public record AdminPostDetailView(
         LocalDateTime updatedAt
 ) {
 
-    /**
-     * 상세 한 줄과 작성자·차단 관리자를 합쳐 화면용 DTO를 만든다.
-     *
-     * <p>{@code blockedByAdmin}은 차단 기록이 없으면 null 이고, 그때 닉네임도 null 이 된다.
-     * 원래 SQL 이 LEFT JOIN 이었으므로 화면에서 비는 것은 그대로다. 작성자 쪽 규칙은
-     * {@link PostListView#of}와 같다.</p>
-     */
+    // null 이 들어올 수 있는 자리가 둘이다.
+    // author == null: 회원 조회에 없는 memberId -> 닉네임 null + 탈퇴로 본다.
+    // blockedByAdmin == null: 차단된 적이 없는 글 -> blockedByNickname 도 null 로 비워 둔다.
     public static AdminPostDetailView of(
             AdminPostDetailRow row,
             MemberCommunityView author,
@@ -64,6 +62,8 @@ public record AdminPostDetailView(
         );
     }
 
+    // 아래 넷은 화면의 th:if / th:text 가 그대로 부르는 파생 메서드다.
+    // 필드에 없는 값을 화면에서 계산하지 않고 여기서 미리 판정해 둔다.
     public String authorName() {
         return authorWithdrawn ? PostListView.WITHDRAWN_AUTHOR_NAME : authorNickname;
     }
@@ -76,6 +76,7 @@ public record AdminPostDetailView(
         return status == PostStatus.DELETED;
     }
 
+    // isBlocked()와 다르다: 차단이 풀린 뒤에도 기록은 남아 있어서 여기는 계속 true 다.
     public boolean hasBlockRecord() {
         return blockedAt != null;
     }

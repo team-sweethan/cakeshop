@@ -13,6 +13,8 @@ import com.cakeshop.domain.community.dto.query.NoticeDetailRow;
  * 설명 : NoticeDetailView 화면에 전달할 데이터를 정의한다.
  * ******************************
  */
+// 고객 공지 상세 화면 한 건이다. NoticeView 에 content 가 하나 더 붙은 모양이다.
+// 날짜 칸을 고르는 방식도 NoticeView.of 와 같다(시작일 우선, 없으면 등록일).
 public record NoticeDetailView(
         Long id,
         String title,

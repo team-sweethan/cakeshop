@@ -9,6 +9,10 @@ import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 
+// 후기 수정 화면(customer/review/edit)의 입력을 담는 상자다. POST /reviews/{reviewId}/edit 이 여기에 채워진다.
+// ReviewWriteForm과 평점·내용 필드는 같지만 orderItemId와 images가 없다
+//   -> 어느 주문의 후기인지는 URL의 reviewId로 이미 정해졌고, 사진은 수정에서 다루지 않는다
+// 수정 폼을 열 때는 반대 방향으로도 쓰인다: Controller가 기존 값을 setter로 넣어 화면에 채워 보낸다
 @Getter
 @Setter
 public class ReviewEditForm {
