@@ -67,6 +67,16 @@ class MemberFeedbackTemplateTests {
     }
 
     @Test
+    void commonMessageArea_usesSharedComponentSpacingAndCornerRadius() throws IOException {
+        String styles = read("static/css/app.css");
+
+        assertThat(styles)
+                .contains(".alert {")
+                .contains("border-radius: 6px")
+                .contains("padding: var(--space-3) var(--space-4)");
+    }
+
+    @Test
     void adminLoginFeedback_exposesStatusAndAlertSemantics() throws IOException {
         String template = read("templates/auth/admin-login.html");
 
