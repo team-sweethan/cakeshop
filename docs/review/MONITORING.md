@@ -229,44 +229,52 @@ M1과 **같은 인덱스 하나로 같이 풀린다.** `(product_id, status, cre
   (커밋 뒤라도 사용자 요청은 아직 안 끝났다)
 
 ```sql
-SET @notification_since = '2026-08-10 00:00:00';   -- 조각 7(알림 연동) 머지 시점
-SET @active_admins = (SELECT COUNT(*) FROM members WHERE role = 'ADMIN' AND status = 'ACTIVE');
+SET @feature_since = TIMESTAMP'2026-08-10 15:28:47';  -- 알림 연동 배포 (조각 7, d553c2a3)
+SET @window_start  = GREATEST(@feature_since, NOW() - INTERVAL 7 DAY);
+SET @window_end    = NOW() - INTERVAL 5 MINUTE;       -- 발송이 끝날 여유
 
 SELECT r.id AS review_id, r.status, r.created_at,
-       COUNT(DISTINCT n.receiver_id) AS notified_admins,
-       @active_admins                AS active_admins_now
+       a.id AS admin_without_notification
 FROM reviews r
 JOIN order_items oi ON oi.id = r.order_item_id
-JOIN orders o ON o.id = oi.order_id
-LEFT JOIN notifications n
-       ON n.review_id = r.id AND n.notification_type = 'NEW_REVIEW'
+JOIN orders o       ON o.id  = oi.order_id
+JOIN members a      ON a.role = 'ADMIN' AND a.status = 'ACTIVE'
 WHERE o.order_number NOT IN ('SEED-REVIEW-GENERAL-REVIEWED', 'SEED-REVIEW-CUSTOM-REVIEWED')
-  AND r.created_at >= @notification_since
-GROUP BY r.id, r.status, r.created_at
-HAVING COUNT(DISTINCT n.receiver_id) < @active_admins
-ORDER BY r.id;
+  AND r.created_at >= @window_start
+  AND r.created_at <  @window_end
+  AND NOT EXISTS (
+      SELECT 1 FROM notifications n
+      WHERE n.review_id         = r.id
+        AND n.notification_type = 'NEW_REVIEW'
+        AND n.receiver_id       = a.id)
+ORDER BY r.id, a.id;
 ```
 
-이 쿼리가 왜 이렇게 생겼는지가 전부 이유가 있다. 하나씩 지우면 검사가 조용히 못 쓰게 된다.
+한 줄이 나오면 **"이 후기의 알림이 이 관리자에게 안 갔다"**는 뜻이다.
+쿼리가 이렇게 생긴 이유가 전부 있고, 하나씩 지우면 검사가 조용히 못 쓰게 된다.
 
-**관리자 수와 비교한다 — "하나라도 있으면 통과"가 아니다.**
+**후기와 활성 관리자를 조합해서 본다 — 개수를 세지 않는다.**
 `ReviewNotificationSender.sendNewReview`는 `findActiveAdminIds()`를 돌며 **활성 관리자 전원에게
-각각** 보낸다. 그래서 "알림이 하나라도 있으면 정상"으로 보면 **관리자 셋 중 하나에게만 갔을 때를
-놓친다.** 지금 이 저장소는 관리자가 한 명뿐이라 차이가 안 나지만, 늘어나는 순간 이 검사가
-반쪽이 된다.
+각각** 보낸다. 그래서 "알림이 하나라도 있으면 정상"으로 보면 셋 중 하나에게만 갔을 때를 놓친다.
+개수만 세는 것도 부족하다 — **비활성 관리자에게 남은 옛 알림 한 건이 빠진 한 건을 대신 채워**
+수가 맞아 버린다. 그래서 관리자마다 그 사람 앞으로 온 알림이 있는지를 따로 본다.
 
-> **다만 이 비교에는 한계가 있다.** 관리자가 나중에 늘면, 그 전에 쓰인 후기는 새 관리자 몫이 없어
-> 어긋난 것처럼 보인다. **알림을 소급해 만들지는 않으므로 그건 정상이다.** 0이면 확실한 실패이고,
-> 0보다 크면서 관리자 수보다 적으면 **관리자가 언제 늘었는지 먼저 확인한다.**
+**최근 것만 본다.**
+
+| 경계 | 왜 |
+|---|---|
+| 시작 = 알림 연동 배포 시각 | 그 전에 앱으로 쓴 후기에는 **설계상** 알림이 없고 채우는 백필도 없다. 날짜가 아니라 **시각**인 것이 중요하다 — 배포는 그날 15시 28분이라, 자정으로 잡으면 같은 날 오전에 쓴 후기가 영원히 실패로 잡힌다 |
+| 시작 = 최근 7일 | **관리자 집합이 바뀌면 위의 조합 대조가 흔들린다.** 관리자가 어제 늘었으면 그 전 후기에는 새 관리자 몫이 없는 게 정상인데 검사는 그걸 모른다. 창이 짧을수록 이 문제가 작다 |
+| 끝 = 5분 전 | 알림은 후기가 **커밋된 뒤** 별도 트랜잭션에서 나간다(`afterCommit` + `REQUIRES_NEW`). 그래서 후기 행은 보이는데 알림은 아직 안 들어온 **정상적인 공백**이 있다. 방금 쓴 후기를 세면 멀쩡한 것을 실패로 부른다 |
+
+> **대가가 있다 — 이 검사는 정기적으로 돌려야 한다.** 창이 7일이라 그보다 오래된 실패는
+> 다시는 안 보인다. 측정 기간에는 최소 주 1회 돌린다. 오래된 것까지 훑고 싶으면 `INTERVAL`을
+> 늘리되, **관리자가 늘어난 시점을 넘기면 그 전 후기가 무더기로 뜨는 것이 정상**임을 알고 본다.
 
 **후기 상태로 거르지 않는다.**
 이 검사가 보는 것은 **"만들어질 때 알림이 나갔는가"**이지 지금 그 후기가 보이는지가 아니다.
 `status = 'PUBLISHED'`로 좁히면, 알림이 실패한 뒤 사용자가 지우거나 관리자가 차단한 순간
 **그 실패가 검사에서 사라진다.** 상태가 바뀐다고 빠진 알림이 채워지지는 않는다.
-
-**알림 연동 이전 후기는 뺀다.**
-알림은 조각 7(2026-08-10 머지)에서 붙었다. 그 전에 앱으로 쓴 후기에는 **설계상** 알림이 없고
-채우는 백필도 없다. 로컬 DB를 갈아엎지 않고 계속 쓰면 그 행이 영원히 남는다.
 
 **시드가 넣은 후기 둘은 세지 않는다.**
 `seed-review.sql`은 `INSERT ... SELECT`로 `reviews`에 직접 행을 넣는다. 애플리케이션을 거치지
@@ -276,8 +284,8 @@ ORDER BY r.id;
 반대로 `SEED-REVIEW-*-WRITABLE` 주문은 시드가 **후기를 안 붙인 채로** 남겨 둔 것이라
 화면에서 사람이 직접 쓴다. 그렇게 생긴 후기는 알림이 있어야 하므로 빼지 않는다.
 
-**뒤의 세 조건이 노리는 것은 같다** — 고칠 수 없는 과거 때문에 검사가 늘 빨간불이면
-사람이 결과를 무시하게 되고, 그러면 조용히 어긋나는 것을 잡으려던 검사가 죽는다.
+**조건들이 노리는 것은 하나다** — 고칠 수 없는 과거나 아직 진행 중인 발송 때문에 검사가 늘
+빨간불이면 사람이 결과를 무시하게 되고, 그러면 조용히 어긋나는 것을 잡으려던 검사가 죽는다.
 
 **어느 선을 넘으면 손을 대나**
 후기 수와 알림 수가 **하나라도 어긋나면** 원인을 본다.
