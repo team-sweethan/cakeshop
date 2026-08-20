@@ -10,6 +10,7 @@
         th:href="@{/css/app.css(v='home-product-square')}">
   <link rel="stylesheet" th:href="@{/css/home.css}">
   <script defer th:src="@{/js/app.js}"></script>
+  <script defer th:src="@{/js/home-banner-rotation.js}"></script>
   <script defer th:src="@{/js/home-notice-rotation.js}"></script>
 </head>
 
@@ -23,8 +24,33 @@
     <section class="section" aria-labelledby="service-title">
       <h2 id="service-title" class="section-title">서비스 안내</h2>
 
-      <div class="hero-placeholder">
-        <strong>정성을 담은 케이크를 원하는 날짜에 만나보세요.</strong>
+      <div class="home-hero"
+           data-home-banner-rotation
+           aria-live="off">
+        <img class="home-hero__image"
+             data-home-banner-slide
+             data-home-banner-active="true"
+             data-home-banner-tone="warm"
+             th:src="@{/images/home/main-banner.jpeg}"
+             alt="딸기, 말차, 치즈 케이크를 소개하는 서비스 안내 배너">
+
+        <img class="home-hero__image"
+             data-home-banner-slide
+             data-home-banner-active="false"
+             data-home-banner-tone="white"
+             th:src="@{/images/home/fresh-cake-banner.png}"
+             alt="달콤한 순간을 위한 신한 케이크 서비스 안내 배너"
+             aria-hidden="true">
+
+        <button class="home-hero__control home-hero__control--previous"
+                data-home-banner-previous
+                type="button"
+                aria-label="이전 배너">&lt;</button>
+
+        <button class="home-hero__control home-hero__control--next"
+                data-home-banner-next
+                type="button"
+                aria-label="다음 배너">&gt;</button>
       </div>
     </section>
 
@@ -69,22 +95,18 @@
       <h2 id="category-title" class="section-title">카테고리</h2>
 
       <div class="grid grid--2">
-        <a class="category-card"
+        <a class="category-card home-category-card"
            th:href="@{/products(type='GENERAL')}">
-          <div class="category-card__name">일반 케이크</div>
-          <div class="category-card__desc">
-            미리 주문하고 원하는 날짜에 픽업
-          </div>
-          <span class="note">상품 목록 →</span>
+          <img class="home-category-card__image"
+               th:src="@{/images/home/general-category.png}"
+               alt="일반 케이크 - 미리 주문하고 원하는 날짜에 픽업">
         </a>
 
-        <a class="category-card"
+        <a class="category-card home-category-card"
            th:href="@{/products(type='CUSTOM')}">
-          <div class="category-card__name">주문 제작</div>
-          <div class="category-card__desc">
-            원하는 디자인으로 맞춤 제작
-          </div>
-          <span class="note">상품 목록 →</span>
+          <img class="home-category-card__image"
+               th:src="@{/images/home/custom-category.png}"
+               alt="주문 제작 - 원하는 옵션과 디자인으로 맞춤 제작">
         </a>
 
       </div>

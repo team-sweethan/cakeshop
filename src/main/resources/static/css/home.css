@@ -3,6 +3,93 @@
     display: none !important
 }
 
+/* 서비스 안내 배너는 원본 비율을 유지해 케이크와 문구가 잘리지 않게 표시한다. */
+.home-hero {
+    aspect-ratio: 2141 / 734;
+    background: #f5eadc;
+    overflow: hidden;
+    position: relative;
+    width: 100%
+}
+
+.home-hero__image {
+    display: block;
+    height: 100%;
+    inset: 0;
+    object-fit: contain;
+    opacity: 0;
+    position: absolute;
+    transition: opacity 900ms ease, visibility 0s linear 900ms;
+    visibility: hidden;
+    width: 100%
+}
+
+.home-hero__image[data-home-banner-active="true"] {
+    opacity: 1;
+    transition-delay: 0s;
+    visibility: visible
+}
+
+.home-hero__image[data-home-banner-tone="warm"] {
+    background: #f5eadc
+}
+
+.home-hero__image[data-home-banner-tone="white"] {
+    background: #fff
+}
+
+.home-hero__control {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    color: #374151;
+    cursor: pointer;
+    display: flex;
+    font-size: 28px;
+    height: 56px;
+    justify-content: center;
+    line-height: 1;
+    opacity: .72;
+    padding: 0;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    transition: opacity 180ms ease;
+    width: 42px;
+    z-index: 2
+}
+
+.home-hero__control:hover {
+    opacity: 1
+}
+
+.home-hero__control:focus-visible {
+    opacity: 1;
+    outline: 2px solid #2563eb;
+    outline-offset: 2px
+}
+
+.home-hero__control--previous {
+    left: 14px
+}
+
+.home-hero__control--next {
+    right: 14px
+}
+
+/* 카테고리 이미지를 자르거나 늘리지 않고 원본 비율 그대로 표시한다. */
+.home-category-card {
+    border: 0;
+    overflow: hidden;
+    padding: 0
+}
+
+.home-category-card__image {
+    display: block;
+    height: auto;
+    width: 100%
+}
+
 /* 매장 정보 높이를 기준으로 사진 영역을 맞추고 넘치는 부분은 중앙에서 자른다. */
 .store-media {
     min-height: 170px;
@@ -19,7 +106,7 @@
 }
 
 .store-photo {
-    border: 1px solid var(--color-border);
+    border: 0;
     display: block;
     object-fit: cover
 }
@@ -35,8 +122,29 @@
 }
 
 @media (max-width: 767px) {
+    .home-hero__control {
+        font-size: 22px;
+        height: 44px;
+        width: 34px
+    }
+
+    .home-hero__control--previous {
+        left: 6px
+    }
+
+    .home-hero__control--next {
+        right: 6px
+    }
+
     .store-media {
         aspect-ratio: 16 / 9;
         min-height: 0
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .home-hero__control,
+    .home-hero__image {
+        transition: none
     }
 }

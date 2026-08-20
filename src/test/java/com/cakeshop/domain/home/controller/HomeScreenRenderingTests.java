@@ -79,6 +79,37 @@ class HomeScreenRenderingTests {
     }
 
     @Test
+    void home_serviceBanner_rotatesRatioPreservingImages() throws Exception {
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(
+                        "src=\"/js/home-banner-rotation.js\"")))
+                .andExpect(content().string(containsString(
+                        "data-home-banner-rotation")))
+                .andExpect(content().string(containsString("class=\"home-hero__image\"")))
+                .andExpect(content().string(containsString(
+                        "src=\"/images/home/main-banner.jpeg\"")))
+                .andExpect(content().string(containsString(
+                        "src=\"/images/home/fresh-cake-banner.png\"")))
+                .andExpect(content().string(containsString(
+                        "data-home-banner-previous")))
+                .andExpect(content().string(containsString(
+                        "data-home-banner-next")));
+    }
+
+    @Test
+    void home_categoryCards_useRatioPreservingImages() throws Exception {
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(
+                        "src=\"/images/home/general-category.png\"")))
+                .andExpect(content().string(containsString(
+                        "src=\"/images/home/custom-category.png\"")))
+                .andExpect(content().string(containsString(
+                        "class=\"home-category-card__image\"")));
+    }
+
+    @Test
     void home_visibleNotice_showsNoticeSectionWithFullListLink() throws Exception {
         when(communityHomeQueryService.getNoticeSection()).thenReturn(
                 new NoticeSectionView(List.of(
