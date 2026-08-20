@@ -14,6 +14,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>게시글 상세 | 관리자</title>
   <link rel="stylesheet" th:href="@{/css/app.css}">
+  <link rel="stylesheet" th:href="@{/css/community.css}">
 </head>
 <body>
 <div class="admin-layout">
@@ -56,8 +57,8 @@
 
           <section class="section">
             <h2 class="section-title">본문</h2>
-            <div class="panel stack">
-              <p th:text="${post.content}" style="white-space:pre-wrap">본문</p>
+            <div class="panel post-body">
+              <p th:text="${post.content}">본문</p>
             </div>
           </section>
 
