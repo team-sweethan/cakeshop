@@ -49,6 +49,7 @@ class MemberFeedbackTemplateTests {
 
         assertThat(template)
                 .contains("th:fragment=\"alert\"")
+                .contains("th:src=\"@{/js/feedback.js}\"")
                 .contains("role=\"status\"")
                 .contains("aria-live=\"polite\"")
                 .contains("role=\"alert\"")
@@ -58,6 +59,11 @@ class MemberFeedbackTemplateTests {
                 .contains("data-feedback-message")
                 .doesNotContain("th:fragment=\"popup\"")
                 .doesNotContain("window.alert(");
+
+        String feedbackScript = read("static/js/feedback.js");
+        assertThat(feedbackScript)
+                .contains("[data-feedback-message][role=\"alert\"]")
+                .contains("feedbackMessage.focus()");
     }
 
     @Test

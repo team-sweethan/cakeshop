@@ -26,10 +26,6 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll("[data-current-year]").forEach((element) => {
     element.textContent = currentYear;
   });
-  const feedbackMessage = document.querySelector("[data-feedback-message]");
-  if (feedbackMessage) {
-    feedbackMessage.focus();
-  }
   loadCartCount();
 });
 

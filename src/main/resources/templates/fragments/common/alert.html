@@ -1,5 +1,6 @@
 <!-- 컨트롤러는 successMessage / errorMessage 키로 플래시를 담고, 화면은 이 공통 조각에서 일괄 출력한다. -->
 <div th:fragment="alert" class="flash-stack">
+  <script defer th:src="@{/js/feedback.js}"></script>
   <div class="alert alert--success"
        th:if="${successMessage}"
        th:text="${successMessage}"
