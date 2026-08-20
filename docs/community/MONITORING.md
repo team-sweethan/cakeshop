@@ -1,6 +1,6 @@
 # 커뮤니티 모니터링 계획
 
-- 상태: **초안** (2026-08-20). 아직 계측이 붙어 있지 않다.
+- 상태: **초안** (2026-08-20). 계측은 붙었고(1절) 아직 아무것도 재 보지 않았다.
 - 범위: `src/main/java/com/cakeshop/domain/community/**`, `src/main/resources/mapper/community/**`
 - 짝 문서: `docs/review/MONITORING.md` (같은 형식, 후기 도메인)
 
@@ -29,16 +29,21 @@
 
 ## 1. 먼저 준비해야 하는 것
 
-계획을 세우기 전에, **지금은 아무 숫자도 볼 수 없는 상태**라는 것부터 알아야 한다.
+이 문서를 쓸 때는 **아무 숫자도 볼 수 없는 상태**였다. 넷 중 셋은 같은 날 닫혔다(`66dae156`).
 
-| 필요한 것 | 지금 상태 | 해야 하는 일 |
+| 필요한 것 | 상태 | 무엇이었나 |
 |---|---|---|
-| 지표를 만드는 라이브러리 | **없다** | `build.gradle`에 `io.micrometer:micrometer-registry-prometheus`를 더한다. 지금은 `actuator`만 있어서 숫자가 아예 생성되지 않는다 |
-| 지표를 꺼내가는 통로 | **막혀 있다** | `SecurityConfig`가 `/actuator/health`만 열어 두고 나머지는 로그인을 요구한다. 수집기는 로그인하지 않으므로 `/actuator/prometheus`도 함께 열어야 한다 |
-| 저장·그래프 | 없다 | Prometheus와 Grafana를 Docker로 띄운다. 수집 간격은 5초로 둔다 (기본 15초는 짧게 튀는 구간을 통째로 놓친다) |
-| 느린 쿼리 기록 | 꺼져 있다 | MariaDB의 slow query log를 켠다. `long_query_time = 0.1`, `log_queries_not_using_indexes = ON` |
+| 지표를 만드는 라이브러리 | **됐다** | `actuator`만으로는 숫자가 아예 생성되지 않는다. `build.gradle`의 `io.micrometer:micrometer-registry-prometheus`가 있어야 `/actuator/prometheus`가 생긴다 |
+| 지표를 꺼내가는 통로 | **됐다** | `SecurityConfig`가 `/actuator/health`만 열어 두고 나머지는 로그인을 요구했다. 수집기는 로그인하지 않는다. `app.monitoring.metrics-public`으로 **`local`에서만** 열고 배포에서는 닫아 둔다 — 지표에는 모든 엔드포인트의 URI 패턴과 커넥션 풀·JVM 내부 상태가 들어 있다 |
+| 저장·그래프 | **됐다** | `monitoring/docker-compose.yml`이 Prometheus와 Grafana를 띄운다. 수집 간격은 5초다 (기본 15초는 짧게 튀는 구간을 통째로 놓친다). 켜는 순서는 `monitoring/README.md` |
+| 느린 쿼리 기록 | **아직 꺼져 있다** | MariaDB의 slow query log를 켠다. `long_query_time = 0.1`, `log_queries_not_using_indexes = ON`. 앱이 아니라 DB 서버 설정이라 위 셋과 함께 닫히지 않았다 |
 
 이 넷은 도메인과 무관한 공통 작업이라 `global` 쪽 변경이다. 커뮤니티 코드는 한 줄도 건드리지 않는다.
+
+**붙어 있다는 것과 떠 있다는 것은 다르다.** 저장·그래프는 컨테이너라서
+`docker compose -f monitoring/docker-compose.yml up -d`를 해야 돌고, 안 띄운 채로는
+`localhost:9090`이 응답조차 하지 않는다. 앱 쪽이 살아 있는지는 수집기를 거치지 말고
+`curl -s localhost:8080/actuator/prometheus`로 먼저 본다 — 어느 쪽이 죽었는지가 한 번에 갈린다.
 
 ### 재는 조건을 고정한다
 
@@ -275,7 +280,8 @@ M4는 값이 틀리거나 사용자가 오류를 보는 문제다.
 
 ## 4. 순서
 
-1. **계측을 붙인다** (1절). 커뮤니티 코드는 안 건드린다
+1. ~~**계측을 붙인다**~~ — **됐다 (2026-08-20, `66dae156`).** 커뮤니티 코드는 안 건드렸다.
+   다만 스택을 띄워 두고 추세를 본 적은 아직 없다
 2. **데이터를 심는다** — 게시글 10만, 댓글 100만. 30건에서는 아무것도 안 보인다
 3. **M4를 먼저 잰다** — 정확성이 걸려 있고, 이미 있는 동시성 테스트가 기준선을 준다
 4. **M1·M3을 잰다** — 코드를 안 고쳐도 `EXPLAIN` 하나로 원인이 확정되는 항목이다

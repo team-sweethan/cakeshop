@@ -1,6 +1,6 @@
 # 후기 모니터링 계획
 
-- 상태: **초안** (2026-08-20). 아직 계측이 붙어 있지 않다.
+- 상태: **초안** (2026-08-20). 계측은 붙었고(1절) 후기 쪽은 아직 아무것도 재 보지 않았다.
 - 범위: `src/main/java/com/cakeshop/domain/review/**`, `src/main/resources/mapper/review/**`
 - 짝 문서: `docs/community/MONITORING.md` (같은 형식, 커뮤니티 도메인)
 
@@ -38,11 +38,13 @@ Flyway가 꺼져 있어 스키마가 반영된 적이 없다. 그래서 이 계�
 
 요지만 옮기면 이렇다.
 
-- 지표를 만드는 라이브러리(`micrometer-registry-prometheus`)가 아직 없다
-- 지표를 꺼내가는 통로(`/actuator/prometheus`)가 로그인에 막혀 있다
-- 느린 쿼리 기록이 꺼져 있다
+- 지표를 만드는 라이브러리(`micrometer-registry-prometheus`) — **됐다** (`66dae156`)
+- 지표를 꺼내가는 통로(`/actuator/prometheus`) — **됐다.** `local` 프로필에서만 열린다
+- 저장·그래프(Prometheus·Grafana) — **됐다.** `monitoring/docker-compose.yml`, 켜는 순서는 `monitoring/README.md`
+- 느린 쿼리 기록 — **아직 꺼져 있다.** 앱이 아니라 DB 서버 설정이라 위 셋과 함께 닫히지 않았다
 
-이 셋은 도메인과 무관한 공통 작업이라 `global` 쪽 변경이고, 후기 코드는 한 줄도 건드리지 않는다.
+이 넷은 도메인과 무관한 공통 작업이라 `global` 쪽 변경이고, 후기 코드는 한 줄도 건드리지 않는다.
+**붙어 있는 것과 떠 있는 것은 다르다** — 저장·그래프는 컨테이너라 `docker compose`로 띄워야 돈다.
 
 ### 후기 도메인에 필요한 추가 준비
 
