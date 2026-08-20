@@ -35,14 +35,14 @@
 |---|---|---|
 | 지표를 만드는 라이브러리 | **됐다** | `actuator`만으로는 숫자가 아예 생성되지 않는다. `build.gradle`의 `io.micrometer:micrometer-registry-prometheus`가 있어야 `/actuator/prometheus`가 생긴다 |
 | 지표를 꺼내가는 통로 | **됐다** | `SecurityConfig`가 `/actuator/health`만 열어 두고 나머지는 로그인을 요구했다. 수집기는 로그인하지 않는다. `app.monitoring.metrics-public`으로 **`local`에서만** 열고 배포에서는 닫아 둔다 — 지표에는 모든 엔드포인트의 URI 패턴과 커넥션 풀·JVM 내부 상태가 들어 있다 |
-| 저장·그래프 | **각자 로컬에서** | Prometheus와 Grafana는 재는 사람이 자기 PC에서 띄운다. 저장소에 두지 않는다 — 근거는 `decisions/decision-log-2nd.md`의 2026-08-20 항목. 수집 간격은 **5초**로 둔다 (기본 15초는 짧게 튀는 구간을 통째로 놓친다). 수집 대상은 앱의 `/actuator/prometheus`이고, 컨테이너에서 호스트 앱을 볼 때는 `host.docker.internal:8080`이다 |
+| 저장·그래프 | **됐다** | `monitoring/docker-compose.yml`이 Prometheus와 Grafana를 띄운다. 수집 간격은 5초다 (기본 15초는 짧게 튀는 구간을 통째로 놓친다). 켜는 순서는 `monitoring/README.md` |
 | 느린 쿼리 기록 | **아직 꺼져 있다** | MariaDB의 slow query log를 켠다. `long_query_time = 0.1`, `log_queries_not_using_indexes = ON`. 앱이 아니라 DB 서버 설정이라 위 셋과 함께 닫히지 않았다 |
 
 이 넷은 도메인과 무관한 공통 작업이라 `global` 쪽 변경이다. 커뮤니티 코드는 한 줄도 건드리지 않는다.
 
-**붙어 있다는 것과 떠 있다는 것은 다르다.** 앱에 계측이 붙어 있어도 수집기를 띄우지 않으면
-`localhost:9090`은 응답조차 하지 않는다. 그 둘은 화면에서 구분되지 않으므로,
-앱 쪽이 살아 있는지는 수집기를 거치지 말고
+**붙어 있다는 것과 떠 있다는 것은 다르다.** 저장·그래프는 컨테이너라서
+`docker compose -f monitoring/docker-compose.yml up -d`를 해야 돌고, 안 띄운 채로는
+`localhost:9090`이 응답조차 하지 않는다. 앱 쪽이 살아 있는지는 수집기를 거치지 말고
 `curl -s localhost:8080/actuator/prometheus`로 먼저 본다 — 어느 쪽이 죽었는지가 한 번에 갈린다.
 
 ### 재는 조건을 고정한다
