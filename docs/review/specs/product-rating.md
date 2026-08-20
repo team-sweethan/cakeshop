@@ -17,7 +17,7 @@
 
 | | |
 |---|---|
-| 계약 | `ProductReviewCommandService` (상품 도메인 공개 Service, **신규**) |
+| 계약 | `ProductReviewCommandService` (상품 도메인 공개 Service. 조각 2에서 후기 담당이 만들었다) |
 | 상품 쪽 SQL | `ProductReviewMapper` + `mapper/product/ProductReviewMapper.xml` — **`products`만 만진다** |
 | 리뷰 쪽 SQL | 집계 SELECT는 `ReviewMapper`에 둔다 |
 | 형판 | `ProductStockService` — 주문·결제에 재고 변경을 공개하는 기존 쓰기 계약과 같은 모양 |
