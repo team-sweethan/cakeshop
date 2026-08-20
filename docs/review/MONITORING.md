@@ -229,26 +229,55 @@ M1과 **같은 인덱스 하나로 같이 풀린다.** `(product_id, status, cre
   (커밋 뒤라도 사용자 요청은 아직 안 끝났다)
 
 ```sql
-SELECT r.id AS review_id, r.product_id, r.created_at
+SET @notification_since = '2026-08-10 00:00:00';   -- 조각 7(알림 연동) 머지 시점
+SET @active_admins = (SELECT COUNT(*) FROM members WHERE role = 'ADMIN' AND status = 'ACTIVE');
+
+SELECT r.id AS review_id, r.status, r.created_at,
+       COUNT(DISTINCT n.receiver_id) AS notified_admins,
+       @active_admins                AS active_admins_now
 FROM reviews r
 JOIN order_items oi ON oi.id = r.order_item_id
 JOIN orders o ON o.id = oi.order_id
-WHERE r.status = 'PUBLISHED'
-  -- 시드가 SQL 로 직접 넣은 후기 둘은 애플리케이션을 거치지 않아 알림이 없다. 아래 참고.
-  AND o.order_number NOT IN ('SEED-REVIEW-GENERAL-REVIEWED', 'SEED-REVIEW-CUSTOM-REVIEWED')
-  AND NOT EXISTS (
-      SELECT 1 FROM notifications n
-      WHERE n.review_id = r.id AND n.notification_type = 'NEW_REVIEW')
+LEFT JOIN notifications n
+       ON n.review_id = r.id AND n.notification_type = 'NEW_REVIEW'
+WHERE o.order_number NOT IN ('SEED-REVIEW-GENERAL-REVIEWED', 'SEED-REVIEW-CUSTOM-REVIEWED')
+  AND r.created_at >= @notification_since
+GROUP BY r.id, r.status, r.created_at
+HAVING COUNT(DISTINCT n.receiver_id) < @active_admins
 ORDER BY r.id;
 ```
 
-**시드가 넣은 후기 둘은 세지 않는다.** `seed-review.sql`은 `INSERT ... SELECT`로 `reviews`에 직접
-행을 넣는다. 애플리케이션을 거치지 않으므로 `afterCommit` 훅이 돌 일이 없고, 따라서 알림도 없다.
-**정상이다.** 위 조건으로 빼지 않으면 이 검사는 **영원히 2건이 어긋난 것으로 나오고**, 그러면 사람이
-결과를 무시하게 되어 검사가 죽는다. 시드가 후기를 더 심게 되면 이 목록도 함께 늘려야 한다.
+이 쿼리가 왜 이렇게 생겼는지가 전부 이유가 있다. 하나씩 지우면 검사가 조용히 못 쓰게 된다.
+
+**관리자 수와 비교한다 — "하나라도 있으면 통과"가 아니다.**
+`ReviewNotificationSender.sendNewReview`는 `findActiveAdminIds()`를 돌며 **활성 관리자 전원에게
+각각** 보낸다. 그래서 "알림이 하나라도 있으면 정상"으로 보면 **관리자 셋 중 하나에게만 갔을 때를
+놓친다.** 지금 이 저장소는 관리자가 한 명뿐이라 차이가 안 나지만, 늘어나는 순간 이 검사가
+반쪽이 된다.
+
+> **다만 이 비교에는 한계가 있다.** 관리자가 나중에 늘면, 그 전에 쓰인 후기는 새 관리자 몫이 없어
+> 어긋난 것처럼 보인다. **알림을 소급해 만들지는 않으므로 그건 정상이다.** 0이면 확실한 실패이고,
+> 0보다 크면서 관리자 수보다 적으면 **관리자가 언제 늘었는지 먼저 확인한다.**
+
+**후기 상태로 거르지 않는다.**
+이 검사가 보는 것은 **"만들어질 때 알림이 나갔는가"**이지 지금 그 후기가 보이는지가 아니다.
+`status = 'PUBLISHED'`로 좁히면, 알림이 실패한 뒤 사용자가 지우거나 관리자가 차단한 순간
+**그 실패가 검사에서 사라진다.** 상태가 바뀐다고 빠진 알림이 채워지지는 않는다.
+
+**알림 연동 이전 후기는 뺀다.**
+알림은 조각 7(2026-08-10 머지)에서 붙었다. 그 전에 앱으로 쓴 후기에는 **설계상** 알림이 없고
+채우는 백필도 없다. 로컬 DB를 갈아엎지 않고 계속 쓰면 그 행이 영원히 남는다.
+
+**시드가 넣은 후기 둘은 세지 않는다.**
+`seed-review.sql`은 `INSERT ... SELECT`로 `reviews`에 직접 행을 넣는다. 애플리케이션을 거치지
+않으므로 `afterCommit` 훅이 돌 일이 없고, 따라서 알림도 없다. **정상이다.**
+시드가 후기를 더 심게 되면 이 목록도 함께 늘려야 한다.
 
 반대로 `SEED-REVIEW-*-WRITABLE` 주문은 시드가 **후기를 안 붙인 채로** 남겨 둔 것이라
-화면에서 사람이 직접 쓴다. 그렇게 생긴 후기는 알림이 있어야 한다.
+화면에서 사람이 직접 쓴다. 그렇게 생긴 후기는 알림이 있어야 하므로 빼지 않는다.
+
+**뒤의 세 조건이 노리는 것은 같다** — 고칠 수 없는 과거 때문에 검사가 늘 빨간불이면
+사람이 결과를 무시하게 되고, 그러면 조용히 어긋나는 것을 잡으려던 검사가 죽는다.
 
 **어느 선을 넘으면 손을 대나**
 후기 수와 알림 수가 **하나라도 어긋나면** 원인을 본다.
