@@ -428,12 +428,28 @@ class ScreenRenderingTests {
         value = "user@cakeshop.local",
         userDetailsServiceBeanName = "memberDetailsService"
     )
+    void generalProductDetail_showsQuantityControlsInPriceSummary() throws Exception {
+        mockMvc.perform(get("/products/{productId}", generalProductId))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("data-quantity")))
+            .andExpect(content().string(containsString("data-selected-quantity")))
+            .andExpect(content().string(containsString("data-product-price-summary")));
+    }
+
+    @Test
+    @WithUserDetails(
+        value = "user@cakeshop.local",
+        userDetailsServiceBeanName = "memberDetailsService"
+    )
     void customProductDetail_showsCustomOptionFlowWithoutServerCartForm() throws Exception {
         mockMvc.perform(get("/products/{productId}", customProductId))
             .andExpect(status().isOk())
             .andExpect(content().string(containsString("/orders/custom/options")))
+            .andExpect(content().string(containsString("data-product-price-summary")))
             .andExpect(content().string(not(containsString("data-login-required"))))
-            .andExpect(content().string(not(containsString("data-server-cart-form"))));
+            .andExpect(content().string(not(containsString("data-server-cart-form"))))
+            .andExpect(content().string(not(containsString("data-quantity"))))
+            .andExpect(content().string(not(containsString("data-selected-quantity"))));
     }
 
     @Test
