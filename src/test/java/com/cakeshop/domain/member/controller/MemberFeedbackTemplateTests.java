@@ -54,6 +54,8 @@ class MemberFeedbackTemplateTests {
                 .contains("role=\"alert\"")
                 .contains("aria-live=\"assertive\"")
                 .contains("aria-atomic=\"true\"")
+                .contains("tabindex=\"-1\"")
+                .contains("data-feedback-message")
                 .doesNotContain("th:fragment=\"popup\"")
                 .doesNotContain("window.alert(");
     }

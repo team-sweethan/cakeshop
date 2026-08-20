@@ -5,11 +5,15 @@
        th:text="${successMessage}"
        role="status"
        aria-live="polite"
-       aria-atomic="true"></div>
+       aria-atomic="true"
+       tabindex="-1"
+       data-feedback-message></div>
   <div class="alert alert--error"
        th:if="${errorMessage}"
        th:text="${errorMessage}"
        role="alert"
        aria-live="assertive"
-       aria-atomic="true"></div>
+       aria-atomic="true"
+       tabindex="-1"
+       data-feedback-message></div>
 </div>
