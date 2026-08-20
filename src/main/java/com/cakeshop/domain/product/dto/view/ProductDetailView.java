@@ -91,4 +91,13 @@ public class ProductDetailView {
     public boolean isAvailable() {
         return stockQuantity == null || stockQuantity > 0;
     }
+
+    /**
+     * 고객이 상세 화면에서 상품 수량을 선택할 수 있는지 확인한다.
+     *
+     * @return 주문 가능한 일반 상품이면 {@code true}
+     */
+    public boolean isQuantitySelectable() {
+        return isAvailable() && productType == ProductType.GENERAL;
+    }
 }

@@ -335,8 +335,7 @@
               class="form-group"
               style="margin-top:12px"
               sec:authorize="!hasRole('ADMIN')"
-              th:if="${product.available
-                      and product.productType.name() == 'GENERAL'}"
+              th:if="${product.quantitySelectable}"
       >
           <span class="form-label">
             수량
@@ -407,7 +406,7 @@
         </div>
 
         <div class="data-row"
-             th:if="${product.productType.name() == 'GENERAL'}">
+             th:if="${product.quantitySelectable}">
           <span class="data-row__label">수량</span>
           <strong data-selected-quantity>1개</strong>
         </div>
