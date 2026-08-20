@@ -51,13 +51,6 @@ async function updateNotificationUnreadCount() {
 
 document.addEventListener('DOMContentLoaded', () => {
   updateNotificationUnreadCount();
-
-  // 장바구니 담기 성공 플래시 메시지가 있는 경우 토스트 팝업 렌더링
-  const successAlert = document.querySelector('.alert.alert--success');
-  if (successAlert && successAlert.textContent && successAlert.textContent.includes('장바구니')) {
-    const text = successAlert.textContent.trim();
-    showToast('장바구니', text, '/cart');
-  }
 });
 
 // 토스트 팝업 생성 및 렌더링 헬퍼 함수

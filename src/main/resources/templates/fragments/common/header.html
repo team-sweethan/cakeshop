@@ -3,7 +3,13 @@
         xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
   <div class="customer-header__inner">
     <div class="customer-header__left">
-      <a class="customer-header__brand" th:href="@{/}">케이크 쇼핑몰</a>
+      <a class="customer-header__brand" th:href="@{/}" aria-label="케이크 쇼핑몰 홈">
+        <span class="customer-header__brand-mark" aria-hidden="true">🍰</span>
+        <span class="customer-header__brand-copy">
+          <strong>케이크 쇼핑몰</strong>
+          <small>CAKE SHOP</small>
+        </span>
+      </a>
       <nav th:replace="~{fragments/customer/gnb :: gnb}"></nav>
     </div>
     <div class="customer-header__actions">

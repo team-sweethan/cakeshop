@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>관리자 로그인 | 케이크 쇼핑몰</title>
   <link rel="stylesheet" th:href="@{/css/app.css}">
-  <link rel="stylesheet" th:href="@{/css/customer-mockup.css}">
   <script defer th:src="@{/js/app.js}"></script>
 </head>
 <body>
@@ -13,8 +12,16 @@
   <section class="panel auth-card section">
     <h1>관리자 로그인</h1>
     <p class="form-help">관리자 계정으로 로그인해 주세요.</p>
-    <p class="alert alert--success" th:if="${param.logout}">로그아웃되었습니다.</p>
-    <p class="alert alert--error" th:if="${param.error}">이메일 또는 비밀번호가 올바르지 않습니다.</p>
+    <p class="alert alert--success"
+       th:if="${param.logout}"
+       role="status"
+       aria-live="polite"
+       aria-atomic="true">로그아웃되었습니다.</p>
+    <p class="alert alert--error"
+       th:if="${param.error}"
+       role="alert"
+       aria-live="assertive"
+       aria-atomic="true">이메일 또는 비밀번호가 올바르지 않습니다.</p>
 
     <!-- 인증 과정: POST /login은 컨트롤러가 아니라 Spring Security Filter가 처리한다. -->
     <form class="form-stack" th:action="@{/login}" method="post">

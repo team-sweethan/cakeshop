@@ -186,16 +186,14 @@ class CustomerPageControllerTests {
     }
 
     @Test
-    void everyCustomerViewAndMockupAssetExists() {
+    void everyCustomerViewAndSharedAssetExists() {
         pages.values().stream().distinct().forEach(viewName ->
                 assertThat(
                         new ClassPathResource("templates/" + viewName + ".html").exists())
                         .as("%s template must exist", viewName)
                         .isTrue()
         );
-        assertThat(
-                new ClassPathResource("static/css/customer-mockup.css").exists())
-                .isTrue();
+        assertThat(new ClassPathResource("static/css/app.css").exists()).isTrue();
         assertThat(
                 new ClassPathResource("static/js/customer-mockup.js").exists())
                 .isTrue();

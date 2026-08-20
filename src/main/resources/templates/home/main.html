@@ -15,10 +15,10 @@
 
 <body>
   <header th:replace="~{fragments/common/header :: header}"></header>
-  <th:block th:replace="~{fragments/common/alert :: popup}"></th:block>
 
   <main class="page-container">
     <h1 class="visually-hidden">케이크 쇼핑몰 메인</h1>
+    <div th:replace="~{fragments/common/alert :: alert}"></div>
 
     <section class="section" aria-labelledby="service-title">
       <h2 id="service-title" class="section-title">서비스 안내</h2>
