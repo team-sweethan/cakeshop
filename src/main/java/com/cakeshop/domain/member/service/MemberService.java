@@ -126,6 +126,10 @@ public class MemberService {
                 .orElseThrow(() -> new BusinessException(MemberErrorCode.NOT_FOUND));
 
         if (form.isPasswordChangeRequested()) {
+            if (member.getPassword() == null) {
+                throw new BusinessException(
+                        MemberErrorCode.PASSWORD_CHANGE_UNAVAILABLE);
+            }
             if (!passwordEncoder.matches(form.getCurrentPassword(), member.getPassword())) {
                 throw new BusinessException(MemberErrorCode.INVALID_CURRENT_PASSWORD);
             }

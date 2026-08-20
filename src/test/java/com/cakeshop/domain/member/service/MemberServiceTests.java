@@ -180,6 +180,33 @@ class MemberServiceTests {
     }
 
     @Test
+    void updateMemberInfo_socialOnlyMemberPasswordChange_rejectsRequest() {
+        Member member = Member.builder()
+                .id(1L)
+                .email("social@cakeshop.local")
+                .password(null)
+                .build();
+        ProfileUpdateForm form = passwordChangeForm();
+        when(memberMapper.findByEmail(member.getEmail()))
+                .thenReturn(Optional.of(member));
+
+        assertThatThrownBy(() ->
+                memberService.updateMemberInfo(member.getEmail(), form))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception ->
+                        ((BusinessException) exception).getErrorCode())
+                .isEqualTo(MemberErrorCode.PASSWORD_CHANGE_UNAVAILABLE);
+
+        verify(passwordEncoder, never()).matches(
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString());
+        verify(passwordEncoder, never()).encode(
+                org.mockito.ArgumentMatchers.anyString());
+        verify(memberMapper, never()).update(
+                org.mockito.ArgumentMatchers.any(Member.class));
+    }
+
+    @Test
     void updateMemberInfo_validPasswordChange_encodesAndUpdatesPassword() {
         Member member = Member.builder()
                 .id(1L)
