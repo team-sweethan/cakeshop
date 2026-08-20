@@ -103,6 +103,21 @@ class MyPageControllerTests {
     }
 
     @Test
+    void profile_socialOnlyMember_exposesPasswordLoginAvailability() {
+        MemberDetails memberDetails = memberDetails();
+        MemberProfileView profile = memberProfile();
+        when(memberService.getMemberProfile(memberDetails.getUsername()))
+                .thenReturn(profile);
+        when(memberService.hasPasswordLogin(memberDetails.getUsername()))
+                .thenReturn(false);
+
+        String viewName = myPageController.profile(memberDetails, model);
+
+        assertThat(viewName).isEqualTo("customer/member/profile-edit");
+        verify(model).addAttribute("hasPasswordLogin", false);
+    }
+
+    @Test
     void withdraw_authenticatedMember_invalidatesSessionAndClearsSecurityContext() {
         MemberDetails memberDetails = memberDetails();
         SecurityContextHolder.getContext().setAuthentication(

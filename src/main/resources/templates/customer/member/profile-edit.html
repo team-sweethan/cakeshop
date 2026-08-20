@@ -5,14 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>회원정보 수정 | 케이크 쇼핑몰</title>
   <link rel="stylesheet" th:href="@{/css/app.css}">
-  <link rel="stylesheet" th:href="@{/css/customer-mockup.css}">
   <script defer th:src="@{/js/app.js}"></script>
   <script defer th:src="@{/js/customer-mockup.js}"></script>
 </head>
 <body data-page-title="회원정보 수정">
 <header th:replace="~{fragments/common/header :: header}"></header>
 <main class="page-container page-container--form">
-  <h1>회원정보 수정</h1>
+  <div class="page-heading cluster cluster--between">
+    <h1>회원정보 수정</h1>
+    <a class="btn" th:href="@{/mypage}">마이페이지로 돌아가기</a>
+  </div>
 
   <form th:action="@{/mypage/profile/update}" th:method="post" th:object="${profileForm}">
     <section class="section">
@@ -40,28 +42,33 @@
           <p class="form-error" th:if="${#fields.hasErrors('phone')}" th:errors="*{phone}"></p>
         </div>
 
-        <hr class="divider">
-        <h3 class="section-title">비밀번호 변경 <span class="text-muted">(선택)</span></h3>
-        <div class="form-group">
-          <label class="form-label" for="current-password">현재 비밀번호</label>
-          <input class="form-control" id="current-password" type="password" th:field="*{currentPassword}">
-          <p class="form-error" th:if="${#fields.hasErrors('currentPassword')}" th:errors="*{currentPassword}"></p>
+        <div th:if="${hasPasswordLogin}">
+          <hr class="divider">
+          <h3 class="section-title">비밀번호 변경 <span class="text-muted">(선택)</span></h3>
+          <div class="form-group">
+            <label class="form-label" for="current-password">현재 비밀번호</label>
+            <input class="form-control" id="current-password" type="password" th:field="*{currentPassword}">
+            <p class="form-error" th:if="${#fields.hasErrors('currentPassword')}" th:errors="*{currentPassword}"></p>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="new-password">새 비밀번호</label>
+            <input class="form-control" id="new-password" type="password" th:field="*{newPassword}">
+            <p class="form-error" th:if="${#fields.hasErrors('newPassword')}" th:errors="*{newPassword}"></p>
+            <p class="form-error" th:if="${#fields.hasErrors('newPasswordValid')}" th:errors="*{newPasswordValid}"></p>
+            <p class="form-help">8자 이상, 영문+숫자+특수문자</p>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="new-password-confirm">새 비밀번호 확인</label>
+            <input class="form-control" id="new-password-confirm" type="password" th:field="*{newPasswordConfirm}">
+            <p class="form-error" th:if="${#fields.hasErrors('newPasswordConfirm')}" th:errors="*{newPasswordConfirm}"></p>
+            <p class="form-error" th:if="${#fields.hasErrors('passwordChangeComplete')}" th:errors="*{passwordChangeComplete}"></p>
+            <p class="form-error" th:if="${#fields.hasErrors('newPasswordConfirmed')}" th:errors="*{newPasswordConfirmed}"></p>
+            <p class="form-help" id="new-password-match-message" aria-live="polite"></p>
+          </div>
         </div>
-        <div class="form-group">
-          <label class="form-label" for="new-password">새 비밀번호</label>
-          <input class="form-control" id="new-password" type="password" th:field="*{newPassword}">
-          <p class="form-error" th:if="${#fields.hasErrors('newPassword')}" th:errors="*{newPassword}"></p>
-          <p class="form-error" th:if="${#fields.hasErrors('newPasswordValid')}" th:errors="*{newPasswordValid}"></p>
-          <p class="form-help">8자 이상, 영문+숫자+특수문자</p>
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="new-password-confirm">새 비밀번호 확인</label>
-          <input class="form-control" id="new-password-confirm" type="password" th:field="*{newPasswordConfirm}">
-          <p class="form-error" th:if="${#fields.hasErrors('newPasswordConfirm')}" th:errors="*{newPasswordConfirm}"></p>
-          <p class="form-error" th:if="${#fields.hasErrors('passwordChangeComplete')}" th:errors="*{passwordChangeComplete}"></p>
-          <p class="form-error" th:if="${#fields.hasErrors('newPasswordConfirmed')}" th:errors="*{newPasswordConfirmed}"></p>
-          <p class="form-help" id="new-password-match-message" aria-live="polite"></p>
-        </div>
+        <p class="form-help" th:unless="${hasPasswordLogin}">
+          소셜 로그인 회원은 별도의 비밀번호를 사용하지 않습니다.
+        </p>
 
         <button class="btn btn--primary" type="submit">변경사항 저장</button>
       </div>
@@ -141,8 +148,10 @@
     newPasswordMatchMessage.className = matches ? "form-success" : "form-error";
   }
 
-  newPasswordInput.addEventListener('input', updateNewPasswordMatchMessage);
-  newPasswordConfirmInput.addEventListener('input', updateNewPasswordMatchMessage);
+  if (newPasswordInput && newPasswordConfirmInput && newPasswordMatchMessage) {
+    newPasswordInput.addEventListener('input', updateNewPasswordMatchMessage);
+    newPasswordConfirmInput.addEventListener('input', updateNewPasswordMatchMessage);
+  }
 </script>
 </body>
 </html>
