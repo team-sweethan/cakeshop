@@ -13,6 +13,7 @@ class CartMessageAreaTemplateTests {
     void cartFeedback_usesMessageAreaWithoutDuplicatingSuccessToast() throws IOException {
         String cartTemplate = read("templates/customer/cart/list.html");
         String commonScript = read("static/js/app.js");
+        String commonStyles = read("static/css/app.css");
 
         assertThat(cartTemplate)
                 .contains("fragments/common/alert :: alert")
@@ -20,6 +21,10 @@ class CartMessageAreaTemplateTests {
         assertThat(commonScript)
                 .doesNotContain("showToast('장바구니'")
                 .doesNotContain("textContent.includes('장바구니')");
+        assertThat(commonStyles)
+                .contains(".cart-item [data-cart-quantity-form]")
+                .contains("grid-template-columns: 34px 56px 34px")
+                .contains("::-webkit-inner-spin-button");
     }
 
     private String read(String location) throws IOException {

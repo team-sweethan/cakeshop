@@ -2351,6 +2351,42 @@ body > main {
     }
 }
 
+/* ---------- 장바구니 수량 조절기 ---------- */
+.cart-item [data-cart-quantity-form] {
+    align-items: center;
+    display: inline-grid;
+    gap: 6px;
+    grid-template-columns: 34px 56px 34px
+}
+
+.cart-item [data-cart-quantity-form] .btn {
+    font-size: 14px;
+    height: 34px;
+    min-height: 34px;
+    padding: 0;
+    width: 34px
+}
+
+.cart-item [data-cart-quantity-form] .form-control {
+    font-size: 13px;
+    font-weight: 600;
+    height: 34px;
+    min-height: 34px;
+    padding: 0 4px;
+    text-align: center;
+    width: 56px
+}
+
+.cart-item [data-cart-quantity-form] input[type="number"] {
+    -moz-appearance: textfield
+}
+
+.cart-item [data-cart-quantity-form] input[type="number"]::-webkit-inner-spin-button,
+.cart-item [data-cart-quantity-form] input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0
+}
+
 /* ---------- Toast Notification Styles ---------- */
 .toast-container {
     position: fixed;
