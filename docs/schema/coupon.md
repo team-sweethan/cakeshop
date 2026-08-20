@@ -18,9 +18,9 @@
 | `maximum_discount_amount` | DECIMAL(12, 0) |  | O | NULL | 최대 할인 금액 |
 | `total_quantity` | INT UNSIGNED |  | O | NULL | 총 발급 가능 수량 |
 | `issued_quantity` | INT UNSIGNED |  | X | `0` | 발급 수량 |
-| `starts_at` | DATETIME(6) |  | X | 없음 | 사용 시작 시각 |
-| `expires_at` | DATETIME(6) |  | X | 없음 | 만료 시각 |
-| `status` | VARCHAR(30) |  | X | `'ACTIVE'` | 쿠폰 상태 |
+| `starts_at` | DATETIME(6) | INDEX | X | 없음 | 사용 시작 시각 |
+| `expires_at` | DATETIME(6) | INDEX | X | 없음 | 만료 시각 |
+| `status` | VARCHAR(30) | INDEX | X | `'ACTIVE'` | 쿠폰 상태 |
 | `target_type` | VARCHAR(30) |  | X | `'SPECIFIC_MEMBERS'` | 발급 대상 유형 |
 | `created_by` | BIGINT | FK | X | 없음 | 생성 회원 식별자 |
 | `created_at` | DATETIME(6) |  | X | `CURRENT_TIMESTAMP(6)` | 생성 시각 |
@@ -30,6 +30,7 @@
 - CHECK: `target_type IN ('ALL_MEMBERS', 'NEW_MEMBERS', 'FIRST_ORDER', 'BIRTHDAY', 'SPECIFIC_MEMBERS')`
 - CHECK: 총 수량이 있으면 `issued_quantity <= total_quantity`
 - CHECK: 특정 회원 대상은 총 수량 필수, 그 외 대상은 총 수량 NULL
+- INDEX: `idx_coupons_status_starts_expires` (`status`, `starts_at`, `expires_at`)
 
 ## `member_coupons`
 
@@ -37,19 +38,23 @@
 
 | 컬럼 | 타입 | 키 | Null | 기본값 | 의미 |
 |---|---|---|---|---|---|
-| `id` | BIGINT | PK | X | AUTO_INCREMENT | 회원 쿠폰 식별자 |
-| `coupon_id` | BIGINT | FK, UK | X | 없음 | 쿠폰 식별자 |
-| `member_id` | BIGINT | FK, UK | X | 없음 | 회원 식별자 |
-| `status` | VARCHAR(30) |  | X | `'AVAILABLE'` | 회원 쿠폰 상태 |
+| `id` | BIGINT | PK, INDEX | X | AUTO_INCREMENT | 회원 쿠폰 식별자 |
+| `coupon_id` | BIGINT | FK, UK, INDEX | X | 없음 | 쿠폰 식별자 |
+| `member_id` | BIGINT | FK, UK, INDEX | X | 없음 | 회원 식별자 |
+| `status` | VARCHAR(30) | INDEX | X | `'AVAILABLE'` | 회원 쿠폰 상태 |
 | `applied_order_id` | BIGINT | FK, UK | O | NULL | 적용 주문 식별자 |
-| `issued_at` | DATETIME(6) |  | X | `CURRENT_TIMESTAMP(6)` | 발급 시각 |
+| `issued_at` | DATETIME(6) | INDEX | X | `CURRENT_TIMESTAMP(6)` | 발급 시각 |
 | `used_at` | DATETIME(6) |  | O | NULL | 사용 시각 |
 
 - UK: `uk_member_coupons_coupon_member` (`coupon_id`, `member_id`)
 - UK: `uk_member_coupons_applied_order` (`applied_order_id`)
 - FK: `coupon_id` → `coupons.id`, `member_id` → `members.id`, `applied_order_id` → `orders.id`
+- INDEX: `idx_member_coupons_issued_at_id` (`issued_at`, `id`)
+- INDEX: `idx_member_coupons_status_member_coupon` (`status`, `member_id`, `coupon_id`)
 
 ## 관련 migration
 
 - `V0__initial_schema.sql`
 - `V20260804_094624__add_coupon_target_type.sql`
+- `V20260819_134600__add_member_coupons_issued_at_index.sql`
+- `V20260819_161602__add_coupon_expiration_notification_indexes.sql`
