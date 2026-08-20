@@ -31,9 +31,13 @@ import org.springframework.security.oauth2.client.registration.ClientRegistratio
 public class SecurityConfig {
 
     private final boolean publicPreview;
+    private final boolean metricsPublic;
 
-    public SecurityConfig(@Value("${app.mockup.public-preview:false}") boolean publicPreview) {
+    public SecurityConfig(
+            @Value("${app.mockup.public-preview:false}") boolean publicPreview,
+            @Value("${app.monitoring.metrics-public:false}") boolean metricsPublic) {
         this.publicPreview = publicPreview;
+        this.metricsPublic = metricsPublic;
     }
 
     @Bean
@@ -99,8 +103,16 @@ public class SecurityConfig {
                         "/css/**", "/js/**", "/webjars/**", "/images/**", "/uploads/**", "/error")
                         .permitAll();
                 auth.requestMatchers("/admin/login").permitAll();
-                // 로드밸런서/헬스체크가 인증 없이 호출할 수 있도록 허용 (그 외 actuator 엔드포인트는 미노출)
+                // 로드밸런서/헬스체크가 인증 없이 호출할 수 있도록 허용
                 auth.requestMatchers("/actuator/health", "/actuator/health/**").permitAll();
+
+                if (metricsPublic) {
+                    // 로컬 측정에서만 연다. Prometheus 수집기는 로그인하지 않으므로 열지 않으면
+                    // anyRequest().hasRole("USER")에 걸려 403이 된다.
+                    // 지표에는 모든 엔드포인트의 URI 패턴과 커넥션 풀·JVM 내부 상태가 들어 있어
+                    // 배포 환경에서는 닫아 둔다 (application.yml 의 app.monitoring.metrics-public).
+                    auth.requestMatchers("/actuator/prometheus").permitAll();
+                }
                 // 공지는 비로그인도 읽어야 하는 안내다. /community/{id:\d+}가 숫자만 받으므로
                 // "notices"는 그 규칙에 걸리지 않아 여기에 따로 적어야 한다.
                 auth.requestMatchers(HttpMethod.GET,

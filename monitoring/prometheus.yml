@@ -1,0 +1,18 @@
+# 수집 간격이 5초인 이유: 기본값 15초는 부하가 짧게 튀는 구간을 통째로 건너뛴다.
+# 커넥션 풀 고갈이나 GC 정지처럼 우리가 보려는 것이 대부분 그 짧은 구간에서 일어난다.
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: cakeshop
+    metrics_path: /actuator/prometheus
+    static_configs:
+      # 앱은 컨테이너가 아니라 호스트에서 뜬다.
+      - targets: ["host.docker.internal:8080"]
+        labels:
+          application: cakeshop
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

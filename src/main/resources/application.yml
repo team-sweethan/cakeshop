@@ -47,9 +47,27 @@ mybatis:
   configuration:
     map-underscore-to-camel-case: true
 
+# 기본값은 health 하나만 연다. 지표 노출은 local 프로필에서만 켠다 —
+# /actuator/prometheus 응답에는 모든 엔드포인트의 URI 패턴과 커넥션 풀·JVM 내부 상태가
+# 들어 있어 배포 환경에서 익명에게 공개하면 AGENTS.md 의 '내부 경로 비노출'에 걸린다.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
 app:
   mockup:
     public-preview: false
+  monitoring:
+    # true 면 /actuator/prometheus 를 인증 없이 연다. 수집기는 로그인하지 않는다.
+    metrics-public: false
   kakao:
     alimtalk:
       enabled: ${SOLAPI_ENABLED:false}
@@ -164,10 +182,19 @@ spring:
     url: "jdbc:mariadb://${LOCAL_DB_HOST:localhost}:${LOCAL_DB_PORT}/${LOCAL_DB_DATABASE}?connectionTimeZone=+09:00&forceConnectionTimeZoneToSession=true"
     username: ${LOCAL_DB_USERNAME}
     password: ${LOCAL_DB_PASSWORD}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus
+
 app:
   mockup:
     # 화면 선이관 기간에만 조회 화면을 로그인 없이 확인한다. rds에서는 false다.
     public-preview: true
+  monitoring:
+    # 로컬 측정용. Prometheus 컨테이너가 인증 없이 긁어 간다 (docs/community/MONITORING.md 1절).
+    metrics-public: true
 
 ---
 # 공용 AWS RDS: 프로젝트 루트의 .env에서 접속 정보를 읽는다.
