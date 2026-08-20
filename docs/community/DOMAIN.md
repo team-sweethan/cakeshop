@@ -107,6 +107,10 @@ Cakeshop 커뮤니티는 고객이 케이크 관련 질문과 후기를 공유�
 
 ## 3. 기존 자산
 
+> **조각 0 착수 시점(2026-08-02)에 이미 있던 것의 목록이다.** 여기서 출발했다는 사실이 이후 결정의
+> 근거로 계속 쓰이므로 목록 자체는 그대로 둔다. 그 뒤에 커뮤니티가 **더한** 것은 아래 각 줄에
+> 표시하고, 지금 스키마의 정본은 `docs/schema/community.md`다.
+
 스키마는 `V0__initial_schema.sql`에 **이미 전부 존재**한다. 공유된 migration이므로 수정하지 않고, 필요하면 새 versioned migration을 추가한다(`gradlew newMigration -Pdesc=<snake_case>`).
 
 - `post_categories`, `posts`, `comments`, `post_likes`, `post_images`, `post_reports`
@@ -114,11 +118,11 @@ Cakeshop 커뮤니티는 고객이 케이크 관련 질문과 후기를 공유�
 - `post_reports(post_id, reporter_id)` UNIQUE 존재
 - `posts`에 `status`, `blocked_at`, `blocked_reason`, `blocked_by`, `view_count`, `like_count` 존재
 - `posts`에 `comment_count` 컬럼은 **없다**
-- **`post_views` 테이블은 없다.** 조회수 중복 방지(`specs/community-read.md` B3)에 필요하므로 새 migration으로 만든다 — V0에 기댈 수 있는 유일한 예외다
+- **`post_views` 테이블은 V0에 없었다.** 조회수 중복 방지(`specs/community-read.md` B3)에 필요해 조각 6이 `V20260803_235726__add_post_views.sql`로 만들었다 — V0에 기댈 수 없던 유일한 예외다. 이후 `daily_popular_posts`·`popular_post_batch_runs`(조각 7b)와 `community_notices`(조각 14a)도 새 migration으로 생겼다
 
-코드 뼈대: `domain/community/`에 controller 3개(뷰 이름만 반환), 빈 `CommunityService`, 빈 `CommunityMapper`, 빈 entity 3개, `CommunityErrorCode`. 테스트 0개.
+코드 뼈대: `domain/community/`에 controller 3개(뷰 이름만 반환), 빈 `CommunityService`, 빈 `CommunityMapper`, 빈 entity 3개, `CommunityErrorCode`. 테스트 0개. **`CommunityService`라는 이름은 지금 없다** — 2026-08-18 클래스 분할로 `CommunityPostService`가 됐고 Service가 여럿으로 갈렸다(`history/2026-08-class-split.md`). Mapper도 `CommunityMapper` 하나에서 여섯으로 늘었다.
 
-템플릿: `templates/customer/community/{list,detail,form}.html`, `templates/admin/community/{list,detail}.html`
+템플릿: `templates/customer/community/{list,detail,form}.html`, `templates/admin/community/{list,detail}.html`. 공지 화면 넷은 조각 14가 더했다.
 
 기존 공용 유틸: `global/common/paging/PageRequest`(1-based, offset, 기본 20, 최대 100), `PageResult`(totalElements, totalPages)
 
@@ -130,7 +134,7 @@ Cakeshop 커뮤니티는 고객이 케이크 관련 질문과 후기를 공유�
 
 - 이유: 조건이 두 개면 새 쿼리를 추가할 때 하나를 빠뜨려 차단된 글이 노출된다. `WHERE status = 'PUBLISHED'` 하나로 끝내면 빠뜨릴 것이 없다.
 - `PostStatus { PUBLISHED, DELETED, BLOCKED }` enum으로 정의하고, `MemberStatus.canTransitionTo` 선례를 따라 전이 규칙을 enum에 둔다.
-- 새 migration으로 `CHECK (status IN ('PUBLISHED','DELETED','BLOCKED'))`를 추가한다 (선례: `V20260729_123306__add_member_status_constraint.sql`).
+- DB에도 `CHECK (status IN ('PUBLISHED','DELETED','BLOCKED'))`가 걸려 있다. 조각 0의 `V20260802_113219__add_post_status_constraint.sql`이 `V20260729_123306__add_member_status_constraint.sql` 선례를 따라 추가했다.
 
 > **이 절은 `posts`에만 적용된다.** 공지는 별도 표이고 노출 기간을 갖기 때문에 조건이 셋이다. 그 예외와 예외를 감당하는 방법은 `specs/community-notice.md` E4가 정본이다.
 
@@ -231,6 +235,23 @@ Cakeshop 커뮤니티는 고객이 케이크 관련 질문과 후기를 공유�
 
 같은 이유로 `reviews/risks.md`와 `decisions/`의 결정 기록에 남은 `6.x` 표기도 고치지 않았다. 과거에 그렇게 적힌 기록이고,
 이 표가 그것을 지금 자리로 옮겨 준다.
+
+### 옛 `SCREENS.md`·`screens/*.md`를 만나면
+
+`decisions/`·`history/`·`reviews/findings.md`에 `SCREENS.md`나 `screens/list.md` 같은 이름이 남아 있다.
+**2026-08-09에 폐지한 화면 문구 명세다**(커밋 `4d709da0`). 문구 표는 `CommunityScreenDocTests`의 입력이었는데
+그 검사를 `docs/testing.md` 4절 기준으로 걷어내면서 소비자가 사라졌다. 그때의 기록은 그대로 두기로 했으므로
+(6.x 번호와 같은 이유다) 이름은 계속 나타난다. 지금 자리는 이렇다.
+
+| 옛 파일 | 지금 있는 곳 |
+|---|---|
+| `SCREENS.md` (인덱스·만들지 않는 화면) | 이 문서 2절(범위)과 4절 끝의 화면 안내 |
+| `screens/list.md` | `specs/community-read.md` B1 |
+| `screens/detail.md` | `specs/community-read.md` B2와 `specs/community-comment.md` B4 |
+| `screens/new.md`·`screens/edit.md` | `specs/community-post.md` A1·A2 |
+| `screens/admin-list.md`·`screens/admin-detail.md` | `specs/community-admin.md` C1~C4 |
+
+화면 문구는 이제 어느 문서도 갖지 않는다. 실제 출력은 템플릿과 `CommunityScreenRenderingTests`가 정본이다.
 
 ## 7. 입력 검증
 

@@ -59,7 +59,7 @@ LIMIT #{size} OFFSET #{offset}
 |---|---|
 | 액터 | 로그인 고객 |
 | 경로 | `GET /reviews/new?orderItemId={N}` |
-| 화면 | `customer/review/form.html` (목업 → 실동작 전환) |
+| 화면 | `customer/review/form.html` (조각 1에서 목업을 실동작으로 전환했다) |
 | 입력 | `orderItemId` **필수** |
 
 **`orderItemId`는 필수다.** 없거나 숫자가 아니면 400이다.

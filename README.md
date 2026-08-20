@@ -44,14 +44,17 @@ cakeshop은 매장에 방문하기 전에 상품과 옵션을 살펴보고 주�
 |---|---|
 | Language | Java 21 |
 | Framework | Spring Boot 4.0.2, Spring MVC |
-| View | Thymeleaf, Thymeleaf Spring Security Extras |
-| Security | Spring Security |
+| View | Thymeleaf, Thymeleaf Spring Security Extras, Chart.js |
+| Security | Spring Security, Spring Security OAuth2 Client |
 | Data | MyBatis 4.0.1, MariaDB Connector/J |
 | Database Migration | Flyway |
+| Realtime | Spring WebSocket |
+| Mail | Spring Boot Starter Mail |
+| Storage | AWS SDK for Java v2 (S3) |
 | Build | Gradle Wrapper |
 | Validation | Jakarta Validation |
 | Test | JUnit Platform, AssertJ, Mockito, MockMvc, Spring Security Test, Testcontainers for MariaDB |
-| Development | Spring Boot DevTools, Lombok, Spring Boot Actuator |
+| Development | Spring Boot DevTools, Lombok, Spring Boot Actuator, Micrometer Prometheus Registry |
 
 정확한 의존성 버전과 구성은 [`build.gradle`](build.gradle)을 기준으로 합니다.
 

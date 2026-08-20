@@ -21,10 +21,10 @@
 | `review_id` | BIGINT | FK | O | NULL | 관련 리뷰 식별자 |
 | `review_reply_id` | BIGINT | FK | O | NULL | 관련 리뷰 답글 식별자 |
 | `user_coupon_id` | BIGINT | FK | O | NULL | 관련 회원 쿠폰 식별자 |
-| `notification_type` | VARCHAR(50) |  | X | 없음 | 알림 유형 |
+| `notification_type` | VARCHAR(50) | INDEX | X | 없음 | 알림 유형 |
 | `title` | VARCHAR(200) |  | X | 없음 | 제목 |
 | `content` | TEXT |  | X | 없음 | 내용 |
-| `delivery_scope` | VARCHAR(30) |  | X | `'WEB_ONLY'` | 발송 범위 |
+| `delivery_scope` | VARCHAR(30) | INDEX | X | `'WEB_ONLY'` | 발송 범위 |
 | `is_read` | TINYINT(1) | INDEX | X | `0` | 읽음 여부 |
 | `read_at` | DATETIME(6) |  | O | NULL | 읽은 시각 |
 | `event_key` | VARCHAR(100) | UK | X | 없음 | 수신자별 이벤트 중복 방지 키 |
@@ -36,6 +36,7 @@
 - FK 삭제 정책: 나머지 관련 식별자는 각 대상 테이블과 `ON DELETE SET NULL`
 - INDEX: `idx_notifications_receiver_last_event` (`receiver_id`, `last_event_at`, `id`)
 - INDEX: `idx_notifications_receiver_read_last_event` (`receiver_id`, `is_read`, `last_event_at`, `id`)
+- INDEX: `idx_notifications_type_scope_id` (`notification_type`, `delivery_scope`, `id`)
 
 ## `notification_deliveries`
 
@@ -64,3 +65,4 @@
 - `V0__initial_schema.sql`
 - `V20260804_150010__add_notification_tables.sql`
 - `V20260806_162203__add_notification_last_event_at.sql`
+- `V20260819_173713__add_notification_retry_indexes.sql`
