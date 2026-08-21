@@ -26,8 +26,22 @@ class NicknameValidationTests {
         assertNicknameIsRejected(oauthSignupForm, oauthSignupForm.getNickname());
     }
 
+    @Test
+    void allMemberNicknameForms_rejectReservedAdministratorNameWithInvisibleCharacter() {
+        SignupForm signupForm = new SignupForm();
+        ProfileUpdateForm profileUpdateForm = new ProfileUpdateForm();
+        OAuthSignupForm oauthSignupForm = new OAuthSignupForm();
+
+        signupForm.setNickname("관\u200B리자");
+        profileUpdateForm.setNickname("관\u034F리자");
+        oauthSignupForm.setNickname("ᄀ\u034Fᅪᆫ리자");
+
+        assertNicknameIsRejected(signupForm, signupForm.getNickname());
+        assertNicknameIsRejected(profileUpdateForm, profileUpdateForm.getNickname());
+        assertNicknameIsRejected(oauthSignupForm, oauthSignupForm.getNickname());
+    }
+
     private void assertNicknameIsRejected(Object form, String nickname) {
-        assertThat(nickname).isEqualTo("관리자");
         assertThat(validator.validate(form))
                 .extracting(violation -> violation.getPropertyPath().toString())
                 .contains("nickname");

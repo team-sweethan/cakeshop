@@ -40,6 +40,13 @@ class NicknamePolicyTests {
     }
 
     @Test
+    void isAllowed_rejectsNfdReservedNicknameWithDefaultIgnorableCharacter() {
+        String nickname = "ᄀ\u034Fᅪᆫ리자";
+
+        assertThat(NicknamePolicy.isAllowed(nickname)).isFalse();
+    }
+
+    @Test
     void normalize_preservesZeroWidthJoinerInEmojiNickname() {
         String nickname = "👩‍💻";
 

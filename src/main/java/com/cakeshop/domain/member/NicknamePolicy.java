@@ -41,12 +41,16 @@ public final class NicknamePolicy {
 
     private static String normalizeForReservedNicknameComparison(String nickname) {
         String normalizedNickname = normalize(nickname);
-        return normalizedNickname == null ? null : normalizedNickname.codePoints()
+        if (normalizedNickname == null) {
+            return null;
+        }
+        String withoutIgnoredCharacters = normalizedNickname.codePoints()
                 .filter(codePoint -> !isIgnoredForReservedNicknameComparison(codePoint))
                 .collect(StringBuilder::new,
                         StringBuilder::appendCodePoint,
                         StringBuilder::append)
                 .toString();
+        return Normalizer.normalize(withoutIgnoredCharacters, Normalizer.Form.NFC);
     }
 
     private static boolean isIgnoredForReservedNicknameComparison(int codePoint) {

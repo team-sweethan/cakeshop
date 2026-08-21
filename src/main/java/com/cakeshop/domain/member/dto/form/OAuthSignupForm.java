@@ -22,7 +22,7 @@ public class OAuthSignupForm {
 
     @NotBlank(message = "닉네임을 입력해 주세요.")
     @Size(max = 50, message = "닉네임은 50자 이하여야 합니다.")
-    @Pattern(regexp = "^(?!\\s*관리자\\s*$).*$", message = "관리자는 닉네임으로 사용할 수 없습니다.")
+    @AllowedNickname
     private String nickname;
 
     public void setNickname(String nickname) {
