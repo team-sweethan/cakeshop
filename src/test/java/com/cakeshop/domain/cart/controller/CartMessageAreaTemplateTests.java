@@ -17,6 +17,8 @@ class CartMessageAreaTemplateTests {
 
         assertThat(cartTemplate)
                 .contains("fragments/common/alert :: alert")
+                .contains("th:style=\"${item.thumbnailUrl != null}")
+                .contains("cart-item__image--has-thumbnail")
                 .doesNotContain("fragments/common/alert :: popup");
         assertThat(commonScript)
                 .doesNotContain("showToast('장바구니'")
@@ -31,4 +33,5 @@ class CartMessageAreaTemplateTests {
         return new ClassPathResource(location)
                 .getContentAsString(StandardCharsets.UTF_8);
     }
+
 }

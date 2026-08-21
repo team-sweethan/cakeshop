@@ -12,6 +12,7 @@ public record CartItemView(
         int quantity,
         Integer stockQuantity,
         boolean available,
+        String thumbnailUrl,
         BigDecimal basePrice,
         BigDecimal optionPrice,
         BigDecimal totalPrice,

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cakeshop.domain.product.mapper.ProductCartMapper">
+
+    <select id="findThumbnailsByProductIds"
+            resultType="com.cakeshop.domain.product.dto.view.ProductCartThumbnail">
+        SELECT
+            p.id AS productId,
+            (
+                SELECT pi.image_url
+                FROM product_images pi
+                WHERE pi.product_id = p.id
+                ORDER BY pi.sort_order ASC, pi.id ASC
+                LIMIT 1
+            ) AS thumbnailUrl
+        FROM products p
+        WHERE p.id IN
+        <foreach collection="productIds" item="productId" open="(" separator="," close=")">
+            #{productId}
+        </foreach>
+    </select>
+</mapper>

@@ -117,6 +117,7 @@ class CartControllerTests {
         form.setQuantity(3);
         CartItemView item = new CartItemView(
                 30L, 10L, "cake", ProductType.GENERAL, 3, 10, true,
+                null,
                 BigDecimal.valueOf(35000), BigDecimal.ZERO, BigDecimal.valueOf(105000),
                 null, List.of());
         CartView cart = new CartView(

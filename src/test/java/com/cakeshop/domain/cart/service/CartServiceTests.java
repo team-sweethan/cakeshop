@@ -15,9 +15,11 @@ import com.cakeshop.domain.cart.error.CartErrorCode;
 import com.cakeshop.domain.cart.mapper.CartMapper;
 import com.cakeshop.domain.product.dto.view.ProductOptionGroupView;
 import com.cakeshop.domain.product.dto.view.ProductOptionItemView;
+import com.cakeshop.domain.product.dto.view.ProductCartThumbnail;
 import com.cakeshop.domain.product.dto.view.ProductSalesInfo;
 import com.cakeshop.domain.product.entity.ProductType;
 import com.cakeshop.domain.product.service.ProductQueryService;
+import com.cakeshop.domain.product.service.ProductCartQueryService;
 import com.cakeshop.domain.product.service.ProductService;
 import com.cakeshop.global.error.BusinessException;
 import java.math.BigDecimal;
@@ -39,6 +41,9 @@ class CartServiceTests {
 
     @Mock
     private ProductQueryService productQueryService;
+
+    @Mock
+    private ProductCartQueryService productCartQueryService;
 
     @Mock
     private ProductService productService;
@@ -203,6 +208,22 @@ class CartServiceTests {
         assertThat(cart.baseTotal()).isZero();
         assertThat(cart.optionTotal()).isZero();
         assertThat(cart.grandTotal()).isZero();
+    }
+
+    @Test
+    void getCart_includesProductRepresentativeImage() {
+        CartItem item = item(30L, 10L, 1);
+        when(cartMapper.findItemsByMemberId(1L)).thenReturn(List.of(item));
+        when(cartMapper.findOptionsByCartItemIds(List.of(30L))).thenReturn(List.of());
+        when(productQueryService.getSalesInfo(10L)).thenReturn(product(10));
+        when(productService.getPublicOptionGroups(10L)).thenReturn(List.of());
+        when(productCartQueryService.getThumbnails(List.of(10L))).thenReturn(List.of(
+                new ProductCartThumbnail(10L, "/uploads/product/representative.jpg")));
+
+        CartView cart = cartService.getCart(1L);
+
+        assertThat(cart.items().getFirst().thumbnailUrl())
+                .isEqualTo("/uploads/product/representative.jpg");
     }
 
     @Test

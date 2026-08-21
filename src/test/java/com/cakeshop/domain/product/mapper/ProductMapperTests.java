@@ -39,6 +39,9 @@ class ProductMapperTests {
     private ProductMapper productMapper;
 
     @Autowired
+    private ProductCartMapper productCartMapper;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     private String keyword;
@@ -287,6 +290,30 @@ class ProductMapperTests {
                         "/uploads/product/representative.jpg"
                 );
         assertThat(productWithoutImages.thumbnailUrl()).isNull();
+    }
+
+    @Test
+    void cartThumbnailQuery_returnsFirstImageBySortOrder() {
+        jdbcTemplate.update(
+                """
+                INSERT INTO product_images (product_id, image_url, sort_order)
+                VALUES
+                    (?, '/uploads/product/later.jpg', 2),
+                    (?, '/uploads/product/representative.jpg', 1)
+                """,
+                optionProductId,
+                optionProductId
+        );
+
+        List<com.cakeshop.domain.product.dto.view.ProductCartThumbnail> thumbnails =
+                productCartMapper.findThumbnailsByProductIds(List.of(optionProductId));
+
+        assertThat(thumbnails).containsExactly(
+                new com.cakeshop.domain.product.dto.view.ProductCartThumbnail(
+                        optionProductId,
+                        "/uploads/product/representative.jpg"
+                )
+        );
     }
 
     @Test

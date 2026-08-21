@@ -58,6 +58,9 @@
               <span class="visually-hidden" th:text="|${item.productName} 선택|">상품 선택</span>
             </label>
             <a class="placeholder-image placeholder-image--sm cart-item__image"
+               th:classappend="${item.thumbnailUrl != null} ? ' cart-item__image--has-thumbnail'"
+               th:style="${item.thumbnailUrl != null} ? |background-image: url('${item.thumbnailUrl}')| : null"
+               th:attr="aria-label=${item.productName}"
                th:href="@{/products/{id}(id=${item.productId})}">상품 이미지</a>
             <div class="cart-item__body">
               <div class="cluster cluster--between">

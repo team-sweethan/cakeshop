@@ -1275,7 +1275,23 @@ h2.section-title {
 }
 
 .cart-item__image {
+    align-items: center;
+    display: flex;
+    height: 84px;
+    justify-content: center;
     min-width: 84px
+}
+
+.cart-item__image img {
+    height: 100%;
+    object-fit: cover;
+    width: 100%
+}
+
+.cart-item__image--has-thumbnail {
+    background-position: center;
+    background-size: cover;
+    color: transparent
 }
 
 .cart-item__body {
@@ -1623,6 +1639,7 @@ body > main {
     }
 
     .cart-item__image {
+        height: 72px;
         min-width: 72px;
         width: 72px
     }

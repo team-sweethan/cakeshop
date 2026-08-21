@@ -10,8 +10,10 @@ import com.cakeshop.domain.cart.error.CartErrorCode;
 import com.cakeshop.domain.cart.mapper.CartMapper;
 import com.cakeshop.domain.product.dto.view.ProductOptionGroupView;
 import com.cakeshop.domain.product.dto.view.ProductOptionItemView;
+import com.cakeshop.domain.product.dto.view.ProductCartThumbnail;
 import com.cakeshop.domain.product.dto.view.ProductSalesInfo;
 import com.cakeshop.domain.product.entity.ProductType;
+import com.cakeshop.domain.product.service.ProductCartQueryService;
 import com.cakeshop.domain.product.service.ProductQueryService;
 import com.cakeshop.domain.product.service.ProductService;
 import com.cakeshop.global.error.BusinessException;
@@ -33,15 +35,18 @@ public class CartService {
 
     private final CartMapper cartMapper;
     private final ProductQueryService productQueryService;
+    private final ProductCartQueryService productCartQueryService;
     private final ProductService productService;
 
     public CartService(
             CartMapper cartMapper,
             ProductQueryService productQueryService,
+            ProductCartQueryService productCartQueryService,
             ProductService productService
     ) {
         this.cartMapper = cartMapper;
         this.productQueryService = productQueryService;
+        this.productCartQueryService = productCartQueryService;
         this.productService = productService;
     }
 
@@ -64,11 +69,20 @@ public class CartService {
         Map<Long, Integer> quantityByProduct = quantityByProduct(
                 items,
                 currentConfigurationItemIds);
+        List<ProductCartThumbnail> thumbnails = productCartQueryService.getThumbnails(
+                items.stream().map(CartItem::getProductId).distinct().toList());
+        Map<Long, String> thumbnailUrls = (thumbnails == null ? List.<ProductCartThumbnail>of()
+                : thumbnails)
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        ProductCartThumbnail::productId,
+                        ProductCartThumbnail::thumbnailUrl));
         List<CartItemView> itemViews = items.stream()
                 .map(item -> toView(
                         item,
                         optionsByItem.getOrDefault(item.getId(), List.of()),
-                        quantityByProduct.getOrDefault(item.getProductId(), 0)))
+                        quantityByProduct.getOrDefault(item.getProductId(), 0),
+                        thumbnailUrls.get(item.getProductId())))
                 .toList();
 
         BigDecimal baseTotal = itemViews.stream()
@@ -323,7 +337,8 @@ public class CartService {
     private CartItemView toView(
             CartItem item,
             List<CartItemOption> options,
-            int totalProductQuantity
+            int totalProductQuantity,
+            String thumbnailUrl
     ) {
         ProductSalesInfo product;
         boolean available = true;
@@ -364,6 +379,7 @@ public class CartService {
                 item.getQuantity(),
                 product.stockQuantity(),
                 available,
+                thumbnailUrl,
                 product.basePrice(),
                 optionPrice,
                 unitPrice.multiply(BigDecimal.valueOf(item.getQuantity())),
