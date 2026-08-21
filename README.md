@@ -313,6 +313,7 @@ src/
 - 🤝 **[팀 미결정 항목](docs/team-plan.md)**: 여러 담당자가 함께 결정해야 하는 도메인 연동과 운영 환경 질문
 - 🔀 **[Pull Request 가이드](docs/pull-request.md)**: PR 크기·제목·본문, 리뷰 요청과 브랜치별 병합 기준
 - 🎨 **[Thymeleaf 화면 작성 규칙](docs/frontend-template-format.md)**: 고객·관리자 화면 구조, 프래그먼트 계약, 정적 자원과 렌더링 검증 기준
+- ♿ **[웹 접근성 가이드라인](docs/web-accessibility.md)**: WCAG 2.2 AA 개발 목표, 키보드·포커스·상태 메시지와 자동·수동 검증 기준
 - 🖼️ **[파일 업로드 저장소 가이드](docs/file-upload-storage.md)**: 프로필별 로컬·S3 저장소 선택, 자격 증명·prefix 설정과 환경 간 이관 주의사항
 
 ## File Upload Storage
