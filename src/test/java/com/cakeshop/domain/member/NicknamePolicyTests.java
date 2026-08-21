@@ -24,6 +24,14 @@ class NicknamePolicyTests {
     }
 
     @Test
+    void isAllowed_rejectsDefaultIgnorableCharacterWithinReservedNickname() {
+        String nickname = "관\u034F리자";
+
+        assertThat(NicknamePolicy.normalize(nickname)).isEqualTo(nickname);
+        assertThat(NicknamePolicy.isAllowed(nickname)).isFalse();
+    }
+
+    @Test
     void isAllowed_rejectsNfdReservedNickname() {
         String nickname = "관리자";
 
