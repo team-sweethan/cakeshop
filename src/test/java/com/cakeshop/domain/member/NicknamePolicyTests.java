@@ -8,7 +8,7 @@ class NicknamePolicyTests {
 
     @Test
     void normalize_trimsUnicodeSpaceSeparatorsAtNicknameBoundaries() {
-        String nickname = "\u00A0\u200B관리자\u202F";
+        String nickname = "\u00A0관리자\u202F";
 
         assertThat(NicknamePolicy.normalize(nickname)).isEqualTo("관리자");
         assertThat(NicknamePolicy.isAllowed(nickname)).isFalse();
@@ -16,10 +16,26 @@ class NicknamePolicyTests {
     }
 
     @Test
-    void normalize_removesInvisibleFormatCharactersWithinReservedNickname() {
+    void isAllowed_rejectsInvisibleFormatCharactersWithinReservedNickname() {
         String nickname = "관\u200B리자";
+
+        assertThat(NicknamePolicy.normalize(nickname)).isEqualTo(nickname);
+        assertThat(NicknamePolicy.isAllowed(nickname)).isFalse();
+    }
+
+    @Test
+    void isAllowed_rejectsNfdReservedNickname() {
+        String nickname = "관리자";
 
         assertThat(NicknamePolicy.normalize(nickname)).isEqualTo("관리자");
         assertThat(NicknamePolicy.isAllowed(nickname)).isFalse();
+    }
+
+    @Test
+    void normalize_preservesZeroWidthJoinerInEmojiNickname() {
+        String nickname = "👩‍💻";
+
+        assertThat(NicknamePolicy.normalize(nickname)).isEqualTo(nickname);
+        assertThat(NicknamePolicy.isAllowed(nickname)).isTrue();
     }
 }
