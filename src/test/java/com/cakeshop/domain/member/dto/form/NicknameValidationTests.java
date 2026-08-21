@@ -19,7 +19,7 @@ class NicknameValidationTests {
 
         signupForm.setNickname("\u00A0관리자\u00A0");
         profileUpdateForm.setNickname("\u202F관리자\u202F");
-        oauthSignupForm.setNickname(" 관리자 ");
+        oauthSignupForm.setNickname("관\u200B리자");
 
         assertNicknameIsRejected(signupForm, signupForm.getNickname());
         assertNicknameIsRejected(profileUpdateForm, profileUpdateForm.getNickname());

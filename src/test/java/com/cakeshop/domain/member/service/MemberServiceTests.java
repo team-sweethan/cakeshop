@@ -78,10 +78,10 @@ class MemberServiceTests {
     }
 
     @Test
-    void join_reservedNicknameWithNonBreakingSpaces_rejectsBeforeConsumingVerification() {
+    void join_reservedNicknameWithInvisibleFormatCharacter_rejectsBeforeConsumingVerification() {
         SignupForm form = new SignupForm();
         form.setEmail("member@cakeshop.local");
-        form.setNickname("\u00A0관리자\u202F");
+        form.setNickname("관\u200B리자");
         when(memberMapper.findByEmail(form.getEmail())).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> memberService.join(

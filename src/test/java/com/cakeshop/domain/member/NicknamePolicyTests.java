@@ -14,4 +14,12 @@ class NicknamePolicyTests {
         assertThat(NicknamePolicy.isAllowed(nickname)).isFalse();
         assertThat(NicknamePolicy.isAllowed("관리자님")).isTrue();
     }
+
+    @Test
+    void normalize_removesInvisibleFormatCharactersWithinReservedNickname() {
+        String nickname = "관\u200B리자";
+
+        assertThat(NicknamePolicy.normalize(nickname)).isEqualTo("관리자");
+        assertThat(NicknamePolicy.isAllowed(nickname)).isFalse();
+    }
 }

@@ -17,28 +17,34 @@ public final class NicknamePolicy {
             return null;
         }
 
+        String withoutFormatCharacters = nickname.codePoints()
+                .filter(codePoint -> Character.getType(codePoint) != Character.FORMAT)
+                .collect(StringBuilder::new,
+                        StringBuilder::appendCodePoint,
+                        StringBuilder::append)
+                .toString();
+
         int start = 0;
-        int end = nickname.length();
+        int end = withoutFormatCharacters.length();
         while (start < end) {
-            int codePoint = nickname.codePointAt(start);
+            int codePoint = withoutFormatCharacters.codePointAt(start);
             if (!isBoundaryWhitespace(codePoint)) {
                 break;
             }
             start += Character.charCount(codePoint);
         }
         while (start < end) {
-            int codePoint = nickname.codePointBefore(end);
+            int codePoint = withoutFormatCharacters.codePointBefore(end);
             if (!isBoundaryWhitespace(codePoint)) {
                 break;
             }
             end -= Character.charCount(codePoint);
         }
-        return nickname.substring(start, end);
+        return withoutFormatCharacters.substring(start, end);
     }
 
     private static boolean isBoundaryWhitespace(int codePoint) {
         return Character.isWhitespace(codePoint)
-                || Character.isSpaceChar(codePoint)
-                || Character.getType(codePoint) == Character.FORMAT;
+                || Character.isSpaceChar(codePoint);
     }
 }
