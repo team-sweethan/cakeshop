@@ -11,7 +11,8 @@ public final class NicknamePolicy {
     }
 
     public static boolean isAllowed(String nickname) {
-        return !RESERVED_NICKNAME.equals(normalizeForReservedNicknameComparison(nickname));
+        return !containsBidirectionalControl(nickname)
+                && !RESERVED_NICKNAME.equals(normalizeForReservedNicknameComparison(nickname));
     }
 
     public static String normalize(String nickname) {
@@ -50,7 +51,25 @@ public final class NicknamePolicy {
                         StringBuilder::appendCodePoint,
                         StringBuilder::append)
                 .toString();
-        return Normalizer.normalize(withoutIgnoredCharacters, Normalizer.Form.NFC);
+        return trimBoundaryWhitespace(
+                Normalizer.normalize(withoutIgnoredCharacters, Normalizer.Form.NFC));
+    }
+
+    private static boolean containsBidirectionalControl(String nickname) {
+        return nickname != null && nickname.codePoints().anyMatch(NicknamePolicy::isBidirectionalControl);
+    }
+
+    private static boolean isBidirectionalControl(int codePoint) {
+        byte directionality = Character.getDirectionality(codePoint);
+        return directionality == Character.DIRECTIONALITY_LEFT_TO_RIGHT_EMBEDDING
+                || directionality == Character.DIRECTIONALITY_RIGHT_TO_LEFT_EMBEDDING
+                || directionality == Character.DIRECTIONALITY_LEFT_TO_RIGHT_OVERRIDE
+                || directionality == Character.DIRECTIONALITY_RIGHT_TO_LEFT_OVERRIDE
+                || directionality == Character.DIRECTIONALITY_POP_DIRECTIONAL_FORMAT
+                || directionality == Character.DIRECTIONALITY_LEFT_TO_RIGHT_ISOLATE
+                || directionality == Character.DIRECTIONALITY_RIGHT_TO_LEFT_ISOLATE
+                || directionality == Character.DIRECTIONALITY_FIRST_STRONG_ISOLATE
+                || directionality == Character.DIRECTIONALITY_POP_DIRECTIONAL_ISOLATE;
     }
 
     private static boolean isIgnoredForReservedNicknameComparison(int codePoint) {
@@ -71,8 +90,7 @@ public final class NicknamePolicy {
                 || isInRange(codePoint, 0xFFF0, 0xFFF8)
                 || isInRange(codePoint, 0x1BCA0, 0x1BCA3)
                 || isInRange(codePoint, 0x1D173, 0x1D17A)
-                || isInRange(codePoint, 0xE0000, 0xE0001)
-                || isInRange(codePoint, 0xE0020, 0xE007F)
+                || isInRange(codePoint, 0xE0000, 0xE0FFF)
                 || isInRange(codePoint, 0xE0100, 0xE01EF);
     }
 
@@ -83,5 +101,25 @@ public final class NicknamePolicy {
     private static boolean isBoundaryWhitespace(int codePoint) {
         return Character.isWhitespace(codePoint)
                 || Character.isSpaceChar(codePoint);
+    }
+
+    private static String trimBoundaryWhitespace(String value) {
+        int start = 0;
+        int end = value.length();
+        while (start < end) {
+            int codePoint = value.codePointAt(start);
+            if (!isBoundaryWhitespace(codePoint)) {
+                break;
+            }
+            start += Character.charCount(codePoint);
+        }
+        while (start < end) {
+            int codePoint = value.codePointBefore(end);
+            if (!isBoundaryWhitespace(codePoint)) {
+                break;
+            }
+            end -= Character.charCount(codePoint);
+        }
+        return value.substring(start, end);
     }
 }

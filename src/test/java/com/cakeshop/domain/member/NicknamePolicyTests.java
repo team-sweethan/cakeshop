@@ -47,6 +47,21 @@ class NicknamePolicyTests {
     }
 
     @Test
+    void isAllowed_rejectsReservedNicknameWithTagCharacter() {
+        assertThat(NicknamePolicy.isAllowed("관\uDB40\uDC02리자")).isFalse();
+    }
+
+    @Test
+    void isAllowed_rejectsReservedNicknameWhenIgnoredCharactersMaskBoundaryWhitespace() {
+        assertThat(NicknamePolicy.isAllowed("\u200B 관리자 \u200B")).isFalse();
+    }
+
+    @Test
+    void isAllowed_rejectsBidirectionalControls() {
+        assertThat(NicknamePolicy.isAllowed("\u202E자리관\u202C")).isFalse();
+    }
+
+    @Test
     void normalize_preservesZeroWidthJoinerInEmojiNickname() {
         String nickname = "👩‍💻";
 
