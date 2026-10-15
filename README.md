@@ -92,7 +92,7 @@ Copy-Item .env_sample .env
 cp .env_sample .env
 ```
 
-기본 개발 환경은 로컬 MariaDB와 공용 S3를 함께 사용합니다. 최소한 다음 값을 확인해야 합니다.
+기본 개발 환경은 `local,oauth`로, 로컬 MariaDB와 로컬 파일 저장소를 사용하며 Google·카카오 소셜 로그인을 활성화합니다. 다음 DB 및 OAuth 값을 확인해야 합니다.
 
 ```dotenv
 LOCAL_DB_HOST=localhost
@@ -100,12 +100,6 @@ LOCAL_DB_PORT=3306
 LOCAL_DB_DATABASE=cakeshop
 LOCAL_DB_USERNAME=your-username
 LOCAL_DB_PASSWORD=your-password
-AWS_REGION=ap-northeast-2
-AWS_ACCESS_KEY_ID=your-access-key
-AWS_SECRET_ACCESS_KEY=your-secret-key
-AWS_S3_BUCKET=sweethan-cakeshop-images
-AWS_S3_BASE_URL=https://sweethan-cakeshop-images.s3.ap-northeast-2.amazonaws.com
-AWS_S3_KEY_PREFIX=local-your-name
 GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 KAKAO_CLIENT_ID=your-kakao-rest-api-key
@@ -113,9 +107,8 @@ KAKAO_CLIENT_SECRET=your-kakao-client-secret
 ```
 
 `.env_sample`의 기본 포트는 `3307`입니다. 로컬 MariaDB가 기본 포트 `3306`을 사용한다면 반드시 수정합니다.
-Access Key와 Secret Key는 팀 공용 S3 전용 IAM 자격 증명을 별도로 전달받아 입력하며, 실제 비밀 값이 들어간
-`.env`는 커밋하지 않습니다. 일반 IAM Access Key는 `AWS_SESSION_TOKEN`이 필요하지 않고, STS 임시 자격 증명을
-사용할 때만 세션 토큰을 함께 입력합니다.
+실제 비밀 값이 들어간 `.env`는 커밋하지 않습니다. 기본 실행에는 AWS 접속 정보가 필요하지 않습니다.
+기존 공용 AWS 자원은 삭제된 상태이므로 `rds`·`s3` 프로필은 새 자원과 접속 정보를 준비한 경우에만 사용합니다.
 
 ### 3. 로컬 데이터베이스 생성
 
@@ -143,15 +136,15 @@ CREATE DATABASE `cakeshop`
 ./gradlew bootRun --args="--spring.profiles.active=local"
 ```
 
-공용 S3 설정까지 `.env`에 입력했다면 기본 프로필인 `local,s3`로 실행할 수 있습니다.
+DB와 OAuth 설정을 `.env`에 입력했다면 기본 프로필인 `local,oauth`로 실행할 수 있습니다.
 
 ```powershell
-# Windows (`local,s3`가 기본값)
+# Windows (`local,oauth`가 기본값)
 .\gradlew.bat bootRun
 ```
 
 ```bash
-# macOS / Linux (`local,s3`가 기본값)
+# macOS / Linux (`local,oauth`가 기본값)
 ./gradlew bootRun
 ```
 
@@ -176,14 +169,14 @@ CREATE DATABASE `cakeshop`
 `s3`가 포함된 조합은 `AWS_S3_BUCKET`, `AWS_S3_BASE_URL`, `AWS_S3_KEY_PREFIX`와 AWS 자격 증명이 필요합니다.
 `rds`가 포함된 조합은 `RDS_ENDPOINT`, `RDS_DATABASE`, `RDS_USERNAME`, `RDS_PASSWORD`가 필요합니다.
 
-Google·카카오 소셜 로그인은 `.env`에 각 서비스의 Client ID와 Client Secret을 입력하고 `oauth` 프로필을
-추가합니다. Google Cloud Console의 승인된 리디렉션 URI에는
+Google·카카오 소셜 로그인은 기본 프로필에 포함됩니다. `.env`에 각 서비스의 Client ID와 Client Secret을
+입력합니다. OAuth를 사용하지 않으면 위의 `local` 단독 실행 명령을 사용합니다. Google Cloud Console의 승인된 리디렉션 URI에는
 `http://localhost:8080/login/oauth2/code/google`을, 카카오 개발자 콘솔의 Redirect URI에는
 `http://localhost:8080/login/oauth2/code/kakao`를 등록합니다.
 
 ```powershell
-# Windows: 로컬 MariaDB + 공용 S3 + Google/Kakao OAuth
-.\gradlew.bat bootRun --args="--spring.profiles.active=local,s3,oauth"
+# Windows: 로컬 MariaDB + 로컬 파일 저장소 + Google/Kakao OAuth
+.\gradlew.bat bootRun --args="--spring.profiles.active=local,oauth"
 ```
 
 `http://localhost:8080`에 접속해 화면이 열리는지 확인합니다.
@@ -229,11 +222,12 @@ SOURCE src/main/resources/db/seed/seed-review.sql;
 
 | 프로필 | 용도 | Flyway |
 |---|---|---|
-| `local,s3` | 개인 PC의 MariaDB와 공용 S3를 사용하는 기본 개발 환경 | 활성화 |
+| `local,oauth` | 개인 PC의 MariaDB·로컬 파일 저장소·Google/Kakao OAuth를 사용하는 기본 개발 환경 | 활성화 |
+| `local,s3` | 별도로 준비한 S3와 개인 PC의 MariaDB를 사용하는 선택 환경 | 활성화 |
 | `local` | 개인 PC의 MariaDB와 로컬 디스크를 사용하는 대체 개발 환경 | 활성화 |
 | `rds` | 팀 공용 AWS RDS 연결 | 비활성화 |
 | `rds,s3` | 팀 공용 AWS RDS와 공용 S3 연결 | 비활성화 |
-| `oauth` | Google·카카오 OAuth 클라이언트와 공통 OAuth 로그인 처리 활성화. 단독 사용하지 않고 `local,s3,oauth`처럼 조합 | 조합 대상 프로필을 따름 |
+| `oauth` | Google·카카오 OAuth 클라이언트와 공통 OAuth 로그인 처리 활성화. 단독 사용하지 않고 `local,oauth`처럼 조합 | 조합 대상 프로필을 따름 |
 
 공용 RDS 스키마는 애플리케이션 시작으로 변경하지 않습니다. `rds` 프로필은 접속 정보와 별도의 스키마 반영 절차가 준비된 경우에만 사용합니다.
 
@@ -318,6 +312,6 @@ src/
 
 ## File Upload Storage
 
-업로드 호출부는 공통 `FileStorageClient`를 사용하며, 기본 개발 환경인 `local,s3`에서는 로컬 DB와 S3를
-함께 사용합니다. 프로필 조합, 로컬 디스크 설정, AWS 자격 증명과 환경 간 파일 이관 방법은
+업로드 호출부는 공통 `FileStorageClient`를 사용하며, 기본 개발 환경인 `local,oauth`에서는 로컬 DB와 로컬 파일 저장소를
+사용합니다. 프로필 조합, 로컬 디스크 설정, AWS 자격 증명과 환경 간 파일 이관 방법은
 [`파일 업로드 저장소 가이드`](docs/file-upload-storage.md)를 참고합니다.
